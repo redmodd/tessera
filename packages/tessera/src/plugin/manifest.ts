@@ -17,6 +17,8 @@ export interface QuizConfig {
   gatesProgress?: boolean;
   maxAttempts?: number;
   showFeedback?: boolean;
+  feedbackMode?: 'review' | 'immediate';
+  retryMode?: 'full' | 'incorrect-only';
 }
 
 export interface ManifestLesson {
