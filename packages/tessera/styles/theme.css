@@ -1,0 +1,36 @@
+:root {
+  /* Colors */
+  --tessera-primary: #2563eb;
+  --tessera-primary-light: #dbeafe;
+  --tessera-primary-dark: #1e40af;
+  --tessera-text: #1f2937;
+  --tessera-text-light: #6b7280;
+  --tessera-bg: #ffffff;
+  --tessera-bg-secondary: #f9fafb;
+  --tessera-border: #e5e7eb;
+  --tessera-success: #16a34a;
+  --tessera-error: #dc2626;
+  --tessera-warning: #d97706;
+
+  /* Typography */
+  --tessera-font-family: 'Inter', system-ui, sans-serif;
+  --tessera-font-size-base: 1rem;
+  --tessera-line-height: 1.6;
+
+  /* Spacing */
+  --tessera-spacing-sm: 0.5rem;
+  --tessera-spacing-md: 1rem;
+  --tessera-spacing-lg: 1.5rem;
+  --tessera-spacing-xl: 2rem;
+
+  /* Layout */
+  --tessera-sidebar-width: 280px;
+  --tessera-content-max-width: 800px;
+
+  /* Focus */
+  --tessera-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.4);
+
+  /* Transitions */
+  --tessera-transition-fast: 150ms ease;
+  --tessera-transition-normal: 250ms ease;
+}

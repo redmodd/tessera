@@ -1,0 +1,16 @@
+{
+  "name": "create-tessera",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "create-tessera": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "echo \"no tests yet\""
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}
