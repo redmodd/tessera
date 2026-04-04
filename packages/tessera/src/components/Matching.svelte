@@ -6,21 +6,24 @@
     pairs,
     correctFeedback = '',
     incorrectFeedback = '',
+    maxRetries = Infinity,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
+  const standalone = !quiz;
 
   let myIndex = $state(-1);
-  // Shuffled right-side items
   let shuffledRight = $state([]);
-  // Current matches: Map<leftIndex, rightIndex>
   let matches = $state(new Map());
-  // Currently selected left item (tap-to-select)
   let selectedLeft = $state(null);
-  // Currently selected right item (tap-to-select)
   let selectedRight = $state(null);
 
-  // Color palette for matched pairs
+  // Standalone state
+  let saAnswered = $state(false);
+  let saRetryCount = $state(0);
+  let saCanRetry = $derived(saRetryCount < maxRetries);
+  let saAllMatched = $derived(matches.size === pairs.length);
+
   const pairColors = [
     '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
     '#0d9488', '#b91c1c', '#7c3aed', '#0369a1', '#a16207',
@@ -35,21 +38,26 @@
     return shuffled;
   }
 
-  onMount(() => {
-    // Create shuffled right column with original indices
+  function initShuffle() {
     shuffledRight = shuffleArray(pairs.map((p, i) => ({ text: p.right, originalIndex: i })));
+  }
 
-    myIndex = quiz.registerQuestion({
-      checkAnswer,
-      reset: resetState,
-      render: renderQuestion,
+  if (standalone) {
+    initShuffle();
+  } else {
+    onMount(() => {
+      initShuffle();
+      myIndex = quiz.registerQuestion({
+        checkAnswer,
+        reset: resetState,
+        render: renderQuestion,
+      });
     });
-  });
+  }
 
   function checkAnswer(answer) {
     if (!answer || !(answer instanceof Map)) return false;
     if (answer.size !== pairs.length) return false;
-    // Every left index must be matched to its correct right index
     for (let i = 0; i < pairs.length; i++) {
       if (answer.get(i) !== i) return false;
     }
@@ -60,30 +68,43 @@
     matches = new Map();
     selectedLeft = null;
     selectedRight = null;
-    shuffledRight = shuffleArray(pairs.map((p, i) => ({ text: p.right, originalIndex: i })));
+    initShuffle();
   }
 
-  let isLocked = $derived(quiz.isLockedCorrect(myIndex));
+  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
+
+  // Auto-submit in standalone mode when all pairs matched
+  $effect(() => {
+    if (standalone && saAllMatched && !saAnswered) {
+      saAnswered = true;
+    }
+  });
 
   function handleLeftClick(leftIndex) {
-    if (quiz.submitted || isLocked) return;
+    if (standalone) {
+      if (saAnswered) return;
+    } else {
+      if (quiz.submitted || isLocked) return;
+    }
 
     if (selectedLeft === leftIndex) {
-      // Deselect
       selectedLeft = null;
       return;
     }
 
     selectedLeft = leftIndex;
 
-    // If a right item is already selected, create the match
     if (selectedRight !== null) {
       createMatch(leftIndex, selectedRight);
     }
   }
 
   function handleRightClick(rightOriginalIndex) {
-    if (quiz.submitted || isLocked) return;
+    if (standalone) {
+      if (saAnswered) return;
+    } else {
+      if (quiz.submitted || isLocked) return;
+    }
 
     if (selectedRight === rightOriginalIndex) {
       selectedRight = null;
@@ -92,7 +113,6 @@
 
     selectedRight = rightOriginalIndex;
 
-    // If a left item is already selected, create the match
     if (selectedLeft !== null) {
       createMatch(selectedLeft, selectedRight);
     }
@@ -101,7 +121,6 @@
   function createMatch(leftIndex, rightOriginalIndex) {
     const newMatches = new Map(matches);
 
-    // Remove any existing match involving this left or right item
     for (const [l, r] of newMatches) {
       if (l === leftIndex || r === rightOriginalIndex) {
         newMatches.delete(l);
@@ -113,16 +132,29 @@
     selectedLeft = null;
     selectedRight = null;
 
-    // Report answer to quiz
-    quiz.setAnswer(myIndex, new Map(matches));
+    if (!standalone) {
+      quiz.setAnswer(myIndex, new Map(matches));
+    }
   }
 
   function removeMatch(leftIndex) {
-    if (quiz.submitted || isLocked) return;
+    if (standalone) {
+      if (saAnswered) return;
+    } else {
+      if (quiz.submitted || isLocked) return;
+    }
     const newMatches = new Map(matches);
     newMatches.delete(leftIndex);
     matches = newMatches;
-    quiz.setAnswer(myIndex, new Map(matches));
+    if (!standalone) {
+      quiz.setAnswer(myIndex, new Map(matches));
+    }
+  }
+
+  function handleRetry() {
+    saRetryCount++;
+    saAnswered = false;
+    resetState();
   }
 
   function getMatchColor(leftIndex) {
@@ -147,7 +179,125 @@
   function isMatchCorrect(leftIndex) {
     return matches.get(leftIndex) === leftIndex;
   }
+
+  let showFeedback = $derived(standalone ? saAnswered : quiz.feedbackVisible(myIndex));
+  let isDisabled = $derived(standalone ? saAnswered : (quiz.submitted || isLocked));
 </script>
+
+{#snippet matchingContent()}
+  <p class="tessera-matching-question">{question}</p>
+
+  <div class="tessera-matching-grid">
+    <!-- Left column -->
+    <div class="tessera-matching-column">
+      <div class="tessera-matching-column-header">Match from</div>
+      {#each pairs as pair, i}
+        {@const color = getMatchColor(i)}
+        {@const isSelected = selectedLeft === i}
+        {@const matched = matches.has(i)}
+        {@const correctMatch = showFeedback && matched && isMatchCorrect(i)}
+        {@const wrongMatch = showFeedback && matched && !isMatchCorrect(i)}
+        <button
+          class="tessera-matching-item left"
+          class:selected={isSelected}
+          class:matched
+          class:correct={correctMatch}
+          class:incorrect={wrongMatch}
+          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          onclick={() => matched && !isDisabled ? removeMatch(i) : handleLeftClick(i)}
+          disabled={isDisabled}
+          aria-label="{pair.left}{matched ? ' (matched)' : ''}"
+        >
+          {#if matched}
+            <span class="tessera-matching-badge" style="background: {color}">
+              {i + 1}
+            </span>
+          {/if}
+          <span>{pair.left}</span>
+          {#if matched && !isDisabled}
+            <span
+              class="tessera-matching-unmatch"
+              role="button"
+              tabindex="0"
+              onclick={(e) => { e.stopPropagation(); removeMatch(i); }}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); removeMatch(i); } }}
+              aria-label="Remove match for {pair.left}"
+            >×</span>
+          {/if}
+        </button>
+      {/each}
+    </div>
+
+    <!-- Right column -->
+    <div class="tessera-matching-column">
+      <div class="tessera-matching-column-header">Match to</div>
+      {#each shuffledRight as item}
+        {@const color = getRightMatchColor(item.originalIndex)}
+        {@const isSelected = selectedRight === item.originalIndex}
+        {@const matched = isRightMatched(item.originalIndex)}
+        <button
+          class="tessera-matching-item right"
+          class:selected={isSelected}
+          class:matched
+          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          onclick={() => handleRightClick(item.originalIndex)}
+          disabled={isDisabled}
+          aria-label="{item.text}{matched ? ' (matched)' : ''}"
+        >
+          {#if matched}
+            {@const leftIdx = [...matches.entries()].find(([, r]) => r === item.originalIndex)?.[0]}
+            <span class="tessera-matching-badge" style="background: {color}">
+              {leftIdx !== undefined ? leftIdx + 1 : ''}
+            </span>
+          {/if}
+          <span>{item.text}</span>
+        </button>
+      {/each}
+    </div>
+  </div>
+
+  {#if showFeedback}
+    {@const isCorrect = checkAnswer(matches)}
+    <div class="tessera-matching-review">
+      {#if isCorrect}
+        <div class="tessera-matching-result correct">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
+            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+          </svg>
+          All pairs matched correctly!
+        </div>
+        {#if correctFeedback}
+          <p class="tessera-matching-feedback correct">{correctFeedback}</p>
+        {/if}
+      {:else}
+        <div class="tessera-matching-result incorrect">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
+            <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
+          </svg>
+          Some pairs are incorrect
+        </div>
+        <div class="tessera-matching-correct-pairs">
+          <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
+          {#each pairs as pair}
+            <p class="tessera-matching-correct-pair">{pair.left} → {pair.right}</p>
+          {/each}
+        </div>
+        {#if incorrectFeedback}
+          <p class="tessera-matching-feedback incorrect">{incorrectFeedback}</p>
+        {/if}
+      {/if}
+      {#if standalone && saCanRetry}
+        <button class="tessera-standalone-retry" onclick={handleRetry}>Try again</button>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#if standalone}
+  <div class="tessera-matching" aria-label={question}>
+    {@render matchingContent()}
+  </div>
+{/if}
 
 {#snippet renderQuestion()}
   <div class="tessera-matching" aria-label={question}>
@@ -159,110 +309,7 @@
         You already got this one right — click Next to continue.
       </div>
     {/if}
-    <p class="tessera-matching-question">{question}</p>
-
-    <div class="tessera-matching-grid">
-      <!-- Left column -->
-      <div class="tessera-matching-column">
-        <div class="tessera-matching-column-header">Match from</div>
-        {#each pairs as pair, i}
-          {@const color = getMatchColor(i)}
-          {@const isSelected = selectedLeft === i}
-          {@const matched = matches.has(i)}
-          {@const correct = quiz.feedbackVisible(myIndex) && matched && isMatchCorrect(i)}
-          {@const wrong = quiz.feedbackVisible(myIndex) && matched && !isMatchCorrect(i)}
-          <button
-            class="tessera-matching-item left"
-            class:selected={isSelected}
-            class:matched
-            class:correct
-            class:incorrect={wrong}
-            style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
-            onclick={() => matched && !quiz.submitted ? removeMatch(i) : handleLeftClick(i)}
-            disabled={quiz.submitted || isLocked}
-            aria-label="{pair.left}{matched ? ' (matched)' : ''}"
-          >
-            {#if matched}
-              <span class="tessera-matching-badge" style="background: {color}">
-                {i + 1}
-              </span>
-            {/if}
-            <span>{pair.left}</span>
-            {#if matched && !quiz.submitted && !isLocked}
-              <span
-                class="tessera-matching-unmatch"
-                role="button"
-                tabindex="0"
-                onclick={(e) => { e.stopPropagation(); removeMatch(i); }}
-                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); removeMatch(i); } }}
-                aria-label="Remove match for {pair.left}"
-              >×</span>
-            {/if}
-          </button>
-        {/each}
-      </div>
-
-      <!-- Right column -->
-      <div class="tessera-matching-column">
-        <div class="tessera-matching-column-header">Match to</div>
-        {#each shuffledRight as item}
-          {@const color = getRightMatchColor(item.originalIndex)}
-          {@const isSelected = selectedRight === item.originalIndex}
-          {@const matched = isRightMatched(item.originalIndex)}
-          <button
-            class="tessera-matching-item right"
-            class:selected={isSelected}
-            class:matched
-            style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
-            onclick={() => handleRightClick(item.originalIndex)}
-            disabled={quiz.submitted || isLocked}
-            aria-label="{item.text}{matched ? ' (matched)' : ''}"
-          >
-            {#if matched}
-              {@const leftIdx = [...matches.entries()].find(([, r]) => r === item.originalIndex)?.[0]}
-              <span class="tessera-matching-badge" style="background: {color}">
-                {leftIdx !== undefined ? leftIdx + 1 : ''}
-              </span>
-            {/if}
-            <span>{item.text}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    {#if quiz.feedbackVisible(myIndex)}
-      {@const answer = quiz.getAnswer(myIndex)}
-      {@const isCorrect = checkAnswer(answer)}
-      <div class="tessera-matching-review">
-        {#if isCorrect}
-          <div class="tessera-matching-result correct">
-            <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-            </svg>
-            All pairs matched correctly!
-          </div>
-          {#if correctFeedback}
-            <p class="tessera-matching-feedback correct">{correctFeedback}</p>
-          {/if}
-        {:else}
-          <div class="tessera-matching-result incorrect">
-            <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
-            </svg>
-            Some pairs are incorrect
-          </div>
-          <div class="tessera-matching-correct-pairs">
-            <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
-            {#each pairs as pair}
-              <p class="tessera-matching-correct-pair">{pair.left} → {pair.right}</p>
-            {/each}
-          </div>
-          {#if incorrectFeedback}
-            <p class="tessera-matching-feedback incorrect">{incorrectFeedback}</p>
-          {/if}
-        {/if}
-      </div>
-    {/if}
+    {@render matchingContent()}
   </div>
 {/snippet}
 
@@ -432,6 +479,24 @@
   .tessera-matching-feedback.incorrect {
     color: var(--tessera-error);
     background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+  }
+
+  .tessera-standalone-retry {
+    display: inline-block;
+    margin-top: var(--tessera-spacing-md);
+    padding: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tessera-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .tessera-standalone-retry:hover {
+    color: var(--tessera-primary-dark);
   }
 
   @media (max-width: 640px) {

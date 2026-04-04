@@ -344,6 +344,104 @@ describe('Immediate feedback flow', () => {
   });
 });
 
+describe('Standalone question mode', () => {
+  it('standalone is detected when quiz context is undefined', () => {
+    const quiz = undefined;
+    const standalone = !quiz;
+    expect(standalone).toBe(true);
+  });
+
+  it('standalone is false when quiz context exists', () => {
+    const quiz = { registerQuestion: () => 0 };
+    const standalone = !quiz;
+    expect(standalone).toBe(false);
+  });
+
+  it('maxRetries defaults to Infinity', () => {
+    const props = { question: 'test', options: [], correct: 0 };
+    const maxRetries = (props as any).maxRetries ?? Infinity;
+    expect(maxRetries).toBe(Infinity);
+  });
+
+  it('retry is allowed when retryCount < maxRetries', () => {
+    let retryCount = 0;
+    const maxRetries = 2;
+    expect(retryCount < maxRetries).toBe(true);
+    retryCount++;
+    expect(retryCount < maxRetries).toBe(true);
+    retryCount++;
+    expect(retryCount < maxRetries).toBe(false);
+  });
+
+  it('retry resets answered state', () => {
+    let answered = true;
+    let selectedOption = 2;
+    let retryCount = 0;
+
+    // Simulate retry
+    retryCount++;
+    answered = false;
+    selectedOption = null as any;
+
+    expect(answered).toBe(false);
+    expect(selectedOption).toBeNull();
+    expect(retryCount).toBe(1);
+  });
+
+  it('standalone MC: selecting an option immediately marks as answered', () => {
+    let answered = false;
+    let selected: number | null = null;
+
+    function handleSelect(optIndex: number) {
+      if (answered) return;
+      selected = optIndex;
+      answered = true;
+    }
+
+    handleSelect(2);
+    expect(answered).toBe(true);
+    expect(selected).toBe(2);
+
+    // Can't change answer once answered
+    handleSelect(0);
+    expect(selected).toBe(2);
+  });
+
+  it('standalone FillInTheBlank: answering locks the input', () => {
+    let answered = false;
+    let inputValue = 'Mars';
+
+    function handleInput(value: string) {
+      if (answered) return;
+      inputValue = value;
+    }
+
+    answered = true;
+    handleInput('Venus');
+    expect(inputValue).toBe('Mars'); // unchanged
+  });
+
+  it('standalone Matching: auto-submits when all pairs matched', () => {
+    let answered = false;
+    const pairCount = 3;
+    let matchCount = 0;
+
+    function checkAutoSubmit() {
+      if (matchCount === pairCount && !answered) {
+        answered = true;
+      }
+    }
+
+    matchCount = 2;
+    checkAutoSubmit();
+    expect(answered).toBe(false);
+
+    matchCount = 3;
+    checkAutoSubmit();
+    expect(answered).toBe(true);
+  });
+});
+
 describe('Retry mode', () => {
   it('retryMode defaults to "full"', () => {
     const quizConfig: { retryMode?: string } = {};

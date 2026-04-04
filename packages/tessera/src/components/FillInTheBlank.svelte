@@ -7,12 +7,19 @@
     caseSensitive = false,
     correctFeedback = '',
     incorrectFeedback = '',
+    maxRetries = Infinity,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
+  const standalone = !quiz;
 
   let inputValue = $state('');
   let myIndex = $state(-1);
+
+  // Standalone state
+  let saAnswered = $state(false);
+  let saRetryCount = $state(0);
+  let saCanRetry = $derived(saRetryCount < maxRetries);
 
   const inputId = `fitb-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -26,22 +33,97 @@
     });
   }
 
-  onMount(() => {
-    myIndex = quiz.registerQuestion({
-      checkAnswer,
-      reset: () => { inputValue = ''; },
-      render: renderQuestion,
+  if (!standalone) {
+    onMount(() => {
+      myIndex = quiz.registerQuestion({
+        checkAnswer,
+        reset: () => { inputValue = ''; },
+        render: renderQuestion,
+      });
     });
-  });
+  }
 
-  let isLocked = $derived(quiz.isLockedCorrect(myIndex));
+  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
 
   function handleInput(e) {
-    if (quiz.submitted || isLocked) return;
-    inputValue = e.target.value;
-    quiz.setAnswer(myIndex, inputValue);
+    if (standalone) {
+      if (saAnswered) return;
+      inputValue = e.target.value;
+    } else {
+      if (quiz.submitted || isLocked) return;
+      inputValue = e.target.value;
+      quiz.setAnswer(myIndex, inputValue);
+    }
+  }
+
+  function handleKeydown(e) {
+    if (!standalone || saAnswered) return;
+    if (e.key === 'Enter' && inputValue.trim()) {
+      saAnswered = true;
+    }
+  }
+
+  function handleRetry() {
+    saRetryCount++;
+    inputValue = '';
+    saAnswered = false;
   }
 </script>
+
+{#if standalone}
+  <div class="tessera-fitb">
+    <label class="tessera-fitb-question" for={inputId}>{question}</label>
+
+    <div class="tessera-fitb-input-wrapper">
+      <input
+        type="text"
+        id={inputId}
+        class="tessera-fitb-input"
+        class:correct={saAnswered && checkAnswer(inputValue)}
+        class:incorrect={saAnswered && !checkAnswer(inputValue)}
+        value={inputValue}
+        oninput={handleInput}
+        onkeydown={handleKeydown}
+        disabled={saAnswered}
+        placeholder="Type your answer and press Enter..."
+        autocomplete="off"
+      />
+    </div>
+
+    {#if saAnswered}
+      {@const isCorrect = checkAnswer(inputValue)}
+      <div class="tessera-fitb-review">
+        {#if isCorrect}
+          <div class="tessera-fitb-result correct">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
+              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+            </svg>
+            Correct
+          </div>
+          {#if correctFeedback}
+            <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
+          {/if}
+        {:else}
+          <div class="tessera-fitb-result incorrect">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
+              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
+            </svg>
+            Incorrect
+          </div>
+          <p class="tessera-fitb-correct-answer">
+            Correct answer{answers.length > 1 ? 's' : ''}: {answers.join(', ')}
+          </p>
+          {#if incorrectFeedback}
+            <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
+          {/if}
+        {/if}
+        {#if saCanRetry}
+          <button class="tessera-standalone-retry" onclick={handleRetry}>Try again</button>
+        {/if}
+      </div>
+    {/if}
+  </div>
+{/if}
 
 {#snippet renderQuestion()}
   <div class="tessera-fitb">
@@ -193,6 +275,24 @@
   .tessera-fitb-feedback.incorrect {
     color: var(--tessera-error);
     background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+  }
+
+  .tessera-standalone-retry {
+    display: inline-block;
+    margin-top: var(--tessera-spacing-md);
+    padding: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tessera-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .tessera-standalone-retry:hover {
+    color: var(--tessera-primary-dark);
   }
 
   @media (max-width: 640px) {

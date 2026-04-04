@@ -8,35 +8,63 @@
     correctFeedback = '',
     incorrectFeedback = '',
     optionFeedback = [],
+    maxRetries = Infinity,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
+  const standalone = !quiz;
 
   let selectedOption = $state(null);
   let myIndex = $state(-1);
 
+  // Standalone state
+  let saAnswered = $state(false);
+  let saRetryCount = $state(0);
+  let saCanRetry = $derived(saRetryCount < maxRetries);
+
   // Unique IDs for accessibility
   const groupId = `mc-${Math.random().toString(36).slice(2, 9)}`;
 
-  onMount(() => {
-    myIndex = quiz.registerQuestion({
-      checkAnswer: (answer) => answer === correct,
-      reset: () => { selectedOption = null; },
-      render: renderQuestion,
+  if (!standalone) {
+    onMount(() => {
+      myIndex = quiz.registerQuestion({
+        checkAnswer: (answer) => answer === correct,
+        reset: () => { selectedOption = null; },
+        render: renderQuestion,
+      });
     });
-  });
+  }
 
   function handleSelect(optIndex) {
-    if (quiz.submitted || isLocked) return;
-    selectedOption = optIndex;
-    quiz.setAnswer(myIndex, optIndex);
+    if (standalone) {
+      if (saAnswered) return;
+      selectedOption = optIndex;
+      saAnswered = true;
+    } else {
+      if (quiz.submitted || isLocked) return;
+      selectedOption = optIndex;
+      quiz.setAnswer(myIndex, optIndex);
+    }
+  }
+
+  function handleRetry() {
+    saRetryCount++;
+    selectedOption = null;
+    saAnswered = false;
   }
 
   function isCorrectOption(optIndex) {
     return optIndex === correct;
   }
 
+  // Quiz-mode helpers
   function getOptionClass(optIndex) {
+    if (standalone) {
+      if (!saAnswered) return '';
+      if (isCorrectOption(optIndex)) return 'correct';
+      if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
+      return '';
+    }
     if (!quiz.feedbackVisible(myIndex)) return '';
     const answer = quiz.getAnswer(myIndex);
     if (isCorrectOption(optIndex)) return 'correct';
@@ -44,8 +72,63 @@
     return '';
   }
 
-  let isLocked = $derived(quiz.isLockedCorrect(myIndex));
+  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
+  let showFeedback = $derived(standalone ? saAnswered : quiz.feedbackVisible(myIndex));
+  let displayAnswer = $derived(standalone ? selectedOption : (quiz.submitted || isLocked ? quiz.getAnswer(myIndex) : selectedOption));
+  let isDisabled = $derived(standalone ? saAnswered : (quiz.submitted || isLocked));
 </script>
+
+{#if standalone}
+  <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
+    <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
+
+    <div class="tessera-mc-options">
+      {#each options as option, i}
+        {@const optionId = `${groupId}-opt-${i}`}
+        {@const isSelected = selectedOption === i}
+        {@const stateClass = getOptionClass(i)}
+        <label
+          class="tessera-mc-option {stateClass}"
+          class:selected={isSelected}
+          for={optionId}
+        >
+          <input
+            type="radio"
+            id={optionId}
+            name={groupId}
+            value={i}
+            checked={isSelected}
+            disabled={saAnswered}
+            onchange={() => handleSelect(i)}
+          />
+          <span class="tessera-mc-radio-custom"></span>
+          <span class="tessera-mc-option-text">{option}</span>
+
+          {#if saAnswered}
+            {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
+              <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
+            {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
+              <span class="tessera-mc-feedback incorrect">{optionFeedback[i] || incorrectFeedback}</span>
+            {:else if optionFeedback[i]}
+              <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
+            {/if}
+          {/if}
+        </label>
+      {/each}
+    </div>
+
+    {#if saAnswered}
+      {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
+        <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
+      {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
+        <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
+      {/if}
+      {#if saCanRetry}
+        <button class="tessera-standalone-retry" onclick={handleRetry}>Try again</button>
+      {/if}
+    {/if}
+  </div>
+{/if}
 
 {#snippet renderQuestion()}
   <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
@@ -241,6 +324,24 @@
   .tessera-mc-overall-feedback.incorrect {
     background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
     color: var(--tessera-error);
+  }
+
+  .tessera-standalone-retry {
+    display: inline-block;
+    margin-top: var(--tessera-spacing-md);
+    padding: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tessera-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .tessera-standalone-retry:hover {
+    color: var(--tessera-primary-dark);
   }
 
   .tessera-mc-option:has(input:focus-visible) {
