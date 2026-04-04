@@ -9,11 +9,16 @@
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
+  import { WebAdapter } from './adapters/web.js';
+
+  // ---- Persistence ----
+  const adapter = new WebAdapter(config.title || '');
+  let persistenceReady = $state(false);
 
   // ---- State classes ----
   const progress = new ProgressState();
   const nav = new NavigationState(manifest, progress, config);
-  const duration = new DurationTracker(0);
+  let duration = $state(new DurationTracker(0));
 
   // Mobile sidebar
   let sidebarOpen = $state(false);
@@ -164,18 +169,143 @@
     progress.quizCompleted(pageIndex, score);
     progress.recalculateCompletion(manifest, config);
     progress.recalculateSuccess(manifest, config);
+    persistState();
+  }
+
+  // ---- Persistence: serialize / restore ----
+  function serializeState() {
+    const q = {};
+    for (const [pageIndex, score] of progress.quizScores) {
+      q[String(pageIndex)] = score;
+    }
+    return {
+      b: nav.currentPageIndex,
+      v: [...progress.visitedPages],
+      q,
+      d: duration.totalSeconds,
+    };
+  }
+
+  function restoreState(saved) {
+    if (!saved) return;
+    // Restore visited pages
+    for (const idx of saved.v) {
+      progress.markVisited(idx);
+    }
+    // Restore quiz scores
+    for (const [key, score] of Object.entries(saved.q)) {
+      progress.quizCompleted(Number(key), score);
+    }
+    // Restore duration
+    duration = new DurationTracker(saved.d || 0);
+    // Recalculate derived state
+    progress.recalculateCompletion(manifest, config);
+    progress.recalculateSuccess(manifest, config);
+    // Navigate to bookmark (after state is restored so locking is correct)
+    if (saved.b > 0 && saved.b < manifest.totalPages) {
+      nav.goToPage(saved.b);
+    }
+  }
+
+  function persistState() {
+    if (!persistenceReady) return;
+    adapter.saveState(serializeState());
+  }
+
+  // ---- Persistence: save on state changes ----
+  // Track previous values to avoid saving on initial load
+  let prevPageIndex = $state(-1);
+  let prevVisitedSize = $state(-1);
+  let prevScoresSize = $state(-1);
+
+  $effect(() => {
+    const idx = nav.currentPageIndex;
+    if (prevPageIndex >= 0 && idx !== prevPageIndex) {
+      untrack(() => persistState());
+    }
+    prevPageIndex = idx;
+  });
+
+  $effect(() => {
+    const size = progress.visitedPages.size;
+    if (prevVisitedSize >= 0 && size !== prevVisitedSize) {
+      untrack(() => persistState());
+    }
+    prevVisitedSize = size;
+  });
+
+  $effect(() => {
+    const size = progress.quizScores.size;
+    if (prevScoresSize >= 0 && size !== prevScoresSize) {
+      untrack(() => persistState());
+    }
+    prevScoresSize = size;
+  });
+
+  // ---- Persistence: report score/completion/success to adapter ----
+  // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
+  $effect(() => {
+    const scores = progress.quizScores;
+    if (!persistenceReady || scores.size === 0) return;
+
+    const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
+    const completedGraded = gradedQuizIndices.filter(i => scores.has(i));
+    if (completedGraded.length === 0) return;
+
+    const average = completedGraded.reduce((sum, i) => sum + scores.get(i), 0) / gradedQuizIndices.length;
+
+    untrack(() => {
+      adapter.setScore(Math.round(average));
+      adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
+      adapter.setDuration(duration.totalSeconds);
+      adapter.commit();
+    });
+  });
+
+  $effect(() => {
+    const status = progress.completionStatus;
+    if (!persistenceReady) return;
+    untrack(() => {
+      adapter.setCompletionStatus(status);
+      adapter.setDuration(duration.totalSeconds);
+      adapter.commit();
+    });
+  });
+
+  // ---- Exit / Terminate lifecycle ----
+  let terminated = false;
+
+  function handleExit() {
+    if (terminated) return;
+    terminated = true;
+    adapter.saveState(serializeState());
+    adapter.setDuration(duration.totalSeconds);
+    adapter.commit();
+    adapter.terminate();
   }
 
   // ---- Lifecycle ----
-  onMount(() => {
+  onMount(async () => {
     applyBranding(config);
     if (config.title) document.title = config.title;
 
+    // Initialize persistence and restore state
+    await adapter.init();
+    const saved = adapter.getState();
+    if (saved) {
+      restoreState(saved);
+    }
+    persistenceReady = true;
+
     window.addEventListener('keydown', handleKeyNav);
+    window.addEventListener('pagehide', handleExit);
+    window.addEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
     appEl?.addEventListener('tessera-quiz-complete', handleQuizComplete);
     return () => {
       window.removeEventListener('keydown', handleKeyNav);
+      window.removeEventListener('pagehide', handleExit);
+      window.removeEventListener('beforeunload', handleExit);
       appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
     };
   });
