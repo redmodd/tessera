@@ -131,6 +131,13 @@
   color: var(--tessera-text-light);
 }
 
+.tessera-nav-lock-icon {
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 4px;
+  opacity: 0.6;
+}
+
 /* ---- Content Area ---- */
 .tessera-main {
   display: flex;

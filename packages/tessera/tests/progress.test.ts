@@ -1,51 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import type { Manifest } from '../src/plugin/manifest.js';
-import type { CourseConfig } from '../src/runtime/types.js';
-
-function createManifest(pageCount: number, quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {}): Manifest {
-  const pages = Array.from({ length: pageCount }, (_, i) => ({
-    index: i,
-    title: `Page ${i}`,
-    slug: `page-${i}`,
-    importPath: `/pages/page-${i}.svelte`,
-    quiz: quizPages[i] ? {
-      graded: quizPages[i].graded ?? false,
-      gatesProgress: quizPages[i].gatesProgress ?? false,
-      maxAttempts: 3,
-      showFeedback: true,
-    } : null,
-  }));
-
-  return {
-    sections: [{
-      title: 'Section',
-      slug: 'section',
-      lessons: [{
-        title: 'Lesson',
-        slug: 'lesson',
-        pages,
-      }],
-    }],
-    pages,
-    totalPages: pageCount,
-  };
-}
-
-function createConfig(overrides: Partial<CourseConfig> = {}): CourseConfig {
-  return {
-    title: 'Test',
-    description: '',
-    author: '',
-    version: '1.0.0',
-    branding: { logo: '', primaryColor: '#2563eb', fontFamily: 'Inter' },
-    navigation: { mode: 'free' as const },
-    completion: { mode: 'percentage' as const, percentageThreshold: 100 },
-    scoring: { passingScore: 70 },
-    export: { standard: 'web' as const },
-    ...overrides,
-  };
-}
+import { createManifest, createConfig } from './helpers.js';
 
 // ---------- ProgressState ----------
 
@@ -95,7 +50,6 @@ describe('ProgressState', () => {
       const config = createConfig({ completion: { mode: 'percentage', percentageThreshold: 80 } });
       const progress = new ProgressState();
 
-      // Visit 7 of 10 = 70%, threshold is 80%
       for (let i = 0; i < 7; i++) progress.markVisited(i);
 
       progress.recalculateCompletion(manifest, config);
@@ -151,8 +105,6 @@ describe('ProgressState', () => {
       const config = createConfig({ completion: { mode: 'quiz' }, scoring: { passingScore: 70 } });
       const progress = new ProgressState();
 
-      // Only quiz 2 passed with 90, quiz 4 unattempted
-      // Average = (90 + 0) / 2 = 45, below 70
       progress.quizCompleted(2, 90);
 
       progress.recalculateCompletion(manifest, config);
@@ -166,7 +118,6 @@ describe('ProgressState', () => {
 
       progress.quizCompleted(2, 90);
       progress.quizCompleted(4, 80);
-      // Average = (90 + 80) / 2 = 85 >= 70
 
       progress.recalculateCompletion(manifest, config);
       expect(progress.completionStatus).toBe('complete');
@@ -208,7 +159,6 @@ describe('ProgressState', () => {
 
       progress.quizCompleted(2, 80);
       progress.quizCompleted(4, 75);
-      // Average = (80 + 75) / 2 = 77.5 >= 70
 
       progress.recalculateSuccess(manifest, config);
       expect(progress.successStatus).toBe('passed');
@@ -220,15 +170,12 @@ describe('ProgressState', () => {
       const progress = new ProgressState();
 
       progress.quizCompleted(2, 80);
-      // Quiz 4 unattempted = 0
-      // Average = (80 + 0) / 2 = 40 < 70
 
       progress.recalculateSuccess(manifest, config);
       expect(progress.successStatus).toBe('failed');
     });
 
     it('runs independently of completion mode', () => {
-      // Even with percentage completion mode, success should be based on quiz scores
       const manifest = createManifest(5, { 2: { graded: true } });
       const config = createConfig({
         completion: { mode: 'percentage', percentageThreshold: 100 },
@@ -243,15 +190,14 @@ describe('ProgressState', () => {
 
     it('ignores non-graded quizzes', () => {
       const manifest = createManifest(5, {
-        1: { graded: false },  // practice quiz
-        3: { graded: true },   // graded quiz
+        1: { graded: false },
+        3: { graded: true },
       });
       const config = createConfig({ scoring: { passingScore: 70 } });
       const progress = new ProgressState();
 
-      progress.quizCompleted(1, 100); // practice — should be ignored
+      progress.quizCompleted(1, 100);
       progress.quizCompleted(3, 80);
-      // Only graded quiz 3 counts: 80 / 1 = 80 >= 70
 
       progress.recalculateSuccess(manifest, config);
       expect(progress.successStatus).toBe('passed');
@@ -268,8 +214,6 @@ describe('ProgressState', () => {
 
       progress.quizCompleted(2, 95);
       progress.quizCompleted(8, 80);
-      // Quiz 5 unattempted
-      // Average = (95 + 0 + 80) / 3 = 58.3 < 70
 
       progress.recalculateSuccess(manifest, config);
       expect(progress.successStatus).toBe('failed');

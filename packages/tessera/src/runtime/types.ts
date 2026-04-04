@@ -1,12 +1,12 @@
 export interface CourseConfig {
   title: string;
-  description: string;
-  author: string;
-  version: string;
-  branding: {
-    logo: string;
-    primaryColor: string;
-    fontFamily: string;
+  description?: string;
+  author?: string;
+  version?: string;
+  branding?: {
+    logo?: string;
+    primaryColor?: string;
+    fontFamily?: string;
   };
   navigation: {
     mode: 'free' | 'sequential';

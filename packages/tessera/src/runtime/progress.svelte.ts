@@ -7,10 +7,18 @@ export class ProgressState {
   completionStatus = $state<'incomplete' | 'complete'>('incomplete');
   successStatus = $state<'unknown' | 'passed' | 'failed'>('unknown');
 
+  /**
+   * Mark a page as visited. Callers must call recalculateCompletion()
+   * afterward to update completionStatus.
+   */
   markVisited(pageIndex: number) {
     this.visitedPages = new Set([...this.visitedPages, pageIndex]);
   }
 
+  /**
+   * Record a quiz score. Callers must call recalculateCompletion()
+   * and recalculateSuccess() afterward to update status fields.
+   */
   quizCompleted(pageIndex: number, score: number) {
     this.quizScores = new Map([...this.quizScores, [pageIndex, score]]);
   }

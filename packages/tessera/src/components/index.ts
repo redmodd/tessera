@@ -7,3 +7,7 @@ export { default as CarouselSlide } from './CarouselSlide.svelte';
 export { default as RevealModal } from './RevealModal.svelte';
 export { default as Video } from './Video.svelte';
 export { default as Audio } from './Audio.svelte';
+export { default as Quiz } from './Quiz.svelte';
+export { default as MultipleChoice } from './MultipleChoice.svelte';
+export { default as FillInTheBlank } from './FillInTheBlank.svelte';
+export { default as Matching } from './Matching.svelte';

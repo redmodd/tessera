@@ -6,10 +6,16 @@
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import Sidebar from './Sidebar.svelte';
+  import { NavigationState } from './navigation.svelte.js';
+  import { ProgressState } from './progress.svelte.js';
+  import { DurationTracker } from './duration.js';
 
-  // ---- State ----
-  let currentPageIndex = $state(0);
-  let visitedPages = $state(new Set());
+  // ---- State classes ----
+  const progress = new ProgressState();
+  const nav = new NavigationState(manifest, progress, config);
+  const duration = new DurationTracker(0);
+
+  // Mobile sidebar
   let sidebarOpen = $state(false);
 
   // Page loading state
@@ -19,20 +25,18 @@
   let retryKey = $state(0);
 
   // ---- Derived ----
-  let canGoPrev = $derived(currentPageIndex > 0);
-  let canGoNext = $derived(currentPageIndex < manifest.totalPages - 1);
   let progressPercent = $derived(
     manifest.totalPages > 0
-      ? Math.round((visitedPages.size / manifest.totalPages) * 100)
+      ? Math.round((progress.visitedPages.size / manifest.totalPages) * 100)
       : 0
   );
 
   // ---- Page context (reactive, read by Quiz in Step 8) ----
-  let pageContext = $state({ quiz: null });
+  let pageContext = $state({ quiz: null, passingScore: config.scoring?.passingScore ?? 70 });
   setContext('tessera-page', pageContext);
 
   // ---- Page loading ----
-  let loadGeneration = 0; // guard against stale loads
+  let loadGeneration = 0;
 
   function loadPage(index) {
     const page = manifest.pages[index];
@@ -58,8 +62,10 @@
       if (gen !== loadGeneration) return; // stale
       PageComponent = mod.default;
       pageLoading = false;
-      // Mark visited
-      visitedPages = new Set([...visitedPages, index]);
+      // Mark visited and recalculate
+      progress.markVisited(index);
+      progress.recalculateCompletion(manifest, config);
+      progress.recalculateSuccess(manifest, config);
     }).catch(err => {
       if (gen !== loadGeneration) return; // stale
       console.error(`Tessera: Failed to load page ${index}`, err);
@@ -68,27 +74,14 @@
     });
   }
 
-  // React to page index changes — only subscribe to currentPageIndex and retryKey
+  // React to page index changes
   $effect(() => {
-    const index = currentPageIndex;
+    const index = nav.currentPageIndex;
     const _retry = retryKey;
     untrack(() => loadPage(index));
   });
 
-  // ---- Navigation ----
-  function goToPage(index) {
-    if (index < 0 || index >= manifest.totalPages) return;
-    currentPageIndex = index;
-  }
-
-  function goNext() {
-    if (canGoNext) goToPage(currentPageIndex + 1);
-  }
-
-  function goPrev() {
-    if (canGoPrev) goToPage(currentPageIndex - 1);
-  }
-
+  // ---- Retry ----
   function retryPage() {
     retryKey++;
   }
@@ -157,11 +150,20 @@
   function handleKeyNav(e) {
     const tag = e.target?.tagName;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-    if (e.target?.closest('[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel')) return;
+    if (e.target?.closest('[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz')) return;
 
-    if (e.key === 'ArrowLeft') { goPrev(); e.preventDefault(); }
-    if (e.key === 'ArrowRight') { goNext(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { nav.goPrev(); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { nav.goNext(); e.preventDefault(); }
     if (e.key === 'Escape' && sidebarOpen) { closeSidebar(); e.preventDefault(); }
+  }
+
+  // ---- Quiz completion handler ----
+  function handleQuizComplete(e) {
+    const { score } = e.detail;
+    const pageIndex = nav.currentPageIndex;
+    progress.quizCompleted(pageIndex, score);
+    progress.recalculateCompletion(manifest, config);
+    progress.recalculateSuccess(manifest, config);
   }
 
   // ---- Lifecycle ----
@@ -170,7 +172,12 @@
     if (config.title) document.title = config.title;
 
     window.addEventListener('keydown', handleKeyNav);
-    return () => window.removeEventListener('keydown', handleKeyNav);
+    const appEl = document.getElementById('tessera-app');
+    appEl?.addEventListener('tessera-quiz-complete', handleQuizComplete);
+    return () => {
+      window.removeEventListener('keydown', handleKeyNav);
+      appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
+    };
   });
 </script>
 
@@ -202,8 +209,9 @@
     <Sidebar
       {manifest}
       {config}
-      {currentPageIndex}
-      onnavigate={goToPage}
+      currentPageIndex={nav.currentPageIndex}
+      {nav}
+      onnavigate={(index) => nav.goToPage(index)}
       onclose={closeSidebar}
     />
   </div>
@@ -222,15 +230,15 @@
     <div class="tessera-page-nav">
       <button
         class="tessera-page-nav-btn"
-        disabled={!canGoPrev}
-        onclick={goPrev}
+        disabled={!nav.canGoPrev}
+        onclick={() => nav.goPrev()}
       >
         ← Previous
       </button>
       <button
         class="tessera-page-nav-btn"
-        disabled={!canGoNext}
-        onclick={goNext}
+        disabled={!nav.canGoNext}
+        onclick={() => nav.goNext()}
       >
         Next →
       </button>
@@ -243,6 +251,6 @@
          aria-label="Course progress">
       <div class="tessera-progress-fill" style="width: {progressPercent}%"></div>
     </div>
-    <div class="tessera-progress-label">{visitedPages.size} of {manifest.totalPages} pages</div>
+    <div class="tessera-progress-label">{progress.visitedPages.size} of {manifest.totalPages} pages</div>
   </div>
 </div>
