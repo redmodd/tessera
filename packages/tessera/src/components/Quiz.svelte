@@ -114,6 +114,18 @@
     }
   }
 
+  // Check if the current question needs immediate feedback before advancing/submitting
+  function needsImmediateFeedback() {
+    return feedbackMode === 'immediate'
+      && !feedbackShown.has(currentQuestionIndex)
+      && !lockedCorrect.has(currentQuestionIndex)
+      && answers.has(currentQuestionIndex);
+  }
+
+  function showImmediateFeedback() {
+    feedbackShown = new Set([...feedbackShown, currentQuestionIndex]);
+  }
+
   // Submission
   function handleSubmit() {
     if (!allAnswered) return;
@@ -230,15 +242,22 @@
           disabled={!answers.has(currentQuestionIndex) && !lockedCorrect.has(currentQuestionIndex)}
           onclick={goNextQuestion}
         >
-          {feedbackMode === 'immediate' && feedbackShown.has(currentQuestionIndex) ? 'Continue' : 'Next'}
+          {feedbackShown.has(currentQuestionIndex) && feedbackMode === 'immediate' ? 'Continue' : 'Next'}
+        </button>
+      {:else if needsImmediateFeedback()}
+        <button
+          class="tessera-quiz-btn tessera-quiz-btn-primary"
+          onclick={showImmediateFeedback}
+        >
+          Check Answer
         </button>
       {:else}
         <button
           class="tessera-quiz-btn tessera-quiz-btn-primary tessera-quiz-btn-submit"
           disabled={!allAnswered}
-          onclick={feedbackMode === 'immediate' && !feedbackShown.has(currentQuestionIndex) && !lockedCorrect.has(currentQuestionIndex) ? () => { feedbackShown = new Set([...feedbackShown, currentQuestionIndex]); } : handleSubmit}
+          onclick={handleSubmit}
         >
-          {feedbackMode === 'immediate' && answers.has(currentQuestionIndex) && !feedbackShown.has(currentQuestionIndex) && !lockedCorrect.has(currentQuestionIndex) ? 'Check Answer' : 'Submit'}
+          Submit
         </button>
       {/if}
     </div>
