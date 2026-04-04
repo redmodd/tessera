@@ -44,13 +44,14 @@
   }
 
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
+  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
 
   function handleInput(e) {
     if (standalone) {
       if (saAnswered) return;
       inputValue = e.target.value;
     } else {
-      if (quiz.submitted || isLocked) return;
+      if (quizLocked) return;
       inputValue = e.target.value;
       quiz.setAnswer(myIndex, inputValue);
     }
@@ -85,9 +86,18 @@
         oninput={handleInput}
         onkeydown={handleKeydown}
         disabled={saAnswered}
-        placeholder="Type your answer and press Enter..."
+        placeholder="Type your answer..."
         autocomplete="off"
       />
+      {#if !saAnswered}
+        <button
+          class="tessera-fitb-check-btn"
+          disabled={!inputValue.trim()}
+          onclick={() => { saAnswered = true; }}
+        >
+          Check
+        </button>
+      {/if}
     </div>
 
     {#if saAnswered}
@@ -144,9 +154,9 @@
         class="tessera-fitb-input"
         class:correct={quiz.feedbackVisible(myIndex) && checkAnswer(quiz.getAnswer(myIndex))}
         class:incorrect={quiz.feedbackVisible(myIndex) && !checkAnswer(quiz.getAnswer(myIndex))}
-        value={quiz.submitted || isLocked ? (quiz.getAnswer(myIndex) ?? '') : inputValue}
+        value={quizLocked ? (quiz.getAnswer(myIndex) ?? '') : inputValue}
         oninput={handleInput}
-        disabled={quiz.submitted || isLocked}
+        disabled={quizLocked}
         placeholder="Type your answer..."
         autocomplete="off"
       />
@@ -275,6 +285,29 @@
   .tessera-fitb-feedback.incorrect {
     color: var(--tessera-error);
     background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+  }
+
+  .tessera-fitb-check-btn {
+    margin-top: var(--tessera-spacing-sm);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--tessera-primary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 44px;
+    transition: background 0.2s, opacity 0.2s;
+  }
+
+  .tessera-fitb-check-btn:hover:not(:disabled) {
+    background: var(--tessera-primary-dark);
+  }
+
+  .tessera-fitb-check-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .tessera-standalone-retry {

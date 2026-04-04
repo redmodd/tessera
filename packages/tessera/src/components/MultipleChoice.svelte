@@ -41,7 +41,7 @@
       selectedOption = optIndex;
       saAnswered = true;
     } else {
-      if (quiz.submitted || isLocked) return;
+      if (quizLocked) return;
       selectedOption = optIndex;
       quiz.setAnswer(myIndex, optIndex);
     }
@@ -73,9 +73,7 @@
   }
 
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let showFeedback = $derived(standalone ? saAnswered : quiz.feedbackVisible(myIndex));
-  let displayAnswer = $derived(standalone ? selectedOption : (quiz.submitted || isLocked ? quiz.getAnswer(myIndex) : selectedOption));
-  let isDisabled = $derived(standalone ? saAnswered : (quiz.submitted || isLocked));
+  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
 </script>
 
 {#if standalone}
@@ -145,7 +143,7 @@
     <div class="tessera-mc-options">
       {#each options as option, i}
         {@const optionId = `${groupId}-opt-${i}`}
-        {@const isSelected = (quiz.submitted || isLocked ? quiz.getAnswer(myIndex) : selectedOption) === i}
+        {@const isSelected = (quizLocked ? quiz.getAnswer(myIndex) : selectedOption) === i}
         {@const stateClass = getOptionClass(i)}
         <label
           class="tessera-mc-option {stateClass}"
@@ -158,7 +156,7 @@
             name={groupId}
             value={i}
             checked={isSelected}
-            disabled={quiz.submitted || isLocked}
+            disabled={quizLocked}
             onchange={() => handleSelect(i)}
           />
           <span class="tessera-mc-radio-custom"></span>

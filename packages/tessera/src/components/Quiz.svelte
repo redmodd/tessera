@@ -65,6 +65,17 @@
         return false;
       };
     },
+    get isAnswerLocked() {
+      return (index) => {
+        // Locked during immediate feedback (answer already revealed)
+        if (feedbackMode === 'immediate' && feedbackShown.has(index)) return true;
+        // Locked after submission
+        if (submitted) return true;
+        // Locked from incorrect-only retry
+        if (lockedCorrect.has(index)) return true;
+        return false;
+      };
+    },
     get isLockedCorrect() {
       return (index) => lockedCorrect.has(index);
     },

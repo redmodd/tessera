@@ -72,6 +72,7 @@
   }
 
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
+  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
 
   // Auto-submit in standalone mode when all pairs matched
   $effect(() => {
@@ -84,7 +85,7 @@
     if (standalone) {
       if (saAnswered) return;
     } else {
-      if (quiz.submitted || isLocked) return;
+      if (quizLocked) return;
     }
 
     if (selectedLeft === leftIndex) {
@@ -103,7 +104,7 @@
     if (standalone) {
       if (saAnswered) return;
     } else {
-      if (quiz.submitted || isLocked) return;
+      if (quizLocked) return;
     }
 
     if (selectedRight === rightOriginalIndex) {
@@ -141,7 +142,7 @@
     if (standalone) {
       if (saAnswered) return;
     } else {
-      if (quiz.submitted || isLocked) return;
+      if (quizLocked) return;
     }
     const newMatches = new Map(matches);
     newMatches.delete(leftIndex);
@@ -181,7 +182,7 @@
   }
 
   let showFeedback = $derived(standalone ? saAnswered : quiz.feedbackVisible(myIndex));
-  let isDisabled = $derived(standalone ? saAnswered : (quiz.submitted || isLocked));
+  let isDisabled = $derived(standalone ? saAnswered : quizLocked);
 </script>
 
 {#snippet matchingContent()}
