@@ -1,9 +1,8 @@
 /**
  * Persistence API — interface for saving/restoring course state.
- *
- * Step 9: Web adapter (localStorage)
- * Step 10: LMS adapters (SCORM 1.2, SCORM 2004, CMI5)
  */
+
+import type { Interaction } from './interaction.js';
 
 export interface PersistenceAdapter {
   init(): Promise<void>;
@@ -11,8 +10,17 @@ export interface PersistenceAdapter {
   saveState(state: SavedState): void;
   setScore(score: number): void;
   setCompletionStatus(status: 'incomplete' | 'complete'): void;
-  setSuccessStatus(status: 'passed' | 'failed'): void;
+  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
   setDuration(seconds: number): void;
+  /**
+   * Report a single learner interaction (answered question) to the LMS.
+   * Called once per question on quiz submit or standalone useQuestion submit.
+   */
+  reportInteraction(
+    questionId: string,
+    interaction: Interaction,
+    correct: boolean | null
+  ): void;
   commit(): void;
   terminate(): void;
 }
@@ -30,4 +38,12 @@ export interface SavedState {
   q: Record<string, number>;
   /** Duration — accumulated seconds */
   d: number;
+  /** Chunk progress — pageIndex (as string key) to highest revealed chunk index */
+  c?: Record<string, number>;
+  /** User-scoped state written via `usePersistence(key)`, keyed by caller. */
+  u?: Record<string, unknown>;
+  /** Standalone question scores — pageIndex → (questionId → score 0-100) */
+  s?: Record<string, Record<string, number>>;
+  /** Graded standalone page indices — pages with at least one graded standalone question */
+  gs?: number[];
 }

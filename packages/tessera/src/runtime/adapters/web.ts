@@ -1,4 +1,6 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type { CourseConfig } from '../types.js';
+import type { Interaction } from '../interaction.js';
 
 /**
  * Slugify a string for use as a localStorage key.
@@ -22,8 +24,8 @@ export class WebAdapter implements PersistenceAdapter {
   #storageKey: string;
   #state: SavedState | null = null;
 
-  constructor(courseTitle: string) {
-    const courseId = slugify(courseTitle) || 'tessera-course';
+  constructor(config: CourseConfig) {
+    const courseId = slugify(config.title || '') || 'tessera-course';
     this.#storageKey = `tessera-${courseId}`;
   }
 
@@ -53,11 +55,20 @@ export class WebAdapter implements PersistenceAdapter {
     }
   }
 
-  // No-ops for web adapter — these are used by LMS adapters (Step 10)
+  // No-ops for web adapter — these are used by LMS adapters
   setScore(_score: number): void {}
   setCompletionStatus(_status: 'incomplete' | 'complete'): void {}
-  setSuccessStatus(_status: 'passed' | 'failed'): void {}
+  setSuccessStatus(_status: 'passed' | 'failed' | 'unknown'): void {}
   setDuration(_seconds: number): void {}
+  reportInteraction(
+    _questionId: string,
+    _interaction: Interaction,
+    _correct: boolean | null
+  ): void {
+    // Web adapter has no external LMS; learner interaction data lives only
+    // in memory. Authors who want to persist per-question state can use
+    // `usePersistence(key)` which writes into SavedState.u.
+  }
   commit(): void {}
   terminate(): void {}
 }
