@@ -1,7 +1,9 @@
 <script>
   import { getContext, onMount } from 'svelte';
+  import { useQuestion } from '../runtime/hooks.svelte.js';
 
   let {
+    id,
     question,
     answers,
     caseSensitive = false,
@@ -14,14 +16,19 @@
   const standalone = !quiz;
 
   let inputValue = $state('');
-  let myIndex = $state(-1);
-
-  // Standalone state
-  let saAnswered = $state(false);
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
   const inputId = `fitb-${Math.random().toString(36).slice(2, 9)}`;
+  const defaultId = `fitb-${slug(question)}`;
+
+  function slug(text) {
+    return String(text ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+  }
 
   function checkAnswer(userAnswer) {
     if (!userAnswer || typeof userAnswer !== 'string') return false;
@@ -33,22 +40,29 @@
     });
   }
 
-  if (!standalone) {
-    onMount(() => {
-      myIndex = quiz.registerQuestion({
-        checkAnswer,
-        reset: () => { inputValue = ''; },
-        render: renderQuestion,
-      });
-    });
-  }
+  const handle = useQuestion({
+    id: id ?? defaultId,
+    response: () => ({
+      type: 'fill-in',
+      response: inputValue,
+      correct: Array.isArray(answers) ? answers : [answers],
+      caseMatters: !!caseSensitive,
+    }),
+    reset: () => { inputValue = ''; },
+  });
+
+  const myIndex = $derived(handle.quizIndex ?? -1);
+
+  onMount(() => {
+    if (!standalone) quiz.setRender(myIndex, renderQuestion);
+  });
 
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
+  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
 
   function handleInput(e) {
     if (standalone) {
-      if (saAnswered) return;
+      if (handle.submitted) return;
       inputValue = e.target.value;
     } else {
       if (quizLocked) return;
@@ -58,16 +72,16 @@
   }
 
   function handleKeydown(e) {
-    if (!standalone || saAnswered) return;
+    if (!standalone || handle.submitted) return;
     if (e.key === 'Enter' && inputValue.trim()) {
-      saAnswered = true;
+      handle.submit();
     }
   }
 
   function handleRetry() {
     saRetryCount++;
     inputValue = '';
-    saAnswered = false;
+    handle.reset();
   }
 </script>
 
@@ -80,27 +94,27 @@
         type="text"
         id={inputId}
         class="tessera-fitb-input"
-        class:correct={saAnswered && checkAnswer(inputValue)}
-        class:incorrect={saAnswered && !checkAnswer(inputValue)}
+        class:correct={handle.submitted && checkAnswer(inputValue)}
+        class:incorrect={handle.submitted && !checkAnswer(inputValue)}
         value={inputValue}
         oninput={handleInput}
         onkeydown={handleKeydown}
-        disabled={saAnswered}
+        disabled={handle.submitted}
         placeholder="Type your answer..."
         autocomplete="off"
       />
-      {#if !saAnswered}
+      {#if !handle.submitted}
         <button
           class="tessera-fitb-check-btn"
           disabled={!inputValue.trim()}
-          onclick={() => { saAnswered = true; }}
+          onclick={() => { handle.submit(); }}
         >
           Check
         </button>
       {/if}
     </div>
 
-    {#if saAnswered}
+    {#if handle.submitted}
       {@const isCorrect = checkAnswer(inputValue)}
       <div class="tessera-fitb-review">
         {#if isCorrect}
