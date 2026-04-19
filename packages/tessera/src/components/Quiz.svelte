@@ -1,5 +1,9 @@
 <script>
   import { getContext, setContext, onMount } from 'svelte';
+  import { buildQuizInteractions } from './quiz-payload.js';
+
+  let { children } = $props();
+  let quizElement = $state(null);
 
   // Read quiz config from page context (set by App.svelte)
   const pageCtx = getContext('tessera-page');
@@ -143,9 +147,12 @@
     submitted = true;
     attemptCount++;
 
-    // Report score to progress via custom event
+    // Report score and per-question interactions via custom event.
+    // `interactions` is empty for built-in components until Phase 2 migrates
+    // them onto the new useQuestion API — additive and back-compat.
+    const interactions = buildQuizInteractions(questions, answers);
     const event = new CustomEvent('tessera-quiz-complete', {
-      detail: { score },
+      detail: { score, interactions },
       bubbles: true,
     });
     quizElement?.dispatchEvent(event);
@@ -198,8 +205,6 @@
     }
   }
 
-  let { children } = $props();
-  let quizElement = $state(null);
 </script>
 
 <div class="tessera-quiz" bind:this={quizElement} role="region" aria-label="Quiz">
