@@ -2,17 +2,17 @@
   import config from 'virtual:tessera-config';
   import manifest from 'virtual:tessera-manifest';
   import pageModules from 'virtual:tessera-pages';
-  import { onMount, setContext, untrack } from 'svelte';
+  import { onMount, onDestroy, setContext, untrack } from 'svelte';
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import Sidebar from './Sidebar.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
-  import { WebAdapter } from './adapters/web.js';
+  import { createAdapter } from './adapters/index.js';
 
   // ---- Persistence ----
-  const adapter = new WebAdapter(config.title || '');
+  const adapter = createAdapter(config);
   let persistenceReady = $state(false);
 
   // ---- State classes ----
@@ -39,6 +39,20 @@
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({ quiz: null, passingScore: config.scoring?.passingScore ?? 70 });
   setContext('tessera-page', pageContext);
+
+  // ---- Navigation context (read by custom chrome components) ----
+  // Exposes nav/manifest/progress/config so courses can build custom top bars,
+  // menus, tables of contents, etc. that can navigate to specific pages.
+  setContext('tessera-nav', { nav, manifest, progress, config });
+
+  // ---- Adapter context (read by useQuestion / usePersistence) ----
+  setContext('tessera-adapter', { get adapter() { return adapter; } });
+
+  // ---- Chrome mode ----
+  // "default" (or unset) renders the built-in sidebar, prev/next, and progress bar.
+  // "custom" hides all three so a course-owned chrome component can take over.
+  const chromeMode = config.chrome === 'custom' ? 'custom' : 'default';
+  const showDefaultChrome = chromeMode === 'default';
 
   // ---- Page loading ----
   let loadGeneration = 0;
@@ -101,9 +115,7 @@
   }
 
   // ---- Branding ----
-  function parseColor(color) {
-    const ctx = document.createElement('canvas').getContext('2d');
-    if (!ctx) return null;
+  function parseColor(ctx, color) {
     ctx.fillStyle = '#000';
     ctx.fillStyle = color;
     if (ctx.fillStyle === '#000000'
@@ -138,7 +150,11 @@
     const el = document.documentElement;
     if (cfg.branding?.primaryColor) {
       el.style.setProperty('--tessera-primary', cfg.branding.primaryColor);
-      const rgb = parseColor(cfg.branding.primaryColor);
+      // Create the canvas once here rather than inside parseColor to avoid
+      // allocating a new element for every color resolved.
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const rgb = ctx ? parseColor(ctx, cfg.branding.primaryColor) : null;
       if (rgb) {
         const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
         el.style.setProperty('--tessera-primary-light', `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, 90%)`);
@@ -178,11 +194,16 @@
     for (const [pageIndex, score] of progress.quizScores) {
       q[String(pageIndex)] = score;
     }
+    const c = {};
+    for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
+      c[String(pageIndex)] = chunkIndex;
+    }
     return {
       b: nav.currentPageIndex,
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
+      c,
     };
   }
 
@@ -195,6 +216,12 @@
     // Restore quiz scores
     for (const [key, score] of Object.entries(saved.q)) {
       progress.quizCompleted(Number(key), score);
+    }
+    // Restore chunk progress (may be absent on state saved before this field existed)
+    if (saved.c) {
+      for (const [key, chunkIndex] of Object.entries(saved.c)) {
+        progress.markChunk(Number(key), Number(chunkIndex));
+      }
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
@@ -217,6 +244,7 @@
   let prevPageIndex = $state(-1);
   let prevVisitedSize = $state(-1);
   let prevScoresSize = $state(-1);
+  let prevChunksSignature = $state(null);
 
   $effect(() => {
     const idx = nav.currentPageIndex;
@@ -242,6 +270,18 @@
     prevScoresSize = size;
   });
 
+  $effect(() => {
+    // Signature reflects every chunk advance (set size alone is not enough since
+    // the same page can advance from chunk 0 → 1 → 2 without growing the map).
+    const sig = [...progress.chunkProgress]
+      .map(([p, c]) => `${p}:${c}`)
+      .join(',');
+    if (prevChunksSignature !== null && sig !== prevChunksSignature) {
+      untrack(() => persistState());
+    }
+    prevChunksSignature = sig;
+  });
+
   // ---- Persistence: report score/completion/success to adapter ----
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
   $effect(() => {
@@ -252,22 +292,27 @@
     const completedGraded = gradedQuizIndices.filter(i => scores.has(i));
     if (completedGraded.length === 0) return;
 
+    // Divide by total graded count — incomplete quizzes count as 0, matching
+    // the recalculateSuccess logic in progress.svelte.ts.
     const average = completedGraded.reduce((sum, i) => sum + scores.get(i), 0) / gradedQuizIndices.length;
 
     untrack(() => {
       adapter.setScore(Math.round(average));
       adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
-      adapter.setDuration(duration.totalSeconds);
+      adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });
   });
 
+  let prevCompletionStatus = $state('incomplete');
   $effect(() => {
     const status = progress.completionStatus;
     if (!persistenceReady) return;
+    if (status === prevCompletionStatus) return;
+    prevCompletionStatus = status;
     untrack(() => {
       adapter.setCompletionStatus(status);
-      adapter.setDuration(duration.totalSeconds);
+      adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });
   });
@@ -279,7 +324,7 @@
     if (terminated) return;
     terminated = true;
     adapter.saveState(serializeState());
-    adapter.setDuration(duration.totalSeconds);
+    adapter.setDuration(duration.sessionSeconds);
     adapter.commit();
     adapter.terminate();
   }
@@ -294,57 +339,71 @@
     const saved = adapter.getState();
     if (saved) {
       restoreState(saved);
+      prevCompletionStatus = progress.completionStatus;
     }
     persistenceReady = true;
+
+    // Push initial completion + success status to the adapter so LMSes never
+    // see the SCORM default ("unknown") on Terminate — SCORM Cloud rolls that
+    // up to "completed"/"passed" during status rollup.
+    adapter.setCompletionStatus(progress.completionStatus);
+    adapter.setSuccessStatus(progress.successStatus);
+    adapter.commit();
 
     window.addEventListener('keydown', handleKeyNav);
     window.addEventListener('pagehide', handleExit);
     window.addEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
     appEl?.addEventListener('tessera-quiz-complete', handleQuizComplete);
-    return () => {
-      window.removeEventListener('keydown', handleKeyNav);
-      window.removeEventListener('pagehide', handleExit);
-      window.removeEventListener('beforeunload', handleExit);
-      appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
-    };
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeyNav);
+    window.removeEventListener('pagehide', handleExit);
+    window.removeEventListener('beforeunload', handleExit);
+    const appEl = document.getElementById('tessera-app');
+    appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
   });
 </script>
 
-<!-- Hamburger button (visible on tablet/mobile only via CSS) -->
-<button
-  class="tessera-hamburger"
-  aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
-  aria-expanded={sidebarOpen}
-  onclick={toggleSidebar}
->
-  <span class="tessera-hamburger-lines">
-    <span class="tessera-hamburger-line"></span>
-    <span class="tessera-hamburger-line"></span>
-    <span class="tessera-hamburger-line"></span>
-  </span>
-</button>
+{#if showDefaultChrome}
+  <!-- Hamburger button (visible on tablet/mobile only via CSS) -->
+  <button
+    class="tessera-hamburger"
+    aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+    aria-expanded={sidebarOpen}
+    onclick={toggleSidebar}
+  >
+    <span class="tessera-hamburger-lines">
+      <span class="tessera-hamburger-line"></span>
+      <span class="tessera-hamburger-line"></span>
+      <span class="tessera-hamburger-line"></span>
+    </span>
+  </button>
 
-<!-- Sidebar overlay backdrop (mobile) -->
-{#if sidebarOpen}
-  <div
-    class="tessera-sidebar-overlay visible"
-    role="presentation"
-    onclick={closeSidebar}
-  ></div>
+  <!-- Sidebar overlay backdrop (mobile) -->
+  {#if sidebarOpen}
+    <div
+      class="tessera-sidebar-overlay visible"
+      role="presentation"
+      onclick={closeSidebar}
+    ></div>
+  {/if}
 {/if}
 
-<div class="tessera-app" id="tessera-app">
-  <div class="tessera-sidebar" class:open={sidebarOpen}>
-    <Sidebar
-      {manifest}
-      {config}
-      currentPageIndex={nav.currentPageIndex}
-      {nav}
-      onnavigate={(index) => nav.goToPage(index)}
-      onclose={closeSidebar}
-    />
-  </div>
+<div class="tessera-app" id="tessera-app" data-chrome={chromeMode}>
+  {#if showDefaultChrome}
+    <div class="tessera-sidebar" class:open={sidebarOpen}>
+      <Sidebar
+        {manifest}
+        {config}
+        currentPageIndex={nav.currentPageIndex}
+        {nav}
+        onnavigate={(index) => nav.goToPage(index)}
+        onclose={closeSidebar}
+      />
+    </div>
+  {/if}
 
   <main class="tessera-main">
     <div class="tessera-content">
@@ -357,30 +416,34 @@
       {/if}
     </div>
 
-    <div class="tessera-page-nav">
-      <button
-        class="tessera-page-nav-btn"
-        disabled={!nav.canGoPrev}
-        onclick={() => nav.goPrev()}
-      >
-        ← Previous
-      </button>
-      <button
-        class="tessera-page-nav-btn"
-        disabled={!nav.canGoNext}
-        onclick={() => nav.goNext()}
-      >
-        Next →
-      </button>
-    </div>
+    {#if showDefaultChrome}
+      <div class="tessera-page-nav">
+        <button
+          class="tessera-page-nav-btn"
+          disabled={!nav.canGoPrev}
+          onclick={() => nav.goPrev()}
+        >
+          ← Previous
+        </button>
+        <button
+          class="tessera-page-nav-btn"
+          disabled={!nav.canGoNext}
+          onclick={() => nav.goNext()}
+        >
+          Next →
+        </button>
+      </div>
+    {/if}
   </main>
 
-  <div class="tessera-progress">
-    <div class="tessera-progress-track" role="progressbar"
-         aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}
-         aria-label="Course progress">
-      <div class="tessera-progress-fill" style="width: {progressPercent}%"></div>
+  {#if showDefaultChrome}
+    <div class="tessera-progress">
+      <div class="tessera-progress-track" role="progressbar"
+           aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}
+           aria-label="Course progress">
+        <div class="tessera-progress-fill" style="width: {progressPercent}%"></div>
+      </div>
+      <div class="tessera-progress-label">{progress.visitedPages.size} of {manifest.totalPages} pages</div>
     </div>
-    <div class="tessera-progress-label">{progress.visitedPages.size} of {manifest.totalPages} pages</div>
-  </div>
+  {/if}
 </div>
