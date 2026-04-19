@@ -1,0 +1,393 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// ---- getContext mock ----
+// The hooks read context via Svelte's `getContext`. Tests provide a per-test
+// context map, then the mock looks up the name in that map.
+const ctxStore = new Map<string, unknown>();
+
+vi.mock('svelte', async () => {
+  const actual = await vi.importActual<typeof import('svelte')>('svelte');
+  return {
+    ...actual,
+    getContext: (name: string) => ctxStore.get(name),
+  };
+});
+
+import {
+  useQuestion,
+  useNavigation,
+  useProgress,
+  usePersistence,
+} from '../src/runtime/hooks.svelte.js';
+import type { Interaction } from '../src/runtime/interaction.js';
+import { ProgressState } from '../src/runtime/progress.svelte.js';
+import { createManifest, createConfig } from './helpers.js';
+
+function makeAdapter() {
+  return {
+    init: vi.fn(),
+    getState: vi.fn(),
+    saveState: vi.fn(),
+    setScore: vi.fn(),
+    setCompletionStatus: vi.fn(),
+    setSuccessStatus: vi.fn(),
+    setDuration: vi.fn(),
+    reportInteraction: vi.fn(),
+    commit: vi.fn(),
+    terminate: vi.fn(),
+  };
+}
+
+function makeNavCtx(progress: ProgressState, currentIndex = 0) {
+  const manifest = createManifest(5);
+  const config = createConfig();
+  const nav: any = {
+    currentPageIndex: currentIndex,
+    canGoNext: true,
+    canGoPrev: false,
+    goToPage: vi.fn((i: number) => { nav.currentPageIndex = i; }),
+    goNext: vi.fn(),
+    goPrev: vi.fn(),
+    isPageLocked: vi.fn(() => false),
+  };
+  return { nav, manifest, progress, config };
+}
+
+beforeEach(() => {
+  ctxStore.clear();
+});
+
+// ============ useQuestion (standalone) ============
+
+describe('useQuestion — standalone mode', () => {
+  it('reports the interaction through the adapter on submit', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const interaction: Interaction = {
+      type: 'choice',
+      response: ['a'],
+      correct: ['a'],
+    };
+    const q = useQuestion({ id: 'q1', response: () => interaction });
+    q.submit();
+
+    expect(adapter.reportInteraction).toHaveBeenCalledWith('q1', interaction, true);
+    expect(q.submitted).toBe(true);
+    expect(q.correct).toBe(true);
+  });
+
+  it('flags incorrect when response does not match', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: false, correct: true }),
+    });
+    q.submit();
+
+    expect(adapter.reportInteraction).toHaveBeenCalledWith(
+      'q1',
+      expect.objectContaining({ type: 'true-false' }),
+      false
+    );
+    expect(q.correct).toBe(false);
+  });
+
+  it('does not register a graded score when graded is false', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress, 2));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    q.submit();
+
+    // Score is recorded for the page (so authors can render it),
+    // but the page is NOT in gradedStandalonePages
+    expect(progress.standaloneQuestionScores.get(2)?.get('q1')).toBe(100);
+    expect(progress.gradedStandalonePages.has(2)).toBe(false);
+  });
+
+  it('registers a graded score when graded is true', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    const ctx = makeNavCtx(progress, 3);
+    ctxStore.set('tessera-nav', ctx);
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    q.submit();
+
+    expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(100);
+    expect(progress.gradedStandalonePages.has(3)).toBe(true);
+    // Graded path also recalculates
+    expect(progress.successStatus).toBe('passed');
+  });
+
+  it('uses score override when provided', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress, 0));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({ type: 'true-false', response: false, correct: true }),
+      score: () => 42,
+    });
+    q.submit();
+
+    expect(progress.standaloneQuestionScores.get(0)?.get('q1')).toBe(42);
+  });
+
+  it('submit is idempotent — calling twice does not double-report', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    q.submit();
+    q.submit();
+    expect(adapter.reportInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it('reset clears submitted/correct and re-enables submit', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    const userReset = vi.fn();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+      reset: userReset,
+    });
+    q.submit();
+    expect(q.submitted).toBe(true);
+    q.reset();
+
+    expect(q.submitted).toBe(false);
+    expect(q.correct).toBe(null);
+    expect(userReset).toHaveBeenCalled();
+
+    q.submit();
+    expect(adapter.reportInteraction).toHaveBeenCalledTimes(2);
+  });
+
+  it('mode is "standalone" outside a Quiz', () => {
+    const progress = new ProgressState();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true }),
+    });
+    expect(q.mode).toBe('standalone');
+  });
+
+  it('reports correct=null when interaction has no correct answer', () => {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'likert', response: 'agree' }),
+    });
+    q.submit();
+
+    expect(adapter.reportInteraction).toHaveBeenCalledWith(
+      'q1',
+      expect.any(Object),
+      null
+    );
+    expect(q.correct).toBe(null);
+  });
+});
+
+// ============ useQuestion (Quiz-degraded) ============
+
+describe('useQuestion — inside a <Quiz>', () => {
+  it('logs a warning and returns mode=quiz when nested in a Quiz context', () => {
+    const progress = new ProgressState();
+    ctxStore.set('tessera-quiz', { /* presence is enough for Phase 1 */ });
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true }),
+    });
+
+    expect(q.mode).toBe('quiz');
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy.mock.calls[0][0]).toContain('q1');
+    warnSpy.mockRestore();
+  });
+});
+
+// ============ useNavigation ============
+
+describe('useNavigation', () => {
+  it('throws when no nav context exists', () => {
+    expect(() => useNavigation()).toThrow(/inside a Tessera course/);
+  });
+
+  it('exposes currentPage, currentPageIndex, and pages from nav context', () => {
+    const progress = new ProgressState();
+    const ctx = makeNavCtx(progress, 2);
+    ctxStore.set('tessera-nav', ctx);
+
+    const navHook = useNavigation();
+    expect(navHook.currentPageIndex).toBe(2);
+    expect(navHook.currentPage).toEqual(ctx.manifest.pages[2]);
+    expect(navHook.pages).toBe(ctx.manifest.pages);
+  });
+
+  it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
+    const progress = new ProgressState();
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    useNavigation().goTo('page-3');
+    expect(ctx.nav.goToPage).toHaveBeenCalledWith(3);
+  });
+
+  it('goTo(unknown slug) is a no-op', () => {
+    const progress = new ProgressState();
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    useNavigation().goTo('does-not-exist');
+    expect(ctx.nav.goToPage).not.toHaveBeenCalled();
+  });
+
+  it('next/prev/canGoNext/canGoPrev delegate to nav', () => {
+    const progress = new ProgressState();
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useNavigation();
+    h.next();
+    h.prev();
+    expect(ctx.nav.goNext).toHaveBeenCalled();
+    expect(ctx.nav.goPrev).toHaveBeenCalled();
+    expect(h.canGoNext).toBe(true);
+    expect(h.canGoPrev).toBe(false);
+  });
+
+  it('canAccess returns false for unknown slug, true when nav.isPageLocked is false', () => {
+    const progress = new ProgressState();
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useNavigation();
+    expect(h.canAccess('page-1')).toBe(true);
+    expect(h.canAccess('does-not-exist')).toBe(false);
+
+    ctx.nav.isPageLocked = vi.fn(() => true);
+    expect(h.canAccess('page-1')).toBe(false);
+  });
+});
+
+// ============ useProgress ============
+
+describe('useProgress', () => {
+  it('throws when no nav context exists', () => {
+    expect(() => useProgress()).toThrow(/inside a Tessera course/);
+  });
+
+  it('exposes reactive ProgressState fields', () => {
+    const progress = new ProgressState();
+    progress.markVisited(0);
+    progress.markVisited(1);
+    progress.quizCompleted(2, 80);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+
+    const h = useProgress();
+    expect(h.visitedPages.size).toBe(2);
+    expect(h.quizScores.get(2)).toBe(80);
+    expect(h.completionStatus).toBe('incomplete');
+    expect(h.successStatus).toBe('unknown');
+  });
+
+  it('markVisited and markChunk delegate to ProgressState', () => {
+    const progress = new ProgressState();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+
+    const h = useProgress();
+    h.markVisited(3);
+    h.markChunk(3, 1);
+
+    expect(progress.visitedPages.has(3)).toBe(true);
+    expect(progress.getChunk(3)).toBe(1);
+  });
+});
+
+// ============ usePersistence ============
+
+describe('usePersistence', () => {
+  function makeStore() {
+    const data: Record<string, unknown> = {};
+    return {
+      data,
+      get: (k: string) => (k in data ? data[k] : null),
+      set: (k: string, v: unknown) => { data[k] = v; },
+    };
+  }
+
+  it('throws when no user-state context exists', () => {
+    expect(() => usePersistence('foo')).toThrow(/inside a Tessera course/);
+  });
+
+  it('get returns null before any set', () => {
+    ctxStore.set('tessera-user-state', makeStore());
+    expect(usePersistence('foo').get()).toBe(null);
+  });
+
+  it('set stores under the namespaced key; get returns it', () => {
+    ctxStore.set('tessera-user-state', makeStore());
+    const p = usePersistence<{ x: number }>('foo');
+    p.set({ x: 42 });
+    expect(p.get()).toEqual({ x: 42 });
+  });
+
+  it('keys are isolated between callers', () => {
+    ctxStore.set('tessera-user-state', makeStore());
+    const a = usePersistence<number>('a');
+    const b = usePersistence<number>('b');
+    a.set(1);
+    b.set(2);
+    expect(a.get()).toBe(1);
+    expect(b.get()).toBe(2);
+  });
+
+  it('values survive across hook calls (reads from shared store)', () => {
+    ctxStore.set('tessera-user-state', makeStore());
+    usePersistence<string>('greeting').set('hello');
+    // simulating a later remount of a widget binding to the same key
+    expect(usePersistence<string>('greeting').get()).toBe('hello');
+  });
+});

@@ -48,6 +48,19 @@
   // ---- Adapter context (read by useQuestion / usePersistence) ----
   setContext('tessera-adapter', { get adapter() { return adapter; } });
 
+  // ---- User-scoped state (read/written by usePersistence) ----
+  // Each call site namespaces under its own key. Persisted to SavedState.u.
+  let userState = $state({});
+  setContext('tessera-user-state', {
+    get(key) {
+      return key in userState ? userState[key] : null;
+    },
+    set(key, value) {
+      userState = { ...userState, [key]: value };
+      persistState();
+    },
+  });
+
   // ---- Chrome mode ----
   // "default" (or unset) renders the built-in sidebar, prev/next, and progress bar.
   // "custom" hides all three so a course-owned chrome component can take over.
@@ -212,6 +225,7 @@
       c,
       s,
       gs: [...progress.gradedStandalonePages],
+      u: userState,
     };
   }
 
@@ -240,6 +254,10 @@
           progress.markStandaloneQuestion(pageIndex, qid, Number(score), gradedSet.has(pageIndex));
         }
       }
+    }
+    // Restore user-scoped state from usePersistence (absent on older saves)
+    if (saved.u && typeof saved.u === 'object') {
+      userState = { ...saved.u };
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
