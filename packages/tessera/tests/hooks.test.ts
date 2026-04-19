@@ -226,25 +226,193 @@ describe('useQuestion — standalone mode', () => {
   });
 });
 
-// ============ useQuestion (Quiz-degraded) ============
+// ============ useQuestion (inside a <Quiz>) ============
+
+function makeQuizCtx(overrides: Record<string, unknown> = {}) {
+  const quiz: any = {
+    submitted: false,
+    registerQuestion: vi.fn(),
+    ...overrides,
+  };
+  let nextIndex = 0;
+  quiz.registerQuestion.mockImplementation(() => nextIndex++);
+  return quiz;
+}
 
 describe('useQuestion — inside a <Quiz>', () => {
-  it('logs a warning and returns mode=quiz when nested in a Quiz context', () => {
+  it('registers with the parent Quiz exactly once', () => {
     const progress = new ProgressState();
-    ctxStore.set('tessera-quiz', { /* presence is enough for Phase 1 */ });
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const q = useQuestion({
       id: 'q1',
-      response: () => ({ type: 'true-false', response: true }),
+      response: () => ({ type: 'true-false', response: true, correct: true }),
     });
 
     expect(q.mode).toBe('quiz');
-    expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy.mock.calls[0][0]).toContain('q1');
-    warnSpy.mockRestore();
+    expect(quiz.registerQuestion).toHaveBeenCalledTimes(1);
+    const arg = quiz.registerQuestion.mock.calls[0][0];
+    expect(arg.id).toBe('q1');
+    expect(typeof arg.checkAnswer).toBe('function');
+    expect(typeof arg.interaction).toBe('function');
+  });
+
+  it('exposes the quiz-returned index on the handle', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const a = useQuestion({ id: 'a', response: () => ({ type: 'true-false', response: true }) });
+    const b = useQuestion({ id: 'b', response: () => ({ type: 'true-false', response: false }) });
+    expect(a.quizIndex).toBe(0);
+    expect(b.quizIndex).toBe(1);
+  });
+
+  it('interaction() callback returns the latest response value (not memoized)', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    let current: Interaction = { type: 'true-false', response: false, correct: true };
+    useQuestion({ id: 'q1', response: () => current });
+
+    const arg = quiz.registerQuestion.mock.calls[0][0];
+    expect(arg.interaction()).toEqual({ type: 'true-false', response: false, correct: true });
+    current = { type: 'true-false', response: true, correct: true };
+    expect(arg.interaction()).toEqual({ type: 'true-false', response: true, correct: true });
+  });
+
+  it('checkAnswer() returns the boolean from isCorrect(response())', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    let current: Interaction = { type: 'true-false', response: true, correct: true };
+    useQuestion({ id: 'q1', response: () => current });
+
+    const arg = quiz.registerQuestion.mock.calls[0][0];
+    expect(arg.checkAnswer()).toBe(true);
+    current = { type: 'true-false', response: false, correct: true };
+    expect(arg.checkAnswer()).toBe(false);
+  });
+
+  it('reset is passed through to the quiz registration', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const userReset = vi.fn();
+    useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true }),
+      reset: userReset,
+    });
+
+    const arg = quiz.registerQuestion.mock.calls[0][0];
+    expect(arg.reset).toBe(userReset);
+  });
+
+  it('handle.submit() is a no-op when nested in a quiz', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    q.submit();
+    q.submit();
+
+    expect(adapter.reportInteraction).not.toHaveBeenCalled();
+    expect(progress.standaloneQuestionScores.size).toBe(0);
+  });
+
+  it('does not mark standaloneQuestionScores even when graded is true (quiz drives scoring)', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress, 3));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const q = useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    q.submit();
+
+    expect(progress.standaloneQuestionScores.size).toBe(0);
+    expect(progress.gradedStandalonePages.has(3)).toBe(false);
+  });
+
+  it('handle.submitted mirrors quiz.submitted', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    expect(q.submitted).toBe(false);
+    expect(q.correct).toBe(null);
+
+    quiz.submitted = true;
+    expect(q.submitted).toBe(true);
+    expect(q.correct).toBe(true);
+  });
+
+  it('handle.reset calls opts.reset but does not reset the whole quiz', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const userReset = vi.fn();
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true }),
+      reset: userReset,
+    });
+    q.reset();
+
+    expect(userReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes render snippet through to registerQuestion', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const fakeSnippet = {} as unknown;
+    useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true }),
+      render: fakeSnippet,
+    });
+
+    const arg = quiz.registerQuestion.mock.calls[0][0];
+    expect(arg.render).toBe(fakeSnippet);
   });
 });
 

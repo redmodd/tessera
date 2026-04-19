@@ -11,12 +11,15 @@ export interface UseQuestionOptions {
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
   /**
-   * Optional score override (0–100). If omitted, score defaults to 100 when
-   * `isCorrect(response())` is true, 0 when false, and 0 when correctness is null.
+   * Optional score override (0–100). Standalone mode only — per-question scoring
+   * inside a `<Quiz>` is the quiz's responsibility (each question is worth 1 point
+   * of the quiz total).
    */
   score?: () => number;
   /** Optional reset handler invoked when the learner tries again. */
   reset?: () => void;
+  /** Optional Svelte snippet the parent `<Quiz>` renders for this question. Ignored in standalone mode. */
+  render?: unknown;
 }
 
 export interface UseQuestionHandle {
@@ -25,25 +28,40 @@ export interface UseQuestionHandle {
   readonly submitted: boolean;
   readonly correct: boolean | null;
   readonly mode: 'standalone' | 'quiz';
+  /** Index returned by the parent Quiz registration, used for per-question context reads. Undefined in standalone mode. */
+  readonly quizIndex: number | undefined;
 }
 
 /**
  * Register a question widget with the Tessera runtime. Works outside a `<Quiz>`
- * for inline practice; inside a `<Quiz>` wrapper it degrades to standalone
- * behavior and logs a warning — full Quiz integration for custom widgets is
- * Phase 2.
+ * for inline practice, and inside a `<Quiz>` wrapper — the same hook drives both
+ * modes. Inside a Quiz the handle's `submit()` is a no-op (the parent Quiz drives
+ * submission) and `submitted`/`correct` mirror the quiz's state.
  */
 export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   const quizCtx = getContext<any>('tessera-quiz');
   const navCtx = getContext<any>('tessera-nav');
   const adapterCtx = getContext<{ adapter: PersistenceAdapter }>('tessera-adapter');
 
-  if (quizCtx) {
-    console.warn(
-      `Tessera: useQuestion('${opts.id}') was called inside a <Quiz>. ` +
-        `Custom question widgets inside <Quiz> are not yet supported — ` +
-        `using standalone behavior. Full Quiz integration lands in Phase 2.`
-    );
+  if (quizCtx?.registerQuestion) {
+    const quizIndex = quizCtx.registerQuestion({
+      id: opts.id,
+      checkAnswer: () => isCorrectInteraction(opts.response()) === true,
+      reset: opts.reset,
+      interaction: () => opts.response(),
+      render: opts.render,
+    });
+    return {
+      submit() {},
+      reset() { opts.reset?.(); },
+      get submitted() { return quizCtx.submitted ?? false; },
+      get correct() {
+        if (!(quizCtx.submitted ?? false)) return null;
+        return isCorrectInteraction(opts.response());
+      },
+      mode: 'quiz' as const,
+      quizIndex,
+    };
   }
 
   let submitted = $state(false);
@@ -84,7 +102,8 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     reset,
     get submitted() { return submitted; },
     get correct() { return correct; },
-    mode: quizCtx ? 'quiz' : 'standalone',
+    mode: 'standalone' as const,
+    quizIndex: undefined,
   };
 }
 
