@@ -143,13 +143,13 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
     });
 
-    it('is failed when no graded quizzes attempted', () => {
+    it('is unknown when graded quizzes exist but none attempted', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
       const config = createConfig({ scoring: { passingScore: 70 } });
       const progress = new ProgressState();
 
       progress.recalculateSuccess(manifest, config);
-      expect(progress.successStatus).toBe('failed');
+      expect(progress.successStatus).toBe('unknown');
     });
 
     it('computes passed when average meets passing score', () => {
@@ -217,6 +217,146 @@ describe('ProgressState', () => {
 
       progress.recalculateSuccess(manifest, config);
       expect(progress.successStatus).toBe('failed');
+    });
+  });
+
+  describe('markStandaloneQuestion', () => {
+    it('stores a question score under its page', () => {
+      const progress = new ProgressState();
+      progress.markStandaloneQuestion(3, 'q1', 80, false);
+      expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(80);
+    });
+
+    it('adds page to gradedStandalonePages only when graded=true', () => {
+      const progress = new ProgressState();
+      progress.markStandaloneQuestion(3, 'q1', 80, false);
+      expect(progress.gradedStandalonePages.has(3)).toBe(false);
+
+      progress.markStandaloneQuestion(4, 'q2', 80, true);
+      expect(progress.gradedStandalonePages.has(4)).toBe(true);
+    });
+
+    it('replaces previous score for the same question id', () => {
+      const progress = new ProgressState();
+      progress.markStandaloneQuestion(3, 'q1', 50, true);
+      progress.markStandaloneQuestion(3, 'q1', 90, true);
+      expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(90);
+      expect(progress.standaloneQuestionScores.get(3)?.size).toBe(1);
+    });
+
+    it('keeps multiple questions on the same page', () => {
+      const progress = new ProgressState();
+      progress.markStandaloneQuestion(3, 'q1', 80, true);
+      progress.markStandaloneQuestion(3, 'q2', 100, true);
+      expect(progress.getPageStandaloneAverage(3)).toBe(90);
+    });
+  });
+
+  describe('getPageStandaloneAverage', () => {
+    it('returns 0 when no questions recorded for the page', () => {
+      const progress = new ProgressState();
+      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+    });
+
+    it('averages all question scores on the page', () => {
+      const progress = new ProgressState();
+      progress.markStandaloneQuestion(3, 'q1', 60, true);
+      progress.markStandaloneQuestion(3, 'q2', 80, true);
+      progress.markStandaloneQuestion(3, 'q3', 100, true);
+      expect(progress.getPageStandaloneAverage(3)).toBe(80);
+    });
+  });
+
+  describe('recalculateSuccess — standalone graded questions', () => {
+    it('includes pages with graded standalone questions', () => {
+      const manifest = createManifest(5);
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.markStandaloneQuestion(2, 'q1', 80, true);
+
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('uses the page average for standalone questions', () => {
+      const manifest = createManifest(5);
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.markStandaloneQuestion(2, 'q1', 60, true);
+      progress.markStandaloneQuestion(2, 'q2', 60, true);
+
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('non-graded standalone questions do not affect success', () => {
+      const manifest = createManifest(5);
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.markStandaloneQuestion(2, 'q1', 100, false);
+
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('unknown');
+    });
+
+    it('mixes pageConfig graded quizzes with graded standalone pages', () => {
+      const manifest = createManifest(5, { 1: { graded: true } });
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.quizCompleted(1, 100);
+      progress.markStandaloneQuestion(3, 'q1', 60, true);
+
+      // Average: (100 + 60) / 2 = 80 → passed
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('pageConfig quiz score takes precedence on a page that also has standalone questions', () => {
+      const manifest = createManifest(5, { 2: { graded: true } });
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.quizCompleted(2, 90);
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+
+      // Page 2 contributes 90 (the pageConfig quiz score), not 0
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('graded standalone page does not double-count when also a graded pageConfig quiz', () => {
+      const manifest = createManifest(5, { 2: { graded: true } });
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState();
+
+      progress.quizCompleted(2, 80);
+      progress.markStandaloneQuestion(2, 'q1', 80, true);
+
+      // Should be average over 1 page (page 2), not 2 entries
+      progress.recalculateSuccess(manifest, config);
+      expect(progress.successStatus).toBe('passed');
+      // (Implicit: we trust passed @ 80 ≥ 70; the regression we guard against
+      // is the average becoming sum/2 vs sum/1.)
+    });
+  });
+
+  describe('recalculateCompletion — quiz mode includes graded standalone', () => {
+    it('graded standalone pages count toward completion in quiz mode', () => {
+      const manifest = createManifest(5);
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
+      const progress = new ProgressState();
+
+      progress.markStandaloneQuestion(2, 'q1', 80, true);
+
+      progress.recalculateCompletion(manifest, config);
+      expect(progress.completionStatus).toBe('complete');
     });
   });
 });

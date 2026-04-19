@@ -198,12 +198,20 @@
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
       c[String(pageIndex)] = chunkIndex;
     }
+    const s = {};
+    for (const [pageIndex, questionMap] of progress.standaloneQuestionScores) {
+      const obj = {};
+      for (const [qid, score] of questionMap) obj[qid] = score;
+      s[String(pageIndex)] = obj;
+    }
     return {
       b: nav.currentPageIndex,
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
       c,
+      s,
+      gs: [...progress.gradedStandalonePages],
     };
   }
 
@@ -221,6 +229,16 @@
     if (saved.c) {
       for (const [key, chunkIndex] of Object.entries(saved.c)) {
         progress.markChunk(Number(key), Number(chunkIndex));
+      }
+    }
+    // Restore standalone question scores (absent on state saved before useQuestion existed)
+    if (saved.s) {
+      const gradedSet = new Set((saved.gs ?? []).map(Number));
+      for (const [pageKey, questions] of Object.entries(saved.s)) {
+        const pageIndex = Number(pageKey);
+        for (const [qid, score] of Object.entries(questions)) {
+          progress.markStandaloneQuestion(pageIndex, qid, Number(score), gradedSet.has(pageIndex));
+        }
       }
     }
     // Restore duration
