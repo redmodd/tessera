@@ -37,19 +37,23 @@
   );
   let retryMode = $derived(quizConfig.retryMode ?? 'full');
 
-  // Register question API (children call this on mount)
-  let questionId = 0;
+  // Register question API (children call this on mount).
+  // The returned integer is the child's quizIndex — position in the `questions`
+  // array — and is used to address the same question in setRender / setAnswer /
+  // getAnswer / feedbackVisible / isAnswerLocked. Keep it distinct from the
+  // API-level `id` the question passes in (a stable slug used for LMS
+  // interaction reporting).
   function registerQuestion(questionApi) {
-    const id = questionId++;
-    questions = [...questions, { id, ...questionApi }];
-    return id;
+    const index = questions.length;
+    questions = [...questions, questionApi];
+    return index;
   }
 
   // Hand the Quiz the render snippet for a registered question.
   // Snippets aren't available at a child's script-top (they live in the template
   // block), so built-ins call this from onMount once the snippet has compiled.
   function setRender(index, render) {
-    questions = questions.map((q) => (q.id === index ? { ...q, render } : q));
+    questions = questions.map((q, i) => (i === index ? { ...q, render } : q));
   }
 
   function setAnswer(questionIndex, answer) {
