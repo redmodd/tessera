@@ -1,7 +1,9 @@
 <script>
   import { getContext, onMount } from 'svelte';
+  import { useQuestion } from '../runtime/hooks.svelte.js';
 
   let {
+    id,
     question,
     pairs,
     correctFeedback = '',
@@ -12,17 +14,24 @@
   const quiz = getContext('tessera-quiz');
   const standalone = !quiz;
 
-  let myIndex = $state(-1);
   let shuffledRight = $state([]);
   let matches = $state(new Map());
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
 
-  // Standalone state
-  let saAnswered = $state(false);
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
   let saAllMatched = $derived(matches.size === pairs.length);
+
+  const defaultId = `matching-${slug(question)}`;
+
+  function slug(text) {
+    return String(text ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+  }
 
   const pairColors = [
     '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
@@ -47,11 +56,7 @@
   } else {
     onMount(() => {
       initShuffle();
-      myIndex = quiz.registerQuestion({
-        checkAnswer,
-        reset: resetState,
-        render: renderQuestion,
-      });
+      quiz.setRender(myIndex, renderQuestion);
     });
   }
 
@@ -71,19 +76,31 @@
     initShuffle();
   }
 
+  const handle = useQuestion({
+    id: id ?? defaultId,
+    response: () => ({
+      type: 'matching',
+      response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
+      correct: pairs.map((_, i) => [String(i), String(i)]),
+    }),
+    reset: resetState,
+  });
+
+  const myIndex = $derived(handle.quizIndex ?? -1);
+
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
+  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
 
   // Auto-submit in standalone mode when all pairs matched
   $effect(() => {
-    if (standalone && saAllMatched && !saAnswered) {
-      saAnswered = true;
+    if (standalone && saAllMatched && !handle.submitted) {
+      handle.submit();
     }
   });
 
   function handleLeftClick(leftIndex) {
     if (standalone) {
-      if (saAnswered) return;
+      if (handle.submitted) return;
     } else {
       if (quizLocked) return;
     }
@@ -102,7 +119,7 @@
 
   function handleRightClick(rightOriginalIndex) {
     if (standalone) {
-      if (saAnswered) return;
+      if (handle.submitted) return;
     } else {
       if (quizLocked) return;
     }
@@ -140,7 +157,7 @@
 
   function removeMatch(leftIndex) {
     if (standalone) {
-      if (saAnswered) return;
+      if (handle.submitted) return;
     } else {
       if (quizLocked) return;
     }
@@ -154,8 +171,7 @@
 
   function handleRetry() {
     saRetryCount++;
-    saAnswered = false;
-    resetState();
+    handle.reset();
   }
 
   function getMatchColor(leftIndex) {
@@ -181,8 +197,8 @@
     return matches.get(leftIndex) === leftIndex;
   }
 
-  let showFeedback = $derived(standalone ? saAnswered : quiz.feedbackVisible(myIndex));
-  let isDisabled = $derived(standalone ? saAnswered : quizLocked);
+  let showFeedback = $derived(standalone ? handle.submitted : quiz.feedbackVisible(myIndex));
+  let isDisabled = $derived(standalone ? handle.submitted : quizLocked);
 </script>
 
 {#snippet matchingContent()}
