@@ -1,7 +1,9 @@
 <script>
   import { getContext, onMount } from 'svelte';
+  import { useQuestion } from '../runtime/hooks.svelte.js';
 
   let {
+    id,
     question,
     options,
     correct,
@@ -15,31 +17,42 @@
   const standalone = !quiz;
 
   let selectedOption = $state(null);
-  let myIndex = $state(-1);
-
-  // Standalone state
-  let saAnswered = $state(false);
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
   // Unique IDs for accessibility
   const groupId = `mc-${Math.random().toString(36).slice(2, 9)}`;
+  const defaultId = `mc-${slug(question)}`;
 
-  if (!standalone) {
-    onMount(() => {
-      myIndex = quiz.registerQuestion({
-        checkAnswer: (answer) => answer === correct,
-        reset: () => { selectedOption = null; },
-        render: renderQuestion,
-      });
-    });
+  function slug(text) {
+    return String(text ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
   }
+
+  const handle = useQuestion({
+    id: id ?? defaultId,
+    response: () => ({
+      type: 'choice',
+      response: selectedOption !== null ? [String(selectedOption)] : [],
+      correct: [String(correct)],
+    }),
+    reset: () => { selectedOption = null; },
+  });
+
+  const myIndex = $derived(handle.quizIndex ?? -1);
+
+  onMount(() => {
+    if (!standalone) quiz.setRender(myIndex, renderQuestion);
+  });
 
   function handleSelect(optIndex) {
     if (standalone) {
-      if (saAnswered) return;
+      if (handle.submitted) return;
       selectedOption = optIndex;
-      saAnswered = true;
+      handle.submit();
     } else {
       if (quizLocked) return;
       selectedOption = optIndex;
@@ -50,7 +63,7 @@
   function handleRetry() {
     saRetryCount++;
     selectedOption = null;
-    saAnswered = false;
+    handle.reset();
   }
 
   function isCorrectOption(optIndex) {
@@ -60,7 +73,7 @@
   // Quiz-mode helpers
   function getOptionClass(optIndex) {
     if (standalone) {
-      if (!saAnswered) return '';
+      if (!handle.submitted) return '';
       if (isCorrectOption(optIndex)) return 'correct';
       if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
       return '';
@@ -73,7 +86,7 @@
   }
 
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? saAnswered : quiz.isAnswerLocked(myIndex));
+  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
 </script>
 
 {#if standalone}
@@ -96,13 +109,13 @@
             name={groupId}
             value={i}
             checked={isSelected}
-            disabled={saAnswered}
+            disabled={handle.submitted}
             onchange={() => handleSelect(i)}
           />
           <span class="tessera-mc-radio-custom"></span>
           <span class="tessera-mc-option-text">{option}</span>
 
-          {#if saAnswered}
+          {#if handle.submitted}
             {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
               <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
             {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
@@ -115,7 +128,7 @@
       {/each}
     </div>
 
-    {#if saAnswered}
+    {#if handle.submitted}
       {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
         <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
       {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}

@@ -45,6 +45,13 @@
     return id;
   }
 
+  // Hand the Quiz the render snippet for a registered question.
+  // Snippets aren't available at a child's script-top (they live in the template
+  // block), so built-ins call this from onMount once the snippet has compiled.
+  function setRender(index, render) {
+    questions = questions.map((q) => (q.id === index ? { ...q, render } : q));
+  }
+
   function setAnswer(questionIndex, answer) {
     answers = new Map([...answers, [questionIndex, answer]]);
   }
@@ -56,6 +63,7 @@
   // Provide context to child question components
   setContext('tessera-quiz', {
     get registerQuestion() { return registerQuestion; },
+    get setRender() { return setRender; },
     get setAnswer() { return setAnswer; },
     get getAnswer() { return getAnswer; },
     get submitted() { return submitted; },
