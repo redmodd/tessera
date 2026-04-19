@@ -1,11 +1,21 @@
 {
-  "name": "tessera",
-  "version": "0.0.1",
+  "name": "@redmondelearning/tessera",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "styles",
+    "README.md"
+  ],
   "exports": {
     ".": {
-      "svelte": "./src/components/index.ts",
-      "default": "./src/components/index.ts"
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./plugin": {
       "import": "./dist/plugin/index.js",
@@ -14,18 +24,21 @@
     },
     "./runtime/*": "./src/runtime/*"
   },
-  "svelte": "./src/components/index.ts",
+  "svelte": "./src/index.ts",
   "scripts": {
     "build": "tsup",
     "test": "vitest run"
   },
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "archiver": "^7.0.1",
     "json5": "^2.0.0",
     "svelte": "^5.0.0"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/node": "^25.5.0",
+    "jsdom": "^29.0.1",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
