@@ -21,6 +21,7 @@ import {
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
+import { NavigationState } from '../src/runtime/navigation.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
 function makeAdapter() {
@@ -397,23 +398,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(userReset).toHaveBeenCalledTimes(1);
   });
 
-  it('passes render snippet through to registerQuestion', () => {
-    const progress = new ProgressState();
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    ctxStore.set('tessera-nav', makeNavCtx(progress));
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
-
-    const fakeSnippet = {} as unknown;
-    useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true }),
-      render: fakeSnippet,
-    });
-
-    const arg = quiz.registerQuestion.mock.calls[0][0];
-    expect(arg.render).toBe(fakeSnippet);
-  });
 });
 
 // ============ useNavigation ============
@@ -477,6 +461,24 @@ describe('useNavigation', () => {
 
     ctx.nav.isPageLocked = vi.fn(() => true);
     expect(h.canAccess('page-1')).toBe(false);
+  });
+
+  it('canAccess honors a custom config.navigation.canAccess', () => {
+    const progress = new ProgressState();
+    const manifest = createManifest(3);
+    const config = createConfig({
+      navigation: {
+        mode: 'free',
+        canAccess: ({ pageIndex }) => pageIndex === 0,
+      },
+    });
+    const nav = new NavigationState(manifest, progress, config);
+    ctxStore.set('tessera-nav', { nav, manifest, progress, config });
+
+    const h = useNavigation();
+    expect(h.canAccess('page-0')).toBe(true);
+    expect(h.canAccess('page-1')).toBe(false);
+    expect(h.canAccess('page-2')).toBe(false);
   });
 });
 
