@@ -1,6 +1,6 @@
 // ---- Components ----
+// `DefaultLayout` is included via the wildcard re-export.
 export * from './components/index.js';
-export { default as DefaultLayout } from './components/DefaultLayout.svelte';
 
 // ---- Hooks ----
 export {

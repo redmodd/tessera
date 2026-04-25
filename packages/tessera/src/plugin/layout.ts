@@ -38,12 +38,16 @@ export function tesseraLayoutPlugin(): Plugin {
 
     configureServer(server: ViteDevServer) {
       const layoutPath = resolve(projectRoot, 'layout.svelte');
-      server.watcher.on('all', (_event, filePath) => {
+      // Only react to add/unlink: those flip the virtual module's load() output
+      // between `export default null` and `export { default } from '...'`. A
+      // `change` event leaves that output identical and is handled by Svelte's
+      // own HMR for the underlying file — full-reloading on every edit would
+      // wipe in-page state for no reason.
+      server.watcher.on('all', (event, filePath) => {
         if (filePath !== layoutPath) return;
+        if (event !== 'add' && event !== 'unlink') return;
         const mod = server.moduleGraph.getModuleById(RESOLVED_LAYOUT_ID);
-        if (mod) {
-          server.moduleGraph.invalidateModule(mod);
-        }
+        if (mod) server.moduleGraph.invalidateModule(mod);
         server.ws.send({ type: 'full-reload' });
       });
     },
