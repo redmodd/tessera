@@ -5,7 +5,7 @@
   import { onMount, onDestroy, setContext, untrack } from 'svelte';
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import ErrorPage from './ErrorPage.svelte';
-  import Sidebar from './Sidebar.svelte';
+  import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
@@ -20,21 +20,11 @@
   const nav = new NavigationState(manifest, progress, config);
   let duration = $state(new DurationTracker(0));
 
-  // Mobile sidebar
-  let sidebarOpen = $state(false);
-
   // Page loading state
   let PageComponent = $state(null);
   let pageLoading = $state(true);
   let pageError = $state(null);
   let retryKey = $state(0);
-
-  // ---- Derived ----
-  let progressPercent = $derived(
-    manifest.totalPages > 0
-      ? Math.round((progress.visitedPages.size / manifest.totalPages) * 100)
-      : 0
-  );
 
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({ quiz: null, passingScore: config.scoring?.passingScore ?? 70 });
@@ -62,10 +52,9 @@
   });
 
   // ---- Chrome mode ----
-  // "default" (or unset) renders the built-in sidebar, prev/next, and progress bar.
-  // "custom" hides all three so a course-owned chrome component can take over.
+  // "default" (or unset) renders the built-in DefaultLayout chrome.
+  // "custom" hides the chrome so a course-owned shell can take over.
   const chromeMode = config.chrome === 'custom' ? 'custom' : 'default';
-  const showDefaultChrome = chromeMode === 'default';
 
   // ---- Page loading ----
   let loadGeneration = 0;
@@ -116,15 +105,6 @@
   // ---- Retry ----
   function retryPage() {
     retryKey++;
-  }
-
-  // ---- Mobile sidebar ----
-  function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
-  }
-
-  function closeSidebar() {
-    sidebarOpen = false;
   }
 
   // ---- Branding ----
@@ -178,17 +158,6 @@
     if (cfg.branding?.fontFamily) {
       el.style.setProperty('--tessera-font-family', cfg.branding.fontFamily);
     }
-  }
-
-  // ---- Keyboard shortcuts ----
-  function handleKeyNav(e) {
-    const tag = e.target?.tagName;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-    if (e.target?.closest('[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz')) return;
-
-    if (e.key === 'ArrowLeft') { nav.goPrev(); e.preventDefault(); }
-    if (e.key === 'ArrowRight') { nav.goNext(); e.preventDefault(); }
-    if (e.key === 'Escape' && sidebarOpen) { closeSidebar(); e.preventDefault(); }
   }
 
   // ---- Quiz completion handler ----
@@ -389,7 +358,6 @@
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('keydown', handleKeyNav);
     window.addEventListener('pagehide', handleExit);
     window.addEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
@@ -397,7 +365,6 @@
   });
 
   onDestroy(() => {
-    window.removeEventListener('keydown', handleKeyNav);
     window.removeEventListener('pagehide', handleExit);
     window.removeEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
@@ -405,84 +372,20 @@
   });
 </script>
 
-{#if showDefaultChrome}
-  <!-- Hamburger button (visible on tablet/mobile only via CSS) -->
-  <button
-    class="tessera-hamburger"
-    aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
-    aria-expanded={sidebarOpen}
-    onclick={toggleSidebar}
-  >
-    <span class="tessera-hamburger-lines">
-      <span class="tessera-hamburger-line"></span>
-      <span class="tessera-hamburger-line"></span>
-      <span class="tessera-hamburger-line"></span>
-    </span>
-  </button>
-
-  <!-- Sidebar overlay backdrop (mobile) -->
-  {#if sidebarOpen}
-    <div
-      class="tessera-sidebar-overlay visible"
-      role="presentation"
-      onclick={closeSidebar}
-    ></div>
+{#snippet page()}
+  {#if pageLoading}
+    <LoadingSkeleton />
+  {:else if pageError}
+    <ErrorPage error={pageError} onretry={retryPage} />
+  {:else if PageComponent}
+    <PageComponent />
   {/if}
-{/if}
+{/snippet}
 
-<div class="tessera-app" id="tessera-app" data-chrome={chromeMode}>
-  {#if showDefaultChrome}
-    <div class="tessera-sidebar" class:open={sidebarOpen}>
-      <Sidebar
-        {manifest}
-        {config}
-        currentPageIndex={nav.currentPageIndex}
-        {nav}
-        onnavigate={(index) => nav.goToPage(index)}
-        onclose={closeSidebar}
-      />
-    </div>
-  {/if}
-
-  <main class="tessera-main">
-    <div class="tessera-content">
-      {#if pageLoading}
-        <LoadingSkeleton />
-      {:else if pageError}
-        <ErrorPage error={pageError} onretry={retryPage} />
-      {:else if PageComponent}
-        <PageComponent />
-      {/if}
-    </div>
-
-    {#if showDefaultChrome}
-      <div class="tessera-page-nav">
-        <button
-          class="tessera-page-nav-btn"
-          disabled={!nav.canGoPrev}
-          onclick={() => nav.goPrev()}
-        >
-          ← Previous
-        </button>
-        <button
-          class="tessera-page-nav-btn"
-          disabled={!nav.canGoNext}
-          onclick={() => nav.goNext()}
-        >
-          Next →
-        </button>
-      </div>
-    {/if}
-  </main>
-
-  {#if showDefaultChrome}
-    <div class="tessera-progress">
-      <div class="tessera-progress-track" role="progressbar"
-           aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}
-           aria-label="Course progress">
-        <div class="tessera-progress-fill" style="width: {progressPercent}%"></div>
-      </div>
-      <div class="tessera-progress-label">{progress.visitedPages.size} of {manifest.totalPages} pages</div>
-    </div>
+<div id="tessera-app" data-chrome={chromeMode}>
+  {#if chromeMode === 'custom'}
+    {@render page()}
+  {:else}
+    <DefaultLayout {page} />
   {/if}
 </div>

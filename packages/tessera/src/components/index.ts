@@ -11,3 +11,5 @@ export { default as Quiz } from './Quiz.svelte';
 export { default as MultipleChoice } from './MultipleChoice.svelte';
 export { default as FillInTheBlank } from './FillInTheBlank.svelte';
 export { default as Matching } from './Matching.svelte';
+export { default as Sorting } from './Sorting.svelte';
+export { default as DefaultLayout } from './DefaultLayout.svelte';
