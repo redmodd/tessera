@@ -10,6 +10,17 @@ export {
   usePersistence,
 } from './runtime/hooks.svelte.js';
 
+// ---- Access ----
+export {
+  freeAccess,
+  sequentialAccess,
+  resolveAccess,
+} from './runtime/access.js';
+export type {
+  AccessFn,
+  AccessContext,
+} from './runtime/access.js';
+
 // ---- Types ----
 export type {
   Interaction,
