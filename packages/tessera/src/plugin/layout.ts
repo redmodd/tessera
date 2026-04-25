@@ -24,10 +24,12 @@ export function tesseraLayoutPlugin(): Plugin {
     load(id) {
       if (id !== RESOLVED_LAYOUT_ID) return null;
       const layoutPath = resolve(projectRoot, 'layout.svelte');
-      // Register the file with Vite so additions/removals invalidate the
-      // virtual module in build --watch mode and the dev watcher fires.
-      this.addWatchFile(layoutPath);
       if (existsSync(layoutPath)) {
+        // Register the file with Vite so edits trigger HMR / build --watch
+        // re-runs. Only add when the file actually exists — calling
+        // addWatchFile on a non-existent path makes Vite's importAnalysis
+        // try to resolve it as a real import.
+        this.addWatchFile(layoutPath);
         const normalized = layoutPath.replace(/\\/g, '/');
         return `export { default } from '${normalized}';`;
       }

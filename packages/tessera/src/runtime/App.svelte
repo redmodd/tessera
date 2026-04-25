@@ -2,6 +2,7 @@
   import config from 'virtual:tessera-config';
   import manifest from 'virtual:tessera-manifest';
   import pageModules from 'virtual:tessera-pages';
+  import UserLayout from 'virtual:tessera-layout';
   import { onMount, onDestroy, setContext, untrack } from 'svelte';
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import ErrorPage from './ErrorPage.svelte';
@@ -52,9 +53,17 @@
   });
 
   // ---- Chrome mode ----
-  // "default" (or unset) renders the built-in DefaultLayout chrome.
-  // "custom" hides the chrome so a course-owned shell can take over.
-  const chromeMode = config.chrome === 'custom' ? 'custom' : 'default';
+  // A project-supplied layout.svelte at the project root takes precedence.
+  // Otherwise: "default" renders the built-in DefaultLayout; "custom" hides
+  // the chrome entirely so a course-owned shell can take over.
+  if (UserLayout && config.chrome === 'custom' && import.meta.env?.DEV) {
+    console.warn('[tessera] Both layout.svelte and chrome: "custom" are set. layout.svelte wins.');
+  }
+  const chromeMode = UserLayout
+    ? 'user'
+    : config.chrome === 'custom'
+      ? 'custom'
+      : 'default';
 
   // ---- Page loading ----
   let loadGeneration = 0;
@@ -383,7 +392,9 @@
 {/snippet}
 
 <div id="tessera-app" data-chrome={chromeMode}>
-  {#if chromeMode === 'custom'}
+  {#if UserLayout}
+    <UserLayout {page} />
+  {:else if chromeMode === 'custom'}
     {@render page()}
   {:else}
     <DefaultLayout {page} />
