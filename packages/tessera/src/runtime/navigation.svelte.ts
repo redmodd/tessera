@@ -1,6 +1,7 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 import { ProgressState } from './progress.svelte.js';
+import { resolveAccess } from './access.js';
 
 export function isPageComplete(
   index: number,
@@ -33,12 +34,6 @@ export class NavigationState {
   canGoNext = $derived.by(() => {
     const next = this.currentPageIndex + 1;
     if (next >= this.manifest.totalPages) return false;
-
-    if (this.#config.navigation.mode === 'sequential') {
-      return isPageComplete(this.currentPageIndex, this.manifest, this.#progress, this.#config);
-    }
-
-    // Free mode: check if next page is locked by a quiz gate
     return !this.isPageLocked(next);
   });
 
@@ -63,30 +58,13 @@ export class NavigationState {
   }
 
   isPageLocked(index: number): boolean {
-    if (this.#config.navigation.mode === 'sequential') {
-      return this.#isPageLockedSequential(index);
-    }
-    return this.#isPageLockedFree(index);
-  }
-
-  #isPageLockedFree(index: number): boolean {
-    // Scan backwards from the target page for the nearest gating quiz
-    for (let i = index - 1; i >= 0; i--) {
-      const page = this.manifest.pages[i];
-      if (page.quiz?.gatesProgress) {
-        return (this.#progress.quizScores.get(i) ?? 0) < this.#config.scoring.passingScore;
-      }
-    }
-    return false;
-  }
-
-  #isPageLockedSequential(index: number): boolean {
-    // All preceding pages must be complete
-    for (let i = 0; i < index; i++) {
-      if (!isPageComplete(i, this.manifest, this.#progress, this.#config)) {
-        return true;
-      }
-    }
-    return false;
+    const fn = resolveAccess(this.#config);
+    return !fn({
+      pageIndex: index,
+      page: this.manifest.pages[index],
+      manifest: this.manifest,
+      progress: this.#progress,
+      config: this.#config,
+    });
   }
 }

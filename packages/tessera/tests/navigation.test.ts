@@ -242,6 +242,25 @@ describe('NavigationState', () => {
     });
   });
 
+  describe('isPageLocked — custom canAccess', () => {
+    it('overrides the preset for the configured mode', () => {
+      const manifest = createManifest(3);
+      const progress = new ProgressState();
+      const config = createConfig({
+        navigation: {
+          mode: 'free',
+          canAccess: ({ pageIndex, progress }) =>
+            pageIndex === 0 || progress.visitedPages.has(0),
+        },
+      });
+      const nav = new NavigationState(manifest, progress, config);
+
+      expect(nav.isPageLocked(1)).toBe(true);
+      progress.markVisited(0);
+      expect(nav.isPageLocked(1)).toBe(false);
+    });
+  });
+
   describe('empty manifest', () => {
     it('canGoNext and canGoPrev are both false', () => {
       const nav = new NavigationState(createManifest(0), new ProgressState(), createConfig());
