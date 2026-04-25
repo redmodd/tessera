@@ -22,12 +22,16 @@
       "types": "./dist/plugin/index.d.ts",
       "default": "./dist/plugin/index.js"
     },
+    "./virtual": {
+      "types": "./src/virtual.d.ts"
+    },
     "./runtime/*": "./src/runtime/*"
   },
   "svelte": "./src/index.ts",
   "scripts": {
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
@@ -38,6 +42,7 @@
   "devDependencies": {
     "@types/archiver": "^7.0.0",
     "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "jsdom": "^29.0.1",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",

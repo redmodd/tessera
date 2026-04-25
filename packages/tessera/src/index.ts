@@ -1,5 +1,6 @@
 // ---- Components ----
 export * from './components/index.js';
+export { default as DefaultLayout } from './components/DefaultLayout.svelte';
 
 // ---- Hooks ----
 export {
