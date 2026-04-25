@@ -1,3 +1,5 @@
+import type { AccessFn } from './access.js';
+
 export interface CourseConfig {
   title: string;
   description?: string;
@@ -10,6 +12,7 @@ export interface CourseConfig {
   };
   navigation: {
     mode: 'free' | 'sequential';
+    canAccess?: AccessFn;
   };
   completion: {
     mode: 'quiz' | 'percentage';
