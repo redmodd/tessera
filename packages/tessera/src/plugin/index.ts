@@ -3,8 +3,12 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, unlinkSync, cpSync, mkdirSync } from 'node:fs';
-import { generateManifest } from './manifest.js';
+import { generateManifest, extractObjectLiteral } from './manifest.js';
+import JSON5 from 'json5';
 import type { Manifest } from './manifest.js';
+import { validateProject } from './validation.js';
+import { runExport } from './export.js';
+import { tesseraLayoutPlugin } from './layout.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,10 +30,13 @@ export function tesseraPlugin() {
     svelte({
       compilerOptions: { css: 'injected' },
     }),
+    tesseraValidationPlugin(),
     tesseraEntryPlugin(),
     tesseraConfigPlugin(),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(),
+    tesseraLayoutPlugin(),
+    tesseraExportPlugin(),
   ];
 }
 
@@ -182,6 +189,7 @@ function tesseraConfigPlugin(): Plugin {
       const root = config.root || process.cwd();
 
       return {
+        base: './',
         resolve: {
           alias: {
             '$assets': resolve(root, 'assets'),
@@ -202,12 +210,31 @@ function tesseraConfigPlugin(): Plugin {
     load(id) {
       if (id === RESOLVED_CONFIG_ID) {
         const configPath = resolve(projectRoot, 'course.config.js');
+        let userConfig: Record<string, any> = {};
+
         if (existsSync(configPath)) {
           this.addWatchFile(configPath);
           const contents = readFileSync(configPath, 'utf-8');
-          return contents;
+          const match = contents.match(/export\s+default\s*(\{)/);
+          if (match && match.index !== undefined) {
+            const startIndex = contents.indexOf('{', match.index);
+            const objectStr = extractObjectLiteral(contents, startIndex);
+            if (objectStr) {
+              try { userConfig = JSON5.parse(objectStr); } catch {}
+            }
+          }
         }
-        return 'export default {};';
+
+        const merged = {
+          title: userConfig.title || 'Untitled Course',
+          ...userConfig,
+          navigation: { mode: 'free', ...userConfig.navigation },
+          completion: { mode: 'percentage', percentageThreshold: 100, ...userConfig.completion },
+          scoring: { passingScore: 70, ...userConfig.scoring },
+          export: { standard: 'web', ...userConfig.export },
+        };
+
+        return `export default ${JSON.stringify(merged)};`;
       }
       return null;
     },
@@ -254,6 +281,92 @@ function tesseraPagesPlugin(): Plugin {
         return `export default import.meta.glob('/pages/**/*.svelte');`;
       }
       return null;
+    },
+  };
+}
+
+// ---------- Validation Plugin ----------
+
+function tesseraValidationPlugin(): Plugin {
+  let projectRoot: string;
+  let isBuild = false;
+
+  return {
+    name: 'tessera:validation',
+    enforce: 'pre',
+
+    configResolved(config: ResolvedConfig) {
+      projectRoot = config.root;
+      isBuild = config.command === 'build';
+      // Run validation during dev (configResolved fires before server starts)
+      if (!isBuild) {
+        runValidation(projectRoot);
+      }
+    },
+
+    buildStart() {
+      // Run validation during build (buildStart fires once before bundling)
+      if (isBuild) {
+        runValidation(projectRoot);
+      }
+    },
+  };
+}
+
+function runValidation(projectRoot: string): void {
+  const { errors, warnings } = validateProject(projectRoot);
+
+  for (const warning of warnings) {
+    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
+  }
+
+  if (errors.length > 0) {
+    for (const error of errors) {
+      console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
+    }
+    throw new Error(
+      `Tessera validation failed with ${errors.length} error(s). Fix the errors above to continue.`
+    );
+  }
+}
+
+// ---------- Export Plugin ----------
+
+function tesseraExportPlugin(): Plugin {
+  let projectRoot: string;
+  let isBuild = false;
+
+  return {
+    name: 'tessera:export',
+    enforce: 'post',
+
+    configResolved(config: ResolvedConfig) {
+      projectRoot = config.root;
+      isBuild = config.command === 'build';
+    },
+
+    async closeBundle() {
+      if (!isBuild) return;
+
+      const configPath = resolve(projectRoot, 'course.config.js');
+      if (!existsSync(configPath)) return;
+
+      const content = readFileSync(configPath, 'utf-8');
+      const match = content.match(/export\s+default\s*(\{)/);
+      if (!match || match.index === undefined) return;
+
+      const startIndex = content.indexOf('{', match.index);
+      const objectStr = extractObjectLiteral(content, startIndex);
+      if (!objectStr) return;
+
+      let config: any;
+      try {
+        config = JSON5.parse(objectStr);
+      } catch {
+        return;
+      }
+
+      await runExport(projectRoot, config);
     },
   };
 }
@@ -332,8 +445,11 @@ function tesseraManifestPlugin(): Plugin {
         addWatchFiles(this, pagesDir);
 
         // Encode as base64 to prevent Vite's import analysis from
-        // scanning .svelte importPath strings as module imports
-        const json = JSON.stringify(currentManifest);
+        // scanning .svelte importPath strings as module imports.
+        // Replace Infinity with 1e9 since JSON.stringify drops it.
+        const json = JSON.stringify(currentManifest, (_key, value) =>
+          value === Infinity ? 1e9 : value
+        );
         const b64 = Buffer.from(json).toString('base64');
         return `export default JSON.parse(atob("${b64}"));`;
       }
