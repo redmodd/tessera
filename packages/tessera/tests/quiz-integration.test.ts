@@ -87,9 +87,11 @@ describe('Quiz integration with navigation gating', () => {
     const config = createConfig({ scoring: { passingScore: 70 } });
     const progress = new ProgressState();
 
-    // No quizzes completed yet — unattempted count as 0, average = 0 < 70 → failed
+    // No quizzes attempted yet — successStatus stays 'unknown' so we don't
+    // mark a course "failed" before the learner has had a chance to start.
+    // (Once *any* graded score is recorded, unattempted siblings count as 0.)
     progress.recalculateSuccess(manifest, config);
-    expect(progress.successStatus).toBe('failed');
+    expect(progress.successStatus).toBe('unknown');
 
     // One quiz completed with 90%
     progress.quizCompleted(1, 90);

@@ -11,10 +11,17 @@
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
   import { createAdapter } from './adapters/index.js';
+  import { buildXAPIClient } from './xapi/setup.js';
+  import { registerXAPIClient } from './xapi/registry.js';
+  import { TESSERA_PAGE, TESSERA_NAV, TESSERA_ADAPTER, TESSERA_USER_STATE } from './contexts.js';
 
   // ---- Persistence ----
   const adapter = createAdapter(config);
   let persistenceReady = $state(false);
+  // Holds the resolved xAPI client for unload-time markUnloading. Set
+  // after adapter.init() resolves and registered globally so useXAPI()
+  // can reach it.
+  let xapiClient = null;
 
   // ---- State classes ----
   const progress = new ProgressState();
@@ -29,26 +36,26 @@
 
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({ quiz: null, passingScore: config.scoring?.passingScore ?? 70 });
-  setContext('tessera-page', pageContext);
+  setContext(TESSERA_PAGE, pageContext);
 
   // ---- Navigation context (read by custom chrome components) ----
   // Exposes nav/manifest/progress/config so courses can build custom top bars,
   // menus, tables of contents, etc. that can navigate to specific pages.
-  setContext('tessera-nav', { nav, manifest, progress, config });
+  setContext(TESSERA_NAV, { nav, manifest, progress, config });
 
   // ---- Adapter context (read by useQuestion / usePersistence) ----
-  setContext('tessera-adapter', { get adapter() { return adapter; } });
+  setContext(TESSERA_ADAPTER, { get adapter() { return adapter; } });
 
   // ---- User-scoped state (read/written by usePersistence) ----
   // Each call site namespaces under its own key. Persisted to SavedState.u.
   let userState = $state({});
-  setContext('tessera-user-state', {
+  setContext(TESSERA_USER_STATE, {
     get(key) {
       return key in userState ? userState[key] : null;
     },
     set(key, value) {
-      userState = { ...userState, [key]: value };
-      persistState();
+      userState[key] = value;
+      requestPersist();
     },
   });
 
@@ -179,7 +186,8 @@
     }
     progress.recalculateCompletion(manifest, config);
     progress.recalculateSuccess(manifest, config);
-    persistState();
+    // Persistence is scheduled by the version-tracking effect below; no
+    // explicit call needed here.
   }
 
   // ---- Persistence: serialize / restore ----
@@ -206,7 +214,7 @@
       c,
       s,
       gs: [...progress.gradedStandalonePages],
-      u: userState,
+      u: { ...userState },
     };
   }
 
@@ -256,47 +264,31 @@
     adapter.saveState(serializeState());
   }
 
-  // ---- Persistence: save on state changes ----
-  // Track previous values to avoid saving on initial load
-  let prevPageIndex = $state(-1);
-  let prevVisitedSize = $state(-1);
-  let prevScoresSize = $state(-1);
-  let prevChunksSignature = $state(null);
+  // ---- Persistence: coalesced save on state changes ----
+  // A single microtask-batched scheduler. Multiple state mutations within one
+  // tick collapse to one persistState() call (and one LMS commit). Replaces
+  // four independent $effects, each of which used to fire its own write.
+  let persistScheduled = false;
+
+  function requestPersist() {
+    if (persistScheduled) return;
+    if (!persistenceReady) return;
+    persistScheduled = true;
+    queueMicrotask(() => {
+      persistScheduled = false;
+      persistState();
+    });
+  }
 
   $effect(() => {
-    const idx = nav.currentPageIndex;
-    if (prevPageIndex >= 0 && idx !== prevPageIndex) {
-      untrack(() => persistState());
-    }
-    prevPageIndex = idx;
-  });
-
-  $effect(() => {
-    const size = progress.visitedPages.size;
-    if (prevVisitedSize >= 0 && size !== prevVisitedSize) {
-      untrack(() => persistState());
-    }
-    prevVisitedSize = size;
-  });
-
-  $effect(() => {
-    const size = progress.quizScores.size;
-    if (prevScoresSize >= 0 && size !== prevScoresSize) {
-      untrack(() => persistState());
-    }
-    prevScoresSize = size;
-  });
-
-  $effect(() => {
-    // Signature reflects every chunk advance (set size alone is not enough since
-    // the same page can advance from chunk 0 → 1 → 2 without growing the map).
-    const sig = [...progress.chunkProgress]
-      .map(([p, c]) => `${p}:${c}`)
-      .join(',');
-    if (prevChunksSignature !== null && sig !== prevChunksSignature) {
-      untrack(() => persistState());
-    }
-    prevChunksSignature = sig;
+    // Subscribe to every signal that influences serializeState():
+    //   - currentPageIndex (bookmark)
+    //   - progress.version (bumped by markVisited / quizCompleted /
+    //     markChunk / markStandaloneQuestion)
+    // userState writes go through requestPersist() directly from the setter.
+    void nav.currentPageIndex;
+    void progress.version;
+    untrack(requestPersist);
   });
 
   // ---- Persistence: report score/completion/success to adapter ----
@@ -342,7 +334,15 @@
     terminated = true;
     adapter.saveState(serializeState());
     adapter.setDuration(duration.sessionSeconds);
+    // Tell SCORM whether this is a suspend-to-resume close or a normal
+    // exit. cmi5/web adapters no-op. Must come before terminate() so the
+    // value is committed in the same flush.
+    adapter.setExit(progress.completionStatus === 'complete' ? 'normal' : 'suspend');
     adapter.commit();
+    // Stop accepting author-issued statements on independent destinations
+    // before terminate() so a late `useXAPI().sendStatement(...)` from a
+    // beforeunload handler can't slip in after Terminated.
+    xapiClient?.markUnloading();
     adapter.terminate();
   }
 
@@ -351,14 +351,37 @@
     applyBranding(config);
     if (config.title) document.title = config.title;
 
-    // Initialize persistence and restore state
-    await adapter.init();
+    // Initialize persistence and restore state. Adapter init() may throw
+    // for malformed launch params (cmi5 actor JSON, missing fetch URL,
+    // failed token request). Surface that to the UI rather than crashing
+    // silently — a launch-time error means the LMS context is wrong and
+    // the user can't continue regardless.
+    try {
+      await adapter.init();
+    } catch (err) {
+      console.error('Tessera: adapter init failed', err);
+      pageError = err instanceof Error ? err : new Error(String(err));
+      pageLoading = false;
+      return;
+    }
     const saved = adapter.getState();
     if (saved) {
       restoreState(saved);
       prevCompletionStatus = progress.completionStatus;
     }
     persistenceReady = true;
+
+    // Build the xAPI client (custom destinations + cmi5 'lms' shared
+    // queue) once the adapter has resolved its launch context. Failure
+    // here is non-fatal — courses with no `xapi:` config get null, which
+    // is what `useXAPI()` is documented to return when nothing is wired.
+    try {
+      xapiClient = await buildXAPIClient(config, adapter);
+    } catch (err) {
+      console.warn('Tessera: xAPI client setup failed', err);
+      xapiClient = null;
+    }
+    registerXAPIClient(xapiClient);
 
     // Push initial completion + success status to the adapter so LMSes never
     // see the SCORM default ("unknown") on Terminate — SCORM Cloud rolls that
@@ -378,6 +401,9 @@
     window.removeEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
     appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
+    // Clear the global slot so a stale client from a previous mount
+    // can't leak into a fresh one (matters for tests that re-mount).
+    registerXAPIClient(null);
   });
 </script>
 

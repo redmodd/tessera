@@ -1,9 +1,10 @@
 <script>
-  import { getContext, onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import Sidebar from '../runtime/Sidebar.svelte';
+  import { requireNavContext } from '../runtime/contexts.js';
 
   let { page } = $props();
-  const { nav, manifest, config, progress } = getContext('tessera-nav');
+  const { nav, manifest, config, progress } = requireNavContext('DefaultLayout');
 
   let sidebarOpen = $state(false);
 

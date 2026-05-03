@@ -84,3 +84,49 @@ export function scorm12Type(type: Interaction['type']): string {
       return type;
   }
 }
+
+/**
+ * Per-standard differences in how `cmi.interactions.n.*` is written. The
+ * SCORM 1.2 vs 2004 deltas are: response field name, result vocabulary,
+ * timestamp field name+format, and the type vocabulary mapping.
+ */
+export interface ScormInteractionSpec {
+  responseField: 'student_response' | 'learner_response';
+  timestampField: 'time' | 'timestamp';
+  /** Wall-clock value formatted to whichever style the standard expects. */
+  timestamp: string;
+  /** Mapped interaction type — already narrowed for SCORM 1.2 callers. */
+  typeValue: string;
+  resultLabels: { correct: string; incorrect: string };
+}
+
+/**
+ * Build the ordered list of `cmi.interactions.n.*` writes that SCORM 1.2 and
+ * SCORM 2004 adapters share. Caller wires each pair through its own LMS
+ * SetValue queue (the queueing semantics differ between adapters).
+ */
+export function buildScormInteractionFields(
+  prefix: string,
+  questionId: string,
+  interaction: Interaction,
+  correct: boolean | null,
+  spec: ScormInteractionSpec
+): Array<[string, string]> {
+  const fields: Array<[string, string]> = [
+    [`${prefix}.id`, questionId],
+    [`${prefix}.type`, spec.typeValue],
+    [`${prefix}.${spec.responseField}`, formatResponse(interaction)],
+  ];
+  const pattern = formatCorrectPattern(interaction);
+  if (pattern !== null) {
+    fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);
+  }
+  if (correct !== null) {
+    fields.push([
+      `${prefix}.result`,
+      correct ? spec.resultLabels.correct : spec.resultLabels.incorrect,
+    ]);
+  }
+  fields.push([`${prefix}.${spec.timestampField}`, spec.timestamp]);
+  return fields;
+}

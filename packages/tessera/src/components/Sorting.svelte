@@ -1,6 +1,7 @@
 <script>
   import { getContext, onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
+  import { slugFromQuestion } from './util.js';
 
   let {
     id,
@@ -11,6 +12,7 @@
     correctFeedback = '',
     incorrectFeedback = '',
     maxRetries = Infinity,
+    weight = 1,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
@@ -25,15 +27,7 @@
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
-  const defaultId = `sorting-${slug(question)}`;
-
-  function slug(text) {
-    return String(text ?? '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 40);
-  }
+  const defaultId = `sorting-${slugFromQuestion(question)}`;
 
   function shuffle(arr) {
     const a = [...arr];
@@ -79,6 +73,7 @@
   // pairs as stringified ids.
   const handle = useQuestion({
     id: id ?? defaultId,
+    weight,
     response: () => ({
       type: 'matching',
       response: [...placements.entries()].map(([i, t]) => [String(i), String(t)]),
@@ -110,7 +105,7 @@
   function placeCard(targetIdx) {
     if (isDisabled || currentItemIdx === null) return;
     const itemIdx = queue[0];
-    placements = new Map([...placements, [itemIdx, targetIdx]]);
+    placements.set(itemIdx, targetIdx);
     queue = queue.slice(1);
     cardSelected = false;
     if (!standalone) quiz.setAnswer(myIndex, new Map(placements));
@@ -118,9 +113,7 @@
 
   function returnCard(itemIdx) {
     if (isDisabled) return;
-    const newPlacements = new Map(placements);
-    newPlacements.delete(itemIdx);
-    placements = newPlacements;
+    placements.delete(itemIdx);
     queue = [itemIdx, ...queue];
     if (!standalone) quiz.setAnswer(myIndex, new Map(placements));
   }
@@ -554,14 +547,6 @@
   .tessera-sorting-remove:hover {
     color: var(--tessera-error);
     background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
-  }
-
-  .tessera-sorting-placeholder {
-    font-size: 0.8125rem;
-    color: var(--tessera-text-light);
-    font-style: italic;
-    padding: var(--tessera-spacing-xs, 4px) 0;
-    text-align: center;
   }
 
   /* --- Feedback --- */

@@ -1,20 +1,7 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { CourseConfig } from '../types.js';
 import type { Interaction } from '../interaction.js';
-
-/**
- * Slugify a string for use as a localStorage key.
- * "My Course Title" → "my-course-title"
- */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
+import { slugify } from '../slugify.js';
 
 /**
  * Web persistence adapter — stores course state in localStorage.
@@ -60,6 +47,7 @@ export class WebAdapter implements PersistenceAdapter {
   setCompletionStatus(_status: 'incomplete' | 'complete'): void {}
   setSuccessStatus(_status: 'passed' | 'failed' | 'unknown'): void {}
   setDuration(_seconds: number): void {}
+  setExit(_mode: 'suspend' | 'normal'): void {}
   reportInteraction(
     _questionId: string,
     _interaction: Interaction,

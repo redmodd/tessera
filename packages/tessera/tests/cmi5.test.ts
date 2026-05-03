@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { CMI5Adapter, hasCMI5LaunchParams } from '../src/runtime/adapters/cmi5.js';
+import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
+import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 
 const mockFetch = vi.fn();
@@ -254,7 +255,8 @@ describe('CMI5Adapter', () => {
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const headers = statementCalls[0][1].headers;
-    expect(headers.get('Authorization')).toBe('Bearer test-auth-token');
+    // cmi5 §6.2: the LMS-issued fetch token is a Basic credential, not a Bearer.
+    expect(headers.get('Authorization')).toBe('Basic test-auth-token');
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
   });
 
@@ -286,7 +288,7 @@ describe('CMI5Adapter', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('terminate sends Terminated statement', async () => {
+  it('terminate sends Suspended then Terminated when not completed (cmi5 §10.1)', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -294,8 +296,38 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
 
+    adapter.setDuration(120);
     adapter.terminate();
 
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0]?.includes('statements')
+    );
+    expect(statementCalls.length).toBe(2);
+    const suspended = JSON.parse(statementCalls[0][1].body);
+    const terminated = JSON.parse(statementCalls[1][1].body);
+    expect(suspended.verb.id).toBe('http://adlnet.gov/expapi/verbs/suspended');
+    expect(suspended.result.duration).toBe('PT2M');
+    expect(terminated.verb.id).toBe('http://adlnet.gov/expapi/verbs/terminated');
+    // cmi5 §9.5.4.1 — Terminated must include result.duration.
+    expect(terminated.result.duration).toBe('PT2M');
+  });
+
+  it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.setScore(85);
+    adapter.setDuration(60);
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 20));
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.terminate();
     await new Promise((r) => setTimeout(r, 50));
 
     const statementCalls = mockFetch.mock.calls.filter(
@@ -304,12 +336,16 @@ describe('CMI5Adapter', () => {
     expect(statementCalls.length).toBe(1);
     const body = JSON.parse(statementCalls[0][1].body);
     expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/terminated');
+    expect(body.result.duration).toBe('PT1M');
   });
 
   it('terminate is idempotent', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
+
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 20));
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });

@@ -24,11 +24,21 @@ export class ProgressState {
   successStatus = $state<'unknown' | 'passed' | 'failed'>('unknown');
 
   /**
+   * Monotonic counter incremented on every persistable state mutation
+   * (visited/scores/chunks/standalone). Callers that need to react to *any*
+   * progress change can subscribe to this single signal instead of iterating
+   * each Map/Set themselves.
+   */
+  version = $state(0);
+
+  /**
    * Mark a page as visited. Callers must call recalculateCompletion()
    * afterward to update completionStatus.
    */
   markVisited(pageIndex: number) {
-    this.visitedPages = new Set([...this.visitedPages, pageIndex]);
+    if (this.visitedPages.has(pageIndex)) return;
+    this.visitedPages.add(pageIndex);
+    this.version++;
   }
 
   /**
@@ -36,7 +46,8 @@ export class ProgressState {
    * and recalculateSuccess() afterward to update status fields.
    */
   quizCompleted(pageIndex: number, score: number) {
-    this.quizScores = new Map([...this.quizScores, [pageIndex, score]]);
+    this.quizScores.set(pageIndex, score);
+    this.version++;
   }
 
   /**
@@ -46,7 +57,8 @@ export class ProgressState {
   markChunk(pageIndex: number, chunkIndex: number) {
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
-    this.chunkProgress = new Map([...this.chunkProgress, [pageIndex, chunkIndex]]);
+    this.chunkProgress.set(pageIndex, chunkIndex);
+    this.version++;
   }
 
   /** Highest chunk revealed on a page, or -1 if none. */
@@ -65,15 +77,16 @@ export class ProgressState {
     score: number,
     graded: boolean
   ) {
-    const pageMap = new Map(this.standaloneQuestionScores.get(pageIndex) ?? []);
-    pageMap.set(questionId, score);
-    this.standaloneQuestionScores = new Map([
-      ...this.standaloneQuestionScores,
-      [pageIndex, pageMap],
-    ]);
-    if (graded) {
-      this.gradedStandalonePages = new Set([...this.gradedStandalonePages, pageIndex]);
+    let pageMap = this.standaloneQuestionScores.get(pageIndex);
+    if (!pageMap) {
+      pageMap = new Map<string, number>();
+      this.standaloneQuestionScores.set(pageIndex, pageMap);
     }
+    pageMap.set(questionId, score);
+    if (graded) {
+      this.gradedStandalonePages.add(pageIndex);
+    }
+    this.version++;
   }
 
   /** Average of standalone question scores on a page, or 0 if none. */

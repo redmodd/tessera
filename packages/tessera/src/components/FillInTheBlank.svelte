@@ -1,6 +1,7 @@
 <script>
   import { getContext, onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
+  import { slugFromQuestion } from './util.js';
 
   let {
     id,
@@ -10,6 +11,7 @@
     correctFeedback = '',
     incorrectFeedback = '',
     maxRetries = Infinity,
+    weight = 1,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
@@ -20,15 +22,7 @@
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
   const inputId = `fitb-${Math.random().toString(36).slice(2, 9)}`;
-  const defaultId = `fitb-${slug(question)}`;
-
-  function slug(text) {
-    return String(text ?? '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 40);
-  }
+  const defaultId = `fitb-${slugFromQuestion(question)}`;
 
   function checkAnswer(userAnswer) {
     if (!userAnswer || typeof userAnswer !== 'string') return false;
@@ -42,6 +36,7 @@
 
   const handle = useQuestion({
     id: id ?? defaultId,
+    weight,
     response: () => ({
       type: 'fill-in',
       response: inputValue,

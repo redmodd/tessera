@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, unlinkSync, cpSync, mkdirSync } from 'node:fs';
-import { generateManifest, extractObjectLiteral } from './manifest.js';
+import { generateManifest, extractDefaultExportObjectLiteral } from './manifest.js';
 import JSON5 from 'json5';
 import type { Manifest } from './manifest.js';
 import { validateProject } from './validation.js';
@@ -214,14 +214,9 @@ function tesseraConfigPlugin(): Plugin {
 
         if (existsSync(configPath)) {
           this.addWatchFile(configPath);
-          const contents = readFileSync(configPath, 'utf-8');
-          const match = contents.match(/export\s+default\s*(\{)/);
-          if (match && match.index !== undefined) {
-            const startIndex = contents.indexOf('{', match.index);
-            const objectStr = extractObjectLiteral(contents, startIndex);
-            if (objectStr) {
-              try { userConfig = JSON5.parse(objectStr); } catch {}
-            }
+          const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
+          if (objectStr) {
+            try { userConfig = JSON5.parse(objectStr); } catch {}
           }
         }
 
@@ -349,21 +344,29 @@ function tesseraExportPlugin(): Plugin {
       if (!isBuild) return;
 
       const configPath = resolve(projectRoot, 'course.config.js');
-      if (!existsSync(configPath)) return;
+      if (!existsSync(configPath)) {
+        // Validation already required course.config.js — getting here means
+        // the file vanished mid-build. Surface that loudly rather than
+        // shipping a bundle with no LMS export silently.
+        throw new Error(
+          '[tessera:export] course.config.js not found at closeBundle. The file must exist for the export step to run.'
+        );
+      }
 
-      const content = readFileSync(configPath, 'utf-8');
-      const match = content.match(/export\s+default\s*(\{)/);
-      if (!match || match.index === undefined) return;
-
-      const startIndex = content.indexOf('{', match.index);
-      const objectStr = extractObjectLiteral(content, startIndex);
-      if (!objectStr) return;
+      const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
+      if (!objectStr) {
+        throw new Error(
+          '[tessera:export] course.config.js: could not locate `export default { ... }`. Cannot determine export.standard.'
+        );
+      }
 
       let config: any;
       try {
         config = JSON5.parse(objectStr);
-      } catch {
-        return;
+      } catch (err) {
+        throw new Error(
+          `[tessera:export] course.config.js: failed to parse export-default object literal — ${(err as Error).message}`
+        );
       }
 
       await runExport(projectRoot, config);

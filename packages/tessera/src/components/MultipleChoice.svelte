@@ -1,6 +1,7 @@
 <script>
   import { getContext, onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
+  import { slugFromQuestion } from './util.js';
 
   let {
     id,
@@ -11,6 +12,7 @@
     incorrectFeedback = '',
     optionFeedback = [],
     maxRetries = Infinity,
+    weight = 1,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
@@ -22,18 +24,11 @@
 
   // Unique IDs for accessibility
   const groupId = `mc-${Math.random().toString(36).slice(2, 9)}`;
-  const defaultId = `mc-${slug(question)}`;
-
-  function slug(text) {
-    return String(text ?? '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 40);
-  }
+  const defaultId = `mc-${slugFromQuestion(question)}`;
 
   const handle = useQuestion({
     id: id ?? defaultId,
+    weight,
     response: () => ({
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],

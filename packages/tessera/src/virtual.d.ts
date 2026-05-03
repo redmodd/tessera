@@ -3,3 +3,14 @@ declare module 'virtual:tessera-layout' {
   const layout: Component<{ page: import('svelte').Snippet }> | null;
   export default layout;
 }
+
+interface ImportMetaEnv {
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly MODE: string;
+  readonly SSR: boolean;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

@@ -15,6 +15,7 @@
   let answers = $state(new Map());
   let submitted = $state(false);
   let score = $state(0);
+  let correctCount = $state(0);
   let attemptCount = $state(0);
   let reviewing = $state(false);
   let reviewIndex = $state(0);
@@ -45,7 +46,10 @@
   // interaction reporting).
   function registerQuestion(questionApi) {
     const index = questions.length;
-    questions = [...questions, questionApi];
+    const weight = typeof questionApi.weight === 'number' && questionApi.weight > 0
+      ? questionApi.weight
+      : 1;
+    questions.push({ ...questionApi, weight });
     return index;
   }
 
@@ -53,11 +57,11 @@
   // Snippets aren't available at a child's script-top (they live in the template
   // block), so built-ins call this from onMount once the snippet has compiled.
   function setRender(index, render) {
-    questions = questions.map((q, i) => (i === index ? { ...q, render } : q));
+    questions[index].render = render;
   }
 
   function setAnswer(questionIndex, answer) {
-    answers = new Map([...answers, [questionIndex, answer]]);
+    answers.set(questionIndex, answer);
   }
 
   function getAnswer(questionIndex) {
@@ -104,7 +108,7 @@
         && answers.has(currentQuestionIndex)
         && !feedbackShown.has(currentQuestionIndex)
         && !lockedCorrect.has(currentQuestionIndex)) {
-      feedbackShown = new Set([...feedbackShown, currentQuestionIndex]);
+      feedbackShown.add(currentQuestionIndex);
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
@@ -139,23 +143,32 @@
   }
 
   function showImmediateFeedback() {
-    feedbackShown = new Set([...feedbackShown, currentQuestionIndex]);
+    feedbackShown.add(currentQuestionIndex);
   }
 
   // Submission
   function handleSubmit() {
     if (!allAnswered) return;
 
-    let correctCount = 0;
+    // Weighted rollup: Σ(w·correct)/Σ(w)·100. With every weight = 1 (the
+    // default) this collapses to the unweighted mean, so existing courses
+    // that never set a `weight` prop see no change.
+    let count = 0;
+    let weighted = 0;
+    let totalWeight = 0;
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       const answer = answers.get(i);
-      if (q.checkAnswer(answer)) {
-        correctCount++;
+      const ok = q.checkAnswer(answer);
+      totalWeight += q.weight;
+      if (ok) {
+        weighted += q.weight;
+        count++;
       }
     }
 
-    score = Math.round((correctCount / totalQuestions) * 100);
+    correctCount = count;
+    score = totalWeight === 0 ? 0 : Math.round((weighted / totalWeight) * 100);
     submitted = true;
     attemptCount++;
 
@@ -185,6 +198,7 @@
     submitted = false;
     reviewing = false;
     score = 0;
+    correctCount = 0;
     currentQuestionIndex = 0;
     reviewIndex = 0;
     feedbackShown = new Set();
@@ -236,7 +250,7 @@
     </div>
 
     <div class="tessera-quiz-questions">
-      {#each questions as q, i}
+      {#each questions as q, i (q.id)}
         <div class="tessera-quiz-question-wrapper" class:active={i === currentQuestionIndex} aria-hidden={i !== currentQuestionIndex}>
           {#if q.render}
             {@render q.render()}
@@ -289,7 +303,7 @@
     </div>
 
     <div class="tessera-quiz-questions">
-      {#each questions as q, i}
+      {#each questions as q, i (q.id)}
         <div class="tessera-quiz-question-wrapper" class:active={i === reviewIndex} aria-hidden={i !== reviewIndex}>
           {#if q.render}
             {@render q.render()}
@@ -334,7 +348,7 @@
         </span>
       </div>
       <p class="tessera-quiz-results-detail">
-        You answered {Math.round(score * totalQuestions / 100)} of {totalQuestions} questions correctly.
+        You answered {correctCount} of {totalQuestions} questions correctly.
       </p>
 
       <div class="tessera-quiz-results-actions">

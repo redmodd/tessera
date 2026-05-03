@@ -1,8 +1,11 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
+import type { QuizConfig } from '../runtime/types.js';
 
 // ---------- Types ----------
+
+export type { QuizConfig };
 
 export interface ManifestPage {
   index: number;
@@ -10,15 +13,6 @@ export interface ManifestPage {
   slug: string;
   importPath: string;
   quiz: QuizConfig | null;
-}
-
-export interface QuizConfig {
-  graded?: boolean;
-  gatesProgress?: boolean;
-  maxAttempts?: number;
-  showFeedback?: boolean;
-  feedbackMode?: 'review' | 'immediate';
-  retryMode?: 'full' | 'incorrect-only';
 }
 
 export interface ManifestLesson {
@@ -37,6 +31,26 @@ export interface Manifest {
   sections: ManifestSection[];
   pages: ManifestPage[];
   totalPages: number;
+}
+
+// ---------- File read cache ----------
+
+/**
+ * Module-level cache of source file contents keyed by absolute path with
+ * mtime invalidation. Both `validateProject` and `generateManifest` read the
+ * same .svelte / _meta.js / course.config.js files during a single build;
+ * sharing the read avoids the second disk hit (and matters most on cold-cache
+ * CI runs and large courses).
+ */
+const fileContentCache = new Map<string, { mtimeMs: number; content: string }>();
+
+export function readSourceFileCached(filePath: string): string {
+  const stat = statSync(filePath);
+  const cached = fileContentCache.get(filePath);
+  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.content;
+  const content = readFileSync(filePath, 'utf-8');
+  fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
+  return content;
 }
 
 // ---------- Helpers ----------
@@ -62,6 +76,29 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
+/** Matches both Svelte 5 `<script module>` and legacy `<script context="module">`. */
+export const MODULE_SCRIPT_RE =
+  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>([\s\S]*?)<\/script>/;
+
+/** Matches `export const pageConfig =` (RHS is read separately). */
+export const PAGE_CONFIG_EXPORT_RE = /export\s+const\s+pageConfig\s*=\s*/;
+
+/** Matches `export default ` (RHS is read separately). */
+const DEFAULT_EXPORT_RE = /export\s+default\s*/;
+
+/**
+ * Locate `export default { ... }` and return the object literal substring,
+ * or null if no balanced object literal follows the `export default` keyword.
+ * Used by both manifest extraction and project validation.
+ */
+export function extractDefaultExportObjectLiteral(source: string): string | null {
+  const match = source.match(DEFAULT_EXPORT_RE);
+  if (!match || match.index === undefined) return null;
+  const startIndex = source.indexOf('{', match.index);
+  if (startIndex < 0) return null;
+  return extractObjectLiteral(source, startIndex);
+}
+
 /**
  * Read a _meta.js file and extract its default export object.
  * Uses the same JSON5 approach as pageConfig extraction — find the object literal
@@ -70,14 +107,7 @@ export function deriveSlug(name: string, isFile = false): string {
 export function readMetaFile(metaPath: string): { title?: string; pages?: string[] } {
   if (!existsSync(metaPath)) return {};
 
-  const content = readFileSync(metaPath, 'utf-8');
-
-  // Find `export default {`
-  const match = content.match(/export\s+default\s*(\{)/);
-  if (!match || match.index === undefined) return {};
-
-  const startIndex = content.indexOf('{', match.index);
-  const objectStr = extractObjectLiteral(content, startIndex);
+  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(metaPath));
   if (!objectStr) return {};
 
   try {
@@ -88,24 +118,21 @@ export function readMetaFile(metaPath: string): { title?: string; pages?: string
 }
 
 /**
- * Extract pageConfig from a .svelte file's <script context="module"> block.
+ * Extract pageConfig from a .svelte file's module script block.
  */
 export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig } {
-  const content = readFileSync(filePath, 'utf-8');
+  const content = readSourceFileCached(filePath);
 
-  // Extract <script context="module"> block
-  const moduleScriptMatch = content.match(
-    /<script\s+context\s*=\s*["']module["'][^>]*>([\s\S]*?)<\/script>/
-  );
+  const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
   if (!moduleScriptMatch) return {};
 
   const scriptContent = moduleScriptMatch[1];
 
-  // Find `export const pageConfig =`
-  const configMatch = scriptContent.match(/export\s+const\s+pageConfig\s*=\s*(\{)/);
+  const configMatch = scriptContent.match(PAGE_CONFIG_EXPORT_RE);
   if (!configMatch || configMatch.index === undefined) return {};
 
-  const startIndex = scriptContent.indexOf('{', configMatch.index);
+  const startIndex = scriptContent.indexOf('{', configMatch.index + configMatch[0].length);
+  if (startIndex < 0) return {};
   const objectStr = extractObjectLiteral(scriptContent, startIndex);
   if (!objectStr) return {};
 

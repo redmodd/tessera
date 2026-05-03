@@ -13,6 +13,13 @@ export interface PersistenceAdapter {
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
   setDuration(seconds: number): void;
   /**
+   * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps
+   * `'suspend'` → `cmi.core.exit = 'suspend'`, `'normal'` → empty (the
+   * vocabulary has no explicit normal value). SCORM 2004 maps directly
+   * onto `cmi.exit`. cmi5 / web adapters no-op.
+   */
+  setExit(mode: 'suspend' | 'normal'): void;
+  /**
    * Report a single learner interaction (answered question) to the LMS.
    * Called once per question on quiz submit or standalone useQuestion submit.
    */

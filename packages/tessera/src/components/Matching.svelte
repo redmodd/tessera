@@ -1,6 +1,7 @@
 <script>
   import { getContext, onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
+  import { slugFromQuestion } from './util.js';
 
   let {
     id,
@@ -9,6 +10,7 @@
     correctFeedback = '',
     incorrectFeedback = '',
     maxRetries = Infinity,
+    weight = 1,
   } = $props();
 
   const quiz = getContext('tessera-quiz');
@@ -23,15 +25,7 @@
   let saCanRetry = $derived(saRetryCount < maxRetries);
   let saAllMatched = $derived(matches.size === pairs.length);
 
-  const defaultId = `matching-${slug(question)}`;
-
-  function slug(text) {
-    return String(text ?? '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 40);
-  }
+  const defaultId = `matching-${slugFromQuestion(question)}`;
 
   const pairColors = [
     '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
@@ -78,6 +72,7 @@
 
   const handle = useQuestion({
     id: id ?? defaultId,
+    weight,
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
@@ -137,16 +132,13 @@
   }
 
   function createMatch(leftIndex, rightOriginalIndex) {
-    const newMatches = new Map(matches);
-
-    for (const [l, r] of newMatches) {
+    for (const [l, r] of matches) {
       if (l === leftIndex || r === rightOriginalIndex) {
-        newMatches.delete(l);
+        matches.delete(l);
       }
     }
 
-    newMatches.set(leftIndex, rightOriginalIndex);
-    matches = newMatches;
+    matches.set(leftIndex, rightOriginalIndex);
     selectedLeft = null;
     selectedRight = null;
 
@@ -161,9 +153,7 @@
     } else {
       if (quizLocked) return;
     }
-    const newMatches = new Map(matches);
-    newMatches.delete(leftIndex);
-    matches = newMatches;
+    matches.delete(leftIndex);
     if (!standalone) {
       quiz.setAnswer(myIndex, new Map(matches));
     }
@@ -223,7 +213,7 @@
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() => matched && !isDisabled ? removeMatch(i) : handleLeftClick(i)}
           disabled={isDisabled}
-          aria-label="{pair.left}{matched ? ' (matched)' : ''}"
+          aria-label="{pair.left}{matched ? ' (matched, activate to unmatch)' : ''}"
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -232,14 +222,7 @@
           {/if}
           <span>{pair.left}</span>
           {#if matched && !isDisabled}
-            <span
-              class="tessera-matching-unmatch"
-              role="button"
-              tabindex="0"
-              onclick={(e) => { e.stopPropagation(); removeMatch(i); }}
-              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); removeMatch(i); } }}
-              aria-label="Remove match for {pair.left}"
-            >×</span>
+            <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
           {/if}
         </button>
       {/each}

@@ -21,6 +21,22 @@ export type {
   AccessContext,
 } from './runtime/access.js';
 
+// ---- xAPI ----
+export { useXAPI } from './runtime/xapi/registry.js';
+export type { XAPIClient } from './runtime/xapi/client.js';
+export type {
+  XAPIAgent,
+  XAPIVerb,
+  XAPIObject,
+  XAPIContext,
+  XAPIResult,
+  PartialStatement,
+  Statement,
+  DestinationOutcome,
+  SendStatementResult,
+  SendStatementOptions,
+} from './runtime/xapi/types.js';
+
 // ---- Types ----
 export type {
   Interaction,
@@ -30,3 +46,9 @@ export type {
   UseQuestionOptions,
   UseQuestionHandle,
 } from './runtime/hooks.svelte.js';
+export type {
+  XAPIConfig,
+  XAPIExplicitConfig,
+  XAPILMSConfig,
+  CourseConfig,
+} from './runtime/types.js';

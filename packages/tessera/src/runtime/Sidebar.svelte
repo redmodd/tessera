@@ -5,13 +5,11 @@
   let collapsedSections = $state(new Set());
 
   function toggleSection(slug) {
-    const next = new Set(collapsedSections);
-    if (next.has(slug)) {
-      next.delete(slug);
+    if (collapsedSections.has(slug)) {
+      collapsedSections.delete(slug);
     } else {
-      next.add(slug);
+      collapsedSections.add(slug);
     }
-    collapsedSections = next;
   }
 
   function handlePageClick(pageIndex) {

@@ -1,7 +1,7 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
-import { WriteQueue, callSync, withRetry, formatISO8601Duration, findLMSAPI } from './retry.js';
+import { buildScormInteractionFields } from '../interaction-format.js';
+import { WriteQueue, callSync, withRetry, formatISO8601Duration } from './retry.js';
 
 /**
  * SCORM 2004 API interface.
@@ -15,14 +15,6 @@ export interface SCORM2004API {
   GetLastError(): string;
   GetErrorString(errorCode: string): string;
   GetDiagnostic(errorCode: string): string;
-}
-
-/**
- * Walk up window.opener and window.parent chain to find the SCORM 2004 API.
- * Returns null if not found within 10 levels.
- */
-export function findSCORM2004API(): SCORM2004API | null {
-  return findLMSAPI('API_1484_11') as SCORM2004API | null;
 }
 
 /**
@@ -41,6 +33,18 @@ export class SCORM2004Adapter implements PersistenceAdapter {
 
   constructor(api: SCORM2004API) {
     this.#api = api;
+    // Wire up GetLastError/GetErrorString so retry warnings can name the
+    // real LMS failure (e.g. "405 Incorrect Data Type") instead of a
+    // generic "LMS call failed" — production triage needs the code.
+    this.#queue.errorReporter = {
+      code: () => this.#api.GetLastError(),
+      message: (c) => this.#api.GetErrorString(c),
+    };
+  }
+
+  /** Expose the underlying SCORM 2004 API so xAPI actor synthesis can read learner fields. */
+  getAPI(): SCORM2004API {
+    return this.#api;
   }
 
   async init(): Promise<void> {
@@ -53,6 +57,16 @@ export class SCORM2004Adapter implements PersistenceAdapter {
       }
     } catch {
       this.#state = null;
+    }
+
+    // Continue cmi.interactions.n indexing where the previous session left
+    // off. Restarting at 0 would overwrite prior records.
+    try {
+      const count = this.#api.GetValue('cmi.interactions._count');
+      const n = parseInt(count, 10);
+      if (Number.isFinite(n) && n >= 0) this.#interactionCount = n;
+    } catch {
+      // Fallback to 0 if _count read fails.
     }
   }
 
@@ -102,34 +116,33 @@ export class SCORM2004Adapter implements PersistenceAdapter {
     );
   }
 
+  setExit(mode: 'suspend' | 'normal'): void {
+    // SCORM 2004 §4.2 cmi.exit vocabulary: time-out, suspend, logout, normal, "".
+    this.#queue.enqueue(() => this.#api.SetValue('cmi.exit', mode));
+  }
+
   reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null
   ): void {
     const n = this.#interactionCount++;
-    const prefix = `cmi.interactions.${n}`;
-    const response = formatResponse(interaction);
-    const pattern = formatCorrectPattern(interaction);
-    const timestamp = new Date().toISOString();
-    this.#queue.enqueue(() => this.#api.SetValue(`${prefix}.id`, questionId));
-    this.#queue.enqueue(() => this.#api.SetValue(`${prefix}.type`, interaction.type));
-    this.#queue.enqueue(() =>
-      this.#api.SetValue(`${prefix}.learner_response`, response)
+    const fields = buildScormInteractionFields(
+      `cmi.interactions.${n}`,
+      questionId,
+      interaction,
+      correct,
+      {
+        responseField: 'learner_response',
+        timestampField: 'timestamp',
+        timestamp: new Date().toISOString(),
+        typeValue: interaction.type,
+        resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+      }
     );
-    if (pattern !== null) {
-      this.#queue.enqueue(() =>
-        this.#api.SetValue(`${prefix}.correct_responses.0.pattern`, pattern)
-      );
+    for (const [key, value] of fields) {
+      this.#queue.enqueue(() => this.#api.SetValue(key, value));
     }
-    if (correct !== null) {
-      this.#queue.enqueue(() =>
-        this.#api.SetValue(`${prefix}.result`, correct ? 'correct' : 'incorrect')
-      );
-    }
-    this.#queue.enqueue(() =>
-      this.#api.SetValue(`${prefix}.timestamp`, timestamp)
-    );
   }
 
   commit(): void {

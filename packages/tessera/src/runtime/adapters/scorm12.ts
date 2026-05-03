@@ -1,7 +1,7 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { formatResponse, formatCorrectPattern, scorm12Type } from '../interaction-format.js';
-import { WriteQueue, callSync, withRetry, formatHHMMSS, findLMSAPI } from './retry.js';
+import { buildScormInteractionFields, scorm12Type } from '../interaction-format.js';
+import { WriteQueue, callSync, withRetry, formatHHMMSS } from './retry.js';
 
 /**
  * SCORM 1.2 API interface.
@@ -15,14 +15,6 @@ export interface SCORM12API {
   LMSGetLastError(): string;
   LMSGetErrorString(errorCode: string): string;
   LMSGetDiagnostic(errorCode: string): string;
-}
-
-/**
- * Walk up window.opener and window.parent chain to find the SCORM 1.2 API.
- * Returns null if not found within 10 levels.
- */
-export function findSCORM12API(): SCORM12API | null {
-  return findLMSAPI('API') as SCORM12API | null;
 }
 
 /**
@@ -45,6 +37,18 @@ export class SCORM12Adapter implements PersistenceAdapter {
 
   constructor(api: SCORM12API) {
     this.#api = api;
+    // Wire up GetLastError/GetErrorString so retry warnings can name the
+    // real LMS failure (e.g. "201 Invalid argument error") instead of a
+    // generic "LMS call failed" — production triage needs the code.
+    this.#queue.errorReporter = {
+      code: () => this.#api.LMSGetLastError(),
+      message: (c) => this.#api.LMSGetErrorString(c),
+    };
+  }
+
+  /** Expose the underlying SCORM 1.2 API so xAPI actor synthesis can read learner fields. */
+  getAPI(): SCORM12API {
+    return this.#api;
   }
 
   async init(): Promise<void> {
@@ -57,6 +61,17 @@ export class SCORM12Adapter implements PersistenceAdapter {
       }
     } catch {
       this.#state = null;
+    }
+
+    // Continue cmi.interactions.n indexing where the previous session left
+    // off. Restarting at 0 would overwrite prior records (the LMS uses n
+    // as the array key, not an upsert field).
+    try {
+      const count = this.#api.LMSGetValue('cmi.interactions._count');
+      const n = parseInt(count, 10);
+      if (Number.isFinite(n) && n >= 0) this.#interactionCount = n;
+    } catch {
+      // Some LMSes throw on _count when no interactions exist — fall back to 0.
     }
   }
 
@@ -109,40 +124,35 @@ export class SCORM12Adapter implements PersistenceAdapter {
     );
   }
 
+  setExit(mode: 'suspend' | 'normal'): void {
+    // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
+    // We only map 'suspend' and the empty/normal case.
+    const value = mode === 'suspend' ? 'suspend' : '';
+    this.#queue.enqueue(() => this.#api.LMSSetValue('cmi.core.exit', value));
+  }
+
   reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null
   ): void {
     const n = this.#interactionCount++;
-    const prefix = `cmi.interactions.${n}`;
-    const response = formatResponse(interaction);
-    const pattern = formatCorrectPattern(interaction);
-    const time = new Date().toTimeString().slice(0, 8);
-    this.#queue.enqueue(() => this.#api.LMSSetValue(`${prefix}.id`, questionId));
-    this.#queue.enqueue(() =>
-      this.#api.LMSSetValue(`${prefix}.type`, scorm12Type(interaction.type))
+    const fields = buildScormInteractionFields(
+      `cmi.interactions.${n}`,
+      questionId,
+      interaction,
+      correct,
+      {
+        responseField: 'student_response',
+        timestampField: 'time',
+        timestamp: new Date().toTimeString().slice(0, 8),
+        typeValue: scorm12Type(interaction.type),
+        resultLabels: { correct: 'correct', incorrect: 'wrong' },
+      }
     );
-    this.#queue.enqueue(() =>
-      this.#api.LMSSetValue(`${prefix}.student_response`, response)
-    );
-    if (pattern !== null) {
-      this.#queue.enqueue(() =>
-        this.#api.LMSSetValue(
-          `${prefix}.correct_responses.0.pattern`,
-          pattern
-        )
-      );
+    for (const [key, value] of fields) {
+      this.#queue.enqueue(() => this.#api.LMSSetValue(key, value));
     }
-    if (correct !== null) {
-      this.#queue.enqueue(() =>
-        this.#api.LMSSetValue(
-          `${prefix}.result`,
-          correct ? 'correct' : 'wrong'
-        )
-      );
-    }
-    this.#queue.enqueue(() => this.#api.LMSSetValue(`${prefix}.time`, time));
   }
 
   commit(): void {
