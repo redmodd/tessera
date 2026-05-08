@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const source = resolve(root, 'AGENTS.md');
 const targets = [
-  resolve(root, 'packages/tessera/AGENTS.md'),
+  resolve(root, 'packages/tessera-learn/AGENTS.md'),
   resolve(root, 'packages/create-tessera/AGENTS.md'),
 ];
 

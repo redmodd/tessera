@@ -23,7 +23,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/redmodd/tessera.git",
-    "directory": "packages/tessera"
+    "directory": "packages/tessera-learn"
   },
   "author": "Derek Redmond <derek.redmond@redmondelearning.ca>",
   "license": "MIT",

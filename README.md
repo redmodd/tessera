@@ -57,7 +57,7 @@ pnpm test              # checks AGENTS.md is in sync, then runs unit tests
 pnpm test:e2e          # runs Playwright suites
 ```
 
-Edit `AGENTS.md` at the repo root only. The sync step in `pnpm build` copies it into `packages/tessera/` and `packages/create-tessera/` so it ships with the published packages. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if a copy has drifted.
+Edit `AGENTS.md` at the repo root only. The sync step in `pnpm build` copies it into `packages/tessera-learn/` and `packages/create-tessera/` so it ships with the published packages. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if a copy has drifted.
 
 ## License
 
