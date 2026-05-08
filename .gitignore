@@ -1,5 +1,32 @@
+# Dependencies
 node_modules
+
+# Build outputs
 dist
-test-project
+coverage
+*.tsbuildinfo
+
+# Caches
+.vite
+
+# Test artifacts
+test-results
+playwright-report
+
+# Logs
+*.log
+docs
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Tool / IDE state
+.claude/
+
+# OS noise
 .DS_Store
+
+# Pack output
 *.tgz
