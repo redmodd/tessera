@@ -7,7 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@redmondelearning/tessera": "workspace:*"
+    "tessera-learn": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.0"

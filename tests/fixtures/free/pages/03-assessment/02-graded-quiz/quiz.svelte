@@ -13,7 +13,7 @@
 </script>
 
 <script>
-  import { MultipleChoice, FillInTheBlank, Matching } from '@redmondelearning/tessera';
+  import { MultipleChoice, FillInTheBlank, Matching } from 'tessera-learn';
 </script>
 
 <h1>Graded Assessment</h1>

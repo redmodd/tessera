@@ -24,7 +24,7 @@ pnpm exec playwright install --with-deps chromium
 pnpm test:e2e
 ```
 
-E2E suites are scoped via Playwright projects (`free-mode`, `sequential-mode`, `mobile`, `lms`) — see `playwright.config.ts`. The fixture projects under `tests/fixtures/` are gitignored; scaffold them with `npm create @redmondd/tessera@latest` or copy from a previous checkout if you need them.
+E2E suites are scoped via Playwright projects (`free-mode`, `sequential-mode`, `mobile`, `lms`) — see `playwright.config.ts`. The fixture projects under `tests/fixtures/` are gitignored; scaffold them with `npm create tessera@latest` or copy from a previous checkout if you need them.
 
 ## Repo layout
 

@@ -4,8 +4,8 @@
 
 ## Affected packages
 
-- [ ] `@redmondd/tessera`
-- [ ] `@redmondd/create-tessera`
+- [ ] `tessera-learn`
+- [ ] `create-tessera`
 
 ## Affected export modes
 

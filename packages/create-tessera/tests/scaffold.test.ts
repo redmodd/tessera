@@ -132,7 +132,7 @@ describe('create-tessera CLI', () => {
     expect(pkg.type).toBe('module');
     expect(pkg.scripts.preview).toBe('vite dev');
     expect(pkg.scripts.export).toBe('vite build');
-    expect(pkg.dependencies['@redmondd/tessera']).toBeDefined();
+    expect(pkg.dependencies['tessera-learn']).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
   });
 
@@ -142,7 +142,7 @@ describe('create-tessera CLI', () => {
       resolve(testDir, 'my-course', 'vite.config.js'),
       'utf-8'
     );
-    expect(content).toContain("from '@redmondd/tessera/plugin'");
+    expect(content).toContain("from 'tessera-learn/plugin'");
     expect(content).toContain('tesseraPlugin()');
   });
 
@@ -217,7 +217,7 @@ describe('create-tessera CLI', () => {
       const layoutPath = resolve(testDir, 'bare-course', 'layout.svelte');
       expect(existsSync(layoutPath)).toBe(true);
       const layout = readFileSync(layoutPath, 'utf-8');
-      expect(layout).toContain("from '@redmondd/tessera'");
+      expect(layout).toContain("from 'tessera-learn'");
       expect(layout).toContain('useNavigation');
       expect(layout).toContain('useProgress');
       expect(layout).toContain('{@render page()}');

@@ -3,7 +3,7 @@
 </script>
 
 <script>
-  import { Accordion, AccordionItem, Carousel, CarouselSlide } from '@redmondelearning/tessera';
+  import { Accordion, AccordionItem, Carousel, CarouselSlide } from 'tessera-learn';
 </script>
 
 <h1>Accordion & Carousel</h1>

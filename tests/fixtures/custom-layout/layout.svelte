@@ -1,5 +1,5 @@
 <script>
-  import { useNavigation, useProgress } from '@redmondelearning/tessera';
+  import { useNavigation, useProgress } from 'tessera-learn';
 
   let { page } = $props();
   const nav = useNavigation();

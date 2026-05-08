@@ -3,7 +3,7 @@
 </script>
 
 <script>
-  import { RevealModal, Video, Audio } from '@redmondelearning/tessera';
+  import { RevealModal, Video, Audio } from 'tessera-learn';
 </script>
 
 <h1>Modal, Video & Audio</h1>

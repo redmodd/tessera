@@ -1,16 +1,50 @@
 {
   "name": "create-tessera",
   "version": "0.0.1",
+  "description": "Scaffold a new Tessera course.",
+  "keywords": [
+    "tessera",
+    "create",
+    "scaffold",
+    "lms",
+    "scorm",
+    "cmi5",
+    "elearning",
+    "course"
+  ],
+  "homepage": "https://github.com/redmodd/tessera#readme",
+  "bugs": {
+    "url": "https://github.com/redmodd/tessera/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redmodd/tessera.git",
+    "directory": "packages/create-tessera"
+  },
+  "author": "Derek Redmond <derek.redmond@redmondelearning.ca>",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "create-tessera": "./dist/index.js"
   },
+  "tesseraVersion": "^0.1.0",
+  "files": [
+    "dist",
+    "AGENTS.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsup",
-    "test": "echo \"no tests yet\""
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
   }
 }

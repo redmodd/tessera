@@ -1,4 +1,4 @@
-import { tesseraPlugin } from '@redmondelearning/tessera/plugin';
+import { tesseraPlugin } from 'tessera-learn/plugin';
 
 export default {
   plugins: [tesseraPlugin()],

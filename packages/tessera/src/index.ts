@@ -5,6 +5,7 @@ export * from './components/index.js';
 // ---- Hooks ----
 export {
   useQuestion,
+  useQuiz,
   useNavigation,
   useProgress,
   usePersistence,
@@ -45,6 +46,7 @@ export { isCorrect } from './runtime/interaction.js';
 export type {
   UseQuestionOptions,
   UseQuestionHandle,
+  UseQuizHandle,
 } from './runtime/hooks.svelte.js';
 export type {
   XAPIConfig,

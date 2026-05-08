@@ -4,8 +4,8 @@
 
 Tessera is pre-1.0. Only the latest published version of each package on npm receives security fixes:
 
-- `@redmondd/tessera`
-- `@redmondd/create-tessera`
+- `tessera-learn`
+- `create-tessera`
 
 ## Reporting a vulnerability
 

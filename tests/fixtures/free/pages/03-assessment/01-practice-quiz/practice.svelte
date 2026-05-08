@@ -11,7 +11,7 @@
 </script>
 
 <script>
-  import { MultipleChoice, FillInTheBlank } from '@redmondelearning/tessera';
+  import { MultipleChoice, FillInTheBlank } from 'tessera-learn';
 </script>
 
 <h1>Practice Quiz</h1>

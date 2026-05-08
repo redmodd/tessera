@@ -3,7 +3,7 @@
   // single Submit button, no built-in Quiz CSS classes. Proves the public
   // useQuiz()/useQuestion() data contract is enough to build any UX while
   // still reporting identically to all four LMS adapters.
-  import { useQuiz } from '@redmondelearning/tessera';
+  import { useQuiz } from 'tessera-learn';
 
   let { children } = $props();
   let host;

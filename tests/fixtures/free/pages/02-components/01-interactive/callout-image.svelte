@@ -3,7 +3,7 @@
 </script>
 
 <script>
-  import { Callout, Image } from '@redmondelearning/tessera';
+  import { Callout, Image } from 'tessera-learn';
 </script>
 
 <h1>Callouts & Images</h1>
