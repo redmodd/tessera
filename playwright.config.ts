@@ -82,13 +82,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd test-project-e2e && pnpm dev --port 5180',
+      command: 'cd tests/fixtures/free && pnpm dev --port 5180',
       port: 5180,
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },
     {
-      command: 'cd test-project-e2e-sequential && pnpm dev --port 5181',
+      command: 'cd tests/fixtures/sequential && pnpm dev --port 5181',
       port: 5181,
       reuseExistingServer: !process.env.CI,
       timeout: 20000,

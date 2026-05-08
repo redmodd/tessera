@@ -89,6 +89,46 @@ importers:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@25.5.0)
 
+  tests/fixtures/custom-layout:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@25.5.0)
+
+  tests/fixtures/custom-quiz:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@25.5.0)
+
+  tests/fixtures/free:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@25.5.0)
+
+  tests/fixtures/sequential:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@25.5.0)
+
 packages:
 
   '@asamuzakjp/css-color@5.1.11':
