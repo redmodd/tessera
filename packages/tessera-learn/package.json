@@ -64,7 +64,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "archiver": "^7.0.1",
     "json5": "^2.0.0",
-    "svelte": "^5.0.0"
+    "svelte": "^5.55.5"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
