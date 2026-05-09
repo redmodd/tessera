@@ -6,6 +6,20 @@ Tessera is an **LMS tracking runtime** for interactive learning content. It hand
 
 ---
 
+## Running the project
+
+From the project root:
+
+```bash
+npm install            # first time only
+npm run preview        # dev server at http://localhost:5173 (Ctrl+C to stop)
+npm run export         # build + package for the LMS standard configured in course.config.js
+```
+
+The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
+
+---
+
 ## Project Structure
 
 The framework imposes the **minimum** structure it needs to discover content. Everything else is convention you can opt into.

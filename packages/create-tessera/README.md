@@ -42,9 +42,11 @@ Then:
 ```bash
 cd my-course
 npm install
-npm run preview   # local dev server
+npm run preview   # local dev server at http://localhost:5173
 npm run export    # build + package for the configured LMS standard
 ```
+
+Open the printed URL in your browser — the page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
 
 ## Flags
 

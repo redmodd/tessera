@@ -23,11 +23,15 @@ node --version    # should print v24.x.x or higher
 npm create tessera@latest my-course
 cd my-course
 npm install
-npm run preview   # local dev server
+npm run preview   # local dev server at http://localhost:5173
 npm run export    # build + package for the configured standard
 ```
 
+Open the printed URL (`http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+
 Prefer hooks-only? `npm create tessera@latest -- --template=bare my-course` scaffolds a minimal project with no built-in components.
+
+Every scaffolded project ships with `AGENTS.md` at its root — open it for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI).
 
 ```svelte
 <script module>
@@ -50,16 +54,15 @@ The authoring guide — components, hooks, quizzes, layouts, custom xAPI, the fu
 
 ```
 packages/
-  tessera/                       # Framework runtime + Vite plugin (tessera-learn)
+  tessera-learn/                 # Framework runtime + Vite plugin
   create-tessera/                # Scaffolder for new courses
 tests/
   e2e/                           # Playwright specs
-  fixtures/                      # Local-only scaffolded courses (gitignored)
+  fixtures/                      # Course projects used by e2e (committed)
+test-projects/                   # Standalone fixtures for specific test scenarios
 AGENTS.md                        # Course authoring guide (canonical source)
 scripts/sync-agents-md.mjs       # Copies AGENTS.md into both packages on prebuild
 ```
-
-`tests/fixtures/` is gitignored. Each subdirectory corresponds to a Playwright project in `playwright.config.ts` and must be scaffolded before running `pnpm test:e2e` — use `npm create tessera@latest` or copy from a previous checkout.
 
 ## Development
 
