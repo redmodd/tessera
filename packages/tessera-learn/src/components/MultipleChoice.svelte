@@ -22,15 +22,13 @@
 
   let selectedOption = $state(null);
 
-  // Unique IDs for accessibility — $props.id() is SSR-safe and stable across hydration.
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
-  const defaultId = `mc-${slugFromQuestion(question)}`;
 
   const handle = useQuestion({
-    id: id ?? defaultId,
-    weight,
-    maxRetries,
+    get id() { return id ?? `mc-${slugFromQuestion(question)}`; },
+    get weight() { return weight; },
+    get maxRetries() { return maxRetries; },
     response: () => ({
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],

@@ -28,8 +28,6 @@
   let isDragging = $state(false);
   let cardSelected = $state(false);    // current card selected via tap/click
 
-  const defaultId = `sorting-${slugFromQuestion(question)}`;
-
   function initQueue() {
     queue = shuffle(items.map((_, i) => i));
     placements = new SvelteMap();
@@ -64,9 +62,9 @@
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
   const handle = useQuestion({
-    id: id ?? defaultId,
-    weight,
-    maxRetries,
+    get id() { return id ?? `sorting-${slugFromQuestion(question)}`; },
+    get weight() { return weight; },
+    get maxRetries() { return maxRetries; },
     response: () => ({
       type: 'matching',
       response: [...placements.entries()].map(([i, t]) => [String(i), String(t)]),

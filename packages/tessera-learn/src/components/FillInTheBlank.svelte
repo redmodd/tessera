@@ -24,7 +24,6 @@
 
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
-  const defaultId = `fitb-${slugFromQuestion(question)}`;
 
   function checkAnswer(userAnswer) {
     if (!userAnswer || typeof userAnswer !== 'string') return false;
@@ -37,9 +36,9 @@
   }
 
   const handle = useQuestion({
-    id: id ?? defaultId,
-    weight,
-    maxRetries,
+    get id() { return id ?? `fitb-${slugFromQuestion(question)}`; },
+    get weight() { return weight; },
+    get maxRetries() { return maxRetries; },
     response: () => ({
       type: 'fill-in',
       response: inputValue,

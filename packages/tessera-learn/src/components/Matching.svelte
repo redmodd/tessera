@@ -28,8 +28,6 @@
   let selectedRight = $state(null);
 
 
-  const defaultId = `matching-${slugFromQuestion(question)}`;
-
   const pairColors = [
     '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
     '#0d9488', '#b91c1c', '#7c3aed', '#0369a1', '#a16207',
@@ -66,9 +64,9 @@
   }
 
   const handle = useQuestion({
-    id: id ?? defaultId,
-    weight,
-    maxRetries,
+    get id() { return id ?? `matching-${slugFromQuestion(question)}`; },
+    get weight() { return weight; },
+    get maxRetries() { return maxRetries; },
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
