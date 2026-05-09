@@ -1,20 +1,3 @@
-/**
- * Shared SCORM 1.2 / 2004 adapter machinery.
- *
- * The two SCORM standards share ~90% of their adapter logic — what differs
- * is the API method *names* (`LMSInitialize` vs `Initialize`), the CMI
- * *element names* (`cmi.core.score.raw` vs `cmi.score.raw`), the duration
- * format (HHMMSS vs ISO8601), and a handful of completion/success
- * vocabulary mappings. This file owns everything else (the WriteQueue,
- * suspend_data save/restore, interaction-count restoration, terminate
- * lifecycle) so neither subclass has to duplicate it.
- *
- * Subclasses provide a `ScormDialect` describing their version's quirks;
- * `setScore` / `setCompletionStatus` / `setSuccessStatus` / `setExit`
- * remain abstract because their CMI write patterns diverge enough that a
- * lookup table would obscure rather than clarify (notably SCORM 1.2's
- * lesson_status combines completion + success into one field).
- */
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
@@ -45,12 +28,6 @@ export interface ScormDialect<TApi> {
   getErrorString(api: TApi, code: string): string;
 }
 
-/**
- * Abstract base for SCORM persistence adapters. Owns the queue, suspend_data
- * (de)serialization, interaction indexing, and the unload-time drain. Concrete
- * subclasses override the per-version write paths that diverge between SCORM
- * 1.2 and 2004.
- */
 export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   protected readonly api: TApi;
   protected readonly dialect: ScormDialect<TApi>;

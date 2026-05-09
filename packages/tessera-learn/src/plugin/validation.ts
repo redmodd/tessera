@@ -468,9 +468,7 @@ function validatePages(
   let totalPages = 0;
   let totalQuizzes = 0;
   let hasGradedQuiz = false;
-  // Shared across the validation pass — every page references many of the
-  // same asset paths (logos, shared media). One existsSync per unique asset
-  // for the entire build, not one per textual reference.
+  // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
 
   if (!existsSync(pagesDir)) {

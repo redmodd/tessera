@@ -28,11 +28,7 @@ export interface UseQuestionOptions {
    * Default 1; ignored in standalone mode.
    */
   weight?: number;
-  /**
-   * Maximum number of standalone retries permitted via `handle.retry()`.
-   * Default `Infinity`. Ignored when the question is registered with a parent
-   * `<Quiz>` (the quiz owns retry semantics there).
-   */
+  /** Standalone retry cap. Default `Infinity`. Ignored inside a `<Quiz>`. */
   maxRetries?: number;
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
@@ -50,17 +46,11 @@ export interface UseQuestionOptions {
 export interface UseQuestionHandle {
   submit(): void;
   reset(): void;
-  /**
-   * Standalone retry — resets the question (calling `opts.reset`) and bumps
-   * the retry counter. No-op when the question has hit `maxRetries` or is
-   * registered with a parent Quiz (the quiz owns retry there).
-   */
+  /** Standalone retry. No-op once `maxRetries` is hit or inside a `<Quiz>`. */
   retry(): void;
   readonly submitted: boolean;
   readonly correct: boolean | null;
-  /** True when the standalone Try-again button should render. Always false inside a Quiz. */
   readonly canRetry: boolean;
-  /** Number of times `retry()` has fired since mount. */
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   /** Index returned by the parent Quiz registration, used for per-question context reads. Undefined in standalone mode. */
@@ -319,17 +309,11 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   const maxAttempts = quizConfig.maxAttempts ?? Infinity;
   const showFeedback = quizConfig.showFeedback ?? true;
 
-  // Desugar the feedback/retry config into predicates. The resolvers handle
-  // the enum→predicate mapping plus dev-mode misuse warnings; useQuiz only
-  // ever calls the predicate API beyond this point.
   const policyCfg = quizConfig as QuizPolicyConfig;
   const feedbackPredicate = resolveFeedbackMode(policyCfg);
   const retryPredicate = resolveRetryStrategy(policyCfg);
-  // Whether revealing feedback for a question should lock that question's
-  // answer. True for the 'immediate' enum and for any custom predicate
-  // (custom predicates are opaque, so we lock conservatively rather than
-  // letting a learner change a checked answer); false for the default
-  // 'review' enum where feedback only appears after submit.
+  // Lock the answer once feedback is revealed in 'immediate' mode and under any
+  // custom predicate (opaque; lock conservatively). 'review' mode is post-submit.
   const revealsLockAnswer =
     policyCfg.feedbackMode === 'immediate' ||
     typeof policyCfg.feedbackMode === 'function';
@@ -513,9 +497,6 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   function retry(): void {
     if (!canRetry) return;
-    // Build the per-question result snapshot for the retry predicate. The
-    // resolver handles enum modes ('full' / 'incorrect-only') and any
-    // author-supplied predicate uniformly.
     const results: QuizQuestionResult[] = [];
     for (let i = 0; i < questions.length; i++) {
       const a = answers.has(i) ? answers.get(i) : undefined;

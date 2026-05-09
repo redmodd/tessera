@@ -5,14 +5,8 @@
   let { children } = $props();
   let quizElement = $state(null);
 
-  // useQuiz owns the state machine, the LMS bridge, and the
-  // `tessera-quiz` context that question components read from. This shell
-  // adds question-by-question navigation and a results screen on top.
   const handle = useQuiz({ element: () => quizElement });
 
-  // Read the page-context config Quiz needs for shell-level UI: passingScore
-  // for the pass/fail banner, showFeedback for the Review button, and
-  // feedbackMode/maxAttempts for the Next/Check button toggle and exhaust msg.
   const pageCtx = getContext('tessera-page');
   let quizConfig = $derived(pageCtx?.quiz ?? {});
   let passingScore = $derived(pageCtx?.passingScore ?? 70);
@@ -20,8 +14,6 @@
   let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
   let isImmediateMode = $derived(showFeedback && quizConfig.feedbackMode === 'immediate');
 
-  // UI navigation indices — separate from the handle's state because the
-  // handle has no opinion on which question is "active" at a given moment.
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
 
@@ -35,9 +27,6 @@
     return handle.getAnswer(i) !== undefined || handle.isLockedCorrect(i);
   }
 
-  // Whether the current question still needs its feedback revealed before
-  // we can advance / submit. Mirrors the original Quiz.svelte's
-  // `needsImmediateFeedback` check.
   function needsReveal(i) {
     return (
       isImmediateMode &&
@@ -47,9 +36,8 @@
     );
   }
 
-  // Navigation
   function goNextQuestion() {
-    // Immediate-mode: first click on Next reveals feedback, second advances.
+    // Immediate-mode: first click reveals feedback, second advances.
     if (needsReveal(currentQuestionIndex)) {
       handle.revealFeedback(currentQuestionIndex);
       return;

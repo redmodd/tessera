@@ -13,33 +13,21 @@ export interface LMSErrorReporter {
 /** Default attempt count for LMS retry loops (one initial + two retries). */
 export const RETRY_ATTEMPTS = 3;
 
-/**
- * Exponential backoff in milliseconds for the Nth retry attempt
- * (0-indexed): 100, 200, 400, 800, …
- */
+/** Exponential backoff (0-indexed): 100, 200, 400, … ms. */
 export function backoffMs(attempt: number): number {
   return 100 * Math.pow(2, attempt);
 }
 
-/**
- * SCORM `LMSSetValue` / `SetValue` semantics: the API returns `"true"` /
- * `"false"` strings, but some implementations also return the boolean form.
- * Anything other than a literal `false` / `"false"` is treated as success.
- */
+// SCORM SetValue may return string "false" or boolean false; everything else is success.
 function lmsCallSucceeded(result: unknown): boolean {
   return result !== false && result !== 'false';
 }
 
-/** Read `LMSGetLastError` / `GetLastError` defensively so it can never throw. */
 function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   if (!reporter) return '';
   try { return reporter.code(); } catch { return ''; }
 }
 
-/**
- * One-line warning emitted when a queued or retried LMS call gives up.
- * Pattern matches what production triage already greps for.
- */
 function logRetryGiveUp(
   errorReporter: LMSErrorReporter | undefined,
   lastErrCode: string,

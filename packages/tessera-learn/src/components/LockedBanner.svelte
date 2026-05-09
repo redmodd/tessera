@@ -1,7 +1,4 @@
 <script>
-  // Shown above a question that's locked from a prior correct attempt during
-  // an `incorrect-only` retry. Same SVG / copy used by every question type so
-  // the visual signal is consistent across MC, FITB, Matching, Sorting.
   let { message = 'You already got this one right — click Next to continue.' } = $props();
 </script>
 

@@ -22,9 +22,7 @@
 
   let shuffledRight = $state([]);
   let matches = $state(new SvelteMap());
-  // Reverse index of `matches` (right.originalIndex → left index). Maintained
-  // alongside matches so right-column rendering is O(1) per item instead of
-  // a O(n) scan over matches.entries() per row.
+  // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
   let rightToLeft = $state(new SvelteMap());
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
@@ -123,9 +121,7 @@
   }
 
   function createMatch(leftIndex, rightOriginalIndex) {
-    // Drop any prior match that conflicts on either side, keeping `rightToLeft`
-    // in sync. A left-side conflict frees its previous right partner; a
-    // right-side conflict frees its previous left partner.
+    // Free any prior partner on either side so both maps stay consistent.
     const priorRightForLeft = matches.get(leftIndex);
     if (priorRightForLeft !== undefined) {
       rightToLeft.delete(priorRightForLeft);

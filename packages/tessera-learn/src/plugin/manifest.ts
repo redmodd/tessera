@@ -33,11 +33,7 @@ export interface Manifest {
   totalPages: number;
 }
 
-/**
- * Append `.svelte` if not already present. Used wherever author-supplied
- * `pages` array entries are matched against on-disk filenames — both forms
- * ("page.svelte" and "page") are accepted historically.
- */
+/** Append `.svelte` if not already present. Both bare and suffixed names are accepted in author config. */
 export function ensureSvelteSuffix(name: string): string {
   return name.endsWith('.svelte') ? name : `${name}.svelte`;
 }
@@ -135,11 +131,7 @@ export type PageConfigParseResult =
   /** Found but couldn't parse as a static object literal — non-literal RHS or JSON5 failure. */
   | { kind: 'invalid' };
 
-/**
- * Source-level pageConfig extraction. Both `extractPageConfig` (manifest
- * generation) and `validatePageConfig` (build-time validation) use this so
- * the parsing pipeline lives in exactly one place.
- */
+/** Source-level pageConfig extraction shared by manifest generation and build-time validation. */
 export function parsePageConfigFromSource(content: string): PageConfigParseResult {
   const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
   if (!moduleScriptMatch) return { kind: 'none' };
@@ -167,11 +159,7 @@ export function parsePageConfigFromSource(content: string): PageConfigParseResul
   }
 }
 
-/**
- * Extract pageConfig from a .svelte file's module script block. Reads via the
- * shared cache. Throws on parse failure so the build-time path can report a
- * file-prefixed error message.
- */
+/** Extract pageConfig from a .svelte file. Throws on parse failure. */
 export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig } {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;

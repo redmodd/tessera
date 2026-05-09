@@ -56,15 +56,7 @@ export interface XAPIPublisherOptions {
    * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
    */
   cmi5Mode?: boolean;
-  /**
-   * If supplied, every send-shaped method (`sendStatement`, `enqueueBuilt`)
-   * rejects with the returned `Error` without touching the network. Used by
-   * dev-fallback shims (cmi5 `endpoint: 'lms'` outside an LMS, SCORM
-   * destinations with no synthesizable actor) to surface an explicit failure
-   * to author code instead of silently no-oping. Construction and `init()`
-   * still complete normally so `getActor()` / `buildStatement()` remain
-   * usable for callers that don't actually transmit.
-   */
+  /** When set, every send method rejects with the returned Error without hitting the network. */
   unavailableReason?: () => Error;
 }
 

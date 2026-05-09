@@ -1,6 +1,4 @@
 <script>
-  // Inline check or cross icon used in question feedback rows. Lifted out of
-  // every question component so the markup lives in exactly one place.
   let { kind, size = 16 } = $props();
 </script>
 

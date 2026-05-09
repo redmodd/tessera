@@ -29,9 +29,6 @@
   const nav = new NavigationState(manifest, progress, config);
   let duration = $state(new DurationTracker(0));
 
-  // Static across the course's lifetime — manifest doesn't change after build.
-  // Hoisted out of the score-rollup effect so it isn't rebuilt on every quiz
-  // submission.
   const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
 
   // Page loading state
@@ -130,9 +127,6 @@
   }
 
   // ---- Branding ----
-  // Parse any CSS color the browser can render — named colors, hex, rgb(), hsl(),
-  // oklch(), etc. — by handing it to the layout engine and reading back the
-  // canonical rgb() form. Returns null for values the browser rejects.
   function parseColor(color) {
     if (typeof CSS !== 'undefined' && CSS.supports && !CSS.supports('color', color)) {
       return null;

@@ -1,8 +1,4 @@
 <script>
-  // Standalone "Try again" button used by every question type (MC, FITB,
-  // Matching, Sorting). Styling is identical across all four; centralizing
-  // here keeps the visual signal consistent and removes a 15-line CSS rule
-  // from each component.
   let { onclick, label = 'Try again' } = $props();
 </script>
 
