@@ -1,5 +1,6 @@
 <script>
   import { getContext, setContext, onMount } from 'svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { buildQuizInteractions } from './quiz-payload.js';
 
   let { children } = $props();
@@ -12,7 +13,7 @@
   // State
   let questions = $state([]);
   let currentQuestionIndex = $state(0);
-  let answers = $state(new Map());
+  let answers = $state(new SvelteMap());
   let submitted = $state(false);
   let score = $state(0);
   let correctCount = $state(0);
@@ -21,9 +22,9 @@
   let reviewIndex = $state(0);
 
   // Immediate feedback state
-  let feedbackShown = $state(new Set());
+  let feedbackShown = $state(new SvelteSet());
   // Retry mode: locked correct questions from prior attempt
-  let lockedCorrect = $state(new Set());
+  let lockedCorrect = $state(new SvelteSet());
 
   // Derived
   let totalQuestions = $derived(questions.length);
@@ -201,12 +202,12 @@
     correctCount = 0;
     currentQuestionIndex = 0;
     reviewIndex = 0;
-    feedbackShown = new Set();
+    feedbackShown = new SvelteSet();
 
     if (retryMode === 'incorrect-only') {
       // Identify correct questions
-      const newLockedCorrect = new Set();
-      const preservedAnswers = new Map();
+      const newLockedCorrect = new SvelteSet();
+      const preservedAnswers = new SvelteMap();
       for (let i = 0; i < questions.length; i++) {
         const answer = answers.get(i);
         if (questions[i].checkAnswer(answer)) {
@@ -223,8 +224,8 @@
         }
       }
     } else {
-      lockedCorrect = new Set();
-      answers = new Map();
+      lockedCorrect = new SvelteSet();
+      answers = new SvelteMap();
       for (const q of questions) {
         if (q.reset) q.reset();
       }
@@ -502,13 +503,13 @@
   }
 
   .tessera-quiz-score-label.passed {
-    color: var(--tessera-success);
-    background: color-mix(in srgb, var(--tessera-success) 10%, transparent);
+    color: color-mix(in srgb, var(--tessera-success) 55%, black);
+    background: color-mix(in srgb, var(--tessera-success) 12%, white);
   }
 
   .tessera-quiz-score-label.failed {
-    color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
+    color: color-mix(in srgb, var(--tessera-error) 55%, black);
+    background: color-mix(in srgb, var(--tessera-error) 12%, white);
   }
 
   .tessera-quiz-results-detail {

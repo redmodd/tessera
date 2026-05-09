@@ -30,6 +30,7 @@ export default defineConfig({
         /lms-roundtrip\.spec\.ts$/,
         /export\.spec\.ts$/,
         /layout-override\.spec\.ts$/,
+        /custom-quiz\.spec\.ts$/,
       ],
     },
     {
@@ -39,6 +40,14 @@ export default defineConfig({
         baseURL: 'http://localhost:5182',
       },
       testMatch: /layout-override\.spec\.ts$/,
+    },
+    {
+      name: 'custom-quiz',
+      use: {
+        browserName: 'chromium',
+        baseURL: 'http://localhost:5183',
+      },
+      testMatch: /custom-quiz\.spec\.ts$/,
     },
     {
       name: 'sequential-mode',
@@ -96,6 +105,12 @@ export default defineConfig({
     {
       command: 'cd test-projects/custom-layout && pnpm dev --port 5182',
       port: 5182,
+      reuseExistingServer: !process.env.CI,
+      timeout: 20000,
+    },
+    {
+      command: 'cd tests/fixtures/custom-quiz && pnpm dev --port 5183',
+      port: 5183,
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },

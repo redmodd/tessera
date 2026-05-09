@@ -3,6 +3,7 @@
   import manifest from 'virtual:tessera-manifest';
   import pageModules from 'virtual:tessera-pages';
   import UserLayout from 'virtual:tessera-layout';
+  import Quiz from 'virtual:tessera-quiz';
   import { onMount, onDestroy, setContext, untrack } from 'svelte';
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import ErrorPage from './ErrorPage.svelte';
@@ -413,7 +414,13 @@
   {:else if pageError}
     <ErrorPage error={pageError} onretry={retryPage} />
   {:else if PageComponent}
-    <PageComponent />
+    {#if pageContext.quiz}
+      <Quiz>
+        <PageComponent />
+      </Quiz>
+    {:else}
+      <PageComponent />
+    {/if}
   {/if}
 {/snippet}
 

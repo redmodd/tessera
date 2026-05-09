@@ -1,5 +1,6 @@
 <script>
   import { getContext, onMount } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion } from './util.js';
 
@@ -17,7 +18,7 @@
   const standalone = !quiz;
 
   let shuffledRight = $state([]);
-  let matches = $state(new Map());
+  let matches = $state(new SvelteMap());
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
 
@@ -64,7 +65,7 @@
   }
 
   function resetState() {
-    matches = new Map();
+    matches = new SvelteMap();
     selectedLeft = null;
     selectedRight = null;
     initShuffle();

@@ -1,25 +1,26 @@
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 
 export class ProgressState {
-  visitedPages = $state(new Set<number>());
-  quizScores = $state(new Map<number, number>());
+  visitedPages = $state(new SvelteSet<number>());
+  quizScores = $state(new SvelteMap<number, number>());
   /**
    * Chunk progress — for pages that reveal content in stages (Continue buttons).
    * Maps pageIndex → highest revealed chunk index (0-based).
    */
-  chunkProgress = $state(new Map<number, number>());
+  chunkProgress = $state(new SvelteMap<number, number>());
   /**
    * Per-page standalone question scores from `useQuestion`. pageIndex → (questionId → score 0-100).
    * Tracked separately from `quizScores` because <Quiz> blocks score as a unit
    * while standalone questions score individually and average per page.
    */
-  standaloneQuestionScores = $state(new Map<number, Map<string, number>>());
+  standaloneQuestionScores = $state(new SvelteMap<number, Map<string, number>>());
   /**
    * Set of page indices that have at least one graded standalone question.
    * Pages in this set contribute to course success status via their standalone average.
    */
-  gradedStandalonePages = $state(new Set<number>());
+  gradedStandalonePages = $state(new SvelteSet<number>());
   completionStatus = $state<'incomplete' | 'complete'>('incomplete');
   successStatus = $state<'unknown' | 'passed' | 'failed'>('unknown');
 
