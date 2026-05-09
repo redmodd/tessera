@@ -30,12 +30,12 @@ yarn create tessera my-course
 
 The scaffolder creates a new directory with:
 
-- `course.config.js` — course metadata, navigation, completion, and export settings
-- `vite.config.js` — Vite config wired up with the Tessera plugin (do not modify)
-- `pages/` — starter section, lesson, and page
-- `assets/` — drop images, audio, and video here
-- `styles/` — optional CSS overrides
-- `AGENTS.md` — the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
+- `course.config.js`: course metadata, navigation, completion, and export settings
+- `vite.config.js`: Vite config wired up with the Tessera plugin (do not modify)
+- `pages/`: starter section, lesson, and page
+- `assets/`: drop images, audio, and video here
+- `styles/`: optional CSS overrides
+- `AGENTS.md`: the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
 
 Then:
 
@@ -46,7 +46,7 @@ npm run preview   # local dev server at http://localhost:5173
 npm run export    # build + package for the configured LMS standard
 ```
 
-Open the printed URL in your browser — the page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
+Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
 
 ## Flags
 

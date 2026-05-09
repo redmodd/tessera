@@ -1,8 +1,8 @@
-# AGENTS.md — Tessera Course Authoring Guide
+# AGENTS.md: Tessera Course Authoring Guide
 
-Tessera is an **LMS tracking runtime** for interactive learning content. It handles SCORM 1.2 / SCORM 2004 / cmi5 / xAPI statements, progress state, completion and success rollup, persistence, and navigation gating — and gets out of the way for the presentation layer.
+Tessera is an **LMS tracking runtime** for interactive learning content. It handles SCORM 1.2 / SCORM 2004 / cmi5 / xAPI statements, progress state, completion and success rollup, persistence, and navigation gating, and gets out of the way for the presentation layer.
 
-**Lock the data contract. Free the presentation.** Build a course with built-in components, your own (via the hooks), or any mix. This file is the canonical reference for any agent or human author working in a Tessera project — read it before generating or editing course code.
+**Lock the data contract. Free the presentation.** Build a course with built-in components, your own (via the hooks), or any mix. This file is the canonical reference for any agent or human author working in a Tessera project. Read it before generating or editing course code.
 
 ---
 
@@ -67,12 +67,12 @@ Sorting is alphabetical by directory / filename. Numeric prefixes on directories
 **Optional everywhere.** When absent, titles fall back to the title-cased slug.
 
 ```js
-// section or lesson _meta.js — title override
+// section or lesson _meta.js: title override
 export default { title: "Getting Started" };
 ```
 
 ```js
-// lesson _meta.js — explicit page order
+// lesson _meta.js: explicit page order
 export default {
   title: "Welcome",
   pages: ["welcome", "objectives"],
@@ -87,13 +87,13 @@ Pages listed in `pages` come first in listed order; any unlisted `.svelte` files
 
 There are five:
 
-1. **Built-in components** — `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc., from `tessera-learn`. Use, compose, or skip.
-2. **Hooks** — `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
-3. **Custom layout** — drop `layout.svelte` at the project root to replace the default chrome.
-4. **Custom quiz shell** — drop `quiz.svelte` at the project root to replace the built-in quiz UI for every page that has `pageConfig.quiz`. Authors call `useQuiz()` for state and dispatch; question widgets continue to register through `useQuestion`.
-5. **Custom xAPI** — `useXAPI()` returns a publisher for emitting your own xAPI verbs to one or more LRSes. See [Custom xAPI statements](#custom-xapi-statements).
+1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc., from `tessera-learn`. Use, compose, or skip.
+2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
+3. **Custom layout**: drop `layout.svelte` at the project root to replace the default chrome.
+4. **Custom quiz shell**: drop `quiz.svelte` at the project root to replace the built-in quiz UI for every page that has `pageConfig.quiz`. Authors call `useQuiz()` for state and dispatch; question widgets continue to register through `useQuestion`.
+5. **Custom xAPI**: `useXAPI()` returns a publisher for emitting your own xAPI verbs to one or more LRSes. See [Custom xAPI statements](#custom-xapi-statements).
 
-The built-ins are reference implementations of the hooks. A custom widget that calls `useQuestion` and emits an `Interaction` is treated identically to `<MultipleChoice>` — same scoring, same LMS reporting, same persistence.
+The built-ins are reference implementations of the hooks. A custom widget that calls `useQuestion` and emits an `Interaction` is treated identically to `<MultipleChoice>`, with the same scoring, LMS reporting, and persistence.
 
 ---
 
@@ -110,7 +110,7 @@ Each page is a `.svelte` file inside a lesson folder.
 
 ### Page configuration
 
-`pageConfig` sets the page title and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values.
+`pageConfig` sets the page title and configures quizzes. It must be a **static object literal** in a module script block. No variables, function calls, or computed values.
 
 Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) are accepted by the manifest parser.
 
@@ -245,7 +245,7 @@ Native player. A11y: `aria-label` from title.
 
 ## Quizzes
 
-A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the page in the resolved quiz shell (built-in `<Quiz>` by default; a project-supplied `quiz.svelte` if one exists at the project root) — page authors no longer need their own `<Quiz>` wrapper. Drop question components directly at the page root.
+A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the page in the resolved quiz shell (built-in `<Quiz>` by default; a project-supplied `quiz.svelte` if one exists at the project root). Page authors no longer need their own `<Quiz>` wrapper. Drop question components directly at the page root.
 
 ### Setup
 
@@ -268,7 +268,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the p
 />
 ```
 
-### Data contract — what the LMS sees
+### Data contract: what the LMS sees
 
 Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through `useQuiz().submit()` → `tessera-quiz-complete` → the persistence adapter. Bypass the hook and the quiz reports nothing.
 
@@ -296,9 +296,9 @@ Pass `weight` to `useQuestion` (and through built-in widget props) to change how
 <MultipleChoice id="q-hard" weight={3} ... />
 ```
 
-Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page. Both paths roll up using `Σ(weight × score) / Σ(weight)` — the same widget answered the same way produces the same page score whether it's wrapped in a quiz or scattered across the page. Non-positive weights are treated as 1.
+Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page. Both paths roll up using `Σ(weight × score) / Σ(weight)`. The same widget answered the same way produces the same page score whether it's wrapped in a quiz or scattered across the page. Non-positive weights are treated as 1.
 
-The LMS still sees each question as a single pass/fail interaction — weights only affect the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*`.
+The LMS still sees each question as a single pass/fail interaction; weights only affect the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*`.
 
 ### Question types
 
@@ -326,8 +326,8 @@ The LMS still sees each question as a single pass/fail interaction — weights o
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `question` | `string` | — | Prompt |
-| `answers` | `string[]` | — | Acceptable answers |
+| `question` | `string` |  | Prompt |
+| `answers` | `string[]` |  | Acceptable answers |
 | `caseSensitive` | `boolean` | `false` | Comparison casing |
 | `weight` | `number` | `1` | Page-level rollup weight |
 
@@ -400,7 +400,7 @@ All four question components also work outside `<Quiz>` for inline practice. Sta
 />
 ```
 
-Standalone questions are not graded by default. To grade one (e.g., a required reflection that affects course success), build it with the `useQuestion` hook directly — see [Recipe 5](#recipe-5-graded-standalone-question).
+Standalone questions are not graded by default. To grade one (e.g., a required reflection that affects course success), build it with the `useQuestion` hook directly. See [Recipe 5](#recipe-5-graded-standalone-question).
 
 ---
 
@@ -520,11 +520,11 @@ Every field except `title` has a default. The build merges yours over:
 }
 ```
 
-So `export default { title: "My Course" }` is a complete config — free navigation, full-percentage completion, web export.
+So `export default { title: "My Course" }` is a complete config: free navigation, full-percentage completion, web export.
 
 ### Custom access rules
 
-For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess`. It runs synchronously on every navigation evaluation — keep it cheap.
+For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess`. It runs synchronously on every navigation evaluation. Keep it cheap.
 
 ```js
 import { sequentialAccess } from 'tessera-learn';
@@ -545,7 +545,7 @@ export default {
 };
 ```
 
-`AccessContext` exposes `pageIndex`, `page`, `manifest`, `progress`, and `config`. The presets `freeAccess` and `sequentialAccess` are re-exported from `tessera-learn` for composition. `resolveAccess(config)` is also exported — it returns the predicate the runtime would use (custom `canAccess` if set, otherwise the matching preset). Useful when you want to wrap rather than replace.
+`AccessContext` exposes `pageIndex`, `page`, `manifest`, `progress`, and `config`. The presets `freeAccess` and `sequentialAccess` are re-exported from `tessera-learn` for composition. `resolveAccess(config)` is also exported. It returns the predicate the runtime would use (custom `canAccess` if set, otherwise the matching preset). Useful when you want to wrap rather than replace.
 
 ### Build output
 
@@ -553,16 +553,16 @@ export default {
 
 | `export.standard` | What ships | Where |
 |-------------------|------------|-------|
-| `web` | Static site (HTML/CSS/JS + `assets/`) | `dist/` — host on any static file server |
+| `web` | Static site (HTML/CSS/JS + `assets/`) | `dist/` (host on any static file server) |
 | `scorm12` | SCORM 1.2 package | `dist/<course>-scorm12.zip` |
 | `scorm2004` | SCORM 2004 4th Edition package | `dist/<course>-scorm2004.zip` |
 | `cmi5` | cmi5 package (AU + manifest) | `dist/<course>-cmi5.zip` |
 
-For LMS exports, upload the zip via your LMS's import flow. For web export, the bundle is a self-contained static site — drop `dist/` on Netlify, GitHub Pages, S3, or any static host.
+For LMS exports, upload the zip via your LMS's import flow. For web export, the bundle is a self-contained static site. Drop `dist/` on Netlify, GitHub Pages, S3, or any static host.
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, asset references, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run preview` (wraps `vite dev` — local dev server with HMR) and `npm run export` (wraps `vite build` — full validation + bundle + adapter packaging). Names diverge from Vite's defaults because they describe the authoring intent ("preview the course", "export for an LMS") rather than the underlying tool.
+The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, asset references, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run preview` (wraps `vite dev`, local dev server with HMR) and `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging). Names diverge from Vite's defaults because they describe the authoring intent ("preview the course", "export for an LMS") rather than the underlying tool.
 
 ---
 
@@ -588,8 +588,8 @@ Each hook is synchronous and must be called during component setup, inside a Tes
 
 Register a question widget so the runtime can submit, score, persist, and report it.
 
-- **Inside `<Quiz>`** — the parent Quiz drives submission. The widget renders the prompt + answer UI; nothing else.
-- **Standalone** — the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
+- **Inside `<Quiz>`**: the parent Quiz drives submission. The widget renders the prompt + answer UI; nothing else.
+- **Standalone**: the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
@@ -609,7 +609,7 @@ function useQuestion(opts: {
 };
 ```
 
-`Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge — `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
+`Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
 ```svelte
 <script>
@@ -636,7 +636,7 @@ function useQuestion(opts: {
 
 ### `useQuiz`
 
-Quiz orchestration hook used by both the built-in `<Quiz>` and any project-supplied `quiz.svelte`. A custom shell calls `useQuiz` to drive submission/retry/review; **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz reports nothing to the LMS.
+Quiz orchestration hook used by both the built-in `<Quiz>` and any project-supplied `quiz.svelte`. A custom shell calls `useQuiz` to drive submission/retry/review; **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`**: bypassing it means the quiz reports nothing to the LMS.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -667,7 +667,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
 };
 ```
 
-Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire — `tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry` — none of them write to the adapter.
+Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter.
 
 ### `useNavigation`
 
@@ -702,7 +702,7 @@ function useProgress(): {
 
 ### `usePersistence<T>(key)`
 
-Per-widget persistent state. Survives reload on every adapter — `localStorage` for web, SCORM `cmi.suspend_data` for SCORM 1.2/2004, xAPI State API for cmi5. Reads sync; writes batched by the adapter. JSON-serializable values only.
+Per-widget persistent state. Survives reload on every adapter: `localStorage` for web, SCORM `cmi.suspend_data` for SCORM 1.2/2004, xAPI State API for cmi5. Reads sync; writes batched by the adapter. JSON-serializable values only.
 
 ```ts
 function usePersistence<T>(key: string): {
@@ -733,7 +733,7 @@ function isCorrect(i: Interaction): boolean | null;
 
 ## Custom xAPI statements
 
-The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated under cmi5; `cmi.*` writes under SCORM) is sent automatically — see [LMS Adapter Reference](#lms-adapter-reference). To emit your own xAPI verbs, use `useXAPI()`:
+The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated under cmi5; `cmi.*` writes under SCORM) is sent automatically. See [LMS Adapter Reference](#lms-adapter-reference). To emit your own xAPI verbs, use `useXAPI()`:
 
 ```ts
 import { useXAPI } from 'tessera-learn';
@@ -745,13 +745,13 @@ xapi?.sendStatement({
 });
 ```
 
-`useXAPI()` is a plain function (not a Svelte context hook), callable from anywhere — component setup, event handlers, async callbacks, plain `.ts` modules. Returns `null` when no LRS is configured or before adapter init resolves; null-check and degrade gracefully.
+`useXAPI()` is a plain function (not a Svelte context hook), callable from anywhere: component setup, event handlers, async callbacks, plain `.ts` modules. Returns `null` when no LRS is configured or before adapter init resolves; null-check and degrade gracefully.
 
 The publisher fills in `actor`, `timestamp`, `id` (UUID), `context.contextActivities.grouping`, `context.registration` (cmi5), and the `sessionid` extension (cmi5). You supply `verb`, `object` (defaults to the activity), and optionally `result`, `context`, `attachments`.
 
-### Configure the destination — `course.config.js`
+### Configure the destination: `course.config.js`
 
-`config.xapi` is one destination, or an array of them. The destination is always declared explicitly — there is no implicit default.
+`config.xapi` is one destination, or an array of them. The destination is always declared explicitly. There is no implicit default.
 
 ```js
 xapi: {
@@ -761,7 +761,7 @@ xapi: {
   activityId: 'https://example.com/courses/intro-to-x',
 }
 
-// cmi5 only — inherit the LMS launch LRS (endpoint+auth+actor+activityId+registration):
+// cmi5 only: inherit the LMS launch LRS (endpoint+auth+actor+activityId+registration):
 xapi: { endpoint: 'lms' }
 
 // Fan out (at most one 'lms' entry):
@@ -786,9 +786,9 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID is m
 
 Priority order (top wins):
 
-1. **Author-supplied `xapi.actor`** — always wins.
-2. **cmi5 launch actor** — under cmi5, the publisher uses the same Agent the LMS handed us at launch.
-3. **SCORM-derived actor** — under scorm12/scorm2004, the publisher synthesizes:
+1. **Author-supplied `xapi.actor`**: always wins.
+2. **cmi5 launch actor**: under cmi5, the publisher uses the same Agent the LMS handed us at launch.
+3. **SCORM-derived actor**: under scorm12/scorm2004, the publisher synthesizes:
    ```ts
    {
      account: {
@@ -802,22 +802,22 @@ Priority order (top wins):
    The `account` IFI satisfies xAPI's Identified Agent rule. `homePage` defaults to the activityId origin; override via `actorAccountHomePage` if your authority namespace is elsewhere. Required if `activityId` is a non-URL IRI.
 4. **Fallback: error.** Web export with no `actor` fails at config time.
 
-Mid-session identity change (e.g., learner logs in/out without reloading) is **not supported in v1** — actor is resolved once per page-load and cached. Reload the runtime on identity change.
+Mid-session identity change (e.g., learner logs in/out without reloading) is **not supported in v1**. Actor is resolved once per page-load and cached. Reload the runtime on identity change.
 
 ### Auth
 
-v1 supports **Basic auth only**. The publisher prepends `Basic ` to whatever your `auth` value resolves to — pass the credential value, not the full header.
+v1 supports **Basic auth only**. The publisher prepends `Basic ` to whatever your `auth` value resolves to; pass the credential value, not the full header.
 
 For OAuth-protected LRSes, wrap the token exchange in your `auth` function and return a Basic credential the LRS accepts (or run a thin proxy that converts).
 
-The function form is re-invoked once on a 401 to cover short-lived tokens that have just expired. Two consecutive 401s mark the auth resolver dead for the publisher's lifetime — every subsequent send fails fast without hitting the LRS. Reload the runtime to retry.
+The function form is re-invoked once on a 401 to cover short-lived tokens that have just expired. Two consecutive 401s mark the auth resolver dead for the publisher's lifetime. Every subsequent send fails fast without hitting the LRS. Reload the runtime to retry.
 
-**Static-string `auth` ships in your bundle** — fine for demos, never for production. Use a function that fetches a server-brokered short-lived token instead.
+**Static-string `auth` ships in your bundle**: fine for demos, never for production. Use a function that fetches a server-brokered short-lived token instead.
 
 ### Retry policy
 
 - **Default:** 3 attempts with exponential backoff (100ms, 200ms, 400ms).
-- **5xx / network errors** retry. **4xx** short-circuits — retrying won't help.
+- **5xx / network errors** retry. **4xx** short-circuits; retrying won't help.
 - **HTTP 409 Conflict** is treated as **success** (xAPI rejects POSTs with a duplicate statement id, so a 409 on retry means the LRS already accepted the statement).
 - **Per-statement opt-out:** `sendStatement(stmt, { retry: false })` for fire-and-forget telemetry where the author would rather drop than block.
 
@@ -832,27 +832,27 @@ const result = await xapi.sendStatement({ verb, object });
 // }
 ```
 
-`destinations[]` lets you act on partial failures under fan-out — one LRS can be down without affecting the others.
+`destinations[]` lets you act on partial failures under fan-out: one LRS can be down without affecting the others.
 
 ### Validation
 
 The publisher checks three things before sending:
 
-1. `verb.id` — present, non-empty string.
-2. `object.id` — non-empty string when `object` is supplied.
-3. `result.score.scaled` — number in `[-1, 1]` when supplied.
+1. `verb.id`: present, non-empty string.
+2. `object.id`: non-empty string when `object` is supplied.
+3. `result.score.scaled`: number in `[-1, 1]` when supplied.
 
 Everything else passes through. The LRS gives clearer errors for IRI / extension / attachment shape issues than we can; failures surface via `destinations[].error`.
 
 ### Mode-specific caveats
 
-**SCORM (1.2 / 2004).** Actor is auto-derived from the LMS data model; supply `actor` explicitly to use a different IFI (`mbox`, `openid`). **CORS** is the painful one — the LRS must allow the LMS-served origin, and many don't by default. cmi5's `sessionid` extension does not exist here; attach your own extension if you need to group statements by session. In dev (WebAdapter fallback), an explicit `xapi` destination with no author actor cannot synthesize an Agent — `sendStatement` rejects with an explicit error.
+**SCORM (1.2 / 2004).** Actor is auto-derived from the LMS data model; supply `actor` explicitly to use a different IFI (`mbox`, `openid`). **CORS** is the painful one: the LRS must allow the LMS-served origin, and many don't by default. cmi5's `sessionid` extension does not exist here; attach your own extension if you need to group statements by session. In dev (WebAdapter fallback), an explicit `xapi` destination with no author actor cannot synthesize an Agent, so `sendStatement` rejects with an explicit error.
 
 **Web.** The bundle is public, so static `auth: 'Basic abc123'` leaks. Always use a function that fetches a server-brokered short-lived token. CORS matters for the token endpoint too. Three actor patterns: hardcoded anonymous, author-wired (`actor: () => getCurrentUser()`), or query-string `?actor=...` mirroring cmi5.
 
-**cmi5 with `endpoint: 'lms'`.** Author and adapter share one publisher instance and one queue, so ordering is preserved (no race between an author's `experienced` and the adapter's `Completed`). Running locally without launch params, `sendStatement` rejects with a missing-params error — no silent fallback. Point `endpoint` at a local LRS for dev.
+**cmi5 with `endpoint: 'lms'`.** Author and adapter share one publisher instance and one queue, so ordering is preserved (no race between an author's `experienced` and the adapter's `Completed`). Running locally without launch params, `sendStatement` rejects with a missing-params error. No silent fallback. Point `endpoint` at a local LRS for dev.
 
-**Page unload.** Once unload begins, every publisher is marked unloading and `useXAPI()?.sendStatement(...)` calls reject — required to keep cmi5 Terminated last on the wire (§9.3.6). Record-at-the-end work belongs in a child component's `onDestroy`, not `beforeunload`.
+**Page unload.** Once unload begins, every publisher is marked unloading and `useXAPI()?.sendStatement(...)` calls reject; this is required to keep cmi5 Terminated last on the wire (§9.3.6). Record-at-the-end work belongs in a child component's `onDestroy`, not `beforeunload`.
 
 ### Non-goals (v1)
 
@@ -868,7 +868,7 @@ Everything else passes through. The LRS gives clearer errors for IRI / extension
 
 ## LMS Adapter Reference
 
-The runtime translates author intent — page visits, quiz scores, completion, persistence — into a fixed set of adapter calls. Each export standard maps those calls onto a different LMS contract. This section is the source-of-truth view of what the LMS sees for any given runtime event.
+The runtime translates author intent (page visits, quiz scores, completion, persistence) into a fixed set of adapter calls. Each export standard maps those calls onto a different LMS contract. This section is the source-of-truth view of what the LMS sees for any given runtime event.
 
 ### Cross-mode rollup
 
@@ -880,30 +880,30 @@ The runtime translates author intent — page visits, quiz scores, completion, p
 | Course completion changes | Funneled into `cmi.core.lesson_status` (only one field exists) | `SetValue("cmi.completion_status", "completed"\|"incomplete")` | **Completed** statement with `result.completion = true`, `result.duration`, `result.score?` (one-shot per session) |
 | Question answered (graded or standalone, inside or outside a quiz) | `cmi.interactions.{n}.id` / `student_response` / `result` / `time` / `type` (n continues from prior `_count`) | `cmi.interactions.{n}.id` / `learner_response` / `result` / `timestamp` / `type` (n continues from prior `_count`) | **Answered** statement; object `${activityId}#${questionId}`, definition `cmi.interaction` + `interactionType`, `result.response`, `result.success` |
 | Resume after reload | Read `cmi.suspend_data` on init; manifest is rebuilt from code, not LMS | Read `cmi.suspend_data` on init | State API `GET` `tessera-state`; lifecycle replays from where the prior session left off |
-| Author exit / unload | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously) | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously) | If course not yet **Completed**, send **Suspended**; then **Terminated** (always last on the wire — cmi5 §9.3.6) |
+| Author exit / unload | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously) | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously) | If course not yet **Completed**, send **Suspended**; then **Terminated** (always last on the wire, cmi5 §9.3.6) |
 | Learner identity (xAPI actor synthesis) | `cmi.core.student_id` + `cmi.core.student_name` | `cmi.learner_id` + `cmi.learner_name` | Launch-supplied actor JSON (Identified Agent) |
 | Persistence cap | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB | 64000 chars per spec | LRS-defined (typically unbounded for State API documents) |
 | Score scale exposed to LMS | `score.raw` only (0–100) | `score.raw` (0–100) **and** `score.scaled` (0–1) | `result.score.scaled` (0–1) |
 
 `commit()` is microtask-coalesced. Multiple state mutations within one tick collapse to a single `LMSCommit` / `Commit`. cmi5 statements are individual (no batched commit).
 
-### SCORM 1.2 — notes
+### SCORM 1.2 notes
 
 API discovery: walks `window.parent` / `window.opener` up to 10 levels looking for `API`.
 
-**One status field.** `cmi.core.lesson_status` collapses completion and pass/fail. The runtime resolves them by priority — success (`passed` / `failed`) wins when known; otherwise completion (`completed` / `incomplete`) is written. There is no "unknown"; until a graded quiz produces a result, the LMS sees `incomplete`.
+**One status field.** `cmi.core.lesson_status` collapses completion and pass/fail. The runtime resolves them by priority: success (`passed` / `failed`) wins when known; otherwise completion (`completed` / `incomplete`) is written. There is no "unknown"; until a graded quiz produces a result, the LMS sees `incomplete`.
 
 **Mastery is Tessera's, not the LMS's.** Pass/fail is computed from `scoring.passingScore`. `cmi.student_data.mastery_score` is read-only for this runtime.
 
-**Not implemented.** No `cmi.objectives.*` writes. No SCORM 1.2 sequencing — `navigation.canAccess` is the only gating layer; the LMS sees one SCO. SCORM 1.2 `time-out` / `logout` exit values are not emitted.
+**Not implemented.** No `cmi.objectives.*` writes. No SCORM 1.2 sequencing; `navigation.canAccess` is the only gating layer, and the LMS sees one SCO. SCORM 1.2 `time-out` / `logout` exit values are not emitted.
 
 **Local testing.** Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free tier) or [Reload SCORM Player](https://github.com/reload/reload). Inspect the LMS API call log to confirm `lesson_status` and `cmi.interactions.*` look right.
 
-### SCORM 2004 4th — notes
+### SCORM 2004 4th notes
 
 API discovery: `API_1484_11` via the same parent/opener walk.
 
-**Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written *explicitly* when no graded result exists — leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
+**Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written *explicitly* when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
 
 **LMS-side fields untouched.** `cmi.completion_threshold` and `cmi.scaled_passing_score` are LMS-owned; Tessera owns the threshold via `scoring.passingScore`.
 
@@ -911,13 +911,13 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Local testing.** SCORM Cloud is the easiest end-to-end check. Moodle, Cornerstone, SuccessFactors, and Canvas (via Rustici Engine) accept `dist/*-scorm2004.zip` directly.
 
-### cmi5 — notes
+### cmi5 notes
 
 **Launch contract.** The LMS opens the course URL with `endpoint`, `fetch`, `actor` (JSON-encoded Identified Agent), `activityId`, and optionally `registration`. Discovery succeeds when all four required params are present; otherwise `LMSAdapterError`.
 
 **Token fetch is single-use** (cmi5 §6.2). On failure, reload from the LMS to retry. The token is used as a `Basic` credential, not Bearer.
 
-**Lifecycle order.** **Initialized** → **Answered** (per question on submit) → **Completed** → **Passed** / **Failed** → **Suspended** (only if not Completed) → **Terminated** (always last, cmi5 §9.3.6). Completed / Passed / Failed are one-shot per session — once dispatched, the corresponding setter no-ops. A reloaded session may re-dispatch them, which is intended: each session sends its lifecycle exactly once.
+**Lifecycle order.** **Initialized** → **Answered** (per question on submit) → **Completed** → **Passed** / **Failed** → **Suspended** (only if not Completed) → **Terminated** (always last, cmi5 §9.3.6). Completed / Passed / Failed are one-shot per session; once dispatched, the corresponding setter no-ops. A reloaded session may re-dispatch them, which is intended: each session sends its lifecycle exactly once.
 
 **Required result fields.** Completed: `completion: true`, `duration`. Passed/Failed: `success`, `duration`. Terminated: `duration` (§9.5.4.1). All include `result.score.scaled` when a score is known.
 
@@ -925,19 +925,19 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **State persistence.** `tessera-state` document via the State API, keyed by `activityId` + `agent` + `registration?` + `stateId='tessera-state'`. Writes chain onto the publisher's queue so the suspend payload lands before Terminated.
 
-**Not implemented.** No multi-AU courses (one course = one AU in v1). No **Waived** or **Abandoned** verbs. No mid-session actor refresh. No `MoveOn` criterion in `cmi5.xml` — completion is decided runtime-side; the LMS evaluates MoveOn against the verbs the runtime *does* emit.
+**Not implemented.** No multi-AU courses (one course = one AU in v1). No **Waived** or **Abandoned** verbs. No mid-session actor refresh. No `MoveOn` criterion in `cmi5.xml`: completion is decided runtime-side; the LMS evaluates MoveOn against the verbs the runtime *does* emit.
 
-**Local testing.** Upload `dist/*-cmi5.zip` to SCORM Cloud and use the cmi5 dispatch URL it generates — closest free equivalent to a real LMS launch.
+**Local testing.** Upload `dist/*-cmi5.zip` to SCORM Cloud and use the cmi5 dispatch URL it generates, the closest free equivalent to a real LMS launch.
 
 ### Common adapter behaviour
 
-**Queue + retry.** SCORM adapters serialize every `LMSSetValue` / `LMSCommit` through a sequential queue with exponential-backoff retry on transient errors. Retry warnings include the real LMS error code (`GetLastError`) — e.g. `405 Incorrect Data Type` rather than a generic "LMS call failed".
+**Queue + retry.** SCORM adapters serialize every `LMSSetValue` / `LMSCommit` through a sequential queue with exponential-backoff retry on transient errors. Retry warnings include the real LMS error code (`GetLastError`), e.g. `405 Incorrect Data Type` rather than a generic "LMS call failed".
 
-**Unload.** `terminate()` cannot run async retries — the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
+**Unload.** `terminate()` cannot run async retries; the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
 
-**Interaction encoding.** `formatResponse` / `formatCorrectPattern` follow SCORM 2004 4th RTE §4.2.7 delimiters — `[,]` items, `[.]` pairs, `[:]` ranges. SCORM 1.2 and cmi5 reuse the encoding (cmi5 embeds it in `result.response` / `definition.correctResponsesPattern`).
+**Interaction encoding.** `formatResponse` / `formatCorrectPattern` follow SCORM 2004 4th RTE §4.2.7 delimiters: `[,]` items, `[.]` pairs, `[:]` ranges. SCORM 1.2 and cmi5 reuse the encoding (cmi5 embeds it in `result.response` / `definition.correctResponsesPattern`).
 
-**Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel — never a silent degradation.
+**Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel. Never a silent degradation.
 
 ---
 
@@ -1093,7 +1093,7 @@ export default {
 
 ### Recipe 4: Custom quiz shell via `quiz.svelte`
 
-Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The runtime wraps every page with `pageConfig.quiz` in your shell instead of the carousel default. The shell uses only the public `useQuiz()` API — no imports from `tessera/runtime/*`.
+Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The runtime wraps every page with `pageConfig.quiz` in your shell instead of the carousel default. The shell uses only the public `useQuiz()` API; no imports from `tessera/runtime/*`.
 
 ```svelte
 <!-- quiz.svelte -->
@@ -1128,11 +1128,11 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 </div>
 ```
 
-Always submit through `useQuiz().submit()` — see [Data contract](#data-contract--what-the-lms-sees).
+Always submit through `useQuiz().submit()`. See [Data contract](#data-contract--what-the-lms-sees).
 
 ### Recipe 5: Graded standalone question
 
-A single inline reflection — not in a `<Quiz>` but `graded: true`, so it counts toward course success. Useful for "must answer to pass" gates without the quiz wrapper.
+A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts toward course success. Useful for "must answer to pass" gates without the quiz wrapper.
 
 ```svelte
 <!-- pages/04-reflection/01-reflect/reflect.svelte -->
@@ -1151,7 +1151,7 @@ A single inline reflection — not in a `<Quiz>` but `graded: true`, so it count
     response: () => ({
       type: 'long-fill-in',
       response: answer,
-      // No `correct` — any answer accepted; we just want completion.
+      // No `correct`: any answer accepted; we just want completion.
     }),
     score: () => answer.trim().length >= 50 ? 100 : 0,
     reset: () => { answer = ''; },
@@ -1166,10 +1166,10 @@ A single inline reflection — not in a `<Quiz>` but `graded: true`, so it count
   Submit
 </button>
 
-{#if q.submitted}<p>Thanks — your reflection has been recorded.</p>{/if}
+{#if q.submitted}<p>Thanks. Your reflection has been recorded.</p>{/if}
 ```
 
-The LMS sees a graded `long-fill-in` interaction. Course success rolls up across all graded items — quizzes and standalones alike.
+The LMS sees a graded `long-fill-in` interaction. Course success rolls up across all graded items: quizzes and standalones alike.
 
 ### Recipe 6: Chunked-reveal page with `markChunk`
 
@@ -1213,7 +1213,7 @@ Use this when a page is long enough that "fully visited" is a meaningful state s
 
 ### Recipe 7: Persisted UI state with `usePersistence`
 
-`usePersistence` is not just for question state — any JSON-serialisable value the learner produces can survive reload through it. Here, a sidebar collapsed/expanded toggle that the learner expects to stay set across sessions.
+`usePersistence` is not just for question state. Any JSON-serialisable value the learner produces can survive reload through it. Here, a sidebar collapsed/expanded toggle that the learner expects to stay set across sessions.
 
 ```svelte
 <!-- in any page component, layout.svelte, or a custom widget -->
@@ -1236,7 +1236,7 @@ Keys are namespaced per course, so two courses on the same LMS don't collide. Un
 
 ## Constraints
 
-- **No runtime data fetching in pages.** Page content is static — no `fetch()` or dynamic loaders in page components.
-- **Public API only.** Import from `tessera-learn`. Do **not** import from `tessera-learn/runtime/*` — those paths are internal and may change.
+- **No runtime data fetching in pages.** Page content is static; no `fetch()` or dynamic loaders in page components.
+- **Public API only.** Import from `tessera-learn`. Do **not** import from `tessera-learn/runtime/*`; those paths are internal and may change.
 - **`pageConfig` is JSON5-parseable.** Trailing commas, unquoted keys, single quotes are fine; variables, function calls, template literals, and computed values are not.
 - **Third-party libraries** must be project dependencies in `package.json`.

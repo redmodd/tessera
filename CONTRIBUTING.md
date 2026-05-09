@@ -17,7 +17,7 @@ pnpm test
 pnpm test:e2e
 ```
 
-If you only need unit tests, `pnpm install && pnpm build && pnpm test` is enough — the setup script is a convenience for getting the full e2e suite running.
+If you only need unit tests, `pnpm install && pnpm build && pnpm test` is enough. The setup script is a convenience for getting the full e2e suite running.
 
 See [TESTING.md](./TESTING.md) for the test layout, single-file runs, the variant pre-build, and debugging tips.
 
@@ -35,6 +35,10 @@ test-projects/
 AGENTS.md            # Course authoring guide
 ```
 
+## Editing AGENTS.md
+
+Edit `AGENTS.md` at the repo root **only**. The `pnpm build` step (`scripts/sync-agents-md.mjs`) copies it into `packages/tessera-learn/` and `packages/create-tessera/` so it ships with the published packages. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if a package copy has drifted from the root.
+
 ## Branch + commit style
 
 - Branch off `main`. Use a short prefix for the branch name (`feat/`, `fix/`, `chore/`, `docs/`).
@@ -47,11 +51,11 @@ AGENTS.md            # Course authoring guide
 - E2E: `pnpm test:e2e`. If you change adapter behavior (SCORM 1.2, SCORM 2004, cmi5, web) or navigation/progress logic, run the e2e suite locally before opening a PR.
 - New features should ship with tests. Bug fixes should ship with a regression test that fails before your change and passes after.
 
-See [TESTING.md](./TESTING.md) for full details — single-test runs, the variant pre-build that produces `tests/.e2e-variants/`, debugging failed CI runs, etc.
+See [TESTING.md](./TESTING.md) for full details: single-test runs, the variant pre-build that produces `tests/.e2e-variants/`, debugging failed CI runs, etc.
 
 ## Adapter changes
 
-Tessera supports four delivery modes — SCORM 1.2, SCORM 2004 4th Edition, cmi5, and static web. If your change touches the runtime API surface or any adapter:
+Tessera supports four delivery modes: SCORM 1.2, SCORM 2004 4th Edition, cmi5, and static web. If your change touches the runtime API surface or any adapter:
 
 - Check that the change works (or is appropriately gated) in every mode.
 - Note in the PR description which modes were tested and how.
@@ -72,7 +76,7 @@ A "Version Packages" PR is opened automatically once changesets land on `main`. 
 
 ## Reporting bugs / requesting features
 
-Use the issue templates on GitHub. For bugs, please include the export mode (SCORM 1.2 / SCORM 2004 / cmi5 / web) and the LMS (if applicable) — adapter behavior is highly sensitive to LMS quirks.
+Use the issue templates on GitHub. For bugs, please include the export mode (SCORM 1.2 / SCORM 2004 / cmi5 / web) and the LMS (if applicable). Adapter behavior is highly sensitive to LMS quirks.
 
 ## Code of conduct
 
