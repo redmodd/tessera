@@ -55,7 +55,7 @@
     "node": ">=26"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm build"
@@ -67,11 +67,10 @@
     "svelte": "^5.55.5"
   },
   "devDependencies": {
-    "@types/archiver": "^7.0.0",
     "@types/node": "^25.6.2",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.0.1",
-    "tsup": "^8.0.0",
+    "tsdown": "^0.22.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.0",
     "vitest": "^4.1.5"

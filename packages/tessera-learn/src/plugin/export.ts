@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'no
 import { resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { slugify } from '../runtime/slugify.js';
 
 // ---------- Types ----------
@@ -176,7 +176,7 @@ export async function createZip(
 ): Promise<number> {
   return new Promise((res, reject) => {
     const output = createWriteStream(outputPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
 
     output.on('close', () => {
       res(archive.pointer());
