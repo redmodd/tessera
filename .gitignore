@@ -13,6 +13,9 @@ coverage
 test-results
 playwright-report
 
+# Ephemeral e2e build variants — recreated by globalSetup each run.
+tests/.e2e-variants/
+
 # Logs
 *.log
 docs
