@@ -15,10 +15,10 @@
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
+    "@axe-core/playwright": "^4.11.3",
     "@changesets/cli": "^2.31.0",
     "@playwright/test": "^1.59.1",
-    "typescript": "^5.7.0",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
   "engines": {
