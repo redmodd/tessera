@@ -163,12 +163,11 @@ function welcomePage(title: string): string {
 <h1>Welcome to ${title}</h1>
 
 <p>
-  This is the first page of your Tessera course. Edit this file to customise the
-  welcome content.
+  This is a basic demo page of your Tessera course.
 </p>
 
 <p>
-  See <code>AGENTS.md</code> at the project root for the authoring guide.
+  Point your agent to <code>AGENTS.md</code> at the project root for the authoring guide.
 </p>
 `;
 }

@@ -8,7 +8,7 @@ Open your course in an AI coding assistant like [Claude Code](https://claude.com
 
 When you're done, one command packages your course as SCORM 1.2, SCORM 2004, cmi5, or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
 
-*Under the hood:* Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting on whatever you'd rather not type by hand.
+*Under the hood:* Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
 
 ## Prerequisites
 
@@ -77,8 +77,6 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 **Permission errors during `npm install`**: don't use `sudo`. See [npm's guide to resolving EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
 
 **The browser shows a blank page after `npm run preview`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
-
-Still stuck? [Open an issue](https://github.com/redmodd/tessera/issues) with what you ran and what you saw.
 
 ## Documentation
 
