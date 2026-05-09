@@ -5,17 +5,17 @@ export default defineConfig({
   timeout: 30000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'dot' : 'list',
+  // Pre-builds the four export-standard variants of tests/fixtures/free into
+  // tests/.e2e-variants/{web,scorm12,scorm2004,cmi5} so the export and lms
+  // projects can read pre-built dist/ output instead of mutating the source
+  // fixture and rebuilding mid-suite.
+  globalSetup: './tests/e2e/global-setup.ts',
   use: {
     trace: 'on-first-retry',
   },
-  // Files in non-LMS/export projects each get their own BrowserContext, so
-  // localStorage and per-test state are already isolated. The LMS and export
-  // projects are exceptions: they rewrite test-project-e2e/course.config.js
-  // and run `pnpm build`, which the shared dev server picks up via HMR — so
-  // they must stay single-threaded and run AFTER the parallel projects (a
-  // rebuild mid-run will rip the rug out from under whoever's mid-test).
-  // GitHub-hosted ubuntu runners have 4 cores; cap workers there. Drop back
-  // if flakiness or OOMs appear.
+  // Each test file gets its own BrowserContext, so localStorage and per-test
+  // state are isolated. GitHub-hosted ubuntu runners have 4 cores; cap workers
+  // there. Drop back if flakiness or OOMs appear.
   fullyParallel: true,
   workers: process.env.CI ? 4 : undefined,
   projects: [
@@ -72,22 +72,11 @@ export default defineConfig({
       name: 'export',
       use: { browserName: 'chromium' },
       testMatch: /export\.spec\.ts$/,
-      // Export tests rebuild test-project-e2e and rewrite course.config.js,
-      // so they must be strictly serial — and depend on the parallel projects
-      // finishing first so the dev server's HMR doesn't churn under them.
-      fullyParallel: false,
-      dependencies: ['free-mode', 'sequential-mode', 'mobile'],
     },
     {
       name: 'lms',
       use: { browserName: 'chromium' },
       testMatch: /lms-roundtrip\.spec\.ts$/,
-      // Same shared-state constraint as `export` — strict serial, runs last.
-      // Depends on `export` so the two don't trample each other's
-      // course.config.js rewrites (both also call `pnpm build` against the
-      // same test-project-e2e, which would corrupt the dist/ artifacts).
-      fullyParallel: false,
-      dependencies: ['free-mode', 'sequential-mode', 'mobile', 'export'],
     },
   ],
   webServer: [

@@ -1,36 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
 import { exec, type ChildProcess } from 'node:child_process';
-import { promisify } from 'node:util';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
+import { variantDir, VITE_BIN, type Standard } from './global-setup.js';
 
-const execAsync = promisify(exec);
-const E2E_PROJECT = resolve(process.cwd(), 'tests/fixtures/free');
-const CONFIG_PATH = resolve(E2E_PROJECT, 'course.config.js');
-
-/**
- * Rewrite the export.standard line in course.config.js. Returns the original
- * text so it can be restored in afterAll.
- */
-function setExportStandard(standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5'): string {
-  const original = readFileSync(CONFIG_PATH, 'utf-8');
-  const modified = original.replace(
-    /export:\s*\{\s*standard:\s*"[^"]*"\s*\}/,
-    `export: { standard: "${standard}" }`
+function startPreview(standard: Standard, port: number): ChildProcess {
+  const dir = variantDir(standard);
+  return exec(
+    `${VITE_BIN} preview ${dir} --port ${port} --strictPort`,
+    { cwd: dir },
   );
-  writeFileSync(CONFIG_PATH, modified);
-  return original;
-}
-
-async function buildProject(): Promise<void> {
-  await execAsync('pnpm build', { cwd: E2E_PROJECT, timeout: 60000 });
-}
-
-function startPreview(port: number): ChildProcess {
-  return exec(`npx vite preview --port ${port} --strictPort`, {
-    cwd: E2E_PROJECT,
-  });
 }
 
 async function waitForServer(page: Page, url: string): Promise<void> {
@@ -89,19 +67,11 @@ async function waitForScormCall(
 test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   const PORT = 5192;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('scorm12');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -112,7 +82,6 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -287,19 +256,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 test.describe.serial('LMS round-trip — SCORM 2004', () => {
   const PORT = 5193;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('scorm2004');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('scorm2004', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -310,7 +271,6 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -442,19 +402,11 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 test.describe.serial('LMS round-trip — CMI5', () => {
   const PORT = 5194;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('cmi5');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('cmi5', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -465,7 +417,6 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test('launch with CMI5 params sends Initialized statement', async ({ page }) => {

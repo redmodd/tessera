@@ -16,6 +16,13 @@ import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
  * unit-level coverage.
  */
 
+// The 3 describe blocks below each rewrite tests/fixtures/custom-quiz/
+// course.config.js and call `pnpm build` against the same fixture, so they
+// must run sequentially within this file. The `lms` Playwright project is
+// `fullyParallel: true` (free-fixture lms-roundtrip pre-builds its variants
+// in globalSetup), so describe blocks would otherwise race each other here.
+test.describe.configure({ mode: 'serial' });
+
 const execAsync = promisify(exec);
 const E2E_PROJECT = resolve(process.cwd(), 'tests/fixtures/custom-quiz');
 const CONFIG_PATH = resolve(E2E_PROJECT, 'course.config.js');
