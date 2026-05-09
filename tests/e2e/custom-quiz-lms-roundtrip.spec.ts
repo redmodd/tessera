@@ -1,9 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { exec, type ChildProcess } from 'node:child_process';
-import { promisify } from 'node:util';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
+import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 /**
  * Phase 5 Task 2 Step 4 — load-bearing custom-quiz LMS roundtrip.
@@ -16,33 +14,12 @@ import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
  * unit-level coverage.
  */
 
-// The 3 describe blocks below each rewrite tests/fixtures/custom-quiz/
-// course.config.js and call `pnpm build` against the same fixture, so they
-// must run sequentially within this file. The `lms` Playwright project is
-// `fullyParallel: true` (free-fixture lms-roundtrip pre-builds its variants
-// in globalSetup), so describe blocks would otherwise race each other here.
-test.describe.configure({ mode: 'serial' });
-
-const execAsync = promisify(exec);
-const E2E_PROJECT = resolve(process.cwd(), 'tests/fixtures/custom-quiz');
-const CONFIG_PATH = resolve(E2E_PROJECT, 'course.config.js');
-
-function setExportStandard(standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5'): string {
-  const original = readFileSync(CONFIG_PATH, 'utf-8');
-  const modified = original.replace(
-    /export:\s*\{\s*standard:\s*"[^"]*"\s*\}/,
-    `export: { standard: "${standard}" }`
+function startPreview(standard: Standard, port: number): ChildProcess {
+  const dir = variantDir('custom-quiz', standard);
+  return exec(
+    `${viteBin('custom-quiz')} preview ${dir} --port ${port} --strictPort`,
+    { cwd: dir },
   );
-  writeFileSync(CONFIG_PATH, modified);
-  return original;
-}
-
-async function buildProject(): Promise<void> {
-  await execAsync('pnpm build', { cwd: E2E_PROJECT, timeout: 60000 });
-}
-
-function startPreview(port: number): ChildProcess {
-  return exec(`npx vite preview --port ${port} --strictPort`, { cwd: E2E_PROJECT });
 }
 
 async function waitForServer(page: Page, url: string): Promise<void> {
@@ -104,19 +81,11 @@ async function answerCustomQuizCorrectly(page: Page): Promise<void> {
 test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
   const PORT = 5295;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('scorm12');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -127,7 +96,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -166,19 +134,11 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
   const PORT = 5296;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('scorm2004');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('scorm2004', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -189,7 +149,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -226,19 +185,11 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
 test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
   const PORT = 5297;
   const BASE = `http://localhost:${PORT}`;
-  let originalConfig: string;
   let preview: ChildProcess;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    originalConfig = setExportStandard('cmi5');
-    try {
-      await buildProject();
-    } catch (err) {
-      writeFileSync(CONFIG_PATH, originalConfig);
-      throw err;
-    }
-    preview = startPreview(PORT);
+    preview = startPreview('cmi5', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -249,7 +200,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
 
   test.afterAll(async () => {
     preview?.kill('SIGTERM');
-    writeFileSync(CONFIG_PATH, originalConfig);
   });
 
   test('Custom quiz emits xAPI Passed and per-question Answered statements', async ({ page }) => {

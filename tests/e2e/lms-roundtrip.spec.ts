@@ -1,12 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { exec, type ChildProcess } from 'node:child_process';
 import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
-import { variantDir, VITE_BIN, type Standard } from './global-setup.js';
+import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 function startPreview(standard: Standard, port: number): ChildProcess {
-  const dir = variantDir(standard);
+  const dir = variantDir('free', standard);
   return exec(
-    `${VITE_BIN} preview ${dir} --port ${port} --strictPort`,
+    `${viteBin('free')} preview ${dir} --port ${port} --strictPort`,
     { cwd: dir },
   );
 }

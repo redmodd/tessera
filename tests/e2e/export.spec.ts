@@ -3,13 +3,13 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { variantDir, VITE_BIN } from './global-setup.js';
+import { variantDir, viteBin } from './global-setup.js';
 
 const execAsync = promisify(exec);
 
 test.describe('Export — Web', () => {
   test('vite build produces dist/ folder with index.html', async () => {
-    const distPath = resolve(variantDir('web'), 'dist');
+    const distPath = resolve(variantDir('free', 'web'), 'dist');
     expect(existsSync(distPath)).toBe(true);
 
     const indexHtml = resolve(distPath, 'index.html');
@@ -21,7 +21,7 @@ test.describe('Export — Web', () => {
   });
 
   test('dist contains JS assets referenced by index.html', async () => {
-    const distPath = resolve(variantDir('web'), 'dist');
+    const distPath = resolve(variantDir('free', 'web'), 'dist');
     const indexHtml = readFileSync(resolve(distPath, 'index.html'), 'utf-8');
 
     // Should reference JS assets
@@ -32,7 +32,7 @@ test.describe('Export — Web', () => {
   });
 
   test('web export does not include SCORM/CMI5 manifests', async () => {
-    const distPath = resolve(variantDir('web'), 'dist');
+    const distPath = resolve(variantDir('free', 'web'), 'dist');
     expect(existsSync(resolve(distPath, 'imsmanifest.xml'))).toBe(false);
     expect(existsSync(resolve(distPath, 'cmi5.xml'))).toBe(false);
   });
@@ -40,11 +40,11 @@ test.describe('Export — Web', () => {
 
 test.describe('Export — Serve Built Output', () => {
   test('built dist/ serves and course loads with navigation', async ({ page }) => {
-    const webDir = variantDir('web');
+    const webDir = variantDir('free', 'web');
 
     // Start vite preview, capture the child process
     const previewProcess = exec(
-      `${VITE_BIN} preview ${webDir} --port 5190 --strictPort`,
+      `${viteBin('free')} preview ${webDir} --port 5190 --strictPort`,
       { cwd: webDir },
     );
 
@@ -84,7 +84,7 @@ test.describe('Export — Serve Built Output', () => {
 
 test.describe('Export — SCORM 1.2', () => {
   test('SCORM 1.2 build produces ZIP with valid imsmanifest.xml', async () => {
-    const scormDir = variantDir('scorm12');
+    const scormDir = variantDir('free', 'scorm12');
     const distPath = resolve(scormDir, 'dist');
 
     // imsmanifest.xml should be generated in dist/
@@ -110,7 +110,7 @@ test.describe('Export — SCORM 1.2', () => {
 
 test.describe('Export — SCORM 2004', () => {
   test('SCORM 2004 build produces ZIP with valid imsmanifest.xml (2004 schema)', async () => {
-    const distPath = resolve(variantDir('scorm2004'), 'dist');
+    const distPath = resolve(variantDir('free', 'scorm2004'), 'dist');
     const manifestPath = resolve(distPath, 'imsmanifest.xml');
     expect(existsSync(manifestPath)).toBe(true);
 
@@ -125,7 +125,7 @@ test.describe('Export — SCORM 2004', () => {
 
 test.describe('Export — CMI5', () => {
   test('CMI5 build produces ZIP with valid cmi5.xml', async () => {
-    const distPath = resolve(variantDir('cmi5'), 'dist');
+    const distPath = resolve(variantDir('free', 'cmi5'), 'dist');
     const cmi5Path = resolve(distPath, 'cmi5.xml');
     expect(existsSync(cmi5Path)).toBe(true);
 
