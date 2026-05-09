@@ -24,7 +24,6 @@
 
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
-  let saAllMatched = $derived(matches.size === pairs.length);
 
   const defaultId = `matching-${slugFromQuestion(question)}`;
 
@@ -87,13 +86,6 @@
   let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
   let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
 
-  // Auto-submit in standalone mode when all pairs matched
-  $effect(() => {
-    if (standalone && saAllMatched && !handle.submitted) {
-      handle.submit();
-    }
-  });
-
   function handleLeftClick(leftIndex) {
     if (standalone) {
       if (handle.submitted) return;
@@ -143,7 +135,11 @@
     selectedLeft = null;
     selectedRight = null;
 
-    if (!standalone) {
+    if (standalone) {
+      if (matches.size === pairs.length && !handle.submitted) {
+        handle.submit();
+      }
+    } else {
       quiz.setAnswer(myIndex, new Map(matches));
     }
   }

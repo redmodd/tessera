@@ -1,5 +1,6 @@
 <script>
   import { getContext, onMount } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion } from './util.js';
 
@@ -19,7 +20,7 @@
   const standalone = !quiz;
 
   let queue = $state([]);              // item indices not yet placed; queue[0] is current
-  let placements = $state(new Map()); // itemIdx → targetIdx
+  let placements = $state(new SvelteMap()); // itemIdx → targetIdx
   let dragOver = $state(null);         // target index highlighted during drag
   let isDragging = $state(false);
   let cardSelected = $state(false);    // current card selected via tap/click
@@ -40,7 +41,7 @@
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i));
-    placements = new Map();
+    placements = new SvelteMap();
     cardSelected = false;
     dragOver = null;
     isDragging = false;
