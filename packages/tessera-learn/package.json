@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "json5": "^2.0.0",
     "svelte": "^5.55.5"
   },
