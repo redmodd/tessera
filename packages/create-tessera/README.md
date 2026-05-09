@@ -2,6 +2,19 @@
 
 Scaffold a new [Tessera](https://www.npmjs.com/package/tessera-learn) course.
 
+## Prerequisites
+
+Requires **Node.js 24 or later** (which includes `npm`). If you already have it, jump to [Usage](#usage). Otherwise:
+
+- **macOS:** Download the macOS Installer (`.pkg`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
+- **Windows:** Download the Windows Installer (`.msi`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
+
+Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window after installing and confirm:
+
+```bash
+node --version    # should print v24.x.x or higher
+```
+
 ## Usage
 
 ```bash

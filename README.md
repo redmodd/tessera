@@ -4,6 +4,19 @@ Tessera is an LMS tracking runtime for interactive learning content. SCORM 1.2, 
 
 Write course content as plain `.svelte` files, organize it into sections and lessons, and drop in built-in components for callouts, carousels, video, audio, modals, and quizzes — or skip the built-ins and build your own widgets with the hooks API. Export as a static website or as a SCORM 1.2, SCORM 2004, or cmi5 package that plugs into any LMS and reports completion, scores, and bookmarking back automatically.
 
+## Prerequisites
+
+Tessera requires **Node.js 24 or later** (which includes `npm`). If you already have it, jump to [Quick start](#quick-start). Otherwise:
+
+- **macOS:** Download the macOS Installer (`.pkg`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
+- **Windows:** Download the Windows Installer (`.msi`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
+
+Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window after installing and confirm:
+
+```bash
+node --version    # should print v24.x.x or higher
+```
+
 ## Quick start
 
 ```bash
