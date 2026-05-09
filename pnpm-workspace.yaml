@@ -1,9 +1,6 @@
 packages:
   - 'packages/*'
-  - 'test-project'
-  - 'test-project-e2e'
-  - 'test-project-e2e-sequential'
   - 'test-projects/*'
-  - 'docs/examples/artemis-course'
+  - 'tests/fixtures/*'
 onlyBuiltDependencies:
   - esbuild

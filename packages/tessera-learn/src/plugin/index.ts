@@ -9,6 +9,7 @@ import type { Manifest } from './manifest.js';
 import { validateProject } from './validation.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
+import { tesseraQuizPlugin } from './quiz.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,6 +37,7 @@ export function tesseraPlugin() {
     tesseraPagesPlugin(),
     tesseraManifestPlugin(),
     tesseraLayoutPlugin(),
+    tesseraQuizPlugin(),
     tesseraExportPlugin(),
   ];
 }

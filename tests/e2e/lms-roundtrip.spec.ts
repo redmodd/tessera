@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
 
 const execAsync = promisify(exec);
-const E2E_PROJECT = resolve(process.cwd(), 'test-project-e2e');
+const E2E_PROJECT = resolve(process.cwd(), 'tests/fixtures/free');
 const CONFIG_PATH = resolve(E2E_PROJECT, 'course.config.js');
 
 /**
