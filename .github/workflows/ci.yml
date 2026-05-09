@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [26]
+        node: [24]
     steps:
       - uses: actions/checkout@v6
 
@@ -33,6 +33,7 @@ jobs:
   e2e:
     name: Playwright e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -40,7 +41,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 26
+          node-version: 24
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
