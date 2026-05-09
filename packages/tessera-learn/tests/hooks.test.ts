@@ -227,6 +227,96 @@ describe('useQuestion — standalone mode', () => {
   });
 });
 
+// ============ useQuestion — standalone retry ============
+
+describe('useQuestion — standalone retry', () => {
+  function setupCtx() {
+    const progress = new ProgressState();
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter });
+    return { progress, adapter };
+  }
+
+  it('canRetry defaults to true and retryCount starts at 0 (default Infinity cap)', () => {
+    setupCtx();
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    expect(q.canRetry).toBe(true);
+    expect(q.retryCount).toBe(0);
+  });
+
+  it('retry() resets submitted/correct, calls opts.reset, and increments retryCount', () => {
+    const { adapter } = setupCtx();
+    const userReset = vi.fn();
+    const q = useQuestion({
+      id: 'q1',
+      maxRetries: 2,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+      reset: userReset,
+    });
+    q.submit();
+    expect(q.submitted).toBe(true);
+    expect(q.correct).toBe(true);
+
+    q.retry();
+
+    expect(q.submitted).toBe(false);
+    expect(q.correct).toBe(null);
+    expect(q.retryCount).toBe(1);
+    expect(userReset).toHaveBeenCalledTimes(1);
+
+    // Resubmit reports a fresh interaction (not deduped against the prior submit).
+    q.submit();
+    expect(adapter.reportInteraction).toHaveBeenCalledTimes(2);
+  });
+
+  it('canRetry flips false when retryCount reaches maxRetries; further retry() is a no-op', () => {
+    const { adapter } = setupCtx();
+    const userReset = vi.fn();
+    const q = useQuestion({
+      id: 'q1',
+      maxRetries: 2,
+      response: () => ({ type: 'true-false', response: false, correct: true }),
+      reset: userReset,
+    });
+
+    q.submit();
+    q.retry();
+    expect(q.canRetry).toBe(true);
+    expect(q.retryCount).toBe(1);
+
+    q.submit();
+    q.retry();
+    expect(q.canRetry).toBe(false);
+    expect(q.retryCount).toBe(2);
+
+    // Cap reached — retry no-ops, retryCount and reset count don't move.
+    q.submit();
+    q.retry();
+    expect(q.retryCount).toBe(2);
+    expect(userReset).toHaveBeenCalledTimes(2);
+    // The third submit still reported (reset wasn't called, but submit() ran before retry no-op).
+    expect(adapter.reportInteraction).toHaveBeenCalledTimes(3);
+  });
+
+  it('maxRetries: 0 means canRetry is false from the start', () => {
+    setupCtx();
+    const q = useQuestion({
+      id: 'q1',
+      maxRetries: 0,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+    expect(q.canRetry).toBe(false);
+    q.submit();
+    q.retry();
+    expect(q.retryCount).toBe(0);
+    expect(q.submitted).toBe(true);
+  });
+});
+
 // ============ useQuestion (inside a <Quiz>) ============
 
 function makeQuizCtx(overrides: Record<string, unknown> = {}) {
@@ -396,6 +486,27 @@ describe('useQuestion — inside a <Quiz>', () => {
     q.reset();
 
     expect(userReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('retry() is a no-op inside a quiz; canRetry is always false', () => {
+    const progress = new ProgressState();
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const userReset = vi.fn();
+    const q = useQuestion({
+      id: 'q1',
+      maxRetries: 5,
+      response: () => ({ type: 'true-false', response: true }),
+      reset: userReset,
+    });
+
+    expect(q.canRetry).toBe(false);
+    q.retry();
+    expect(q.retryCount).toBe(0);
+    expect(userReset).not.toHaveBeenCalled();
   });
 
 });
