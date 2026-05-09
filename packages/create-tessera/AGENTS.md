@@ -598,12 +598,16 @@ function useQuestion(opts: {
   response: () => Interaction;  // current learner answer; called on submit
   score?: () => number;         // standalone-only override (0–100)
   weight?: number;              // page-level rollup weight (default 1)
+  maxRetries?: number;          // standalone retry cap (default Infinity); ignored inside <Quiz>
   reset?: () => void;
 }): {
   submit(): void;
   reset(): void;
+  retry(): void;                // standalone-only; no-op once maxRetries hit or inside <Quiz>
   readonly submitted: boolean;
   readonly correct: boolean | null;
+  readonly canRetry: boolean;
+  readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   readonly quizIndex: number | undefined;
 };
