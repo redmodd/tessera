@@ -2,6 +2,8 @@
 
 Scaffold a new [Tessera](https://www.npmjs.com/package/tessera-learn) course.
 
+Tessera is a toolkit for building interactive online courses that play in any LMS (SCORM 1.2, SCORM 2004, cmi5, or static Web), designed for AI-assisted authoring: open the scaffolded project in Claude Code, Cursor, or any tool that reads `AGENTS.md`, and describe the course you want in plain English. This package is the entry point — it generates the project, wires up the runtime, and drops `AGENTS.md` at the root so the agent knows the conventions.
+
 ## Prerequisites
 
 Requires **Node.js 24 or later** (which includes `npm`). If you already have it, jump to [Usage](#usage). Otherwise:
@@ -33,9 +35,10 @@ The scaffolder creates a new directory with:
 - `course.config.js`: course metadata, navigation, completion, and export settings
 - `vite.config.js`: Vite config wired up with the Tessera plugin (do not modify)
 - `pages/`: starter section, lesson, and page
-- `assets/`: drop images, audio, and video here
-- `styles/`: optional CSS overrides
 - `AGENTS.md`: the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
+- `.gitignore`
+
+The `default` template additionally creates `assets/` (drop images, audio, video here) and `styles/custom.css` (optional CSS overrides). The `bare` template instead creates a `layout.svelte` at the project root for you to customise, plus a project `README.md`.
 
 Then:
 
@@ -53,8 +56,7 @@ Open the printed URL in your browser. The page hot-reloads as you edit course fi
 | Flag | Description |
 |------|-------------|
 | `--template=<name>` | `default` (full starter, components included) or `bare` (hooks-only, layout.svelte, no built-in components). Defaults to `default`. |
-| `--help` | Print usage and exit. |
-| `--version` | Print scaffolder version and exit. |
+| `--help`, `-h` | Print usage and exit. |
 
 ## License
 
