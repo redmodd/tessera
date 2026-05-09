@@ -52,7 +52,7 @@
   },
   "svelte": "./src/index.ts",
   "engines": {
-    "node": "^20.19 || ^22.12 || >=24"
+    "node": ">=26"
   },
   "scripts": {
     "build": "tsup",
