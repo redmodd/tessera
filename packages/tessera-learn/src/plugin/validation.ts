@@ -2,11 +2,10 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import JSON5 from 'json5';
 import {
-  extractObjectLiteral,
   extractDefaultExportObjectLiteral,
+  parsePageConfigFromSource,
   readSourceFileCached,
-  MODULE_SCRIPT_RE,
-  PAGE_CONFIG_EXPORT_RE,
+  ensureSvelteSuffix,
 } from './manifest.js';
 import { validateAgent } from '../runtime/xapi/agent-rules.js';
 
@@ -371,7 +370,7 @@ function validateSingleXAPIEntry(
       );
     }
   } else if (typeof actor === 'object' && actor !== null) {
-    const err = validateStaticAgent(actor);
+    const err = validateAgent(actor);
     if (err) {
       const joined = err.startsWith('.')
         ? `${label}.actor${err}`
@@ -450,13 +449,6 @@ function validateSingleXAPIEntry(
     }
   }
 }
-
-/**
- * Build-time alias for the shared `validateAgent` rules. Suffixes are already
- * prefix-friendly (no leading "actor"), so this is a straight pass-through —
- * kept named so the call sites in this file stay readable.
- */
-const validateStaticAgent = validateAgent;
 
 // ---------- Pages Validation ----------
 
@@ -539,9 +531,7 @@ function validatePages(
 
     if (sectionMeta?.pages) {
       for (const pageName of sectionMeta.pages) {
-        const fileName = pageName.endsWith('.svelte')
-          ? pageName
-          : `${pageName}.svelte`;
+        const fileName = ensureSvelteSuffix(pageName);
         if (!sectionSvelteFiles.includes(fileName)) {
           const metaRel = relative(projectRoot, resolve(sectionPath, '_meta.js'));
           errors.push(
@@ -597,9 +587,7 @@ function validatePages(
       // Check pages array references
       if (meta?.pages) {
         for (const pageName of meta.pages) {
-          const fileName = pageName.endsWith('.svelte')
-            ? pageName
-            : `${pageName}.svelte`;
+          const fileName = ensureSvelteSuffix(pageName);
           if (!svelteFiles.includes(fileName)) {
             const metaRel = relative(projectRoot, resolve(lessonPath, '_meta.js'));
             errors.push(
@@ -611,11 +599,7 @@ function validatePages(
 
       // Check for unlisted .svelte files
       if (meta?.pages && meta.pages.length > 0) {
-        const listedSet = new Set(
-          meta.pages.map((p: string) =>
-            p.endsWith('.svelte') ? p : `${p}.svelte`
-          )
-        );
+        const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
         for (const file of svelteFiles) {
           if (!listedSet.has(file)) {
             const relPath = relative(projectRoot, resolve(lessonPath, file));
@@ -700,47 +684,14 @@ function validatePageConfig(
   fileRel: string,
   errors: string[]
 ): { title?: string; quiz?: unknown } | null {
-  const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
-  if (!moduleScriptMatch) return null;
-
-  const scriptContent = moduleScriptMatch[1];
-  const exportMatch = scriptContent.match(PAGE_CONFIG_EXPORT_RE);
-  if (!exportMatch || exportMatch.index === undefined) return null;
-
-  // Now check if the RHS starts with `{` (a static object literal)
-  const afterEquals = scriptContent
-    .slice(exportMatch.index + exportMatch[0].length)
-    .trimStart();
-
-  if (!afterEquals.startsWith('{')) {
-    // pageConfig is exported but assigned to something other than an object literal
+  const result = parsePageConfigFromSource(content);
+  if (result.kind === 'ok') return result.value;
+  if (result.kind === 'invalid') {
     errors.push(
       `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
     );
-    return null;
   }
-
-  // Find the opening brace in the original scriptContent
-  const braceIndex = scriptContent.indexOf(
-    '{',
-    exportMatch.index + exportMatch[0].length
-  );
-  const objectStr = extractObjectLiteral(scriptContent, braceIndex);
-  if (!objectStr) {
-    errors.push(
-      `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
-    );
-    return null;
-  }
-
-  try {
-    return JSON5.parse(objectStr);
-  } catch {
-    errors.push(
-      `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
-    );
-    return null;
-  }
+  return null;
 }
 
 // ---------- Quiz Config Validation ----------

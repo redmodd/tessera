@@ -33,6 +33,15 @@ export interface Manifest {
   totalPages: number;
 }
 
+/**
+ * Append `.svelte` if not already present. Used wherever author-supplied
+ * `pages` array entries are matched against on-disk filenames — both forms
+ * ("page.svelte" and "page") are accepted historically.
+ */
+export function ensureSvelteSuffix(name: string): string {
+  return name.endsWith('.svelte') ? name : `${name}.svelte`;
+}
+
 // ---------- File read cache ----------
 
 /**
@@ -117,32 +126,61 @@ export function readMetaFile(metaPath: string): { title?: string; pages?: string
   }
 }
 
-/**
- * Extract pageConfig from a .svelte file's module script block.
- */
-export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig } {
-  const content = readSourceFileCached(filePath);
+/** Result of parsing a `.svelte` source for its `pageConfig` module-script export. */
+export type PageConfigParseResult =
+  /** No module script, or no `pageConfig =` export. Treat as "no config". */
+  | { kind: 'none' }
+  /** Found and successfully parsed. */
+  | { kind: 'ok'; value: { title?: string; quiz?: QuizConfig } }
+  /** Found but couldn't parse as a static object literal — non-literal RHS or JSON5 failure. */
+  | { kind: 'invalid' };
 
+/**
+ * Source-level pageConfig extraction. Both `extractPageConfig` (manifest
+ * generation) and `validatePageConfig` (build-time validation) use this so
+ * the parsing pipeline lives in exactly one place.
+ */
+export function parsePageConfigFromSource(content: string): PageConfigParseResult {
   const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
-  if (!moduleScriptMatch) return {};
+  if (!moduleScriptMatch) return { kind: 'none' };
 
   const scriptContent = moduleScriptMatch[1];
 
   const configMatch = scriptContent.match(PAGE_CONFIG_EXPORT_RE);
-  if (!configMatch || configMatch.index === undefined) return {};
+  if (!configMatch || configMatch.index === undefined) return { kind: 'none' };
+
+  const afterExport = scriptContent
+    .slice(configMatch.index + configMatch[0].length)
+    .trimStart();
+  // pageConfig assigned to something other than an object literal — flag as invalid.
+  if (!afterExport.startsWith('{')) return { kind: 'invalid' };
 
   const startIndex = scriptContent.indexOf('{', configMatch.index + configMatch[0].length);
-  if (startIndex < 0) return {};
+  if (startIndex < 0) return { kind: 'invalid' };
   const objectStr = extractObjectLiteral(scriptContent, startIndex);
-  if (!objectStr) return {};
+  if (!objectStr) return { kind: 'invalid' };
 
   try {
-    return JSON5.parse(objectStr);
+    return { kind: 'ok', value: JSON5.parse(objectStr) };
   } catch {
+    return { kind: 'invalid' };
+  }
+}
+
+/**
+ * Extract pageConfig from a .svelte file's module script block. Reads via the
+ * shared cache. Throws on parse failure so the build-time path can report a
+ * file-prefixed error message.
+ */
+export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig } {
+  const result = parsePageConfigFromSource(readSourceFileCached(filePath));
+  if (result.kind === 'ok') return result.value;
+  if (result.kind === 'invalid') {
     throw new Error(
       `${filePath}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
     );
   }
+  return {};
 }
 
 /**
@@ -319,7 +357,7 @@ export function orderPageFiles(allFiles: string[], pagesArray?: string[]): strin
     return allFiles;
   }
 
-  const listed = pagesArray.map(name => name.endsWith('.svelte') ? name : `${name}.svelte`);
+  const listed = pagesArray.map(ensureSvelteSuffix);
   const listedSet = new Set(listed);
   const unlisted = allFiles.filter(f => !listedSet.has(f)).sort();
 
