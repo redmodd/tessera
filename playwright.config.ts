@@ -14,9 +14,10 @@ export default defineConfig({
   // and run `pnpm build`, which the shared dev server picks up via HMR — so
   // they must stay single-threaded and run AFTER the parallel projects (a
   // rebuild mid-run will rip the rug out from under whoever's mid-test).
-  // Workers cap at 2 so the projects don't fight over CPU on small CI runners.
+  // GitHub-hosted ubuntu runners have 4 cores; cap workers there. Drop back
+  // if flakiness or OOMs appear.
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   projects: [
     {
       name: 'free-mode',
