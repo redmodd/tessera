@@ -27,7 +27,7 @@
   "bin": {
     "create-tessera": "./dist/index.js"
   },
-  "tesseraVersion": "^0.1.0",
+  "tesseraVersion": "^0.0.1",
   "files": [
     "dist",
     "AGENTS.md",
