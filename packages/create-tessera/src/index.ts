@@ -107,9 +107,9 @@ function packageJson(name: string): string {
       'tessera-learn': TESSERA_VERSION,
     },
     devDependencies: {
-      '@sveltejs/vite-plugin-svelte': '^5.0.0',
+      '@sveltejs/vite-plugin-svelte': '^7.1.2',
       svelte: '^5.0.0',
-      vite: '^6.0.0',
+      vite: '^8.0.0',
     },
   };
   return JSON.stringify(pkg, null, 2) + '\n';
