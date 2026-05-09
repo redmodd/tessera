@@ -1,115 +1,57 @@
 <script>
-  import { getContext, setContext, onMount } from 'svelte';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import { buildQuizInteractions } from './quiz-payload.js';
+  import { getContext } from 'svelte';
+  import { useQuiz } from '../runtime/hooks.svelte.js';
 
   let { children } = $props();
   let quizElement = $state(null);
 
-  // Read quiz config from page context (set by App.svelte)
-  const pageCtx = getContext('tessera-page');
-  const quizConfig = $derived(pageCtx?.quiz ?? {});
+  // useQuiz owns the state machine, the LMS bridge, and the
+  // `tessera-quiz` context that question components read from. This shell
+  // adds question-by-question navigation and a results screen on top.
+  const handle = useQuiz({ element: () => quizElement });
 
-  // State
-  let questions = $state([]);
+  // Read the page-context config Quiz needs for shell-level UI: passingScore
+  // for the pass/fail banner, showFeedback for the Review button, and
+  // feedbackMode/maxAttempts for the Next/Check button toggle and exhaust msg.
+  const pageCtx = getContext('tessera-page');
+  let quizConfig = $derived(pageCtx?.quiz ?? {});
+  let passingScore = $derived(pageCtx?.passingScore ?? 70);
+  let showFeedback = $derived(quizConfig.showFeedback ?? true);
+  let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
+  let isImmediateMode = $derived(showFeedback && quizConfig.feedbackMode === 'immediate');
+
+  // UI navigation indices — separate from the handle's state because the
+  // handle has no opinion on which question is "active" at a given moment.
   let currentQuestionIndex = $state(0);
-  let answers = $state(new SvelteMap());
-  let submitted = $state(false);
-  let score = $state(0);
-  let correctCount = $state(0);
-  let attemptCount = $state(0);
-  let reviewing = $state(false);
   let reviewIndex = $state(0);
 
-  // Immediate feedback state
-  let feedbackShown = $state(new SvelteSet());
-  // Retry mode: locked correct questions from prior attempt
-  let lockedCorrect = $state(new SvelteSet());
-
-  // Derived
-  let totalQuestions = $derived(questions.length);
-  let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
-  let showFeedback = $derived(quizConfig.showFeedback ?? true);
-  let passingScore = $derived(pageCtx?.passingScore ?? 70);
-  let canRetry = $derived(attemptCount < maxAttempts);
-  let passed = $derived(score >= passingScore);
-  let allAnswered = $derived(totalQuestions > 0 && answers.size >= totalQuestions);
-  let feedbackMode = $derived(
-    (quizConfig.showFeedback && quizConfig.feedbackMode === 'immediate') ? 'immediate' : 'review'
+  let totalQuestions = $derived(handle.questions.length);
+  let correctCount = $derived(
+    handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0)
   );
-  let retryMode = $derived(quizConfig.retryMode ?? 'full');
+  let passed = $derived(handle.score >= passingScore);
 
-  // Register question API (children call this on mount).
-  // The returned integer is the child's quizIndex — position in the `questions`
-  // array — and is used to address the same question in setRender / setAnswer /
-  // getAnswer / feedbackVisible / isAnswerLocked. Keep it distinct from the
-  // API-level `id` the question passes in (a stable slug used for LMS
-  // interaction reporting).
-  function registerQuestion(questionApi) {
-    const index = questions.length;
-    const weight = typeof questionApi.weight === 'number' && questionApi.weight > 0
-      ? questionApi.weight
-      : 1;
-    questions.push({ ...questionApi, weight });
-    return index;
+  function isAnswered(i) {
+    return handle.getAnswer(i) !== undefined || handle.isLockedCorrect(i);
   }
 
-  // Hand the Quiz the render snippet for a registered question.
-  // Snippets aren't available at a child's script-top (they live in the template
-  // block), so built-ins call this from onMount once the snippet has compiled.
-  function setRender(index, render) {
-    questions[index].render = render;
+  // Whether the current question still needs its feedback revealed before
+  // we can advance / submit. Mirrors the original Quiz.svelte's
+  // `needsImmediateFeedback` check.
+  function needsReveal(i) {
+    return (
+      isImmediateMode &&
+      isAnswered(i) &&
+      !handle.isLockedCorrect(i) &&
+      !handle.feedbackVisible(i)
+    );
   }
-
-  function setAnswer(questionIndex, answer) {
-    answers.set(questionIndex, answer);
-  }
-
-  function getAnswer(questionIndex) {
-    return answers.get(questionIndex);
-  }
-
-  // Provide context to child question components
-  setContext('tessera-quiz', {
-    get registerQuestion() { return registerQuestion; },
-    get setRender() { return setRender; },
-    get setAnswer() { return setAnswer; },
-    get getAnswer() { return getAnswer; },
-    get submitted() { return submitted; },
-    get reviewing() { return reviewing; },
-    get showFeedback() { return showFeedback; },
-    get currentQuestionIndex() { return reviewing ? reviewIndex : currentQuestionIndex; },
-    get feedbackVisible() {
-      return (index) => {
-        if (feedbackMode === 'immediate' && showFeedback && feedbackShown.has(index)) return true;
-        if (submitted && reviewing && showFeedback) return true;
-        return false;
-      };
-    },
-    get isAnswerLocked() {
-      return (index) => {
-        // Locked during immediate feedback (answer already revealed)
-        if (feedbackMode === 'immediate' && feedbackShown.has(index)) return true;
-        // Locked after submission
-        if (submitted) return true;
-        // Locked from incorrect-only retry
-        if (lockedCorrect.has(index)) return true;
-        return false;
-      };
-    },
-    get isLockedCorrect() {
-      return (index) => lockedCorrect.has(index);
-    },
-  });
 
   // Navigation
   function goNextQuestion() {
-    // Immediate feedback: first Next shows feedback, second advances
-    if (feedbackMode === 'immediate'
-        && answers.has(currentQuestionIndex)
-        && !feedbackShown.has(currentQuestionIndex)
-        && !lockedCorrect.has(currentQuestionIndex)) {
-      feedbackShown.add(currentQuestionIndex);
+    // Immediate-mode: first click on Next reveals feedback, second advances.
+    if (needsReveal(currentQuestionIndex)) {
+      handle.revealFeedback(currentQuestionIndex);
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
@@ -118,124 +60,36 @@
   }
 
   function goPrevQuestion() {
-    if (currentQuestionIndex > 0) {
-      currentQuestionIndex--;
-    }
+    if (currentQuestionIndex > 0) currentQuestionIndex--;
   }
 
   function goNextReview() {
-    if (reviewIndex < totalQuestions - 1) {
-      reviewIndex++;
-    }
+    if (reviewIndex < totalQuestions - 1) reviewIndex++;
   }
 
   function goPrevReview() {
-    if (reviewIndex > 0) {
-      reviewIndex--;
-    }
+    if (reviewIndex > 0) reviewIndex--;
   }
 
-  // Check if the current question needs immediate feedback before advancing/submitting
-  function needsImmediateFeedback() {
-    return feedbackMode === 'immediate'
-      && !feedbackShown.has(currentQuestionIndex)
-      && !lockedCorrect.has(currentQuestionIndex)
-      && answers.has(currentQuestionIndex);
-  }
-
-  function showImmediateFeedback() {
-    feedbackShown.add(currentQuestionIndex);
-  }
-
-  // Submission
   function handleSubmit() {
-    if (!allAnswered) return;
-
-    // Weighted rollup: Σ(w·correct)/Σ(w)·100. With every weight = 1 (the
-    // default) this collapses to the unweighted mean, so existing courses
-    // that never set a `weight` prop see no change.
-    let count = 0;
-    let weighted = 0;
-    let totalWeight = 0;
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      const answer = answers.get(i);
-      const ok = q.checkAnswer(answer);
-      totalWeight += q.weight;
-      if (ok) {
-        weighted += q.weight;
-        count++;
-      }
-    }
-
-    correctCount = count;
-    score = totalWeight === 0 ? 0 : Math.round((weighted / totalWeight) * 100);
-    submitted = true;
-    attemptCount++;
-
-    // Report score and per-question interactions via custom event.
-    // `interactions` is empty for built-in components until Phase 2 migrates
-    // them onto the new useQuestion API — additive and back-compat.
-    const interactions = buildQuizInteractions(questions, answers);
-    const event = new CustomEvent('tessera-quiz-complete', {
-      detail: { score, interactions },
-      bubbles: true,
-    });
-    quizElement?.dispatchEvent(event);
+    if (!handle.canSubmit) return;
+    handle.submit();
   }
 
-  // Review
-  function startReview() {
-    reviewing = true;
+  function handleStartReview() {
     reviewIndex = 0;
+    handle.startReview();
   }
 
-  function exitReview() {
-    reviewing = false;
-  }
-
-  // Retry
   function handleRetry() {
-    submitted = false;
-    reviewing = false;
-    score = 0;
-    correctCount = 0;
+    handle.retry();
     currentQuestionIndex = 0;
     reviewIndex = 0;
-    feedbackShown = new SvelteSet();
-
-    if (retryMode === 'incorrect-only') {
-      // Identify correct questions
-      const newLockedCorrect = new SvelteSet();
-      const preservedAnswers = new SvelteMap();
-      for (let i = 0; i < questions.length; i++) {
-        const answer = answers.get(i);
-        if (questions[i].checkAnswer(answer)) {
-          newLockedCorrect.add(i);
-          preservedAnswers.set(i, answer);
-        }
-      }
-      lockedCorrect = newLockedCorrect;
-      answers = preservedAnswers;
-      // Only reset incorrect questions
-      for (let i = 0; i < questions.length; i++) {
-        if (!newLockedCorrect.has(i) && questions[i].reset) {
-          questions[i].reset();
-        }
-      }
-    } else {
-      lockedCorrect = new SvelteSet();
-      answers = new SvelteMap();
-      for (const q of questions) {
-        if (q.reset) q.reset();
-      }
-    }
   }
-
 </script>
 
 <div class="tessera-quiz" bind:this={quizElement} role="region" aria-label="Quiz">
-  {#if !submitted}
+  {#if handle.state === 'answering'}
     <!-- Question phase -->
     <div class="tessera-quiz-progress" aria-live="polite">
       <span class="tessera-quiz-progress-text">
@@ -251,10 +105,11 @@
     </div>
 
     <div class="tessera-quiz-questions">
-      {#each questions as q, i (q.id)}
+      {#each handle.questions as q, i (q.id)}
+        {@const render = handle.getRender(i)}
         <div class="tessera-quiz-question-wrapper" class:active={i === currentQuestionIndex} aria-hidden={i !== currentQuestionIndex}>
-          {#if q.render}
-            {@render q.render()}
+          {#if render}
+            {@render render()}
           {/if}
         </div>
       {/each}
@@ -271,22 +126,22 @@
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           class="tessera-quiz-btn tessera-quiz-btn-primary"
-          disabled={!answers.has(currentQuestionIndex) && !lockedCorrect.has(currentQuestionIndex)}
+          disabled={!isAnswered(currentQuestionIndex)}
           onclick={goNextQuestion}
         >
-          {feedbackShown.has(currentQuestionIndex) && feedbackMode === 'immediate' ? 'Continue' : 'Next'}
+          {handle.feedbackVisible(currentQuestionIndex) && isImmediateMode ? 'Continue' : 'Next'}
         </button>
-      {:else if needsImmediateFeedback()}
+      {:else if needsReveal(currentQuestionIndex)}
         <button
           class="tessera-quiz-btn tessera-quiz-btn-primary"
-          onclick={showImmediateFeedback}
+          onclick={() => handle.revealFeedback(currentQuestionIndex)}
         >
           Check Answer
         </button>
       {:else}
         <button
           class="tessera-quiz-btn tessera-quiz-btn-primary tessera-quiz-btn-submit"
-          disabled={!allAnswered}
+          disabled={!handle.canSubmit}
           onclick={handleSubmit}
         >
           Submit
@@ -294,7 +149,7 @@
       {/if}
     </div>
 
-  {:else if reviewing}
+  {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
     <div class="tessera-quiz-progress" aria-live="polite">
       <span class="tessera-quiz-progress-text">
@@ -304,10 +159,11 @@
     </div>
 
     <div class="tessera-quiz-questions">
-      {#each questions as q, i (q.id)}
+      {#each handle.questions as q, i (q.id)}
+        {@const render = handle.getRender(i)}
         <div class="tessera-quiz-question-wrapper" class:active={i === reviewIndex} aria-hidden={i !== reviewIndex}>
-          {#if q.render}
-            {@render q.render()}
+          {#if render}
+            {@render render()}
           {/if}
         </div>
       {/each}
@@ -331,7 +187,7 @@
       {:else}
         <button
           class="tessera-quiz-btn tessera-quiz-btn-primary"
-          onclick={exitReview}
+          onclick={() => handle.exitReview()}
         >
           Done
         </button>
@@ -343,7 +199,7 @@
     <div class="tessera-quiz-results" role="status" aria-live="polite">
       <h2 class="tessera-quiz-results-title">Quiz Results</h2>
       <div class="tessera-quiz-score">
-        <span class="tessera-quiz-score-value">{score}%</span>
+        <span class="tessera-quiz-score-value">{handle.score}%</span>
         <span class="tessera-quiz-score-label" class:passed class:failed={!passed}>
           {passed ? 'Passed' : 'Not Passed'}
         </span>
@@ -356,12 +212,12 @@
         {#if showFeedback}
           <button
             class="tessera-quiz-btn tessera-quiz-btn-secondary"
-            onclick={startReview}
+            onclick={handleStartReview}
           >
             Review Answers
           </button>
         {/if}
-        {#if canRetry}
+        {#if handle.canRetry}
           <button
             class="tessera-quiz-btn tessera-quiz-btn-primary"
             onclick={handleRetry}
@@ -369,8 +225,8 @@
             Retry Quiz
           </button>
         {/if}
-        {#if maxAttempts !== Infinity && attemptCount >= maxAttempts}
-          <p class="tessera-quiz-attempts-exhausted">All attempts used ({attemptCount}/{maxAttempts})</p>
+        {#if maxAttempts !== Infinity && handle.attemptCount >= maxAttempts}
+          <p class="tessera-quiz-attempts-exhausted">All attempts used ({handle.attemptCount}/{maxAttempts})</p>
         {/if}
       </div>
     </div>
@@ -528,24 +384,6 @@
     color: var(--tessera-text-light);
     font-size: 0.875rem;
     font-style: italic;
-  }
-
-  .tessera-quiz-locked-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    padding: var(--tessera-spacing-md);
-    margin-bottom: var(--tessera-spacing-md);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tessera-success) 25%, transparent);
-    border-radius: 6px;
-    color: var(--tessera-success);
-    font-size: 0.9375rem;
-    font-weight: 500;
-  }
-
-  .tessera-quiz-locked-banner svg {
-    flex-shrink: 0;
   }
 
   /* Mobile */

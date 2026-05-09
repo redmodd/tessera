@@ -6,8 +6,8 @@ import type {
   Statement,
   DestinationOutcome,
 } from './types.js';
-import { XAPIPublisher, XAPIConfigError } from './publisher.js';
-import { validatePartialStatement } from './validation.js';
+import { XAPIPublisher } from './publisher.js';
+import { validatePartialStatement, XAPIConfigError } from './validation.js';
 import { uuidv4 } from './uuid.js';
 
 /**

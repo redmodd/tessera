@@ -2,7 +2,10 @@
   import { getContext, onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { slugFromQuestion } from './util.js';
+  import { slugFromQuestion, shuffle } from './util.js';
+  import LockedBanner from './LockedBanner.svelte';
+  import ResultIcon from './ResultIcon.svelte';
+  import RetryButton from './RetryButton.svelte';
 
   let {
     id,
@@ -25,19 +28,7 @@
   let isDragging = $state(false);
   let cardSelected = $state(false);    // current card selected via tap/click
 
-  let saRetryCount = $state(0);
-  let saCanRetry = $derived(saRetryCount < maxRetries);
-
   const defaultId = `sorting-${slugFromQuestion(question)}`;
-
-  function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i));
@@ -75,6 +66,7 @@
   const handle = useQuestion({
     id: id ?? defaultId,
     weight,
+    maxRetries,
     response: () => ({
       type: 'matching',
       response: [...placements.entries()].map(([i, t]) => [String(i), String(t)]),
@@ -171,10 +163,6 @@
     placeCard(targetIdx);
   }
 
-  function handleRetry() {
-    saRetryCount++;
-    handle.reset();
-  }
 </script>
 
 {#snippet sortingContent()}
@@ -268,9 +256,7 @@
     <div class="tessera-sorting-review">
       {#if isCorrect}
         <div class="tessera-sorting-result correct">
-          <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-          </svg>
+          <ResultIcon kind="correct" />
           All items sorted correctly!
         </div>
         {#if correctFeedback}
@@ -278,9 +264,7 @@
         {/if}
       {:else}
         <div class="tessera-sorting-result incorrect">
-          <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-            <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
-          </svg>
+          <ResultIcon kind="incorrect" />
           Some items are in the wrong category.
         </div>
         <div class="tessera-sorting-correct-list">
@@ -293,8 +277,8 @@
           <p class="tessera-sorting-feedback incorrect">{incorrectFeedback}</p>
         {/if}
       {/if}
-      {#if standalone && saCanRetry}
-        <button class="tessera-standalone-retry" onclick={handleRetry}>Try again</button>
+      {#if standalone && handle.canRetry}
+        <RetryButton onclick={() => handle.retry()} />
       {/if}
     </div>
   {/if}
@@ -318,12 +302,7 @@
 {#snippet renderQuestion()}
   <div class="tessera-sorting" aria-label={question}>
     {#if isLocked}
-      <div class="tessera-quiz-locked-banner">
-        <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-        </svg>
-        You already got this one right — click Next to continue.
-      </div>
+      <LockedBanner />
     {/if}
     {@render sortingContent()}
   </div>
@@ -623,25 +602,6 @@
 
   .tessera-sorting-check:hover {
     background: var(--tessera-primary-dark);
-  }
-
-  .tessera-standalone-retry {
-    display: inline-block;
-    margin-top: var(--tessera-spacing-md);
-    padding: 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--tessera-primary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    font-family: var(--tessera-font-family);
-  }
-
-  .tessera-standalone-retry:hover {
-    color: var(--tessera-primary-dark);
   }
 
   /* --- Mobile --- */

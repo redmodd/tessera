@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { XAPIPublisher, XAPIConfigError, XAPIStatementError, validateAgent, validateAuthCredential } from '../src/runtime/xapi/publisher.js';
+import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
+import { XAPIConfigError, XAPIStatementError, validateAgent, validateAuthCredential } from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
 

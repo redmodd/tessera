@@ -10,6 +10,12 @@ import {
 } from './contexts.js';
 import { buildQuizInteractions } from '../components/quiz-payload.js';
 import type { QuizContext } from '../components/quiz-payload.js';
+import {
+  resolveFeedbackMode,
+  resolveRetryStrategy,
+  type QuizPolicyConfig,
+  type QuizQuestionResult,
+} from './quiz-policy.js';
 
 export interface UseQuestionOptions {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
@@ -22,6 +28,12 @@ export interface UseQuestionOptions {
    * Default 1; ignored in standalone mode.
    */
   weight?: number;
+  /**
+   * Maximum number of standalone retries permitted via `handle.retry()`.
+   * Default `Infinity`. Ignored when the question is registered with a parent
+   * `<Quiz>` (the quiz owns retry semantics there).
+   */
+  maxRetries?: number;
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
   /**
@@ -38,8 +50,18 @@ export interface UseQuestionOptions {
 export interface UseQuestionHandle {
   submit(): void;
   reset(): void;
+  /**
+   * Standalone retry — resets the question (calling `opts.reset`) and bumps
+   * the retry counter. No-op when the question has hit `maxRetries` or is
+   * registered with a parent Quiz (the quiz owns retry there).
+   */
+  retry(): void;
   readonly submitted: boolean;
   readonly correct: boolean | null;
+  /** True when the standalone Try-again button should render. Always false inside a Quiz. */
+  readonly canRetry: boolean;
+  /** Number of times `retry()` has fired since mount. */
+  readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   /** Index returned by the parent Quiz registration, used for per-question context reads. Undefined in standalone mode. */
   readonly quizIndex: number | undefined;
@@ -68,18 +90,23 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     return {
       submit() {},
       reset() { opts.reset?.(); },
+      retry() {},
       get submitted() { return quizCtx.submitted ?? false; },
       get correct() {
         if (!(quizCtx.submitted ?? false)) return null;
         return isCorrectInteraction(opts.response());
       },
+      canRetry: false,
+      retryCount: 0,
       mode: 'quiz' as const,
       quizIndex,
     };
   }
 
+  const maxRetries = opts.maxRetries ?? Infinity;
   let submitted = $state(false);
   let correct = $state<boolean | null>(null);
+  let retryCount = $state(0);
 
   function submit() {
     if (submitted) return;
@@ -111,11 +138,20 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     opts.reset?.();
   }
 
+  function retry() {
+    if (retryCount >= maxRetries) return;
+    retryCount++;
+    reset();
+  }
+
   return {
     submit,
     reset,
+    retry,
     get submitted() { return submitted; },
     get correct() { return correct; },
+    get canRetry() { return retryCount < maxRetries; },
+    get retryCount() { return retryCount; },
     mode: 'standalone' as const,
     quizIndex: undefined,
   };
@@ -267,7 +303,6 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     );
   }
   const quizConfig = pageCtx.quiz;
-  const passingScore = pageCtx.passingScore ?? 70;
 
   // Dev-mode warning: a second useQuiz on the same page silently overwrites
   // the first quiz's pageIndex-keyed score. We can't prevent it (some pages
@@ -283,9 +318,21 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   const maxAttempts = quizConfig.maxAttempts ?? Infinity;
   const showFeedback = quizConfig.showFeedback ?? true;
-  const feedbackMode: 'review' | 'immediate' =
-    showFeedback && quizConfig.feedbackMode === 'immediate' ? 'immediate' : 'review';
-  const retryMode: 'full' | 'incorrect-only' = quizConfig.retryMode ?? 'full';
+
+  // Desugar the feedback/retry config into predicates. The resolvers handle
+  // the enum→predicate mapping plus dev-mode misuse warnings; useQuiz only
+  // ever calls the predicate API beyond this point.
+  const policyCfg = quizConfig as QuizPolicyConfig;
+  const feedbackPredicate = resolveFeedbackMode(policyCfg);
+  const retryPredicate = resolveRetryStrategy(policyCfg);
+  // Whether revealing feedback for a question should lock that question's
+  // answer. True for the 'immediate' enum and for any custom predicate
+  // (custom predicates are opaque, so we lock conservatively rather than
+  // letting a learner change a checked answer); false for the default
+  // 'review' enum where feedback only appears after submit.
+  const revealsLockAnswer =
+    policyCfg.feedbackMode === 'immediate' ||
+    typeof policyCfg.feedbackMode === 'function';
 
   interface InternalQuestion extends UseQuizQuestionApi {
     weight: number;
@@ -380,9 +427,14 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   function feedbackVisible(index: number): boolean {
     if (!showFeedback) return false;
-    if (feedbackMode === 'immediate' && feedbackShown.has(index)) return true;
-    if (submitted && reviewing) return true;
-    return false;
+    return feedbackPredicate({
+      questionIndex: index,
+      submitted,
+      reviewing,
+      hasAnswered: answers.has(index),
+      revealed: feedbackShown.has(index),
+      attemptCount,
+    });
   }
 
   function revealFeedback(index: number): void {
@@ -442,7 +494,6 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     attemptCount++;
 
     const interactions = buildQuizInteractions(questions, answers);
-    void passingScore; // reserved for future custom-shell extensions
     el.dispatchEvent(
       new CustomEvent('tessera-quiz-complete', {
         detail: { score: rounded, interactions },
@@ -462,26 +513,28 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   function retry(): void {
     if (!canRetry) return;
-    if (retryMode === 'incorrect-only') {
-      const newLocked = new Set<number>();
-      const preserved = new Map<number, unknown>();
-      for (let i = 0; i < questions.length; i++) {
-        const a = answers.has(i) ? answers.get(i) : undefined;
-        if (questions[i].checkAnswer(a)) {
-          newLocked.add(i);
-          preserved.set(i, a);
-        }
-      }
-      lockedCorrect = newLocked;
-      answers.clear();
-      for (const [i, a] of preserved) answers.set(i, a);
-      for (let i = 0; i < questions.length; i++) {
-        if (!newLocked.has(i) && questions[i].reset) questions[i].reset!();
-      }
-    } else {
-      lockedCorrect = new Set();
-      answers.clear();
-      for (const q of questions) q.reset?.();
+    // Build the per-question result snapshot for the retry predicate. The
+    // resolver handles enum modes ('full' / 'incorrect-only') and any
+    // author-supplied predicate uniformly.
+    const results: QuizQuestionResult[] = [];
+    for (let i = 0; i < questions.length; i++) {
+      const a = answers.has(i) ? answers.get(i) : undefined;
+      results.push({
+        interaction: questions[i].interaction?.() ?? ({} as never),
+        correct: questions[i].checkAnswer(a),
+        weight: questions[i].weight,
+      });
+    }
+    const newLocked = retryPredicate(results);
+    const preserved = new Map<number, unknown>();
+    for (const i of newLocked) {
+      if (answers.has(i)) preserved.set(i, answers.get(i));
+    }
+    lockedCorrect = newLocked;
+    answers.clear();
+    for (const [i, a] of preserved) answers.set(i, a);
+    for (let i = 0; i < questions.length; i++) {
+      if (!newLocked.has(i) && questions[i].reset) questions[i].reset!();
     }
     answersVersion++;
     feedbackShown = new Set();
@@ -507,7 +560,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
       return (i: number) =>
         submitted ||
         lockedCorrect.has(i) ||
-        (feedbackMode === 'immediate' && feedbackShown.has(i));
+        (revealsLockAnswer && feedbackShown.has(i));
     },
     get isLockedCorrect() { return (i: number) => lockedCorrect.has(i); },
   });

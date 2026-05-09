@@ -2,6 +2,8 @@
   import { getContext, onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion } from './util.js';
+  import LockedBanner from './LockedBanner.svelte';
+  import RetryButton from './RetryButton.svelte';
 
   let {
     id,
@@ -19,8 +21,6 @@
   const standalone = !quiz;
 
   let selectedOption = $state(null);
-  let saRetryCount = $state(0);
-  let saCanRetry = $derived(saRetryCount < maxRetries);
 
   // Unique IDs for accessibility — $props.id() is SSR-safe and stable across hydration.
   const componentId = $props.id();
@@ -30,6 +30,7 @@
   const handle = useQuestion({
     id: id ?? defaultId,
     weight,
+    maxRetries,
     response: () => ({
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],
@@ -54,12 +55,6 @@
       selectedOption = optIndex;
       quiz.setAnswer(myIndex, optIndex);
     }
-  }
-
-  function handleRetry() {
-    saRetryCount++;
-    selectedOption = null;
-    handle.reset();
   }
 
   function isCorrectOption(optIndex) {
@@ -130,8 +125,8 @@
       {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
         <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
       {/if}
-      {#if saCanRetry}
-        <button class="tessera-standalone-retry" onclick={handleRetry}>Try again</button>
+      {#if handle.canRetry}
+        <RetryButton onclick={() => handle.retry()} />
       {/if}
     {/if}
   </div>
@@ -140,12 +135,7 @@
 {#snippet renderQuestion()}
   <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
     {#if isLocked}
-      <div class="tessera-quiz-locked-banner">
-        <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true">
-          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-        </svg>
-        You already got this one right — click Next to continue.
-      </div>
+      <LockedBanner />
     {/if}
     <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
@@ -331,24 +321,6 @@
   .tessera-mc-overall-feedback.incorrect {
     background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
     color: var(--tessera-error);
-  }
-
-  .tessera-standalone-retry {
-    display: inline-block;
-    margin-top: var(--tessera-spacing-md);
-    padding: 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--tessera-primary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .tessera-standalone-retry:hover {
-    color: var(--tessera-primary-dark);
   }
 
   .tessera-mc-option:has(input:focus-visible) {

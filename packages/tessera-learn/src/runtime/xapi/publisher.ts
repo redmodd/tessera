@@ -21,10 +21,6 @@ import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 const CMI5_SESSIONID_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
 
-// Re-exported so existing callers (xapi/client.ts, tests, etc.) that pull
-// these symbols from the publisher entry point keep working.
-export { XAPIConfigError, XAPIStatementError, validateAgent, validateAuthCredential };
-
 /**
  * Combine a field label (e.g. `xapi.actor`) with the prefix-friendly suffix
  * returned by `validateAgent`. Sub-field suffixes start with `.` and chain

@@ -22,3 +22,16 @@ export function slugFromQuestion(text: unknown): string {
     .replace(/^-|-$/g, '')
     .slice(0, 40);
 }
+
+/**
+ * Fisher-Yates shuffle returning a fresh array. Used by question components
+ * (Sorting, Matching) that randomize their option order on mount.
+ */
+export function shuffle<T>(arr: readonly T[]): T[] {
+  const result = arr.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
