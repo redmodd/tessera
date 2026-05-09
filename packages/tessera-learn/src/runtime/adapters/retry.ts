@@ -10,6 +10,54 @@ export interface LMSErrorReporter {
   message(code: string): string;
 }
 
+/** Default attempt count for LMS retry loops (one initial + two retries). */
+export const RETRY_ATTEMPTS = 3;
+
+/**
+ * Exponential backoff in milliseconds for the Nth retry attempt
+ * (0-indexed): 100, 200, 400, 800, …
+ */
+export function backoffMs(attempt: number): number {
+  return 100 * Math.pow(2, attempt);
+}
+
+/**
+ * SCORM `LMSSetValue` / `SetValue` semantics: the API returns `"true"` /
+ * `"false"` strings, but some implementations also return the boolean form.
+ * Anything other than a literal `false` / `"false"` is treated as success.
+ */
+function lmsCallSucceeded(result: unknown): boolean {
+  return result !== false && result !== 'false';
+}
+
+/** Read `LMSGetLastError` / `GetLastError` defensively so it can never throw. */
+function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
+  if (!reporter) return '';
+  try { return reporter.code(); } catch { return ''; }
+}
+
+/**
+ * One-line warning emitted when a queued or retried LMS call gives up.
+ * Pattern matches what production triage already greps for.
+ */
+function logRetryGiveUp(
+  errorReporter: LMSErrorReporter | undefined,
+  lastErrCode: string,
+  context: string | undefined
+): void {
+  let detail = '';
+  if (errorReporter && lastErrCode && lastErrCode !== '0') {
+    try {
+      const msg = errorReporter.message(lastErrCode);
+      detail = ` (LMS error ${lastErrCode}${msg ? `: ${msg}` : ''})`;
+    } catch {}
+  }
+  const ctx = context ? ` [${context}]` : '';
+  console.warn(
+    `Tessera: LMS call failed after retries${ctx}${detail}, continuing without persistence`
+  );
+}
+
 /**
  * Retry wrapper for LMS API calls.
  * Retries up to maxRetries times with exponential backoff.
@@ -27,36 +75,23 @@ export interface LMSErrorReporter {
  */
 export async function withRetry(
   fn: () => any,
-  maxRetries = 3,
+  maxRetries = RETRY_ATTEMPTS,
   errorReporter?: LMSErrorReporter,
   context?: string
 ): Promise<boolean> {
   let lastErrCode = '';
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const result = fn();
-      if (result !== false && result !== 'false') return true;
+      if (lmsCallSucceeded(fn())) return true;
     } catch {
       // API call threw — treat as failure
     }
-    if (errorReporter) {
-      try { lastErrCode = errorReporter.code(); } catch {}
-    }
+    lastErrCode = readLastErrorCode(errorReporter);
     if (attempt < maxRetries - 1) {
-      await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempt)));
+      await new Promise((r) => setTimeout(r, backoffMs(attempt)));
     }
   }
-  let detail = '';
-  if (errorReporter && lastErrCode && lastErrCode !== '0') {
-    try {
-      const msg = errorReporter.message(lastErrCode);
-      detail = ` (LMS error ${lastErrCode}${msg ? `: ${msg}` : ''})`;
-    } catch {}
-  }
-  const ctx = context ? ` [${context}]` : '';
-  console.warn(
-    `Tessera: LMS call failed after retries${ctx}${detail}, continuing without persistence`
-  );
+  logRetryGiveUp(errorReporter, lastErrCode, context);
   return false;
 }
 
@@ -66,8 +101,7 @@ export async function withRetry(
  */
 export function callSync(fn: () => any): boolean {
   try {
-    const result = fn();
-    return result !== false && result !== 'false';
+    return lmsCallSucceeded(fn());
   } catch {
     return false;
   }
@@ -122,8 +156,6 @@ export class WriteQueue {
     this.#flushing = true;
     this.#aborted = false;
 
-    const MAX_ATTEMPTS = 3;
-
     while (this.#queue.length > 0) {
       if (this.#aborted) {
         this.#flushing = false;
@@ -134,11 +166,10 @@ export class WriteQueue {
       let succeeded = false;
       let lastErrCode = '';
 
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
         let ok = false;
         try {
-          const result = entry.fn();
-          ok = result !== false && result !== 'false';
+          ok = lmsCallSucceeded(entry.fn());
         } catch {
           // API call threw — treat as failure
         }
@@ -146,15 +177,13 @@ export class WriteQueue {
           succeeded = true;
           break;
         }
-        if (this.errorReporter) {
-          try { lastErrCode = this.errorReporter.code(); } catch {}
-        }
-        if (attempt < MAX_ATTEMPTS - 1) {
+        lastErrCode = readLastErrorCode(this.errorReporter);
+        if (attempt < RETRY_ATTEMPTS - 1) {
           // The next attempt is gated on a backoff timer that won't fire
           // during page unload. Mark in-flight so drainSync can re-run
           // the entry synchronously if it interrupts here.
           this.#inFlight = entry;
-          await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempt)));
+          await new Promise((r) => setTimeout(r, backoffMs(attempt)));
           this.#inFlight = null;
           if (this.#aborted) {
             this.#flushing = false;
@@ -164,17 +193,7 @@ export class WriteQueue {
       }
 
       if (!succeeded) {
-        let detail = '';
-        if (this.errorReporter && lastErrCode && lastErrCode !== '0') {
-          try {
-            const msg = this.errorReporter.message(lastErrCode);
-            detail = ` (LMS error ${lastErrCode}${msg ? `: ${msg}` : ''})`;
-          } catch {}
-        }
-        const ctx = entry.context ? ` [${entry.context}]` : '';
-        console.warn(
-          `Tessera: LMS call failed after retries${ctx}${detail}, continuing without persistence`
-        );
+        logRetryGiveUp(this.errorReporter, lastErrCode, entry.context);
         this.#queue.unshift(entry);
         this.#flushing = false;
         return;

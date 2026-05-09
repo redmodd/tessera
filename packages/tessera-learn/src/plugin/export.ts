@@ -70,10 +70,36 @@ function formatSize(bytes: number): string {
 
 // ---------- Manifest Generators ----------
 
-export function generateSCORM12Manifest(
+/** Per-version XML differences in imsmanifest.xml between SCORM 1.2 and 2004. */
+interface ScormManifestDialect {
+  rootNs: string;
+  adlcpNs: string;
+  schemaversion: string;
+  /** Attribute name on <resource>: SCORM 1.2 uses lowercase, 2004 uses camelCase. */
+  scormTypeAttr: 'scormtype' | 'scormType';
+}
+
+const SCORM_DIALECTS: Record<'1.2' | '2004', ScormManifestDialect> = {
+  '1.2': {
+    rootNs: 'http://www.imsproject.org/xsd/imscp_rootv1p1p2',
+    adlcpNs: 'http://www.adlnet.org/xsd/adlcp_rootv1p2',
+    schemaversion: '1.2',
+    scormTypeAttr: 'scormtype',
+  },
+  '2004': {
+    rootNs: 'http://www.imsglobal.org/xsd/imscp_v1p1',
+    adlcpNs: 'http://www.adlnet.org/xsd/adlcp_v1p3',
+    schemaversion: '2004 4th Edition',
+    scormTypeAttr: 'scormType',
+  },
+};
+
+export function generateScormManifest(
+  version: '1.2' | '2004',
   config: ExportConfig,
   distDir: string
 ): string {
+  const dialect = SCORM_DIALECTS[version];
   const title = escapeXml(config.title || 'Tessera Course');
   const files = collectFiles(distDir);
   const fileElements = files
@@ -82,11 +108,11 @@ export function generateSCORM12Manifest(
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
-  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
-  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+  xmlns="${dialect.rootNs}"
+  xmlns:adlcp="${dialect.adlcpNs}">
   <metadata>
     <schema>ADL SCORM</schema>
-    <schemaversion>1.2</schemaversion>
+    <schemaversion>${dialect.schemaversion}</schemaversion>
   </metadata>
   <organizations default="org-1">
     <organization identifier="org-1">
@@ -97,45 +123,25 @@ export function generateSCORM12Manifest(
     </organization>
   </organizations>
   <resources>
-    <resource identifier="res-1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+    <resource identifier="res-1" type="webcontent" adlcp:${dialect.scormTypeAttr}="sco" href="index.html">
 ${fileElements}
     </resource>
   </resources>
 </manifest>`;
 }
 
+export function generateSCORM12Manifest(
+  config: ExportConfig,
+  distDir: string
+): string {
+  return generateScormManifest('1.2', config, distDir);
+}
+
 export function generateSCORM2004Manifest(
   config: ExportConfig,
   distDir: string
 ): string {
-  const title = escapeXml(config.title || 'Tessera Course');
-  const files = collectFiles(distDir);
-  const fileElements = files
-    .map((f) => `      <file href="${escapeXml(f)}" />`)
-    .join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="tessera-course" version="1.0"
-  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
-  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3">
-  <metadata>
-    <schema>ADL SCORM</schema>
-    <schemaversion>2004 4th Edition</schemaversion>
-  </metadata>
-  <organizations default="org-1">
-    <organization identifier="org-1">
-      <title>${title}</title>
-      <item identifier="item-1" identifierref="res-1">
-        <title>${title}</title>
-      </item>
-    </organization>
-  </organizations>
-  <resources>
-    <resource identifier="res-1" type="webcontent" adlcp:scormType="sco" href="index.html">
-${fileElements}
-    </resource>
-  </resources>
-</manifest>`;
+  return generateScormManifest('2004', config, distDir);
 }
 
 export function generateCMI5Xml(config: ExportConfig): string {

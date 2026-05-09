@@ -15,6 +15,7 @@ import {
   XAPIConfigError,
   XAPIStatementError,
 } from './validation.js';
+import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 
 /** cmi5 §9.6.2 — well-known IRI owned by ADL for the cmi5 session id extension. */
 const CMI5_SESSIONID_EXT =
@@ -59,6 +60,16 @@ export interface XAPIPublisherOptions {
    * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
    */
   cmi5Mode?: boolean;
+  /**
+   * If supplied, every send-shaped method (`sendStatement`, `enqueueBuilt`)
+   * rejects with the returned `Error` without touching the network. Used by
+   * dev-fallback shims (cmi5 `endpoint: 'lms'` outside an LMS, SCORM
+   * destinations with no synthesizable actor) to surface an explicit failure
+   * to author code instead of silently no-oping. Construction and `init()`
+   * still complete normally so `getActor()` / `buildStatement()` remain
+   * usable for callers that don't actually transmit.
+   */
+  unavailableReason?: () => Error;
 }
 
 interface SendOutcome {
@@ -67,7 +78,7 @@ interface SendOutcome {
   error?: Error;
 }
 
-const STATEMENT_RETRY_ATTEMPTS = 3;
+const STATEMENT_RETRY_ATTEMPTS = RETRY_ATTEMPTS;
 /**
  * Soft cap on the number of in-flight statements queued behind the head of
  * the chain. We log a one-time warning when the queue grows past this so
@@ -105,6 +116,9 @@ export class XAPIPublisher {
   readonly #registration?: string;
   readonly #sessionId: string;
   readonly #cmi5Mode: boolean;
+
+  // When set, every send method short-circuits with a rejected promise.
+  readonly #unavailableReason: (() => Error) | null;
 
   // Auth — string or resolver. Cached after first resolution.
   readonly #authValue: string | (() => string | Promise<string>);
@@ -149,6 +163,7 @@ export class XAPIPublisher {
     this.#authValue = opts.auth;
     this.#actorValue = opts.actor;
     this.#sessionId = opts.sessionId ?? uuidv4();
+    this.#unavailableReason = opts.unavailableReason ?? null;
 
     if (typeof this.#actorValue !== 'function') {
       this.#cachedActor = this.#actorValue;
@@ -298,6 +313,9 @@ export class XAPIPublisher {
     partial: PartialStatement,
     options?: SendStatementOptions & { id?: string }
   ): Promise<SendStatementResult> {
+    if (this.#unavailableReason) {
+      return Promise.reject(this.#unavailableReason());
+    }
     try {
       validatePartialStatement(partial);
     } catch (err) {
@@ -332,6 +350,9 @@ export class XAPIPublisher {
     statementOrBatch: Statement | Statement[],
     options?: SendStatementOptions
   ): Promise<DestinationOutcome> {
+    if (this.#unavailableReason) {
+      return Promise.reject(this.#unavailableReason());
+    }
     if (this.#queueDepth >= QUEUE_DEPTH_SATURATED) {
       return Promise.resolve<DestinationOutcome>({
         endpoint: this.#endpoint,
@@ -449,7 +470,7 @@ export class XAPIPublisher {
         }
         if (isFinal) return outcome;
         return new Promise<void>((r) =>
-          setTimeout(r, 100 * Math.pow(2, n))
+          setTimeout(r, backoffMs(n))
         ).then(() => attempt(n + 1));
       });
     };

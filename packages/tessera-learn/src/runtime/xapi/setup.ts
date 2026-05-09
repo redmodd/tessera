@@ -42,28 +42,21 @@ class XAPIDevFallbackError extends Error {
 }
 
 /**
- * Build a stub publisher whose sends reject with `error`. Used for both
- * dev-fallback paths: cmi5 `endpoint: 'lms'` with no launch params, and
- * SCORM explicit endpoints that depend on a learner identity the dev
- * fallback can't synthesize. The placeholder publisher carries a static
- * actor so its constructor invariants hold and `XAPIClient.buildStatement`
- * can run without throwing — only the network-bound methods reject.
+ * Build a stub publisher whose sends reject with the supplied error. Used for
+ * both dev-fallback paths: cmi5 `endpoint: 'lms'` with no launch params, and
+ * SCORM explicit endpoints that depend on a learner identity the dev fallback
+ * can't synthesize. The placeholder carries a static actor so the constructor
+ * invariants hold and `XAPIClient.buildStatement` can run without throwing —
+ * the `unavailableReason` opt makes only the network-bound methods reject.
  */
 function makeRejectingPublisher(error: () => Error): XAPIPublisher {
-  const pub = new XAPIPublisher({
+  return new XAPIPublisher({
     endpoint: 'http://localhost/__tessera_dev_fallback__/',
     auth: '',
     actor: { mbox: 'mailto:nobody@example.invalid', objectType: 'Agent' },
     activityId: 'http://localhost/__tessera_dev_fallback__',
+    unavailableReason: error,
   });
-  // The static actor is cached at construction so getActor()/buildStatement
-  // work without a separate init() call. We only override the methods that
-  // would otherwise hit the network so author code surfaces the explicit
-  // error rather than silently no-oping.
-  const reject = (): Promise<never> => Promise.reject(error());
-  (pub as any).sendStatement = reject;
-  (pub as any).enqueueBuilt = reject;
-  return pub;
 }
 
 function makeDevFallbackPublisher(): XAPIPublisher {
