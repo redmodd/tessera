@@ -96,8 +96,8 @@ importers:
         version: link:../../../packages/tessera-learn
     devDependencies:
       vite:
-        specifier: ^6.0.0
-        version: 6.4.1(@types/node@25.5.0)
+        specifier: ^8.0.0
+        version: 8.0.11(@types/node@25.5.0)(esbuild@0.27.4)
 
   tests/fixtures/custom-quiz:
     dependencies:
@@ -106,8 +106,8 @@ importers:
         version: link:../../../packages/tessera-learn
     devDependencies:
       vite:
-        specifier: ^6.0.0
-        version: 6.4.1(@types/node@25.5.0)
+        specifier: ^8.0.0
+        version: 8.0.11(@types/node@25.5.0)(esbuild@0.27.4)
 
   tests/fixtures/free:
     dependencies:
@@ -116,8 +116,8 @@ importers:
         version: link:../../../packages/tessera-learn
     devDependencies:
       vite:
-        specifier: ^6.0.0
-        version: 6.4.1(@types/node@25.5.0)
+        specifier: ^8.0.0
+        version: 8.0.11(@types/node@25.5.0)(esbuild@0.27.4)
 
   tests/fixtures/sequential:
     dependencies:
@@ -126,8 +126,8 @@ importers:
         version: link:../../../packages/tessera-learn
     devDependencies:
       vite:
-        specifier: ^6.0.0
-        version: 6.4.1(@types/node@25.5.0)
+        specifier: ^8.0.0
+        version: 8.0.11(@types/node@25.5.0)(esbuild@0.27.4)
 
 packages:
 
