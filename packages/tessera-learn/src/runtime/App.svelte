@@ -29,6 +29,11 @@
   const nav = new NavigationState(manifest, progress, config);
   let duration = $state(new DurationTracker(0));
 
+  // Static across the course's lifetime — manifest doesn't change after build.
+  // Hoisted out of the score-rollup effect so it isn't rebuilt on every quiz
+  // submission.
+  const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
+
   // Page loading state
   let PageComponent = $state(null);
   let pageLoading = $state(true);
@@ -125,21 +130,21 @@
   }
 
   // ---- Branding ----
-  function parseColor(ctx, color) {
-    ctx.fillStyle = '#000';
-    ctx.fillStyle = color;
-    if (ctx.fillStyle === '#000000'
-        && color.trim().toLowerCase() !== '#000000'
-        && color.trim().toLowerCase() !== '#000'
-        && color.trim().toLowerCase() !== 'black') {
+  // Parse any CSS color the browser can render — named colors, hex, rgb(), hsl(),
+  // oklch(), etc. — by handing it to the layout engine and reading back the
+  // canonical rgb() form. Returns null for values the browser rejects.
+  function parseColor(color) {
+    if (typeof CSS !== 'undefined' && CSS.supports && !CSS.supports('color', color)) {
       return null;
     }
-    const hex = ctx.fillStyle;
-    return {
-      r: parseInt(hex.slice(1, 3), 16),
-      g: parseInt(hex.slice(3, 5), 16),
-      b: parseInt(hex.slice(5, 7), 16),
-    };
+    const el = document.createElement('span');
+    el.style.color = color;
+    document.documentElement.appendChild(el);
+    const computed = getComputedStyle(el).color;
+    el.remove();
+    const match = computed.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (!match) return null;
+    return { r: +match[1], g: +match[2], b: +match[3] };
   }
 
   function rgbToHsl(r, g, b) {
@@ -160,11 +165,7 @@
     const el = document.documentElement;
     if (cfg.branding?.primaryColor) {
       el.style.setProperty('--tessera-primary', cfg.branding.primaryColor);
-      // Create the canvas once here rather than inside parseColor to avoid
-      // allocating a new element for every color resolved.
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const rgb = ctx ? parseColor(ctx, cfg.branding.primaryColor) : null;
+      const rgb = parseColor(cfg.branding.primaryColor);
       if (rgb) {
         const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
         el.style.setProperty('--tessera-primary-light', `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, 90%)`);
@@ -297,14 +298,14 @@
   $effect(() => {
     const scores = progress.quizScores;
     if (!persistenceReady || scores.size === 0) return;
+    if (gradedQuizIndices.length === 0) return;
 
-    const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
     const completedGraded = gradedQuizIndices.filter(i => scores.has(i));
     if (completedGraded.length === 0) return;
 
     // Divide by total graded count — incomplete quizzes count as 0, matching
     // the recalculateSuccess logic in progress.svelte.ts.
-    const average = completedGraded.reduce((sum, i) => sum + scores.get(i), 0) / gradedQuizIndices.length;
+    const average = completedGraded.reduce((sum, i) => sum + (scores.get(i) ?? 0), 0) / gradedQuizIndices.length;
 
     untrack(() => {
       adapter.setScore(Math.round(average));

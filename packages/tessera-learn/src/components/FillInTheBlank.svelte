@@ -21,7 +21,8 @@
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
-  const inputId = `fitb-${Math.random().toString(36).slice(2, 9)}`;
+  const componentId = $props.id();
+  const inputId = `fitb-${componentId}`;
   const defaultId = `fitb-${slugFromQuestion(question)}`;
 
   function checkAnswer(userAnswer) {

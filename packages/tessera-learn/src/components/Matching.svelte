@@ -19,6 +19,10 @@
 
   let shuffledRight = $state([]);
   let matches = $state(new SvelteMap());
+  // Reverse index of `matches` (right.originalIndex → left index). Maintained
+  // alongside matches so right-column rendering is O(1) per item instead of
+  // a O(n) scan over matches.entries() per row.
+  let rightToLeft = $state(new SvelteMap());
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
 
@@ -65,6 +69,7 @@
 
   function resetState() {
     matches = new SvelteMap();
+    rightToLeft = new SvelteMap();
     selectedLeft = null;
     selectedRight = null;
     initShuffle();
@@ -125,13 +130,20 @@
   }
 
   function createMatch(leftIndex, rightOriginalIndex) {
-    for (const [l, r] of matches) {
-      if (l === leftIndex || r === rightOriginalIndex) {
-        matches.delete(l);
-      }
+    // Drop any prior match that conflicts on either side, keeping `rightToLeft`
+    // in sync. A left-side conflict frees its previous right partner; a
+    // right-side conflict frees its previous left partner.
+    const priorRightForLeft = matches.get(leftIndex);
+    if (priorRightForLeft !== undefined) {
+      rightToLeft.delete(priorRightForLeft);
+    }
+    const priorLeftForRight = rightToLeft.get(rightOriginalIndex);
+    if (priorLeftForRight !== undefined) {
+      matches.delete(priorLeftForRight);
     }
 
     matches.set(leftIndex, rightOriginalIndex);
+    rightToLeft.set(rightOriginalIndex, leftIndex);
     selectedLeft = null;
     selectedRight = null;
 
@@ -150,7 +162,9 @@
     } else {
       if (quizLocked) return;
     }
+    const right = matches.get(leftIndex);
     matches.delete(leftIndex);
+    if (right !== undefined) rightToLeft.delete(right);
     if (!standalone) {
       quiz.setAnswer(myIndex, new Map(matches));
     }
@@ -167,17 +181,16 @@
   }
 
   function getRightMatchColor(rightOriginalIndex) {
-    for (const [l, r] of matches) {
-      if (r === rightOriginalIndex) return pairColors[l % pairColors.length];
-    }
-    return null;
+    const l = rightToLeft.get(rightOriginalIndex);
+    return l === undefined ? null : pairColors[l % pairColors.length];
   }
 
   function isRightMatched(rightOriginalIndex) {
-    for (const [, r] of matches) {
-      if (r === rightOriginalIndex) return true;
-    }
-    return false;
+    return rightToLeft.has(rightOriginalIndex);
+  }
+
+  function getLeftForRight(rightOriginalIndex) {
+    return rightToLeft.get(rightOriginalIndex);
   }
 
   function isMatchCorrect(leftIndex) {
@@ -242,7 +255,7 @@
           aria-label="{item.text}{matched ? ' (matched)' : ''}"
         >
           {#if matched}
-            {@const leftIdx = [...matches.entries()].find(([, r]) => r === item.originalIndex)?.[0]}
+            {@const leftIdx = getLeftForRight(item.originalIndex)}
             <span class="tessera-matching-badge" style="background: {color}">
               {leftIdx !== undefined ? leftIdx + 1 : ''}
             </span>

@@ -22,8 +22,9 @@
   let saRetryCount = $state(0);
   let saCanRetry = $derived(saRetryCount < maxRetries);
 
-  // Unique IDs for accessibility
-  const groupId = `mc-${Math.random().toString(36).slice(2, 9)}`;
+  // Unique IDs for accessibility — $props.id() is SSR-safe and stable across hydration.
+  const componentId = $props.id();
+  const groupId = `mc-${componentId}`;
   const defaultId = `mc-${slugFromQuestion(question)}`;
 
   const handle = useQuestion({

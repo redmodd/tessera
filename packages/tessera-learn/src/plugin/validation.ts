@@ -476,6 +476,10 @@ function validatePages(
   let totalPages = 0;
   let totalQuizzes = 0;
   let hasGradedQuiz = false;
+  // Shared across the validation pass — every page references many of the
+  // same asset paths (logos, shared media). One existsSync per unique asset
+  // for the entire build, not one per textual reference.
+  const assetExistsCache = new Map<string, boolean>();
 
   if (!existsSync(pagesDir)) {
     errors.push(
@@ -563,7 +567,7 @@ function validatePages(
         }
       }
 
-      validateAssetRefs(content, fileRel, assetsDir, warnings);
+      validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
     }
 
     // Get lesson directories
@@ -643,7 +647,7 @@ function validatePages(
         }
 
         // Check $assets references
-        validateAssetRefs(content, fileRel, assetsDir, warnings);
+        validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
       }
     }
   }
@@ -763,20 +767,34 @@ function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): v
 
 // ---------- Asset Reference Validation ----------
 
+const ASSET_REF_RE = /\$assets\/([^\s"'`)]+)/g;
+
+/** Match $assets/... refs in any context (src attrs, import statements, url() etc) and dedupe. */
+function collectAssetRefs(content: string): string[] {
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+  ASSET_REF_RE.lastIndex = 0;
+  while ((match = ASSET_REF_RE.exec(content)) !== null) {
+    seen.add(match[1]);
+  }
+  return [...seen];
+}
+
 function validateAssetRefs(
   content: string,
   fileRel: string,
   assetsDir: string,
-  warnings: string[]
+  warnings: string[],
+  existsCache: Map<string, boolean>
 ): void {
-  // Match $assets/... references in src attributes, import statements, url() etc.
-  const assetRefPattern = /\$assets\/([^\s"'`)]+)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = assetRefPattern.exec(content)) !== null) {
-    const assetPath = match[1];
+  for (const assetPath of collectAssetRefs(content)) {
     const fullAssetPath = resolve(assetsDir, assetPath);
-    if (!existsSync(fullAssetPath)) {
+    let exists = existsCache.get(fullAssetPath);
+    if (exists === undefined) {
+      exists = existsSync(fullAssetPath);
+      existsCache.set(fullAssetPath, exists);
+    }
+    if (!exists) {
       warnings.push(
         `${fileRel}: "$assets/${assetPath}" not found in assets/ directory`
       );
