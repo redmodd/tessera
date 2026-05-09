@@ -1,12 +1,12 @@
 # Tessera
 
-Tessera is a toolkit for building interactive online courses that play in any learning management system. **It's designed for AI-assisted authoring.**
+Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
 
 Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Cursor](https://cursor.com), [Aider](https://aider.chat), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
-**There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything you can build with HTML, CSS, and Svelte works.
+**There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
 
-When you're done, one command packages your course as SCORM 1.2, SCORM 2004, cmi5, or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
+When you're done, one command packages your course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
 
 *Under the hood:* Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
 
@@ -23,7 +23,7 @@ Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window 
 node --version    # should print v24.x.x or higher
 ```
 
-**Editor (optional):** You can edit course files in any text editor, but [Visual Studio Code](https://code.visualstudio.com/) is a good free choice. Install the [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) extension for syntax highlighting on `.svelte` files.
+**Editor (optional):** While Tessera is designed for AI-assisted authoring, you can see and edit course files in any text editor, such as [Visual Studio Code](https://code.visualstudio.com/) which is a good free choice. Install the [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) extension for syntax highlighting on `.svelte` files.
 
 ## Quick start
 
@@ -35,9 +35,9 @@ npm run preview   # local dev server at http://localhost:5173
 npm run export    # build + package for the configured standard
 ```
 
-Open the printed URL (`http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
-Every scaffolded project ships with `AGENTS.md` at its root. Open it for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI).
+Every scaffolded project ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
 ```svelte
 <script module>
