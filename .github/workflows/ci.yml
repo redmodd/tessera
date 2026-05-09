@@ -28,7 +28,16 @@ jobs:
 
       - run: pnpm build
 
-      - run: pnpm test
+      - run: pnpm test:coverage
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.node }}
+          path: |
+            packages/*/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
 
   e2e:
     name: Playwright e2e

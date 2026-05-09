@@ -39,10 +39,12 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
+    "@vitest/coverage-v8": "^4.1.5",
     "tsdown": "^0.22.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"

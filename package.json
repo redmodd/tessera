@@ -8,6 +8,7 @@
     "prebuild": "pnpm sync:agents",
     "build": "pnpm --filter='./packages/*' -r build",
     "test": "pnpm sync:agents:check && pnpm -r test",
+    "test:coverage": "pnpm sync:agents:check && pnpm -r test:coverage",
     "test:e2e": "playwright test",
     "lint": "pnpm -r lint",
     "changeset": "changeset",

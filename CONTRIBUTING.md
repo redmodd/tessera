@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This document covers how to get the re
 
 ## Prerequisites
 
-- Node.js >= 20 (CI tests against 20 and 22)
+- Node.js >= 24 (CI runs Node 24)
 - [pnpm](https://pnpm.io/) (the repo is a pnpm workspace; corepack will pick the right version automatically)
 
 ## Getting set up
@@ -12,29 +12,26 @@ Thanks for your interest in contributing. This document covers how to get the re
 ```bash
 git clone https://github.com/redmodd/tessera.git
 cd tessera
-pnpm install
-pnpm build
+./scripts/setup-e2e.sh   # pnpm install + build + Playwright browsers
 pnpm test
-```
-
-For end-to-end Playwright tests:
-
-```bash
-pnpm exec playwright install --with-deps chromium
 pnpm test:e2e
 ```
 
-E2E suites are scoped via Playwright projects (`free-mode`, `sequential-mode`, `mobile`, `lms`) — see `playwright.config.ts`. The fixture projects under `tests/fixtures/` are gitignored; scaffold them with `npm create tessera@latest` or copy from a previous checkout if you need them.
+If you only need unit tests, `pnpm install && pnpm build && pnpm test` is enough — the setup script is a convenience for getting the full e2e suite running.
+
+See [TESTING.md](./TESTING.md) for the test layout, single-file runs, the variant pre-build, and debugging tips.
 
 ## Repo layout
 
 ```
 packages/
-  tessera/           # Framework runtime + Vite plugin
+  tessera-learn/     # Framework runtime + Vite plugin
   create-tessera/    # Scaffolder
 tests/
   e2e/               # Playwright specs
-  fixtures/          # Local-only scaffolded courses (gitignored)
+  fixtures/          # Course projects used by e2e (committed)
+test-projects/
+  custom-layout/     # Standalone fixture for layout-override tests
 AGENTS.md            # Course authoring guide
 ```
 
@@ -46,9 +43,11 @@ AGENTS.md            # Course authoring guide
 
 ## Tests
 
-- Unit tests: `pnpm test` (Vitest, runs in both packages).
-- E2E: `pnpm test:e2e`. If you change adapter behavior (SCORM 1.2, SCORM 2004, cmi5, web) or navigation/progress logic, run the E2E suite locally before opening a PR.
+- Unit tests: `pnpm test` (Vitest, runs in both packages). Add `:coverage` for v8 reports.
+- E2E: `pnpm test:e2e`. If you change adapter behavior (SCORM 1.2, SCORM 2004, cmi5, web) or navigation/progress logic, run the e2e suite locally before opening a PR.
 - New features should ship with tests. Bug fixes should ship with a regression test that fails before your change and passes after.
+
+See [TESTING.md](./TESTING.md) for full details — single-test runs, the variant pre-build that produces `tests/.e2e-variants/`, debugging failed CI runs, etc.
 
 ## Adapter changes
 

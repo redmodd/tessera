@@ -41,7 +41,7 @@ interface ParseResult {
   help?: boolean;
 }
 
-function parseArgs(argv: string[]): ParseResult {
+export function parseArgs(argv: string[]): ParseResult {
   const args: ParsedArgs = { template: 'default' };
   for (const a of argv) {
     if (a === '--help' || a === '-h') return { help: true };
@@ -64,7 +64,7 @@ function parseArgs(argv: string[]): ParseResult {
 
 // npm package name rules: 1-214 chars, lowercase, must start with [a-z0-9],
 // allowed chars [a-z0-9._-], no leading dot or underscore.
-function validateProjectName(name: string): string | null {
+export function validateProjectName(name: string): string | null {
   if (!name) return 'Project name is required';
   if (name.length > 214) return 'Project name must be 214 characters or fewer';
   if (name !== name.toLowerCase()) return 'Project name must be lowercase';
@@ -77,7 +77,7 @@ function validateProjectName(name: string): string | null {
   return null;
 }
 
-function toTitleCase(slug: string): string {
+export function toTitleCase(slug: string): string {
   return slug
     .split(/[-_.\s]+/)
     .filter(Boolean)
@@ -384,4 +384,8 @@ function main() {
   );
 }
 
-main();
+// Only run the CLI when invoked as the entry point. Importing this module
+// (e.g. from unit tests) returns the helpers without triggering main().
+if (import.meta.main) {
+  main();
+}
