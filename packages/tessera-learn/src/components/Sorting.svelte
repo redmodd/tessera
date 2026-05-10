@@ -373,8 +373,8 @@
   }
 
   .tessera-sorting-card:focus-visible {
-    outline: var(--tessera-focus-ring);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--tessera-focus-ring);
     border-color: var(--tessera-primary);
   }
 
