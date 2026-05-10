@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.0.3
+
+### Patch Changes
+
+- Update the README on npm: add the AI-authoring framing for the project, correct the description of what the `default` vs. `bare` templates scaffold (the previous list was inaccurate), and tidy the CLI flags table (`--help`, `-h`).
+- Bump the scaffolded `tessera-learn` pin to `^0.0.2` so newly-created projects pick up the latest published runtime.
+
 ## 0.0.2
 
 ### Patch Changes
