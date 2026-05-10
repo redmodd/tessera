@@ -16,8 +16,8 @@
     gap: var(--tessera-spacing-sm);
     padding: var(--tessera-spacing-md);
     margin-bottom: var(--tessera-spacing-md);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tessera-success) 25%, transparent);
+    background: var(--tessera-success-bg);
+    border: 1px solid var(--tessera-success-border);
     border-radius: 6px;
     color: var(--tessera-success);
     font-size: 0.9375rem;

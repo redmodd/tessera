@@ -373,7 +373,7 @@
   }
 
   .tessera-sorting-card:focus-visible {
-    outline: var(--tessera-focus-ring, 0 0 0 3px rgba(37, 99, 235, 0.4));
+    outline: var(--tessera-focus-ring);
     outline-offset: 2px;
     border-color: var(--tessera-primary);
   }
@@ -486,12 +486,12 @@
 
   .tessera-sorting-placed-item.correct {
     border-color: var(--tessera-success);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
+    background: var(--tessera-success-bg);
   }
 
   .tessera-sorting-placed-item.incorrect {
     border-color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+    background: var(--tessera-error-bg);
   }
 
   .tessera-sorting-item-text {
@@ -580,12 +580,12 @@
 
   .tessera-sorting-feedback.correct {
     color: var(--tessera-success);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
+    background: var(--tessera-success-bg);
   }
 
   .tessera-sorting-feedback.incorrect {
     color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+    background: var(--tessera-error-bg);
   }
 
   /* --- Standalone actions --- */

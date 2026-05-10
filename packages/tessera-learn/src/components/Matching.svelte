@@ -364,12 +364,12 @@
 
   .tessera-matching-item.correct {
     border-color: var(--tessera-success) !important;
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent) !important;
+    background: var(--tessera-success-bg) !important;
   }
 
   .tessera-matching-item.incorrect {
     border-color: var(--tessera-error) !important;
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent) !important;
+    background: var(--tessera-error-bg) !important;
   }
 
   .tessera-matching-item:disabled {
@@ -456,12 +456,12 @@
 
   .tessera-matching-feedback.correct {
     color: var(--tessera-success);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
+    background: var(--tessera-success-bg);
   }
 
   .tessera-matching-feedback.incorrect {
     color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+    background: var(--tessera-error-bg);
   }
 
   @media (max-width: 640px) {

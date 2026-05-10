@@ -226,12 +226,12 @@
 
   .tessera-mc-option.correct {
     border-color: var(--tessera-success);
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
+    background: var(--tessera-success-bg);
   }
 
   .tessera-mc-option.incorrect {
     border-color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+    background: var(--tessera-error-bg);
   }
 
   .tessera-mc-option input[type="radio"] {
@@ -312,12 +312,12 @@
   }
 
   .tessera-mc-overall-feedback.correct {
-    background: color-mix(in srgb, var(--tessera-success) 8%, transparent);
+    background: var(--tessera-success-bg);
     color: var(--tessera-success);
   }
 
   .tessera-mc-overall-feedback.incorrect {
-    background: color-mix(in srgb, var(--tessera-error) 8%, transparent);
+    background: var(--tessera-error-bg);
     color: var(--tessera-error);
   }
 
