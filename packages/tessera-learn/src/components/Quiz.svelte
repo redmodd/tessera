@@ -84,9 +84,9 @@
         <span class="tessera-quiz-progress-desktop">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
         <span class="tessera-quiz-progress-mobile">{currentQuestionIndex + 1}/{totalQuestions}</span>
       </span>
-      <div class="tessera-quiz-progress-bar">
+      <div class="tessera-progress-track">
         <div
-          class="tessera-quiz-progress-fill"
+          class="tessera-progress-fill"
           style="width: {totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0}%"
         ></div>
       </div>
@@ -247,19 +247,8 @@
     display: none;
   }
 
-  .tessera-quiz-progress-bar {
+  .tessera-quiz-progress :global(.tessera-progress-track) {
     flex: 1;
-    height: 4px;
-    background: var(--tessera-border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .tessera-quiz-progress-fill {
-    height: 100%;
-    background: var(--tessera-primary);
-    border-radius: 2px;
-    transition: width 0.3s ease;
   }
 
   .tessera-quiz-question-wrapper {
