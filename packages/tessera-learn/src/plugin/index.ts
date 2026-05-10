@@ -180,6 +180,16 @@ mount(App, {
 const VIRTUAL_CONFIG_ID = 'virtual:tessera-config';
 const RESOLVED_CONFIG_ID = '\0' + VIRTUAL_CONFIG_ID;
 
+function completionDefaults(mode: string | undefined): {
+  completion: Record<string, unknown>;
+  passingScore: number;
+} {
+  if (mode === 'manual') {
+    return { completion: { mode: 'manual' }, passingScore: 0 };
+  }
+  return { completion: { mode: 'percentage', percentageThreshold: 100 }, passingScore: 70 };
+}
+
 function tesseraConfigPlugin(): Plugin {
   let projectRoot: string;
 
@@ -222,17 +232,13 @@ function tesseraConfigPlugin(): Plugin {
           }
         }
 
-        const completionMode = userConfig.completion?.mode ?? 'percentage';
-        const defaultPassingScore = completionMode === 'manual' ? 0 : 70;
+        const { completion, passingScore } = completionDefaults(userConfig.completion?.mode);
         const merged = {
           title: userConfig.title || 'Untitled Course',
           ...userConfig,
           navigation: { mode: 'free', ...userConfig.navigation },
-          completion:
-            completionMode === 'manual'
-              ? { mode: 'manual', ...userConfig.completion }
-              : { mode: 'percentage', percentageThreshold: 100, ...userConfig.completion },
-          scoring: { passingScore: defaultPassingScore, ...userConfig.scoring },
+          completion: { ...completion, ...userConfig.completion },
+          scoring: { passingScore, ...userConfig.scoring },
           export: { standard: 'web', ...userConfig.export },
         };
 

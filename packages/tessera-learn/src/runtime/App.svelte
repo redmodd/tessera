@@ -102,18 +102,15 @@
       if (gen !== loadGeneration) return; // stale
       PageComponent = mod.default;
       pageLoading = false;
-      // Mark visited and recalculate
       progress.markVisited(index);
       if (
         manifest.pages[index].completesOn === 'view' &&
         config.completion.mode === 'manual'
       ) {
         progress.markCompleteManually();
-        progress.recalculateSuccess(manifest, config);
-      } else {
-        progress.recalculateCompletion(manifest, config);
-        progress.recalculateSuccess(manifest, config);
       }
+      progress.recalculateCompletion(manifest, config);
+      progress.recalculateSuccess(manifest, config);
     }).catch(err => {
       if (gen !== loadGeneration) return; // stale
       console.error(`Tessera: Failed to load page ${index}`, err);
@@ -338,6 +335,18 @@
     });
   });
 
+  let prevSuccessStatus = $state('unknown');
+  $effect(() => {
+    const status = progress.successStatus;
+    if (!persistenceReady) return;
+    if (status === prevSuccessStatus) return;
+    prevSuccessStatus = status;
+    untrack(() => {
+      adapter.setSuccessStatus(status);
+      adapter.commit();
+    });
+  });
+
   // ---- Exit / Terminate lifecycle ----
   let terminated = false;
   let manualWatchdog = null;
@@ -393,6 +402,7 @@
     if (saved) {
       restoreState(saved);
       prevCompletionStatus = progress.completionStatus;
+      prevSuccessStatus = progress.successStatus;
     }
     persistenceReady = true;
 

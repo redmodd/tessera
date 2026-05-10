@@ -318,7 +318,7 @@ export function generateManifest(pagesDir: string): Manifest {
           slug: pageSlug,
           importPath: relativePath,
           quiz: pageConfig.quiz || null,
-          ...(pageConfig.completesOn ? { completesOn: pageConfig.completesOn } : {}),
+          ...(pageConfig.completesOn === 'view' ? { completesOn: 'view' as const } : {}),
         };
 
         lesson.pages.push(page);

@@ -730,24 +730,13 @@ describe('manual completion — page trigger', () => {
     progress: ProgressState,
     config: CourseConfig
   ) {
+    const manifest = { sections: [], pages, totalPages: pages.length };
     progress.markVisited(index);
-    const page = pages[index];
-    if (page.completesOn === 'view' && config.completion.mode === 'manual') {
+    if (pages[index].completesOn === 'view' && config.completion.mode === 'manual') {
       progress.markCompleteManually();
-      progress.recalculateSuccess(
-        { sections: [], pages, totalPages: pages.length },
-        config
-      );
-    } else {
-      progress.recalculateCompletion(
-        { sections: [], pages, totalPages: pages.length },
-        config
-      );
-      progress.recalculateSuccess(
-        { sections: [], pages, totalPages: pages.length },
-        config
-      );
     }
+    progress.recalculateCompletion(manifest, config);
+    progress.recalculateSuccess(manifest, config);
   }
 
   it('marks completion on first visit to a completesOn:"view" page', () => {
@@ -789,5 +778,98 @@ describe('manual completion — page trigger', () => {
 
     loadPage(0, pages, progress, config);
     expect(progress.manuallyCompleted).toBe(false);
+  });
+});
+
+// ============================================================================
+// 7. Live-session success push (mirrors App.svelte's prevSuccessStatus effect)
+// ============================================================================
+
+describe('manual completion — live success-status push', () => {
+  /**
+   * Mirror of App.svelte's status-push effects: completion and success each
+   * commit on change. The effect re-runs whenever its tracked reads change;
+   * the test invokes it manually after each progress mutation.
+   */
+  function makeStatusPusher(progress: ProgressState, adapter: {
+    setCompletionStatus(s: 'incomplete' | 'complete'): void;
+    setSuccessStatus(s: 'unknown' | 'passed' | 'failed'): void;
+    commit(): void;
+  }) {
+    let prevCompletion: 'incomplete' | 'complete' = progress.completionStatus;
+    let prevSuccess: 'unknown' | 'passed' | 'failed' = progress.successStatus;
+    return () => {
+      if (progress.completionStatus !== prevCompletion) {
+        prevCompletion = progress.completionStatus;
+        adapter.setCompletionStatus(prevCompletion);
+        adapter.commit();
+      }
+      if (progress.successStatus !== prevSuccess) {
+        prevSuccess = progress.successStatus;
+        adapter.setSuccessStatus(prevSuccess);
+        adapter.commit();
+      }
+    };
+  }
+
+  it('pushes setSuccessStatus("passed") to the adapter when markComplete fires under requireSuccessStatus', () => {
+    const progress = new ProgressState();
+    const manifest = createManifest(2);
+    const config = manualConfig({ requireSuccessStatus: 'passed' });
+    const adapter = {
+      setCompletionStatus: vi.fn(),
+      setSuccessStatus: vi.fn(),
+      commit: vi.fn(),
+    };
+
+    const flush = makeStatusPusher(progress, adapter);
+
+    progress.markCompleteManually();
+    progress.recalculateSuccess(manifest, config);
+    flush();
+
+    expect(adapter.setCompletionStatus).toHaveBeenCalledWith('complete');
+    expect(adapter.setSuccessStatus).toHaveBeenCalledWith('passed');
+    expect(adapter.commit).toHaveBeenCalled();
+  });
+
+  it('does not push success on markComplete when requireSuccessStatus is omitted', () => {
+    const progress = new ProgressState();
+    const manifest = createManifest(2);
+    const config = manualConfig();
+    const adapter = {
+      setCompletionStatus: vi.fn(),
+      setSuccessStatus: vi.fn(),
+      commit: vi.fn(),
+    };
+
+    const flush = makeStatusPusher(progress, adapter);
+
+    progress.markCompleteManually();
+    progress.recalculateSuccess(manifest, config);
+    flush();
+
+    expect(adapter.setCompletionStatus).toHaveBeenCalledWith('complete');
+    // successStatus stayed 'unknown' — no transition, no push.
+    expect(adapter.setSuccessStatus).not.toHaveBeenCalled();
+  });
+
+  it('pushes setSuccessStatus("failed") under requireSuccessStatus: "failed"', () => {
+    const progress = new ProgressState();
+    const manifest = createManifest(2);
+    const config = manualConfig({ requireSuccessStatus: 'failed' });
+    const adapter = {
+      setCompletionStatus: vi.fn(),
+      setSuccessStatus: vi.fn(),
+      commit: vi.fn(),
+    };
+
+    const flush = makeStatusPusher(progress, adapter);
+
+    progress.markCompleteManually();
+    progress.recalculateSuccess(manifest, config);
+    flush();
+
+    expect(adapter.setSuccessStatus).toHaveBeenCalledWith('failed');
   });
 });

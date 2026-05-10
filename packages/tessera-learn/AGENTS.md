@@ -88,7 +88,7 @@ Pages listed in `pages` come first in listed order; any unlisted `.svelte` files
 There are five:
 
 1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc., from `tessera-learn`. Use, compose, or skip.
-2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
+2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
 3. **Custom layout**: drop `layout.svelte` at the project root to replace the default chrome.
 4. **Custom quiz shell**: drop `quiz.svelte` at the project root to replace the built-in quiz UI for every page that has `pageConfig.quiz`. Authors call `useQuiz()` for state and dispatch; question widgets continue to register through `useQuestion`.
 5. **Custom xAPI**: `useXAPI()` returns a publisher for emitting your own xAPI verbs to one or more LRSes. See [Custom xAPI statements](#custom-xapi-statements).
@@ -660,7 +660,7 @@ The Vite plugin runs project validation on every dev start and build (manifest s
 
 ## Hooks Reference
 
-Five hooks plus one helper make up the stable contract between widgets and the runtime.
+Six hooks plus one helper make up the stable contract between widgets and the runtime.
 
 ```js
 import {
@@ -668,6 +668,7 @@ import {
   useQuiz,
   useNavigation,
   useProgress,
+  useCompletion,
   usePersistence,
   isCorrect,
 } from 'tessera-learn';
