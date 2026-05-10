@@ -8,7 +8,7 @@
   {#if error?.message}
     <p><small>{error.message}</small></p>
   {/if}
-  <button class="tessera-error-retry" onclick={onretry}>
+  <button class="tessera-btn-primary tessera-error-retry" onclick={onretry}>
     Retry
   </button>
 </div>

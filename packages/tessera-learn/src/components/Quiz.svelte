@@ -113,7 +113,7 @@
       </button>
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
-          class="tessera-quiz-btn tessera-quiz-btn-primary"
+          class="tessera-quiz-btn tessera-btn-primary"
           disabled={!isAnswered(currentQuestionIndex)}
           onclick={goNextQuestion}
         >
@@ -121,14 +121,14 @@
         </button>
       {:else if needsReveal(currentQuestionIndex)}
         <button
-          class="tessera-quiz-btn tessera-quiz-btn-primary"
+          class="tessera-quiz-btn tessera-btn-primary"
           onclick={() => handle.revealFeedback(currentQuestionIndex)}
         >
           Check Answer
         </button>
       {:else}
         <button
-          class="tessera-quiz-btn tessera-quiz-btn-primary tessera-quiz-btn-submit"
+          class="tessera-quiz-btn tessera-btn-primary tessera-quiz-btn-submit"
           disabled={!handle.canSubmit}
           onclick={handleSubmit}
         >
@@ -167,14 +167,14 @@
       </button>
       {#if reviewIndex < totalQuestions - 1}
         <button
-          class="tessera-quiz-btn tessera-quiz-btn-primary"
+          class="tessera-quiz-btn tessera-btn-primary"
           onclick={goNextReview}
         >
           Next
         </button>
       {:else}
         <button
-          class="tessera-quiz-btn tessera-quiz-btn-primary"
+          class="tessera-quiz-btn tessera-btn-primary"
           onclick={() => handle.exitReview()}
         >
           Done
@@ -207,7 +207,7 @@
         {/if}
         {#if handle.canRetry}
           <button
-            class="tessera-quiz-btn tessera-quiz-btn-primary"
+            class="tessera-quiz-btn tessera-btn-primary"
             onclick={handleRetry}
           >
             Retry Quiz
@@ -283,15 +283,6 @@
   .tessera-quiz-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-  }
-
-  .tessera-quiz-btn-primary {
-    background: var(--tessera-primary);
-    color: #fff;
-  }
-
-  .tessera-quiz-btn-primary:hover:not(:disabled) {
-    background: var(--tessera-primary-dark);
   }
 
   .tessera-quiz-btn-secondary {

@@ -97,7 +97,7 @@
       />
       {#if !handle.submitted}
         <button
-          class="tessera-fitb-check-btn"
+          class="tessera-btn-primary tessera-fitb-check-btn"
           disabled={!inputValue.trim()}
           onclick={() => { handle.submit(); }}
         >
@@ -285,22 +285,6 @@
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #fff;
-    background: var(--tessera-primary);
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    min-height: 44px;
-    transition: background 0.2s, opacity 0.2s;
-  }
-
-  .tessera-fitb-check-btn:hover:not(:disabled) {
-    background: var(--tessera-primary-dark);
-  }
-
-  .tessera-fitb-check-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
   }
 
   @media (max-width: 640px) {

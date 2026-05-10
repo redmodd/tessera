@@ -315,6 +315,27 @@
   text-align: center;
 }
 
+/* ---- Buttons ---- */
+.tessera-btn-primary {
+  background-color: var(--tessera-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 44px;
+  font-family: var(--tessera-font-family);
+  transition: background-color var(--tessera-transition-fast), opacity var(--tessera-transition-fast);
+}
+
+.tessera-btn-primary:hover:not(:disabled) {
+  background-color: var(--tessera-primary-dark);
+}
+
+.tessera-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ---- Error Page ---- */
 .tessera-error {
   text-align: center;
@@ -338,16 +359,6 @@
   padding: var(--tessera-spacing-sm) var(--tessera-spacing-lg);
   font-size: 0.875rem;
   font-weight: 600;
-  color: #ffffff;
-  background-color: var(--tessera-primary);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color var(--tessera-transition-fast);
-}
-
-.tessera-error-retry:hover {
-  background-color: var(--tessera-primary-dark);
 }
 
 /* ---- Responsive: Tablet (max-width: 1024px) ---- */

@@ -294,7 +294,7 @@
   <!-- Standalone Check button (shown once all cards are placed) -->
   {#if standalone && !handle.submitted && placements.size === items.length}
     <div class="tessera-sorting-actions">
-      <button class="tessera-sorting-check" onclick={() => handle.submit()}>
+      <button class="tessera-btn-primary tessera-sorting-check" onclick={() => handle.submit()}>
         Check Answer
       </button>
     </div>
@@ -596,20 +596,8 @@
 
   .tessera-sorting-check {
     padding: 0.625rem 1.5rem;
-    background: var(--tessera-primary);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
     font-size: 0.9375rem;
     font-weight: 500;
-    font-family: var(--tessera-font-family);
-    cursor: pointer;
-    min-height: 44px;
-    transition: background 0.2s;
-  }
-
-  .tessera-sorting-check:hover {
-    background: var(--tessera-primary-dark);
   }
 
   /* --- Mobile --- */
