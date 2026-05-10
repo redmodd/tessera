@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.0.5
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.4` so newly-created projects pick up the latest published runtime (manual completion mode and the SCORM/cmi5 adapter fixes).
+
 ## 0.0.4
 
 ### Patch Changes

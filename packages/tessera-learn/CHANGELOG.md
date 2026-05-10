@@ -1,5 +1,13 @@
 # tessera-learn
 
+## 0.0.4
+
+### Patch Changes
+
+- **Manual completion** — new `completion.mode: "manual"` lets authors own the moment of completion, either by declaring `pageConfig.completesOn: "view"` on a page or by calling `useCompletion().markComplete()` from any component. First-to-fire wins; the latch is monotonic and persists across resume. Optional `completion.trigger: "page"` opts into a build-time satisfiability check; `requireSuccessStatus: "passed" | "failed"` ties success status to the manual mark for compliance "acknowledge" flows. Behavior is identical across SCORM 1.2 / 2004 4th / cmi5 / web — no adapter changes.
+
+  **SCORM suspend overflow / cmi5 mastery + moveOn** — SCORM adapters now warn when serialized `cmi.suspend_data` exceeds the spec cap (1.2: 4096; 2004: 64000) instead of silently truncating on the LMS side. cmi5 honors LMS-supplied `masteryScore` from the launch contract (overrides `scoring.passingScore` for the session) and respects the `moveOn` criterion when emitting Completed/Passed/Failed.
+
 ## 0.0.3
 
 ### Patch Changes
