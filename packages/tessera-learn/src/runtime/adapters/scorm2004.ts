@@ -18,6 +18,8 @@ export interface SCORM2004API {
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   sessionTimeKey: 'cmi.session_time',
   formatDuration: formatISO8601Duration,
+  suspendDataLimit: 64000,
+  suspendDataLimitLabel: 'SCORM 2004 4E cmi.suspend_data 64000-char',
   interactionFields: {
     responseField: 'learner_response',
     timestampField: 'timestamp',

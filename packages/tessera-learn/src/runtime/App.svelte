@@ -360,6 +360,18 @@
       pageLoading = false;
       return;
     }
+
+    // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
+    // threshold for this launch and overrides the manifest. Mutate the
+    // imported config object once before any UI reads it so every
+    // downstream consumer (recalculateSuccess, navigation gating, Quiz
+    // page context) sees the same effective value.
+    const lmsMastery = adapter.getMasteryScore?.();
+    if (typeof lmsMastery === 'number') {
+      config.scoring.passingScore = lmsMastery * 100;
+      pageContext.passingScore = lmsMastery * 100;
+    }
+
     const saved = adapter.getState();
     if (saved) {
       restoreState(saved);

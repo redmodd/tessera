@@ -17,9 +17,28 @@ const VERBS = {
   failed: 'http://adlnet.gov/expapi/verbs/failed',
   suspended: 'http://adlnet.gov/expapi/verbs/suspended',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
+  satisfied: 'https://w3id.org/xapi/adl/verbs/satisfied',
 } as const;
 
 const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interaction';
+
+const CMI5_MASTERYSCORE_EXT =
+  'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
+
+export type CMI5MoveOn =
+  | 'Passed'
+  | 'Completed'
+  | 'CompletedAndPassed'
+  | 'CompletedOrPassed'
+  | 'NotApplicable';
+
+const VALID_MOVE_ON: ReadonlySet<CMI5MoveOn> = new Set([
+  'Passed',
+  'Completed',
+  'CompletedAndPassed',
+  'CompletedOrPassed',
+  'NotApplicable',
+]);
 
 /**
  * CMI5 persistence adapter using xAPI.
@@ -50,7 +69,15 @@ export class CMI5Adapter implements PersistenceAdapter {
   #completedSent = false;
   #completionStatus: 'incomplete' | 'complete' = 'incomplete';
   #successSent = false;
+  #passed = false;
   #terminated = false;
+
+  // cmi5 §8 launch params. masteryScore (when present) overrides the
+  // course's manifest passingScore for this launch — the LMS is the
+  // authority. moveOn drives the optional Satisfied statement (§9.5.3).
+  #masteryScore: number | null = null;
+  #moveOn: CMI5MoveOn = 'NotApplicable';
+  #satisfiedSent = false;
 
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
@@ -62,6 +89,29 @@ export class CMI5Adapter implements PersistenceAdapter {
     // string makes LRSes 400. Omit when the LMS didn't provide one.
     this.#registration = reg ? reg : undefined;
     this.#activityId = params.get('activityId') || '';
+
+    const rawMastery = params.get('masteryScore');
+    if (rawMastery !== null && rawMastery !== '') {
+      const m = Number(rawMastery);
+      if (Number.isFinite(m) && m >= 0 && m <= 1) {
+        this.#masteryScore = m;
+      } else {
+        console.warn(
+          `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`
+        );
+      }
+    }
+
+    const rawMoveOn = params.get('moveOn');
+    if (rawMoveOn !== null && rawMoveOn !== '') {
+      if (VALID_MOVE_ON.has(rawMoveOn as CMI5MoveOn)) {
+        this.#moveOn = rawMoveOn as CMI5MoveOn;
+      } else {
+        console.warn(
+          `Tessera cmi5: launch parameter 'moveOn' is not a recognized value (got "${rawMoveOn}"); defaulting to NotApplicable.`
+        );
+      }
+    }
 
     // Malformed actor JSON is a launch-time failure: an empty {} actor
     // would fail every Identified-Agent check downstream and produce
@@ -156,6 +206,21 @@ export class CMI5Adapter implements PersistenceAdapter {
     return this.#publisher;
   }
 
+  /**
+   * LMS-supplied masteryScore from the cmi5 launch URL (a decimal in
+   * [0, 1]), or null when omitted. When present, the runtime should treat
+   * it as the authoritative pass threshold for this session, overriding
+   * `course.config.js scoring.passingScore`.
+   */
+  getMasteryScore(): number | null {
+    return this.#masteryScore;
+  }
+
+  /** LMS-supplied moveOn criterion (defaults to "NotApplicable"). */
+  getMoveOn(): CMI5MoveOn {
+    return this.#moveOn;
+  }
+
   getState(): SavedState | null {
     return this.#state;
   }
@@ -197,15 +262,18 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
         result,
+        context: this.#masteryContext(),
       })
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Completed statement', err);
       });
+    this.#maybeSendSatisfied();
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
     if (status === 'unknown' || this.#successSent || !this.#publisher) return;
     this.#successSent = true;
+    this.#passed = status === 'passed';
 
     const verb = status === 'passed' ? VERBS.passed : VERBS.failed;
     const verbName = status === 'passed' ? 'passed' : 'failed';
@@ -220,10 +288,12 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: verb, display: { 'en-US': verbName } },
         result,
+        context: this.#masteryContext(),
       })
       .catch((err) => {
         console.warn(`Tessera cmi5: failed to send ${verbName} statement`, err);
       });
+    this.#maybeSendSatisfied();
   }
 
   setDuration(seconds: number): void {
@@ -304,6 +374,56 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   // ---- Private helpers ----
+
+  /**
+   * Build a context object carrying the cmi5 masteryscore extension when
+   * the LMS provided one. Returns undefined otherwise so the publisher
+   * doesn't add an empty `context.extensions` block.
+   */
+  #masteryContext(): Record<string, unknown> | undefined {
+    if (this.#masteryScore === null) return undefined;
+    return {
+      extensions: { [CMI5_MASTERYSCORE_EXT]: this.#masteryScore },
+    };
+  }
+
+  /**
+   * cmi5 §9.5.3: when the moveOn criterion has been met, the AU MAY send
+   * a Satisfied statement so LMSes that don't compute moveOn themselves
+   * still see satisfaction. NotApplicable disables emission entirely.
+   */
+  #maybeSendSatisfied(): void {
+    if (this.#satisfiedSent || !this.#publisher) return;
+    if (this.#moveOn === 'NotApplicable') return;
+
+    let satisfied = false;
+    switch (this.#moveOn) {
+      case 'Passed':
+        satisfied = this.#passed;
+        break;
+      case 'Completed':
+        satisfied = this.#completedSent;
+        break;
+      case 'CompletedAndPassed':
+        satisfied = this.#completedSent && this.#passed;
+        break;
+      case 'CompletedOrPassed':
+        satisfied = this.#completedSent || this.#passed;
+        break;
+    }
+    if (!satisfied) return;
+
+    this.#satisfiedSent = true;
+    this.#publisher
+      .sendStatement({
+        verb: { id: VERBS.satisfied, display: { 'en-US': 'satisfied' } },
+        result: { duration: formatISO8601Duration(this.#durationSeconds) },
+        context: this.#masteryContext(),
+      })
+      .catch((err) => {
+        console.warn('Tessera cmi5: failed to send Satisfied statement', err);
+      });
+  }
 
   #buildStateUrl(): string {
     const agentJson = JSON.stringify(this.#actor);

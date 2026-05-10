@@ -19,6 +19,8 @@ export interface SCORM12API {
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   sessionTimeKey: 'cmi.core.session_time',
   formatDuration: formatHHMMSS,
+  suspendDataLimit: 4096,
+  suspendDataLimitLabel: 'SCORM 1.2 cmi.suspend_data 4096-char',
   interactionFields: {
     responseField: 'student_response',
     timestampField: 'time',

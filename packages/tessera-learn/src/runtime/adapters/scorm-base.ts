@@ -9,6 +9,16 @@ export interface ScormDialect<TApi> {
   sessionTimeKey: string;
   /** Format `seconds` for the session-time field — HHMMSS for 1.2, ISO8601 for 2004. */
   formatDuration(seconds: number): string;
+  /**
+   * Per-spec maximum byte length for `cmi.suspend_data` (SCORM 1.2 RTE
+   * §3.4.5.2 = 4096; SCORM 2004 4E §4.2 = 64000). Used by `saveState` to
+   * warn once when the serialized payload would be silently truncated by
+   * the LMS. Treated as "characters" since SCORM data-model lengths are
+   * specified in characters and Tessera stores ASCII-safe JSON.
+   */
+  suspendDataLimit: number;
+  /** Human label for the limit warning, e.g. "SCORM 1.2 (4096 chars)". */
+  suspendDataLimitLabel: string;
   /** Per-interaction-row field config passed to `buildScormInteractionFields`. */
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
@@ -34,6 +44,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   protected readonly queue = new WriteQueue();
   #state: SavedState | null = null;
   #terminated = false;
+  #suspendOverflowWarned = false;
   protected interactionCount = 0;
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
@@ -84,6 +95,19 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   saveState(state: SavedState): void {
     this.#state = state;
     const json = JSON.stringify(state);
+    if (
+      !this.#suspendOverflowWarned &&
+      json.length > this.dialect.suspendDataLimit
+    ) {
+      this.#suspendOverflowWarned = true;
+      console.warn(
+        `Tessera: cmi.suspend_data is ${json.length} chars, over the ` +
+          `${this.dialect.suspendDataLimitLabel} limit. The LMS will likely ` +
+          `truncate it and the next resume will lose state. Reduce ` +
+          `usePersistence() payloads or switch export.standard to a ` +
+          `larger-limit standard (scorm2004/cmi5).`
+      );
+    }
     this.queue.enqueue(() =>
       this.dialect.setValue(this.api, 'cmi.suspend_data', json)
     );

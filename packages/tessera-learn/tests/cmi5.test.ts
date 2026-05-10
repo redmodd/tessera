@@ -361,6 +361,239 @@ describe('CMI5Adapter', () => {
     expect(statementCalls.length).toBe(1);
   });
 
+  describe('LMS launch params: masteryScore + moveOn (cmi5 §8, §9.5.3)', () => {
+    it('parses masteryScore and exposes it via getMasteryScore()', async () => {
+      setSearchParams({ ...baseLaunchParams, masteryScore: '0.8' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBe(0.8);
+    });
+
+    it('returns null when no masteryScore is present', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+    });
+
+    it('rejects masteryScore outside [0, 1] and warns', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setSearchParams({ ...baseLaunchParams, masteryScore: '1.5' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+      expect(warn.mock.calls.some((c: any[]) =>
+        String(c[0]).includes("masteryScore")
+      )).toBe(true);
+      warn.mockRestore();
+    });
+
+    it('parses moveOn and defaults to NotApplicable', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedAndPassed' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMoveOn()).toBe('CompletedAndPassed');
+    });
+
+    it('falls back to NotApplicable for unrecognized moveOn value', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setSearchParams({ ...baseLaunchParams, moveOn: 'WhateverElse' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMoveOn()).toBe('NotApplicable');
+      warn.mockRestore();
+    });
+
+    it('attaches masteryscore extension to Completed when launch supplied it', async () => {
+      setSearchParams({ ...baseLaunchParams, masteryScore: '0.7' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(85);
+      adapter.setDuration(60);
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const completed = mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed');
+      expect(completed).toBeDefined();
+      expect(
+        completed.context.extensions[
+          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
+        ]
+      ).toBe(0.7);
+    });
+
+    it('attaches masteryscore extension to Passed and Failed', async () => {
+      setSearchParams({ ...baseLaunchParams, masteryScore: '0.6' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(40);
+      adapter.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const failed = mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/failed');
+      expect(
+        failed.context.extensions[
+          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
+        ]
+      ).toBe(0.6);
+    });
+
+    it('omits the extension entirely when masteryScore is absent', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(85);
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const completed = mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed');
+      const ext = completed?.context?.extensions ?? {};
+      expect(
+        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore']
+      ).toBeUndefined();
+    });
+
+    it('does not send Satisfied when moveOn is NotApplicable (default)', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(95);
+      adapter.setSuccessStatus('passed');
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+    });
+
+    it('emits Satisfied once when moveOn=Passed and learner passes', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'Passed', masteryScore: '0.7' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(90);
+      adapter.setDuration(120);
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const satisfied = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; }})
+        .filter((b: any) => b?.verb?.id === 'https://w3id.org/xapi/adl/verbs/satisfied');
+      expect(satisfied).toHaveLength(1);
+      expect(satisfied[0].result.duration).toBe('PT2M');
+      expect(
+        satisfied[0].context.extensions[
+          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
+        ]
+      ).toBe(0.7);
+    });
+
+    it('does not emit Satisfied when moveOn=Passed and learner fails', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'Passed' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+    });
+
+    it('emits Satisfied for moveOn=Completed when course completes', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'Completed' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+
+      const verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      expect(verbs).toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+    });
+
+    it('moveOn=CompletedAndPassed waits for both before emitting Satisfied', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedAndPassed' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 30));
+      let verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+
+      adapter.setScore(80);
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 30));
+      verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      const count = verbs.filter((v: any) => v === 'https://w3id.org/xapi/adl/verbs/satisfied').length;
+      expect(count).toBe(1);
+    });
+
+    it('moveOn=CompletedOrPassed emits on whichever happens first', async () => {
+      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedOrPassed' });
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 30));
+      let verbs = mockFetch.mock.calls
+        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+      const count = verbs.filter((v: any) => v === 'https://w3id.org/xapi/adl/verbs/satisfied').length;
+      expect(count).toBe(1);
+    });
+  });
+
   describe('reportInteraction', () => {
     async function initAndReport(
       questionId: string,

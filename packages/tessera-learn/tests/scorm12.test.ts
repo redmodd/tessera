@@ -83,6 +83,48 @@ describe('SCORM12Adapter', () => {
     );
   });
 
+  describe('suspend_data size guard', () => {
+    it('warns once when serialized state exceeds 4096 chars', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      const big = { padding: 'x'.repeat(4200) };
+      const state: SavedState = { b: 0, v: [], q: {}, d: 0, u: { big } };
+      adapter.saveState(state);
+      adapter.saveState(state);
+      await flush();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(/SCORM 1\.2 cmi\.suspend_data 4096/);
+      warn.mockRestore();
+    });
+
+    it('does not warn for state under the limit', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      adapter.saveState({ b: 0, v: [0], q: {}, d: 0 });
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('still writes the oversize value to the LMS', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      const state: SavedState = {
+        b: 0,
+        v: [],
+        q: {},
+        d: 0,
+        u: { big: 'y'.repeat(4200) },
+      };
+      adapter.saveState(state);
+      await flush();
+      expect(api.LMSSetValue).toHaveBeenCalledWith(
+        'cmi.suspend_data',
+        JSON.stringify(state)
+      );
+    });
+  });
+
   it('sets score with raw, min, max via queue', async () => {
     adapter.setScore(85);
     await flush();

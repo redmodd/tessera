@@ -83,6 +83,41 @@ describe('SCORM2004Adapter', () => {
     );
   });
 
+  describe('suspend_data size guard', () => {
+    it('warns once when serialized state exceeds 64000 chars', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      const state: SavedState = {
+        b: 0,
+        v: [],
+        q: {},
+        d: 0,
+        u: { big: 'x'.repeat(64100) },
+      };
+      adapter.saveState(state);
+      adapter.saveState(state);
+      await flush();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(/SCORM 2004 4E cmi\.suspend_data 64000/);
+      warn.mockRestore();
+    });
+
+    it('does not warn at the SCORM 1.2 threshold (would warn under 1.2)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      adapter.saveState({
+        b: 0,
+        v: [],
+        q: {},
+        d: 0,
+        u: { big: 'y'.repeat(5000) },
+      });
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
   it('sets score with raw, min, max, and scaled via queue', async () => {
     adapter.setScore(85);
     await flush();
