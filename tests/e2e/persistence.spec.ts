@@ -110,7 +110,7 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const primaryBtn = page.locator('.tessera-quiz-nav .tessera-quiz-btn-primary');
+    const primaryBtn = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     const progress = page.locator('.tessera-quiz-progress-desktop').first();
 
     // Q1: "2 + 2" → option index 1 ("4")

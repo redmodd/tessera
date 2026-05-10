@@ -16,7 +16,7 @@ async function navigateToPage(page: Page, pageTitle: string) {
 }
 
 const primaryBtn = (page: Page) =>
-  page.locator('.tessera-quiz-nav .tessera-quiz-btn-primary');
+  page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
 async function answerMultipleChoice(page: Page, optionIndex: number) {
   const radios = page.locator('.tessera-quiz-question-wrapper.active .tessera-mc-option');

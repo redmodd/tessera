@@ -164,7 +164,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
-    const primary = page.locator('.tessera-quiz-nav .tessera-quiz-btn-primary');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click(); // immediate feedback
     await page.waitForTimeout(300);
     await primary.click(); // continue
@@ -316,7 +316,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
-    const primary = page.locator('.tessera-quiz-nav .tessera-quiz-btn-primary');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
     await page.waitForTimeout(300);
     await primary.click();
@@ -523,7 +523,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
-    const primary = page.locator('.tessera-quiz-nav .tessera-quiz-btn-primary');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
     await page.waitForTimeout(300);
     await primary.click();
