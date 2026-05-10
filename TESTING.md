@@ -25,8 +25,6 @@ tests/
   e2e/                   # Playwright specs across all export modes
   fixtures/              # course projects used by the e2e suite (committed)
   .e2e-variants/         # generated per run by globalSetup; gitignored
-test-projects/
-  custom-layout/         # standalone fixture for layout-override tests
 ```
 
 ## Running tests
@@ -88,7 +86,7 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Se
 | ---------------- | ----- | ------------------------------- | ------------------------------- |
 | `free-mode`      | 5180  | `tests/fixtures/free`           | most non-mode-specific specs    |
 | `sequential-mode`| 5181  | `tests/fixtures/sequential`     | `sequential.spec.ts`            |
-| `custom-layout`  | 5182  | `test-projects/custom-layout`   | `layout-override.spec.ts`       |
+| `custom-layout`  | 5182  | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`       |
 | `custom-quiz`    | 5183  | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`           |
 | `mobile`         | 5180  | `tests/fixtures/free` (375x667) | `mobile.spec.ts`                |
 | `export`         | n/a   | pre-built variants              | `export.spec.ts`                |

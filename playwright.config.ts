@@ -93,7 +93,7 @@ export default defineConfig({
       timeout: 20000,
     },
     {
-      command: 'cd test-projects/custom-layout && pnpm dev --port 5182',
+      command: 'cd tests/fixtures/custom-layout && pnpm dev --port 5182',
       port: 5182,
       reuseExistingServer: !process.env.CI,
       timeout: 20000,

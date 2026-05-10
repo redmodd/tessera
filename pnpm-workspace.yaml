@@ -1,6 +1,5 @@
 packages:
   - 'packages/*'
-  - 'test-projects/*'
   - 'tests/fixtures/*'
 onlyBuiltDependencies:
   - esbuild

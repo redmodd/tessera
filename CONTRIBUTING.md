@@ -30,8 +30,6 @@ packages/
 tests/
   e2e/               # Playwright specs
   fixtures/          # Course projects used by e2e (committed)
-test-projects/
-  custom-layout/     # Standalone fixture for layout-override tests
 AGENTS.md            # Course authoring guide
 ```
 
