@@ -1,5 +1,11 @@
 # tessera-learn
 
+## 0.0.3
+
+### Patch Changes
+
+- Ship the MIT `LICENSE` file inside the package tarball. Previous versions declared `"license": "MIT"` in `package.json` but did not include the license text, which is required by the MIT terms and expected by license-auditing tools.
+
 ## 0.0.2
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.0.4
+
+### Patch Changes
+
+- Ship the MIT `LICENSE` file inside the package tarball. Previous versions declared `"license": "MIT"` in `package.json` but did not include the license text, which is required by the MIT terms and expected by license-auditing tools.
+- Bump the scaffolded `tessera-learn` pin to `^0.0.3` so newly-created projects pick up the latest published runtime.
+
 ## 0.0.3
 
 ### Patch Changes
