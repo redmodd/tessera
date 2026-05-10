@@ -161,6 +161,13 @@
     placeCard(targetIdx);
   }
 
+  function onTargetKeydown(e, targetIdx) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onTargetClick(targetIdx);
+    }
+  }
+
 </script>
 
 {#snippet sortingContent()}
@@ -212,12 +219,15 @@
         class="tessera-sorting-target"
         class:drag-over={dragOver === targetIdx}
         class:clickable={cardSelected && !isDisabled}
-        role="group"
-        aria-label="Target: {targetLabel}"
+        role="button"
+        tabindex="0"
+        aria-disabled={!(cardSelected && !isDisabled)}
+        aria-label="Target: {targetLabel}{cardSelected && !isDisabled ? ` (activate to place ${items[currentItemIdx]})` : ''}"
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
         onclick={() => onTargetClick(targetIdx)}
+        onkeydown={(e) => onTargetKeydown(e, targetIdx)}
       >
         <div class="tessera-sorting-target-label">{targetLabel}</div>
         {#if targetItems.length > 0}
