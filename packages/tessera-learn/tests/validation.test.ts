@@ -138,7 +138,7 @@ describe('config validation', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.mode" must be "quiz" or "percentage", got "everything"')
+      expect.stringContaining('"completion.mode" must be "quiz", "percentage", or "manual", got "everything"')
     );
   });
 

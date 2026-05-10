@@ -104,8 +104,16 @@
       pageLoading = false;
       // Mark visited and recalculate
       progress.markVisited(index);
-      progress.recalculateCompletion(manifest, config);
-      progress.recalculateSuccess(manifest, config);
+      if (
+        manifest.pages[index].completesOn === 'view' &&
+        config.completion.mode === 'manual'
+      ) {
+        progress.markCompleteManually();
+        progress.recalculateSuccess(manifest, config);
+      } else {
+        progress.recalculateCompletion(manifest, config);
+        progress.recalculateSuccess(manifest, config);
+      }
     }).catch(err => {
       if (gen !== loadGeneration) return; // stale
       console.error(`Tessera: Failed to load page ${index}`, err);
@@ -211,6 +219,7 @@
       s,
       gs: [...progress.gradedStandalonePages],
       u: { ...userState },
+      ...(progress.manuallyCompleted ? { m: 1 } : {}),
     };
   }
 
@@ -246,6 +255,10 @@
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
+    // Must come before recalc so manual-mode branches see the latch.
+    if (saved.m === 1) {
+      progress.markCompleteManually();
+    }
     // Recalculate derived state
     progress.recalculateCompletion(manifest, config);
     progress.recalculateSuccess(manifest, config);
@@ -303,7 +316,10 @@
 
     untrack(() => {
       adapter.setScore(Math.round(average));
-      adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
+      // Under manual mode, success is owned by requireSuccessStatus.
+      if (config.completion.mode !== 'manual') {
+        adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
+      }
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });
@@ -324,6 +340,7 @@
 
   // ---- Exit / Terminate lifecycle ----
   let terminated = false;
+  let manualWatchdog = null;
 
   function handleExit() {
     if (terminated) return;
@@ -402,6 +419,27 @@
     window.addEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
     appEl?.addEventListener('tessera-quiz-complete', handleQuizComplete);
+
+    // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
+    // trigger check — catches the hook never being called or no completesOn
+    // page being reachable.
+    if (
+      import.meta.env?.DEV &&
+      config.completion.mode === 'manual' &&
+      config.completion.trigger === undefined &&
+      progress.completionStatus === 'incomplete'
+    ) {
+      manualWatchdog = window.setTimeout(() => {
+        if (progress.completionStatus === 'incomplete') {
+          console.warn(
+            '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
+              'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
+              '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
+              'in course.config.js to fail the build instead of waiting at runtime.'
+          );
+        }
+      }, 60_000);
+    }
   });
 
   onDestroy(() => {
@@ -409,6 +447,10 @@
     window.removeEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
     appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
+    if (manualWatchdog !== null) {
+      clearTimeout(manualWatchdog);
+      manualWatchdog = null;
+    }
     // Clear the global slot so a stale client from a previous mount
     // can't leak into a fresh one (matters for tests that re-mount).
     registerXAPIClient(null);

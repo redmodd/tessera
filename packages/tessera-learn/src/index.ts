@@ -8,6 +8,7 @@ export {
   useQuiz,
   useNavigation,
   useProgress,
+  useCompletion,
   usePersistence,
 } from './runtime/hooks.svelte.js';
 

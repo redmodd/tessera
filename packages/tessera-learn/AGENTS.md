@@ -404,6 +404,95 @@ Standalone questions are not graded by default. To grade one (e.g., a required r
 
 ---
 
+## Manual completion
+
+`completion.mode: "manual"` is for courses where the author — not a quiz score or a page-visit ratio — owns the moment of completion. Two examples:
+
+- A short policy briefing where reading the final page **is** the proof of completion.
+- A compliance "click to acknowledge" button at the end of a module.
+
+Under manual mode, **both** triggers below are always active. First-to-fire wins; subsequent calls are idempotent.
+
+### Trigger A: page frontmatter
+
+Declare `completesOn: "view"` on any page. Completion fires the moment that page renders.
+
+```svelte
+<!-- pages/05-summary/finale.svelte -->
+<script module>
+  export const pageConfig = {
+    title: "You're done",
+    completesOn: "view",
+  };
+</script>
+
+<h1>Thanks for completing the briefing.</h1>
+```
+
+`completesOn` accepts the literal string `"view"` (only value in v1). The page is marked visited and completion fires in the same effect — the LMS sees one `setCompletionStatus("complete")` immediately after the page renders.
+
+### Trigger B: runtime hook
+
+```svelte
+<script>
+  import { useCompletion } from 'tessera-learn';
+
+  const { markComplete, completionStatus } = useCompletion();
+</script>
+
+<button
+  onclick={() => markComplete()}
+  disabled={completionStatus === 'complete'}
+>
+  I acknowledge
+</button>
+
+{#if completionStatus === 'complete'}
+  <p>Recorded. You may now close this window.</p>
+{/if}
+```
+
+Composes cleanly with custom widgets, modal close handlers, video-ended events, timer expirations, etc. Calling `markComplete()` outside `completion.mode: "manual"` is a no-op with a one-shot dev warning per session — safe to leave in shared components.
+
+### `completion.trigger` (build-time check)
+
+Optional. Set to `"page"` to fail the build when no page declares `completesOn: "view"`. Useful when the page-view path is load-bearing and a typo should fail the build, not the launch. Both triggers still work either way; the field only adds a static check.
+
+```js
+completion: { mode: "manual", trigger: "page" }
+```
+
+When omitted, the dev runtime warns once after 60 s if completion has not fired — a safety net that covers both "no `completesOn` page exists" and "the hook is never called" cases.
+
+### Success status
+
+By default `successStatus` stays `"unknown"` under manual — the LMS sees completion without a pass/fail verdict. If you want completion **and** an automatic pass (typical for "acknowledge" flows):
+
+```js
+completion: { mode: "manual", requireSuccessStatus: "passed" }  // or "failed"
+```
+
+| Adapter        | What the LMS sees on `markComplete()` (no `requireSuccessStatus`)  |
+| -------------- | ------------------------------------------------------------------ |
+| SCORM 1.2      | `cmi.core.lesson_status = "completed"`                             |
+| SCORM 2004 4th | `cmi.completion_status = "completed"`, `cmi.success_status = "unknown"` |
+| cmi5           | **Completed** statement (no Passed / Failed)                       |
+| web            | `localStorage` only                                                |
+
+With `requireSuccessStatus: "passed"`, SCORM 1.2 writes `lesson_status = "passed"`, SCORM 2004 writes `success_status = "passed"`, and cmi5 emits a **Passed** statement alongside **Completed**.
+
+### Quizzes under manual mode
+
+A graded quiz under `mode: "manual"` reports its score to the LMS gradebook but does **not** drive completion or success — `markComplete()` / `completesOn` does. The build emits a warning to make this explicit. Set `graded: false` (or remove the quiz) if that's not what you want.
+
+### Non-goals
+
+- Combining manual + quiz/percentage rules ("complete when X **and** quiz passed"). Use a `useCompletion()` call inside a custom `$effect` if you need conditional logic.
+- Per-learner conditional completion expressed in config — same answer: do it in a component with `useCompletion()`.
+- Marking a course **incomplete** after it has been completed. Completion is monotonic in every spec we target. The runtime ignores re-marks.
+
+---
+
 ## Assets
 
 Drop files into `assets/`. Reference them with `$assets/` in component props:
@@ -486,12 +575,14 @@ export default {
   },
 
   completion: {
-    mode: "percentage",             // "percentage" or "quiz"
+    mode: "percentage",             // "percentage" | "quiz" | "manual"
     percentageThreshold: 100,       // 0–100 (percentage mode)
+    // trigger: "page",              // (manual only) opt into build-time check
+    // requireSuccessStatus: "passed", // (manual only) "passed" | "failed"
   },
 
   scoring: {
-    passingScore: 70,
+    passingScore: 70,               // optional under "manual" (defaults to 0)
   },
 
   export: {
@@ -504,6 +595,7 @@ export default {
 - `navigation.mode: "sequential"` → pages unlock one at a time as each is completed.
 - `completion.mode: "percentage"` → course completes when `visitedPages / totalPages * 100 >= percentageThreshold`.
 - `completion.mode: "quiz"` → course completes when graded quiz average >= `scoring.passingScore`.
+- `completion.mode: "manual"` → course completes when an author-declared trigger fires: a page declares `pageConfig.completesOn: "view"`, or any component calls `useCompletion().markComplete()`. First-to-fire wins. `scoring.passingScore` is optional (defaults to 0). See [Manual completion](#manual-completion).
 
 ### Minimum config
 
@@ -704,6 +796,18 @@ function useProgress(): {
 };
 ```
 
+### `useCompletion`
+
+Trigger course completion from any component, and reactively read the current completion status. Active under `completion.mode: "manual"`; in any other mode `markComplete()` is a no-op with a one-shot dev warning. See [Manual completion](#manual-completion).
+
+```ts
+function useCompletion(): {
+  /** Idempotent — only the first call per session has an effect. */
+  markComplete(): void;
+  readonly completionStatus: 'incomplete' | 'complete';
+};
+```
+
 ### `usePersistence<T>(key)`
 
 Per-widget persistent state. Survives reload on every adapter: `localStorage` for web, SCORM `cmi.suspend_data` for SCORM 1.2/2004, xAPI State API for cmi5. Reads sync; writes batched by the adapter. JSON-serializable values only.
@@ -882,6 +986,7 @@ The runtime translates author intent (page visits, quiz scores, completion, pers
 | State persisted (page visited, bookmark moved, chunk revealed, `usePersistence` write, etc.) | `LMSSetValue("cmi.suspend_data", json)` (microtask-coalesced) | `SetValue("cmi.suspend_data", json)` (microtask-coalesced) | State API `PUT` `tessera-state` document, chained on the publisher queue |
 | Graded quiz scored | `LMSSetValue("cmi.core.score.raw"\|"min"\|"max", …)` then `LMSSetValue("cmi.core.lesson_status", "passed"\|"failed")` | `SetValue("cmi.score.raw"\|"min"\|"max"\|"scaled", …)` then `SetValue("cmi.success_status", "passed"\|"failed")` | **Passed** or **Failed** statement, with `result.score.scaled` and `result.duration` (one-shot per session) |
 | Course completion changes | Funneled into `cmi.core.lesson_status` (only one field exists) | `SetValue("cmi.completion_status", "completed"\|"incomplete")` | **Completed** statement with `result.completion = true`, `result.duration`, `result.score?` (one-shot per session) |
+| Author marks complete (`completion.mode: "manual"`) | `cmi.core.lesson_status = "completed"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | `cmi.completion_status = "completed"`; `cmi.success_status = "unknown"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | **Completed** statement; **Passed**/**Failed** if `requireSuccessStatus` set |
 | Question answered (graded or standalone, inside or outside a quiz) | `cmi.interactions.{n}.id` / `student_response` / `result` / `time` / `type` (n continues from prior `_count`) | `cmi.interactions.{n}.id` / `learner_response` / `result` / `timestamp` / `type` (n continues from prior `_count`) | **Answered** statement; object `${activityId}#${questionId}`, definition `cmi.interaction` + `interactionType`, `result.response`, `result.success` |
 | Resume after reload | Read `cmi.suspend_data` on init; manifest is rebuilt from code, not LMS | Read `cmi.suspend_data` on init | State API `GET` `tessera-state`; lifecycle replays from where the prior session left off |
 | Author exit / unload | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously) | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously) | If course not yet **Completed**, send **Suspended**; then **Terminated** (always last on the wire, cmi5 §9.3.6) |

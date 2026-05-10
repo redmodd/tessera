@@ -24,6 +24,21 @@ export class ProgressState {
   completionStatus = $state<'incomplete' | 'complete'>('incomplete');
   successStatus = $state<'unknown' | 'passed' | 'failed'>('unknown');
 
+  // Latch for manual completion. Monotonic; recalc methods bail when set.
+  #manuallyCompleted = $state(false);
+
+  get manuallyCompleted(): boolean {
+    return this.#manuallyCompleted;
+  }
+
+  /** Idempotent — only the first call per session has an effect. */
+  markCompleteManually(): void {
+    if (this.#manuallyCompleted) return;
+    this.#manuallyCompleted = true;
+    this.completionStatus = 'complete';
+    this.version++;
+  }
+
   /**
    * Monotonic counter incremented on every persistable state mutation
    * (visited/scores/chunks/standalone). Callers that need to react to *any*
@@ -100,6 +115,8 @@ export class ProgressState {
   }
 
   recalculateCompletion(manifest: Manifest, config: CourseConfig) {
+    if (this.#manuallyCompleted) return;
+    if (config.completion.mode === 'manual') return;
     if (config.completion.mode === 'percentage') {
       const threshold = config.completion.percentageThreshold ?? 100;
       const percent = manifest.totalPages > 0
@@ -118,6 +135,14 @@ export class ProgressState {
   }
 
   recalculateSuccess(manifest: Manifest, config: CourseConfig) {
+    if (config.completion.mode === 'manual') {
+      const want = config.completion.requireSuccessStatus;
+      // Stay 'unknown' until manual mark fires, so a learner who never
+      // finishes isn't reported as passed.
+      this.successStatus = this.#manuallyCompleted && want !== undefined ? want : 'unknown';
+      return;
+    }
+
     const { indices, attempted } = this.#gradedPages(manifest);
 
     if (indices.length === 0) {

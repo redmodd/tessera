@@ -32,8 +32,10 @@ const KNOWN_CONFIG_FIELDS = new Set([
 ]);
 
 const VALID_NAV_MODES = ['free', 'sequential'];
-const VALID_COMPLETION_MODES = ['quiz', 'percentage'];
+const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
+const VALID_MANUAL_TRIGGERS = ['page'];
+const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 
 // ---------- Main ----------
 
@@ -75,7 +77,12 @@ export function validateProject(projectRoot: string): ValidationResult {
 interface ParsedConfig {
   title?: string;
   navigation?: { mode?: string };
-  completion?: { mode?: string; percentageThreshold?: number };
+  completion?: {
+    mode?: string;
+    percentageThreshold?: number;
+    trigger?: string;
+    requireSuccessStatus?: string;
+  };
   scoring?: { passingScore?: number };
   export?: { standard?: string };
   [key: string]: unknown;
@@ -126,7 +133,31 @@ function parseConfig(
   if (config.completion?.mode !== undefined) {
     if (!VALID_COMPLETION_MODES.includes(config.completion.mode)) {
       errors.push(
-        `course.config.js: "completion.mode" must be "quiz" or "percentage", got "${config.completion.mode}"`
+        `course.config.js: "completion.mode" must be "quiz", "percentage", or "manual", got "${config.completion.mode}"`
+      );
+    }
+  }
+
+  if (config.completion?.trigger !== undefined) {
+    if (config.completion.mode !== 'manual') {
+      warnings.push(
+        `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`
+      );
+    } else if (!VALID_MANUAL_TRIGGERS.includes(config.completion.trigger)) {
+      errors.push(
+        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`
+      );
+    }
+  }
+
+  if (config.completion?.requireSuccessStatus !== undefined) {
+    if (config.completion.mode !== 'manual') {
+      warnings.push(
+        `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`
+      );
+    } else if (!VALID_REQUIRE_SUCCESS_STATUS.includes(config.completion.requireSuccessStatus)) {
+      errors.push(
+        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`
       );
     }
   }
@@ -452,10 +483,19 @@ function validateSingleXAPIEntry(
 
 // ---------- Pages Validation ----------
 
+interface PageInfo {
+  fileRel: string;
+  navIndex: number;
+  hasGradedQuiz: boolean;
+  hasQuiz: boolean;
+  completesOnView: boolean;
+}
+
 interface PagesValidationResult extends ValidationResult {
   totalPages: number;
   totalQuizzes: number;
   hasGradedQuiz: boolean;
+  pages: PageInfo[];
 }
 
 function validatePages(
@@ -465,6 +505,7 @@ function validatePages(
 ): PagesValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const pages: PageInfo[] = [];
   let totalPages = 0;
   let totalQuizzes = 0;
   let hasGradedQuiz = false;
@@ -475,7 +516,7 @@ function validatePages(
     errors.push(
       'No pages found. Create at least one section with a lesson and page in pages/'
     );
-    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false };
+    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false, pages };
   }
 
   const topLevelEntries = readdirSync(pagesDir);
@@ -503,7 +544,7 @@ function validatePages(
     errors.push(
       'No pages found. Create at least one section with a lesson and page in pages/'
     );
-    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false };
+    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false, pages };
   }
 
   for (const sectionName of sectionDirs) {
@@ -545,15 +586,27 @@ function validatePages(
       const content = readSourceFileCached(filePath);
 
       const pageConfig = validatePageConfig(content, fileRel, errors);
+      const navIndex = totalPages;
       totalPages++;
 
+      let pageHasGradedQuiz = false;
       if (pageConfig?.quiz) {
         totalQuizzes++;
         validateQuizConfig(pageConfig.quiz, fileRel, errors);
         if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
           hasGradedQuiz = true;
+          pageHasGradedQuiz = true;
         }
       }
+
+      const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
+      pages.push({
+        fileRel,
+        navIndex,
+        hasGradedQuiz: pageHasGradedQuiz,
+        hasQuiz: !!pageConfig?.quiz,
+        completesOnView,
+      });
 
       validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
     }
@@ -615,8 +668,10 @@ function validatePages(
         const content = readSourceFileCached(filePath);
 
         const pageConfig = validatePageConfig(content, fileRel, errors);
+        const navIndex = totalPages;
         totalPages++;
 
+        let pageHasGradedQuiz = false;
         if (pageConfig?.quiz) {
           totalQuizzes++;
 
@@ -625,8 +680,18 @@ function validatePages(
 
           if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
             hasGradedQuiz = true;
+            pageHasGradedQuiz = true;
           }
         }
+
+        const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
+        pages.push({
+          fileRel,
+          navIndex,
+          hasGradedQuiz: pageHasGradedQuiz,
+          hasQuiz: !!pageConfig?.quiz,
+          completesOnView,
+        });
 
         // Check $assets references
         validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
@@ -640,7 +705,7 @@ function validatePages(
     );
   }
 
-  return { errors, warnings, totalPages, totalQuizzes, hasGradedQuiz };
+  return { errors, warnings, totalPages, totalQuizzes, hasGradedQuiz, pages };
 }
 
 // ---------- _meta.js Validation ----------
@@ -681,7 +746,7 @@ function validatePageConfig(
   content: string,
   fileRel: string,
   errors: string[]
-): { title?: string; quiz?: unknown } | null {
+): { title?: string; quiz?: unknown; completesOn?: unknown } | null {
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
@@ -690,6 +755,19 @@ function validatePageConfig(
     );
   }
   return null;
+}
+
+function validateCompletesOn(
+  pageConfig: { completesOn?: unknown } | null,
+  fileRel: string,
+  errors: string[]
+): boolean {
+  if (!pageConfig || pageConfig.completesOn === undefined) return false;
+  if (pageConfig.completesOn === 'view') return true;
+  errors.push(
+    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`
+  );
+  return false;
 }
 
 // ---------- Quiz Config Validation ----------
@@ -764,6 +842,58 @@ function crossValidate(
     errors.push(
       'completion.mode is "quiz" but no pages have quiz config with graded: true'
     );
+  }
+
+  const isManual = config.completion?.mode === 'manual';
+  const completesOnPages = pageResults.pages.filter((p) => p.completesOnView);
+
+  if (isManual && config.completion?.trigger === 'page' && completesOnPages.length === 0) {
+    errors.push(
+      'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view". ' +
+        'Either add a completesOn page or remove the trigger field to drop the static check.'
+    );
+  }
+
+  if (isManual) {
+    for (const page of pageResults.pages) {
+      if (page.hasGradedQuiz) {
+        warnings.push(
+          `${page.fileRel}: quiz.graded is true under completion.mode: "manual". ` +
+            'The score will be reported to the LMS for transcripts, but it will not drive ' +
+            'completion or success status — `markComplete()` / completesOn does. If that\'s ' +
+            'not what you want, set graded: false or change completion.mode.'
+        );
+      }
+    }
+  }
+
+  if (isManual && config.completion?.percentageThreshold !== undefined) {
+    warnings.push(
+      'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"'
+    );
+  }
+  if (!isManual) {
+    for (const page of completesOnPages) {
+      warnings.push(
+        `${page.fileRel}: pageConfig.completesOn is ignored — completion.mode is "${config.completion?.mode ?? 'percentage'}"`
+      );
+    }
+  }
+  for (const page of pageResults.pages) {
+    if (page.completesOnView && page.hasQuiz) {
+      warnings.push(
+        `${page.fileRel}: completion fires on view, before the quiz can be answered — likely a mistake`
+      );
+    }
+  }
+
+  if (isManual) {
+    const firstPage = pageResults.pages.find((p) => p.navIndex === 0);
+    if (firstPage?.completesOnView) {
+      warnings.push(
+        `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`
+      );
+    }
   }
 
   // SCORM 1.2 + high page count warning

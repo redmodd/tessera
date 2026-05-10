@@ -13,6 +13,7 @@ export interface ManifestPage {
   slug: string;
   importPath: string;
   quiz: QuizConfig | null;
+  completesOn?: 'view';
 }
 
 export interface ManifestLesson {
@@ -127,7 +128,7 @@ export type PageConfigParseResult =
   /** No module script, or no `pageConfig =` export. Treat as "no config". */
   | { kind: 'none' }
   /** Found and successfully parsed. */
-  | { kind: 'ok'; value: { title?: string; quiz?: QuizConfig } }
+  | { kind: 'ok'; value: { title?: string; quiz?: QuizConfig; completesOn?: 'view' } }
   /** Found but couldn't parse as a static object literal — non-literal RHS or JSON5 failure. */
   | { kind: 'invalid' };
 
@@ -160,7 +161,7 @@ export function parsePageConfigFromSource(content: string): PageConfigParseResul
 }
 
 /** Extract pageConfig from a .svelte file. Throws on parse failure. */
-export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig } {
+export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig; completesOn?: 'view' } {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
@@ -300,7 +301,7 @@ export function generateManifest(pagesDir: string): Manifest {
         const filePath = resolve(lessonPath, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
-        let pageConfig: { title?: string; quiz?: QuizConfig } = {};
+        let pageConfig: { title?: string; quiz?: QuizConfig; completesOn?: 'view' } = {};
         try {
           pageConfig = extractPageConfig(filePath);
         } catch (e) {
@@ -317,6 +318,7 @@ export function generateManifest(pagesDir: string): Manifest {
           slug: pageSlug,
           importPath: relativePath,
           quiz: pageConfig.quiz || null,
+          ...(pageConfig.completesOn ? { completesOn: pageConfig.completesOn } : {}),
         };
 
         lesson.pages.push(page);

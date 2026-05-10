@@ -191,6 +191,45 @@ export function useProgress() {
   };
 }
 
+// One dev warning per session, regardless of caller count.
+let warnedNonManualCompletion = false;
+
+/** Test-only: reset the once-per-session warning latch. */
+export function __resetUseCompletionWarning(): void {
+  warnedNonManualCompletion = false;
+}
+
+/**
+ * Trigger course completion from any component, and reactively read the
+ * current completion status. Active under `completion.mode: "manual"`; a
+ * no-op (with a one-shot dev warning) under any other mode.
+ */
+export function useCompletion(): {
+  markComplete(): void;
+  readonly completionStatus: 'incomplete' | 'complete';
+} {
+  const { progress, manifest, config } = requireNavContext('useCompletion()');
+  return {
+    markComplete() {
+      if (config.completion.mode !== 'manual') {
+        if (import.meta.env?.DEV && !warnedNonManualCompletion) {
+          warnedNonManualCompletion = true;
+          console.warn(
+            "Tessera: useCompletion().markComplete() ignored — completion.mode is not 'manual'. " +
+              '(This warning is shown once per session.)'
+          );
+        }
+        return;
+      }
+      progress.markCompleteManually();
+      progress.recalculateSuccess(manifest, config);
+    },
+    get completionStatus() {
+      return progress.completionStatus;
+    },
+  };
+}
+
 /**
  * Scoped persistence — save and restore per-widget state that survives reload.
  * Routes to whichever adapter the course is running under (localStorage, SCORM

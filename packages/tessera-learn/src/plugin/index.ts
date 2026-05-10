@@ -222,12 +222,17 @@ function tesseraConfigPlugin(): Plugin {
           }
         }
 
+        const completionMode = userConfig.completion?.mode ?? 'percentage';
+        const defaultPassingScore = completionMode === 'manual' ? 0 : 70;
         const merged = {
           title: userConfig.title || 'Untitled Course',
           ...userConfig,
           navigation: { mode: 'free', ...userConfig.navigation },
-          completion: { mode: 'percentage', percentageThreshold: 100, ...userConfig.completion },
-          scoring: { passingScore: 70, ...userConfig.scoring },
+          completion:
+            completionMode === 'manual'
+              ? { mode: 'manual', ...userConfig.completion }
+              : { mode: 'percentage', percentageThreshold: 100, ...userConfig.completion },
+          scoring: { passingScore: defaultPassingScore, ...userConfig.scoring },
           export: { standard: 'web', ...userConfig.export },
         };
 

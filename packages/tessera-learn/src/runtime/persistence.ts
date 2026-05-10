@@ -53,4 +53,6 @@ export interface SavedState {
   s?: Record<string, Record<string, number>>;
   /** Graded standalone page indices — pages with at least one graded standalone question */
   gs?: number[];
+  /** Manual completion latch. 1 if the learner triggered manual completion. Absent otherwise. */
+  m?: 1;
 }

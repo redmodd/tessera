@@ -29,10 +29,8 @@ export interface CourseConfig {
     mode: 'free' | 'sequential';
     canAccess?: AccessFn;
   };
-  completion: {
-    mode: 'quiz' | 'percentage';
-    percentageThreshold?: number;
-  };
+  completion: ManualCompletion | QuizCompletion | PercentageCompletion;
+  /** Optional under "manual"; required under "quiz". */
   scoring: {
     passingScore: number;
   };
@@ -46,6 +44,27 @@ export interface CourseConfig {
    * credentials and shares the cmi5 adapter's queue.
    */
   xapi?: XAPIConfig | XAPIConfig[];
+}
+
+export interface ManualCompletion {
+  mode: 'manual';
+  /**
+   * Set to "page" to opt into a build-time check that at least one page
+   * declares `completesOn: "view"`. Omit to skip the check; both completion
+   * paths still work at runtime.
+   */
+  trigger?: 'page';
+  /** When set, markComplete() also flips successStatus. Omit for unknown. */
+  requireSuccessStatus?: 'passed' | 'failed';
+}
+
+export interface QuizCompletion {
+  mode: 'quiz';
+}
+
+export interface PercentageCompletion {
+  mode: 'percentage';
+  percentageThreshold?: number;
 }
 
 /**
