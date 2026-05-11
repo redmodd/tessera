@@ -253,6 +253,25 @@ describe('XAPIPublisher — send + retry', () => {
     expect(r.destinations[0]).toMatchObject({ ok: false, status: 400 });
   });
 
+  it('surfaces the LRS response body in the error message on non-2xx', async () => {
+    // Without the body, debugging cmi5 rejections is opaque — the LRS
+    // returns rich text like "Forbidden cmi5 defined statement: ..."
+    // and dropping it on the floor turns every 403 into "LRS responded
+    // 403" with no actionable hint.
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: async () =>
+        'Forbidden cmi5 defined statement: context.contextActivities.grouping does not contain Publisher Activity',
+    });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    expect(r.destinations[0].ok).toBe(false);
+    expect(r.destinations[0].status).toBe(403);
+    expect(r.destinations[0].error?.message).toContain('Publisher Activity');
+  });
+
   it('per-statement retry: false sends once and reports outcome', async () => {
     let n = 0;
     mockFetch.mockImplementation(async () => {

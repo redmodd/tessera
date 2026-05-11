@@ -568,11 +568,34 @@ export class XAPIPublisher {
           })
         );
     }
-    return {
-      ok: false,
-      status: resp.status,
-      error: new Error(`LRS responded ${resp.status}`),
-    };
+    // Pull the response body into the error message so callers see the
+    // LRS's specific reason (e.g. SCORM Cloud's "Forbidden cmi5 defined
+    // statement: context.contextActivities.grouping does not contain
+    // Publisher Activity") instead of just "LRS responded 403". Cap at
+    // 500 chars to keep error logs readable; LRS error bodies rarely
+    // exceed that. A failure to read the body falls back to the bare
+    // status — don't surface a confusing read-error as the cause.
+    if (typeof resp.text !== 'function') {
+      return {
+        ok: false,
+        status: resp.status,
+        error: new Error(`LRS responded ${resp.status}`),
+      };
+    }
+    return resp.text().then(
+      (respBody): SendOutcome => ({
+        ok: false,
+        status: resp.status,
+        error: new Error(
+          `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`
+        ),
+      }),
+      (): SendOutcome => ({
+        ok: false,
+        status: resp.status,
+        error: new Error(`LRS responded ${resp.status}`),
+      })
+    );
   }
 
   #resolveAuth(forceRefresh: boolean): Promise<string> {
