@@ -920,6 +920,33 @@ describe('CMI5Adapter', () => {
         audioPreference: 'off',
       });
     });
+
+    it('fetches Learner Preferences BEFORE sending Initialized (§11)', async () => {
+      // cmi5 §11 requires the AU to retrieve the Learner Preferences
+      // document. SCORM Cloud enforces this by rejecting Initialized
+      // with "The AU must retrieve Learner Preferences document from
+      // the Agent Profile" if the AU hits /statements before
+      // /agents/profile. The order matters even when the prefs doc
+      // itself 404s (no preferences set is a valid state).
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+
+      const callOrder = mockFetch.mock.calls.map((c: any[]) => c[0] as string);
+      const profileIdx = callOrder.findIndex((u) => u.includes('agents/profile'));
+      const initializedIdx = callOrder.findIndex(
+        (u, i) => u.includes('statements') &&
+          (() => {
+            try {
+              return JSON.parse(mockFetch.mock.calls[i][1]?.body)?.verb?.id
+                === 'http://adlnet.gov/expapi/verbs/initialized';
+            } catch { return false; }
+          })()
+      );
+      expect(profileIdx).toBeGreaterThanOrEqual(0);
+      expect(initializedIdx).toBeGreaterThanOrEqual(0);
+      expect(profileIdx).toBeLessThan(initializedIdx);
+    });
   });
 
   describe('contextTemplate merge (cmi5 §10.2.1)', () => {

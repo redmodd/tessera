@@ -339,6 +339,16 @@ export class CMI5Adapter implements PersistenceAdapter {
       }
     }
 
+    // cmi5 §11 — fetch the Learner Preferences Agent Profile document
+    // BEFORE issuing Initialized. SCORM Cloud (and other strict LRSes)
+    // enforce §11 by tracking whether the AU has hit the Agent Profile
+    // endpoint, and reject Initialized with "The AU must retrieve
+    // Learner Preferences document from the Agent Profile" if it
+    // hasn't. The document itself may legitimately 404 (no prefs set),
+    // but the GET itself MUST happen first. Non-fatal; missing prefs
+    // just means course defaults.
+    this.#learnerPreferences = await this.#fetchLearnerPreferences();
+
     this.#publisher = new XAPIPublisher({
       endpoint: this.#endpoint,
       auth: this.#authToken,
@@ -351,10 +361,10 @@ export class CMI5Adapter implements PersistenceAdapter {
     await this.#publisher.init();
 
     // cmi5 §9.3.2 — Initialized SHOULD follow launch within a reasonable
-    // period. Queue it before the (potentially slow) resume State GET
-    // and Learner Preferences fetch so a slow LRS can't push it past
-    // the 30-second window strict LMSes enforce. The publisher queue
-    // still keeps it ordered before any later Defined Statement.
+    // period. Queue it before the resume State GET so a slow LRS can't
+    // push it past the 30-second window strict LMSes enforce. The
+    // publisher queue still keeps it ordered before any later Defined
+    // Statement.
     this.#publisher
       .sendStatement({
         verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
@@ -364,10 +374,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Initialized statement', err);
       });
-
-    // cmi5 §11 — fetch the Learner Preferences Agent Profile document.
-    // Non-fatal; missing prefs just means defaults.
-    this.#learnerPreferences = await this.#fetchLearnerPreferences();
 
     // Retrieve saved state from xAPI State API. The State API is a different
     // URL than statements/, so it doesn't go through the publisher's send
