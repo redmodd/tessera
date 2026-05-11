@@ -109,6 +109,30 @@ interface CMI5LearnerPreferences {
 }
 
 /**
+ * Build a `.then` handler that surfaces LRS non-2xx responses for a
+ * named cmi5 verb. The XAPIPublisher resolves successfully even when
+ * the LRS returns 4xx/5xx (the failure lives in DestinationOutcome,
+ * not as a rejection), so a bare `.catch(err => ...)` on a lifecycle
+ * send swallows rich LRS error text. Returns the body included in the
+ * outcome's Error (see XAPIPublisher#handleResponse), which surfaces
+ * e.g. SCORM Cloud's "session not active" or "origin of statement
+ * does not match request context" reasons in the console.
+ */
+function warnOnLRSReject(
+  verbName: string
+): (res: { destinations?: Array<{ ok?: boolean; status?: number; error?: Error }> }) => void {
+  return (res) => {
+    const dest = res.destinations?.[0];
+    if (dest && !dest.ok) {
+      console.warn(
+        `Tessera cmi5: ${verbName} statement rejected by LRS (${dest.status ?? 'network error'})`,
+        dest.error
+      );
+    }
+  };
+}
+
+/**
  * CMI5 persistence adapter using xAPI.
  *
  * Lifecycle statements (Initialized, Completed, Passed/Failed, Terminated)
@@ -334,6 +358,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
         context: this.#cmi5Context(),
       })
+      .then(warnOnLRSReject('Initialized'))
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Initialized statement', err);
       });
@@ -486,6 +511,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         result,
         context: this.#cmi5Context({ moveOn: true }),
       })
+      .then(warnOnLRSReject('Completed'))
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Completed statement', err);
       });
@@ -532,6 +558,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         result,
         context: this.#cmi5Context({ moveOn: true }),
       })
+      .then(warnOnLRSReject(verbName === 'passed' ? 'Passed' : 'Failed'))
       .catch((err) => {
         console.warn(`Tessera cmi5: failed to send ${verbName} statement`, err);
       });
@@ -576,20 +603,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         },
         result,
       })
-      .then((res) => {
-        const dest = res.destinations[0];
-        if (!dest?.ok) {
-          // Publisher resolves successfully even on LRS 4xx/5xx (the
-          // failure is in the outcome, not a rejection). Without this
-          // log, a rejected Answered statement is invisible to the
-          // author — the learner answers a question and the response
-          // never appears in the LMS's interaction report.
-          console.warn(
-            `Tessera cmi5: Answered statement rejected by LRS (${dest?.status ?? 'network error'})`,
-            dest?.error
-          );
-        }
-      })
+      .then(warnOnLRSReject('Answered'))
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Answered statement', err);
       });
@@ -622,6 +636,7 @@ export class CMI5Adapter implements PersistenceAdapter {
           result: { duration },
           context: this.#cmi5Context(),
         })
+        .then(warnOnLRSReject('Suspended'))
         .catch((err) => {
           console.warn('Tessera cmi5: failed to send Suspended statement', err);
         });
@@ -633,6 +648,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         result: { duration },
         context: this.#cmi5Context(),
       })
+      .then(warnOnLRSReject('Terminated'))
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Terminated statement', err);
       });
@@ -763,6 +779,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         result: { duration: formatISO8601Duration(this.#durationSeconds) },
         context: this.#cmi5Context(),
       })
+      .then(warnOnLRSReject('Satisfied'))
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Satisfied statement', err);
       });
