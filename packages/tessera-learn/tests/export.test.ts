@@ -217,6 +217,16 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="Completed"');
   });
 
+  it('emits url as a child element of <au>, not an attribute', () => {
+    // cmi5 CourseStructure.xsd requires <au> to contain <url> as a child
+    // element (between <description> and any <objectives>). Emitting
+    // `url="index.html"` as an attribute makes the manifest fail XSD
+    // validation in conformant LMS importers (e.g., SCORM Cloud).
+    const xml = generateCMI5Xml({ title: 'Test' });
+    expect(xml).toContain('<url>index.html</url>');
+    expect(xml).not.toMatch(/<au\b[^>]*\burl=/);
+  });
+
   it('escapes XML special characters', () => {
     const xml = generateCMI5Xml({
       title: 'A & B',

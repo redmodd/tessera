@@ -167,9 +167,10 @@ export function generateCMI5Xml(config: ExportConfig): string {
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
   </course>
-  <au id="${auId}" url="index.html" moveOn="${moveOn}" masteryScore="${masteryScore}">
+  <au id="${auId}" moveOn="${moveOn}" masteryScore="${masteryScore}">
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
+    <url>index.html</url>
   </au>
 </courseStructure>`;
 }
