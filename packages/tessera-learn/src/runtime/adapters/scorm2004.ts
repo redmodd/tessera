@@ -1,3 +1,4 @@
+import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatISO8601Duration } from './retry.js';
 
@@ -27,6 +28,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+    format: SCORM2004_INTERACTION_FORMAT,
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),
@@ -50,13 +52,21 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setScore(score: number): void {
-    this.queue.enqueue(() =>
-      this.api.SetValue('cmi.score.raw', String(score))
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.score.raw', String(score)),
+      'cmi.score.raw'
     );
-    this.queue.enqueue(() => this.api.SetValue('cmi.score.min', '0'));
-    this.queue.enqueue(() => this.api.SetValue('cmi.score.max', '100'));
-    this.queue.enqueue(() =>
-      this.api.SetValue('cmi.score.scaled', String(score / 100))
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.score.min', '0'),
+      'cmi.score.min'
+    );
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.score.max', '100'),
+      'cmi.score.max'
+    );
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.score.scaled', String(score / 100)),
+      'cmi.score.scaled'
     );
   }
 
@@ -65,19 +75,26 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   // logic internally via course.config.js settings.
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
     const value = status === 'complete' ? 'completed' : 'incomplete';
-    this.queue.enqueue(() =>
-      this.api.SetValue('cmi.completion_status', value)
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.completion_status', value),
+      'cmi.completion_status'
     );
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
     // "unknown" is a valid SCORM 2004 value — setting it explicitly prevents
     // LMSes (notably SCORM Cloud) from rolling up a null status to "passed".
-    this.queue.enqueue(() => this.api.SetValue('cmi.success_status', status));
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.success_status', status),
+      'cmi.success_status'
+    );
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
     // SCORM 2004 §4.2 cmi.exit vocabulary: time-out, suspend, logout, normal, "".
-    this.queue.enqueue(() => this.api.SetValue('cmi.exit', mode));
+    this.queue.enqueue(
+      () => this.api.SetValue('cmi.exit', mode),
+      'cmi.exit'
+    );
   }
 }

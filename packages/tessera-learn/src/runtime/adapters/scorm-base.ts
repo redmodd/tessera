@@ -1,6 +1,9 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { buildScormInteractionFields } from '../interaction-format.js';
+import {
+  buildScormInteractionFields,
+  type InteractionFormat,
+} from '../interaction-format.js';
 import { WriteQueue, callSync, withRetry } from './retry.js';
 
 /** Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters. */
@@ -27,6 +30,8 @@ export interface ScormDialect<TApi> {
     timestamp(): string;
     typeValue(type: Interaction['type']): string;
     resultLabels: { correct: string; incorrect: string };
+    /** Response/pattern encoding (delimiters, identifier sanitization). */
+    format: InteractionFormat;
   };
   /** API method wrappers — abstract over the `LMS*`-prefixed and bare names. */
   initialize(api: TApi): string;
@@ -108,15 +113,18 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
           `larger-limit standard (scorm2004/cmi5).`
       );
     }
-    this.queue.enqueue(() =>
-      this.dialect.setValue(this.api, 'cmi.suspend_data', json)
+    this.queue.enqueue(
+      () => this.dialect.setValue(this.api, 'cmi.suspend_data', json),
+      'cmi.suspend_data'
     );
   }
 
   setDuration(seconds: number): void {
     const formatted = this.dialect.formatDuration(seconds);
-    this.queue.enqueue(() =>
-      this.dialect.setValue(this.api, this.dialect.sessionTimeKey, formatted)
+    this.queue.enqueue(
+      () =>
+        this.dialect.setValue(this.api, this.dialect.sessionTimeKey, formatted),
+      this.dialect.sessionTimeKey
     );
   }
 
@@ -137,15 +145,19 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
         timestamp: this.dialect.interactionFields.timestamp(),
         typeValue: this.dialect.interactionFields.typeValue(interaction.type),
         resultLabels: this.dialect.interactionFields.resultLabels,
+        format: this.dialect.interactionFields.format,
       }
     );
     for (const [key, value] of fields) {
-      this.queue.enqueue(() => this.dialect.setValue(this.api, key, value));
+      this.queue.enqueue(
+        () => this.dialect.setValue(this.api, key, value),
+        key
+      );
     }
   }
 
   commit(): void {
-    this.queue.enqueue(() => this.dialect.commit(this.api));
+    this.queue.enqueue(() => this.dialect.commit(this.api), 'Commit');
   }
 
   terminate(): void {

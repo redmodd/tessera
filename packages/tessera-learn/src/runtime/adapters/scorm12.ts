@@ -1,4 +1,7 @@
-import { scorm12Type } from '../interaction-format.js';
+import {
+  SCORM12_INTERACTION_FORMAT,
+  scorm12Type,
+} from '../interaction-format.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS } from './retry.js';
 
@@ -27,6 +30,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
     timestamp: () => new Date().toTimeString().slice(0, 8),
     typeValue: (t) => scorm12Type(t),
     resultLabels: { correct: 'correct', incorrect: 'wrong' },
+    format: SCORM12_INTERACTION_FORMAT,
   },
   initialize: (api) => api.LMSInitialize(''),
   terminate: (api) => api.LMSFinish(''),
@@ -58,11 +62,18 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   setScore(score: number): void {
-    this.queue.enqueue(() =>
-      this.api.LMSSetValue('cmi.core.score.raw', String(score))
+    this.queue.enqueue(
+      () => this.api.LMSSetValue('cmi.core.score.raw', String(score)),
+      'cmi.core.score.raw'
     );
-    this.queue.enqueue(() => this.api.LMSSetValue('cmi.core.score.min', '0'));
-    this.queue.enqueue(() => this.api.LMSSetValue('cmi.core.score.max', '100'));
+    this.queue.enqueue(
+      () => this.api.LMSSetValue('cmi.core.score.min', '0'),
+      'cmi.core.score.min'
+    );
+    this.queue.enqueue(
+      () => this.api.LMSSetValue('cmi.core.score.max', '100'),
+      'cmi.core.score.max'
+    );
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
@@ -78,17 +89,19 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   #flushLessonStatus(): void {
-    // Success status takes priority — it's the more specific status.
     const value = this.#successStatus ?? this.#completionStatus;
-    this.queue.enqueue(() =>
-      this.api.LMSSetValue('cmi.core.lesson_status', value)
+    this.queue.enqueue(
+      () => this.api.LMSSetValue('cmi.core.lesson_status', value),
+      'cmi.core.lesson_status'
     );
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
     // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
-    // We only map 'suspend' and the empty/normal case.
     const value = mode === 'suspend' ? 'suspend' : '';
-    this.queue.enqueue(() => this.api.LMSSetValue('cmi.core.exit', value));
+    this.queue.enqueue(
+      () => this.api.LMSSetValue('cmi.core.exit', value),
+      'cmi.core.exit'
+    );
   }
 }

@@ -276,10 +276,72 @@ describe('SCORM12Adapter', () => {
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.id']).toBe('q1');
       expect(v['cmi.interactions.0.type']).toBe('choice');
-      expect(v['cmi.interactions.0.student_response']).toBe('a[,]b');
+      expect(v['cmi.interactions.0.student_response']).toBe('a,b');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
       expect(v['cmi.interactions.0.result']).toBe('wrong');
       expect(v['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    });
+
+    it('slugs non-alphanumeric choice identifiers (SCORM 1.2 CMIIdentifier)', async () => {
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['88 Earth days', 'Iron-rich dust'],
+          correct: ['88 Earth days'],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('88_Earth_days,Iron_rich_dust');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('88_Earth_days');
+    });
+
+    it('encodes true-false as t/f per SCORM 1.2', async () => {
+      adapter.reportInteraction(
+        'tf1',
+        { type: 'true-false', response: true, correct: false },
+        false
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('t');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('f');
+    });
+
+    it('uses plain . and , delimiters for matching pairs', async () => {
+      adapter.reportInteraction(
+        'm1',
+        {
+          type: 'matching',
+          response: [
+            ['Phobos', 'Mars'],
+            ['Europa', 'Jupiter'],
+          ],
+          correct: [
+            ['Phobos', 'Mars'],
+            ['Europa', 'Jupiter'],
+          ],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('Phobos.Mars,Europa.Jupiter');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Phobos.Mars,Europa.Jupiter');
+    });
+
+    it('uses plain : range delimiter for numeric correct pattern', async () => {
+      adapter.reportInteraction(
+        'n1',
+        { type: 'numeric', response: 22, correct: { min: 19, max: 25 } },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('22');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('19:25');
     });
 
     it('maps long-fill-in to fill-in (SCORM 1.2 has no long-fill-in type)', async () => {
