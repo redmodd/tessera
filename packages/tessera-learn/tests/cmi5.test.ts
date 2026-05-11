@@ -260,6 +260,65 @@ describe('CMI5Adapter', () => {
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
   });
 
+  it('uses the session id embedded in the fetch URL query string', async () => {
+    // SCORM Cloud (and other Rustici-based LRSes) bake the cmi5 session
+    // id onto the fetch URL itself, e.g.
+    //   .../cmi5Fetch.jsp?session=<uuid>&extCfg=...
+    // and reject every statement whose sessionid extension doesn't
+    // match with "Forbidden cmi5 allowed statement: session id does
+    // not match request context". If the AU mints its own UUID, the
+    // whole cmi5 session never registers as active and Allowed
+    // Statements (Answered) fail with the downstream "session not
+    // active" error.
+    const lmsSession = '11111111-2222-3333-4444-555555555555';
+    const fetchWithSession = `https://lms.example.com/fetch-token?session=${lmsSession}&extCfg=opaque`;
+    setSearchParams({ ...baseLaunchParams, fetch: fetchWithSession });
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === fetchWithSession) {
+        return { ok: true, text: async () => 'test-auth-token' };
+      }
+      if (url.includes('activities/state') && (!options || options.method === 'GET')) {
+        return { ok: false, status: 404 };
+      }
+      if (url.includes('statements')) {
+        return { ok: true };
+      }
+      return { ok: false, status: 404 };
+    });
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const initialized = mockFetch.mock.calls
+      .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; } })
+      .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized');
+    expect(initialized).toBeDefined();
+    expect(
+      initialized.context.extensions[
+        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
+      ]
+    ).toBe(lmsSession);
+  });
+
+  it('falls back to a minted UUID when neither fetch response nor fetch URL carries a session id', async () => {
+    // The cmi5 v1 default: when the LMS hasn't picked one, the AU
+    // chooses. baseLaunchParams.fetch has no `session=`, and the
+    // default mock body has only `auth-token`, so the publisher mints
+    // its own UUID.
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const initialized = mockFetch.mock.calls
+      .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; } })
+      .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized');
+    const sid = initialized?.context?.extensions?.[
+      'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
+    ];
+    expect(sid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+  });
+
   it('parses the spec-conformant JSON token body from the fetch URL', async () => {
     // cmi5 §11.2: the fetch endpoint returns
     //   { "auth-token": "<base64-encoded credentials>" }

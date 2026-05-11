@@ -51,6 +51,32 @@ const VALID_MOVE_ON: ReadonlySet<CMI5MoveOn> = new Set([
 ]);
 
 /**
+ * Pull a session id out of the LMS's fetch URL when it embeds one as a
+ * query parameter. cmi5 v1 §9.6.2 allows either the LMS or the AU to
+ * choose the session id; SCORM Cloud picks it server-side and bakes it
+ * into the fetch URL (e.g. `?session=<uuid>`), and rejects every
+ * statement whose sessionid extension doesn't match with "Forbidden
+ * cmi5 allowed statement: session id does not match request context".
+ * Returns undefined when no candidate parameter is present, leaving the
+ * publisher to mint its own UUID — the cmi5-v1-spec default.
+ */
+function extractSessionFromFetchUrl(fetchUrl: string): string | undefined {
+  try {
+    const url = new URL(fetchUrl);
+    // The cmi5 spec doesn't standardize the parameter name, so accept
+    // common variants. The SCORM Cloud convention is `session`.
+    const candidates = ['session', 'sessionId', 'session-id', 'sessionid'];
+    for (const key of candidates) {
+      const v = url.searchParams.get(key);
+      if (v && v.trim()) return v.trim();
+    }
+  } catch {
+    // Not a parseable URL — let the publisher mint its own UUID.
+  }
+  return undefined;
+}
+
+/**
  * CMI5 persistence adapter using xAPI.
  *
  * Lifecycle statements (Initialized, Completed, Passed/Failed, Terminated)
@@ -167,12 +193,26 @@ export class CMI5Adapter implements PersistenceAdapter {
     // optionally with an "auth-token=" prefix. Try JSON first, then fall
     // back to the legacy forms. The credential itself is the value used
     // as the "Basic" Authorization header — NOT a Bearer token.
+    //
+    // The LMS MAY also pass an explicit session id alongside the
+    // token. cmi5 v1 §9.6.2 allows either side to pick the value; when
+    // the LMS provides one, the AU must use it. The key isn't
+    // standardized, so accept the common spellings.
     let token = '';
+    let sessionId: string | undefined;
     if (text.startsWith('{')) {
       try {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed['auth-token'] === 'string') {
           token = parsed['auth-token'].trim();
+        }
+        const sid =
+          parsed?.['session-id'] ??
+          parsed?.['sessionId'] ??
+          parsed?.['sessionid'] ??
+          parsed?.['session_id'];
+        if (typeof sid === 'string' && sid.trim()) {
+          sessionId = sid.trim();
         }
       } catch {
         // fall through to legacy parsing
@@ -188,12 +228,24 @@ export class CMI5Adapter implements PersistenceAdapter {
       );
     }
 
+    // SCORM Cloud (and other Rustici-based LRSes) embed the cmi5
+    // session id as a query parameter on the fetch URL itself —
+    // there's no other channel in the cmi5 launch surface that
+    // communicates it. Without using that exact value, every cmi5
+    // statement is rejected with "Forbidden cmi5 allowed statement:
+    // session id does not match request context". Fall back to the
+    // fetch-URL extraction when the response body didn't carry one.
+    if (!sessionId) {
+      sessionId = extractSessionFromFetchUrl(fetchUrl);
+    }
+
     this.#publisher = new XAPIPublisher({
       endpoint: this.#endpoint,
       auth: this.#authToken,
       actor: this.#actor,
       activityId: this.#activityId,
       registration: this.#registration,
+      sessionId,
       cmi5Mode: true,
     });
     await this.#publisher.init();
