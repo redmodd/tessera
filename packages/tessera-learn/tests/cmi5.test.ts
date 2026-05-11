@@ -861,6 +861,53 @@ describe('CMI5Adapter', () => {
     });
   });
 
+  describe('exit() — returnURL redirect (cmi5 §10.2.6)', () => {
+    function findStatement(verbId: string): any {
+      return mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === verbId);
+    }
+
+    it('redirects to LMS-supplied returnURL after sending Terminated', async () => {
+      const returnURL = 'https://lms.example.com/learner/done';
+      setupInitMocks(undefined, { returnURL });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+
+      const assign = vi.fn();
+      vi.stubGlobal('window', {
+        ...globalThis.window,
+        location: { ...globalThis.window.location, assign },
+      });
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      await adapter.exit();
+      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+      expect(assign).toHaveBeenCalledWith(returnURL);
+    });
+
+    it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+
+      const assign = vi.fn();
+      vi.stubGlobal('window', {
+        ...globalThis.window,
+        location: { ...globalThis.window.location, assign },
+      });
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      await adapter.exit();
+      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+      expect(assign).not.toHaveBeenCalled();
+    });
+  });
+
   describe('LMS.LaunchData fields (cmi5 §10.2)', () => {
     function findStatement(verbId: string): any {
       return mockFetch.mock.calls

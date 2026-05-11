@@ -399,10 +399,10 @@ export class CMI5Adapter implements PersistenceAdapter {
 
   /**
    * LMS-supplied URL to navigate to when the AU terminates
-   * (cmi5 §10.2.6). The adapter doesn't auto-redirect (terminate is
-   * usually called during page unload, where redirects are unreliable);
-   * authors wiring an explicit Exit button should read this and
-   * `window.location.assign` to it after `terminate()`.
+   * (cmi5 §10.2.6). Use `exit()` for the spec-conformant Terminated +
+   * redirect sequence; this getter is for authors who want to inspect
+   * the URL without triggering exit, or who need to integrate
+   * redirection into a custom shutdown flow.
    */
   getReturnURL(): string | undefined {
     return this.#returnURL;
@@ -636,6 +636,35 @@ export class CMI5Adapter implements PersistenceAdapter {
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Terminated statement', err);
       });
+  }
+
+  /**
+   * cmi5 §10.2.6: the AU SHALL redirect the current browser window to
+   * `returnURL` when terminated. `terminate()` runs synchronously
+   * during pagehide/beforeunload where redirects are unreliable; this
+   * `exit()` method is the explicit-Exit path. It calls `terminate()`,
+   * awaits the publisher's queue so Terminated lands before navigation,
+   * and then redirects.
+   *
+   * No-ops the redirect (but still terminates) when the LMS didn't
+   * provide a returnURL — that's a legitimate launch configuration.
+   */
+  async exit(): Promise<void> {
+    this.terminate();
+    if (this.#publisher) {
+      // chainTask returns a promise that resolves after the previous
+      // queue head (Suspended/Terminated) drains, regardless of HTTP
+      // outcome — exactly the ordering we need before navigating away.
+      try {
+        await this.#publisher.chainTask(async () => {});
+      } catch {
+        // chainTask never rejects, but defend against publisher
+        // refactors. Failing to flush shouldn't block the redirect.
+      }
+    }
+    if (this.#returnURL && typeof window !== 'undefined') {
+      window.location.assign(this.#returnURL);
+    }
   }
 
   // ---- Private helpers ----
