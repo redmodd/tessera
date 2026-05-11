@@ -190,7 +190,9 @@ describe('CMI5Adapter', () => {
     const body = JSON.parse(statementCalls[0][1].body);
     expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/completed');
     expect(body.result.completion).toBe(true);
-    expect(body.result.score.scaled).toBe(0.85);
+    // cmi5 §9.5.1: Completed MUST NOT include `score`. The score (when
+    // present) belongs on Passed/Failed only.
+    expect(body.result.score).toBeUndefined();
   });
 
   it('does not send Completed when status is incomplete', async () => {
@@ -385,7 +387,11 @@ describe('CMI5Adapter', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('terminate sends Suspended then Terminated when not completed (cmi5 §10.1)', async () => {
+  it('terminate sends Terminated only — cmi5 has no Suspended verb (§9.3)', async () => {
+    // The cmi5 §9.3 verb enumeration covers nine verbs and "Suspended"
+    // is not among them. An incomplete-exit signal is conveyed by the
+    // *absence* of Completed before Terminated; the LMS handles
+    // resume / Abandoned itself from the registration state.
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -401,14 +407,16 @@ describe('CMI5Adapter', () => {
     const statementCalls = mockFetch.mock.calls.filter(
       (c: any[]) => c[0]?.includes('statements')
     );
-    expect(statementCalls.length).toBe(2);
-    const suspended = JSON.parse(statementCalls[0][1].body);
-    const terminated = JSON.parse(statementCalls[1][1].body);
-    expect(suspended.verb.id).toBe('http://adlnet.gov/expapi/verbs/suspended');
-    expect(suspended.result.duration).toBe('PT2M');
+    expect(statementCalls.length).toBe(1);
+    const terminated = JSON.parse(statementCalls[0][1].body);
     expect(terminated.verb.id).toBe('http://adlnet.gov/expapi/verbs/terminated');
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
+    // Nothing with a "suspended" verb.
+    const verbs = statementCalls.map((c: any[]) => {
+      try { return JSON.parse(c[1].body).verb.id; } catch { return null; }
+    });
+    expect(verbs).not.toContain('http://adlnet.gov/expapi/verbs/suspended');
   });
 
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
@@ -505,7 +513,7 @@ describe('CMI5Adapter', () => {
       warn.mockRestore();
     });
 
-    it('attaches masteryscore extension to Completed when launch supplied it', async () => {
+    it('does NOT attach masteryscore extension to Completed (§9.6.3.2 scopes it to Passed/Failed)', async () => {
       setSearchParams({ ...baseLaunchParams, masteryScore: '0.7' });
       setupInitMocks();
       adapter = new CMI5Adapter();
@@ -524,11 +532,10 @@ describe('CMI5Adapter', () => {
         })
         .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed');
       expect(completed).toBeDefined();
+      const ext = completed?.context?.extensions ?? {};
       expect(
-        completed.context.extensions[
-          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
-        ]
-      ).toBe(0.7);
+        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore']
+      ).toBeUndefined();
     });
 
     it('attaches masteryscore extension to Passed and Failed', async () => {
@@ -669,7 +676,7 @@ describe('CMI5Adapter', () => {
       expect(categoryIds(failed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
-    it('tags Suspended and Terminated with the cmi5 category only', async () => {
+    it('tags Terminated with the cmi5 category only', async () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
@@ -677,9 +684,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
-      const suspended = statementFor('http://adlnet.gov/expapi/verbs/suspended');
       const terminated = statementFor('http://adlnet.gov/expapi/verbs/terminated');
-      expect(categoryIds(suspended)).toEqual([CMI5_CAT]);
       expect(categoryIds(terminated)).toEqual([CMI5_CAT]);
     });
 
@@ -992,6 +997,8 @@ describe('CMI5Adapter', () => {
     }
 
     it('clamps setScore to [0, 100] so scaled stays in [0, 1] (xAPI)', async () => {
+      // Score is asserted on Passed (not Completed) because cmi5 §9.5.1
+      // forbids score on Completed.
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
@@ -999,10 +1006,10 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       adapter.setScore(150);
-      adapter.setCompletionStatus('complete');
+      adapter.setSuccessStatus('passed');
       await new Promise((r) => setTimeout(r, 50));
-      const completed = findStatement('http://adlnet.gov/expapi/verbs/completed');
-      expect(completed.result.score.scaled).toBe(1);
+      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      expect(passed.result.score.scaled).toBe(1);
     });
 
     it('omits scaled score on Passed when below masteryScore (§9.3.4)', async () => {
@@ -1038,7 +1045,7 @@ describe('CMI5Adapter', () => {
       expect(passed.result.score.scaled).toBeCloseTo(0.85);
     });
 
-    it('keeps scaled score on Failed regardless of mastery', async () => {
+    it('keeps scaled score on Failed when below mastery', async () => {
       setupInitMocks(undefined, { masteryScore: 0.7 });
       adapter = new CMI5Adapter();
       await adapter.init();
@@ -1050,6 +1057,25 @@ describe('CMI5Adapter', () => {
       await new Promise((r) => setTimeout(r, 50));
       const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
       expect(failed.result.score.scaled).toBeCloseTo(0.4);
+    });
+
+    it('omits scaled score on Failed when at or above masteryScore (§9.3.5)', async () => {
+      // Symmetric to the Passed/§9.3.4 invariant: a Failed statement
+      // carrying a score MUST have scaled < masteryScore.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupInitMocks(undefined, { masteryScore: 0.7 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(85); // scaled = 0.85, above mastery 0.7
+      adapter.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      expect(failed).toBeDefined();
+      expect(failed.result.score).toBeUndefined();
+      warn.mockRestore();
     });
   });
 });

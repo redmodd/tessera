@@ -15,13 +15,14 @@ const VERBS = {
   completed: 'http://adlnet.gov/expapi/verbs/completed',
   passed: 'http://adlnet.gov/expapi/verbs/passed',
   failed: 'http://adlnet.gov/expapi/verbs/failed',
-  suspended: 'http://adlnet.gov/expapi/verbs/suspended',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
-  // NB: "satisfied" (https://w3id.org/xapi/adl/verbs/satisfied) is
-  // intentionally absent. Per cmi5 §9.3.9 the satisfied statement is
-  // sent by the LMS, not the AU — SCORM Cloud and other strict LRSes
-  // reject AU-originated satisfied with "origin of statement does not
-  // match request context".
+  // The following are intentionally absent:
+  //   - "satisfied" — per cmi5 §9.3.9 sent by the LMS, not the AU.
+  //   - "suspended" — not a cmi5-defined verb. The cmi5 §9.3 verb
+  //     enumeration covers nine verbs; "suspended" isn't one of them.
+  //     The AU signals an incomplete exit by simply *not* sending
+  //     Completed before Terminated; the LMS infers Abandoned vs
+  //     resume from the registration and prior statements (§9.3.6).
 } as const;
 
 const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interaction';
@@ -163,7 +164,6 @@ export class CMI5Adapter implements PersistenceAdapter {
   #durationSeconds = 0;
   #state: SavedState | null = null;
   #completedSent = false;
-  #completionStatus: 'incomplete' | 'complete' = 'incomplete';
   #successSent = false;
   #terminated = false;
 
@@ -501,18 +501,18 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    this.#completionStatus = status;
     if (status !== 'complete' || this.#completedSent || !this.#publisher) return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Completed.
     if (this.#launchMode !== 'Normal') return;
     this.#completedSent = true;
+    // cmi5 §9.5.1: "cmi5 defined statements, other than passed or failed,
+    // MUST NOT include the `score` property." Completed only carries
+    // completion + duration; the score belongs on the Passed/Failed
+    // statement that follows.
     const result: Record<string, unknown> = {
       completion: true,
       duration: formatISO8601Duration(this.#durationSeconds),
     };
-    if (this.#score !== null) {
-      result.score = { scaled: this.#score / 100 };
-    }
     this.#publisher
       .sendStatement({
         verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
@@ -539,21 +539,26 @@ export class CMI5Adapter implements PersistenceAdapter {
     };
     if (this.#score !== null) {
       const scaled = this.#score / 100;
-      // cmi5 §9.3.4: a `passed` statement carrying a scaled score MUST
-      // have scaled >= masteryScore. Sending a Passed below threshold
-      // produces a non-conformant statement; rather than refuse the
-      // verb (the author asserted it), we omit the score and warn.
-      // Failed is unconstrained.
-      if (
-        status === 'passed' &&
-        this.#masteryScore !== null &&
-        scaled < this.#masteryScore
-      ) {
-        console.warn(
-          `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to Passed ` +
-            `(masteryScore=${this.#masteryScore}); per cmi5 §9.3.4 a Passed with a score must satisfy mastery. ` +
-            `Statement will be sent without a score.`
-        );
+      // cmi5 §9.3.4: a Passed statement carrying a scaled score MUST
+      // have scaled >= masteryScore.
+      // cmi5 §9.3.5: a Failed statement carrying a scaled score MUST
+      // have scaled <  masteryScore.
+      // The author asserted the verb (passed/failed); rather than
+      // refuse the statement, we drop the score when it would
+      // contradict the verb and warn so the inconsistency is visible.
+      if (this.#masteryScore !== null) {
+        const violatesPassed = status === 'passed' && scaled < this.#masteryScore;
+        const violatesFailed = status === 'failed' && scaled >= this.#masteryScore;
+        if (violatesPassed || violatesFailed) {
+          console.warn(
+            `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to ` +
+              `${status === 'passed' ? 'Passed' : 'Failed'} (masteryScore=${this.#masteryScore}); ` +
+              `per cmi5 §9.3.${status === 'passed' ? '4' : '5'} the score would contradict the verb. ` +
+              `Statement will be sent without a score.`
+          );
+        } else {
+          result.score = { scaled };
+        }
       } else {
         result.score = { scaled };
       }
@@ -562,7 +567,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: verb, display: { 'en-US': verbName } },
         result,
-        context: this.#cmi5Context({ moveOn: true }),
+        context: this.#cmi5Context({ moveOn: true, mastery: true }),
       })
       .then(warnOnLRSReject(verbName === 'passed' ? 'Passed' : 'Failed'))
       .catch((err) => {
@@ -627,25 +632,12 @@ export class CMI5Adapter implements PersistenceAdapter {
     // must be the last statement of the cmi5 session (§9.3.6).
     this.#publisher.markUnloading();
     const duration = formatISO8601Duration(this.#durationSeconds);
-    // cmi5 §10.1: when the AU exits without Completed, send Suspended
-    // first so the LMS distinguishes a deliberate pause from abandonment.
-    // cmi5 §10.2.2: Browse/Review MUST NOT emit Suspended either.
-    if (
-      this.#launchMode === 'Normal' &&
-      !this.#completedSent &&
-      this.#completionStatus !== 'complete'
-    ) {
-      this.#publisher
-        .sendStatement({
-          verb: { id: VERBS.suspended, display: { 'en-US': 'suspended' } },
-          result: { duration },
-          context: this.#cmi5Context(),
-        })
-        .then(warnOnLRSReject('Suspended'))
-        .catch((err) => {
-          console.warn('Tessera cmi5: failed to send Suspended statement', err);
-        });
-    }
+    // No "Suspended" statement here — cmi5 doesn't define one. An AU
+    // signalling an incomplete exit just sends Terminated without
+    // having sent Completed; the LMS distinguishes a deliberate pause
+    // (resume on next launch with the same registration) from
+    // abandonment (§9.3.6 — the LMS emits Abandoned on its own when
+    // a new session opens against an already-active registration).
     // cmi5 §9.5.4.1: Terminated MUST include result.duration.
     this.#publisher
       .sendStatement({
@@ -692,12 +684,14 @@ export class CMI5Adapter implements PersistenceAdapter {
 
   /**
    * Build the cmi5 context for a Defined Statement. Always emits the
-   * "cmi5" Category Activity (§9.6); adds the "moveOn" Category Activity
-   * for statements that affect moveOn satisfaction ("completed", "passed",
-   * "failed"). Also surfaces the LMS-supplied masteryscore extension when
-   * present.
+   * "cmi5" Category Activity (§9.6); adds the "moveOn" Category
+   * Activity for Completed/Passed/Failed (§9.6.2.2). Adds the
+   * LMS-supplied masteryScore context extension *only* for
+   * Passed/Failed (§9.6.3.2 scopes it explicitly to those two verbs).
    */
-  #cmi5Context(opts: { moveOn?: boolean } = {}): Record<string, unknown> {
+  #cmi5Context(
+    opts: { moveOn?: boolean; mastery?: boolean } = {}
+  ): Record<string, unknown> {
     // Start from the LMS's contextTemplate (cmi5 §9.6.2) — Publisher
     // Activity in grouping, session id extension, any LMS extras. The
     // spec is explicit (§10.2.1) that the AU MUST NOT overwrite these.
@@ -736,11 +730,11 @@ export class CMI5Adapter implements PersistenceAdapter {
       ...(tmpl as Record<string, unknown>),
       contextActivities,
     };
-    // Surface the LMS-supplied mastery score extension on Defined
-    // Statements that carry score/completion. cmi5 §9.6.3.2 puts this
-    // on Completed/Passed/Failed; we add it whenever it's known and
-    // merge with any template-supplied extensions.
-    if (this.#masteryScore !== null) {
+    // cmi5 §9.6.3.2 — the AU MUST include masteryScore in the context
+    // extension *only* on Passed and Failed statements. Putting it on
+    // Initialized/Completed/Terminated produces statements that strict
+    // conformance suites flag as non-conformant.
+    if (opts.mastery && this.#masteryScore !== null) {
       ctx.extensions = {
         ...((tmpl.extensions ?? {}) as Record<string, unknown>),
         [CMI5_MASTERYSCORE_EXT]: this.#masteryScore,

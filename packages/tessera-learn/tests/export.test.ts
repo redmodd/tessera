@@ -217,6 +217,14 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="Completed"');
   });
 
+  it('emits launchMethod attribute on <au> (defaults to AnyWindow)', () => {
+    // The cmi5 CourseStructure XSD requires `launchMethod` on every
+    // <au>; importers that validate against the schema reject the
+    // manifest without it.
+    const xml = generateCMI5Xml({ title: 'Test' });
+    expect(xml).toMatch(/<au\b[^>]*\blaunchMethod="AnyWindow"/);
+  });
+
   it('emits url as a child element of <au>, not an attribute', () => {
     // cmi5 CourseStructure.xsd requires <au> to contain <url> as a child
     // element (between <description> and any <objectives>). Emitting

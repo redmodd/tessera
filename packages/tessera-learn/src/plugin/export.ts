@@ -151,7 +151,12 @@ export function generateCMI5Xml(config: ExportConfig): string {
   // orphaning existing learner records in the LRS.
   const courseId = stableUrn('course', `tessera-course:${config.title || ''}`);
   const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
-  const masteryScore = (config.scoring?.passingScore ?? 70) / 100;
+  // cmi5 §10.2.4 caps masteryScore precision at 4 decimal places;
+  // emitting the raw float (e.g. `0.7000000000000001` from 70/100)
+  // makes some importers fail XSD validation.
+  const masteryScore = Number(
+    ((config.scoring?.passingScore ?? 70) / 100).toFixed(4)
+  );
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
@@ -167,7 +172,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
   </course>
-  <au id="${auId}" moveOn="${moveOn}" masteryScore="${masteryScore}">
+  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}" masteryScore="${masteryScore}">
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
     <url>index.html</url>
