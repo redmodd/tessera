@@ -77,7 +77,11 @@ describe('CMI5Adapter', () => {
     vi.restoreAllMocks();
   });
 
-  function setupInitMocks(savedState?: SavedState) {
+  function setupInitMocks(
+    savedState?: SavedState,
+    launchData?: Record<string, unknown> | null,
+    learnerPreferences?: Record<string, unknown> | null
+  ) {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       // Token fetch
       if (url === baseLaunchParams.fetch) {
@@ -85,12 +89,19 @@ describe('CMI5Adapter', () => {
       }
       // State API GET
       if (url.includes('activities/state') && (!options || options.method === 'GET')) {
-        if (savedState) {
-          return { ok: true, json: async () => savedState };
+        if (url.includes('stateId=LMS.LaunchData')) {
+          if (launchData) return { ok: true, json: async () => launchData };
+          return { ok: false, status: 404 };
         }
+        if (savedState) return { ok: true, json: async () => savedState };
         return { ok: false, status: 404 };
       }
-      // Statements POST (Initialized)
+      // Agent Profile GET (Learner Preferences)
+      if (url.includes('agents/profile')) {
+        if (learnerPreferences) return { ok: true, json: async () => learnerPreferences };
+        return { ok: false, status: 404 };
+      }
+      // Statements POST (Initialized, Answered, etc.)
       if (url.includes('statements')) {
         return { ok: true };
       }
@@ -260,30 +271,26 @@ describe('CMI5Adapter', () => {
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
   });
 
-  it('uses the session id embedded in the fetch URL query string', async () => {
-    // SCORM Cloud (and other Rustici-based LRSes) bake the cmi5 session
-    // id onto the fetch URL itself, e.g.
-    //   .../cmi5Fetch.jsp?session=<uuid>&extCfg=...
-    // and reject every statement whose sessionid extension doesn't
-    // match with "Forbidden cmi5 allowed statement: session id does
-    // not match request context". If the AU mints its own UUID, the
-    // whole cmi5 session never registers as active and Allowed
-    // Statements (Answered) fail with the downstream "session not
-    // active" error.
+  it('uses session id and Publisher Activity from LMS.LaunchData contextTemplate', async () => {
+    // cmi5 §9.6.2 — the AU MUST use the contextTemplate from
+    // LMS.LaunchData as the base context on every Defined Statement.
+    // Per §9.6.2.3 the Publisher Activity in `grouping` and per
+    // §9.6.3.1 the session id extension are LMS-chosen values; strict
+    // LRSes (SCORM Cloud) reject statements that don't carry them
+    // verbatim ("Forbidden cmi5 defined statement: ... does not
+    // contain Publisher Activity" / "session id does not match
+    // request context").
     const lmsSession = '11111111-2222-3333-4444-555555555555';
-    const fetchWithSession = `https://lms.example.com/fetch-token?session=${lmsSession}&extCfg=opaque`;
-    setSearchParams({ ...baseLaunchParams, fetch: fetchWithSession });
-    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (url === fetchWithSession) {
-        return { ok: true, text: async () => 'test-auth-token' };
-      }
-      if (url.includes('activities/state') && (!options || options.method === 'GET')) {
-        return { ok: false, status: 404 };
-      }
-      if (url.includes('statements')) {
-        return { ok: true };
-      }
-      return { ok: false, status: 404 };
+    const publisherActivity = 'https://lms.example.com/courses/abc';
+    setupInitMocks(undefined, {
+      contextTemplate: {
+        contextActivities: {
+          grouping: [{ id: publisherActivity }],
+        },
+        extensions: {
+          'https://w3id.org/xapi/cmi5/context/extensions/sessionid': lmsSession,
+        },
+      },
     });
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -297,13 +304,14 @@ describe('CMI5Adapter', () => {
         'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
       ]
     ).toBe(lmsSession);
+    expect(initialized.context.contextActivities.grouping).toEqual([
+      { id: publisherActivity },
+    ]);
   });
 
-  it('falls back to a minted UUID when neither fetch response nor fetch URL carries a session id', async () => {
-    // The cmi5 v1 default: when the LMS hasn't picked one, the AU
-    // chooses. baseLaunchParams.fetch has no `session=`, and the
-    // default mock body has only `auth-token`, so the publisher mints
-    // its own UUID.
+  it('falls back to a minted UUID when LMS.LaunchData has no session id', async () => {
+    // When the LMS doesn't pre-populate sessionid (non-conformant or
+    // dev fixtures), the publisher mints a UUID — the cmi5 v1 fallback.
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -850,6 +858,210 @@ describe('CMI5Adapter', () => {
       );
       expect(body.result.response).toBe('7');
       expect(body.object.definition.correctResponsesPattern).toEqual(['5[:]10']);
+    });
+  });
+
+  describe('LMS.LaunchData fields (cmi5 §10.2)', () => {
+    function findStatement(verbId: string): any {
+      return mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === verbId);
+    }
+
+    it('exposes launchMode / returnURL / launchParameters from LaunchData via getters', async () => {
+      setupInitMocks(undefined, {
+        launchMode: 'Review',
+        returnURL: 'https://lms.example.com/learner/done',
+        launchParameters: 'foo=bar&baz=qux',
+      });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getLaunchMode()).toBe('Review');
+      expect(adapter.getReturnURL()).toBe('https://lms.example.com/learner/done');
+      expect(adapter.getLaunchParameters()).toBe('foo=bar&baz=qux');
+    });
+
+    it('defaults launchMode to Normal when LaunchData is absent', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getLaunchMode()).toBe('Normal');
+      expect(adapter.getReturnURL()).toBeUndefined();
+    });
+
+    it('rejects invalid launchMode values and falls back to Normal', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupInitMocks(undefined, { launchMode: 'NotARealMode' });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getLaunchMode()).toBe('Normal');
+      warn.mockRestore();
+    });
+
+    it('prefers LaunchData.masteryScore over the URL launch param (§10.2.4)', async () => {
+      // URL says 0.5, LaunchData says 0.8 — LaunchData is the authoritative
+      // source per the spec (§10.2.4). The URL form is non-standard.
+      setSearchParams({ ...baseLaunchParams, masteryScore: '0.5' });
+      setupInitMocks(undefined, { masteryScore: 0.8 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBe(0.8);
+    });
+
+    it('does NOT emit Completed under launchMode=Browse (§10.2.2)', async () => {
+      setupInitMocks(undefined, { launchMode: 'Browse' });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+      expect(findStatement('http://adlnet.gov/expapi/verbs/completed')).toBeUndefined();
+    });
+
+    it('does NOT emit Passed or Failed under launchMode=Review (§10.2.2)', async () => {
+      setupInitMocks(undefined, { launchMode: 'Review' });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.setScore(95);
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 50));
+      expect(findStatement('http://adlnet.gov/expapi/verbs/passed')).toBeUndefined();
+      expect(findStatement('http://adlnet.gov/expapi/verbs/failed')).toBeUndefined();
+    });
+
+    it('does NOT emit Suspended under launchMode=Browse on terminate (§10.2.2)', async () => {
+      setupInitMocks(undefined, { launchMode: 'Browse' });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.terminate();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(findStatement('http://adlnet.gov/expapi/verbs/suspended')).toBeUndefined();
+      // Terminated is always allowed.
+      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+    });
+
+    it('exposes learner preferences from the Agent Profile (§11)', async () => {
+      setupInitMocks(undefined, null, {
+        languagePreference: 'fr-CA',
+        audioPreference: 'off',
+      });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getLearnerPreferences()).toEqual({
+        languagePreference: 'fr-CA',
+        audioPreference: 'off',
+      });
+    });
+  });
+
+  describe('contextTemplate merge (cmi5 §10.2.1)', () => {
+    function findStatement(verbId: string): any {
+      return mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === verbId);
+    }
+
+    it('concats LMS-supplied template categories with cmi5 + moveOn instead of overwriting', async () => {
+      // cmi5 §10.2.1 — the AU MUST NOT overwrite contextTemplate values.
+      // If the LMS pre-populates `category`, the AU must merge (concat
+      // + dedupe), not replace.
+      const lmsCategory = { id: 'https://lms.example.com/cat/custom', objectType: 'Activity' };
+      setupInitMocks(undefined, {
+        contextTemplate: {
+          contextActivities: { category: [lmsCategory] },
+        },
+      });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+      const completed = findStatement('http://adlnet.gov/expapi/verbs/completed');
+      const ids = completed.context.contextActivities.category.map((c: any) => c.id);
+      expect(ids).toContain(lmsCategory.id);
+      expect(ids).toContain('https://w3id.org/xapi/cmi5/context/categories/cmi5');
+      expect(ids).toContain('https://w3id.org/xapi/cmi5/context/categories/moveon');
+    });
+  });
+
+  describe('score validation (cmi5 §9.5.1, §9.3.4)', () => {
+    function findStatement(verbId: string): any {
+      return mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === verbId);
+    }
+
+    it('clamps setScore to [0, 100] so scaled stays in [0, 1] (xAPI)', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(150);
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+      const completed = findStatement('http://adlnet.gov/expapi/verbs/completed');
+      expect(completed.result.score.scaled).toBe(1);
+    });
+
+    it('omits scaled score on Passed when below masteryScore (§9.3.4)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupInitMocks(undefined, { masteryScore: 0.8 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(50); // scaled = 0.5, below mastery 0.8
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 50));
+      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      expect(passed).toBeDefined();
+      // The Passed verb is still emitted (author asserted it) but
+      // without a score that would make the statement non-conformant.
+      expect(passed.result.score).toBeUndefined();
+      warn.mockRestore();
+    });
+
+    it('keeps scaled score on Passed when at or above masteryScore', async () => {
+      setupInitMocks(undefined, { masteryScore: 0.7 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(85);
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 50));
+      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      expect(passed.result.score.scaled).toBeCloseTo(0.85);
+    });
+
+    it('keeps scaled score on Failed regardless of mastery', async () => {
+      setupInitMocks(undefined, { masteryScore: 0.7 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(40);
+      adapter.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      expect(failed.result.score.scaled).toBeCloseTo(0.4);
     });
   });
 });
