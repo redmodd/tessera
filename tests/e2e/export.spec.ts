@@ -135,7 +135,9 @@ test.describe('Export — CMI5', () => {
     expect(xml).toContain('courseStructure');
     expect(xml).toContain('<course id=');
     expect(xml).toContain('<au id=');
-    expect(xml).toContain('url="index.html"');
+    // cmi5 CourseStructure XSD requires <url> as a child element of <au>, not an attribute.
+    expect(xml).toContain('<url>index.html</url>');
+    expect(xml).toContain('launchMethod="AnyWindow"');
     expect(xml).toContain('E2E Test Course');
     expect(xml).toContain('masteryScore');
   });

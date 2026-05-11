@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.0.6
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.5` so newly-created projects pick up the cmi5 spec-conformance fixes (LMS.LaunchData / Learner Preferences consumption, launchMode gating, returnURL + `adapter.exit()`, removal of AU-emitted Satisfied / Suspended, §9.6 Context Categories, score-scope and masteryScore-extension corrections, manifest `<url>` element + `launchMethod` attribute).
+
 ## 0.0.5
 
 ### Patch Changes

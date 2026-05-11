@@ -1,5 +1,42 @@
 # tessera-learn
 
+## 0.0.5
+
+### Patch Changes
+
+- **cmi5 spec conformance against strict LRSes.** End-to-end validated against SCORM Cloud. The adapter now consumes the documents cmi5 actually requires and emits the statement shapes strict validators accept, replacing several heuristics that produced silent rejections in earlier versions.
+
+  - **`LMS.LaunchData` (§10)** — fetched at init; `contextTemplate` is now the base context on every Defined Statement (§9.6.2). The Publisher Activity (`contextActivities.grouping`, §9.6.2.3) and session id extension (§9.6.3.1) come from there, not from heuristic URL parsing. `launchMode`, `returnURL`, `launchParameters`, `masteryScore`, and `moveOn` are also read from LaunchData and exposed via new getters: `getLaunchMode()`, `getReturnURL()`, `getLaunchParameters()`. LaunchData wins over the URL `masteryScore` parameter.
+  - **Learner Preferences (§11)** — `cmi5LearnerPreferences` Agent Profile is fetched at startup _before_ Initialized, satisfying the §11 obligation strict LRSes enforce. Exposed via `getLearnerPreferences()`.
+  - **`launchMode` (§10.2.2)** — Browse and Review launches now suppress every Defined Statement except Initialized and Terminated.
+  - **`exit()` method (§10.2.6)** — new explicit-exit path. Calls `terminate()`, awaits the publisher queue so Terminated lands first, then `window.location.assign`s to the LMS-supplied `returnURL`.
+
+  Spec-conformance fixes to lifecycle statement shapes:
+
+  - **§9.6 Context Categories** — every Defined Statement now carries the `cmi5` Category Activity in `contextActivities.category`; Completed / Passed / Failed additionally carry the `moveOn` Category. Without these, conformant LRSes silently fail to roll up cmi5 lifecycle state.
+  - **§9.5.1 score scope** — `result.score` is dropped from Completed (forbidden) and kept on Passed / Failed only.
+  - **§9.6.3.2 masteryScore extension** — scoped to Passed / Failed only; previously emitted on every Defined Statement.
+  - **§9.3.4 / §9.3.5 score-vs-mastery invariant** — a Passed with `scaled < masteryScore` or a Failed with `scaled >= masteryScore` would be non-conformant; the verb is preserved and the score is dropped (with a console warning).
+  - **§9.3.9 Satisfied** — no longer emitted by the AU. Satisfied is an LMS-only verb; sending it from the AU triggers "origin of statement does not match request context" rejections.
+  - **§9.3 Suspended** — no longer emitted. Suspended isn't in the cmi5 verb enumeration. Incomplete exits are signalled by Terminated without a preceding Completed; the LMS handles Abandoned (§9.3.6) and resume itself.
+  - **§9.6.2 contextTemplate merge** — template-supplied categories are concatenated with the AU's required ones (never overwritten, per §10.2.1).
+
+  cmi5 fetch / token plumbing:
+
+  - **§11.2 auth-token parsing** — accepts the spec-conformant JSON body (`{"auth-token": "..."}`) in addition to the legacy plain-text form. Without this the Authorization header carried the entire JSON string, producing 400 "Malformed authorization header" on every authenticated call.
+
+  Manifest (`cmi5.xml`) fixes:
+
+  - `<au>` emits `<url>` as a child element (was an attribute) so the manifest passes the cmi5 CourseStructure XSD.
+  - `<au>` emits a `launchMethod="AnyWindow"` attribute (required by the XSD).
+  - `masteryScore` is rounded to 4 decimal places (§10.2.4) to avoid `0.7000000000000001` float drift.
+
+  Operational visibility:
+
+  - LRS non-2xx responses now surface the response body in the outcome's error message (capped at 500 chars) — debugging cmi5 rejections no longer requires snapshotting the network panel.
+  - Every lifecycle statement (Initialized / Completed / Passed / Failed / Terminated / Answered) now logs a console warning on LRS rejection with the verb name and status. The previous `.catch(() => {})` path swallowed 4xx/5xx outcomes that the publisher resolves successfully.
+  - State API GET / PUT and Agent Profile GET log meaningful non-2xx statuses (404 is silent on resume + prefs, since "no document" is normal).
+
 ## 0.0.4
 
 ### Patch Changes
