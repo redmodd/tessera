@@ -577,117 +577,31 @@ describe('CMI5Adapter', () => {
       ).toBeUndefined();
     });
 
-    it('does not send Satisfied when moveOn is NotApplicable (default)', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
+    it('NEVER emits Satisfied — that statement is LMS-only (cmi5 §9.3.9)', async () => {
+      // SCORM Cloud (and every strict cmi5 LRS) rejects AU-originated
+      // Satisfied with "Forbidden cmi5 defined statement: origin of
+      // statement does not match request context". The LMS issues
+      // Satisfied itself when the moveOn criterion is met; the AU's
+      // job is to emit Completed/Passed/Failed accurately and let the
+      // LMS roll up. Exercising every combination of moveOn here
+      // protects against a future "MAY send" comment slipping back in.
+      for (const moveOn of ['Passed', 'Completed', 'CompletedAndPassed', 'CompletedOrPassed']) {
+        setSearchParams({ ...baseLaunchParams, moveOn, masteryScore: '0.7' });
+        setupInitMocks();
+        adapter = new CMI5Adapter();
+        await adapter.init();
+        mockFetch.mockClear();
+        mockFetch.mockResolvedValue({ ok: true });
 
-      adapter.setScore(95);
-      adapter.setSuccessStatus('passed');
-      adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
+        adapter.setScore(90);
+        adapter.setCompletionStatus('complete');
+        adapter.setSuccessStatus('passed');
+        await new Promise((r) => setTimeout(r, 50));
 
-      const verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
-    });
-
-    it('emits Satisfied once when moveOn=Passed and learner passes', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'Passed', masteryScore: '0.7' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      adapter.setScore(90);
-      adapter.setDuration(120);
-      adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-
-      const satisfied = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; }})
-        .filter((b: any) => b?.verb?.id === 'https://w3id.org/xapi/adl/verbs/satisfied');
-      expect(satisfied).toHaveLength(1);
-      expect(satisfied[0].result.duration).toBe('PT2M');
-      expect(
-        satisfied[0].context.extensions[
-          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
-        ]
-      ).toBe(0.7);
-    });
-
-    it('does not emit Satisfied when moveOn=Passed and learner fails', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'Passed' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      adapter.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
-
-      const verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
-    });
-
-    it('emits Satisfied for moveOn=Completed when course completes', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'Completed' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
-
-      const verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      expect(verbs).toContain('https://w3id.org/xapi/adl/verbs/satisfied');
-    });
-
-    it('moveOn=CompletedAndPassed waits for both before emitting Satisfied', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedAndPassed' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 30));
-      let verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
-
-      adapter.setScore(80);
-      adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 30));
-      verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      const count = verbs.filter((v: any) => v === 'https://w3id.org/xapi/adl/verbs/satisfied').length;
-      expect(count).toBe(1);
-    });
-
-    it('moveOn=CompletedOrPassed emits on whichever happens first', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedOrPassed' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 30));
-      let verbs = mockFetch.mock.calls
-        .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-      const count = verbs.filter((v: any) => v === 'https://w3id.org/xapi/adl/verbs/satisfied').length;
-      expect(count).toBe(1);
+        const verbs = mockFetch.mock.calls
+          .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
+        expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+      }
     });
   });
 

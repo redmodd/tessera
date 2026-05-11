@@ -17,7 +17,11 @@ const VERBS = {
   failed: 'http://adlnet.gov/expapi/verbs/failed',
   suspended: 'http://adlnet.gov/expapi/verbs/suspended',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
-  satisfied: 'https://w3id.org/xapi/adl/verbs/satisfied',
+  // NB: "satisfied" (https://w3id.org/xapi/adl/verbs/satisfied) is
+  // intentionally absent. Per cmi5 §9.3.9 the satisfied statement is
+  // sent by the LMS, not the AU — SCORM Cloud and other strict LRSes
+  // reject AU-originated satisfied with "origin of statement does not
+  // match request context".
 } as const;
 
 const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interaction';
@@ -161,7 +165,6 @@ export class CMI5Adapter implements PersistenceAdapter {
   #completedSent = false;
   #completionStatus: 'incomplete' | 'complete' = 'incomplete';
   #successSent = false;
-  #passed = false;
   #terminated = false;
 
   // cmi5 §8 launch params. masteryScore (when present) overrides the
@@ -169,7 +172,6 @@ export class CMI5Adapter implements PersistenceAdapter {
   // authority. moveOn drives the optional Satisfied statement (§9.5.3).
   #masteryScore: number | null = null;
   #moveOn: CMI5MoveOn = 'NotApplicable';
-  #satisfiedSent = false;
 
   // cmi5 §10: the LMS pre-populates the LMS.LaunchData State document
   // with a `contextTemplate`. Per §9.6.2, the AU MUST use that template
@@ -515,7 +517,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Completed statement', err);
       });
-    this.#maybeSendSatisfied();
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
@@ -523,7 +524,6 @@ export class CMI5Adapter implements PersistenceAdapter {
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Passed/Failed.
     if (this.#launchMode !== 'Normal') return;
     this.#successSent = true;
-    this.#passed = status === 'passed';
 
     const verb = status === 'passed' ? VERBS.passed : VERBS.failed;
     const verbName = status === 'passed' ? 'passed' : 'failed';
@@ -562,7 +562,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       .catch((err) => {
         console.warn(`Tessera cmi5: failed to send ${verbName} statement`, err);
       });
-    this.#maybeSendSatisfied();
   }
 
   setDuration(seconds: number): void {
@@ -742,47 +741,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       };
     }
     return ctx;
-  }
-
-  /**
-   * cmi5 §9.5.3: when the moveOn criterion has been met, the AU MAY send
-   * a Satisfied statement so LMSes that don't compute moveOn themselves
-   * still see satisfaction. NotApplicable disables emission entirely.
-   */
-  #maybeSendSatisfied(): void {
-    if (this.#satisfiedSent || !this.#publisher) return;
-    // cmi5 §10.2.2 — only Initialized/Terminated are allowed outside Normal.
-    if (this.#launchMode !== 'Normal') return;
-    if (this.#moveOn === 'NotApplicable') return;
-
-    let satisfied = false;
-    switch (this.#moveOn) {
-      case 'Passed':
-        satisfied = this.#passed;
-        break;
-      case 'Completed':
-        satisfied = this.#completedSent;
-        break;
-      case 'CompletedAndPassed':
-        satisfied = this.#completedSent && this.#passed;
-        break;
-      case 'CompletedOrPassed':
-        satisfied = this.#completedSent || this.#passed;
-        break;
-    }
-    if (!satisfied) return;
-
-    this.#satisfiedSent = true;
-    this.#publisher
-      .sendStatement({
-        verb: { id: VERBS.satisfied, display: { 'en-US': 'satisfied' } },
-        result: { duration: formatISO8601Duration(this.#durationSeconds) },
-        context: this.#cmi5Context(),
-      })
-      .then(warnOnLRSReject('Satisfied'))
-      .catch((err) => {
-        console.warn('Tessera cmi5: failed to send Satisfied statement', err);
-      });
   }
 
   #buildStateUrl(stateId: string = 'tessera-state'): string {
