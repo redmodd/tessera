@@ -150,14 +150,31 @@ export class CMI5Adapter implements PersistenceAdapter {
         `Tessera cmi5: fetch token request returned ${resp.status}. The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`
       );
     }
-    const text = await resp.text();
-    // The fetch URL returns the token, possibly with "auth-token=" prefix
-    // (cmi5 §6.2). The credential itself is the value used as the
-    // "Basic" Authorization header — NOT a Bearer token.
-    this.#authToken = text.replace(/^auth-token=/, '').trim();
+    const text = (await resp.text()).trim();
+    // cmi5 §11.2: the spec-conformant response is JSON of the form
+    //   { "auth-token": "<base64-encoded credentials>" }
+    // Some older/non-conformant LMSes return the value as plain text,
+    // optionally with an "auth-token=" prefix. Try JSON first, then fall
+    // back to the legacy forms. The credential itself is the value used
+    // as the "Basic" Authorization header — NOT a Bearer token.
+    let token = '';
+    if (text.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed['auth-token'] === 'string') {
+          token = parsed['auth-token'].trim();
+        }
+      } catch {
+        // fall through to legacy parsing
+      }
+    }
+    if (!token) {
+      token = text.replace(/^auth-token=/, '').trim();
+    }
+    this.#authToken = token;
     if (!this.#authToken) {
       throw new Error(
-        'Tessera cmi5: fetch token request returned an empty body. Expected an "auth-token=..." or bare token.'
+        'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.'
       );
     }
 
@@ -179,8 +196,15 @@ export class CMI5Adapter implements PersistenceAdapter {
       const resp = await this.#xapiFetch(stateUrl, { method: 'GET' });
       if (resp.ok) {
         this.#state = await resp.json();
+      } else if (resp.status !== 404) {
+        console.warn(
+          `Tessera cmi5: State API GET returned ${resp.status}; resume disabled for this launch.`
+        );
       }
-    } catch {
+    } catch (err) {
+      console.warn(
+        `Tessera cmi5: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`
+      );
       this.#state = null;
     }
 
@@ -232,11 +256,16 @@ export class CMI5Adapter implements PersistenceAdapter {
     // Terminated. We can't use sendStatement here (different URL/verb).
     this.#publisher.chainTask(async () => {
       try {
-        await this.#xapiFetch(this.#buildStateUrl(), {
+        const resp = await this.#xapiFetch(this.#buildStateUrl(), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(state),
         });
+        if (!resp.ok) {
+          console.warn(
+            `Tessera cmi5: State API PUT returned ${resp.status}; learner progress did not persist.`
+          );
+        }
       } catch (err) {
         console.warn('Tessera: Failed to save CMI5 state', err);
       }

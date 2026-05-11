@@ -260,6 +260,36 @@ describe('CMI5Adapter', () => {
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
   });
 
+  it('parses the spec-conformant JSON token body from the fetch URL', async () => {
+    // cmi5 §11.2: the fetch endpoint returns
+    //   { "auth-token": "<base64-encoded credentials>" }
+    // Stuffing the entire JSON string into `Basic <...>` produces the
+    // "Malformed authorization header" 400 SCORM Cloud returns.
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === baseLaunchParams.fetch) {
+        return {
+          ok: true,
+          text: async () => '{"auth-token": "spec-conformant-token"}',
+        };
+      }
+      if (url.includes('activities/state') && (!options || options.method === 'GET')) {
+        return { ok: false, status: 404 };
+      }
+      if (url.includes('statements')) {
+        return { ok: true };
+      }
+      return { ok: false, status: 404 };
+    });
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements')
+    );
+    const headers = statementCalls[0][1].headers;
+    expect(headers.get('Authorization')).toBe('Basic spec-conformant-token');
+  });
+
   it('includes registration and context in statements', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
