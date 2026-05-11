@@ -151,9 +151,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
   // orphaning existing learner records in the LRS.
   const courseId = stableUrn('course', `tessera-course:${config.title || ''}`);
   const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
-  // cmi5 §10.2.4 caps masteryScore precision at 4 decimal places;
-  // emitting the raw float (e.g. `0.7000000000000001` from 70/100)
-  // makes some importers fail XSD validation.
+  // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
     ((config.scoring?.passingScore ?? 70) / 100).toFixed(4)
   );

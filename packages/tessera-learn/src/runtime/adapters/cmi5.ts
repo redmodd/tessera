@@ -16,13 +16,10 @@ const VERBS = {
   passed: 'http://adlnet.gov/expapi/verbs/passed',
   failed: 'http://adlnet.gov/expapi/verbs/failed',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
-  // The following are intentionally absent:
-  //   - "satisfied" — per cmi5 §9.3.9 sent by the LMS, not the AU.
-  //   - "suspended" — not a cmi5-defined verb. The cmi5 §9.3 verb
-  //     enumeration covers nine verbs; "suspended" isn't one of them.
-  //     The AU signals an incomplete exit by simply *not* sending
-  //     Completed before Terminated; the LMS infers Abandoned vs
-  //     resume from the registration and prior statements (§9.3.6).
+  // Intentionally absent: "satisfied" (LMS-only, §9.3.9) and
+  // "suspended" (not a cmi5-defined verb — §9.3 enumerates nine, none
+  // of them Suspended). The LMS infers Abandoned vs resume from
+  // registration state when Terminated lands without Completed.
 } as const;
 
 const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interaction';
@@ -73,16 +70,7 @@ const CMI5_LEARNER_PREFS_PROFILE_ID = 'cmi5LearnerPreferences';
 const CMI5_SESSIONID_EXT_IRI =
   'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
 
-/**
- * Shape of the cmi5 `LMS.LaunchData` State document (cmi5 §10). The
- * LMS pre-populates this document before launching the AU; the AU is
- * required to GET it and use `contextTemplate` as the base context on
- * every cmi5 Defined Statement (§9.6.2). The template carries the
- * session id and Publisher Activity that strict LRSes (SCORM Cloud)
- * validate. Other fields cover launch mode (§10.2.2), return URL
- * (§10.2.6), masteryScore (§10.2.4), and the opaque per-launch
- * `launchParameters` string (§10.2.3).
- */
+/** cmi5 §10 `LMS.LaunchData` document. `contextTemplate` is the base context for every Defined Statement (§9.6.2). */
 interface CMI5LaunchData {
   contextTemplate?: {
     contextActivities?: {
@@ -103,26 +91,14 @@ interface CMI5LaunchData {
   [k: string]: unknown;
 }
 
-/**
- * Shape of the cmi5 Learner Preferences Agent Profile document
- * (cmi5 §11.1). Stored under profile id `cmi5LearnerPreferences`.
- */
+/** cmi5 §11.1 Learner Preferences Agent Profile document. */
 interface CMI5LearnerPreferences {
   languagePreference?: string;
   audioPreference?: 'on' | 'off';
   [k: string]: unknown;
 }
 
-/**
- * Build a `.then` handler that surfaces LRS non-2xx responses for a
- * named cmi5 verb. The XAPIPublisher resolves successfully even when
- * the LRS returns 4xx/5xx (the failure lives in DestinationOutcome,
- * not as a rejection), so a bare `.catch(err => ...)` on a lifecycle
- * send swallows rich LRS error text. Returns the body included in the
- * outcome's Error (see XAPIPublisher#handleResponse), which surfaces
- * e.g. SCORM Cloud's "session not active" or "origin of statement
- * does not match request context" reasons in the console.
- */
+/** `.then` handler that warns on LRS non-2xx. Publisher resolves successfully on 4xx/5xx (failure is in the outcome), so `.catch` alone misses them. */
 function warnOnLRSReject(
   verbName: string
 ): (res: { destinations?: Array<{ ok?: boolean; status?: number; error?: Error }> }) => void {
@@ -173,21 +149,17 @@ export class CMI5Adapter implements PersistenceAdapter {
   #masteryScore: number | null = null;
   #moveOn: CMI5MoveOn = 'NotApplicable';
 
-  // cmi5 §10: the LMS pre-populates the LMS.LaunchData State document
-  // with a `contextTemplate`. Per §9.6.2, the AU MUST use that template
-  // as the base context on every cmi5 Defined Statement. The template
-  // carries the Publisher Activity (in grouping) and the session id —
-  // both fields strict LRSes (e.g. SCORM Cloud) validate against. The
-  // document also carries launchMode/returnURL/launchParameters/etc.
-  // (§10.2), broken out into the dedicated fields below.
+  // cmi5 §10 LMS.LaunchData. `contextTemplate` is the AU's base context
+  // (§9.6.2) — Publisher Activity and session id live there, and strict
+  // LRSes validate every Defined Statement against it.
   #launchData: CMI5LaunchData | null = null;
-  /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed/Suspended/Satisfied. */
+  /** cmi5 §10.2.2 — Browse/Review forbid every Defined Statement except Initialized/Terminated. */
   #launchMode: CMI5LaunchMode = 'Normal';
-  /** cmi5 §10.2.6 — AU SHALL redirect here on terminate when supplied. */
+  /** cmi5 §10.2.6 — AU redirects here on `exit()`. */
   #returnURL: string | undefined;
   /** cmi5 §10.2.3 — opaque per-launch content config string. */
   #launchParameters: string | undefined;
-  /** cmi5 §11 — Learner Preferences Agent Profile document. */
+  /** cmi5 §11.1 Learner Preferences. */
   #learnerPreferences: CMI5LearnerPreferences | null = null;
 
   async init(): Promise<void> {
@@ -262,12 +234,10 @@ export class CMI5Adapter implements PersistenceAdapter {
       );
     }
     const text = (await resp.text()).trim();
-    // cmi5 §11.2: the spec-conformant response is JSON of the form
-    //   { "auth-token": "<base64-encoded credentials>" }
-    // Some older/non-conformant LMSes return the value as plain text,
-    // optionally with an "auth-token=" prefix. Try JSON first, then fall
-    // back to the legacy forms. The credential itself is the value used
-    // as the "Basic" Authorization header — NOT a Bearer token.
+    // cmi5 §11.2 — response is `{"auth-token": "..."}`. Some
+    // non-conformant LMSes return bare text with an `auth-token=`
+    // prefix, so we fall back to that. The token value is the literal
+    // Basic credential (already base64); we don't re-encode.
     let token = '';
     if (text.startsWith('{')) {
       try {
@@ -289,12 +259,11 @@ export class CMI5Adapter implements PersistenceAdapter {
       );
     }
 
-    // cmi5 §10: GET the LMS.LaunchData State document. This is the
-    // *only* spec-defined channel for the session id (§9.6.3.1) and
-    // Publisher Activity (§9.6.2.3) the LRS validates statements
-    // against. It also carries launchMode (§10.2.2), returnURL
-    // (§10.2.6), launchParameters (§10.2.3), and the authoritative
-    // masteryScore/moveOn for this launch (§10.2.4/§10.2.5).
+    // cmi5 §10 — LaunchData is the only spec-defined channel for the
+    // session id (§9.6.3.1) and Publisher Activity (§9.6.2.3) the LRS
+    // validates against, plus launchMode/returnURL/launchParameters/
+    // masteryScore/moveOn (§10.2). LaunchData values override the URL
+    // masteryScore parsed earlier (§10.2.4 makes it authoritative).
     this.#launchData = await this.#fetchLaunchData();
     const tmpl = this.#launchData?.contextTemplate ?? {};
     let sessionId: string | undefined;
@@ -303,7 +272,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       sessionId = launchSession.trim();
     }
     if (this.#launchData) {
-      // launchMode default is "Normal" (§10.2.2). Validate before honoring.
       if (
         typeof this.#launchData.launchMode === 'string' &&
         VALID_LAUNCH_MODE.has(this.#launchData.launchMode)
@@ -319,9 +287,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       if (typeof this.#launchData.launchParameters === 'string') {
         this.#launchParameters = this.#launchData.launchParameters;
       }
-      // cmi5 §10.2.4 — LaunchData.masteryScore is the authoritative
-      // source. The URL `masteryScore` parsed earlier is non-standard
-      // and only kept as a fallback. LaunchData wins when present.
       if (
         typeof this.#launchData.masteryScore === 'number' &&
         Number.isFinite(this.#launchData.masteryScore) &&
@@ -330,7 +295,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       ) {
         this.#masteryScore = this.#launchData.masteryScore;
       }
-      // moveOn likewise: LaunchData is authoritative when present.
       if (
         typeof this.#launchData.moveOn === 'string' &&
         VALID_MOVE_ON.has(this.#launchData.moveOn)
@@ -339,14 +303,9 @@ export class CMI5Adapter implements PersistenceAdapter {
       }
     }
 
-    // cmi5 §11 — fetch the Learner Preferences Agent Profile document
-    // BEFORE issuing Initialized. SCORM Cloud (and other strict LRSes)
-    // enforce §11 by tracking whether the AU has hit the Agent Profile
-    // endpoint, and reject Initialized with "The AU must retrieve
-    // Learner Preferences document from the Agent Profile" if it
-    // hasn't. The document itself may legitimately 404 (no prefs set),
-    // but the GET itself MUST happen first. Non-fatal; missing prefs
-    // just means course defaults.
+    // cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict
+    // LRSes track the GET and reject Initialized otherwise. A 404 here
+    // is legitimate (no prefs set); the GET itself is what's required.
     this.#learnerPreferences = await this.#fetchLearnerPreferences();
 
     this.#publisher = new XAPIPublisher({
@@ -360,11 +319,9 @@ export class CMI5Adapter implements PersistenceAdapter {
     });
     await this.#publisher.init();
 
-    // cmi5 §9.3.2 — Initialized SHOULD follow launch within a reasonable
-    // period. Queue it before the resume State GET so a slow LRS can't
-    // push it past the 30-second window strict LMSes enforce. The
-    // publisher queue still keeps it ordered before any later Defined
-    // Statement.
+    // cmi5 §9.3.2 — queue Initialized before the resume State GET so a
+    // slow LRS can't push it past the spec's "reasonable period". The
+    // publisher queue keeps it ordered before any later Defined Statement.
     this.#publisher
       .sendStatement({
         verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
@@ -420,41 +377,22 @@ export class CMI5Adapter implements PersistenceAdapter {
     return this.#moveOn;
   }
 
-  /**
-   * LMS-supplied launch mode (cmi5 §10.2.2). "Normal" is the default
-   * and the only mode where progress-bearing Defined Statements
-   * (Completed / Passed / Failed / Suspended / Satisfied) are
-   * permitted. "Browse" and "Review" launches MUST NOT emit them.
-   */
+  /** cmi5 §10.2.2 — "Normal" is the only mode where progress-bearing Defined Statements are permitted. */
   getLaunchMode(): CMI5LaunchMode {
     return this.#launchMode;
   }
 
-  /**
-   * LMS-supplied URL to navigate to when the AU terminates
-   * (cmi5 §10.2.6). Use `exit()` for the spec-conformant Terminated +
-   * redirect sequence; this getter is for authors who want to inspect
-   * the URL without triggering exit, or who need to integrate
-   * redirection into a custom shutdown flow.
-   */
+  /** cmi5 §10.2.6 — URL the AU navigates to on `exit()`. Returns undefined when the LMS didn't supply one. */
   getReturnURL(): string | undefined {
     return this.#returnURL;
   }
 
-  /**
-   * LMS-supplied opaque content-config string for this launch
-   * (cmi5 §10.2.3). Authors interpret the value however the LMS
-   * configured it (e.g. JSON, query string, key=value pairs).
-   */
+  /** cmi5 §10.2.3 — opaque per-launch content-config string. */
   getLaunchParameters(): string | undefined {
     return this.#launchParameters;
   }
 
-  /**
-   * Learner Preferences (cmi5 §11.1) — `audioPreference` and
-   * `languagePreference` are common keys. Returns null when the LMS
-   * didn't provide a preferences document.
-   */
+  /** cmi5 §11.1 Learner Preferences. Null when the LMS didn't publish one. */
   getLearnerPreferences(): CMI5LearnerPreferences | null {
     return this.#learnerPreferences;
   }
@@ -487,12 +425,8 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   setScore(score: number): void {
-    // cmi5 §9.5.1 / xAPI: `score.scaled` is a decimal in [0, 1]. We
-    // accept percentage in (the project-internal) 0–100 range and
-    // clamp out-of-range values so an over- or under-eager author
-    // call can't produce a statement the LRS will reject. Out-of-band
-    // values are clamped silently — the alternative (rejecting the
-    // setter) breaks resume math elsewhere in the runtime.
+    // Clamped to [0, 100] so the /100 division yields a spec-legal
+    // scaled value in [0, 1] (xAPI).
     if (!Number.isFinite(score)) {
       this.#score = null;
       return;
@@ -505,10 +439,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Completed.
     if (this.#launchMode !== 'Normal') return;
     this.#completedSent = true;
-    // cmi5 §9.5.1: "cmi5 defined statements, other than passed or failed,
-    // MUST NOT include the `score` property." Completed only carries
-    // completion + duration; the score belongs on the Passed/Failed
-    // statement that follows.
+    // cmi5 §9.5.1 — `score` MUST NOT appear on Completed (Passed/Failed only).
     const result: Record<string, unknown> = {
       completion: true,
       duration: formatISO8601Duration(this.#durationSeconds),
@@ -539,13 +470,10 @@ export class CMI5Adapter implements PersistenceAdapter {
     };
     if (this.#score !== null) {
       const scaled = this.#score / 100;
-      // cmi5 §9.3.4: a Passed statement carrying a scaled score MUST
-      // have scaled >= masteryScore.
-      // cmi5 §9.3.5: a Failed statement carrying a scaled score MUST
-      // have scaled <  masteryScore.
-      // The author asserted the verb (passed/failed); rather than
-      // refuse the statement, we drop the score when it would
-      // contradict the verb and warn so the inconsistency is visible.
+      // cmi5 §9.3.4 / §9.3.5 — Passed-with-score requires scaled >=
+      // masteryScore; Failed-with-score requires scaled < masteryScore.
+      // The author asserted the verb, so on contradiction we keep the
+      // verb and drop the score (and warn).
       if (this.#masteryScore !== null) {
         const violatesPassed = status === 'passed' && scaled < this.#masteryScore;
         const violatesFailed = status === 'failed' && scaled >= this.#masteryScore;
@@ -632,13 +560,10 @@ export class CMI5Adapter implements PersistenceAdapter {
     // must be the last statement of the cmi5 session (§9.3.6).
     this.#publisher.markUnloading();
     const duration = formatISO8601Duration(this.#durationSeconds);
-    // No "Suspended" statement here — cmi5 doesn't define one. An AU
-    // signalling an incomplete exit just sends Terminated without
-    // having sent Completed; the LMS distinguishes a deliberate pause
-    // (resume on next launch with the same registration) from
-    // abandonment (§9.3.6 — the LMS emits Abandoned on its own when
-    // a new session opens against an already-active registration).
-    // cmi5 §9.5.4.1: Terminated MUST include result.duration.
+    // No Suspended — cmi5 doesn't define that verb (§9.3); the LMS
+    // handles resume vs Abandoned itself when a new session opens
+    // against an active registration (§9.3.6).
+    // cmi5 §9.5.4.1 — Terminated MUST include result.duration.
     this.#publisher
       .sendStatement({
         verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
@@ -652,27 +577,19 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   /**
-   * cmi5 §10.2.6: the AU SHALL redirect the current browser window to
-   * `returnURL` when terminated. `terminate()` runs synchronously
-   * during pagehide/beforeunload where redirects are unreliable; this
-   * `exit()` method is the explicit-Exit path. It calls `terminate()`,
-   * awaits the publisher's queue so Terminated lands before navigation,
-   * and then redirects.
-   *
-   * No-ops the redirect (but still terminates) when the LMS didn't
-   * provide a returnURL — that's a legitimate launch configuration.
+   * cmi5 §10.2.6 — explicit-Exit path. Terminate, wait for the
+   * publisher queue to drain so Terminated lands first, then redirect
+   * to `returnURL`. `terminate()` alone (called from pagehide) can't
+   * redirect — the page is already unloading.
    */
   async exit(): Promise<void> {
     this.terminate();
     if (this.#publisher) {
-      // chainTask returns a promise that resolves after the previous
-      // queue head (Suspended/Terminated) drains, regardless of HTTP
-      // outcome — exactly the ordering we need before navigating away.
+      // chainTask with a no-op task awaits the queue head.
       try {
         await this.#publisher.chainTask(async () => {});
       } catch {
-        // chainTask never rejects, but defend against publisher
-        // refactors. Failing to flush shouldn't block the redirect.
+        // never rejects today; don't let a refactor block redirect.
       }
     }
     if (this.#returnURL && typeof window !== 'undefined') {
@@ -683,27 +600,20 @@ export class CMI5Adapter implements PersistenceAdapter {
   // ---- Private helpers ----
 
   /**
-   * Build the cmi5 context for a Defined Statement. Always emits the
-   * "cmi5" Category Activity (§9.6); adds the "moveOn" Category
-   * Activity for Completed/Passed/Failed (§9.6.2.2). Adds the
-   * LMS-supplied masteryScore context extension *only* for
-   * Passed/Failed (§9.6.3.2 scopes it explicitly to those two verbs).
+   * Build the cmi5 context for a Defined Statement, starting from the
+   * LMS contextTemplate (§9.6.2 — AU MUST NOT overwrite). Adds the
+   * cmi5 Category Activity (§9.6.2.1), the moveOn Category for
+   * Completed/Passed/Failed (§9.6.2.2), and the masteryScore extension
+   * for Passed/Failed (§9.6.3.2).
    */
   #cmi5Context(
     opts: { moveOn?: boolean; mastery?: boolean } = {}
   ): Record<string, unknown> {
-    // Start from the LMS's contextTemplate (cmi5 §9.6.2) — Publisher
-    // Activity in grouping, session id extension, any LMS extras. The
-    // spec is explicit (§10.2.1) that the AU MUST NOT overwrite these.
     const tmpl = this.#launchData?.contextTemplate ?? {};
     const tmplActivities = (tmpl.contextActivities ?? {}) as Record<string, unknown>;
 
-    // Per-verb category requirements:
-    //   - cmi5 Category Activity on every Defined Statement (§9.6.2.1)
-    //   - moveOn Category Activity on Completed/Passed/Failed (§9.6.2.2)
-    // Concatenate with whatever the template supplied and dedupe by id
-    // so the spec's "MUST NOT overwrite" rule holds even if the LMS
-    // pre-populated a category list of its own.
+    // Concat-dedupe category to preserve any template-supplied entries
+    // (§10.2.1 forbids overwriting them).
     const seen = new Set<string>();
     const category: Array<{ id: string; objectType: string }> = [];
     const push = (id: string) => {
@@ -730,10 +640,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       ...(tmpl as Record<string, unknown>),
       contextActivities,
     };
-    // cmi5 §9.6.3.2 — the AU MUST include masteryScore in the context
-    // extension *only* on Passed and Failed statements. Putting it on
-    // Initialized/Completed/Terminated produces statements that strict
-    // conformance suites flag as non-conformant.
+    // cmi5 §9.6.3.2 — masteryScore extension is scoped to Passed/Failed.
     if (opts.mastery && this.#masteryScore !== null) {
       ctx.extensions = {
         ...((tmpl.extensions ?? {}) as Record<string, unknown>),
@@ -757,11 +664,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     return `${this.#endpoint}activities/state?${params.toString()}`;
   }
 
-  /**
-   * Build the Agent Profile API URL for a given profileId. cmi5 §11
-   * scopes the Learner Preferences document by agent only (no activity
-   * or registration), so the URL omits both.
-   */
+  /** cmi5 §11 — Agent Profile URL. Scoped to agent only (no activity/registration). */
   #buildAgentProfileUrl(profileId: string): string {
     const agentJson = JSON.stringify(this.#actor);
     const params = new URLSearchParams({
@@ -771,15 +674,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     return `${this.#endpoint}agents/profile?${params.toString()}`;
   }
 
-  /**
-   * GET the cmi5 `LMS.LaunchData` State document. The LMS pre-populates
-   * this doc (cmi5 §10) with a `contextTemplate` the AU MUST use as the
-   * base context on every cmi5 Defined Statement, plus launchMode,
-   * returnURL, launchParameters, masteryScore, and moveOn (§10.2).
-   * Returns null when the document is absent or unparseable; the
-   * caller logs a warning, since a missing LaunchData document
-   * indicates a non-conformant LMS and statements will likely fail.
-   */
+  /** GET the cmi5 §10 `LMS.LaunchData` document. Null if absent — strict LRSes will then reject Defined Statements. */
   async #fetchLaunchData(): Promise<CMI5LaunchData | null> {
     try {
       const url = this.#buildStateUrl(LMS_LAUNCH_DATA_STATE_ID);
@@ -800,12 +695,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     return null;
   }
 
-  /**
-   * GET the cmi5 Learner Preferences Agent Profile document (cmi5 §11).
-   * Stored under profile id `cmi5LearnerPreferences`, scoped to the
-   * agent. Returns null when the LMS hasn't published one (a 404 is
-   * normal, not an error) — authors fall back to course defaults.
-   */
+  /** GET cmi5 §11.1 Learner Preferences. 404 is normal (no prefs set). */
   async #fetchLearnerPreferences(): Promise<CMI5LearnerPreferences | null> {
     try {
       const url = this.#buildAgentProfileUrl(CMI5_LEARNER_PREFS_PROFILE_ID);

@@ -568,13 +568,9 @@ export class XAPIPublisher {
           })
         );
     }
-    // Pull the response body into the error message so callers see the
-    // LRS's specific reason (e.g. SCORM Cloud's "Forbidden cmi5 defined
-    // statement: context.contextActivities.grouping does not contain
-    // Publisher Activity") instead of just "LRS responded 403". Cap at
-    // 500 chars to keep error logs readable; LRS error bodies rarely
-    // exceed that. A failure to read the body falls back to the bare
-    // status — don't surface a confusing read-error as the cause.
+    // Append the LRS body to the error message so callers see the
+    // specific reason (e.g. "Forbidden cmi5 defined statement: ...").
+    // Cap at 500 chars; on read failure, fall back to bare status.
     if (typeof resp.text !== 'function') {
       return {
         ok: false,
