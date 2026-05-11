@@ -624,6 +624,102 @@ describe('CMI5Adapter', () => {
     });
   });
 
+  describe('cmi5 §9.6 Context Categories', () => {
+    // The cmi5 spec is strict: a conformant LRS rolls up Completed/Passed/
+    // Failed into the AU's lifecycle state only when these categories
+    // are present. Without them, the LMS accepts the POST but treats the
+    // statement as an opaque xAPI verb — the learner never registers as
+    // having finished the course.
+    const CMI5_CAT = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+    const MOVEON_CAT = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
+
+    function categoryIds(body: any): string[] {
+      const cats = body?.context?.contextActivities?.category ?? [];
+      return cats.map((c: any) => c?.id).filter((id: any) => typeof id === 'string');
+    }
+
+    function statementFor(verbId: string): any {
+      return mockFetch.mock.calls
+        .map((c: any[]) => {
+          try { return JSON.parse(c[1]?.body); } catch { return null; }
+        })
+        .find((b: any) => b?.verb?.id === verbId);
+    }
+
+    it('tags Initialized with the cmi5 category', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      const initialized = statementFor('http://adlnet.gov/expapi/verbs/initialized');
+      expect(categoryIds(initialized)).toEqual([CMI5_CAT]);
+    });
+
+    it('tags Completed with cmi5 + moveOn categories', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 50));
+      const completed = statementFor('http://adlnet.gov/expapi/verbs/completed');
+      expect(categoryIds(completed)).toEqual([CMI5_CAT, MOVEON_CAT]);
+    });
+
+    it('tags Passed and Failed with cmi5 + moveOn categories', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.setSuccessStatus('passed');
+      await new Promise((r) => setTimeout(r, 50));
+      const passed = statementFor('http://adlnet.gov/expapi/verbs/passed');
+      expect(categoryIds(passed)).toEqual([CMI5_CAT, MOVEON_CAT]);
+
+      const adapter2 = new CMI5Adapter();
+      setupInitMocks();
+      await adapter2.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter2.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+      const failed = statementFor('http://adlnet.gov/expapi/verbs/failed');
+      expect(categoryIds(failed)).toEqual([CMI5_CAT, MOVEON_CAT]);
+    });
+
+    it('tags Suspended and Terminated with the cmi5 category only', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.terminate();
+      await new Promise((r) => setTimeout(r, 50));
+      const suspended = statementFor('http://adlnet.gov/expapi/verbs/suspended');
+      const terminated = statementFor('http://adlnet.gov/expapi/verbs/terminated');
+      expect(categoryIds(suspended)).toEqual([CMI5_CAT]);
+      expect(categoryIds(terminated)).toEqual([CMI5_CAT]);
+    });
+
+    it('does NOT tag Answered with the cmi5 category (it is an Allowed Statement, not Defined)', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true
+      );
+      await new Promise((r) => setTimeout(r, 50));
+      const answered = statementFor('http://adlnet.gov/expapi/verbs/answered');
+      expect(categoryIds(answered)).not.toContain(CMI5_CAT);
+      expect(categoryIds(answered)).not.toContain(MOVEON_CAT);
+    });
+  });
+
   describe('reportInteraction', () => {
     async function initAndReport(
       questionId: string,

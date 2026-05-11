@@ -25,6 +25,16 @@ const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interactio
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
 
+// cmi5 §9.6 — every cmi5 Defined Statement MUST carry the "cmi5" Category
+// Activity in context.contextActivities.category, and "completed", "passed",
+// "failed" MUST additionally carry the "moveOn" Category. Without these, an
+// LRS will accept the statement as an arbitrary xAPI verb but won't roll it
+// up into cmi5 lifecycle state — the LMS never sees the AU as completed.
+const CMI5_CATEGORY_CMI5 =
+  'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+const CMI5_CATEGORY_MOVEON =
+  'https://w3id.org/xapi/cmi5/context/categories/moveon';
+
 export type CMI5MoveOn =
   | 'Passed'
   | 'Completed'
@@ -215,6 +225,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     await this.#publisher
       .sendStatement({
         verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
+        context: this.#cmi5Context(),
       })
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Initialized statement', err);
@@ -291,7 +302,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
         result,
-        context: this.#masteryContext(),
+        context: this.#cmi5Context({ moveOn: true }),
       })
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Completed statement', err);
@@ -317,7 +328,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: verb, display: { 'en-US': verbName } },
         result,
-        context: this.#masteryContext(),
+        context: this.#cmi5Context({ moveOn: true }),
       })
       .catch((err) => {
         console.warn(`Tessera cmi5: failed to send ${verbName} statement`, err);
@@ -363,7 +374,23 @@ export class CMI5Adapter implements PersistenceAdapter {
         },
         result,
       })
-      .catch(() => {});
+      .then((res) => {
+        const dest = res.destinations[0];
+        if (!dest?.ok) {
+          // Publisher resolves successfully even on LRS 4xx/5xx (the
+          // failure is in the outcome, not a rejection). Without this
+          // log, a rejected Answered statement is invisible to the
+          // author — the learner answers a question and the response
+          // never appears in the LMS's interaction report.
+          console.warn(
+            `Tessera cmi5: Answered statement rejected by LRS (${dest?.status ?? 'network error'})`,
+            dest?.error
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Tessera cmi5: failed to send Answered statement', err);
+      });
   }
 
   commit(): void {
@@ -386,6 +413,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         .sendStatement({
           verb: { id: VERBS.suspended, display: { 'en-US': 'suspended' } },
           result: { duration },
+          context: this.#cmi5Context(),
         })
         .catch((err) => {
           console.warn('Tessera cmi5: failed to send Suspended statement', err);
@@ -396,6 +424,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
         result: { duration },
+        context: this.#cmi5Context(),
       })
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Terminated statement', err);
@@ -405,15 +434,26 @@ export class CMI5Adapter implements PersistenceAdapter {
   // ---- Private helpers ----
 
   /**
-   * Build a context object carrying the cmi5 masteryscore extension when
-   * the LMS provided one. Returns undefined otherwise so the publisher
-   * doesn't add an empty `context.extensions` block.
+   * Build the cmi5 context for a Defined Statement. Always emits the
+   * "cmi5" Category Activity (§9.6); adds the "moveOn" Category Activity
+   * for statements that affect moveOn satisfaction ("completed", "passed",
+   * "failed"). Also surfaces the LMS-supplied masteryscore extension when
+   * present.
    */
-  #masteryContext(): Record<string, unknown> | undefined {
-    if (this.#masteryScore === null) return undefined;
-    return {
-      extensions: { [CMI5_MASTERYSCORE_EXT]: this.#masteryScore },
+  #cmi5Context(opts: { moveOn?: boolean } = {}): Record<string, unknown> {
+    const category: Array<{ id: string; objectType: 'Activity' }> = [
+      { id: CMI5_CATEGORY_CMI5, objectType: 'Activity' },
+    ];
+    if (opts.moveOn) {
+      category.push({ id: CMI5_CATEGORY_MOVEON, objectType: 'Activity' });
+    }
+    const ctx: Record<string, unknown> = {
+      contextActivities: { category },
     };
+    if (this.#masteryScore !== null) {
+      ctx.extensions = { [CMI5_MASTERYSCORE_EXT]: this.#masteryScore };
+    }
+    return ctx;
   }
 
   /**
@@ -447,7 +487,7 @@ export class CMI5Adapter implements PersistenceAdapter {
       .sendStatement({
         verb: { id: VERBS.satisfied, display: { 'en-US': 'satisfied' } },
         result: { duration: formatISO8601Duration(this.#durationSeconds) },
-        context: this.#masteryContext(),
+        context: this.#cmi5Context(),
       })
       .catch((err) => {
         console.warn('Tessera cmi5: failed to send Satisfied statement', err);
