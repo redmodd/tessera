@@ -47,13 +47,19 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: ':',
   supportsNumericRange: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
-  identifier: cmi12Identifier,
+  identifier: shortIdentifier,
 };
 
 /**
  * SCORM 2004 4E RTE §4.2.7 / xAPI `cmi.interaction` encoding. The bracketed
  * delimiters are literal text, not regex; xAPI consumers parse them the same
  * way.
+ *
+ * `short_identifier_type` (Appendix A) is the same alphanumeric/underscore
+ * restriction as SCORM 1.2 `CMIIdentifier`, applied to the same interaction
+ * types (choice, sequencing, matching, performance, likert). Strict 2004
+ * validators (SCORM Cloud) reject raw option labels with spaces/punctuation
+ * with error 406 "Data Model Element Type Mismatch".
  */
 export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: '[,]',
@@ -61,16 +67,17 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsNumericRange: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: (v) => v,
+  identifier: shortIdentifier,
 };
 
 /**
- * Slug an arbitrary string into a SCORM 1.2 `CMIIdentifier` — alphanumerics
- * only, max 250 chars. Authors typically pass option labels ("88 Earth
- * days") which the strict 1.2 validator (e.g. SCORM Cloud) rejects with
- * error 405 unless reduced to this character set.
+ * Slug an arbitrary string into a SCORM 1.2 `CMIIdentifier` / SCORM 2004
+ * `short_identifier_type` — alphanumerics + underscore, max 250 chars.
+ * Authors typically pass option labels ("88 Earth days", "Apollo 11 lands
+ * on the Moon") which the strict validators reject unless reduced to this
+ * character set.
  */
-function cmi12Identifier(value: string): string {
+function shortIdentifier(value: string): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const trimmed = cleaned.slice(0, 250);
   return trimmed || '_';

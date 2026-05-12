@@ -290,6 +290,52 @@ describe('SCORM2004Adapter', () => {
       expect(v['cmi.interactions.0.learner_response']).toBe('x[,]y[,]z');
     });
 
+    it('slugs non-alphanumeric sequencing identifiers (SCORM 2004 short_identifier_type)', async () => {
+      adapter.reportInteraction(
+        's2',
+        {
+          type: 'sequencing',
+          response: [
+            'Sputnik 1 launched',
+            'Yuri Gagarin orbits Earth',
+            'Apollo 8\'s "Earthrise" photo',
+            'Apollo 11 lands on the Moon',
+          ],
+          correct: [
+            'Sputnik 1 launched',
+            'Yuri Gagarin orbits Earth',
+            'Apollo 8\'s "Earthrise" photo',
+            'Apollo 11 lands on the Moon',
+          ],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.learner_response']).toBe(
+        'Sputnik_1_launched[,]Yuri_Gagarin_orbits_Earth[,]Apollo_8_s_Earthrise_photo[,]Apollo_11_lands_on_the_Moon'
+      );
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'Sputnik_1_launched[,]Yuri_Gagarin_orbits_Earth[,]Apollo_8_s_Earthrise_photo[,]Apollo_11_lands_on_the_Moon'
+      );
+    });
+
+    it('slugs non-alphanumeric choice identifiers', async () => {
+      adapter.reportInteraction(
+        'c2',
+        {
+          type: 'choice',
+          response: ['88 Earth days'],
+          correct: ['88 Earth days'],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.learner_response']).toBe('88_Earth_days');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('88_Earth_days');
+    });
+
     it('writes numeric interaction', async () => {
       adapter.reportInteraction(
         'n1',
