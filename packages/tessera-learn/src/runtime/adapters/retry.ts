@@ -350,6 +350,19 @@ export function formatReal107(value: number): string {
 }
 
 /**
+ * Format a Date as a SCORM 2004 4E `time(second,10,0)` timestamp.
+ *
+ * The spec (§3.3.10.1) references ISO 8601 §5.3.3 and allows up to 10
+ * fractional-second digits, but several strict validators (SCORM Cloud)
+ * reject any fractional seconds with error 406 "is not a valid time
+ * type". `Date.toISOString()` always emits 3 fractional digits, so we
+ * strip them. Second-resolution is universally accepted.
+ */
+export function formatISO8601Timestamp(date: Date): string {
+  return date.toISOString().replace(/\.\d+Z$/, 'Z');
+}
+
+/**
  * Format seconds as ISO 8601 duration: PT1H30M45S
  */
 export function formatISO8601Duration(totalSeconds: number): string {

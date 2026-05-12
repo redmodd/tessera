@@ -5,8 +5,21 @@ import {
   WriteQueue,
   formatHHMMSS,
   formatISO8601Duration,
+  formatISO8601Timestamp,
   formatReal107,
 } from '../src/runtime/adapters/retry.js';
+
+describe('formatISO8601Timestamp', () => {
+  it('strips milliseconds (strict SCORM 2004 validators reject fractional seconds)', () => {
+    const d = new Date('2026-05-12T00:28:37.910Z');
+    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37Z');
+  });
+
+  it('preserves second resolution', () => {
+    const d = new Date(Date.UTC(2026, 4, 12, 0, 28, 37));
+    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37Z');
+  });
+});
 
 describe('formatReal107', () => {
   it('keeps clean decimals unchanged', () => {

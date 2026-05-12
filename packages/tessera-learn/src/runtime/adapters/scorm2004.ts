@@ -1,7 +1,11 @@
 import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
-import { formatISO8601Duration, formatReal107 } from './retry.js';
+import {
+  formatISO8601Duration,
+  formatISO8601Timestamp,
+  formatReal107,
+} from './retry.js';
 
 /**
  * SCORM 2004 API interface.
@@ -25,7 +29,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   interactionFields: {
     responseField: 'learner_response',
     timestampField: 'timestamp',
-    timestamp: () => new Date().toISOString(),
+    timestamp: () => formatISO8601Timestamp(new Date()),
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
     format: SCORM2004_INTERACTION_FORMAT,
