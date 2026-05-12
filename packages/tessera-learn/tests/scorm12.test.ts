@@ -332,7 +332,7 @@ describe('SCORM12Adapter', () => {
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Phobos.Mars,Europa.Jupiter');
     });
 
-    it('uses plain : range delimiter for numeric correct pattern', async () => {
+    it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
       adapter.reportInteraction(
         'n1',
         { type: 'numeric', response: 22, correct: { min: 19, max: 25 } },
@@ -341,7 +341,20 @@ describe('SCORM12Adapter', () => {
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.student_response']).toBe('22');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('19:25');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined();
+      // result still tells the LMS pass/fail
+      expect(v['cmi.interactions.0.result']).toBe('correct');
+    });
+
+    it('keeps numeric correct_responses when min == max (single value)', async () => {
+      adapter.reportInteraction(
+        'n2',
+        { type: 'numeric', response: 7, correct: { min: 7, max: 7 } },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('7');
     });
 
     it('maps long-fill-in to fill-in (SCORM 1.2 has no long-fill-in type)', async () => {

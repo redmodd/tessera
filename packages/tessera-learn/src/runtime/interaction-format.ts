@@ -25,6 +25,12 @@ export interface InteractionFormat {
   pairDelim: string;
   /** Range separator for numeric `correct` patterns. */
   rangeDelim: string;
+  /**
+   * Whether numeric `correct_responses.n.pattern` may express a range. SCORM
+   * 1.2 RTE §3.4.7 defines this pattern as a single `CMIDecimal`, so a range
+   * has to be dropped (the LMS still gets the pass/fail from `result`).
+   */
+  supportsNumericRange: boolean;
   /** Format a boolean response for `true-false`. */
   formatBoolean(value: boolean): string;
   /** Sanitize an identifier so it satisfies the dialect's data-type rules. */
@@ -39,6 +45,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: ',',
   pairDelim: '.',
   rangeDelim: ':',
+  supportsNumericRange: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: cmi12Identifier,
 };
@@ -52,6 +59,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: '[,]',
   pairDelim: '[.]',
   rangeDelim: '[:]',
+  supportsNumericRange: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
@@ -124,9 +132,15 @@ export function formatCorrectPattern(
         .join(fmt.itemDelim);
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
-      const min = c.min ?? '';
-      const max = c.max ?? '';
-      return `${min}${fmt.rangeDelim}${max}`;
+      if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
+        return String(c.min);
+      }
+      if (c.min !== undefined && c.max === undefined) return String(c.min);
+      if (c.min === undefined && c.max !== undefined) return String(c.max);
+      // True range. SCORM 1.2 has no numeric range syntax — drop the pattern
+      // and let the LMS rely on cmi.interactions.n.result for pass/fail.
+      if (!fmt.supportsNumericRange) return null;
+      return `${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`;
     }
     case 'likert':
     case 'other':
