@@ -4,7 +4,8 @@ import {
   buildScormInteractionFields,
   type InteractionFormat,
 } from '../interaction-format.js';
-import { WriteQueue, callSync, withRetry } from './retry.js';
+import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
+import type { LMSErrorReporter } from './retry.js';
 
 /** Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters. */
 export interface ScormDialect<TApi> {
@@ -41,12 +42,15 @@ export interface ScormDialect<TApi> {
   commit(api: TApi): string;
   getLastError(api: TApi): string;
   getErrorString(api: TApi, code: string): string;
+  /** Optional verbose diagnostic — LMSGetDiagnostic / GetDiagnostic. */
+  getDiagnostic?(api: TApi, code: string): string;
 }
 
 export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   protected readonly api: TApi;
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
+  protected readonly errorReporter: LMSErrorReporter;
   #state: SavedState | null = null;
   #terminated = false;
   #suspendOverflowWarned = false;
@@ -55,13 +59,19 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
     this.api = api;
     this.dialect = dialect;
-    // Wire up GetLastError/GetErrorString so retry warnings can name the
-    // real LMS failure (e.g. "201 Invalid argument error") instead of a
-    // generic "LMS call failed" — production triage needs the code.
-    this.queue.errorReporter = {
+    // Wire up GetLastError/GetErrorString/GetDiagnostic so retry warnings
+    // can name the real LMS failure (e.g. "201 Invalid argument error —
+    // cmi.interactions.0.student_response invalid CMIFeedback") instead
+    // of a generic "LMS call failed". Production triage needs the code
+    // AND the diagnostic to identify the offending element.
+    this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),
+      diagnostic: this.dialect.getDiagnostic
+        ? (c) => this.dialect.getDiagnostic!(this.api, c)
+        : undefined,
     };
+    this.queue.errorReporter = this.errorReporter;
   }
 
   /** Expose the underlying SCORM API so xAPI actor synthesis can read learner fields. */
@@ -70,26 +80,65 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   }
 
   async init(): Promise<void> {
-    await withRetry(() => this.dialect.initialize(this.api));
+    const initialized = await withRetry(
+      () => this.dialect.initialize(this.api),
+      undefined,
+      this.errorReporter,
+      'Initialize'
+    );
+    if (!initialized) {
+      // withRetry already logged the LMS error code; add a top-level note
+      // so the developer understands the downstream silence: every later
+      // SetValue will also fail with error 301 (Not Initialized).
+      console.warn(
+        'Tessera: LMS Initialize failed — all subsequent persistence calls will fail with error 301 (Not Initialized). Reload the launch from the LMS.'
+      );
+      return;
+    }
 
+    let raw = '';
     try {
-      const raw = this.dialect.getValue(this.api, 'cmi.suspend_data');
-      if (raw && raw.trim()) {
+      raw = this.dialect.getValue(this.api, 'cmi.suspend_data');
+    } catch (err) {
+      console.warn(
+        'Tessera: LMS threw on GetValue(cmi.suspend_data); resume disabled for this launch',
+        err
+      );
+    }
+    if (raw && raw.trim()) {
+      try {
         this.#state = JSON.parse(raw);
+      } catch (err) {
+        console.warn(
+          'Tessera: cmi.suspend_data is not valid JSON; resume disabled for this launch (the LMS may have truncated a prior write)',
+          err
+        );
+        this.#state = null;
       }
-    } catch {
-      this.#state = null;
     }
 
     // Continue cmi.interactions.n indexing where the previous session left
     // off. Restarting at 0 would overwrite prior records (the LMS uses n
-    // as the array key, not an upsert field).
+    // as the array key, not an upsert field), so a silent fallback here
+    // is genuinely dangerous — warn loudly.
+    let countRaw = '';
     try {
-      const count = this.dialect.getValue(this.api, 'cmi.interactions._count');
-      const n = parseInt(count, 10);
-      if (Number.isFinite(n) && n >= 0) this.interactionCount = n;
-    } catch {
-      // Some LMSes throw on _count when no interactions exist — fall back to 0.
+      countRaw = this.dialect.getValue(this.api, 'cmi.interactions._count');
+    } catch (err) {
+      console.warn(
+        'Tessera: LMS threw on GetValue(cmi.interactions._count); new interactions will be written from index 0 and may overwrite prior session records',
+        err
+      );
+      return;
+    }
+    if (countRaw === '' || countRaw === '0') return;
+    const n = parseInt(countRaw, 10);
+    if (Number.isFinite(n) && n >= 0) {
+      this.interactionCount = n;
+    } else {
+      console.warn(
+        `Tessera: LMS returned non-numeric cmi.interactions._count="${countRaw}"; new interactions will be written from index 0 and may overwrite prior session records`
+      );
     }
   }
 
@@ -165,10 +214,16 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     this.#terminated = true;
     // During page unload, async retries can't run.
     // Drain any pending queue operations synchronously (single attempt each),
-    // then commit and finish synchronously.
+    // then commit and finish synchronously. The terminate path is the last
+    // chance to persist this session's data — log loudly on failure since
+    // the user is about to navigate away and won't see a second chance.
     this.queue.drainSync();
-    callSync(() => this.dialect.commit(this.api));
-    callSync(() => this.dialect.terminate(this.api));
+    callSyncOrWarn(() => this.dialect.commit(this.api), 'Commit', this.errorReporter);
+    callSyncOrWarn(
+      () => this.dialect.terminate(this.api),
+      'Terminate',
+      this.errorReporter
+    );
   }
 
   // The four operations that genuinely diverge between SCORM versions.

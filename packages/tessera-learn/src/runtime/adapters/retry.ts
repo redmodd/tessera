@@ -8,6 +8,13 @@ export interface LMSErrorReporter {
   code(): string;
   /** Human-readable message from `LMSGetErrorString` / `GetErrorString`. */
   message(code: string): string;
+  /**
+   * Optional verbose diagnostic from `LMSGetDiagnostic` / `GetDiagnostic`.
+   * Spec-defined as implementation-specific extra detail beyond the
+   * canonical errorString — Rustici/SCORM Cloud uses it to name the
+   * offending data-model element, for example.
+   */
+  diagnostic?(code: string): string;
 }
 
 /** Default attempt count for LMS retry loops (one initial + two retries). */
@@ -33,17 +40,57 @@ function logRetryGiveUp(
   lastErrCode: string,
   context: string | undefined
 ): void {
-  let detail = '';
-  if (errorReporter && lastErrCode && lastErrCode !== '0') {
-    try {
-      const msg = errorReporter.message(lastErrCode);
-      detail = ` (LMS error ${lastErrCode}${msg ? `: ${msg}` : ''})`;
-    } catch {}
-  }
   const ctx = context ? ` [${context}]` : '';
   console.warn(
-    `Tessera: LMS call failed after retries${ctx}${detail}, continuing without persistence`
+    `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`
   );
+}
+
+/** Build the `(LMS error N: msg — diagnostic)` suffix used in failure logs. */
+export function formatLMSErrorDetail(
+  errorReporter: LMSErrorReporter | undefined,
+  code: string
+): string {
+  if (!errorReporter || !code || code === '0') return '';
+  let msg = '';
+  let diag = '';
+  try { msg = errorReporter.message(code); } catch {}
+  try { diag = errorReporter.diagnostic?.(code) ?? ''; } catch {}
+  let detail = ` (LMS error ${code}`;
+  if (msg) detail += `: ${msg}`;
+  if (diag && diag !== msg) detail += ` — ${diag}`;
+  detail += ')';
+  return detail;
+}
+
+/**
+ * Synchronous single-attempt LMS call that warns on failure with the LMS
+ * error code + diagnostic when available. Use for terminate-path calls
+ * (drainSync, commit-at-finish, finish) where async retries can't run but
+ * silent failure is worse than a noisy log.
+ */
+export function callSyncOrWarn(
+  fn: () => any,
+  context: string,
+  errorReporter?: LMSErrorReporter
+): boolean {
+  let ok = false;
+  try {
+    ok = lmsCallSucceeded(fn());
+  } catch (err) {
+    console.warn(
+      `Tessera: LMS call threw [${context}] during terminate`,
+      err
+    );
+    return false;
+  }
+  if (!ok) {
+    const code = readLastErrorCode(errorReporter);
+    console.warn(
+      `Tessera: LMS call failed [${context}] during terminate${formatLMSErrorDetail(errorReporter, code)}`
+    );
+  }
+  return ok;
 }
 
 /**
@@ -68,16 +115,24 @@ export async function withRetry(
   context?: string
 ): Promise<boolean> {
   let lastErrCode = '';
+  let threw = false;
+  let lastError: unknown;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    threw = false;
     try {
       if (lmsCallSucceeded(fn())) return true;
-    } catch {
-      // API call threw — treat as failure
+    } catch (err) {
+      threw = true;
+      lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
     if (attempt < maxRetries - 1) {
       await new Promise((r) => setTimeout(r, backoffMs(attempt)));
     }
+  }
+  if (threw) {
+    const ctx = context ? ` [${context}]` : '';
+    console.warn(`Tessera: LMS call threw${ctx} on final retry`, lastError);
   }
   logRetryGiveUp(errorReporter, lastErrCode, context);
   return false;

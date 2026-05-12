@@ -39,6 +39,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   commit: (api) => api.LMSCommit(''),
   getLastError: (api) => api.LMSGetLastError(),
   getErrorString: (api, code) => api.LMSGetErrorString(code),
+  getDiagnostic: (api, code) => api.LMSGetDiagnostic(code),
 };
 
 /**

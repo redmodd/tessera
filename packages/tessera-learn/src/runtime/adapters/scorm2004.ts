@@ -37,6 +37,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   commit: (api) => api.Commit(''),
   getLastError: (api) => api.GetLastError(),
   getErrorString: (api, code) => api.GetErrorString(code),
+  getDiagnostic: (api, code) => api.GetDiagnostic(code),
 };
 
 /**
