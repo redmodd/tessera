@@ -37,6 +37,8 @@ describe('SCORM12Adapter', () => {
     adapter = new SCORM12Adapter(api);
   });
 
+  // ---- lifecycle / init ----
+
   it('calls LMSInitialize on init', async () => {
     await adapter.init();
     expect(api.LMSInitialize).toHaveBeenCalledWith('');
@@ -70,96 +72,7 @@ describe('SCORM12Adapter', () => {
     warn.mockRestore();
   });
 
-  it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
-    await adapter.init();
-    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
-    await flush();
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_location', '4');
-  });
-
-  it('rounds fractional scores to real(10,7) — no 16-digit decimal trips 405', async () => {
-    await adapter.init();
-    adapter.setScore((7 / 11) * 100);
-    await flush();
-    const rawCall = (api.LMSSetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.core.score.raw'
-    );
-    expect(rawCall[1]).toBe('63.6363636');
-  });
-
-  describe('error logging parity with cmi5', () => {
-    it('warns with LMS error code + diagnostic when LMSInitialize fails', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (api.LMSInitialize as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
-      (api.LMSGetDiagnostic as any).mockReturnValue('LMS unavailable');
-      await adapter.init();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
-      expect(messages).toMatch(/Initialize/);
-      expect(messages).toMatch(/101/);
-      expect(messages).toMatch(/General Exception/);
-      expect(messages).toMatch(/LMS unavailable/);
-      expect(messages).toMatch(/error 301/);
-      warn.mockRestore();
-    });
-
-    it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (api.LMSGetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.interactions._count' ? 'NaN' : ''
-      );
-      await adapter.init();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
-      expect(messages).toMatch(/cmi\.interactions\._count/);
-      expect(messages).toMatch(/overwrite prior session records/);
-      warn.mockRestore();
-    });
-
-    it('warns when LMSCommit fails during terminate', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      await adapter.init();
-      (api.LMSCommit as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
-      adapter.terminate();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
-      expect(messages).toMatch(/Commit.*during terminate/);
-      expect(messages).toMatch(/101/);
-      warn.mockRestore();
-    });
-
-    it('warns when LMSFinish fails during terminate', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      await adapter.init();
-      (api.LMSFinish as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
-      adapter.terminate();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
-      expect(messages).toMatch(/Terminate.*during terminate/);
-      warn.mockRestore();
-    });
-
-    it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      await adapter.init();
-      (api.LMSSetValue as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('405');
-      (api.LMSGetErrorString as any).mockReturnValue('Incorrect Data Type');
-      (api.LMSGetDiagnostic as any).mockReturnValue(
-        'student_response invalid CMIFeedback'
-      );
-      adapter.setScore(85);
-      await new Promise((r) => setTimeout(r, 1000));
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
-      expect(messages).toMatch(/cmi\.core\.score\.raw/);
-      expect(messages).toMatch(/405/);
-      expect(messages).toMatch(/Incorrect Data Type/);
-      expect(messages).toMatch(/student_response invalid CMIFeedback/);
-      warn.mockRestore();
-    });
-  });
+  // ---- saveState / suspend_data ----
 
   it('saves state to suspend_data via queue', async () => {
     await adapter.init();
@@ -175,6 +88,13 @@ describe('SCORM12Adapter', () => {
       'cmi.suspend_data',
       JSON.stringify(state)
     );
+  });
+
+  it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
+    await adapter.init();
+    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
+    await flush();
+    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_location', '4');
   });
 
   describe('suspend_data size guard', () => {
@@ -219,6 +139,8 @@ describe('SCORM12Adapter', () => {
     });
   });
 
+  // ---- setScore ----
+
   it('sets score with raw, min, max via queue', async () => {
     adapter.setScore(85);
     await flush();
@@ -226,6 +148,18 @@ describe('SCORM12Adapter', () => {
     expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.min', '0');
     expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.max', '100');
   });
+
+  it('rounds fractional scores to real(10,7) — no 16-digit decimal trips 405', async () => {
+    await adapter.init();
+    adapter.setScore((7 / 11) * 100);
+    await flush();
+    const rawCall = (api.LMSSetValue as any).mock.calls.find(
+      ([k]: [string]) => k === 'cmi.core.score.raw'
+    );
+    expect(rawCall[1]).toBe('63.6363636');
+  });
+
+  // ---- lesson_status ----
 
   describe('lesson_status reconciliation', () => {
     it('sets incomplete when completion is incomplete', async () => {
@@ -278,6 +212,8 @@ describe('SCORM12Adapter', () => {
     });
   });
 
+  // ---- duration / commit / terminate ----
+
   it('sets duration in HHHH:MM:SS format via queue', async () => {
     adapter.setDuration(3661);
     await flush();
@@ -318,6 +254,8 @@ describe('SCORM12Adapter', () => {
     expect(api.LMSFinish).toHaveBeenCalledTimes(1);
   });
 
+  // ---- queue ----
+
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
     (api.LMSSetValue as any).mockImplementation(
@@ -350,6 +288,8 @@ describe('SCORM12Adapter', () => {
     await new Promise((r) => setTimeout(r, 1000));
     expect(callCount).toBeGreaterThanOrEqual(3);
   });
+
+  // ---- interactions ----
 
   describe('reportInteraction', () => {
     function setValuesFor(prefix: string): Record<string, string> {
@@ -494,6 +434,82 @@ describe('SCORM12Adapter', () => {
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined();
       expect(v['cmi.interactions.0.result']).toBeUndefined();
+    });
+  });
+
+  // ---- error logging (parity with cmi5) ----
+
+  describe('error logging parity with cmi5', () => {
+    it('warns with LMS error code + diagnostic when LMSInitialize fails', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (api.LMSInitialize as any).mockReturnValue('false');
+      (api.LMSGetLastError as any).mockReturnValue('101');
+      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
+      (api.LMSGetDiagnostic as any).mockReturnValue('LMS unavailable');
+      await adapter.init();
+      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(messages).toMatch(/Initialize/);
+      expect(messages).toMatch(/101/);
+      expect(messages).toMatch(/General Exception/);
+      expect(messages).toMatch(/LMS unavailable/);
+      expect(messages).toMatch(/error 301/);
+      warn.mockRestore();
+    });
+
+    it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (api.LMSGetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.interactions._count' ? 'NaN' : ''
+      );
+      await adapter.init();
+      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(messages).toMatch(/cmi\.interactions\._count/);
+      expect(messages).toMatch(/overwrite prior session records/);
+      warn.mockRestore();
+    });
+
+    it('warns when LMSCommit fails during terminate', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      (api.LMSCommit as any).mockReturnValue('false');
+      (api.LMSGetLastError as any).mockReturnValue('101');
+      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
+      adapter.terminate();
+      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(messages).toMatch(/Commit.*during terminate/);
+      expect(messages).toMatch(/101/);
+      warn.mockRestore();
+    });
+
+    it('warns when LMSFinish fails during terminate', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      (api.LMSFinish as any).mockReturnValue('false');
+      (api.LMSGetLastError as any).mockReturnValue('101');
+      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
+      adapter.terminate();
+      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(messages).toMatch(/Terminate.*during terminate/);
+      warn.mockRestore();
+    });
+
+    it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await adapter.init();
+      (api.LMSSetValue as any).mockReturnValue('false');
+      (api.LMSGetLastError as any).mockReturnValue('405');
+      (api.LMSGetErrorString as any).mockReturnValue('Incorrect Data Type');
+      (api.LMSGetDiagnostic as any).mockReturnValue(
+        'student_response invalid CMIFeedback'
+      );
+      adapter.setScore(85);
+      await new Promise((r) => setTimeout(r, 1000));
+      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(messages).toMatch(/cmi\.core\.score\.raw/);
+      expect(messages).toMatch(/405/);
+      expect(messages).toMatch(/Incorrect Data Type/);
+      expect(messages).toMatch(/student_response invalid CMIFeedback/);
+      warn.mockRestore();
     });
   });
 });
