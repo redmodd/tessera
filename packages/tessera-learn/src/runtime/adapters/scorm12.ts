@@ -2,8 +2,9 @@ import {
   SCORM12_INTERACTION_FORMAT,
   scorm12Type,
 } from '../interaction-format.js';
+import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
-import { formatHHMMSS } from './retry.js';
+import { formatHHMMSS, formatReal107 } from './retry.js';
 
 /**
  * SCORM 1.2 API interface.
@@ -62,9 +63,21 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     super(api, SCORM12_DIALECT);
   }
 
+  saveState(state: SavedState): void {
+    super.saveState(state);
+    // §3.4.5.3 cmi.core.lesson_location — bookmark for LMS resume UIs.
+    // Tessera persists everything in cmi.suspend_data; lesson_location is
+    // additional surface for the LMS to render "Resume from page N".
+    this.queue.enqueue(
+      () =>
+        this.api.LMSSetValue('cmi.core.lesson_location', String(state.b)),
+      'cmi.core.lesson_location'
+    );
+  }
+
   setScore(score: number): void {
     this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.score.raw', String(score)),
+      () => this.api.LMSSetValue('cmi.core.score.raw', formatReal107(score)),
       'cmi.core.score.raw'
     );
     this.queue.enqueue(

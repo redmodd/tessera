@@ -127,6 +127,29 @@ describe('SCORM2004Adapter', () => {
     expect(api.SetValue).toHaveBeenCalledWith('cmi.score.scaled', '0.85');
   });
 
+  it('rounds fractional scores to real(10,7) — no >7-digit decimal trips 406', async () => {
+    // 7 / 11 * 100 = 63.6363636363... → raw must not exceed 7 fractional digits
+    adapter.setScore((7 / 11) * 100);
+    await flush();
+    const rawCall = (api.SetValue as any).mock.calls.find(
+      ([k]: [string]) => k === 'cmi.score.raw'
+    );
+    const scaledCall = (api.SetValue as any).mock.calls.find(
+      ([k]: [string]) => k === 'cmi.score.scaled'
+    );
+    expect(rawCall[1]).toBe('63.6363636');
+    expect(scaledCall[1]).toBe('0.6363636');
+  });
+
+  it('clamps cmi.score.scaled to the spec-defined [-1,1] band', async () => {
+    adapter.setScore(150);
+    await flush();
+    const scaledCall = (api.SetValue as any).mock.calls.find(
+      ([k]: [string]) => k === 'cmi.score.scaled'
+    );
+    expect(scaledCall[1]).toBe('1');
+  });
+
   it('sets completion_status to completed', async () => {
     adapter.setCompletionStatus('complete');
     await flush();
@@ -207,6 +230,110 @@ describe('SCORM2004Adapter', () => {
     const suspendIdx = order.indexOf('cmi.suspend_data');
     const scoreIdx = order.indexOf('cmi.score.raw');
     expect(suspendIdx).toBeLessThan(scoreIdx);
+  });
+
+  it('writes cmi.location from SavedState.b on saveState', async () => {
+    await adapter.init();
+    adapter.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], q: {}, d: 100 });
+    await flush();
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.location', '7');
+  });
+
+  it('writes cmi.progress_measure=1 when setCompletionStatus is complete', async () => {
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await flush();
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.progress_measure', '1');
+  });
+
+  it('does not write progress_measure when status is incomplete', async () => {
+    await adapter.init();
+    adapter.setCompletionStatus('incomplete');
+    await flush();
+    const progressCalls = (api.SetValue as any).mock.calls.filter(
+      ([k]: [string]) => k === 'cmi.progress_measure'
+    );
+    expect(progressCalls).toHaveLength(0);
+  });
+
+  describe('cmi.mode honoring (browse / review launches)', () => {
+    function mockReview(): void {
+      (api.GetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.mode' ? 'review' : ''
+      );
+    }
+    function mockBrowse(): void {
+      (api.GetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.mode' ? 'browse' : ''
+      );
+    }
+    function settersDidNotFire(): void {
+      const writes = (api.SetValue as any).mock.calls.map(([k]: [string]) => k);
+      expect(writes).not.toContain('cmi.score.raw');
+      expect(writes).not.toContain('cmi.completion_status');
+      expect(writes).not.toContain('cmi.success_status');
+      expect(writes).not.toContain('cmi.session_time');
+      expect(writes).not.toContain('cmi.exit');
+      expect(writes).not.toContain('cmi.suspend_data');
+      expect(writes).not.toContain('cmi.location');
+    }
+
+    it('exposes the LMS-supplied mode via getLaunchMode()', async () => {
+      mockReview();
+      await adapter.init();
+      expect(adapter.getLaunchMode()).toBe('review');
+    });
+
+    it('refuses every learner-record write in review mode', async () => {
+      mockReview();
+      await adapter.init();
+      adapter.setScore(85);
+      adapter.setCompletionStatus('complete');
+      adapter.setSuccessStatus('passed');
+      adapter.setDuration(100);
+      adapter.setExit('normal');
+      adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
+      adapter.reportInteraction('q1', { type: 'true-false', response: true }, true);
+      await flush();
+      settersDidNotFire();
+    });
+
+    it('refuses every learner-record write in browse mode', async () => {
+      mockBrowse();
+      await adapter.init();
+      adapter.setScore(85);
+      adapter.setCompletionStatus('complete');
+      adapter.saveState({ b: 3, v: [], q: {}, d: 0 });
+      await flush();
+      settersDidNotFire();
+    });
+  });
+
+  describe('LMS-supplied thresholds', () => {
+    it('reads cmi.scaled_passing_score and exposes via getMasteryScore()', async () => {
+      (api.GetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.scaled_passing_score' ? '0.7' : ''
+      );
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBe(0.7);
+    });
+
+    it('reads cmi.completion_threshold and exposes via getCompletionThreshold()', async () => {
+      (api.GetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.completion_threshold' ? '0.8' : ''
+      );
+      await adapter.init();
+      expect(adapter.getCompletionThreshold()).toBe(0.8);
+    });
+
+    it('returns null for out-of-range or missing thresholds', async () => {
+      (api.GetValue as any).mockImplementation((key: string) =>
+        key === 'cmi.scaled_passing_score' ? '1.5' : ''
+      );
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+      expect(adapter.getCompletionThreshold()).toBeNull();
+    });
   });
 
   describe('reportInteraction', () => {

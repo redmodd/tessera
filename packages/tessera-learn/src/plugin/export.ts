@@ -77,6 +77,8 @@ interface ScormManifestDialect {
   schemaversion: string;
   /** Attribute name on <resource>: SCORM 1.2 uses lowercase, 2004 uses camelCase. */
   scormTypeAttr: 'scormtype' | 'scormType';
+  /** Whitespace-separated namespace+XSD pairs for xsi:schemaLocation. */
+  schemaLocation: string;
 }
 
 const SCORM_DIALECTS: Record<'1.2' | '2004', ScormManifestDialect> = {
@@ -85,12 +87,19 @@ const SCORM_DIALECTS: Record<'1.2' | '2004', ScormManifestDialect> = {
     adlcpNs: 'http://www.adlnet.org/xsd/adlcp_rootv1p2',
     schemaversion: '1.2',
     scormTypeAttr: 'scormtype',
+    schemaLocation:
+      'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
+      'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
+      'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
   },
   '2004': {
     rootNs: 'http://www.imsglobal.org/xsd/imscp_v1p1',
     adlcpNs: 'http://www.adlnet.org/xsd/adlcp_v1p3',
     schemaversion: '2004 4th Edition',
     scormTypeAttr: 'scormType',
+    schemaLocation:
+      'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd ' +
+      'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
   },
 };
 
@@ -109,7 +118,9 @@ export function generateScormManifest(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
   xmlns="${dialect.rootNs}"
-  xmlns:adlcp="${dialect.adlcpNs}">
+  xmlns:adlcp="${dialect.adlcpNs}"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="${dialect.schemaLocation}">
   <metadata>
     <schema>ADL SCORM</schema>
     <schemaversion>${dialect.schemaversion}</schemaversion>

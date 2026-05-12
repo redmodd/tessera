@@ -5,7 +5,33 @@ import {
   WriteQueue,
   formatHHMMSS,
   formatISO8601Duration,
+  formatReal107,
 } from '../src/runtime/adapters/retry.js';
+
+describe('formatReal107', () => {
+  it('keeps clean decimals unchanged', () => {
+    expect(formatReal107(0.85)).toBe('0.85');
+    expect(formatReal107(85)).toBe('85');
+    expect(formatReal107(0)).toBe('0');
+    expect(formatReal107(1)).toBe('1');
+  });
+
+  it('truncates beyond 7 fractional digits', () => {
+    expect(formatReal107(1 / 3)).toBe('0.3333333');
+    expect(formatReal107(2 / 3)).toBe('0.6666667');
+    expect(formatReal107((7 / 11) * 100)).toBe('63.6363636');
+  });
+
+  it('drops trailing zeros (no padded 0.8500000)', () => {
+    expect(formatReal107(0.5)).toBe('0.5');
+    expect(formatReal107(0.75)).toBe('0.75');
+  });
+
+  it('returns "0" for non-finite input', () => {
+    expect(formatReal107(NaN)).toBe('0');
+    expect(formatReal107(Infinity)).toBe('0');
+  });
+});
 
 describe('withRetry', () => {
   it('returns true on first success', async () => {

@@ -70,6 +70,23 @@ describe('SCORM12Adapter', () => {
     warn.mockRestore();
   });
 
+  it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
+    await adapter.init();
+    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
+    await flush();
+    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_location', '4');
+  });
+
+  it('rounds fractional scores to real(10,7) — no 16-digit decimal trips 405', async () => {
+    await adapter.init();
+    adapter.setScore((7 / 11) * 100);
+    await flush();
+    const rawCall = (api.LMSSetValue as any).mock.calls.find(
+      ([k]: [string]) => k === 'cmi.core.score.raw'
+    );
+    expect(rawCall[1]).toBe('63.6363636');
+  });
+
   describe('error logging parity with cmi5', () => {
     it('warns with LMS error code + diagnostic when LMSInitialize fails', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -107,6 +107,20 @@ describe('generateSCORM12Manifest', () => {
     const xml = generateSCORM12Manifest({ title: 'Test' }, distDir);
     expect(xml).toMatch(/href="index.html">/);
   });
+
+  it('declares xsi namespace and schemaLocation pairs', () => {
+    const distDir = createDistDir(testRoot);
+    const xml = generateSCORM12Manifest({ title: 'Test' }, distDir);
+    expect(xml).toContain(
+      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+    );
+    expect(xml).toContain(
+      'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd'
+    );
+    expect(xml).toContain(
+      'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd'
+    );
+  });
 });
 
 // ---- SCORM 2004 Manifest ----
@@ -138,6 +152,20 @@ describe('generateSCORM2004Manifest', () => {
     const xml = generateSCORM2004Manifest({ title: 'Test' }, distDir);
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
+  });
+
+  it('declares xsi namespace and schemaLocation pairs', () => {
+    const distDir = createDistDir(testRoot);
+    const xml = generateSCORM2004Manifest({ title: 'Test' }, distDir);
+    expect(xml).toContain(
+      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+    );
+    expect(xml).toContain(
+      'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd'
+    );
+    expect(xml).toContain(
+      'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd'
+    );
   });
 });
 

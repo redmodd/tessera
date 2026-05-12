@@ -331,6 +331,25 @@ export function formatHHMMSS(totalSeconds: number): string {
 }
 
 /**
+ * Format a number as SCORM `real(10,7)` — at most 7 fractional digits, no
+ * trailing zeros (cleaner than `.toFixed(7)`'s padded form). SCORM 2004 4E
+ * §4.2 / §4.3 define every CMIDecimal-like element as real(10,7); a value
+ * like `String(1/3) = '0.3333333333333333'` exceeds that and trips strict
+ * validators (SCORM Cloud) with error 406 Data Model Element Type Mismatch.
+ */
+export function formatReal107(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  const rounded = Math.round(value * 1e7) / 1e7;
+  // Use toFixed to defeat exponential notation from very small/large values,
+  // then trim trailing zeros so we don't pad short values like "0.85" to
+  // "0.8500000".
+  return rounded
+    .toFixed(7)
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '');
+}
+
+/**
  * Format seconds as ISO 8601 duration: PT1H30M45S
  */
 export function formatISO8601Duration(totalSeconds: number): string {
