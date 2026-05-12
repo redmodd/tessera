@@ -352,14 +352,22 @@ export function formatReal107(value: number): string {
 /**
  * Format a Date as a SCORM 2004 4E `time(second,10,0)` timestamp.
  *
- * The spec (§3.3.10.1) references ISO 8601 §5.3.3 and allows up to 10
- * fractional-second digits, but several strict validators (SCORM Cloud)
- * reject any fractional seconds with error 406 "is not a valid time
- * type". `Date.toISOString()` always emits 3 fractional digits, so we
- * strip them. Second-resolution is universally accepted.
+ * SCORM 2004 4E §3.3.10.1 references ISO 8601 §5.3.3 — combination of date
+ * and time of day, *no* zone designator. Strict validators (SCORM Cloud)
+ * interpret that literally and reject anything carrying a `Z` or `±hh:mm`
+ * suffix or any fractional seconds with error 406 "is not a valid time
+ * type". We emit `YYYY-MM-DDThh:mm:ss` from the Date's UTC components:
+ * zone-free per §5.3.3, second-resolution per the data-type precision,
+ * and timezone-independent so writes don't drift across local-TZ flips.
  */
 export function formatISO8601Timestamp(date: Date): string {
-  return date.toISOString().replace(/\.\d+Z$/, 'Z');
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  const hh = String(date.getUTCHours()).padStart(2, '0');
+  const mi = String(date.getUTCMinutes()).padStart(2, '0');
+  const ss = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
 }
 
 /**

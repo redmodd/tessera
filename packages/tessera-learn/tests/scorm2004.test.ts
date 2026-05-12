@@ -358,9 +358,10 @@ describe('SCORM2004Adapter', () => {
       expect(v['cmi.interactions.0.learner_response']).toBe('a[,]b');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
       expect(v['cmi.interactions.0.result']).toBe('incorrect');
-      // Second-resolution ISO 8601, no fractional seconds — strict SCORM 2004
-      // validators (SCORM Cloud) reject the ".sssZ" form with error 406.
-      expect(v['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      // Zone-free, second-resolution per §5.3.3 — strict SCORM 2004
+      // validators (SCORM Cloud) reject both fractional seconds and the
+      // `Z` / `±hh:mm` zone designators with error 406.
+      expect(v['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
     });
 
     it('writes true-false interaction', async () => {

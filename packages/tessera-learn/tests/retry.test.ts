@@ -10,14 +10,20 @@ import {
 } from '../src/runtime/adapters/retry.js';
 
 describe('formatISO8601Timestamp', () => {
-  it('strips milliseconds (strict SCORM 2004 validators reject fractional seconds)', () => {
+  it('emits zone-free, second-resolution dateTime per SCORM 2004 §5.3.3', () => {
     const d = new Date('2026-05-12T00:28:37.910Z');
-    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37Z');
+    // No "Z", no fractional. Strict 2004 validators reject either.
+    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37');
   });
 
-  it('preserves second resolution', () => {
+  it('uses UTC components, not local TZ', () => {
     const d = new Date(Date.UTC(2026, 4, 12, 0, 28, 37));
-    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37Z');
+    expect(formatISO8601Timestamp(d)).toBe('2026-05-12T00:28:37');
+  });
+
+  it('zero-pads single-digit fields', () => {
+    const d = new Date(Date.UTC(2026, 0, 3, 4, 5, 6));
+    expect(formatISO8601Timestamp(d)).toBe('2026-01-03T04:05:06');
   });
 });
 
