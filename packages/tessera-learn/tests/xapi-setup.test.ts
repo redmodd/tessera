@@ -4,18 +4,6 @@ import { buildXAPIClient } from '../src/runtime/xapi/setup.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 
-/**
- * Verifies the custom-xAPI wiring that crosses the cmi5 boundary still
- * works after the cmi5 lifecycle refactors:
- *
- *  1. `endpoint: 'lms'` resolves to the cmi5 adapter's live publisher
- *     (shared queue, same auth/actor as Initialized/Completed/etc.)
- *  2. An explicit cmi5 destination inherits the launch actor when the
- *     author omits `xapi.actor`.
- *  3. Author-issued `useXAPI().sendStatement()` fan-outs land at the
- *     real LRS through the cmi5 publisher.
- */
-
 const mockFetch = vi.fn();
 
 const baseLaunchParams = {
@@ -187,9 +175,8 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it("dev fallback: 'lms' under cmi5 with no launch params surfaces a clear error on send", async () => {
-    // Strip the launch params so CMI5Adapter init would refuse; we never
-    // construct it. buildXAPIClient receives `null` for the adapter — same
-    // shape the runtime hands it when it falls through to WebAdapter.
+    // No launch params → the runtime hands buildXAPIClient `null` (it'd
+    // otherwise pass the WebAdapter fallback). Mirror that shape here.
     setSearchParams({});
 
     const config = baseConfig();
@@ -198,9 +185,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     const client = await buildXAPIClient(config, null);
     expect(client).not.toBeNull();
 
-    // XAPIClient.sendStatement is Promise.all-fail-fast: when the only
-    // destination is the dev-fallback rejector, the whole call rejects
-    // with the explanatory error rather than silently no-oping.
+    // sendStatement is Promise.all-fail-fast — the whole call rejects.
     await expect(
       client!.sendStatement(
         { verb: { id: 'http://verb/exp' } },

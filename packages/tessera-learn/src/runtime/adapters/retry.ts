@@ -1,19 +1,11 @@
 /**
- * Optional callback that surfaces the LMS's last-error code/message after
- * a failed call, so warning logs can name the actual cause instead of a
- * generic "LMS call failed".
+ * Surfaces LMSGetLastError / LMSGetErrorString / LMSGetDiagnostic so failure
+ * logs can name the cause instead of a generic "LMS call failed". SCORM
+ * Cloud uses the diagnostic to name the offending data-model element.
  */
 export interface LMSErrorReporter {
-  /** Last error from `LMSGetLastError` / `GetLastError`. */
   code(): string;
-  /** Human-readable message from `LMSGetErrorString` / `GetErrorString`. */
   message(code: string): string;
-  /**
-   * Optional verbose diagnostic from `LMSGetDiagnostic` / `GetDiagnostic`.
-   * Spec-defined as implementation-specific extra detail beyond the
-   * canonical errorString — Rustici/SCORM Cloud uses it to name the
-   * offending data-model element, for example.
-   */
   diagnostic?(code: string): string;
 }
 
@@ -46,7 +38,6 @@ function logRetryGiveUp(
   );
 }
 
-/** Build the `(LMS error N: msg — diagnostic)` suffix used in failure logs. */
 export function formatLMSErrorDetail(
   errorReporter: LMSErrorReporter | undefined,
   code: string
@@ -63,12 +54,7 @@ export function formatLMSErrorDetail(
   return detail;
 }
 
-/**
- * Synchronous single-attempt LMS call that warns on failure with the LMS
- * error code + diagnostic when available. Use for terminate-path calls
- * (drainSync, commit-at-finish, finish) where async retries can't run but
- * silent failure is worse than a noisy log.
- */
+/** Sync call that warns with the LMS error code on failure (terminate-path). */
 export function callSyncOrWarn(
   fn: () => any,
   context: string,
@@ -331,18 +317,13 @@ export function formatHHMMSS(totalSeconds: number): string {
 }
 
 /**
- * Format a number as SCORM `real(10,7)` — at most 7 fractional digits, no
- * trailing zeros (cleaner than `.toFixed(7)`'s padded form). SCORM 2004 4E
- * §4.2 / §4.3 define every CMIDecimal-like element as real(10,7); a value
- * like `String(1/3) = '0.3333333333333333'` exceeds that and trips strict
- * validators (SCORM Cloud) with error 406 Data Model Element Type Mismatch.
+ * SCORM 2004 4E §4.2/§4.3 define CMIDecimal-like elements as real(10,7) —
+ * `String(1/3)` exceeds that and trips SCORM Cloud with error 406. Rounds,
+ * then trims trailing zeros (no padded "0.8500000" forms).
  */
 export function formatReal107(value: number): string {
   if (!Number.isFinite(value)) return '0';
   const rounded = Math.round(value * 1e7) / 1e7;
-  // Use toFixed to defeat exponential notation from very small/large values,
-  // then trim trailing zeros so we don't pad short values like "0.85" to
-  // "0.8500000".
   return rounded
     .toFixed(7)
     .replace(/(\.\d*?)0+$/, '$1')
@@ -350,15 +331,10 @@ export function formatReal107(value: number): string {
 }
 
 /**
- * Format a Date as a SCORM 2004 4E `time(second,10,0)` timestamp.
- *
- * SCORM 2004 4E §3.3.10.1 references ISO 8601 §5.3.3 — combination of date
- * and time of day, *no* zone designator. Strict validators (SCORM Cloud)
- * interpret that literally and reject anything carrying a `Z` or `±hh:mm`
- * suffix or any fractional seconds with error 406 "is not a valid time
- * type". We emit `YYYY-MM-DDThh:mm:ss` from the Date's UTC components:
- * zone-free per §5.3.3, second-resolution per the data-type precision,
- * and timezone-independent so writes don't drift across local-TZ flips.
+ * SCORM 2004 4E §3.3.10.1 references ISO 8601 §5.3.3 — local date+time, no
+ * zone designator. Strict validators reject `Z`, `±hh:mm`, and fractional
+ * seconds with error 406. UTC components are used so writes don't drift
+ * across local-TZ flips even though the format is zone-free.
  */
 export function formatISO8601Timestamp(date: Date): string {
   const yyyy = date.getUTCFullYear();

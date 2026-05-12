@@ -7,34 +7,27 @@ import {
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 
-/** Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters. */
+/**
+ * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
+ *
+ * `suspendDataLimit` is per-spec characters: SCORM 1.2 RTE §3.4.5.2 = 4096;
+ * SCORM 2004 4E §4.2 = 64000. The `LMS*`-prefixed (1.2) vs bare (2004)
+ * method names are abstracted here so the base class can stay version-
+ * agnostic.
+ */
 export interface ScormDialect<TApi> {
-  /** SCORM 1.2: `cmi.core.session_time`. SCORM 2004: `cmi.session_time`. */
   sessionTimeKey: string;
-  /** Format `seconds` for the session-time field — HHMMSS for 1.2, ISO8601 for 2004. */
   formatDuration(seconds: number): string;
-  /**
-   * Per-spec maximum byte length for `cmi.suspend_data` (SCORM 1.2 RTE
-   * §3.4.5.2 = 4096; SCORM 2004 4E §4.2 = 64000). Used by `saveState` to
-   * warn once when the serialized payload would be silently truncated by
-   * the LMS. Treated as "characters" since SCORM data-model lengths are
-   * specified in characters and Tessera stores ASCII-safe JSON.
-   */
   suspendDataLimit: number;
-  /** Human label for the limit warning, e.g. "SCORM 1.2 (4096 chars)". */
   suspendDataLimitLabel: string;
-  /** Per-interaction-row field config passed to `buildScormInteractionFields`. */
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
     timestampField: 'time' | 'timestamp';
-    /** Build the per-call timestamp string (HH:MM:SS for 1.2, ISO8601 for 2004). */
     timestamp(): string;
     typeValue(type: Interaction['type']): string;
     resultLabels: { correct: string; incorrect: string };
-    /** Response/pattern encoding (delimiters, identifier sanitization). */
     format: InteractionFormat;
   };
-  /** API method wrappers — abstract over the `LMS*`-prefixed and bare names. */
   initialize(api: TApi): string;
   terminate(api: TApi): string;
   getValue(api: TApi, key: string): string;
@@ -42,7 +35,6 @@ export interface ScormDialect<TApi> {
   commit(api: TApi): string;
   getLastError(api: TApi): string;
   getErrorString(api: TApi, code: string): string;
-  /** Optional verbose diagnostic — LMSGetDiagnostic / GetDiagnostic. */
   getDiagnostic?(api: TApi, code: string): string;
 }
 
@@ -59,11 +51,6 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
     this.api = api;
     this.dialect = dialect;
-    // Wire up GetLastError/GetErrorString/GetDiagnostic so retry warnings
-    // can name the real LMS failure (e.g. "201 Invalid argument error —
-    // cmi.interactions.0.student_response invalid CMIFeedback") instead
-    // of a generic "LMS call failed". Production triage needs the code
-    // AND the diagnostic to identify the offending element.
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),
@@ -74,7 +61,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     this.queue.errorReporter = this.errorReporter;
   }
 
-  /** Expose the underlying SCORM API so xAPI actor synthesis can read learner fields. */
+  /** Exposed for xAPI actor synthesis (reads learner fields off the API). */
   getAPI(): TApi {
     return this.api;
   }
@@ -87,9 +74,6 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       'Initialize'
     );
     if (!initialized) {
-      // withRetry already logged the LMS error code; add a top-level note
-      // so the developer understands the downstream silence: every later
-      // SetValue will also fail with error 301 (Not Initialized).
       console.warn(
         'Tessera: LMS Initialize failed — all subsequent persistence calls will fail with error 301 (Not Initialized). Reload the launch from the LMS.'
       );
@@ -117,10 +101,8 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       }
     }
 
-    // Continue cmi.interactions.n indexing where the previous session left
-    // off. Restarting at 0 would overwrite prior records (the LMS uses n
-    // as the array key, not an upsert field), so a silent fallback here
-    // is genuinely dangerous — warn loudly.
+    // n indexing must continue from _count — restarting at 0 would overwrite
+    // the prior session's records (the LMS uses n as the array key).
     let countRaw = '';
     try {
       countRaw = this.dialect.getValue(this.api, 'cmi.interactions._count');
@@ -212,11 +194,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   terminate(): void {
     if (this.#terminated) return;
     this.#terminated = true;
-    // During page unload, async retries can't run.
-    // Drain any pending queue operations synchronously (single attempt each),
-    // then commit and finish synchronously. The terminate path is the last
-    // chance to persist this session's data — log loudly on failure since
-    // the user is about to navigate away and won't see a second chance.
+    // Async retries can't run during page unload — drain + commit + finish synchronously.
     this.queue.drainSync();
     callSyncOrWarn(() => this.dialect.commit(this.api), 'Commit', this.errorReporter);
     callSyncOrWarn(
@@ -226,7 +204,6 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     );
   }
 
-  // The four operations that genuinely diverge between SCORM versions.
   abstract setScore(score: number): void;
   abstract setCompletionStatus(status: 'incomplete' | 'complete'): void;
   abstract setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;

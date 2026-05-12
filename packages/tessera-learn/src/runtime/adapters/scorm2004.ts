@@ -7,9 +7,6 @@ import {
   formatReal107,
 } from './retry.js';
 
-/**
- * SCORM 2004 API interface.
- */
 export interface SCORM2004API {
   Initialize(param: string): string;
   Terminate(param: string): string;
@@ -30,6 +27,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     responseField: 'learner_response',
     timestampField: 'timestamp',
     timestamp: () => formatISO8601Timestamp(new Date()),
+    // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
     format: SCORM2004_INTERACTION_FORMAT,
@@ -48,23 +46,14 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
 export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 
 /**
- * SCORM 2004 persistence adapter.
- *
- * Uses a sequential write queue for all LMS SetValue/Commit calls.
- * On terminate, the queue is drained synchronously (single attempt)
- * since async retries cannot complete during page unload.
+ * Per §4.2.1.5, the SCO MUST NOT alter the learner record in `browse` or
+ * `review` mode — every write below is gated on `#mode === 'normal'`.
+ * `#masteryScore` (§4.2.4.3) and `#completionThreshold` (§4.2.4.4) are
+ * LMS-supplied thresholds in [0,1].
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
-  /**
-   * SCORM 2004 4E §4.2.1.5 — the LMS may launch in `browse` or `review`
-   * mode. Per the spec, the SCO MUST NOT alter the learner's record in
-   * those modes (the LMS uses them to preview the SCO or replay an
-   * existing attempt). Mirrors cmi5's launchMode handling.
-   */
   #mode: SCORM2004Mode = 'normal';
-  /** §4.2.4.3 — LMS-supplied passing threshold (scaled in [0,1]). */
   #masteryScore: number | null = null;
-  /** §4.2.4.4 — LMS-supplied completion threshold (scaled in [0,1]). */
   #completionThreshold: number | null = null;
 
   constructor(api: SCORM2004API) {
@@ -80,22 +69,15 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     );
   }
 
-  /** Current launch mode. Callers should treat anything other than `normal` as read-only. */
   getLaunchMode(): SCORM2004Mode {
     return this.#mode;
   }
 
-  /**
-   * LMS-supplied `cmi.scaled_passing_score` as a decimal in [0, 1], or null
-   * when omitted. Read by App.svelte to override `course.config.js
-   * scoring.passingScore` for this launch — parity with cmi5's launch-time
-   * `masteryScore`.
-   */
+  /** Read by App.svelte to override `course.config.js scoring.passingScore`. */
   getMasteryScore(): number | null {
     return this.#masteryScore;
   }
 
-  /** LMS-supplied `cmi.completion_threshold` as a decimal in [0, 1], or null. */
   getCompletionThreshold(): number | null {
     return this.#completionThreshold;
   }
@@ -122,14 +104,9 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   saveState(state: SavedState): void {
-    // §4.2.1.5 — browse/review launches MUST NOT alter the learner record,
-    // and cmi.suspend_data is part of that record.
     if (this.#mode !== 'normal') return;
     super.saveState(state);
-    // §4.2.1.4 cmi.location — bookmark of where the learner left off.
-    // Tessera persists everything inside cmi.suspend_data, but writing a
-    // value here surfaces "Resume from page N" affordances in LMS UIs and
-    // is harmless when no UI consumes it.
+    // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.queue.enqueue(
       () => this.api.SetValue('cmi.location', String(state.b)),
       'cmi.location'
@@ -153,8 +130,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   setScore(score: number): void {
     if (this.#mode !== 'normal') return;
     const raw = formatReal107(score);
-    // §4.2.4.3.5 — score.scaled must be in [-1, 1]; we clamp the [0,100]
-    // raw score to [0,1] for the scaled field.
+    // §4.2.4.3.5 — score.scaled is bounded to [-1, 1].
     const scaled = formatReal107(Math.max(0, Math.min(1, score / 100)));
     this.queue.enqueue(
       () => this.api.SetValue('cmi.score.raw', raw),
@@ -174,10 +150,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     );
   }
 
-  // Note: cmi.completion_threshold and cmi.scaled_passing_score are typically
-  // set by the LMS, not the SCO. Tessera reads them in init() (above) and
-  // exposes them via getMasteryScore/getCompletionThreshold; the SCO writes
-  // its own outcome via cmi.completion_status / cmi.success_status / score.
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
     if (this.#mode !== 'normal') return;
     const value = status === 'complete' ? 'completed' : 'incomplete';
@@ -185,9 +157,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
       () => this.api.SetValue('cmi.completion_status', value),
       'cmi.completion_status'
     );
-    // §4.2.4.2 cmi.progress_measure — [0,1] scaled progress. Writing 1
-    // on completion gives LMS dashboards a sensible "100% complete" value
-    // even when tessera hasn't been streaming intermediate progress.
+    // §4.2.4.2 — writing 1.0 surfaces a "100%" reading on LMS dashboards.
     if (status === 'complete') {
       this.queue.enqueue(
         () => this.api.SetValue('cmi.progress_measure', '1'),
@@ -198,8 +168,8 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
     if (this.#mode !== 'normal') return;
-    // "unknown" is a valid SCORM 2004 value — setting it explicitly prevents
-    // LMSes (notably SCORM Cloud) from rolling up a null status to "passed".
+    // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
+    // a null status to "passed".
     this.queue.enqueue(
       () => this.api.SetValue('cmi.success_status', status),
       'cmi.success_status'
@@ -208,7 +178,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
 
   setExit(mode: 'suspend' | 'normal'): void {
     if (this.#mode !== 'normal') return;
-    // SCORM 2004 §4.2 cmi.exit vocabulary: time-out, suspend, logout, normal, "".
     this.queue.enqueue(
       () => this.api.SetValue('cmi.exit', mode),
       'cmi.exit'

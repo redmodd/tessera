@@ -65,9 +65,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   saveState(state: SavedState): void {
     super.saveState(state);
-    // §3.4.5.3 cmi.core.lesson_location — bookmark for LMS resume UIs.
-    // Tessera persists everything in cmi.suspend_data; lesson_location is
-    // additional surface for the LMS to render "Resume from page N".
+    // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
     this.queue.enqueue(
       () =>
         this.api.LMSSetValue('cmi.core.lesson_location', String(state.b)),
