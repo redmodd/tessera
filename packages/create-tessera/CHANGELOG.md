@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.0.7
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.6` so newly-created projects pick up the SCORM 1.2 / 2004 spec-conformance pass.
+
 ## 0.0.6
 
 ### Patch Changes

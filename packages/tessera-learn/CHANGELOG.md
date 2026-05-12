@@ -1,5 +1,17 @@
 # tessera-learn
 
+## 0.0.6
+
+### Patch Changes
+
+- **SCORM 1.2 + 2004 spec-conformance pass against SCORM Cloud.** Several response-encoding and lifecycle paths were re-used unchanged across both dialects; the strict Rustici validator rejects the mismatch with 405 / 406. This split-and-tighten release: SCORM 1.2 uses plain `,` / `.` / `:` delimiters per §3.4.7 (not the bracketed 2004 form), `t`/`f` for `true-false`, and slugs response/correct identifiers to `CMIIdentifier` (alphanumeric + underscore) — raw labels like `"88 Earth days"` become `88_Earth_days`. SCORM 2004 applies the same slug rule for `short_identifier_type` and emits zone-free, second-resolution `cmi.interactions.n.timestamp` (`2026-05-12T00:32:28` per §5.3.3). All CMIDecimal writes round through `formatReal107` so fractional scores don't exceed `real(10,7)`.
+
+- **SCORM 2004 catch-up with cmi5.** Reads `cmi.mode` on init and suppresses every learner-record write in `browse` / `review` launches (exposed via `getLaunchMode()`). Reads `cmi.scaled_passing_score` and `cmi.completion_threshold` (exposed via `getMasteryScore()` / `getCompletionThreshold()`); `App.svelte` lets the LMS-supplied mastery override `scoring.passingScore`. Writes `cmi.location` from `SavedState.b` and `cmi.progress_measure = 1` on completion. SCORM 1.2 gets the equivalent `cmi.core.lesson_location` write.
+
+- **Manifest `xsi:schemaLocation`.** Both 1.2 and 2004 `imsmanifest.xml` now declare the IMS CP and ADL CP XSD pairs. Strict importers flag the absence.
+
+- **Error logging parity with cmi5.** Every queued LMS write now carries the cmi key as context; retry give-up surfaces it alongside the code (`GetLastError`), message (`GetErrorString`), and the verbose diagnostic (`GetDiagnostic`, which SCORM Cloud uses to name the offending element). `LMSInitialize` failure, malformed `cmi.suspend_data`, non-numeric `cmi.interactions._count` (silent fallback to 0 would clobber prior session records), and terminate-path `Commit` / `LMSFinish` failures all log instead of failing silently.
+
 ## 0.0.5
 
 ### Patch Changes
