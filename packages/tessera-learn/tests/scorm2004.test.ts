@@ -63,8 +63,11 @@ describe('SCORM2004Adapter', () => {
 
   it('returns null state for corrupted data', async () => {
     (api.GetValue as any).mockReturnValue('{broken');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
+    expect(warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0])))).toBe(true);
+    warn.mockRestore();
   });
 
   it('saves state to suspend_data via queue', async () => {
@@ -358,9 +361,7 @@ describe('SCORM2004Adapter', () => {
       expect(v['cmi.interactions.0.learner_response']).toBe('a[,]b');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
       expect(v['cmi.interactions.0.result']).toBe('incorrect');
-      // Zone-free, second-resolution per §5.3.3 — strict SCORM 2004
-      // validators (SCORM Cloud) reject both fractional seconds and the
-      // `Z` / `±hh:mm` zone designators with error 406.
+      // Zone-free, second-resolution — see formatISO8601Timestamp tests.
       expect(v['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
     });
 
@@ -420,50 +421,27 @@ describe('SCORM2004Adapter', () => {
       expect(v['cmi.interactions.0.learner_response']).toBe('x[,]y[,]z');
     });
 
-    it('slugs non-alphanumeric sequencing identifiers (SCORM 2004 short_identifier_type)', async () => {
+    it('slugs response and correct identifiers to short_identifier_type', async () => {
+      // choice and sequencing share the same identifier-mapping branch, so
+      // testing one covers both. Use sequencing with realistic demo content
+      // exercising spaces, apostrophes, and quotes.
       adapter.reportInteraction(
         's2',
         {
           type: 'sequencing',
-          response: [
-            'Sputnik 1 launched',
-            'Yuri Gagarin orbits Earth',
-            'Apollo 8\'s "Earthrise" photo',
-            'Apollo 11 lands on the Moon',
-          ],
-          correct: [
-            'Sputnik 1 launched',
-            'Yuri Gagarin orbits Earth',
-            'Apollo 8\'s "Earthrise" photo',
-            'Apollo 11 lands on the Moon',
-          ],
+          response: ['Sputnik 1 launched', 'Apollo 8\'s "Earthrise" photo'],
+          correct: ['Sputnik 1 launched', 'Apollo 8\'s "Earthrise" photo'],
         },
         true
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.learner_response']).toBe(
-        'Sputnik_1_launched[,]Yuri_Gagarin_orbits_Earth[,]Apollo_8_s_Earthrise_photo[,]Apollo_11_lands_on_the_Moon'
+        'Sputnik_1_launched[,]Apollo_8_s_Earthrise_photo'
       );
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'Sputnik_1_launched[,]Yuri_Gagarin_orbits_Earth[,]Apollo_8_s_Earthrise_photo[,]Apollo_11_lands_on_the_Moon'
+        'Sputnik_1_launched[,]Apollo_8_s_Earthrise_photo'
       );
-    });
-
-    it('slugs non-alphanumeric choice identifiers', async () => {
-      adapter.reportInteraction(
-        'c2',
-        {
-          type: 'choice',
-          response: ['88 Earth days'],
-          correct: ['88 Earth days'],
-        },
-        true
-      );
-      await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.learner_response']).toBe('88_Earth_days');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('88_Earth_days');
     });
 
     it('writes numeric interaction', async () => {

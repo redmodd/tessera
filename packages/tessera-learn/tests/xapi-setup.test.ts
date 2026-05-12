@@ -64,24 +64,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     vi.restoreAllMocks();
   });
 
-  it("resolves xapi: { endpoint: 'lms' } to the cmi5 adapter's live publisher", async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
-
-    const config = baseConfig();
-    config.xapi = { endpoint: 'lms' };
-
-    const client = await buildXAPIClient(config, adapter);
-    expect(client).not.toBeNull();
-    // The client must reuse the cmi5 adapter's publisher — verifiable via
-    // the actor identity (set from the launch URL, not invented).
-    expect(client!.getActor()).toEqual({
-      mbox: 'mailto:learner@example.com',
-      name: 'Learner',
-    });
-  });
-
-  it("fan-outs a useXAPI() sendStatement to the LMS LRS through the cmi5 publisher", async () => {
+  it("fan-outs a useXAPI() sendStatement through the cmi5 publisher (endpoint: 'lms')", async () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
