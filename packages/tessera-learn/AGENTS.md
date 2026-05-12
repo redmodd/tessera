@@ -1005,6 +1005,10 @@ API discovery: walks `window.parent` / `window.opener` up to 10 levels looking f
 
 **Mastery is Tessera's, not the LMS's.** Pass/fail is computed from `scoring.passingScore`. `cmi.student_data.mastery_score` is read-only for this runtime.
 
+**Interaction encoding (§3.4.7).** Plain `,` items, `.` pairs, `:` ranges (not the bracketed `[,]` 2004 form). Response/correct identifiers are slugged to `CMIIdentifier` (alphanumeric + underscore, max 250 chars) — raw option text like `"88 Earth days"` becomes `88_Earth_days` to dodge `405 Incorrect Data Type`. `true-false` writes `t`/`f`. Numeric `correct_responses.n.pattern` is a single CMIDecimal; ranges are dropped (`result` still carries pass/fail).
+
+**Bookmark.** `cmi.core.lesson_location` is written from `SavedState.b` on every `saveState` to surface "Resume from page N" in LMS UIs.
+
 **Not implemented.** No `cmi.objectives.*` writes. No SCORM 1.2 sequencing; `navigation.canAccess` is the only gating layer, and the LMS sees one SCO. SCORM 1.2 `time-out` / `logout` exit values are not emitted.
 
 **Local testing.** Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free tier) or [Reload SCORM Player](https://github.com/reload/reload). Inspect the LMS API call log to confirm `lesson_status` and `cmi.interactions.*` look right.
@@ -1015,7 +1019,15 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written *explicitly* when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
 
-**LMS-side fields untouched.** `cmi.completion_threshold` and `cmi.scaled_passing_score` are LMS-owned; Tessera owns the threshold via `scoring.passingScore`.
+**LMS-supplied thresholds.** `cmi.scaled_passing_score` (§4.2.4.3) and `cmi.completion_threshold` (§4.2.4.4) are read on init and exposed via `adapter.getMasteryScore()` / `getCompletionThreshold()`. `App.svelte` picks up `masteryScore` and overrides `scoring.passingScore` for the launch — parity with cmi5's launch-time mastery.
+
+**Launch mode (§4.2.1.5).** `cmi.mode` is read on init. In `browse` and `review` launches every learner-record write is silently suppressed (`setScore` / `setCompletionStatus` / `setSuccessStatus` / `setExit` / `setDuration` / `reportInteraction` / `saveState` — including the `cmi.suspend_data` write). Mirrors cmi5's launchMode handling; exposed via `adapter.getLaunchMode()`.
+
+**Interaction encoding (§4.2.7 / Appendix A).** Bracketed delimiters `[,]` / `[.]` / `[:]` (literal text, not regex). Response/correct identifiers must be `short_identifier_type` (same alphanumeric + underscore rules as 1.2 — raw option labels are slugged to dodge `406 Data Model Element Type Mismatch`). `cmi.interactions.n.timestamp` is `time(second,10,0)` per §3.3.10.1 / ISO 8601 §5.3.3 — zone-free, second-resolution (`YYYY-MM-DDThh:mm:ss`); SCORM Cloud rejects fractional seconds and `Z` / `±hh:mm` suffixes with 406.
+
+**Bookmark + progress.** `cmi.location` is written from `SavedState.b` on every `saveState`. `cmi.progress_measure = 1` fires on `setCompletionStatus('complete')` so LMS dashboards show 100%.
+
+**Real precision.** All CMIDecimal-like writes (`score.raw`, `score.scaled`, etc.) round through `formatReal107` — SCORM 2004 4E defines them as `real(10,7)`, and `String(1/3)` would otherwise trip 406.
 
 **Not implemented.** `imsss:sequencing` rules are omitted from `imsmanifest.xml` by design. No `cmi.objectives.*`, no `cmi.adl.nav.*` writes.
 
@@ -1051,11 +1063,13 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 ### Common adapter behaviour
 
-**Queue + retry.** SCORM adapters serialize every `LMSSetValue` / `LMSCommit` through a sequential queue with exponential-backoff retry on transient errors. Retry warnings include the real LMS error code (`GetLastError`), e.g. `405 Incorrect Data Type` rather than a generic "LMS call failed".
+**Queue + retry.** SCORM adapters serialize every `LMSSetValue` / `LMSCommit` through a sequential queue with exponential-backoff retry on transient errors. Each enqueue carries the cmi key as `context`; retry warnings include the real LMS error code (`GetLastError`), the message (`GetErrorString`), and — when supplied — the verbose diagnostic (`GetDiagnostic`, which SCORM Cloud uses to name the offending element). The give-up log reads e.g. `[cmi.interactions.0.timestamp] (LMS error 406: Data Model Element Type Mismatch — is not a valid time type)`.
+
+**Init / terminate logging.** `Initialize` failures fire a top-level warning that names the LMS error code and notes downstream writes will all 301. Malformed `cmi.suspend_data` and non-numeric `cmi.interactions._count` are logged loudly — the latter is dangerous to silently fall back to 0 (the next session would overwrite prior records). Terminate-path `Commit` / `Terminate` / `LMSFinish` failures route through `callSyncOrWarn` so the last-chance writes aren't silent.
 
 **Unload.** `terminate()` cannot run async retries; the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
 
-**Interaction encoding.** `formatResponse` / `formatCorrectPattern` follow SCORM 2004 4th RTE §4.2.7 delimiters: `[,]` items, `[.]` pairs, `[:]` ranges. SCORM 1.2 and cmi5 reuse the encoding (cmi5 embeds it in `result.response` / `definition.correctResponsesPattern`).
+**Interaction encoding.** Split by dialect: SCORM 1.2 (§3.4.7) uses plain `,` / `.` / `:` and slugs identifiers to alphanumeric+underscore; SCORM 2004 (§4.2.7) + cmi5 use bracketed `[,]` / `[.]` / `[:]` and apply the same identifier slugging for short_identifier_type fields. Both dialects share `formatResponse` / `formatCorrectPattern` parameterised over an `InteractionFormat` record; cmi5 embeds the 2004 encoding in `result.response` / `definition.correctResponsesPattern`.
 
 **Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel. Never a silent degradation.
 
