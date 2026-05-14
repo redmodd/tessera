@@ -609,6 +609,7 @@ function validatePages(
       });
 
       validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+      validateQuestionComponents(content, fileRel, errors);
     }
 
     // Get lesson directories
@@ -695,6 +696,7 @@ function validatePages(
 
         // Check $assets references
         validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+        validateQuestionComponents(content, fileRel, errors);
       }
     }
   }
@@ -774,7 +776,7 @@ function validateCompletesOn(
 
 function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): void {
   if (!quiz || typeof quiz !== 'object') return;
-  const cfg = quiz as { maxAttempts?: unknown; graded?: unknown };
+  const cfg = quiz as Record<string, unknown>;
 
   if (cfg.maxAttempts !== undefined) {
     const val = cfg.maxAttempts;
@@ -785,10 +787,225 @@ function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): v
     }
   }
 
-  if (cfg.graded !== undefined && typeof cfg.graded !== 'boolean') {
-    errors.push(
-      `${fileRel}: quiz.graded must be a boolean, got ${typeof cfg.graded}`
-    );
+  for (const field of ['graded', 'gatesProgress', 'showFeedback']) {
+    if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
+      errors.push(
+        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`
+      );
+    }
+  }
+}
+
+// ---------- Question Component Validation ----------
+
+const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
+  MultipleChoice: ['question', 'options', 'correct'],
+  FillInTheBlank: ['question', 'answers'],
+  Matching: ['question', 'pairs'],
+  Sorting: ['question', 'items', 'targets', 'correct'],
+};
+
+type PropValue =
+  | { kind: 'string'; value: string }
+  | { kind: 'expr'; raw: string }
+  | { kind: 'bool' };
+
+/** Extract a balanced {...} or [...] span starting at startIndex, or null. */
+function extractBalanced(source: string, startIndex: number): string | null {
+  const open = source[startIndex];
+  if (open !== '{' && open !== '[') return null;
+  let depth = 0;
+  let inString: string | null = null;
+  let escaped = false;
+  for (let i = startIndex; i < source.length; i++) {
+    const char = source[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+    if (inString) {
+      if (char === inString) inString = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      inString = char;
+      continue;
+    }
+    if (char === '{' || char === '[') depth++;
+    if (char === '}' || char === ']') {
+      depth--;
+      if (depth === 0) return source.slice(startIndex, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse the props of an opening tag starting just after the component name.
+ * Returns null if the tag can't be parsed cleanly — callers then skip it
+ * rather than risk a false positive.
+ */
+function parseTagProps(content: string, start: number): Map<string, PropValue> | null {
+  const props = new Map<string, PropValue>();
+  let i = start;
+  while (i < content.length) {
+    while (i < content.length && /\s/.test(content[i])) i++;
+    if (i >= content.length) return null;
+    const c = content[i];
+    if (c === '>') return props;
+    if (c === '/' && content[i + 1] === '>') return props;
+    // Spread / shorthand expression — skip the whole {...} block.
+    if (c === '{') {
+      const block = extractBalanced(content, i);
+      if (!block) return null;
+      i += block.length;
+      continue;
+    }
+    const nameMatch = /^[A-Za-z_][\w-]*/.exec(content.slice(i));
+    if (!nameMatch) return null;
+    const propName = nameMatch[0];
+    i += propName.length;
+    while (i < content.length && /\s/.test(content[i])) i++;
+    if (content[i] !== '=') {
+      props.set(propName, { kind: 'bool' });
+      continue;
+    }
+    i++;
+    while (i < content.length && /\s/.test(content[i])) i++;
+    const v = content[i];
+    if (v === '"' || v === "'") {
+      const end = content.indexOf(v, i + 1);
+      if (end === -1) return null;
+      props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
+      i = end + 1;
+    } else if (v === '{') {
+      const block = extractBalanced(content, i);
+      if (!block) return null;
+      props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
+      i += block.length;
+    } else {
+      return null;
+    }
+  }
+  return null;
+}
+
+function staticArray(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
+  try {
+    const parsed = JSON5.parse(prop.raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function staticNumber(prop: PropValue | undefined): number | null {
+  if (prop?.kind !== 'expr') return null;
+  try {
+    const parsed = JSON5.parse(prop.raw);
+    return typeof parsed === 'number' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateQuestionComponents(
+  content: string,
+  fileRel: string,
+  errors: string[]
+): void {
+  const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
+  const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
+  const seenIds = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = tagStartRe.exec(content)) !== null) {
+    const name = m[1];
+    const props = parseTagProps(content, m.index + m[0].length);
+    if (!props) continue;
+
+    for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
+      if (!props.has(req)) {
+        errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
+      }
+    }
+
+    const idProp = props.get('id');
+    if (idProp?.kind === 'string') {
+      if (seenIds.has(idProp.value)) {
+        errors.push(
+          `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`
+        );
+      }
+      seenIds.add(idProp.value);
+    }
+
+    if (name === 'MultipleChoice') {
+      const options = staticArray(props.get('options'));
+      const correct = staticNumber(props.get('correct'));
+      if (options && correct !== null) {
+        if (!Number.isInteger(correct) || correct < 0 || correct >= options.length) {
+          errors.push(
+            `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`
+          );
+        }
+      }
+    } else if (name === 'Sorting') {
+      const items = staticArray(props.get('items'));
+      const targets = staticArray(props.get('targets'));
+      const correct = staticArray(props.get('correct'));
+      if (items && correct && correct.length !== items.length) {
+        errors.push(
+          `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`
+        );
+      }
+      if (targets && correct) {
+        for (const idx of correct) {
+          if (
+            typeof idx !== 'number' ||
+            !Number.isInteger(idx) ||
+            idx < 0 ||
+            idx >= targets.length
+          ) {
+            errors.push(
+              `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`
+            );
+            break;
+          }
+        }
+      }
+    } else if (name === 'Matching') {
+      const pairs = staticArray(props.get('pairs'));
+      if (pairs) {
+        const bad = pairs.some(
+          (p) =>
+            typeof p !== 'object' ||
+            p === null ||
+            typeof (p as { left?: unknown }).left !== 'string' ||
+            typeof (p as { right?: unknown }).right !== 'string'
+        );
+        if (bad) {
+          errors.push(
+            `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`
+          );
+        }
+      }
+    } else if (name === 'FillInTheBlank') {
+      const answers = staticArray(props.get('answers'));
+      if (answers) {
+        if (answers.length === 0) {
+          errors.push(`${fileRel}: <FillInTheBlank> answers must not be empty`);
+        } else if (answers.some((a) => typeof a !== 'string')) {
+          errors.push(
+            `${fileRel}: <FillInTheBlank> answers must be an array of strings`
+          );
+        }
+      }
+    }
   }
 }
 
