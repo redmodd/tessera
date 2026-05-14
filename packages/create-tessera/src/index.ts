@@ -334,6 +334,9 @@ function scaffoldBare(dir: string, name: string, title: string) {
   );
   write(join(dir, 'pages/01-course/01-lesson/intro.svelte'), bareIntro(title));
   write(join(dir, 'pages/01-course/01-lesson/check.svelte'), BARE_CHECK);
+
+  write(join(dir, 'styles/.gitkeep'), '');
+  write(join(dir, 'assets/.gitkeep'), '');
 }
 
 function fail(message: string): never {

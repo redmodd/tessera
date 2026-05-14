@@ -277,5 +277,12 @@ describe('create-tessera CLI', () => {
       expect(existsSync(resolve(projectDir, 'package.json'))).toBe(true);
       expect(existsSync(resolve(projectDir, 'vite.config.js'))).toBe(true);
     });
+
+    it('scaffolds empty styles/ and assets/ folders', () => {
+      runCLI('bare-course --template=bare', testDir);
+      const projectDir = resolve(testDir, 'bare-course');
+      expect(existsSync(resolve(projectDir, 'styles/.gitkeep'))).toBe(true);
+      expect(existsSync(resolve(projectDir, 'assets/.gitkeep'))).toBe(true);
+    });
   });
 });
