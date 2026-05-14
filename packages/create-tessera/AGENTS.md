@@ -249,6 +249,8 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the p
 
 ### Setup
 
+A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imported, questions dropped at the page root:
+
 ```svelte
 <script module>
   export const pageConfig = {
@@ -258,15 +260,33 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the p
 </script>
 
 <script>
-  import { MultipleChoice } from 'tessera-learn';
+  import { MultipleChoice, FillInTheBlank } from 'tessera-learn';
 </script>
 
 <MultipleChoice
+  id="q-planet"
   question="Which planet is closest to the Sun?"
   options={["Venus", "Mercury", "Earth", "Mars"]}
   correct={1}
 />
+
+<FillInTheBlank
+  id="q-symbol"
+  question="What element has the symbol 'O'?"
+  answers={["Oxygen"]}
+/>
 ```
+
+### Common mistakes
+
+The build validator catches these — but get them right the first time:
+
+- **`correct` is a 0-based index, not the answer text.** `correct={1}` means the second option. It must be in range for `options`.
+- **Every required prop must be present.** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
+- **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
+- **Question `id`s must be unique within a page.** Duplicates collide in `cmi.interactions`.
+- **Don't add your own `<Quiz>` wrapper.** A page with `pageConfig.quiz` is wrapped automatically — just drop the question components at the page root.
+- **Custom widgets must register through `useQuestion` and submit through `useQuiz().submit()`.** Bypass either and the quiz reports nothing to the LMS.
 
 ### Data contract: what the LMS sees
 
