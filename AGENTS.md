@@ -56,6 +56,20 @@ my-course/
             └── overview.svelte
 ```
 
+### What you can edit
+
+You own everything in the project directory: `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, and `styles/`. Edit those freely.
+
+**Never edit `node_modules/` or `vite.config.js`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `npm install`, and are silently wiped when the course's tessera-learn version is updated. If you think you need to change framework behaviour, you're looking for an extension point instead:
+
+- **New question type or interactive widget** → a custom component using the `useQuestion` hook.
+- **Different course chrome** (header, nav, layout) → `layout.svelte`.
+- **Different quiz UI** → `quiz.svelte` using the `useQuiz` hook.
+- **Styling** → `styles/`.
+- **Navigation, completion, scoring, or export target** → `course.config.js`.
+
+If none of those fit, the limitation is real — surface it rather than patching around it in `node_modules/`.
+
 ### Hierarchy and ordering
 
 The manifest is always **section → lesson → page**. Files directly in a section folder are flattened into one implicit lesson with the section's title; lesson subdirectories nest as expected. Both shapes can coexist.
