@@ -11,7 +11,7 @@ Tessera is pre-1.0. Only the latest published version of each package on npm rec
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Instead, report privately via GitHub's [private vulnerability reporting](https://github.com/redmodd/tessera/security/advisories/new), or email `derek.redmond@redmondelearning.ca` with the subject `[tessera security]`.
+Instead, report privately via GitHub's [private vulnerability reporting](https://github.com/redmodd/tessera/security/advisories/new).
 
 Please include:
 

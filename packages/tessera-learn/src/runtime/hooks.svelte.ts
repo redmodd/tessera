@@ -600,6 +600,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   });
 
   onMount(() => {
+    if (!import.meta.env?.DEV) return;
     // Questions register synchronously as child widgets initialise; a tick()
     // also covers any effect-driven registration before we check.
     void tick().then(() => __warnEmptyQuiz(questions.length));

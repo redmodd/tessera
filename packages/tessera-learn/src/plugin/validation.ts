@@ -506,6 +506,57 @@ interface PagesValidationResult extends ValidationResult {
   pages: PageInfo[];
 }
 
+/**
+ * Validate a single page .svelte file. Used for both section-level (flat) and
+ * lesson-level pages — the validation is identical, only the containing
+ * directory differs.
+ */
+function validatePageFile(
+  filePath: string,
+  projectRoot: string,
+  assetsDir: string,
+  navIndex: number,
+  errors: string[],
+  warnings: string[],
+  assetExistsCache: Map<string, boolean>
+): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
+  const fileRel = relative(projectRoot, filePath);
+  const content = readSourceFileCached(filePath);
+
+  const pageConfig = validatePageConfig(content, fileRel, errors);
+
+  const isQuiz = !!pageConfig?.quiz;
+  let isGradedQuiz = false;
+  if (pageConfig?.quiz) {
+    validateQuizConfig(pageConfig.quiz, fileRel, errors);
+    if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
+      isGradedQuiz = true;
+    }
+  }
+
+  const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
+
+  validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+  validateQuestionComponents(content, fileRel, errors);
+  validateContractBypass(content, fileRel, errors);
+  if (
+    pageConfig?.quiz &&
+    !HAS_USE_QUESTION_RE.test(content) &&
+    !HAS_QUESTION_TAG_RE.test(content)
+  ) {
+    warnings.push(
+      `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
+        `the quiz will have nothing to score`
+    );
+  }
+
+  return {
+    page: { fileRel, navIndex, hasGradedQuiz: isGradedQuiz, hasQuiz: isQuiz, completesOnView },
+    isQuiz,
+    isGradedQuiz,
+  };
+}
+
 function validatePages(
   pagesDir: string,
   assetsDir: string,
@@ -589,46 +640,19 @@ function validatePages(
     }
 
     for (const fileName of sectionSvelteFiles) {
-      const filePath = resolve(sectionPath, fileName);
-      const fileRel = relative(projectRoot, filePath);
-      const content = readSourceFileCached(filePath);
-
-      const pageConfig = validatePageConfig(content, fileRel, errors);
-      const navIndex = totalPages;
+      const result = validatePageFile(
+        resolve(sectionPath, fileName),
+        projectRoot,
+        assetsDir,
+        totalPages,
+        errors,
+        warnings,
+        assetExistsCache
+      );
       totalPages++;
-
-      let pageHasGradedQuiz = false;
-      if (pageConfig?.quiz) {
-        totalQuizzes++;
-        validateQuizConfig(pageConfig.quiz, fileRel, errors);
-        if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
-          hasGradedQuiz = true;
-          pageHasGradedQuiz = true;
-        }
-      }
-
-      const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
-      pages.push({
-        fileRel,
-        navIndex,
-        hasGradedQuiz: pageHasGradedQuiz,
-        hasQuiz: !!pageConfig?.quiz,
-        completesOnView,
-      });
-
-      validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
-      validateQuestionComponents(content, fileRel, errors);
-      validateContractBypass(content, fileRel, errors);
-      if (
-        pageConfig?.quiz &&
-        !HAS_USE_QUESTION_RE.test(content) &&
-        !HAS_QUESTION_TAG_RE.test(content)
-      ) {
-        warnings.push(
-          `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
-            `the quiz will have nothing to score`
-        );
-      }
+      if (result.isQuiz) totalQuizzes++;
+      if (result.isGradedQuiz) hasGradedQuiz = true;
+      pages.push(result.page);
     }
 
     // Get lesson directories
@@ -683,50 +707,19 @@ function validatePages(
 
       // Validate each .svelte file
       for (const fileName of svelteFiles) {
-        const filePath = resolve(lessonPath, fileName);
-        const fileRel = relative(projectRoot, filePath);
-        const content = readSourceFileCached(filePath);
-
-        const pageConfig = validatePageConfig(content, fileRel, errors);
-        const navIndex = totalPages;
+        const result = validatePageFile(
+          resolve(lessonPath, fileName),
+          projectRoot,
+          assetsDir,
+          totalPages,
+          errors,
+          warnings,
+          assetExistsCache
+        );
         totalPages++;
-
-        let pageHasGradedQuiz = false;
-        if (pageConfig?.quiz) {
-          totalQuizzes++;
-
-          // Validate quiz config
-          validateQuizConfig(pageConfig.quiz, fileRel, errors);
-
-          if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
-            hasGradedQuiz = true;
-            pageHasGradedQuiz = true;
-          }
-        }
-
-        const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
-        pages.push({
-          fileRel,
-          navIndex,
-          hasGradedQuiz: pageHasGradedQuiz,
-          hasQuiz: !!pageConfig?.quiz,
-          completesOnView,
-        });
-
-        // Check $assets references
-        validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
-        validateQuestionComponents(content, fileRel, errors);
-        validateContractBypass(content, fileRel, errors);
-        if (
-          pageConfig?.quiz &&
-          !HAS_USE_QUESTION_RE.test(content) &&
-          !HAS_QUESTION_TAG_RE.test(content)
-        ) {
-          warnings.push(
-            `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
-              `the quiz will have nothing to score`
-          );
-        }
+        if (result.isQuiz) totalQuizzes++;
+        if (result.isGradedQuiz) hasGradedQuiz = true;
+        pages.push(result.page);
       }
     }
   }
