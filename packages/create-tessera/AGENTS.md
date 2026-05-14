@@ -12,14 +12,14 @@ From the project root:
 
 ```bash
 npm install            # first time only
-npm run preview        # dev server at http://localhost:5173 (Ctrl+C to stop)
+npm run dev            # dev server at http://localhost:5173 (Ctrl+C to stop)
 npm run export         # build + package for the LMS standard configured in course.config.js
 npm run validate       # run project validation only — no server, no bundle
 ```
 
 The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
 
-`npm run validate` runs the same checks as `preview` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
+`npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
 ---
 
@@ -677,7 +677,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run preview` (wraps `vite dev`, local dev server with HMR), `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging), and `npm run validate` (validation only — no server, no bundle, exits non-zero on errors). Names diverge from Vite's defaults because they describe the authoring intent ("preview the course", "export for an LMS") rather than the underlying tool.
+The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run dev` (wraps `vite dev`, local dev server with HMR), `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging), and `npm run validate` (validation only — no server, no bundle, exits non-zero on errors). `export` is named for the authoring intent ("export for an LMS") rather than the underlying `vite build`.
 
 ---
 

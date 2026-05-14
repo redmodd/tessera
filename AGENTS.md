@@ -12,7 +12,7 @@ From the project root:
 
 ```bash
 npm install            # first time only
-npm run preview        # dev server at http://localhost:5173 (Ctrl+C to stop)
+npm run dev            # dev server at http://localhost:5173 (Ctrl+C to stop)
 npm run export         # build + package for the LMS standard configured in course.config.js
 ```
 
@@ -654,7 +654,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, asset references, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run preview` (wraps `vite dev`, local dev server with HMR) and `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging). Names diverge from Vite's defaults because they describe the authoring intent ("preview the course", "export for an LMS") rather than the underlying tool.
+The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, asset references, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run dev` (wraps `vite dev`, local dev server with HMR) and `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging). `export` is named for the authoring intent ("export for an LMS") rather than the underlying `vite build`.
 
 ---
 

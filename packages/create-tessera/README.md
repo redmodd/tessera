@@ -45,7 +45,7 @@ Then:
 ```bash
 cd my-course
 npm install
-npm run preview   # local dev server at http://localhost:5173
+npm run dev       # local dev server at http://localhost:5173
 npm run export    # build + package for the configured LMS standard
 ```
 

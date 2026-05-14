@@ -31,7 +31,7 @@ node --version    # should print v24.x.x or higher
 npm create tessera@latest my-course
 cd my-course
 npm install
-npm run preview   # local dev server at http://localhost:5173
+npm run dev       # local dev server at http://localhost:5173
 npm run export    # build + package for the configured standard
 ```
 
@@ -76,7 +76,7 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 **Permission errors during `npm install`**: don't use `sudo`. See [npm's guide to resolving EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
 
-**The browser shows a blank page after `npm run preview`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
+**The browser shows a blank page after `npm run dev`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
 
 ## Documentation
 

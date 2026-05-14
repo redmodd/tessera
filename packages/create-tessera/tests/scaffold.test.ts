@@ -130,7 +130,7 @@ describe('create-tessera CLI', () => {
     expect(pkg.name).toBe('my-course');
     expect(pkg.private).toBe(true);
     expect(pkg.type).toBe('module');
-    expect(pkg.scripts.preview).toBe('vite dev');
+    expect(pkg.scripts.dev).toBe('vite dev');
     expect(pkg.scripts.export).toBe('vite build');
     expect(pkg.scripts.validate).toBe('tessera-validate');
     expect(pkg.dependencies['tessera-learn']).toBeDefined();

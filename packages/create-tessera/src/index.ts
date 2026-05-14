@@ -100,7 +100,7 @@ function packageJson(name: string): string {
     private: true,
     type: 'module',
     scripts: {
-      preview: 'vite dev',
+      dev: 'vite dev',
       export: 'vite build',
       validate: 'tessera-validate',
     },
@@ -274,7 +274,7 @@ default — bring your own UI.
 
 \`\`\`bash
 npm install
-npm run preview
+npm run dev
 \`\`\`
 
 ## Structure
@@ -383,7 +383,7 @@ function main() {
   }
 
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  npm install\n  npm run preview\n`
+    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  npm install\n  npm run dev\n`
   );
 }
 
