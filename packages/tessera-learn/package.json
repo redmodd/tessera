@@ -52,6 +52,9 @@
     "./runtime/*": "./src/runtime/*"
   },
   "svelte": "./src/index.ts",
+  "bin": {
+    "tessera-validate": "./dist/plugin/cli.js"
+  },
   "engines": {
     "node": ">=24"
   },
