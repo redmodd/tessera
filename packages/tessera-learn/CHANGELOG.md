@@ -1,5 +1,15 @@
 # tessera-learn
 
+## 0.0.7
+
+### Patch Changes
+
+- **`tessera-validate` CLI.** New standalone bin that runs the project validation checks outside a dev server or build — a fast, scriptable feedback loop for authoring tools and agents. Prints errors/warnings and exits non-zero on errors.
+
+- **Question-component and quiz-config validation.** Static checks now inspect `MultipleChoice` / `FillInTheBlank` / `Matching` / `Sorting` props — required props, correct-index ranges, parallel-array consistency, pair/answer shapes, and duplicate question ids — and verify `quiz.gatesProgress` / `quiz.showFeedback` are booleans. Previously only `pageConfig` object literals were inspected. Dynamic-expression props are skipped to avoid false positives.
+
+- **LMS data-contract bypass detection.** Build-time: errors on direct `tessera-quiz-complete` dispatch and `tessera-learn/runtime/*` imports, warns on quiz pages with no questions. Runtime: dev warning when a quiz mounts with zero questions registered through `useQuestion` — the custom-widget path static analysis can't see.
+
 ## 0.0.6
 
 ### Patch Changes

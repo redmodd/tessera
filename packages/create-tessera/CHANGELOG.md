@@ -1,5 +1,14 @@
 # create-tessera
 
+## 0.0.8
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.7` so newly-created projects pick up the `tessera-validate` CLI and the expanded question-component / quiz-config validation.
+- Add a `validate` npm script (runs `tessera-validate`) to both templates as the fast post-edit feedback loop, documented in AGENTS.md.
+- Scaffold `assets/` and `styles/` folders in the bare template — previously omitted despite AGENTS.md documenting them as part of the project structure.
+- Rename the scaffolded `preview` script to `dev`. `preview` collided with Vite's convention, where `vite preview` serves a production build — the opposite of starting a dev server.
+
 ## 0.0.7
 
 ### Patch Changes
