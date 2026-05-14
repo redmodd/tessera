@@ -676,6 +676,106 @@ describe('question component validation', () => {
   });
 });
 
+// ---- Contract Bypass Detection ----
+
+describe('contract bypass detection', () => {
+  function writePage(content: string): void {
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', content);
+  }
+
+  it('errors when a page dispatches tessera-quiz-complete directly', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>
+  function fakeSubmit(el) {
+    el.dispatchEvent(new CustomEvent('tessera-quiz-complete', { detail: {} }));
+  }
+</script>
+<h1>Page</h1>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('dispatches "tessera-quiz-complete" directly')
+    );
+  });
+
+  it('errors when a page imports from tessera-learn/runtime/*', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>
+  import { something } from 'tessera-learn/runtime/hooks.svelte.js';
+</script>
+<h1>Page</h1>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('imports from tessera-learn/runtime/*')
+    );
+  });
+
+  it('errors on contract bypass in root quiz.svelte', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'quiz.svelte',
+      `<script>
+  import { internal } from 'tessera-learn/runtime/hooks.svelte.js';
+</script>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('quiz.svelte: imports from tessera-learn/runtime/*')
+    );
+  });
+
+  it('warns on a quiz page with no questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Empty quiz</h1>`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('quiz page has no question components or useQuestion() calls')
+    );
+  });
+
+  it('does not warn when a quiz page has a question component', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
+    ).toHaveLength(0);
+  });
+
+  it('does not warn when a quiz page uses useQuestion directly', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ type: 'other', response: [] }) });
+</script>
+<h1>Custom question</h1>`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
+    ).toHaveLength(0);
+  });
+});
+
 // ---- Cross-Cutting Validation ----
 
 describe('cross-cutting validation', () => {

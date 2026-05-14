@@ -442,6 +442,28 @@ describe('useQuiz', () => {
     }
   });
 
+  it('warns when a quiz mounts with no registered questions', async () => {
+    // A quiz page wrapped by a shell but with no useQuestion() widgets has
+    // nothing to score or report. Exercised directly via the exported helper
+    // for the same jsdom/onMount timing reasons as the unmount warning above.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
+      __warnEmptyQuiz(0);
+      const matched = warn.mock.calls.some((args) =>
+        args.some((a) => typeof a === 'string' && /no registered questions/i.test(a))
+      );
+      expect(matched).toBe(true);
+
+      // Inverse: any registered question → no warning.
+      warn.mockClear();
+      __warnEmptyQuiz(1);
+      expect(warn.mock.calls.length).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('warns when submit() runs with a null host element (silent LMS dropout)', () => {
     // Sister to the unmount warning. submitCalled flips true here so the
     // unmount path can't see the bug — the submit() warning must fire instead.

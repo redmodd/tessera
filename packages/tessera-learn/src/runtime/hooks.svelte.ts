@@ -1,4 +1,4 @@
-import { getContext, setContext, onDestroy } from 'svelte';
+import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import {
@@ -312,6 +312,20 @@ export function __warnUnsubmittedQuiz(stats: {
 }
 
 /**
+ * Dev warning helper for a quiz host that mounts with no questions registered
+ * through useQuestion(). Such a page has a quiz wrapper but nothing the runtime
+ * can score or report to the LMS. Exported so tests can exercise the warning
+ * without depending on jsdom mount timing under vitest.
+ */
+export function __warnEmptyQuiz(questionsCount: number): void {
+  if (questionsCount > 0) return;
+  console.warn(
+    '[tessera] useQuiz: quiz mounted with no registered questions. Question widgets ' +
+      'must call useQuestion() to be scored and reported to the LMS.'
+  );
+}
+
+/**
  * Programmatic quiz orchestration for custom quiz shells. Returns a handle
  * exposing the same state machine `<Quiz>` runs internally — register
  * questions, set answers, submit, review, retry — but with no template
@@ -583,6 +597,12 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
         (revealsLockAnswer && feedbackShown.has(i));
     },
     get isLockedCorrect() { return (i: number) => lockedCorrect.has(i); },
+  });
+
+  onMount(() => {
+    // Questions register synchronously as child widgets initialise; a tick()
+    // also covers any effect-driven registration before we check.
+    void tick().then(() => __warnEmptyQuiz(questions.length));
   });
 
   onDestroy(() => {

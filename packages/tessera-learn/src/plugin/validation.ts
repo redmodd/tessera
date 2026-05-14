@@ -64,7 +64,15 @@ export function validateProject(projectRoot: string): ValidationResult {
   errors.push(...pageResults.errors);
   warnings.push(...pageResults.warnings);
 
-  // 4. Cross-cutting validations
+  // 4. Contract-bypass checks on project-root shell files
+  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+    const shellPath = resolve(projectRoot, shellFile);
+    if (existsSync(shellPath)) {
+      validateContractBypass(readSourceFileCached(shellPath), shellFile, errors);
+    }
+  }
+
+  // 5. Cross-cutting validations
   if (config) {
     crossValidate(config, pageResults, errors, warnings);
   }
@@ -610,6 +618,17 @@ function validatePages(
 
       validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
       validateQuestionComponents(content, fileRel, errors);
+      validateContractBypass(content, fileRel, errors);
+      if (
+        pageConfig?.quiz &&
+        !HAS_USE_QUESTION_RE.test(content) &&
+        !HAS_QUESTION_TAG_RE.test(content)
+      ) {
+        warnings.push(
+          `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
+            `the quiz will have nothing to score`
+        );
+      }
     }
 
     // Get lesson directories
@@ -697,6 +716,17 @@ function validatePages(
         // Check $assets references
         validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
         validateQuestionComponents(content, fileRel, errors);
+        validateContractBypass(content, fileRel, errors);
+        if (
+          pageConfig?.quiz &&
+          !HAS_USE_QUESTION_RE.test(content) &&
+          !HAS_QUESTION_TAG_RE.test(content)
+        ) {
+          warnings.push(
+            `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
+              `the quiz will have nothing to score`
+          );
+        }
       }
     }
   }
@@ -1006,6 +1036,40 @@ function validateQuestionComponents(
         }
       }
     }
+  }
+}
+
+// ---------- Contract Bypass Detection ----------
+
+const QUIZ_COMPLETE_DISPATCH_RE =
+  /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
+const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
+const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
+const HAS_QUESTION_TAG_RE = new RegExp(
+  `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`
+);
+
+/**
+ * Detect ways an author file can bypass the LMS data contract. These check
+ * source text for known escape hatches — they never inspect course content,
+ * so they constrain how you wire things up, not what you build.
+ */
+function validateContractBypass(
+  content: string,
+  fileRel: string,
+  errors: string[]
+): void {
+  if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
+    errors.push(
+      `${fileRel}: dispatches "tessera-quiz-complete" directly — submit through ` +
+        `useQuiz().submit() so the result reaches the LMS`
+    );
+  }
+  if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
+    errors.push(
+      `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
+        `(useQuiz, useQuestion, useNavigation, …) instead`
+    );
   }
 }
 
