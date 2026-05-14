@@ -35,7 +35,7 @@ AGENTS.md            # Course authoring guide
 
 ## Editing AGENTS.md
 
-Edit `AGENTS.md` at the repo root **only**. The `pnpm build` step (`scripts/sync-agents-md.mjs`) copies it into `packages/tessera-learn/` and `packages/create-tessera/` so it ships with the published packages. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if a package copy has drifted from the root.
+Edit `AGENTS.md` at the repo root **only**. The `pnpm build` step (`scripts/sync-agents-md.mjs`) copies it into `packages/create-tessera/` so it ships with the scaffolder and lands in every scaffolded project. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if the package copy has drifted from the root.
 
 ## Branch + commit style
 
