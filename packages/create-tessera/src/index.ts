@@ -102,6 +102,7 @@ function packageJson(name: string): string {
     scripts: {
       preview: 'vite dev',
       export: 'vite build',
+      validate: 'tessera-validate',
     },
     dependencies: {
       'tessera-learn': TESSERA_VERSION,
