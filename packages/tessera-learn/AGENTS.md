@@ -14,9 +14,12 @@ From the project root:
 npm install            # first time only
 npm run dev            # dev server at http://localhost:5173 (Ctrl+C to stop)
 npm run export         # build + package for the LMS standard configured in course.config.js
+npm run validate       # run project validation only — no server, no bundle
 ```
 
 The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
+
+`npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
 ---
 
@@ -263,6 +266,8 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the p
 
 ### Setup
 
+A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imported, questions dropped at the page root:
+
 ```svelte
 <script module>
   export const pageConfig = {
@@ -272,15 +277,33 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the p
 </script>
 
 <script>
-  import { MultipleChoice } from 'tessera-learn';
+  import { MultipleChoice, FillInTheBlank } from 'tessera-learn';
 </script>
 
 <MultipleChoice
+  id="q-planet"
   question="Which planet is closest to the Sun?"
   options={["Venus", "Mercury", "Earth", "Mars"]}
   correct={1}
 />
+
+<FillInTheBlank
+  id="q-symbol"
+  question="What element has the symbol 'O'?"
+  answers={["Oxygen"]}
+/>
 ```
+
+### Common mistakes
+
+The build validator catches these — but get them right the first time:
+
+- **`correct` is a 0-based index, not the answer text.** `correct={1}` means the second option. It must be in range for `options`.
+- **Every required prop must be present.** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
+- **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
+- **Question `id`s must be unique within a page.** Duplicates collide in `cmi.interactions`.
+- **Don't add your own `<Quiz>` wrapper.** A page with `pageConfig.quiz` is wrapped automatically — just drop the question components at the page root.
+- **Custom widgets must register through `useQuestion` and submit through `useQuiz().submit()`.** Bypass either and the quiz reports nothing to the LMS.
 
 ### Data contract: what the LMS sees
 
@@ -668,7 +691,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, asset references, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run dev` (wraps `vite dev`, local dev server with HMR) and `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging). `export` is named for the authoring intent ("export for an LMS") rather than the underlying `vite build`.
+The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run dev` (wraps `vite dev`, local dev server with HMR), `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging), and `npm run validate` (validation only — no server, no bundle, exits non-zero on errors). `export` is named for the authoring intent ("export for an LMS") rather than the underlying `vite build`.
 
 ---
 
