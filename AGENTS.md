@@ -21,6 +21,17 @@ The dev server hot-reloads as you edit pages, layouts, components, and `course.c
 
 `npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
+### Upgrading the project
+
+```bash
+npx create-tessera@latest upgrade        # apply the latest framework files to this project
+npx create-tessera@latest upgrade --dry-run   # preview the changes first
+```
+
+`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
+
+`dev`, `export`, and `validate` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
+
 ---
 
 ## Project Structure

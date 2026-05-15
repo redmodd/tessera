@@ -33,6 +33,7 @@ cd my-course
 npm install
 npm run dev       # local dev server at http://localhost:5173
 npm run export    # build + package for the configured standard
+npm run validate  # check the project for structural errors, no server or build
 ```
 
 Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
