@@ -1,5 +1,13 @@
 # create-tessera
 
+## 0.0.9
+
+### Patch Changes
+
+- **`create-tessera upgrade` command.** Re-applies framework-owned files to an existing project: merges the reserved npm scripts (`dev`, `export`, `validate`) into `package.json`, applies the `preview`→`dev` rename migration, pins `tessera-learn` to the version this CLI ships, and overwrites `AGENTS.md` and `vite.config.js`. Authored files (`course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md`) are never touched. A reserved script whose value has been customised is left alone with a warning. Supports `--dry-run` to preview changes without writing.
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.8`.
+
 ## 0.0.8
 
 ### Patch Changes

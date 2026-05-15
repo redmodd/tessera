@@ -1,5 +1,11 @@
 # tessera-learn
 
+## 0.0.8
+
+### Patch Changes
+
+- **Empty-quiz warning is now dev-only.** The `useQuiz` runtime warning about zero registered questions no longer runs in production builds — it is gated on `import.meta.env.DEV` so it only fires during development.
+
 ## 0.0.7
 
 ### Patch Changes
