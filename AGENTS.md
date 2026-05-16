@@ -791,6 +791,8 @@ Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` t
 
 `Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
+For `choice` / `sequencing` / `matching`, set `response` / `correct` to **option indexes as strings** (`['0']`, `[['0','1']]`), not your widget's internal ids — SCORM Cloud's strict CMIFeedback validator rejects long named identifiers as "must be consistent with interaction type" even though they're valid CMIIdentifiers per the spec text. Built-in `<MultipleChoice>` already does this; custom widgets must too.
+
 ### `useQuestion`
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
@@ -1105,7 +1107,9 @@ API discovery: walks `window.parent` / `window.opener` up to 10 levels looking f
 
 **Mastery is Tessera's, not the LMS's.** Pass/fail is computed from `scoring.passingScore`. `cmi.student_data.mastery_score` is read-only for this runtime.
 
-**Interaction encoding (§3.4.7).** Plain `,` items, `.` pairs, `:` ranges (not the bracketed `[,]` 2004 form). Response/correct identifiers are slugged to `CMIIdentifier` (alphanumeric + underscore, max 250 chars) — raw option text like `"88 Earth days"` becomes `88_Earth_days` to dodge `405 Incorrect Data Type`. `true-false` writes `t`/`f`. Numeric `correct_responses.n.pattern` is a single CMIDecimal; ranges are dropped (`result` still carries pass/fail).
+**Interaction encoding (§3.4.7).** Plain `,` items, `.` pairs, `:` ranges (not the bracketed `[,]` 2004 form). `cmi.interactions.n.id` and response/correct identifiers are slugged to `CMIIdentifier` (alphanumeric + underscore, max 250 chars) — raw option text like `"88 Earth days"` becomes `88_Earth_days`, and an id like `q-1` becomes `q_1`, to dodge `405 Incorrect Data Type`. `true-false` writes `t`/`f`. Numeric `correct_responses.n.pattern` is a single CMIDecimal; ranges are dropped (`result` still carries pass/fail).
+
+**Field write order.** `id` → `type` → `correct_responses.0.pattern` → `student_response` → `result` → `time`, matching the spec's `interactions._children` ordering. SCORM Cloud's strict validator rejects `student_response` with the misleading "must be consistent with interaction type" if `correct_responses.0.pattern` hasn't been declared first — the LMS has no expected pattern to validate against. Other LMSes (Moodle, Reload, scorm-again) accept any order, but the spec ordering is the safest.
 
 **Bookmark.** `cmi.core.lesson_location` is written from `SavedState.b` on every `saveState` to surface "Resume from page N" in LMS UIs.
 
