@@ -174,7 +174,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     const idWrites = log
       .filter((e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]))
       .map((e) => e[2]);
-    expect(idWrites).toEqual(['q_planet', 'q_water']);
+    expect(idWrites).toEqual(['q-planet', 'q-water']);
   });
 });
 

@@ -38,7 +38,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsNumericRange: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: shortIdentifier,
+  identifier: (v) => v,
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {

@@ -791,7 +791,7 @@ Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` t
 
 `Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
-For `choice` / `sequencing` / `matching`, named identifiers (`['speed-limit']`) ship cleanly through cmi5 to xAPI's `result.response` — the adapter passes them through unchanged so LRS traces stay self-describing. SCORM 1.2 / 2004, however, slug them to `CMIIdentifier` (alphanumeric + underscore) before writing, and SCORM Cloud's strict validator rejects the slugged-but-still-long form with "must be consistent with interaction type". For courses that ship as SCORM, **prefer option indexes as strings** (`['0']`, `[['0','1']]`) — they're spec-compliant CMIIdentifiers and survive every adapter unchanged. Built-in `<MultipleChoice>` does this; cmi5-only courses can keep readable named identifiers.
+For `choice` / `sequencing` / `matching`, named identifiers (`['speed-limit']`) ship through cmi5 and SCORM 2004 unchanged — both adapters preserve widget-supplied ids so LRS / `cmi.interactions` traces stay self-describing. SCORM 1.2 still slugs to `CMIIdentifier` (alphanumeric + underscore) because §3.4.7's `short_identifier_type` is enforced by every conformant 1.2 LMS. SCORM Cloud's strict validator additionally rejects long named identifiers in 1.2 mode even after slugging (`"must be consistent with interaction type"`), so courses that target SCORM 1.2 **should prefer option indexes as strings** (`['0']`, `[['0','1']]`). Built-in `<MultipleChoice>` does this; cmi5- or 2004-only courses can keep readable named identifiers.
 
 ### `useQuestion`
 
@@ -1127,7 +1127,7 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Launch mode (§4.2.1.5).** `cmi.mode` is read on init. In `browse` and `review` launches every learner-record write is silently suppressed (`setScore` / `setCompletionStatus` / `setSuccessStatus` / `setExit` / `setDuration` / `reportInteraction` / `saveState` — including the `cmi.suspend_data` write). Mirrors cmi5's launchMode handling; exposed via `adapter.getLaunchMode()`.
 
-**Interaction encoding (§4.2.7 / Appendix A).** Bracketed delimiters `[,]` / `[.]` / `[:]` (literal text, not regex). Response/correct identifiers must be `short_identifier_type` (same alphanumeric + underscore rules as 1.2 — raw option labels are slugged to dodge `406 Data Model Element Type Mismatch`). `cmi.interactions.n.timestamp` is `time(second,10,0)` per §3.3.10.1 / ISO 8601 §5.3.3 — zone-free, second-resolution (`YYYY-MM-DDThh:mm:ss`); SCORM Cloud rejects fractional seconds and `Z` / `±hh:mm` suffixes with 406.
+**Interaction encoding (§4.2.7 / Appendix A).** Bracketed delimiters `[,]` / `[.]` / `[:]` (literal text, not regex). Identifiers are passed through unchanged — §4.2.7 / Appendix A's `short_identifier_type` allows any printable, and 2004's `cmi.interactions.n.id` upgraded to `long_identifier_type` (4000 chars). Slugging would only obscure LMS-side reports without buying anything. `cmi.interactions.n.timestamp` is `time(second,10,0)` per §3.3.10.1 / ISO 8601 §5.3.3 — zone-free, second-resolution (`YYYY-MM-DDThh:mm:ss`); SCORM Cloud rejects fractional seconds and `Z` / `±hh:mm` suffixes with 406.
 
 **Bookmark + progress.** `cmi.location` is written from `SavedState.b` on every `saveState`. `cmi.progress_measure = 1` fires on `setCompletionStatus('complete')` so LMS dashboards show 100%.
 
@@ -1173,7 +1173,7 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Unload.** `terminate()` cannot run async retries; the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
 
-**Interaction encoding.** Split by dialect: SCORM 1.2 (§3.4.7) uses plain `,` / `.` / `:` and slugs identifiers to alphanumeric+underscore; SCORM 2004 (§4.2.7) + cmi5 use bracketed `[,]` / `[.]` / `[:]` and apply the same identifier slugging for short_identifier_type fields. Both dialects share `formatResponse` / `formatCorrectPattern` parameterised over an `InteractionFormat` record; cmi5 embeds the 2004 encoding in `result.response` / `definition.correctResponsesPattern`.
+**Interaction encoding.** Split by dialect: SCORM 1.2 (§3.4.7) uses plain `,` / `.` / `:` and slugs identifiers to alphanumeric+underscore; SCORM 2004 (§4.2.7) and cmi5 use bracketed `[,]` / `[.]` / `[:]` and pass identifiers through unchanged. All three share `formatResponse` / `formatCorrectPattern` parameterised over an `InteractionFormat` record (`SCORM12_INTERACTION_FORMAT`, `SCORM2004_INTERACTION_FORMAT`, `XAPI_INTERACTION_FORMAT`); cmi5 embeds its encoding in `result.response` / `definition.correctResponsesPattern`.
 
 **Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel. Never a silent degradation.
 
