@@ -112,7 +112,7 @@ describe('useQuiz', () => {
     expect(q.canSubmit).toBe(true);
   });
 
-  it('submit() dispatches tessera-quiz-complete with score and per-question interactions', () => {
+  it('submit() dispatches tessera-quiz-complete with the rolled-up score', () => {
     const m = mountHarness({ graded: true });
     mountings.push(m);
     const q = m.ref.handle!;
@@ -124,12 +124,7 @@ describe('useQuiz', () => {
     q.submit();
 
     expect(m.ref.events).toHaveLength(1);
-    const detail = m.ref.events[0];
-    expect(detail.score).toBe(50);
-    expect(detail.interactions).toEqual([
-      { id: 'a', interaction: { type: 'true-false', response: true, correct: true }, correct: true },
-      { id: 'b', interaction: { type: 'true-false', response: false, correct: true }, correct: false },
-    ]);
+    expect(m.ref.events[0].score).toBe(50);
   });
 
   it('reports each interaction to the adapter when the widget calls commit(), not on setAnswer', () => {
@@ -412,8 +407,14 @@ describe('useQuiz', () => {
     expect(q.getRender(0)).toBe(snippet);
   });
 
-  it('event payload omits questions that do not expose interaction()', () => {
-    const m = mountHarness({ graded: true });
+  it('reportInteraction skips questions that do not expose interaction()', () => {
+    const calls: Array<[string, Interaction, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, i: Interaction, correct: boolean | null) {
+        calls.push([id, i, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
     mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
@@ -426,8 +427,8 @@ describe('useQuiz', () => {
     q.setAnswer(1, true);
     q.submit();
 
-    expect(m.ref.events[0].interactions).toEqual([
-      { id: 'a', interaction: { type: 'true-false', response: true, correct: true }, correct: true },
+    expect(calls).toEqual([
+      ['a', { type: 'true-false', response: true, correct: true }, true],
     ]);
   });
 

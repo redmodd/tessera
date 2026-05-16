@@ -61,10 +61,9 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await expect(submit).toBeEnabled();
   });
 
-  test('submit() dispatches tessera-quiz-complete with the correct interactions payload', async ({ page }) => {
+  test('submit() dispatches tessera-quiz-complete with the rolled-up score', async ({ page }) => {
     await navigateToExam(page);
 
-    // Capture the quiz-complete event before triggering the submit.
     await page.evaluate(() => {
       (window as any).__tesseraQuizEvents = [];
       document.addEventListener('tessera-quiz-complete', (e: Event) => {
@@ -78,24 +77,12 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page.locator('[data-question-id="q-water"] input[type="text"]').fill('H2O');
     await page.locator('[data-testid="custom-quiz-submit"]').click();
 
-    // The hook updates state synchronously after dispatch; assert state moved
-    // to "submitted" and the captured event payload matches the answers.
     await expect(page.locator('[data-testid="custom-quiz-status"]')).toContainText('state: submitted');
 
     const events = await page.evaluate(() => (window as any).__tesseraQuizEvents);
     expect(events).toHaveLength(1);
-    expect(events[0].score).toBe(100);
-    expect(events[0].interactions).toHaveLength(2);
-    expect(events[0].interactions[0]).toMatchObject({
-      id: 'q-planet',
-      correct: true,
-      interaction: { type: 'choice' },
-    });
-    expect(events[0].interactions[1]).toMatchObject({
-      id: 'q-water',
-      correct: true,
-      interaction: { type: 'fill-in' },
-    });
+    expect(events[0]).toEqual({ score: 100 });
+    // Per-question reporting to the LMS is covered by custom-quiz-lms-roundtrip.spec.ts.
   });
 
   test('Quiz score persists to localStorage (Web adapter bridge fired)', async ({ page }) => {

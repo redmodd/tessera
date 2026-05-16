@@ -8,7 +8,6 @@ import {
   getPageContext,
   requireUserStateStore,
 } from './contexts.js';
-import { buildQuizInteractions } from '../components/quiz-payload.js';
 import {
   resolveFeedbackMode,
   resolveRetryStrategy,
@@ -417,7 +416,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   let internalQuestions = $state<InternalQuestion[]>([]);
   const answers = new Map<number, unknown>();
-  const reportedAnswers = new Map<number, unknown>();
+  const reportedAnswers = new Map<number, string>();
   let answersVersion = $state(0);
   let submitted = $state(false);
   let reviewing = $state(false);
@@ -455,12 +454,13 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     if (!adapterCtx) return;
     const q = internalQuestions[index];
     if (!q || typeof q.interaction !== 'function') return;
-    const answer = answers.has(index) ? answers.get(index) : undefined;
-    if (reportedAnswers.has(index) && reportedAnswers.get(index) === answer) return;
     const interaction = q.interaction();
     if (!interaction) return;
-    reportedAnswers.set(index, answer);
+    const fingerprint = JSON.stringify(interaction);
+    if (reportedAnswers.get(index) === fingerprint) return;
+    const answer = answers.has(index) ? answers.get(index) : undefined;
     adapterCtx.adapter.reportInteraction(q.id, interaction, q.checkAnswer(answer));
+    reportedAnswers.set(index, fingerprint);
   }
 
   function getAnswerInternal(index: number): unknown {
@@ -585,10 +585,9 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     submitted = true;
     attemptCount++;
 
-    const interactions = buildQuizInteractions(internalQuestions, answers);
     el.dispatchEvent(
       new CustomEvent('tessera-quiz-complete', {
-        detail: { score: rounded, interactions },
+        detail: { score: rounded },
         bubbles: true,
       })
     );

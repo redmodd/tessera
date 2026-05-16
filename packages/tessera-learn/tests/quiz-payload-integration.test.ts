@@ -9,8 +9,8 @@ import type { Interaction } from '../src/runtime/interaction.js';
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
-// payload, and asserts the emitted Interaction shape for the full round-trip
-// the real `<Quiz>` relies on when building `tessera-quiz-complete`.
+// payload, and asserts the emitted Interaction shape the real `<Quiz>` hands
+// to the persistence adapter when the widget commits.
 
 interface Registration {
   id: string;
