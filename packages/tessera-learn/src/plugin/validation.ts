@@ -542,7 +542,8 @@ function validatePageFile(
   if (
     pageConfig?.quiz &&
     !HAS_USE_QUESTION_RE.test(content) &&
-    !HAS_QUESTION_TAG_RE.test(content)
+    !HAS_QUESTION_TAG_RE.test(content) &&
+    !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
   ) {
     warnings.push(
       `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
@@ -1041,6 +1042,10 @@ const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`
 );
+// Custom widget imported from a local `.svelte` file may wrap useQuestion.
+// Treat its presence as enough to suppress the "no questions" warning —
+// false negatives are acceptable for a heuristic that's already advisory.
+const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check

@@ -774,6 +774,23 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       warnings.filter((w) => w.includes('quiz page has no question'))
     ).toHaveLength(0);
   });
+
+  it('does not warn when a quiz page imports a custom .svelte widget', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>
+  import CustomRound from '../components/CustomRound.svelte';
+</script>
+{#each [1, 2, 3] as i}<CustomRound {i} />{/each}`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
+    ).toHaveLength(0);
+  });
 });
 
 // ---- Cross-Cutting Validation ----
