@@ -862,7 +862,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
 };
 ```
 
-Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter — adapter writes happen inside `revealFeedback()` and `submit()`.
+Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter — adapter writes happen inside `q.commit()` and `submit()`.
 
 `passingScore` reads the resolved threshold: config's `scoring.passingScore`, overridden when the LMS supplies one (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`). Use this instead of importing `course.config.js` directly — importing the config skips the LMS override.
 
