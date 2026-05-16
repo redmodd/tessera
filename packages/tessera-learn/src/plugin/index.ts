@@ -207,6 +207,11 @@ function tesseraConfigPlugin(): Plugin {
             '$assets': resolve(root, 'assets'),
           },
         },
+        // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer
+        // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.
+        optimizeDeps: {
+          exclude: ['tessera-learn'],
+        },
       };
     },
 
