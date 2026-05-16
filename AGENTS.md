@@ -92,11 +92,13 @@ Sorting is alphabetical by directory / filename. Numeric prefixes on directories
 
 ### `_meta.js` files
 
-**Optional everywhere.** When absent, titles fall back to the title-cased slug.
+**Optional everywhere.** When absent, titles fall back to the title-cased slug (`01-getting-started/` → "Getting Started") and pages sort alphabetically by filename. **Omit the file entirely** when those defaults are what you want — `pages: ["only-page"]` on a single-page lesson is a no-op, and `title: "Splash"` on `01-splash/` duplicates the auto-derived title.
+
+Reach for `_meta.js` only when the override is real:
 
 ```js
-// section or lesson _meta.js: title override
-export default { title: "Getting Started" };
+// section or lesson _meta.js: title override (folder name doesn't auto-derive to what you want)
+export default { title: "How to play" };  // folder is `01-intro`
 ```
 
 ```js
@@ -327,8 +329,7 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would fr
 | `graded` | `boolean` | `false` | Whether the score counts toward course success |
 | `gatesProgress` | `boolean` | `false` | Whether passing is required to access the next page |
 | `maxAttempts` | `number` | `Infinity` | Max attempts |
-| `showFeedback` | `boolean` | `true` | Master gate. When `false`, feedback never renders regardless of `feedbackMode`. |
-| `feedbackMode` | `"review" \| "immediate" \| (qIndex, attempt) => boolean` | `"review"` | When feedback renders (only consulted if `showFeedback` is true). `"immediate"` shows feedback after each answer; `"review"` after submit. Predicates have full control. |
+| `feedbackMode` | `"review" \| "immediate" \| "never" \| (state) => boolean` | `"review"` | When feedback renders. `"immediate"` reveals after the shell calls `revealFeedback(q)`; `"review"` only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button). Predicates have full control. Under `"immediate"`, revealing feedback locks the answer. |
 | `retryMode` | `"full" \| "incorrect-only" \| (results) => Set<number>` | `"full"` | Enum sugar or a predicate that returns the set of question indices to lock as "already correct" on retry. |
 | `canSubmit` | `(answered, total) => boolean` | all-answered | Custom Submit gate. Default requires every question to have an answer. |
 | `score` | `(results) => number` | weighted-correct % | Returns 0–100. Default: `Σ(weight × correct) / Σ(weight) × 100`. With every weight = 1 (the default), this matches the unweighted mean. |
@@ -767,11 +768,33 @@ import type { Interaction } from 'tessera-learn';
 
 Each hook is synchronous and must be called during component setup, inside a Tessera course. Calling them outside the runtime throws.
 
+### The `Question` model
+
+Both `useQuiz()` and `useQuestion()` traffic in the same per-question object. A quiz shell iterates `quiz.questions`; a widget gets its own `Question` directly from `useQuestion()`. No indexes, no `getContext('tessera-quiz')` — both halves use the same handle.
+
+```ts
+interface Question {
+  readonly id: string;
+  readonly submitted: boolean;
+  readonly correct: boolean | null;
+  readonly answer: unknown;
+  readonly feedbackVisible: boolean;
+  readonly locked: boolean;          // input must be read-only: submitted OR feedbackVisible OR isLockedCorrect
+  readonly isLockedCorrect: boolean; // narrow case: locked because retry policy preserved this as already-correct
+  readonly render: unknown;          // snippet the widget registered; shell calls {@render q.render()}
+  setAnswer(answer: unknown): void;
+}
+```
+
+Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` to render the "already correct" banner.
+
+`Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
+
 ### `useQuestion`
 
-Register a question widget so the runtime can submit, score, persist, and report it.
+Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside `<Quiz>`**: the parent Quiz drives submission. The widget renders the prompt + answer UI; nothing else.
+- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
 - **Standalone**: the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
@@ -781,22 +804,18 @@ function useQuestion(opts: {
   response: () => Interaction;  // current learner answer; called on submit
   score?: () => number;         // standalone-only override (0–100)
   weight?: number;              // page-level rollup weight (default 1)
-  maxRetries?: number;          // standalone retry cap (default Infinity); ignored inside <Quiz>
+  maxRetries?: number;          // standalone retry cap (default Infinity); ignored inside a quiz
   reset?: () => void;
-}): {
-  submit(): void;
+}): Question & {
+  submit(): void;               // standalone: triggers own check. quiz: no-op (shell drives).
   reset(): void;
-  retry(): void;                // standalone-only; no-op once maxRetries hit or inside <Quiz>
-  readonly submitted: boolean;
-  readonly correct: boolean | null;
+  retry(): void;                // standalone only; no-op once maxRetries hit or inside a quiz
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
-  readonly quizIndex: number | undefined;
+  setRender(render: unknown): void;   // registers the snippet for the parent shell to render
 };
 ```
-
-`Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
 ```svelte
 <script>
@@ -823,38 +842,28 @@ function useQuestion(opts: {
 
 ### `useQuiz`
 
-Quiz orchestration hook used by both the built-in `<Quiz>` and any project-supplied `quiz.svelte`. A custom shell calls `useQuiz` to drive submission/retry/review; **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`**: bypassing it means the quiz reports nothing to the LMS.
+Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review; **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz reports nothing to the LMS.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
-  registerQuestion(api: {
-    id: string;
-    weight?: number;
-    checkAnswer: () => boolean;
-    reset?: () => void;
-    interaction: () => Interaction;
-  }): number;
-  setRender(index: number, render: unknown): void;
-  setAnswer(index: number, answer: unknown): void;
-  submit(): void;        // dispatches tessera-quiz-complete; runtime forwards interactions to the adapter
+  readonly state: 'answering' | 'submitted' | 'reviewing';
+  readonly questions: ReadonlyArray<Question>;
+  readonly canSubmit: boolean;
+  readonly canRetry: boolean;
+  readonly score: number;
+  readonly passingScore: number;   // resolved at runtime (config + LMS mastery override)
+  readonly attemptCount: number;
+  submit(): void;       // dispatches tessera-quiz-complete; runtime forwards interactions to the adapter
   retry(): void;
   startReview(): void;
   exitReview(): void;
-  revealFeedback(index: number): void;   // immediate-feedback flow
-  getAnswer(index: number): unknown;
-  getRender(index: number): unknown;
-  feedbackVisible(index: number): boolean;
-  isLockedCorrect(index: number): boolean;
-  readonly questions: ReadonlyArray<{ id: string; submitted: boolean; correct: boolean | null }>;
-  readonly state: 'answering' | 'submitted' | 'reviewing';
-  readonly score: number;
-  readonly attemptCount: number;
-  readonly canSubmit: boolean;
-  readonly canRetry: boolean;
+  revealFeedback(q: Question): void;   // immediate-feedback flow
 };
 ```
 
 Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter.
+
+`passingScore` reads the resolved threshold: config's `scoring.passingScore`, overridden when the LMS supplies one (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`). Use this instead of importing `course.config.js` directly — importing the config skips the LMS override.
 
 ### `useNavigation`
 
@@ -1317,7 +1326,7 @@ export default {
 
 ### Recipe 4: Custom quiz shell via `quiz.svelte`
 
-Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The runtime wraps every page with `pageConfig.quiz` in your shell instead of the carousel default. The shell uses only the public `useQuiz()` API; no imports from `tessera/runtime/*`.
+Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The runtime wraps every page with `pageConfig.quiz` in your shell instead of the default. The shell uses only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
 
 ```svelte
 <!-- quiz.svelte -->
@@ -1335,14 +1344,16 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 <div bind:this={host} class="my-quiz">
   <p>Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz.questions.length}</p>
 
-  {#each quiz.questions as q, i}
-    {@const renderFn = quiz.getRender(i)}
-    <section data-question-id={q.id}>{#if renderFn}{@render renderFn()}{/if}</section>
+  {#each quiz.questions as q (q.id)}
+    <section data-question-id={q.id}>
+      {#if q.render}{@render q.render()}{/if}
+    </section>
   {/each}
 
   {#if quiz.state === 'answering'}
     <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}>Submit</button>
   {:else if quiz.state === 'submitted'}
+    <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
     <button onclick={() => quiz.startReview()}>Review</button>
   {/if}
@@ -1353,6 +1364,68 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 ```
 
 Always submit through `useQuiz().submit()`. See [Data contract](#data-contract--what-the-lms-sees).
+
+### Recipe 4b: Custom question widget for a custom quiz shell
+
+Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
+
+```svelte
+<!-- components/MyChoice.svelte -->
+<script>
+  import { onMount } from 'svelte';
+  import { useQuestion } from 'tessera-learn';
+
+  let { id, prompt, options, correct } = $props();
+  let selected = $state(null);
+
+  const q = useQuestion({
+    id,
+    response: () => ({
+      type: 'choice',
+      response: selected !== null ? [String(selected)] : [],
+      correct: [String(correct)],
+    }),
+    reset: () => { selected = null; },
+  });
+
+  // Register the snippet the shell will render. mode === 'quiz' inside a quiz host;
+  // 'standalone' when used outside one. setRender is a no-op in standalone.
+  onMount(() => q.setRender(view));
+
+  function pick(i) {
+    if (q.locked) return;
+    selected = i;
+    q.setAnswer(i);    // shell sees this through q.answer / canSubmit
+  }
+</script>
+
+{#snippet view()}
+  <fieldset disabled={q.locked}>
+    <legend>{prompt}</legend>
+    {#each options as opt, i}
+      {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
+      <label>
+        <input type="radio" checked={chosen} onchange={() => pick(i)} />
+        {opt}
+      </label>
+    {/each}
+  </fieldset>
+
+  {#if q.feedbackVisible}
+    <p>{q.answer === correct ? 'Correct.' : 'The right answer was ' + options[correct] + '.'}</p>
+  {/if}
+{/snippet}
+
+<!-- Render the same snippet inline for standalone use (mode === 'standalone'). -->
+{#if q.mode === 'standalone'}
+  {@render view()}
+  {#if !q.submitted}
+    <button disabled={selected === null} onclick={() => q.submit()}>Check</button>
+  {/if}
+{/if}
+```
+
+Under `feedbackMode: 'immediate'`, the shell calls `quiz.revealFeedback(q)` when it wants the next click to show feedback; that flips `q.feedbackVisible`, which in turn flips `q.locked`. Under `'review'`, feedback only appears after `quiz.submit()` followed by `quiz.startReview()`. Under `'never'`, `feedbackVisible` stays false, but `q.locked` still flips on submit.
 
 ### Recipe 5: Graded standalone question
 
