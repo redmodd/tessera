@@ -5,7 +5,6 @@
       graded: true,
       gatesProgress: true,
       maxAttempts: 3,
-      showFeedback: true,
       feedbackMode: "immediate",
       retryMode: "incorrect-only",
     }

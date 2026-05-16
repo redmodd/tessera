@@ -315,32 +315,18 @@ describe('Immediate feedback flow', () => {
   it('feedbackVisible returns true when immediate feedback is shown for a question', () => {
     const feedbackShown = new Set([0, 2]);
     const feedbackMode = 'immediate';
-    const showFeedback = true;
     const submitted = false;
     const reviewing = false;
 
     function feedbackVisible(index: number): boolean {
-      if (feedbackMode === 'immediate' && showFeedback && feedbackShown.has(index)) return true;
-      if (submitted && reviewing && showFeedback) return true;
+      if (feedbackMode === 'immediate' && feedbackShown.has(index)) return true;
+      if (submitted && reviewing) return true;
       return false;
     }
 
     expect(feedbackVisible(0)).toBe(true);
     expect(feedbackVisible(1)).toBe(false);
     expect(feedbackVisible(2)).toBe(true);
-  });
-
-  it('feedbackVisible returns false when feedbackMode is immediate but showFeedback is false', () => {
-    const feedbackShown = new Set([0]);
-    const feedbackMode = 'immediate';
-    const showFeedback = false;
-
-    function feedbackVisible(index: number): boolean {
-      if (feedbackMode === 'immediate' && showFeedback && feedbackShown.has(index)) return true;
-      return false;
-    }
-
-    expect(feedbackVisible(0)).toBe(false);
   });
 });
 

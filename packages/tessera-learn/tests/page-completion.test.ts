@@ -40,7 +40,7 @@ describe('isPageComplete', () => {
   });
 
   it('non-gating quiz page is complete when answered', () => {
-    const page = createPage(0, { graded: true, gatesProgress: false, maxAttempts: 3, showFeedback: true });
+    const page = createPage(0, { graded: true, gatesProgress: false, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState();
     const config = createConfig();
@@ -52,7 +52,7 @@ describe('isPageComplete', () => {
   });
 
   it('gating quiz page is complete only when passed', () => {
-    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3, showFeedback: true });
+    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState();
     const config = createConfig({ scoring: { passingScore: 70 } });
@@ -67,7 +67,7 @@ describe('isPageComplete', () => {
   });
 
   it('gating quiz uses config passingScore', () => {
-    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3, showFeedback: true });
+    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState();
     const config = createConfig({ scoring: { passingScore: 90 } });
