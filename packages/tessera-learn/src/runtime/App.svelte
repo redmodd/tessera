@@ -397,6 +397,7 @@
       restoreState(saved);
       prevCompletionStatus = progress.completionStatus;
       prevSuccessStatus = progress.successStatus;
+      adapter.seedLifecycle?.(progress.completionStatus, progress.successStatus);
     }
     persistenceReady = true;
 

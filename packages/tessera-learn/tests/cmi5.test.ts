@@ -257,6 +257,73 @@ describe('CMI5Adapter', () => {
     expect(body.result.success).toBe(false);
   });
 
+  it('seedLifecycle suppresses duplicate Failed when resuming an already-failed session', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('incomplete', 'failed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(40);
+    adapter.setSuccessStatus('failed');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    expect(statementCalls).toHaveLength(0);
+  });
+
+  it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('incomplete', 'failed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(85);
+    adapter.setSuccessStatus('passed');
+    adapter.setCompletionStatus('complete');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    const verbs = statementCalls.map((c: any[]) => JSON.parse(c[1].body).verb.id);
+    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/passed');
+    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/completed');
+  });
+
+  it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('complete', 'passed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(85);
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    expect(statementCalls).toHaveLength(0);
+  });
+
   it('includes auth header on xAPI requests', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();

@@ -139,8 +139,8 @@ export class CMI5Adapter implements PersistenceAdapter {
   #score: number | null = null;
   #durationSeconds = 0;
   #state: SavedState | null = null;
-  #completedSent = false;
-  #successSent = false;
+  #completedEmitted = false;
+  #lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
   #terminated = false;
 
   // cmi5 §8 launch params. masteryScore (when present) overrides the
@@ -449,11 +449,21 @@ export class CMI5Adapter implements PersistenceAdapter {
     this.#score = Math.max(0, Math.min(100, score));
   }
 
+  seedLifecycle(
+    completion: 'incomplete' | 'complete',
+    success: 'unknown' | 'passed' | 'failed'
+  ): void {
+    if (completion === 'complete') this.#completedEmitted = true;
+    if (success === 'passed' || success === 'failed') {
+      this.#lastSuccessEmitted = success;
+    }
+  }
+
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    if (status !== 'complete' || this.#completedSent || !this.#publisher) return;
+    if (status !== 'complete' || this.#completedEmitted || !this.#publisher) return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Completed.
     if (this.#launchMode !== 'Normal') return;
-    this.#completedSent = true;
+    this.#completedEmitted = true;
     // cmi5 §9.5.1 — `score` MUST NOT appear on Completed (Passed/Failed only).
     const result: Record<string, unknown> = {
       completion: true,
@@ -472,10 +482,11 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
-    if (status === 'unknown' || this.#successSent || !this.#publisher) return;
+    if (status === 'unknown' || !this.#publisher) return;
+    if (status === this.#lastSuccessEmitted) return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Passed/Failed.
     if (this.#launchMode !== 'Normal') return;
-    this.#successSent = true;
+    this.#lastSuccessEmitted = status;
 
     const verb = status === 'passed' ? VERBS.passed : VERBS.failed;
     const verbName = status === 'passed' ? 'passed' : 'failed';

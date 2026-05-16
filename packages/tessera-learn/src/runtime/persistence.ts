@@ -11,6 +11,11 @@ export interface PersistenceAdapter {
   setScore(score: number): void;
   setCompletionStatus(status: 'incomplete' | 'complete'): void;
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
+  /** Tell the adapter what was already emitted in prior sessions, so it skips re-emitting on resume. */
+  seedLifecycle?(
+    completion: 'incomplete' | 'complete',
+    success: 'unknown' | 'passed' | 'failed'
+  ): void;
   setDuration(seconds: number): void;
   /**
    * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps
