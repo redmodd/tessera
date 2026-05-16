@@ -543,7 +543,7 @@ A graded quiz under `mode: "manual"` reports its score to the LMS gradebook but 
 
 ## Assets
 
-Drop files into `assets/`. Reference them with `$assets/` in component props:
+Drop files into `assets/`. Reference them with `$assets/` in built-in component props:
 
 ```svelte
 <Image src="$assets/photo.png" alt="Photo" />
@@ -560,6 +560,48 @@ In CSS, use a relative path from `styles/`:
 External URLs work too: `<Image src="https://example.com/img.jpg" alt="..." />`.
 
 At build time the plugin copies `assets/` into `dist/assets/` so `$assets/foo.png` resolves the same way in the shipped bundle as it does in the dev server.
+
+### `$assets/` is three things — know which you're using
+
+`$assets/` is presented as a single convention, but it's actually three distinct mechanisms with different scopes. Custom components have to pick one explicitly; the wrong choice gives a silent 404, not a build error.
+
+1. **Vite import alias** — works in ES `import` statements. Vite resolves `$assets/...` to the project's `assets/` directory and bundles the asset:
+   ```js
+   import logoUrl from '$assets/logo.svg?url';
+   ```
+2. **Built-in component prop rewrite** — `Image`, `Audio`, and `Video` rewrite `$assets/foo` → `./assets/foo` internally before rendering. This is why `<Image src="$assets/photo.png">` works.
+3. **Build-time copy** — the plugin copies `assets/` to `dist/assets/`, so the document-relative path `./assets/foo.png` resolves identically in dev and in the shipped bundle.
+
+**Raw HTML attributes are not rewritten.** `<img src="$assets/foo.svg">` in a custom component fetches the literal string `/$assets/foo.svg` and 404s — there's no validator warning for this. Same for `new Audio('$assets/...')`, CSS `url()` strings built in JS, etc.
+
+### Asset references in custom components
+
+Pick by use case:
+
+**One-off reference — ES import (preferred):**
+```svelte
+<script>
+  import url from '$assets/diagram.svg?url';
+</script>
+<img src={url} alt="Diagram" />
+```
+Build-time bundling, asset hashing, fails the build if missing.
+
+**Collection referenced by name — `import.meta.glob`:**
+```js
+const signs = import.meta.glob('$assets/signs/*.svg', {
+  eager: true, query: '?url', import: 'default',
+});
+// then look up by full key:
+const url = signs[`/assets/signs/${filename}`];
+```
+Use this when the asset is chosen at runtime by ID/filename. Same build-time guarantees as a single import.
+
+**Pure runtime string (last resort):**
+```js
+const src = `./assets/signs/${filename}`;
+```
+No build-time guarantees, but works when neither pattern above fits (e.g., filenames that come from server data). Equivalent to what `Image`/`Audio`/`Video` do internally.
 
 ---
 
