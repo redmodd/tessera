@@ -177,18 +177,12 @@
     }
   }
 
-  // ---- Quiz completion handler ----
   function handleQuizComplete(e) {
-    const { score, interactions = [] } = e.detail;
+    const { score } = e.detail;
     const pageIndex = nav.currentPageIndex;
     progress.quizCompleted(pageIndex, score);
-    for (const { id, interaction, correct } of interactions) {
-      adapter.reportInteraction(id, interaction, correct);
-    }
     progress.recalculateCompletion(manifest, config);
     progress.recalculateSuccess(manifest, config);
-    // Persistence is scheduled by the version-tracking effect below; no
-    // explicit call needed here.
   }
 
   // ---- Persistence: serialize / restore ----

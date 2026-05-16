@@ -320,7 +320,7 @@ The build validator catches these — but get them right the first time:
 
 ### Data contract: what the LMS sees
 
-Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through `useQuiz().submit()` → `tessera-quiz-complete` → the persistence adapter. Bypass the hook and the quiz reports nothing.
+Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through the persistence adapter. Each interaction is reported the moment its feedback is revealed via `useQuiz().revealFeedback(q)` (so a per-question-feedback shell like the road-sign demo gets answers to the LMS as the learner plays); any questions still unrevealed at `useQuiz().submit()` time are reported in one pass before the score event fires. Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.
 
 ### `pageConfig.quiz` fields
 
@@ -842,7 +842,7 @@ function useQuestion(opts: {
 
 ### `useQuiz`
 
-Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review; **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz reports nothing to the LMS.
+Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review. Each question's Answered / `cmi.interactions` write fires the moment its feedback is revealed — `revealFeedback(q)` calls `adapter.reportInteraction()` for that question, so a per-question-feedback shell pushes answers to the LMS as the learner plays rather than batching them at the end. `submit()` reports any questions still unrevealed before dispatching `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz never marks Completed / Passed / Failed.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -853,7 +853,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly score: number;
   readonly passingScore: number;   // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  submit(): void;       // dispatches tessera-quiz-complete; runtime forwards interactions to the adapter
+  submit(): void;       // reports any unrevealed interactions, then dispatches tessera-quiz-complete
   retry(): void;
   startReview(): void;
   exitReview(): void;
@@ -861,7 +861,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
 };
 ```
 
-Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter.
+Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter — adapter writes happen inside `revealFeedback()` and `submit()`.
 
 `passingScore` reads the resolved threshold: config's `scoring.passingScore`, overridden when the LMS supplies one (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`). Use this instead of importing `course.config.js` directly — importing the config skips the LMS override.
 

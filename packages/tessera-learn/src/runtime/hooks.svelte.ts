@@ -371,6 +371,7 @@ export function __warnEmptyQuiz(questionsCount: number): void {
 
 export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHandle {
   const pageCtx = getPageContext();
+  const adapterCtx = getAdapterContext();
   if (!pageCtx?.quiz) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).'
@@ -395,6 +396,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   let internalQuestions = $state<InternalQuestion[]>([]);
   const answers = new Map<number, unknown>();
+  const reportedAnswers = new Map<number, unknown>();
   let answersVersion = $state(0);
   let submitted = $state(false);
   let reviewing = $state(false);
@@ -428,6 +430,18 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     dispatch('tessera-quiz-question-answered', { index });
   }
 
+  function reportAnswer(index: number): void {
+    if (!adapterCtx) return;
+    if (reportedAnswers.has(index)) return;
+    const q = internalQuestions[index];
+    if (!q || typeof q.interaction !== 'function') return;
+    const answer = answers.has(index) ? answers.get(index) : undefined;
+    const interaction = q.interaction();
+    if (!interaction) return;
+    reportedAnswers.set(index, answer);
+    adapterCtx.adapter.reportInteraction(q.id, interaction, q.checkAnswer(answer));
+  }
+
   function getAnswerInternal(index: number): unknown {
     void answersVersion;
     return answers.get(index);
@@ -458,6 +472,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     const next = new Set(feedbackShown);
     next.add(index);
     feedbackShown = next;
+    reportAnswer(index);
   }
 
   function isLockedCorrectInternal(index: number): boolean {
@@ -542,6 +557,8 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     }
     el.dispatchEvent(new CustomEvent('tessera-quiz-before-submit', { bubbles: true }));
 
+    for (let i = 0; i < internalQuestions.length; i++) reportAnswer(i);
+
     const { rounded } = computeScore();
     score = rounded;
     submitted = true;
@@ -583,6 +600,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     }
     lockedCorrect = newLocked;
     answers.clear();
+    reportedAnswers.clear();
     for (const [i, a] of preserved) answers.set(i, a);
     for (let i = 0; i < internalQuestions.length; i++) {
       if (!newLocked.has(i) && internalQuestions[i].reset) internalQuestions[i].reset!();

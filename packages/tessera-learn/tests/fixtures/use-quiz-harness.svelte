@@ -8,17 +8,21 @@
   // body has run, which is too late for tests that call submit() right away.
   // Props are read once at init by design — untrack() makes the snapshot intent
   // explicit so the compiler doesn't warn about non-reactive captures.
-  let { ref, quizConfig, host, secondQuiz = false, nullElement = false } = $props();
+  let { ref, quizConfig, host, secondQuiz = false, nullElement = false, adapter = null } = $props();
 
   const refSnap = untrack(() => ref);
   const hostSnap = untrack(() => host);
   const doubleRegister = untrack(() => secondQuiz);
   const forceNullElement = untrack(() => nullElement);
+  const adapterSnap = untrack(() => adapter);
 
   setContext('tessera-page', {
     quiz: untrack(() => quizConfig),
     passingScore: 70,
   });
+  if (adapterSnap) {
+    setContext('tessera-adapter', { get adapter() { return adapterSnap; } });
+  }
 
   function onComplete(e) {
     refSnap.events.push(e.detail);

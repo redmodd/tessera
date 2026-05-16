@@ -20,7 +20,10 @@ interface HarnessRef {
   thrown: unknown;
 }
 
-function mountHarness(quizConfig: unknown, opts: { secondQuiz?: boolean; nullElement?: boolean } = {}) {
+function mountHarness(
+  quizConfig: unknown,
+  opts: { secondQuiz?: boolean; nullElement?: boolean; adapter?: unknown } = {}
+) {
   const ref: HarnessRef = { handle: null, element: null, events: [], thrown: null };
   const target = document.createElement('div');
   const host = document.createElement('div');
@@ -34,6 +37,7 @@ function mountHarness(quizConfig: unknown, opts: { secondQuiz?: boolean; nullEle
       host,
       secondQuiz: opts.secondQuiz ?? false,
       nullElement: opts.nullElement ?? false,
+      adapter: opts.adapter ?? null,
     },
   });
   return { component, target, ref };
@@ -126,6 +130,84 @@ describe('useQuiz', () => {
       { id: 'a', interaction: { type: 'true-false', response: true, correct: true }, correct: true },
       { id: 'b', interaction: { type: 'true-false', response: false, correct: true }, correct: false },
     ]);
+  });
+
+  it('reports each interaction to the adapter the moment its feedback is revealed', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.registerQuestion(tfQuestion('b', false, true));
+
+    q.setAnswer(0, true);
+    q.setAnswer(1, false);
+    expect(calls).toHaveLength(0);
+
+    q.revealFeedbackByIndex(0);
+    expect(calls).toEqual([['a', true]]);
+
+    q.revealFeedbackByIndex(1);
+    expect(calls).toEqual([['a', true], ['b', false]]);
+
+    q.submit();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('submit() reports any questions whose feedback was never revealed', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.registerQuestion(tfQuestion('b', false, true));
+    q.setAnswer(0, true);
+    q.setAnswer(1, false);
+    q.submit();
+    expect(calls).toEqual(['a', 'b']);
+  });
+
+  it('does not re-report a question whose feedback was already revealed before submit', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.revealFeedbackByIndex(0);
+    q.submit();
+    expect(calls).toEqual(['a']);
+  });
+
+  it('re-reports after retry() so a second attempt produces fresh statements', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', false, true));
+    q.setAnswer(0, false);
+    q.submit();
+    expect(calls).toHaveLength(1);
+    q.retry();
+    q.setAnswer(0, false);
+    q.submit();
+    expect(calls).toHaveLength(2);
   });
 
   it('submit() is the only sanctioned dispatcher — calling twice does not double-fire', () => {
