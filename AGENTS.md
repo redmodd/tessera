@@ -2,7 +2,7 @@
 
 Tessera is an **LMS tracking runtime** for interactive learning content. It handles SCORM 1.2 / SCORM 2004 / cmi5 / xAPI statements, progress state, completion and success rollup, persistence, and navigation gating, and gets out of the way for the presentation layer.
 
-**Lock the data contract. Free the presentation.** Build a course with built-in components, your own (via the hooks), or any mix. This file is the canonical reference for any agent or human author working in a Tessera project. Read it before generating or editing course code.
+Build a course with built-in components, your own (via the hooks), or any mix. This file is the canonical reference for any agent or human author working in a Tessera project. Read it before generating or editing course code.
 
 ---
 
@@ -50,7 +50,7 @@ my-course/
         └── welcome.svelte
 ```
 
-That's it. `pages/` exists, contains one or more **section directories**, each containing one or more `.svelte` files (directly or inside lesson subdirectories). The runtime works with that alone.
+`pages/` exists, contains one or more **section directories**, each containing one or more `.svelte` files (directly or inside lesson subdirectories). The runtime works with that alone.
 
 ### Optional
 
@@ -115,15 +115,13 @@ Pages listed in `pages` come first in listed order; any unlisted `.svelte` files
 
 ## Authoring Surfaces
 
-There are five:
-
 1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc., from `tessera-learn`. Use, compose, or skip.
 2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
 3. **Custom layout**: drop `layout.svelte` at the project root to replace the default chrome.
 4. **Custom quiz shell**: drop `quiz.svelte` at the project root to replace the built-in quiz UI for every page that has `pageConfig.quiz`. Authors call `useQuiz()` for state and dispatch; question widgets continue to register through `useQuestion`.
 5. **Custom xAPI**: `useXAPI()` returns a publisher for emitting your own xAPI verbs to one or more LRSes. See [Custom xAPI statements](#custom-xapi-statements).
 
-The built-ins are reference implementations of the hooks. A custom widget that calls `useQuestion` and emits an `Interaction` is treated identically to `<MultipleChoice>`, with the same scoring, LMS reporting, and persistence.
+A custom widget that calls `useQuestion` and emits an `Interaction` is treated identically to `<MultipleChoice>`, with the same scoring, LMS reporting, and persistence.
 
 ---
 
@@ -309,14 +307,14 @@ A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imp
 
 ### Common mistakes
 
-The build validator catches these — but get them right the first time:
+Watch for these:
 
 - **`correct` is a 0-based index, not the answer text.** `correct={1}` means the second option. It must be in range for `options`.
 - **Every required prop must be present.** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
 - **Question `id`s must be unique within a page.** Duplicates collide in `cmi.interactions`.
 - **Don't add your own `<Quiz>` wrapper.** A page with `pageConfig.quiz` is wrapped automatically — just drop the question components at the page root.
-- **Custom widgets must register through `useQuestion` and submit through `useQuiz().submit()`.** Bypass either and the quiz reports nothing to the LMS.
+- **Custom widgets must register through `useQuestion` and submit through `useQuiz().submit()`.** See [Data contract](#data-contract-what-the-lms-sees) below.
 
 ### Data contract: what the LMS sees
 
@@ -329,23 +327,25 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would fr
 | `graded` | `boolean` | `false` | Whether the score counts toward course success |
 | `gatesProgress` | `boolean` | `false` | Whether passing is required to access the next page |
 | `maxAttempts` | `number` | `Infinity` | Max attempts |
-| `feedbackMode` | `"review" \| "immediate" \| "never" \| (state) => boolean` | `"review"` | When feedback renders. `"immediate"` reveals after the shell calls `revealFeedback(q)`; `"review"` only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button). Predicates have full control. Under `"immediate"`, revealing feedback locks the answer. |
+| `feedbackMode` | `"review" \| "immediate" \| "never" \| (state) => boolean` | `"review"` | When feedback renders. See below. |
 | `retryMode` | `"full" \| "incorrect-only" \| (results) => Set<number>` | `"full"` | Enum sugar or a predicate that returns the set of question indices to lock as "already correct" on retry. |
 | `canSubmit` | `(answered, total) => boolean` | all-answered | Custom Submit gate. Default requires every question to have an answer. |
-| `score` | `(results) => number` | weighted-correct % | Returns 0–100. Default: `Σ(weight × correct) / Σ(weight) × 100`. With every weight = 1 (the default), this matches the unweighted mean. |
+| `score` | `(results) => number` | weighted-correct % | Returns 0–100. Default: `Σ(weight × correct) / Σ(weight) × 100`. |
 
-Enum sugar and predicate forms are equally first-class; pick whichever fits the course. `gatesProgress: true` blocks navigation to the next page until the learner passes. Works in both `free` and `sequential` navigation modes.
+`feedbackMode` values: `"immediate"` reveals after the shell calls `revealFeedback(q)` and locks the answer; `"review"` shows feedback only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button). A predicate gets full control over per-question reveal.
+
+`gatesProgress: true` blocks navigation to the next page until the learner passes. Works in both `free` and `sequential` navigation modes.
 
 ### Per-question weighting
 
-Pass `weight` to `useQuestion` (and through built-in widget props) to change how much a question pulls on the page-level score. Defaults to 1.
+Pass `weight` to `useQuestion` (and through built-in widget props) to change how much a question pulls on the page-level score. Defaults to 1; non-positive values are treated as 1.
 
 ```svelte
 <MultipleChoice id="q-easy" weight={1} ... />
 <MultipleChoice id="q-hard" weight={3} ... />
 ```
 
-Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page. Both paths roll up using `Σ(weight × score) / Σ(weight)`. The same widget answered the same way produces the same page score whether it's wrapped in a quiz or scattered across the page. Non-positive weights are treated as 1.
+Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page — the same widget answered the same way produces the same page score either way.
 
 The LMS still sees each question as a single pass/fail interaction; weights only affect the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*`.
 
@@ -511,7 +511,7 @@ Optional. Set to `"page"` to fail the build when no page declares `completesOn: 
 completion: { mode: "manual", trigger: "page" }
 ```
 
-When omitted, the dev runtime warns once after 60 s if completion has not fired — a safety net that covers both "no `completesOn` page exists" and "the hook is never called" cases.
+When omitted, the dev runtime warns once after 60 s if completion has not fired.
 
 ### Success status
 
@@ -686,7 +686,7 @@ export default {
 - `navigation.mode: "sequential"` → pages unlock one at a time as each is completed.
 - `completion.mode: "percentage"` → course completes when `visitedPages / totalPages * 100 >= percentageThreshold`.
 - `completion.mode: "quiz"` → course completes when graded quiz average >= `scoring.passingScore`.
-- `completion.mode: "manual"` → course completes when an author-declared trigger fires: a page declares `pageConfig.completesOn: "view"`, or any component calls `useCompletion().markComplete()`. First-to-fire wins. `scoring.passingScore` is optional (defaults to 0). See [Manual completion](#manual-completion).
+- `completion.mode: "manual"` → course completes when an author-declared trigger fires. See [Manual completion](#manual-completion).
 
 ### Minimum config
 
@@ -745,7 +745,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. The npm scripts in a scaffolded project are `npm run dev` (wraps `vite dev`, local dev server with HMR), `npm run export` (wraps `vite build`, full validation + bundle + adapter packaging), and `npm run validate` (validation only — no server, no bundle, exits non-zero on errors). `export` is named for the authoring intent ("export for an LMS") rather than the underlying `vite build`.
+The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `npm run validate` to check without building.
 
 ---
 
@@ -811,7 +811,7 @@ Matching uses `optionPairs: { left, right }` for the same effect, mapping each p
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `commit()` when the answer is final (single click for atomic widgets; blur / final-state for composite ones like matching/sorting/fill-in), `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
+- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `commit()` when the answer is final, `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
 - **Standalone**: the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
@@ -878,7 +878,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
 };
 ```
 
-Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter — adapter writes happen inside `q.commit()` and `submit()`.
+Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter.
 
 `passingScore` reads the resolved threshold: config's `scoring.passingScore`, overridden when the LMS supplies one (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`). Use this instead of importing `course.config.js` directly — importing the config skips the LMS override.
 
@@ -1111,7 +1111,7 @@ The runtime translates author intent (page visits, quiz scores, completion, pers
 | Persistence cap | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB | 64000 chars per spec | LRS-defined (typically unbounded for State API documents) |
 | Score scale exposed to LMS | `score.raw` only (0–100) | `score.raw` (0–100) **and** `score.scaled` (0–1) | `result.score.scaled` (0–1) |
 
-The SCORM adapter's internal `commit()` (the `LMSCommit` / `Commit` call) is microtask-coalesced — multiple state mutations within one tick collapse to a single API call. cmi5 statements are individual (no batched commit). Note: this is unrelated to the per-question `q.commit()` exposed on the `Question` handle, which signals "this answer is final" and triggers one `reportInteraction` write.
+The SCORM adapter's internal `commit()` (the `LMSCommit` / `Commit` call) is microtask-coalesced — multiple state mutations within one tick collapse to a single API call. cmi5 statements are individual (no batched commit).
 
 ### SCORM 1.2 notes
 
@@ -1186,8 +1186,6 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 **Init / terminate logging.** `Initialize` failures fire a top-level warning that names the LMS error code and notes downstream writes will all 301. Malformed `cmi.suspend_data` and non-numeric `cmi.interactions._count` are logged loudly — the latter is dangerous to silently fall back to 0 (the next session would overwrite prior records). Terminate-path `Commit` / `Terminate` / `LMSFinish` failures route through `callSyncOrWarn` so the last-chance writes aren't silent.
 
 **Unload.** `terminate()` cannot run async retries; the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
-
-**Interaction encoding.** Split by dialect: SCORM 1.2 (§3.4.7) uses plain `,` / `.` / `:` and slugs identifiers to alphanumeric+underscore; SCORM 2004 (§4.2.7) and cmi5 use bracketed `[,]` / `[.]` / `[:]` and pass identifiers through unchanged. All three share `formatResponse` / `formatCorrectPattern` parameterised over an `InteractionFormat` record (`SCORM12_INTERACTION_FORMAT`, `SCORM2004_INTERACTION_FORMAT`, `XAPI_INTERACTION_FORMAT`); cmi5 embeds its encoding in `result.response` / `definition.correctResponsesPattern`.
 
 **Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel. Never a silent degradation.
 
@@ -1386,7 +1384,7 @@ Always submit through `useQuiz().submit()`. See [Data contract](#data-contract--
 
 ### Recipe 4b: Custom question widget for a custom quiz shell
 
-Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, calls `commit()` when the answer is final (this is what triggers the LMS write), and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
+Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, calls `commit()` when the answer is final, and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
@@ -1555,5 +1553,5 @@ Keys are namespaced per course, so two courses on the same LMS don't collide. Un
 
 - **No runtime data fetching in pages.** Page content is static; no `fetch()` or dynamic loaders in page components.
 - **Public API only.** Import from `tessera-learn`. Do **not** import from `tessera-learn/runtime/*`; those paths are internal and may change.
-- **`pageConfig` is JSON5-parseable.** Trailing commas, unquoted keys, single quotes are fine; variables, function calls, template literals, and computed values are not.
+- **`pageConfig` must be a static object literal.** Trailing commas, unquoted keys, and single quotes are fine (JSON5-parseable); variables, function calls, template literals, and computed values are not.
 - **Third-party libraries** must be project dependencies in `package.json`.
