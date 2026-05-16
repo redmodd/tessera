@@ -310,8 +310,8 @@ describe('SCORM12Adapter', () => {
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.id']).toBe('q1');
       expect(v['cmi.interactions.0.type']).toBe('choice');
-      expect(v['cmi.interactions.0.student_response']).toBe('{a,b}');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('{a}');
+      expect(v['cmi.interactions.0.student_response']).toBe('a,b');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
       expect(v['cmi.interactions.0.result']).toBe('wrong');
       expect(v['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/);
     });
@@ -328,8 +328,8 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('{88_Earth_days,Iron_rich_dust}');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('{88_Earth_days}');
+      expect(v['cmi.interactions.0.student_response']).toBe('88_Earth_days,Iron_rich_dust');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('88_Earth_days');
     });
 
     it('encodes true-false as t/f per SCORM 1.2', async () => {
@@ -344,7 +344,7 @@ describe('SCORM12Adapter', () => {
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('f');
     });
 
-    it('wraps matching pairs in braces with . and , inner delimiters (SCORM 1.2 §3.4.7.7.5)', async () => {
+    it('uses plain . and , delimiters for matching pairs', async () => {
       adapter.reportInteraction(
         'm1',
         {
@@ -362,8 +362,8 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('{Phobos.Mars,Europa.Jupiter}');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('{Phobos.Mars,Europa.Jupiter}');
+      expect(v['cmi.interactions.0.student_response']).toBe('Phobos.Mars,Europa.Jupiter');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Phobos.Mars,Europa.Jupiter');
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
