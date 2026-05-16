@@ -9,37 +9,35 @@
 
   const pageCtx = getContext('tessera-page');
   let quizConfig = $derived(pageCtx?.quiz ?? {});
-  let passingScore = $derived(pageCtx?.passingScore ?? 70);
-  let showFeedback = $derived(quizConfig.showFeedback ?? true);
+  let feedbackDisabled = $derived(quizConfig.feedbackMode === 'never');
   let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
-  let isImmediateMode = $derived(showFeedback && quizConfig.feedbackMode === 'immediate');
+  let isImmediateMode = $derived(!feedbackDisabled && quizConfig.feedbackMode === 'immediate');
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
 
   let totalQuestions = $derived(handle.questions.length);
+  let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
+  let reviewQuestion = $derived(handle.questions[reviewIndex]);
   let correctCount = $derived(
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0)
   );
-  let passed = $derived(handle.score >= passingScore);
+  let passed = $derived(handle.score >= handle.passingScore);
 
-  function isAnswered(i) {
-    return handle.getAnswer(i) !== undefined || handle.isLockedCorrect(i);
+  function isAnswered(q) {
+    if (!q) return false;
+    return q.answer !== undefined || q.isLockedCorrect;
   }
 
-  function needsReveal(i) {
-    return (
-      isImmediateMode &&
-      isAnswered(i) &&
-      !handle.isLockedCorrect(i) &&
-      !handle.feedbackVisible(i)
-    );
+  function needsReveal(q) {
+    if (!q) return false;
+    return isImmediateMode && isAnswered(q) && !q.isLockedCorrect && !q.feedbackVisible;
   }
 
   function goNextQuestion() {
     // Immediate-mode: first click reveals feedback, second advances.
-    if (needsReveal(currentQuestionIndex)) {
-      handle.revealFeedback(currentQuestionIndex);
+    if (needsReveal(currentQuestion)) {
+      handle.revealFeedback(currentQuestion);
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
@@ -94,10 +92,9 @@
 
     <div class="tessera-quiz-questions">
       {#each handle.questions as q, i (q.id)}
-        {@const render = handle.getRender(i)}
         <div class="tessera-quiz-question-wrapper" class:active={i === currentQuestionIndex} aria-hidden={i !== currentQuestionIndex}>
-          {#if render}
-            {@render render()}
+          {#if q.render}
+            {@render q.render()}
           {/if}
         </div>
       {/each}
@@ -114,15 +111,15 @@
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           class="tessera-quiz-btn tessera-btn-primary"
-          disabled={!isAnswered(currentQuestionIndex)}
+          disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
         >
-          {handle.feedbackVisible(currentQuestionIndex) && isImmediateMode ? 'Continue' : 'Next'}
+          {currentQuestion?.feedbackVisible && isImmediateMode ? 'Continue' : 'Next'}
         </button>
-      {:else if needsReveal(currentQuestionIndex)}
+      {:else if needsReveal(currentQuestion)}
         <button
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={() => handle.revealFeedback(currentQuestionIndex)}
+          onclick={() => handle.revealFeedback(currentQuestion)}
         >
           Check Answer
         </button>
@@ -148,10 +145,9 @@
 
     <div class="tessera-quiz-questions">
       {#each handle.questions as q, i (q.id)}
-        {@const render = handle.getRender(i)}
         <div class="tessera-quiz-question-wrapper" class:active={i === reviewIndex} aria-hidden={i !== reviewIndex}>
-          {#if render}
-            {@render render()}
+          {#if q.render}
+            {@render q.render()}
           {/if}
         </div>
       {/each}
@@ -197,7 +193,7 @@
       </p>
 
       <div class="tessera-quiz-results-actions">
-        {#if showFeedback}
+        {#if !feedbackDisabled}
           <button
             class="tessera-quiz-btn tessera-quiz-btn-secondary"
             onclick={handleStartReview}

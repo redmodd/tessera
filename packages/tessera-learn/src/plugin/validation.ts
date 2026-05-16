@@ -811,7 +811,7 @@ function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): v
     }
   }
 
-  for (const field of ['graded', 'gatesProgress', 'showFeedback']) {
+  for (const field of ['graded', 'gatesProgress']) {
     if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
       errors.push(
         `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`

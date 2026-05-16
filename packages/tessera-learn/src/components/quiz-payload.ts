@@ -1,40 +1,19 @@
 import type { Interaction } from '../runtime/interaction.js';
 
 /**
- * Shape contributed by a question component when it registers with a `<Quiz>`.
+ * Shape contributed by a question component when it registers with a quiz.
  * `useQuestion` always supplies both `id` and `interaction`; custom widgets
  * may omit `interaction` (presentational steps that don't report to the LMS),
  * in which case they're skipped by `buildQuizInteractions`.
  */
 export interface QuizQuestionApi {
   id: string;
-  /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)*100`. */
+  /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)·100`. */
   weight?: number;
   checkAnswer: (answer: unknown) => boolean;
   reset?: () => void;
   render?: unknown;
   interaction?: () => Interaction;
-}
-
-/**
- * Reactive context published by `<Quiz>` (and `useQuiz`) under the
- * `'tessera-quiz'` Svelte context key. Question widgets read this through
- * `getContext<QuizContext>('tessera-quiz')` to coordinate with their host.
- *
- * All accessors are getters so the consumer re-runs when the underlying rune
- * state changes — destructuring the object will break reactivity.
- */
-export interface QuizContext {
-  registerQuestion(api: QuizQuestionApi): number;
-  setRender(index: number, render: unknown): void;
-  setAnswer(index: number, answer: unknown): void;
-  getAnswer(index: number): unknown;
-  readonly submitted: boolean;
-  readonly reviewing: boolean;
-  readonly showFeedback: boolean;
-  feedbackVisible(index: number): boolean;
-  isAnswerLocked(index: number): boolean;
-  isLockedCorrect(index: number): boolean;
 }
 
 export interface QuizInteractionEntry {

@@ -1,5 +1,5 @@
 <script>
-  import { getContext, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion } from './util.js';
   import LockedBanner from './LockedBanner.svelte';
@@ -17,15 +17,12 @@
     weight = 1,
   } = $props();
 
-  const quiz = getContext('tessera-quiz');
-  const standalone = !quiz;
-
   let selectedOption = $state(null);
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
 
-  const handle = useQuestion({
+  const q = useQuestion({
     get id() { return id ?? `mc-${slugFromQuestion(question)}`; },
     get weight() { return weight; },
     get maxRetries() { return maxRetries; },
@@ -37,21 +34,20 @@
     reset: () => { selectedOption = null; },
   });
 
-  const myIndex = $derived(handle.quizIndex ?? -1);
+  // `q.mode` is fixed for the lifetime of the widget; capture once.
+  const inQuiz = q.mode === 'quiz';
 
   onMount(() => {
-    if (!standalone) quiz.setRender(myIndex, renderQuestion);
+    if (inQuiz) q.setRender(renderQuestion);
   });
 
   function handleSelect(optIndex) {
-    if (standalone) {
-      if (handle.submitted) return;
-      selectedOption = optIndex;
-      handle.submit();
+    if (q.locked) return;
+    selectedOption = optIndex;
+    if (inQuiz) {
+      q.setAnswer(optIndex);
     } else {
-      if (quizLocked) return;
-      selectedOption = optIndex;
-      quiz.setAnswer(myIndex, optIndex);
+      q.submit();
     }
   }
 
@@ -59,26 +55,16 @@
     return optIndex === correct;
   }
 
-  // Quiz-mode helpers
   function getOptionClass(optIndex) {
-    if (standalone) {
-      if (!handle.submitted) return '';
-      if (isCorrectOption(optIndex)) return 'correct';
-      if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
-      return '';
-    }
-    if (!quiz.feedbackVisible(myIndex)) return '';
-    const answer = quiz.getAnswer(myIndex);
+    if (!q.feedbackVisible) return '';
+    const answer = inQuiz ? q.answer : selectedOption;
     if (isCorrectOption(optIndex)) return 'correct';
     if (optIndex === answer && !isCorrectOption(optIndex)) return 'incorrect';
     return '';
   }
-
-  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
 </script>
 
-{#if standalone}
+{#if !inQuiz}
   <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
     <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
@@ -98,13 +84,13 @@
             name={groupId}
             value={i}
             checked={isSelected}
-            disabled={handle.submitted}
+            disabled={q.submitted}
             onchange={() => handleSelect(i)}
           />
           <span class="tessera-mc-radio-custom"></span>
           <span class="tessera-mc-option-text">{option}</span>
 
-          {#if handle.submitted}
+          {#if q.submitted}
             {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
               <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
             {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
@@ -117,14 +103,14 @@
       {/each}
     </div>
 
-    {#if handle.submitted}
+    {#if q.submitted}
       {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
         <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
       {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
         <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
       {/if}
-      {#if handle.canRetry}
-        <RetryButton onclick={() => handle.retry()} />
+      {#if q.canRetry}
+        <RetryButton onclick={() => q.retry()} />
       {/if}
     {/if}
   </div>
@@ -132,7 +118,7 @@
 
 {#snippet renderQuestion()}
   <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
-    {#if isLocked}
+    {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
     <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
@@ -140,7 +126,7 @@
     <div class="tessera-mc-options">
       {#each options as option, i}
         {@const optionId = `${groupId}-opt-${i}`}
-        {@const isSelected = (quizLocked ? quiz.getAnswer(myIndex) : selectedOption) === i}
+        {@const isSelected = (q.locked ? q.answer : selectedOption) === i}
         {@const stateClass = getOptionClass(i)}
         <label
           class="tessera-mc-option {stateClass}"
@@ -153,13 +139,13 @@
             name={groupId}
             value={i}
             checked={isSelected}
-            disabled={quizLocked}
+            disabled={q.locked}
             onchange={() => handleSelect(i)}
           />
           <span class="tessera-mc-radio-custom"></span>
           <span class="tessera-mc-option-text">{option}</span>
 
-          {#if quiz.feedbackVisible(myIndex)}
+          {#if q.feedbackVisible}
             {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
               <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
             {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
@@ -172,8 +158,8 @@
       {/each}
     </div>
 
-    {#if quiz.feedbackVisible(myIndex)}
-      {@const answer = quiz.getAnswer(myIndex)}
+    {#if q.feedbackVisible}
+      {@const answer = q.answer}
       {#if answer === correct && correctFeedback && !optionFeedback[answer]}
         <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
       {:else if answer !== correct && incorrectFeedback && !optionFeedback[answer]}

@@ -1,5 +1,5 @@
 <script>
-  import { getContext, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion, shuffle } from './util.js';
@@ -19,9 +19,6 @@
     weight = 1,
   } = $props();
 
-  const quiz = getContext('tessera-quiz');
-  const standalone = !quiz;
-
   let queue = $state([]);              // item indices not yet placed; queue[0] is current
   let placements = $state(new SvelteMap()); // itemIdx → targetIdx
   let dragOver = $state(null);         // target index highlighted during drag
@@ -34,15 +31,6 @@
     cardSelected = false;
     dragOver = null;
     isDragging = false;
-  }
-
-  if (standalone) {
-    initQueue();
-  } else {
-    onMount(() => {
-      initQueue();
-      quiz.setRender(myIndex, renderQuestion);
-    });
   }
 
   function checkAnswer(answer) {
@@ -61,7 +49,7 @@
   // Sorting is semantically a categorization (each item → one target) and maps
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
-  const handle = useQuestion({
+  const q = useQuestion({
     get id() { return id ?? `sorting-${slugFromQuestion(question)}`; },
     get weight() { return weight; },
     get maxRetries() { return maxRetries; },
@@ -73,13 +61,20 @@
     reset: resetState,
   });
 
-  const myIndex = $derived(handle.quizIndex ?? -1);
+  // `q.mode` is fixed for the lifetime of the widget; capture it once so
+  // setup-time branches don't trip Svelte's "state_referenced_locally" warning.
+  const inQuiz = q.mode === 'quiz';
+
+  if (!inQuiz) {
+    initQueue();
+  } else {
+    onMount(() => {
+      initQueue();
+      q.setRender(renderQuestion);
+    });
+  }
 
   let currentItemIdx = $derived(queue.length > 0 ? queue[0] : null);
-
-  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let isDisabled = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
-  let showFeedback = $derived(standalone ? handle.submitted : quiz.feedbackVisible(myIndex));
 
   function getItemsForTarget(targetIdx) {
     const result = [];
@@ -94,19 +89,19 @@
   }
 
   function placeCard(targetIdx) {
-    if (isDisabled || currentItemIdx === null) return;
+    if (q.locked || currentItemIdx === null) return;
     const itemIdx = queue[0];
     placements.set(itemIdx, targetIdx);
     queue = queue.slice(1);
     cardSelected = false;
-    if (!standalone) quiz.setAnswer(myIndex, new Map(placements));
+    if (inQuiz) q.setAnswer(new Map(placements));
   }
 
   function returnCard(itemIdx) {
-    if (isDisabled) return;
+    if (q.locked) return;
     placements.delete(itemIdx);
     queue = [itemIdx, ...queue];
-    if (!standalone) quiz.setAnswer(myIndex, new Map(placements));
+    if (inQuiz) q.setAnswer(new Map(placements));
   }
 
   // --- Drag handlers ---
@@ -122,7 +117,7 @@
   }
 
   function onDragOver(e, targetIdx) {
-    if (isDisabled) return;
+    if (q.locked) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     dragOver = targetIdx;
@@ -145,7 +140,7 @@
   // --- Click / tap handlers ---
 
   function onCardClick() {
-    if (isDisabled || currentItemIdx === null) return;
+    if (q.locked || currentItemIdx === null) return;
     cardSelected = !cardSelected;
   }
 
@@ -157,7 +152,7 @@
   }
 
   function onTargetClick(targetIdx) {
-    if (isDisabled || !cardSelected) return;
+    if (q.locked || !cardSelected) return;
     placeCard(targetIdx);
   }
 
@@ -174,7 +169,7 @@
   <p class="tessera-sorting-question">{question}</p>
 
   <!-- Card deck: shows the current card to be placed -->
-  {#if !isDisabled}
+  {#if !q.locked}
     <div class="tessera-sorting-deck" aria-live="polite" aria-atomic="false">
       {#if currentItemIdx !== null}
         <div class="tessera-sorting-deck-inner">
@@ -212,17 +207,17 @@
   {/if}
 
   <!-- Drop targets -->
-  <div class="tessera-sorting-targets" class:targets-active={cardSelected && !isDisabled}>
+  <div class="tessera-sorting-targets" class:targets-active={cardSelected && !q.locked}>
     {#each targets as targetLabel, targetIdx}
       {@const targetItems = getItemsForTarget(targetIdx)}
       <div
         class="tessera-sorting-target"
         class:drag-over={dragOver === targetIdx}
-        class:clickable={cardSelected && !isDisabled}
+        class:clickable={cardSelected && !q.locked}
         role="button"
         tabindex="0"
-        aria-disabled={!(cardSelected && !isDisabled)}
-        aria-label="Target: {targetLabel}{cardSelected && !isDisabled ? ` (activate to place ${items[currentItemIdx]})` : ''}"
+        aria-disabled={!(cardSelected && !q.locked)}
+        aria-label="Target: {targetLabel}{cardSelected && !q.locked ? ` (activate to place ${items[currentItemIdx]})` : ''}"
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
@@ -235,17 +230,17 @@
             {#each targetItems as itemIdx}
               <div
                 class="tessera-sorting-placed-item"
-                class:correct={showFeedback && isCorrectPlacement(itemIdx)}
-                class:incorrect={showFeedback && !isCorrectPlacement(itemIdx)}
+                class:correct={q.feedbackVisible && isCorrectPlacement(itemIdx)}
+                class:incorrect={q.feedbackVisible && !isCorrectPlacement(itemIdx)}
               >
                 <span class="tessera-sorting-item-text">{items[itemIdx]}</span>
-                {#if !isDisabled}
+                {#if !q.locked}
                   <button
                     class="tessera-sorting-remove"
                     aria-label="Return '{items[itemIdx]}' to deck"
                     onclick={(e) => { e.stopPropagation(); returnCard(itemIdx); }}
                   >×</button>
-                {:else if showFeedback}
+                {:else if q.feedbackVisible}
                   <span class="tessera-sorting-item-icon" aria-hidden="true">
                     {isCorrectPlacement(itemIdx) ? '✓' : '✗'}
                   </span>
@@ -259,7 +254,7 @@
   </div>
 
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
-  {#if showFeedback}
+  {#if q.feedbackVisible}
     {@const isCorrect = checkAnswer(placements)}
     <div class="tessera-sorting-review">
       {#if isCorrect}
@@ -285,23 +280,23 @@
           <p class="tessera-sorting-feedback incorrect">{incorrectFeedback}</p>
         {/if}
       {/if}
-      {#if standalone && handle.canRetry}
-        <RetryButton onclick={() => handle.retry()} />
+      {#if !inQuiz && q.canRetry}
+        <RetryButton onclick={() => q.retry()} />
       {/if}
     </div>
   {/if}
 
   <!-- Standalone Check button (shown once all cards are placed) -->
-  {#if standalone && !handle.submitted && placements.size === items.length}
+  {#if !inQuiz && !q.submitted && placements.size === items.length}
     <div class="tessera-sorting-actions">
-      <button class="tessera-btn-primary tessera-sorting-check" onclick={() => handle.submit()}>
+      <button class="tessera-btn-primary tessera-sorting-check" onclick={() => q.submit()}>
         Check Answer
       </button>
     </div>
   {/if}
 {/snippet}
 
-{#if standalone}
+{#if !inQuiz}
   <div class="tessera-sorting" aria-label={question}>
     {@render sortingContent()}
   </div>
@@ -309,7 +304,7 @@
 
 {#snippet renderQuestion()}
   <div class="tessera-sorting" aria-label={question}>
-    {#if isLocked}
+    {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
     {@render sortingContent()}

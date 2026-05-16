@@ -401,21 +401,6 @@ export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
     );
   });
 
-  it('errors on quiz.showFeedback not boolean', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
-export const pageConfig = { title: "Quiz", quiz: { showFeedback: 1 } };
-</script>
-<h1>Quiz</h1>`
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining('quiz.showFeedback must be a boolean, got number')
-    );
-  });
 });
 
 // ---- Structure Validation ----

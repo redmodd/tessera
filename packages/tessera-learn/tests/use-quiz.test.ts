@@ -3,7 +3,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, unmount } from 'svelte';
 import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
-import type { UseQuizHandle } from '../src/runtime/hooks.svelte.js';
+// Tests drive the engine directly via the index-keyed internal surface.
+// Authors of custom shells/widgets use the slim public UseQuizHandle.
+import type { UseQuizInternalHandle as UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 
 // useQuiz needs a real component lifecycle (setContext, onDestroy, $state/$derived
 // reactivity), so each test mounts a tiny harness component. The harness exposes
@@ -79,13 +81,16 @@ describe('useQuiz', () => {
     expect(q.attemptCount).toBe(0);
   });
 
-  it('registerQuestion returns sequential indices', () => {
+  it('registerQuestion appends to quiz.questions in order, returning a handle per question', () => {
     const m = mountHarness({ graded: true });
     mountings.push(m);
     const q = m.ref.handle!;
-    expect(q.registerQuestion(tfQuestion('a', true, true))).toBe(0);
-    expect(q.registerQuestion(tfQuestion('b', false, true))).toBe(1);
-    expect(q.registerQuestion(tfQuestion('c', true, true))).toBe(2);
+    const a = q.registerQuestion(tfQuestion('a', true, true));
+    const b = q.registerQuestion(tfQuestion('b', false, true));
+    const c = q.registerQuestion(tfQuestion('c', true, true));
+    expect(a.id).toBe('a');
+    expect(b.id).toBe('b');
+    expect(c.id).toBe('c');
     expect(q.questions).toHaveLength(3);
     expect(q.questions.map((qq) => qq.id)).toEqual(['a', 'b', 'c']);
   });
@@ -267,12 +272,14 @@ describe('useQuiz', () => {
   });
 
   it('revealFeedback flips feedbackVisible for a question', () => {
-    const m = mountHarness({ graded: true, showFeedback: true, feedbackMode: 'immediate' });
+    const m = mountHarness({ graded: true, feedbackMode: 'immediate' });
     mountings.push(m);
     const q = m.ref.handle!;
-    q.registerQuestion(tfQuestion('a', true, true));
+    const a = q.registerQuestion(tfQuestion('a', true, true));
+    expect(a.feedbackVisible).toBe(false);
     expect(q.feedbackVisible(0)).toBe(false);
-    q.revealFeedback(0);
+    q.revealFeedback(a);
+    expect(a.feedbackVisible).toBe(true);
     expect(q.feedbackVisible(0)).toBe(true);
   });
 

@@ -21,22 +21,22 @@ interface Registration {
 
 function makeQuizCtx() {
   const registrations: Registration[] = [];
-  let nextIndex = 0;
   const quiz: any = {
-    submitted: false,
     registerQuestion(api: Registration) {
       registrations.push(api);
-      return nextIndex++;
+      return {
+        id: api.id,
+        submitted: false,
+        correct: null,
+        answer: undefined,
+        feedbackVisible: false,
+        locked: false,
+        isLockedCorrect: false,
+        render: undefined,
+        setAnswer() {},
+        setRender() {},
+      };
     },
-    setRender() {},
-    setAnswer() {},
-    getAnswer() { return undefined; },
-    feedbackVisible() { return false; },
-    isAnswerLocked() { return false; },
-    isLockedCorrect() { return false; },
-    reviewing: false,
-    showFeedback: false,
-    currentQuestionIndex: 0,
   };
   return { quiz, registrations };
 }

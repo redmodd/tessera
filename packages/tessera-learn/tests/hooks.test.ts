@@ -320,13 +320,40 @@ describe('useQuestion — standalone retry', () => {
 // ============ useQuestion (inside a <Quiz>) ============
 
 function makeQuizCtx(overrides: Record<string, unknown> = {}) {
+  // Shared state the test can poke to simulate the quiz advancing/submitting.
+  const state = { submitted: false };
+  const handles: any[] = [];
   const quiz: any = {
-    submitted: false,
+    get submitted() { return state.submitted; },
+    set submitted(v: boolean) {
+      state.submitted = v;
+      for (const h of handles) h._setSubmitted(v);
+    },
     registerQuestion: vi.fn(),
     ...overrides,
   };
-  let nextIndex = 0;
-  quiz.registerQuestion.mockImplementation(() => nextIndex++);
+  quiz.registerQuestion.mockImplementation((api: any) => {
+    let submitted = state.submitted;
+    let correct: boolean | null = null;
+    const h = {
+      id: api.id,
+      get submitted() { return submitted; },
+      get correct() { return correct; },
+      answer: undefined,
+      feedbackVisible: false,
+      get locked() { return submitted; },
+      isLockedCorrect: false,
+      render: undefined,
+      setAnswer() {},
+      setRender() {},
+      _setSubmitted(v: boolean) {
+        submitted = v;
+        correct = v ? api.checkAnswer() : null;
+      },
+    };
+    handles.push(h);
+    return h;
+  });
   return quiz;
 }
 
@@ -351,7 +378,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(typeof arg.interaction).toBe('function');
   });
 
-  it('exposes the quiz-returned index on the handle', () => {
+  it('forwards each widget through to a distinct quiz registration', () => {
     const progress = new ProgressState();
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
@@ -360,8 +387,9 @@ describe('useQuestion — inside a <Quiz>', () => {
 
     const a = useQuestion({ id: 'a', response: () => ({ type: 'true-false', response: true }) });
     const b = useQuestion({ id: 'b', response: () => ({ type: 'true-false', response: false }) });
-    expect(a.quizIndex).toBe(0);
-    expect(b.quizIndex).toBe(1);
+    expect(quiz.registerQuestion).toHaveBeenCalledTimes(2);
+    expect(a.id).toBe('a');
+    expect(b.id).toBe('b');
   });
 
   it('interaction() callback returns the latest response value (not memoized)', () => {

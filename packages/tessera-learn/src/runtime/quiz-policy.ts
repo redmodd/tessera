@@ -47,13 +47,17 @@ export type ScorePredicate = (results: QuizQuestionResult[]) => number;
 
 export interface QuizPolicyConfig {
   /**
-   * Show feedback after each answer (`'immediate'`), only on the review screen
-   * (`'review'`), or via a custom predicate `(state) => boolean` returning
-   * whether feedback should currently be visible. Predicates receive a full
-   * `FeedbackVisibilityState` so they can decide independently of the enum
-   * branches — the enums themselves desugar to predicates over the same state.
+   * When feedback for a question should render:
+   *  - `'immediate'` — after the shell calls `revealFeedback(q)` for the question.
+   *  - `'review'` (default) — only while the quiz is in review mode.
+   *  - `'never'` — feedback never renders, no Review button.
+   *  - predicate `(state) => boolean` — full control over visibility.
+   *
+   * Predicates receive a `FeedbackVisibilityState` so they can decide
+   * independently of the enum branches — the enums themselves desugar to
+   * predicates over the same state.
    */
-  feedbackMode?: 'immediate' | 'review' | FeedbackModePredicate;
+  feedbackMode?: 'immediate' | 'review' | 'never' | FeedbackModePredicate;
   /**
    * On retry, clear every answer (`'full'`), preserve correct answers
    * (`'incorrect-only'`), or pass a custom predicate that takes the previous
@@ -71,11 +75,6 @@ export interface QuizPolicyConfig {
    * 0–100; values outside that range warn in dev mode.
    */
   score?: ScorePredicate;
-  /**
-   * If false, feedback never renders even when `feedbackMode` says it should.
-   * Mirrors the historical `showFeedback` flag.
-   */
-  showFeedback?: boolean;
 }
 
 /**
@@ -83,21 +82,22 @@ export interface QuizPolicyConfig {
  * the "should this question's feedback be visible right now?" decision.
  *
  * The shipping enums desugar to:
- *  - `'immediate'` — visible after the shell calls `revealFeedback` for the
- *    question, OR while the quiz is in review mode.
+ *  - `'immediate'` — visible after the shell calls `revealFeedback(q)` for
+ *    the question, OR while the quiz is in review mode.
  *  - `'review'` (default) — visible only while the quiz is in review mode.
+ *  - `'never'` — never visible. `useQuiz` short-circuits before calling here.
  *
  * Predicates receive the full visibility state so they can encode any policy
  * — e.g. "only after first wrong attempt": `(s) => s.attemptCount > 0 && s.submitted`.
- *
- * The `showFeedback: false` global gate is applied separately by `useQuiz`
- * before this predicate runs.
  */
 export function resolveFeedbackMode(cfg: QuizPolicyConfig | undefined | null): FeedbackModePredicate {
   const mode = cfg?.feedbackMode;
   if (typeof mode === 'function') return mode;
   if (mode === 'immediate') {
     return (s) => s.revealed || s.reviewing;
+  }
+  if (mode === 'never') {
+    return () => false;
   }
   // Default + 'review'
   return (s) => s.reviewing;

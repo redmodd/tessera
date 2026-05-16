@@ -10,8 +10,7 @@ export interface QuizConfig {
   graded?: boolean;
   gatesProgress?: boolean;
   maxAttempts?: number;
-  showFeedback?: boolean;
-  feedbackMode?: 'review' | 'immediate';
+  feedbackMode?: 'review' | 'immediate' | 'never';
   retryMode?: 'full' | 'incorrect-only';
 }
 

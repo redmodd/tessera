@@ -1,5 +1,5 @@
 <script>
-  import { getContext, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion } from './util.js';
   import LockedBanner from './LockedBanner.svelte';
@@ -17,9 +17,6 @@
     weight = 1,
   } = $props();
 
-  const quiz = getContext('tessera-quiz');
-  const standalone = !quiz;
-
   let inputValue = $state('');
 
   const componentId = $props.id();
@@ -35,7 +32,7 @@
     });
   }
 
-  const handle = useQuestion({
+  const q = useQuestion({
     get id() { return id ?? `fitb-${slugFromQuestion(question)}`; },
     get weight() { return weight; },
     get maxRetries() { return maxRetries; },
@@ -48,36 +45,28 @@
     reset: () => { inputValue = ''; },
   });
 
-  const myIndex = $derived(handle.quizIndex ?? -1);
+  // `q.mode` is fixed for the lifetime of the widget; capture once.
+  const inQuiz = q.mode === 'quiz';
 
   onMount(() => {
-    if (!standalone) quiz.setRender(myIndex, renderQuestion);
+    if (inQuiz) q.setRender(renderQuestion);
   });
 
-  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
-
   function handleInput(e) {
-    if (standalone) {
-      if (handle.submitted) return;
-      inputValue = e.target.value;
-    } else {
-      if (quizLocked) return;
-      inputValue = e.target.value;
-      quiz.setAnswer(myIndex, inputValue);
-    }
+    if (q.locked) return;
+    inputValue = e.target.value;
+    if (inQuiz) q.setAnswer(inputValue);
   }
 
   function handleKeydown(e) {
-    if (!standalone || handle.submitted) return;
+    if (inQuiz || q.submitted) return;
     if (e.key === 'Enter' && inputValue.trim()) {
-      handle.submit();
+      q.submit();
     }
   }
-
 </script>
 
-{#if standalone}
+{#if !inQuiz}
   <div class="tessera-fitb">
     <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
@@ -86,27 +75,27 @@
         type="text"
         id={inputId}
         class="tessera-fitb-input"
-        class:correct={handle.submitted && checkAnswer(inputValue)}
-        class:incorrect={handle.submitted && !checkAnswer(inputValue)}
+        class:correct={q.submitted && checkAnswer(inputValue)}
+        class:incorrect={q.submitted && !checkAnswer(inputValue)}
         value={inputValue}
         oninput={handleInput}
         onkeydown={handleKeydown}
-        disabled={handle.submitted}
+        disabled={q.submitted}
         placeholder="Type your answer..."
         autocomplete="off"
       />
-      {#if !handle.submitted}
+      {#if !q.submitted}
         <button
           class="tessera-btn-primary tessera-fitb-check-btn"
           disabled={!inputValue.trim()}
-          onclick={() => { handle.submit(); }}
+          onclick={() => { q.submit(); }}
         >
           Check
         </button>
       {/if}
     </div>
 
-    {#if handle.submitted}
+    {#if q.submitted}
       {@const isCorrect = checkAnswer(inputValue)}
       <div class="tessera-fitb-review">
         {#if isCorrect}
@@ -129,8 +118,8 @@
             <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
           {/if}
         {/if}
-        {#if handle.canRetry}
-          <RetryButton onclick={() => handle.retry()} />
+        {#if q.canRetry}
+          <RetryButton onclick={() => q.retry()} />
         {/if}
       </div>
     {/if}
@@ -139,7 +128,7 @@
 
 {#snippet renderQuestion()}
   <div class="tessera-fitb">
-    {#if isLocked}
+    {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
     <label class="tessera-fitb-question" for={inputId}>{question}</label>
@@ -149,18 +138,18 @@
         type="text"
         id={inputId}
         class="tessera-fitb-input"
-        class:correct={quiz.feedbackVisible(myIndex) && checkAnswer(quiz.getAnswer(myIndex))}
-        class:incorrect={quiz.feedbackVisible(myIndex) && !checkAnswer(quiz.getAnswer(myIndex))}
-        value={quizLocked ? (quiz.getAnswer(myIndex) ?? '') : inputValue}
+        class:correct={q.feedbackVisible && checkAnswer(q.answer)}
+        class:incorrect={q.feedbackVisible && !checkAnswer(q.answer)}
+        value={q.locked ? (q.answer ?? '') : inputValue}
         oninput={handleInput}
-        disabled={quizLocked}
+        disabled={q.locked}
         placeholder="Type your answer..."
         autocomplete="off"
       />
     </div>
 
-    {#if quiz.feedbackVisible(myIndex)}
-      {@const userAnswer = quiz.getAnswer(myIndex)}
+    {#if q.feedbackVisible}
+      {@const userAnswer = q.answer}
       {@const isCorrect = checkAnswer(userAnswer)}
       <div class="tessera-fitb-review">
         {#if isCorrect}
