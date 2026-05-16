@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.0.10
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.9` so newly-created projects pick up the per-question `q.commit()` API, adaptive interaction-id encoding (readable ids preserved on cmi5/SCORM 2004, mapped to indexes on SCORM 1.2), the SCORM 1.2 strict-validator fixes (id slugging, field write order, brace-wrapped responses), and the cmi5 resume / fetch-URL fixes.
+
 ## 0.0.9
 
 ### Patch Changes
