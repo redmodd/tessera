@@ -14,6 +14,13 @@ export interface InteractionFormat {
    * is a single CMIDecimal. SCORM 2004 supports `min[:]max`.
    */
   supportsNumericRange: boolean;
+  /**
+   * SCORM 1.2 RTE §3.4.7.7.5 wraps the response list for `choice` /
+   * `sequencing` / `matching` in literal braces (e.g. `{a,b}`). SCORM Cloud
+   * enforces this; lenient validators (Moodle, Reload) accept the bare form
+   * too. SCORM 2004 / cmi5 use bracketed delimiters and no outer braces.
+   */
+  listWrap?: [string, string];
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -23,6 +30,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '.',
   rangeDelim: ':',
   supportsNumericRange: false,
+  listWrap: ['{', '}'],
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -51,6 +59,10 @@ function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
+function wrapList(value: string, fmt: InteractionFormat): string {
+  return fmt.listWrap ? `${fmt.listWrap[0]}${value}${fmt.listWrap[1]}` : value;
+}
+
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT
@@ -58,7 +70,7 @@ export function formatResponse(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response.map(fmt.identifier).join(fmt.itemDelim);
+      return wrapList(i.response.map(fmt.identifier).join(fmt.itemDelim), fmt);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -67,9 +79,12 @@ export function formatResponse(
     case 'other':
       return i.response;
     case 'matching':
-      return i.response
-        .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
-        .join(fmt.itemDelim);
+      return wrapList(
+        i.response
+          .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
+          .join(fmt.itemDelim),
+        fmt
+      );
     case 'numeric':
       return String(i.response);
     case 'performance':
@@ -88,16 +103,19 @@ export function formatCorrectPattern(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return (i.correct as string[]).map(fmt.identifier).join(fmt.itemDelim);
+      return wrapList((i.correct as string[]).map(fmt.identifier).join(fmt.itemDelim), fmt);
     case 'true-false':
       return fmt.formatBoolean(i.correct as boolean);
     case 'fill-in':
     case 'long-fill-in':
       return (i.correct as string[]).join(fmt.itemDelim);
     case 'matching':
-      return (i.correct as Array<[string, string]>)
-        .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
-        .join(fmt.itemDelim);
+      return wrapList(
+        (i.correct as Array<[string, string]>)
+          .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
+          .join(fmt.itemDelim),
+        fmt
+      );
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
       if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
