@@ -783,7 +783,7 @@ interface Question {
   readonly isLockedCorrect: boolean; // narrow case: locked because retry policy preserved this as already-correct
   readonly render: unknown;          // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void;                    // signal the answer is final; triggers the per-question LMS write
+  commit(): void;                    // signal the answer is final; triggers the per-question LMS write. Idempotent — a second call with the same answer is a no-op.
 }
 ```
 
