@@ -240,13 +240,28 @@ export class CMI5Adapter implements PersistenceAdapter {
     // Basic credential (already base64); we don't re-encode.
     let token = '';
     if (text.startsWith('{')) {
+      let parsed: unknown;
       try {
-        const parsed = JSON.parse(text);
-        if (parsed && typeof parsed['auth-token'] === 'string') {
-          token = parsed['auth-token'].trim();
-        }
+        parsed = JSON.parse(text);
       } catch {
-        // fall through to legacy parsing
+        parsed = undefined;
+      }
+      if (parsed && typeof parsed === 'object') {
+        const obj = parsed as Record<string, unknown>;
+        if (typeof obj['auth-token'] === 'string') {
+          token = (obj['auth-token'] as string).trim();
+        } else {
+          const code = typeof obj['error-code'] === 'string' ? obj['error-code'] : undefined;
+          const errText = typeof obj['error-text'] === 'string' ? obj['error-text'] : undefined;
+          const detail =
+            code !== undefined || errText !== undefined
+              ? ` (error-code=${code ?? 'unknown'}${errText ? `: ${errText}` : ''})`
+              : '';
+          throw new Error(
+            `Tessera cmi5: fetch URL returned a JSON response without an 'auth-token' field${detail}. ` +
+              'The cmi5 fetch URL is single-use (§8.2.3.1); reload from the LMS to obtain a fresh launch.'
+          );
+        }
       }
     }
     if (!token) {

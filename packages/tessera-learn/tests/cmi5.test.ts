@@ -359,6 +359,25 @@ describe('CMI5Adapter', () => {
     expect(headers.get('Authorization')).toBe('Basic spec-conformant-token');
   });
 
+  it('throws when fetch URL returns a spec-defined error JSON instead of a token', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === baseLaunchParams.fetch) {
+        return {
+          ok: true,
+          text: async () =>
+            '{"error-code":"1","error-text":"The authorization token has already been returned."}',
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+    adapter = new CMI5Adapter();
+    await expect(adapter.init()).rejects.toThrow(/error-code=1.*already been returned/);
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements')
+    );
+    expect(statementCalls.length).toBe(0);
+  });
+
   it('includes registration and context in statements', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
