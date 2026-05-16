@@ -320,7 +320,7 @@ The build validator catches these — but get them right the first time:
 
 ### Data contract: what the LMS sees
 
-Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through the persistence adapter. Each interaction is reported the moment its feedback is revealed via `useQuiz().revealFeedback(q)` (so a per-question-feedback shell like the road-sign demo gets answers to the LMS as the learner plays); any questions still unrevealed at `useQuiz().submit()` time are reported in one pass before the score event fires. Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.
+Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through the persistence adapter. Each interaction is reported the moment the widget calls `q.commit()` — atomic widgets (MCQ, true-false, likert) call it on click, composite widgets (matching, sorting, fill-in) call it on blur or final-state. `useQuiz().submit()` calls commit on any question whose widget hasn't yet, as a safety net. The reporting cost — one xAPI Answered / one `cmi.interactions.n` block per call — happens incrementally throughout the session rather than batching at the end, so a learner closing the tab after the last commit still gets credit. Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.
 
 ### `pageConfig.quiz` fields
 
@@ -783,6 +783,7 @@ interface Question {
   readonly isLockedCorrect: boolean; // narrow case: locked because retry policy preserved this as already-correct
   readonly render: unknown;          // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
+  commit(): void;                    // signal the answer is final; triggers the per-question LMS write
 }
 ```
 
@@ -794,7 +795,7 @@ Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` t
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
+- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `commit()` when the answer is final (single click for atomic widgets; blur / final-state for composite ones like matching/sorting/fill-in), `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
 - **Standalone**: the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
@@ -842,7 +843,7 @@ function useQuestion(opts: {
 
 ### `useQuiz`
 
-Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review. Each question's Answered / `cmi.interactions` write fires the moment its feedback is revealed — `revealFeedback(q)` calls `adapter.reportInteraction()` for that question, so a per-question-feedback shell pushes answers to the LMS as the learner plays rather than batching them at the end. `submit()` reports any questions still unrevealed before dispatching `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz never marks Completed / Passed / Failed.
+Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review. Question widgets call `q.commit()` when their answer is final; that's what triggers the per-question LMS write. `submit()` calls commit for any uncommitted questions as a safety net, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz never marks Completed / Passed / Failed.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -853,7 +854,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly score: number;
   readonly passingScore: number;   // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  submit(): void;       // reports any unrevealed interactions, then dispatches tessera-quiz-complete
+  submit(): void;       // reports any uncommitted interactions, then dispatches tessera-quiz-complete
   retry(): void;
   startReview(): void;
   exitReview(): void;

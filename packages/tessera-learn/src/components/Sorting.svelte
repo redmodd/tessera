@@ -94,7 +94,10 @@
     placements.set(itemIdx, targetIdx);
     queue = queue.slice(1);
     cardSelected = false;
-    if (inQuiz) q.setAnswer(new Map(placements));
+    if (inQuiz) {
+      q.setAnswer(new Map(placements));
+      if (placements.size === items.length) q.commit();
+    }
   }
 
   function returnCard(itemIdx) {

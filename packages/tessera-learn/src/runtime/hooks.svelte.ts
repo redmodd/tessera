@@ -49,6 +49,8 @@ export interface Question {
   readonly render: unknown;
   /** Record the learner's current answer. Called from the widget on user input. */
   setAnswer(answer: unknown): void;
+  /** Signal the answer is final; triggers the per-question LMS write. */
+  commit(): void;
 }
 
 export interface UseQuestionOptions {
@@ -136,6 +138,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       get isLockedCorrect() { return q.isLockedCorrect; },
       get render() { return q.render; },
       setAnswer(a: unknown) { q.setAnswer(a); },
+      commit() { q.commit(); },
       submit() {},
       reset() { opts.reset?.(); },
       retry() {},
@@ -152,6 +155,19 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   let retryCount = $state(0);
   let currentAnswer = $state<unknown>(undefined);
 
+  let committed = false;
+
+  function commit() {
+    const response = opts.response();
+    if (!response) return;
+    committed = true;
+    adapterCtx?.adapter.reportInteraction(
+      opts.id,
+      response,
+      isCorrectInteraction(response)
+    );
+  }
+
   function submit() {
     if (submitted) return;
     const response = opts.response();
@@ -163,7 +179,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         ? 100
         : 0;
 
-    adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
+    if (!committed) {
+      adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
+      committed = true;
+    }
     if (opts.graded && navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
@@ -181,6 +200,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     submitted = false;
     correct = null;
     currentAnswer = undefined;
+    committed = false;
     opts.reset?.();
   }
 
@@ -200,6 +220,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     get isLockedCorrect() { return submitted && correct === true && retryCount >= maxRetries; },
     render: undefined,
     setAnswer(a: unknown) { currentAnswer = a; },
+    commit,
     submit,
     reset,
     retry,
@@ -430,12 +451,12 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     dispatch('tessera-quiz-question-answered', { index });
   }
 
-  function reportAnswer(index: number): void {
+  function commitInternal(index: number): void {
     if (!adapterCtx) return;
-    if (reportedAnswers.has(index)) return;
     const q = internalQuestions[index];
     if (!q || typeof q.interaction !== 'function') return;
     const answer = answers.has(index) ? answers.get(index) : undefined;
+    if (reportedAnswers.has(index) && reportedAnswers.get(index) === answer) return;
     const interaction = q.interaction();
     if (!interaction) return;
     reportedAnswers.set(index, answer);
@@ -472,7 +493,6 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     const next = new Set(feedbackShown);
     next.add(index);
     feedbackShown = next;
-    reportAnswer(index);
   }
 
   function isLockedCorrectInternal(index: number): boolean {
@@ -496,6 +516,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
       get isLockedCorrect() { return isLockedCorrectInternal(i); },
       get render() { return getRenderInternal(i); },
       setAnswer(a: unknown) { setAnswerInternal(i, a); },
+      commit() { commitInternal(i); },
       setRender(r: unknown) { setRenderInternal(i, r); },
     };
   }
@@ -557,7 +578,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     }
     el.dispatchEvent(new CustomEvent('tessera-quiz-before-submit', { bubbles: true }));
 
-    for (let i = 0; i < internalQuestions.length; i++) reportAnswer(i);
+    for (let i = 0; i < internalQuestions.length; i++) commitInternal(i);
 
     const { rounded } = computeScore();
     score = rounded;

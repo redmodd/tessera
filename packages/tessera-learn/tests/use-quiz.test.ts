@@ -132,7 +132,7 @@ describe('useQuiz', () => {
     ]);
   });
 
-  it('reports each interaction to the adapter the moment its feedback is revealed', () => {
+  it('reports each interaction to the adapter when the widget calls commit(), not on setAnswer', () => {
     const calls: Array<[string, boolean | null]> = [];
     const adapter = {
       reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
@@ -149,17 +149,17 @@ describe('useQuiz', () => {
     q.setAnswer(1, false);
     expect(calls).toHaveLength(0);
 
-    q.revealFeedbackByIndex(0);
+    q.questions[0].commit();
     expect(calls).toEqual([['a', true]]);
 
-    q.revealFeedbackByIndex(1);
+    q.questions[1].commit();
     expect(calls).toEqual([['a', true], ['b', false]]);
 
     q.submit();
     expect(calls).toHaveLength(2);
   });
 
-  it('submit() reports any questions whose feedback was never revealed', () => {
+  it('submit() reports any questions whose widget never called commit()', () => {
     const calls: string[] = [];
     const adapter = {
       reportInteraction(id: string) { calls.push(id); },
@@ -175,7 +175,7 @@ describe('useQuiz', () => {
     expect(calls).toEqual(['a', 'b']);
   });
 
-  it('does not re-report a question whose feedback was already revealed before submit', () => {
+  it('does not re-report a question whose answer was already committed before submit', () => {
     const calls: string[] = [];
     const adapter = {
       reportInteraction(id: string) { calls.push(id); },
@@ -185,8 +185,45 @@ describe('useQuiz', () => {
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
-    q.revealFeedbackByIndex(0);
+    q.questions[0].commit();
     q.submit();
+    expect(calls).toEqual(['a']);
+  });
+
+  it('re-reports when commit() is called after the answer changes', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion({
+      id: 'a',
+      checkAnswer: (answer) => answer === true,
+      interaction: () => ({ type: 'true-false', response: q.getAnswer(0) === true, correct: true }),
+    });
+    q.setAnswer(0, false);
+    q.questions[0].commit();
+    q.setAnswer(0, true);
+    q.questions[0].commit();
+    expect(calls).toEqual([['a', false], ['a', true]]);
+  });
+
+  it('is a no-op when commit() is called twice with the same answer', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.questions[0].commit();
+    q.questions[0].commit();
     expect(calls).toEqual(['a']);
   });
 
