@@ -1,6 +1,10 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
+import {
+  formatResponse,
+  formatCorrectPattern,
+  XAPI_INTERACTION_FORMAT,
+} from '../interaction-format.js';
 import { formatISO8601Duration } from './retry.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
@@ -544,8 +548,8 @@ export class CMI5Adapter implements PersistenceAdapter {
     correct: boolean | null
   ): void {
     if (!this.#publisher) return;
-    const response = formatResponse(interaction);
-    const pattern = formatCorrectPattern(interaction);
+    const response = formatResponse(interaction, XAPI_INTERACTION_FORMAT);
+    const pattern = formatCorrectPattern(interaction, XAPI_INTERACTION_FORMAT);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,

@@ -123,8 +123,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     const idWrites = log
       .filter((e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]))
       .map((e) => e[2]);
-    // Hyphens in question ids are slugged by shortIdentifier() — SCORM Cloud's
-    // strict CMIIdentifier validation rejects hyphens in .id.
     expect(idWrites).toEqual(['q_planet', 'q_water']);
   });
 });
@@ -176,8 +174,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     const idWrites = log
       .filter((e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]))
       .map((e) => e[2]);
-    // Hyphens in question ids are slugged by shortIdentifier() — SCORM Cloud's
-    // strict CMIIdentifier validation rejects hyphens in .id.
     expect(idWrites).toEqual(['q_planet', 'q_water']);
   });
 });

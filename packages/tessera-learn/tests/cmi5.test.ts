@@ -829,6 +829,16 @@ describe('CMI5Adapter', () => {
       expect(body.result.success).toBe(false);
     });
 
+    it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
+      const body = await initAndReport(
+        'q1',
+        { type: 'choice', response: ['speed-limit', 'no-entry'], correct: ['speed-limit'] },
+        true
+      );
+      expect(body.result.response).toBe('speed-limit[,]no-entry');
+      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

@@ -1,6 +1,7 @@
 /**
  * SCORM 1.2 RTE §3.4.7 vs SCORM 2004 4E RTE §4.2.7 differ in delimiter
- * encoding and identifier rules; cmi5 (xAPI) reuses the 2004 encoding.
+ * encoding and identifier rules; cmi5 (xAPI) reuses 2004's delimiters but
+ * not its identifier slugging.
  */
 
 import type { Interaction } from './interaction.js';
@@ -38,6 +39,15 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   supportsNumericRange: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: shortIdentifier,
+};
+
+export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
+  itemDelim: '[,]',
+  pairDelim: '[.]',
+  rangeDelim: '[:]',
+  supportsNumericRange: true,
+  formatBoolean: (v) => (v ? 'true' : 'false'),
+  identifier: (v) => v,
 };
 
 /**
@@ -151,11 +161,6 @@ export function buildScormInteractionFields(
     [`${prefix}.id`, spec.format.identifier(questionId)],
     [`${prefix}.type`, spec.typeValue],
   ];
-  // SCORM Cloud's strict validator rejects `student_response` with "must be
-  // consistent with interaction type" when `correct_responses.0.pattern`
-  // hasn't been declared yet — the LMS has no expected pattern to compare
-  // against. Spec's `interactions._children` ordering (id, ..., type,
-  // correct_responses, ..., student_response, result, ...) implies the same.
   const pattern = formatCorrectPattern(interaction, spec.format);
   if (pattern !== null) {
     fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);

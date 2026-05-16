@@ -791,7 +791,7 @@ Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` t
 
 `Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
-For `choice` / `sequencing` / `matching`, set `response` / `correct` to **option indexes as strings** (`['0']`, `[['0','1']]`), not your widget's internal ids — SCORM Cloud's strict CMIFeedback validator rejects long named identifiers as "must be consistent with interaction type" even though they're valid CMIIdentifiers per the spec text. Built-in `<MultipleChoice>` already does this; custom widgets must too.
+For `choice` / `sequencing` / `matching`, named identifiers (`['speed-limit']`) ship cleanly through cmi5 to xAPI's `result.response` — the adapter passes them through unchanged so LRS traces stay self-describing. SCORM 1.2 / 2004, however, slug them to `CMIIdentifier` (alphanumeric + underscore) before writing, and SCORM Cloud's strict validator rejects the slugged-but-still-long form with "must be consistent with interaction type". For courses that ship as SCORM, **prefer option indexes as strings** (`['0']`, `[['0','1']]`) — they're spec-compliant CMIIdentifiers and survive every adapter unchanged. Built-in `<MultipleChoice>` does this; cmi5-only courses can keep readable named identifiers.
 
 ### `useQuestion`
 
