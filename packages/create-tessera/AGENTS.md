@@ -802,7 +802,7 @@ Register a question widget so the runtime can submit, score, persist, and report
 function useQuestion(opts: {
   id: string;                   // unique on the page; LMS interaction id
   graded?: boolean;             // standalone only
-  response: () => Interaction;  // current learner answer; called on submit
+  response: () => Interaction;  // current learner answer; called on each commit() and on submit
   score?: () => number;         // standalone-only override (0–100)
   weight?: number;              // page-level rollup weight (default 1)
   maxRetries?: number;          // standalone retry cap (default Infinity); ignored inside a quiz
@@ -1095,7 +1095,7 @@ The runtime translates author intent (page visits, quiz scores, completion, pers
 | Persistence cap | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB | 64000 chars per spec | LRS-defined (typically unbounded for State API documents) |
 | Score scale exposed to LMS | `score.raw` only (0–100) | `score.raw` (0–100) **and** `score.scaled` (0–1) | `result.score.scaled` (0–1) |
 
-`commit()` is microtask-coalesced. Multiple state mutations within one tick collapse to a single `LMSCommit` / `Commit`. cmi5 statements are individual (no batched commit).
+The SCORM adapter's internal `commit()` (the `LMSCommit` / `Commit` call) is microtask-coalesced — multiple state mutations within one tick collapse to a single API call. cmi5 statements are individual (no batched commit). Note: this is unrelated to the per-question `q.commit()` exposed on the `Question` handle, which signals "this answer is final" and triggers one `reportInteraction` write.
 
 ### SCORM 1.2 notes
 
@@ -1137,9 +1137,9 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Launch contract.** The LMS opens the course URL with `endpoint`, `fetch`, `actor` (JSON-encoded Identified Agent), `activityId`, and optionally `registration`. Discovery succeeds when all four required params are present; otherwise `LMSAdapterError`.
 
-**Token fetch is single-use** (cmi5 §6.2). On failure, reload from the LMS to retry. The token is used as a `Basic` credential, not Bearer.
+**Token fetch is single-use** (cmi5 §6.2). On failure, reload from the LMS to retry. The token is used as a `Basic` credential, not Bearer. If the fetch URL responds with the spec-defined `{"error-code":...,"error-text":...}` shape (§8.2.3 — typically the single-use violation on a refresh), `adapter.init()` throws with the LMS's error-code/text instead of stuffing the JSON blob into the `Basic` credential and 400-spamming the LRS.
 
-**Lifecycle order.** **Initialized** → **Answered** (per question on submit) → **Completed** → **Passed** / **Failed** → **Terminated** (always last, cmi5 §9.3.6). Completed / Passed / Failed are one-shot per session; once dispatched, the corresponding setter no-ops. A reloaded session may re-dispatch them, which is intended: each session sends its lifecycle exactly once. **Satisfied** and **Suspended** are not emitted by the AU — Satisfied is LMS-only (§9.3.9), and Suspended isn't a cmi5 verb (§9.3 enumerates nine; the LMS handles Abandoned / resume on relaunch).
+**Lifecycle order.** **Initialized** → **Answered** (one per question, as each widget calls `q.commit()`; uncommitted ones flush at submit) → **Completed** → **Passed** / **Failed** → **Terminated** (always last, cmi5 §9.3.6). Completed / Passed / Failed are one-shot per session; once dispatched, the corresponding setter no-ops. A reloaded session may re-dispatch them, which is intended: each session sends its lifecycle exactly once. **Satisfied** and **Suspended** are not emitted by the AU — Satisfied is LMS-only (§9.3.9), and Suspended isn't a cmi5 verb (§9.3 enumerates nine; the LMS handles Abandoned / resume on relaunch).
 
 **Required result fields.** Completed: `completion: true`, `duration` (no `score` — §9.5.1 forbids it). Passed: `success: true`, `duration`, `result.score.scaled` when known (§9.3.4 requires `scaled >= masteryScore` when present). Failed: `success: false`, `duration`, `result.score.scaled` when known (§9.3.5 requires `scaled < masteryScore` when present). Terminated: `duration` (§9.5.4.1). On contradiction the verb is preserved and the score is dropped with a console warning.
 
@@ -1368,7 +1368,7 @@ Always submit through `useQuiz().submit()`. See [Data contract](#data-contract--
 
 ### Recipe 4b: Custom question widget for a custom quiz shell
 
-Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
+Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, calls `commit()` when the answer is final (this is what triggers the LMS write), and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
@@ -1396,7 +1396,8 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
   function pick(i) {
     if (q.locked) return;
     selected = i;
-    q.setAnswer(i);    // shell sees this through q.answer / canSubmit
+    q.setAnswer(i);
+    q.commit();
   }
 </script>
 
