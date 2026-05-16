@@ -839,6 +839,21 @@ describe('CMI5Adapter', () => {
       expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
     });
 
+    it('ignores `options` for index mapping and keeps named identifiers in result.response', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'choice',
+          response: ['speed-limit'],
+          correct: ['speed-limit'],
+          options: ['stop', 'yield', 'speed-limit', 'merge'],
+        },
+        true
+      );
+      expect(body.result.response).toBe('speed-limit');
+      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

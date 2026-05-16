@@ -791,7 +791,21 @@ Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` t
 
 `Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
 
-For `choice` / `sequencing` / `matching`, named identifiers (`['speed-limit']`) ship through cmi5 and SCORM 2004 unchanged — both adapters preserve widget-supplied ids so LRS / `cmi.interactions` traces stay self-describing. SCORM 1.2 still slugs to `CMIIdentifier` (alphanumeric + underscore) because §3.4.7's `short_identifier_type` is enforced by every conformant 1.2 LMS. SCORM Cloud's strict validator additionally rejects long named identifiers in 1.2 mode even after slugging (`"must be consistent with interaction type"`), so courses that target SCORM 1.2 **should prefer option indexes as strings** (`['0']`, `[['0','1']]`). Built-in `<MultipleChoice>` does this; cmi5- or 2004-only courses can keep readable named identifiers.
+For `choice` / `sequencing` / `matching`, name your responses with readable ids (`response: ['speed-limit']`) and pass the full option list alongside via `options` (or `optionPairs` for matching). The encoder is then adaptive per export: cmi5 and SCORM 2004 ship the names through unchanged for self-describing traces; SCORM 1.2 maps each name to its position index in `options` so SCORM Cloud's strict validator accepts the value. Omit `options` and SCORM 1.2 falls back to slugging the literal identifier.
+
+```ts
+response: () => ({
+  type: 'choice',
+  response: selected ? [selected] : [],
+  correct: ['speed-limit'],
+  options: ['stop', 'yield', 'speed-limit', 'merge'],
+});
+// SCORM 1.2 → student_response: "2"
+// SCORM 2004 → learner_response: "speed-limit"
+// cmi5      → result.response:    "speed-limit"
+```
+
+Matching uses `optionPairs: { left, right }` for the same effect, mapping each pair's `[l, r]` to `"<leftIdx>.<rightIdx>"` on SCORM 1.2.
 
 ### `useQuestion`
 

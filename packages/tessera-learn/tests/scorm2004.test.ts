@@ -441,6 +441,23 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
+    it('ignores `options` and keeps named identifiers (no index mapping for SCORM 2004)', async () => {
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['speed-limit'],
+          correct: ['speed-limit'],
+          options: ['stop', 'yield', 'speed-limit', 'merge'],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.learner_response']).toBe('speed-limit');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('speed-limit');
+    });
+
     it('writes numeric interaction', async () => {
       adapter.reportInteraction(
         'n1',
