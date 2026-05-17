@@ -27,6 +27,7 @@ function resolveStylesDir(): string {
 }
 
 export function tesseraPlugin() {
+  const manifestRef: { current: Manifest | null; root: string } = { current: null, root: '' };
   return [
     svelte({
       compilerOptions: { css: 'external' },
@@ -35,9 +36,10 @@ export function tesseraPlugin() {
     tesseraEntryPlugin(),
     tesseraConfigPlugin(),
     tesseraPagesPlugin(),
-    tesseraManifestPlugin(),
+    tesseraManifestPlugin(manifestRef),
     tesseraLayoutPlugin(),
     tesseraQuizPlugin(),
+    tesseraFirstPagePreloadPlugin(manifestRef),
     tesseraExportPlugin(),
   ];
 }
@@ -397,15 +399,15 @@ function tesseraExportPlugin(): Plugin {
 const VIRTUAL_MANIFEST_ID = 'virtual:tessera-manifest';
 const RESOLVED_MANIFEST_ID = '\0' + VIRTUAL_MANIFEST_ID;
 
-function tesseraManifestPlugin(): Plugin {
+function tesseraManifestPlugin(manifestRef: { current: Manifest | null; root: string }): Plugin {
   let projectRoot: string;
   let pagesDir: string;
-  let currentManifest: Manifest | null = null;
   let server: ViteDevServer | null = null;
 
   function buildManifest(): Manifest {
-    currentManifest = generateManifest(pagesDir);
-    return currentManifest;
+    const m = generateManifest(pagesDir);
+    manifestRef.current = m;
+    return m;
   }
 
   return {
@@ -415,6 +417,7 @@ function tesseraManifestPlugin(): Plugin {
     configResolved(config: ResolvedConfig) {
       projectRoot = config.root;
       pagesDir = resolve(projectRoot, 'pages');
+      manifestRef.root = projectRoot;
     },
 
     configureServer(devServer: ViteDevServer) {
@@ -432,7 +435,7 @@ function tesseraManifestPlugin(): Plugin {
           event === 'unlinkDir';
 
         if (isRelevant) {
-          currentManifest = null; // invalidate cache
+          manifestRef.current = null; // invalidate cache
 
           // Invalidate the virtual module to trigger HMR
           const mod = devServer.moduleGraph.getModuleById(RESOLVED_MANIFEST_ID);
@@ -457,7 +460,7 @@ function tesseraManifestPlugin(): Plugin {
 
     load(id) {
       if (id === RESOLVED_MANIFEST_ID) {
-        if (!currentManifest) {
+        if (!manifestRef.current) {
           buildManifest();
         }
 
@@ -468,13 +471,31 @@ function tesseraManifestPlugin(): Plugin {
         // Encode as base64 to prevent Vite's import analysis from
         // scanning .svelte importPath strings as module imports.
         // Replace Infinity with 1e9 since JSON.stringify drops it.
-        const json = JSON.stringify(currentManifest, (_key, value) =>
+        const json = JSON.stringify(manifestRef.current, (_key, value) =>
           value === Infinity ? 1e9 : value
         );
         const b64 = Buffer.from(json).toString('base64');
         return `export default JSON.parse(atob("${b64}"));`;
       }
       return null;
+    },
+  };
+}
+
+function tesseraFirstPagePreloadPlugin(manifestRef: { current: Manifest | null; root: string }): Plugin {
+  return {
+    name: 'tessera:first-page-preload',
+    apply: 'build',
+    transformIndexHtml(html, ctx) {
+      const firstPagePath = manifestRef.current?.pages[0]?.importPath;
+      if (!firstPagePath || !ctx.bundle) return html;
+      const normalized = resolve(manifestRef.root, firstPagePath.replace(/^\//, '')).replace(/\\/g, '/');
+      const chunk = Object.values(ctx.bundle).find(
+        (c): c is import('rollup').OutputChunk =>
+          c.type === 'chunk' && !!c.facadeModuleId && c.facadeModuleId.replace(/\\/g, '/') === normalized
+      );
+      if (!chunk) return html;
+      return html.replace('</head>', `  <link rel="modulepreload" href="./${chunk.fileName}">\n  </head>`);
     },
   };
 }
