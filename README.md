@@ -1,5 +1,12 @@
 # Tessera
 
+[![CI](https://img.shields.io/github/actions/workflow/status/redmodd/tessera/ci.yml?branch=main&label=CI)](https://github.com/redmodd/tessera/actions/workflows/ci.yml)
+[![tessera-learn on npm](https://img.shields.io/npm/v/tessera-learn?label=tessera-learn)](https://www.npmjs.com/package/tessera-learn)
+[![create-tessera on npm](https://img.shields.io/npm/v/create-tessera?label=create-tessera)](https://www.npmjs.com/package/create-tessera)
+[![Node.js >=24](https://img.shields.io/node/v/tessera-learn?label=node)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/github/license/redmodd/tessera)](./LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
 Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
 
 Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Cursor](https://cursor.com), [Aider](https://aider.chat), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
