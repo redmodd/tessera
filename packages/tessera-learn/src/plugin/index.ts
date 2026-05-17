@@ -40,6 +40,7 @@ export function tesseraPlugin() {
     tesseraLayoutPlugin(),
     tesseraQuizPlugin(),
     tesseraAdapterPlugin(),
+    tesseraXAPISetupPlugin(),
     tesseraFirstPagePreloadPlugin(manifestRef),
     tesseraExportPlugin(),
   ];
@@ -566,6 +567,59 @@ export function createAdapter(config) {
 }
 `;
       }
+    },
+  };
+}
+
+const VIRTUAL_XAPI_SETUP_ID = 'virtual:tessera-xapi-setup';
+const RESOLVED_XAPI_SETUP_ID = '\0' + VIRTUAL_XAPI_SETUP_ID;
+
+function tesseraXAPISetupPlugin(): Plugin {
+  let projectRoot: string;
+  let isBuild = false;
+
+  return {
+    name: 'tessera:xapi-setup',
+    enforce: 'pre',
+
+    configResolved(config: ResolvedConfig) {
+      projectRoot = config.root;
+      isBuild = config.command === 'build';
+    },
+
+    resolveId(id) {
+      if (id === VIRTUAL_XAPI_SETUP_ID) return RESOLVED_XAPI_SETUP_ID;
+      return null;
+    },
+
+    load(id) {
+      if (id !== RESOLVED_XAPI_SETUP_ID) return null;
+
+      if (!isBuild) {
+        return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
+      }
+
+      let standard = 'web';
+      let hasXapi = false;
+      const configPath = resolve(projectRoot, 'course.config.js');
+      if (existsSync(configPath)) {
+        const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
+        if (objectStr) {
+          try {
+            const parsed = JSON5.parse(objectStr);
+            if (typeof parsed?.export?.standard === 'string') standard = parsed.export.standard;
+            hasXapi = parsed?.xapi != null;
+          } catch {}
+        }
+      }
+
+      // cmi5 needs the publisher regardless of explicit xapi config (cmi5
+      // adapter shares the publisher queue for its own LMS-required statements).
+      if (hasXapi || standard === 'cmi5') {
+        return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
+      }
+
+      return `export async function buildXAPIClient() { return null; }`;
     },
   };
 }

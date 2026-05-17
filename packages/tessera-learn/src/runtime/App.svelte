@@ -12,7 +12,7 @@
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
   import { createAdapter } from 'virtual:tessera-adapter';
-  import { buildXAPIClient } from './xapi/setup.js';
+  import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
   import { registerXAPIClient } from './xapi/registry.js';
   import { TESSERA_PAGE, TESSERA_NAV, TESSERA_ADAPTER, TESSERA_USER_STATE } from './contexts.js';
 
