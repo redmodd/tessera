@@ -84,22 +84,20 @@
 
     const gen = ++loadGeneration;
     pageLoading = true;
-    pageError = null;
-    PageComponent = null;
-
-    // Update context for the new page
-    pageContext.quiz = page.quiz;
 
     const loader = pageModules[page.importPath];
     if (!loader) {
       console.error(`Tessera: No loader for page ${index} at ${page.importPath}`);
       pageError = new Error(`Page not found: ${page.importPath}`);
+      PageComponent = null;
       pageLoading = false;
       return;
     }
 
     loader().then(mod => {
       if (gen !== loadGeneration) return; // stale
+      pageError = null;
+      pageContext.quiz = page.quiz;
       PageComponent = mod.default;
       pageLoading = false;
       progress.markVisited(index);
