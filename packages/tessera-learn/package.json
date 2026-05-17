@@ -51,6 +51,9 @@
     "./runtime/*": "./src/runtime/*"
   },
   "svelte": "./src/index.ts",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "bin": {
     "tessera-validate": "./dist/plugin/cli.js"
   },
