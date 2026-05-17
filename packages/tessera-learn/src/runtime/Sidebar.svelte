@@ -60,6 +60,8 @@
               aria-current={page.index === currentPageIndex ? 'page' : undefined}
               aria-disabled={locked ? 'true' : undefined}
               onclick={() => handlePageClick(page.index)}
+              onpointerenter={() => !locked && nav.prefetch(page.index)}
+              onfocusin={() => !locked && nav.prefetch(page.index)}
             >
               {#if locked}
                 <svg class="tessera-nav-lock-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="12" height="12">

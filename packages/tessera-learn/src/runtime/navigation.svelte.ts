@@ -22,10 +22,13 @@ export function isPageComplete(
   return (progress.quizScores.get(index) ?? 0) >= config.scoring.passingScore;
 }
 
+export type PageModuleMap = Record<string, () => Promise<unknown>>;
+
 export class NavigationState {
   manifest = $state<Manifest>(null!);
   #progress: ProgressState;
   #config: CourseConfig;
+  #pageModules: PageModuleMap | null = null;
   currentPageIndex = $state(0);
 
   canGoPrev = $derived(this.currentPageIndex > 0);
@@ -46,6 +49,23 @@ export class NavigationState {
     this.manifest = manifest;
     this.#progress = progress;
     this.#config = config;
+  }
+
+  setPageModules(modules: PageModuleMap) {
+    this.#pageModules = modules;
+  }
+
+  /**
+   * Warm the browser module cache for a page chunk. Idempotent — repeated
+   * calls for the same index hit the existing cache. Bails on locked pages
+   * so callers don't need to guard.
+   */
+  prefetch(index: number) {
+    if (!this.#pageModules) return;
+    if (index < 0 || index >= this.manifest.totalPages) return;
+    if (this.isPageLocked(index)) return;
+    const page = this.manifest.pages[index];
+    this.#pageModules[page.importPath]?.();
   }
 
   goToPage(index: number) {

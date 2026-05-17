@@ -27,7 +27,12 @@
   // ---- State classes ----
   const progress = new ProgressState();
   const nav = new NavigationState(manifest, progress, config);
+  nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
+
+  const onIdle = typeof window !== 'undefined' && window.requestIdleCallback
+    ? window.requestIdleCallback.bind(window)
+    : (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1);
 
   const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
 
@@ -109,6 +114,7 @@
       }
       progress.recalculateCompletion(manifest, config);
       progress.recalculateSuccess(manifest, config);
+      onIdle(() => nav.prefetch(index + 1));
     }).catch(err => {
       if (gen !== loadGeneration) return; // stale
       console.error(`Tessera: Failed to load page ${index}`, err);

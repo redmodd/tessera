@@ -91,6 +91,8 @@
         class="tessera-page-nav-btn"
         disabled={!nav.canGoNext}
         onclick={() => nav.goNext()}
+        onpointerenter={() => nav.prefetch(nav.currentPageIndex + 1)}
+        onfocusin={() => nav.prefetch(nav.currentPageIndex + 1)}
       >
         Next →
       </button>
