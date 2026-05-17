@@ -15,7 +15,6 @@ export function createManifest(
           graded: quizPages[i].graded ?? false,
           gatesProgress: quizPages[i].gatesProgress ?? false,
           maxAttempts: 3,
-          showFeedback: true,
         }
       : null,
   }));

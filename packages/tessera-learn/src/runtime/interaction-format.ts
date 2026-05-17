@@ -1,6 +1,7 @@
 /**
  * SCORM 1.2 RTE §3.4.7 vs SCORM 2004 4E RTE §4.2.7 differ in delimiter
- * encoding and identifier rules; cmi5 (xAPI) reuses the 2004 encoding.
+ * encoding and identifier rules; cmi5 (xAPI) reuses 2004's delimiters but
+ * not its identifier slugging.
  */
 
 import type { Interaction } from './interaction.js';
@@ -37,7 +38,16 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsNumericRange: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: shortIdentifier,
+  identifier: (v) => v,
+};
+
+export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
+  itemDelim: '[,]',
+  pairDelim: '[.]',
+  rangeDelim: '[:]',
+  supportsNumericRange: true,
+  formatBoolean: (v) => (v ? 'true' : 'false'),
+  identifier: (v) => v,
 };
 
 /**
@@ -51,6 +61,20 @@ function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
+function indexLookup(options: string[] | undefined, value: string): string | null {
+  if (!options) return null;
+  const idx = options.indexOf(value);
+  return idx >= 0 ? String(idx) : null;
+}
+
+function encodeListItem(value: string, options: string[] | undefined, fmt: InteractionFormat): string {
+  if (fmt === SCORM12_INTERACTION_FORMAT) {
+    const idx = indexLookup(options, value);
+    if (idx !== null) return idx;
+  }
+  return fmt.identifier(value);
+}
+
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT
@@ -58,7 +82,7 @@ export function formatResponse(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response.map(fmt.identifier).join(fmt.itemDelim);
+      return i.response.map((v) => encodeListItem(v, i.options, fmt)).join(fmt.itemDelim);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -68,7 +92,10 @@ export function formatResponse(
       return i.response;
     case 'matching':
       return i.response
-        .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
+        .map(
+          ([l, r]) =>
+            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`
+        )
         .join(fmt.itemDelim);
     case 'numeric':
       return String(i.response);
@@ -88,7 +115,9 @@ export function formatCorrectPattern(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return (i.correct as string[]).map(fmt.identifier).join(fmt.itemDelim);
+      return (i.correct as string[])
+        .map((v) => encodeListItem(v, i.options, fmt))
+        .join(fmt.itemDelim);
     case 'true-false':
       return fmt.formatBoolean(i.correct as boolean);
     case 'fill-in':
@@ -96,7 +125,10 @@ export function formatCorrectPattern(
       return (i.correct as string[]).join(fmt.itemDelim);
     case 'matching':
       return (i.correct as Array<[string, string]>)
-        .map(([l, r]) => `${fmt.identifier(l)}${fmt.pairDelim}${fmt.identifier(r)}`)
+        .map(
+          ([l, r]) =>
+            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`
+        )
         .join(fmt.itemDelim);
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
@@ -148,14 +180,14 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec
 ): Array<[string, string]> {
   const fields: Array<[string, string]> = [
-    [`${prefix}.id`, questionId],
+    [`${prefix}.id`, spec.format.identifier(questionId)],
     [`${prefix}.type`, spec.typeValue],
-    [`${prefix}.${spec.responseField}`, formatResponse(interaction, spec.format)],
   ];
   const pattern = formatCorrectPattern(interaction, spec.format);
   if (pattern !== null) {
     fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);
   }
+  fields.push([`${prefix}.${spec.responseField}`, formatResponse(interaction, spec.format)]);
   if (correct !== null) {
     fields.push([
       `${prefix}.result`,

@@ -3,7 +3,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, unmount } from 'svelte';
 import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
-import type { UseQuizHandle } from '../src/runtime/hooks.svelte.js';
+// Tests drive the engine directly via the index-keyed internal surface.
+// Authors of custom shells/widgets use the slim public UseQuizHandle.
+import type { UseQuizInternalHandle as UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 
 // useQuiz needs a real component lifecycle (setContext, onDestroy, $state/$derived
 // reactivity), so each test mounts a tiny harness component. The harness exposes
@@ -18,7 +20,10 @@ interface HarnessRef {
   thrown: unknown;
 }
 
-function mountHarness(quizConfig: unknown, opts: { secondQuiz?: boolean; nullElement?: boolean } = {}) {
+function mountHarness(
+  quizConfig: unknown,
+  opts: { secondQuiz?: boolean; nullElement?: boolean; adapter?: unknown } = {}
+) {
   const ref: HarnessRef = { handle: null, element: null, events: [], thrown: null };
   const target = document.createElement('div');
   const host = document.createElement('div');
@@ -32,6 +37,7 @@ function mountHarness(quizConfig: unknown, opts: { secondQuiz?: boolean; nullEle
       host,
       secondQuiz: opts.secondQuiz ?? false,
       nullElement: opts.nullElement ?? false,
+      adapter: opts.adapter ?? null,
     },
   });
   return { component, target, ref };
@@ -79,13 +85,16 @@ describe('useQuiz', () => {
     expect(q.attemptCount).toBe(0);
   });
 
-  it('registerQuestion returns sequential indices', () => {
+  it('registerQuestion appends to quiz.questions in order, returning a handle per question', () => {
     const m = mountHarness({ graded: true });
     mountings.push(m);
     const q = m.ref.handle!;
-    expect(q.registerQuestion(tfQuestion('a', true, true))).toBe(0);
-    expect(q.registerQuestion(tfQuestion('b', false, true))).toBe(1);
-    expect(q.registerQuestion(tfQuestion('c', true, true))).toBe(2);
+    const a = q.registerQuestion(tfQuestion('a', true, true));
+    const b = q.registerQuestion(tfQuestion('b', false, true));
+    const c = q.registerQuestion(tfQuestion('c', true, true));
+    expect(a.id).toBe('a');
+    expect(b.id).toBe('b');
+    expect(c.id).toBe('c');
     expect(q.questions).toHaveLength(3);
     expect(q.questions.map((qq) => qq.id)).toEqual(['a', 'b', 'c']);
   });
@@ -103,7 +112,7 @@ describe('useQuiz', () => {
     expect(q.canSubmit).toBe(true);
   });
 
-  it('submit() dispatches tessera-quiz-complete with score and per-question interactions', () => {
+  it('submit() dispatches tessera-quiz-complete with the rolled-up score', () => {
     const m = mountHarness({ graded: true });
     mountings.push(m);
     const q = m.ref.handle!;
@@ -115,12 +124,122 @@ describe('useQuiz', () => {
     q.submit();
 
     expect(m.ref.events).toHaveLength(1);
-    const detail = m.ref.events[0];
-    expect(detail.score).toBe(50);
-    expect(detail.interactions).toEqual([
-      { id: 'a', interaction: { type: 'true-false', response: true, correct: true }, correct: true },
-      { id: 'b', interaction: { type: 'true-false', response: false, correct: true }, correct: false },
-    ]);
+    expect(m.ref.events[0].score).toBe(50);
+  });
+
+  it('reports each interaction to the adapter when the widget calls commit(), not on setAnswer', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.registerQuestion(tfQuestion('b', false, true));
+
+    q.setAnswer(0, true);
+    q.setAnswer(1, false);
+    expect(calls).toHaveLength(0);
+
+    q.questions[0].commit();
+    expect(calls).toEqual([['a', true]]);
+
+    q.questions[1].commit();
+    expect(calls).toEqual([['a', true], ['b', false]]);
+
+    q.submit();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('submit() reports any questions whose widget never called commit()', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.registerQuestion(tfQuestion('b', false, true));
+    q.setAnswer(0, true);
+    q.setAnswer(1, false);
+    q.submit();
+    expect(calls).toEqual(['a', 'b']);
+  });
+
+  it('does not re-report a question whose answer was already committed before submit', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.questions[0].commit();
+    q.submit();
+    expect(calls).toEqual(['a']);
+  });
+
+  it('re-reports when commit() is called after the answer changes', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion({
+      id: 'a',
+      checkAnswer: (answer) => answer === true,
+      interaction: () => ({ type: 'true-false', response: q.getAnswer(0) === true, correct: true }),
+    });
+    q.setAnswer(0, false);
+    q.questions[0].commit();
+    q.setAnswer(0, true);
+    q.questions[0].commit();
+    expect(calls).toEqual([['a', false], ['a', true]]);
+  });
+
+  it('is a no-op when commit() is called twice with the same answer', () => {
+    const calls: string[] = [];
+    const adapter = {
+      reportInteraction(id: string) { calls.push(id); },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.questions[0].commit();
+    q.questions[0].commit();
+    expect(calls).toEqual(['a']);
+  });
+
+  it('re-reports after retry() so a second attempt produces fresh statements', () => {
+    const calls: Array<[string, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, _i: Interaction, correct: boolean | null) {
+        calls.push([id, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', false, true));
+    q.setAnswer(0, false);
+    q.submit();
+    expect(calls).toHaveLength(1);
+    q.retry();
+    q.setAnswer(0, false);
+    q.submit();
+    expect(calls).toHaveLength(2);
   });
 
   it('submit() is the only sanctioned dispatcher — calling twice does not double-fire', () => {
@@ -267,12 +386,14 @@ describe('useQuiz', () => {
   });
 
   it('revealFeedback flips feedbackVisible for a question', () => {
-    const m = mountHarness({ graded: true, showFeedback: true, feedbackMode: 'immediate' });
+    const m = mountHarness({ graded: true, feedbackMode: 'immediate' });
     mountings.push(m);
     const q = m.ref.handle!;
-    q.registerQuestion(tfQuestion('a', true, true));
+    const a = q.registerQuestion(tfQuestion('a', true, true));
+    expect(a.feedbackVisible).toBe(false);
     expect(q.feedbackVisible(0)).toBe(false);
-    q.revealFeedback(0);
+    q.revealFeedback(a);
+    expect(a.feedbackVisible).toBe(true);
     expect(q.feedbackVisible(0)).toBe(true);
   });
 
@@ -286,8 +407,14 @@ describe('useQuiz', () => {
     expect(q.getRender(0)).toBe(snippet);
   });
 
-  it('event payload omits questions that do not expose interaction()', () => {
-    const m = mountHarness({ graded: true });
+  it('reportInteraction skips questions that do not expose interaction()', () => {
+    const calls: Array<[string, Interaction, boolean | null]> = [];
+    const adapter = {
+      reportInteraction(id: string, i: Interaction, correct: boolean | null) {
+        calls.push([id, i, correct]);
+      },
+    };
+    const m = mountHarness({ graded: true }, { adapter });
     mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
@@ -300,8 +427,8 @@ describe('useQuiz', () => {
     q.setAnswer(1, true);
     q.submit();
 
-    expect(m.ref.events[0].interactions).toEqual([
-      { id: 'a', interaction: { type: 'true-false', response: true, correct: true }, correct: true },
+    expect(calls).toEqual([
+      ['a', { type: 'true-false', response: true, correct: true }, true],
     ]);
   });
 
@@ -436,6 +563,28 @@ describe('useQuiz', () => {
       warn.mockClear();
       __warnUnsubmittedQuiz({ questionsCount: 2, answersCount: 0, submitCalled: false });
       __warnUnsubmittedQuiz({ questionsCount: 2, answersCount: 1, submitCalled: true });
+      expect(warn.mock.calls.length).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns when a quiz mounts with no registered questions', async () => {
+    // A quiz page wrapped by a shell but with no useQuestion() widgets has
+    // nothing to score or report. Exercised directly via the exported helper
+    // for the same jsdom/onMount timing reasons as the unmount warning above.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
+      __warnEmptyQuiz(0);
+      const matched = warn.mock.calls.some((args) =>
+        args.some((a) => typeof a === 'string' && /no registered questions/i.test(a))
+      );
+      expect(matched).toBe(true);
+
+      // Inverse: any registered question → no warning.
+      warn.mockClear();
+      __warnEmptyQuiz(1);
       expect(warn.mock.calls.length).toBe(0);
     } finally {
       warn.mockRestore();

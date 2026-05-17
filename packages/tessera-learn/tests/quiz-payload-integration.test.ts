@@ -9,8 +9,8 @@ import type { Interaction } from '../src/runtime/interaction.js';
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
-// payload, and asserts the emitted Interaction shape for the full round-trip
-// the real `<Quiz>` relies on when building `tessera-quiz-complete`.
+// payload, and asserts the emitted Interaction shape the real `<Quiz>` hands
+// to the persistence adapter when the widget commits.
 
 interface Registration {
   id: string;
@@ -21,22 +21,22 @@ interface Registration {
 
 function makeQuizCtx() {
   const registrations: Registration[] = [];
-  let nextIndex = 0;
   const quiz: any = {
-    submitted: false,
     registerQuestion(api: Registration) {
       registrations.push(api);
-      return nextIndex++;
+      return {
+        id: api.id,
+        submitted: false,
+        correct: null,
+        answer: undefined,
+        feedbackVisible: false,
+        locked: false,
+        isLockedCorrect: false,
+        render: undefined,
+        setAnswer() {},
+        setRender() {},
+      };
     },
-    setRender() {},
-    setAnswer() {},
-    getAnswer() { return undefined; },
-    feedbackVisible() { return false; },
-    isAnswerLocked() { return false; },
-    isLockedCorrect() { return false; },
-    reviewing: false,
-    showFeedback: false,
-    currentQuestionIndex: 0,
   };
   return { quiz, registrations };
 }

@@ -211,7 +211,6 @@ export const pageConfig = {
     graded: true,
     gatesProgress: true,
     maxAttempts: 3,
-    showFeedback: true,
   }
 }
 </script>
@@ -222,7 +221,6 @@ export const pageConfig = {
       graded: true,
       gatesProgress: true,
       maxAttempts: 3,
-      showFeedback: true,
     });
   });
 
@@ -360,7 +358,7 @@ describe('generateManifest', () => {
     createFile('01-s/01-l/quiz.svelte', `<script context="module">
 export const pageConfig = {
   title: "Assessment",
-  quiz: { graded: true, gatesProgress: true, maxAttempts: 3, showFeedback: true }
+  quiz: { graded: true, gatesProgress: true, maxAttempts: 3 }
 }
 </script>`);
     const manifest = generateManifest(TMP);
@@ -369,7 +367,6 @@ export const pageConfig = {
       graded: true,
       gatesProgress: true,
       maxAttempts: 3,
-      showFeedback: true,
     });
   });
 

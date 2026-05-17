@@ -64,7 +64,15 @@ export function validateProject(projectRoot: string): ValidationResult {
   errors.push(...pageResults.errors);
   warnings.push(...pageResults.warnings);
 
-  // 4. Cross-cutting validations
+  // 4. Contract-bypass checks on project-root shell files
+  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+    const shellPath = resolve(projectRoot, shellFile);
+    if (existsSync(shellPath)) {
+      validateContractBypass(readSourceFileCached(shellPath), shellFile, errors);
+    }
+  }
+
+  // 5. Cross-cutting validations
   if (config) {
     crossValidate(config, pageResults, errors, warnings);
   }
@@ -498,6 +506,58 @@ interface PagesValidationResult extends ValidationResult {
   pages: PageInfo[];
 }
 
+/**
+ * Validate a single page .svelte file. Used for both section-level (flat) and
+ * lesson-level pages — the validation is identical, only the containing
+ * directory differs.
+ */
+function validatePageFile(
+  filePath: string,
+  projectRoot: string,
+  assetsDir: string,
+  navIndex: number,
+  errors: string[],
+  warnings: string[],
+  assetExistsCache: Map<string, boolean>
+): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
+  const fileRel = relative(projectRoot, filePath);
+  const content = readSourceFileCached(filePath);
+
+  const pageConfig = validatePageConfig(content, fileRel, errors);
+
+  const isQuiz = !!pageConfig?.quiz;
+  let isGradedQuiz = false;
+  if (pageConfig?.quiz) {
+    validateQuizConfig(pageConfig.quiz, fileRel, errors);
+    if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
+      isGradedQuiz = true;
+    }
+  }
+
+  const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
+
+  validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+  validateQuestionComponents(content, fileRel, errors);
+  validateContractBypass(content, fileRel, errors);
+  if (
+    pageConfig?.quiz &&
+    !HAS_USE_QUESTION_RE.test(content) &&
+    !HAS_QUESTION_TAG_RE.test(content) &&
+    !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
+  ) {
+    warnings.push(
+      `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
+        `the quiz will have nothing to score`
+    );
+  }
+
+  return {
+    page: { fileRel, navIndex, hasGradedQuiz: isGradedQuiz, hasQuiz: isQuiz, completesOnView },
+    isQuiz,
+    isGradedQuiz,
+  };
+}
+
 function validatePages(
   pagesDir: string,
   assetsDir: string,
@@ -581,34 +641,19 @@ function validatePages(
     }
 
     for (const fileName of sectionSvelteFiles) {
-      const filePath = resolve(sectionPath, fileName);
-      const fileRel = relative(projectRoot, filePath);
-      const content = readSourceFileCached(filePath);
-
-      const pageConfig = validatePageConfig(content, fileRel, errors);
-      const navIndex = totalPages;
+      const result = validatePageFile(
+        resolve(sectionPath, fileName),
+        projectRoot,
+        assetsDir,
+        totalPages,
+        errors,
+        warnings,
+        assetExistsCache
+      );
       totalPages++;
-
-      let pageHasGradedQuiz = false;
-      if (pageConfig?.quiz) {
-        totalQuizzes++;
-        validateQuizConfig(pageConfig.quiz, fileRel, errors);
-        if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
-          hasGradedQuiz = true;
-          pageHasGradedQuiz = true;
-        }
-      }
-
-      const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
-      pages.push({
-        fileRel,
-        navIndex,
-        hasGradedQuiz: pageHasGradedQuiz,
-        hasQuiz: !!pageConfig?.quiz,
-        completesOnView,
-      });
-
-      validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+      if (result.isQuiz) totalQuizzes++;
+      if (result.isGradedQuiz) hasGradedQuiz = true;
+      pages.push(result.page);
     }
 
     // Get lesson directories
@@ -663,38 +708,19 @@ function validatePages(
 
       // Validate each .svelte file
       for (const fileName of svelteFiles) {
-        const filePath = resolve(lessonPath, fileName);
-        const fileRel = relative(projectRoot, filePath);
-        const content = readSourceFileCached(filePath);
-
-        const pageConfig = validatePageConfig(content, fileRel, errors);
-        const navIndex = totalPages;
+        const result = validatePageFile(
+          resolve(lessonPath, fileName),
+          projectRoot,
+          assetsDir,
+          totalPages,
+          errors,
+          warnings,
+          assetExistsCache
+        );
         totalPages++;
-
-        let pageHasGradedQuiz = false;
-        if (pageConfig?.quiz) {
-          totalQuizzes++;
-
-          // Validate quiz config
-          validateQuizConfig(pageConfig.quiz, fileRel, errors);
-
-          if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
-            hasGradedQuiz = true;
-            pageHasGradedQuiz = true;
-          }
-        }
-
-        const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
-        pages.push({
-          fileRel,
-          navIndex,
-          hasGradedQuiz: pageHasGradedQuiz,
-          hasQuiz: !!pageConfig?.quiz,
-          completesOnView,
-        });
-
-        // Check $assets references
-        validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
+        if (result.isQuiz) totalQuizzes++;
+        if (result.isGradedQuiz) hasGradedQuiz = true;
+        pages.push(result.page);
       }
     }
   }
@@ -774,7 +800,7 @@ function validateCompletesOn(
 
 function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): void {
   if (!quiz || typeof quiz !== 'object') return;
-  const cfg = quiz as { maxAttempts?: unknown; graded?: unknown };
+  const cfg = quiz as Record<string, unknown>;
 
   if (cfg.maxAttempts !== undefined) {
     const val = cfg.maxAttempts;
@@ -785,9 +811,262 @@ function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): v
     }
   }
 
-  if (cfg.graded !== undefined && typeof cfg.graded !== 'boolean') {
+  for (const field of ['graded', 'gatesProgress']) {
+    if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
+      errors.push(
+        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`
+      );
+    }
+  }
+}
+
+// ---------- Question Component Validation ----------
+
+const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
+  MultipleChoice: ['question', 'options', 'correct'],
+  FillInTheBlank: ['question', 'answers'],
+  Matching: ['question', 'pairs'],
+  Sorting: ['question', 'items', 'targets', 'correct'],
+};
+
+type PropValue =
+  | { kind: 'string'; value: string }
+  | { kind: 'expr'; raw: string }
+  | { kind: 'bool' };
+
+/** Extract a balanced {...} or [...] span starting at startIndex, or null. */
+function extractBalanced(source: string, startIndex: number): string | null {
+  const open = source[startIndex];
+  if (open !== '{' && open !== '[') return null;
+  let depth = 0;
+  let inString: string | null = null;
+  let escaped = false;
+  for (let i = startIndex; i < source.length; i++) {
+    const char = source[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+    if (inString) {
+      if (char === inString) inString = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      inString = char;
+      continue;
+    }
+    if (char === '{' || char === '[') depth++;
+    if (char === '}' || char === ']') {
+      depth--;
+      if (depth === 0) return source.slice(startIndex, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse the props of an opening tag starting just after the component name.
+ * Returns null if the tag can't be parsed cleanly — callers then skip it
+ * rather than risk a false positive.
+ */
+function parseTagProps(content: string, start: number): Map<string, PropValue> | null {
+  const props = new Map<string, PropValue>();
+  let i = start;
+  while (i < content.length) {
+    while (i < content.length && /\s/.test(content[i])) i++;
+    if (i >= content.length) return null;
+    const c = content[i];
+    if (c === '>') return props;
+    if (c === '/' && content[i + 1] === '>') return props;
+    // Spread / shorthand expression — skip the whole {...} block.
+    if (c === '{') {
+      const block = extractBalanced(content, i);
+      if (!block) return null;
+      i += block.length;
+      continue;
+    }
+    const nameMatch = /^[A-Za-z_][\w-]*/.exec(content.slice(i));
+    if (!nameMatch) return null;
+    const propName = nameMatch[0];
+    i += propName.length;
+    while (i < content.length && /\s/.test(content[i])) i++;
+    if (content[i] !== '=') {
+      props.set(propName, { kind: 'bool' });
+      continue;
+    }
+    i++;
+    while (i < content.length && /\s/.test(content[i])) i++;
+    const v = content[i];
+    if (v === '"' || v === "'") {
+      const end = content.indexOf(v, i + 1);
+      if (end === -1) return null;
+      props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
+      i = end + 1;
+    } else if (v === '{') {
+      const block = extractBalanced(content, i);
+      if (!block) return null;
+      props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
+      i += block.length;
+    } else {
+      return null;
+    }
+  }
+  return null;
+}
+
+function staticArray(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
+  try {
+    const parsed = JSON5.parse(prop.raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function staticNumber(prop: PropValue | undefined): number | null {
+  if (prop?.kind !== 'expr') return null;
+  try {
+    const parsed = JSON5.parse(prop.raw);
+    return typeof parsed === 'number' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateQuestionComponents(
+  content: string,
+  fileRel: string,
+  errors: string[]
+): void {
+  const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
+  const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
+  const seenIds = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = tagStartRe.exec(content)) !== null) {
+    const name = m[1];
+    const props = parseTagProps(content, m.index + m[0].length);
+    if (!props) continue;
+
+    for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
+      if (!props.has(req)) {
+        errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
+      }
+    }
+
+    const idProp = props.get('id');
+    if (idProp?.kind === 'string') {
+      if (seenIds.has(idProp.value)) {
+        errors.push(
+          `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`
+        );
+      }
+      seenIds.add(idProp.value);
+    }
+
+    if (name === 'MultipleChoice') {
+      const options = staticArray(props.get('options'));
+      const correct = staticNumber(props.get('correct'));
+      if (options && correct !== null) {
+        if (!Number.isInteger(correct) || correct < 0 || correct >= options.length) {
+          errors.push(
+            `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`
+          );
+        }
+      }
+    } else if (name === 'Sorting') {
+      const items = staticArray(props.get('items'));
+      const targets = staticArray(props.get('targets'));
+      const correct = staticArray(props.get('correct'));
+      if (items && correct && correct.length !== items.length) {
+        errors.push(
+          `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`
+        );
+      }
+      if (targets && correct) {
+        for (const idx of correct) {
+          if (
+            typeof idx !== 'number' ||
+            !Number.isInteger(idx) ||
+            idx < 0 ||
+            idx >= targets.length
+          ) {
+            errors.push(
+              `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`
+            );
+            break;
+          }
+        }
+      }
+    } else if (name === 'Matching') {
+      const pairs = staticArray(props.get('pairs'));
+      if (pairs) {
+        const bad = pairs.some(
+          (p) =>
+            typeof p !== 'object' ||
+            p === null ||
+            typeof (p as { left?: unknown }).left !== 'string' ||
+            typeof (p as { right?: unknown }).right !== 'string'
+        );
+        if (bad) {
+          errors.push(
+            `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`
+          );
+        }
+      }
+    } else if (name === 'FillInTheBlank') {
+      const answers = staticArray(props.get('answers'));
+      if (answers) {
+        if (answers.length === 0) {
+          errors.push(`${fileRel}: <FillInTheBlank> answers must not be empty`);
+        } else if (answers.some((a) => typeof a !== 'string')) {
+          errors.push(
+            `${fileRel}: <FillInTheBlank> answers must be an array of strings`
+          );
+        }
+      }
+    }
+  }
+}
+
+// ---------- Contract Bypass Detection ----------
+
+const QUIZ_COMPLETE_DISPATCH_RE =
+  /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
+const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
+const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
+const HAS_QUESTION_TAG_RE = new RegExp(
+  `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`
+);
+// Custom widget imported from a local `.svelte` file may wrap useQuestion.
+// Treat its presence as enough to suppress the "no questions" warning —
+// false negatives are acceptable for a heuristic that's already advisory.
+const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
+
+/**
+ * Detect ways an author file can bypass the LMS data contract. These check
+ * source text for known escape hatches — they never inspect course content,
+ * so they constrain how you wire things up, not what you build.
+ */
+function validateContractBypass(
+  content: string,
+  fileRel: string,
+  errors: string[]
+): void {
+  if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
     errors.push(
-      `${fileRel}: quiz.graded must be a boolean, got ${typeof cfg.graded}`
+      `${fileRel}: dispatches "tessera-quiz-complete" directly — submit through ` +
+        `useQuiz().submit() so the result reaches the LMS`
+    );
+  }
+  if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
+    errors.push(
+      `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
+        `(useQuiz, useQuestion, useNavigation, …) instead`
     );
   }
 }

@@ -1,5 +1,28 @@
 # create-tessera
 
+## 0.0.10
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.9` so newly-created projects pick up the per-question `q.commit()` API, adaptive interaction-id encoding (readable ids preserved on cmi5/SCORM 2004, mapped to indexes on SCORM 1.2), the SCORM 1.2 strict-validator fixes (id slugging, field write order, brace-wrapped responses), and the cmi5 resume / fetch-URL fixes.
+
+## 0.0.9
+
+### Patch Changes
+
+- **`create-tessera upgrade` command.** Re-applies framework-owned files to an existing project: merges the reserved npm scripts (`dev`, `export`, `validate`) into `package.json`, applies the `preview`→`dev` rename migration, pins `tessera-learn` to the version this CLI ships, and overwrites `AGENTS.md` and `vite.config.js`. Authored files (`course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md`) are never touched. A reserved script whose value has been customised is left alone with a warning. Supports `--dry-run` to preview changes without writing.
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.8`.
+
+## 0.0.8
+
+### Patch Changes
+
+- Bump the scaffolded `tessera-learn` pin to `^0.0.7` so newly-created projects pick up the `tessera-validate` CLI and the expanded question-component / quiz-config validation.
+- Add a `validate` npm script (runs `tessera-validate`) to both templates as the fast post-edit feedback loop, documented in AGENTS.md.
+- Scaffold `assets/` and `styles/` folders in the bare template — previously omitted despite AGENTS.md documenting them as part of the project structure.
+- Rename the scaffolded `preview` script to `dev`. `preview` collided with Vite's convention, where `vite preview` serves a production build — the opposite of starting a dev server.
+
 ## 0.0.7
 
 ### Patch Changes

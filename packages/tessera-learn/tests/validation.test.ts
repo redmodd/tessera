@@ -384,6 +384,23 @@ export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
       expect.stringContaining('quiz.graded must be a boolean, got string')
     );
   });
+
+  it('errors on quiz.gatesProgress not boolean', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
+</script>
+<h1>Quiz</h1>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('quiz.gatesProgress must be a boolean, got string')
+    );
+  });
+
 });
 
 // ---- Structure Validation ----
@@ -489,6 +506,274 @@ describe('asset reference validation', () => {
     const { warnings } = validateProject(testRoot);
     expect(
       warnings.filter((w) => w.includes('$assets/logo.png'))
+    ).toHaveLength(0);
+  });
+});
+
+// ---- Question Component Validation ----
+
+describe('question component validation', () => {
+  function writePage(content: string): void {
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', content);
+  }
+
+  it('errors when MultipleChoice is missing a required prop', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Pick one" options={["a", "b"]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<MultipleChoice> is missing required prop "correct"')
+    );
+  });
+
+  it('errors when MultipleChoice correct index is out of range', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b", "c"]} correct={5} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('correct={5} is out of range for 3 options')
+    );
+  });
+
+  it('accepts a well-formed MultipleChoice', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b", "c"]} correct={2} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
+  });
+
+  it('skips static checks when props are dynamic expressions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>
+  import { MultipleChoice } from 'tessera-learn';
+  let opts = ["a", "b"];
+  let answer = 9;
+</script>
+<MultipleChoice question="Q" options={opts} correct={answer} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
+  });
+
+  it('errors when Sorting correct and items arrays differ in length', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { Sorting } from 'tessera-learn';</script>
+<Sorting question="Q" items={["x", "y", "z"]} targets={["A", "B"]} correct={[0, 1]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('correct has 2 entries but items has 3')
+    );
+  });
+
+  it('errors when Sorting correct contains an out-of-range target index', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { Sorting } from 'tessera-learn';</script>
+<Sorting question="Q" items={["x", "y"]} targets={["A", "B"]} correct={[0, 4]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('correct contains 4, out of range for 2 targets')
+    );
+  });
+
+  it('errors on duplicate question ids on the same page', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="q1" question="A" options={["a", "b"]} correct={0} />
+<MultipleChoice id="q1" question="B" options={["a", "b"]} correct={1} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('duplicate question id "q1"')
+    );
+  });
+
+  it('errors when Matching is missing pairs', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { Matching } from 'tessera-learn';</script>
+<Matching question="Match them" />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<Matching> is missing required prop "pairs"')
+    );
+  });
+
+  it('errors when Matching pairs entries are malformed', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { Matching } from 'tessera-learn';</script>
+<Matching question="Q" pairs={[{ left: "France" }]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<Matching> pairs must be an array of { left: string, right: string }')
+    );
+  });
+
+  it('accepts well-formed Matching pairs', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { Matching } from 'tessera-learn';</script>
+<Matching question="Q" pairs={[{ left: "France", right: "Paris" }]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('Matching'))).toHaveLength(0);
+  });
+
+  it('errors when FillInTheBlank answers contains a non-string', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank question="Q" answers={["Oxygen", 8]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<FillInTheBlank> answers must be an array of strings')
+    );
+  });
+
+  it('errors when FillInTheBlank answers is empty', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank question="Q" answers={[]} />`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<FillInTheBlank> answers must not be empty')
+    );
+  });
+});
+
+// ---- Contract Bypass Detection ----
+
+describe('contract bypass detection', () => {
+  function writePage(content: string): void {
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', content);
+  }
+
+  it('errors when a page dispatches tessera-quiz-complete directly', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>
+  function fakeSubmit(el) {
+    el.dispatchEvent(new CustomEvent('tessera-quiz-complete', { detail: {} }));
+  }
+</script>
+<h1>Page</h1>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('dispatches "tessera-quiz-complete" directly')
+    );
+  });
+
+  it('errors when a page imports from tessera-learn/runtime/*', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>
+  import { something } from 'tessera-learn/runtime/hooks.svelte.js';
+</script>
+<h1>Page</h1>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('imports from tessera-learn/runtime/*')
+    );
+  });
+
+  it('errors on contract bypass in root quiz.svelte', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'quiz.svelte',
+      `<script>
+  import { internal } from 'tessera-learn/runtime/hooks.svelte.js';
+</script>`
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('quiz.svelte: imports from tessera-learn/runtime/*')
+    );
+  });
+
+  it('warns on a quiz page with no questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Empty quiz</h1>`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('quiz page has no question components or useQuestion() calls')
+    );
+  });
+
+  it('does not warn when a quiz page has a question component', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
+    ).toHaveLength(0);
+  });
+
+  it('does not warn when a quiz page uses useQuestion directly', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ type: 'other', response: [] }) });
+</script>
+<h1>Custom question</h1>`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
+    ).toHaveLength(0);
+  });
+
+  it('does not warn when a quiz page imports a custom .svelte widget', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<script>
+  import CustomRound from '../components/CustomRound.svelte';
+</script>
+{#each [1, 2, 3] as i}<CustomRound {i} />{/each}`
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('quiz page has no question'))
     ).toHaveLength(0);
   });
 });

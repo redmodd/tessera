@@ -257,6 +257,73 @@ describe('CMI5Adapter', () => {
     expect(body.result.success).toBe(false);
   });
 
+  it('seedLifecycle suppresses duplicate Failed when resuming an already-failed session', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('incomplete', 'failed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(40);
+    adapter.setSuccessStatus('failed');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    expect(statementCalls).toHaveLength(0);
+  });
+
+  it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('incomplete', 'failed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(85);
+    adapter.setSuccessStatus('passed');
+    adapter.setCompletionStatus('complete');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    const verbs = statementCalls.map((c: any[]) => JSON.parse(c[1].body).verb.id);
+    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/passed');
+    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/completed');
+  });
+
+  it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    adapter.seedLifecycle('complete', 'passed');
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setScore(85);
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statementCalls = mockFetch.mock.calls.filter(
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+    );
+    expect(statementCalls).toHaveLength(0);
+  });
+
   it('includes auth header on xAPI requests', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
@@ -357,6 +424,25 @@ describe('CMI5Adapter', () => {
     );
     const headers = statementCalls[0][1].headers;
     expect(headers.get('Authorization')).toBe('Basic spec-conformant-token');
+  });
+
+  it('throws when fetch URL returns a spec-defined error JSON instead of a token', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === baseLaunchParams.fetch) {
+        return {
+          ok: true,
+          text: async () =>
+            '{"error-code":"1","error-text":"The authorization token has already been returned."}',
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+    adapter = new CMI5Adapter();
+    await expect(adapter.init()).rejects.toThrow(/error-code=1.*already been returned/);
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements')
+    );
+    expect(statementCalls.length).toBe(0);
   });
 
   it('includes registration and context in statements', async () => {
@@ -741,6 +827,31 @@ describe('CMI5Adapter', () => {
       expect(body.object.definition.correctResponsesPattern).toEqual(['a']);
       expect(body.result.response).toBe('a[,]b');
       expect(body.result.success).toBe(false);
+    });
+
+    it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
+      const body = await initAndReport(
+        'q1',
+        { type: 'choice', response: ['speed-limit', 'no-entry'], correct: ['speed-limit'] },
+        true
+      );
+      expect(body.result.response).toBe('speed-limit[,]no-entry');
+      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
+    });
+
+    it('ignores `options` for index mapping and keeps named identifiers in result.response', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'choice',
+          response: ['speed-limit'],
+          correct: ['speed-limit'],
+          options: ['stop', 'yield', 'speed-limit', 'merge'],
+        },
+        true
+      );
+      expect(body.result.response).toBe('speed-limit');
+      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
     });
 
     it('omits correctResponsesPattern when no correct provided', async () => {

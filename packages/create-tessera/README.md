@@ -38,24 +38,37 @@ The scaffolder creates a new directory with:
 - `AGENTS.md`: the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
 - `.gitignore`
 
-The `default` template additionally creates `assets/` (drop images, audio, video here) and `styles/custom.css` (optional CSS overrides). The `bare` template instead creates a `layout.svelte` at the project root for you to customise, plus a project `README.md`.
+Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise, plus a project `README.md`.
 
 Then:
 
 ```bash
 cd my-course
 npm install
-npm run preview   # local dev server at http://localhost:5173
+npm run dev       # local dev server at http://localhost:5173
 npm run export    # build + package for the configured LMS standard
+npm run validate  # check the project for structural errors, no server or build
 ```
 
 Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
+
+## Upgrading an existing project
+
+Run from a project root to re-apply the latest framework files:
+
+```bash
+npx create-tessera@latest upgrade            # apply changes
+npx create-tessera@latest upgrade --dry-run  # preview without writing
+```
+
+`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
 | `--template=<name>` | `default` (full starter, components included) or `bare` (hooks-only, layout.svelte, no built-in components). Defaults to `default`. |
+| `--dry-run` | (`upgrade` only) Preview changes without writing any files. |
 | `--help`, `-h` | Print usage and exit. |
 
 ## License

@@ -48,6 +48,7 @@ export type {
   UseQuestionOptions,
   UseQuestionHandle,
   UseQuizHandle,
+  Question,
 } from './runtime/hooks.svelte.js';
 export type {
   XAPIConfig,

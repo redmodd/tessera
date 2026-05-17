@@ -1,5 +1,41 @@
 # tessera-learn
 
+## 0.0.9
+
+### Patch Changes
+
+- **Per-question `q.commit()` for widget-driven LMS writes.** New method on the `Question` handle: widgets signal a final answer and the interaction is reported then, not batched at submit. `useQuiz().submit()` still flushes any uncommitted question as a safety net. Idempotent. A learner closing the tab after the last commit now gets credit; previously the unsent batch was lost.
+
+- **Adaptive interaction-id encoding per export.** Authors pass readable identifiers alongside the full option list (`options` for choice/sequencing, `optionPairs` for matching). cmi5 and SCORM 2004 ship the names through unchanged; SCORM 1.2 maps each name to its `options` index so SCORM Cloud's strict validator accepts it. Omit `options` and SCORM 1.2 falls back to slugging the literal identifier.
+
+- **SCORM 1.2 strict-validator parity.** Interaction `id`s slug to `CMIIdentifier` (`q-1` → `q_1`). Field write order now matches the spec (`id` → `type` → `correct_responses.0.pattern` → `student_response` → `result` → `time`) — SCORM Cloud rejects `student_response` with a misleading type error if the pattern isn't declared first. choice/sequencing/matching responses are brace-wrapped per §3.4.7.7.5.
+
+- **cmi5 resume safety.** The adapter seeds its lifecycle state from saved state at restore time so the LMS isn't re-spammed with Completed/Passed/Failed (and 403'd) on resume. Passed/Failed still re-emit on a real status transition.
+
+- **cmi5 fetch-URL error handling.** When the LMS fetch URL responds with the spec-defined `{"error-code":...,"error-text":...}` shape (§8.2.3), `adapter.init()` throws with that code/text instead of stuffing the JSON blob into the `Basic` credential and 400-spamming the LRS.
+
+- **Unified `Question` model across `useQuestion` and `useQuiz`.** Both hooks now traffic in the same per-question handle — no `getContext('tessera-quiz')`, no index tracking. New fields: `locked`, `isLockedCorrect`, `render`.
+
+- **Empty-quiz warning suppressed when the page imports a custom widget.** Static analysis can't see widget registration through `useQuestion` in a custom component, so the runtime warning was a false positive in that case.
+
+- **Vite dep-optimizer self-exclusion.** Prevents the plugin from pre-bundling itself when used inside the framework workspace.
+
+## 0.0.8
+
+### Patch Changes
+
+- **Empty-quiz warning is now dev-only.** The `useQuiz` runtime warning about zero registered questions no longer runs in production builds — it is gated on `import.meta.env.DEV` so it only fires during development.
+
+## 0.0.7
+
+### Patch Changes
+
+- **`tessera-validate` CLI.** New standalone bin that runs the project validation checks outside a dev server or build — a fast, scriptable feedback loop for authoring tools and agents. Prints errors/warnings and exits non-zero on errors.
+
+- **Question-component and quiz-config validation.** Static checks now inspect `MultipleChoice` / `FillInTheBlank` / `Matching` / `Sorting` props — required props, correct-index ranges, parallel-array consistency, pair/answer shapes, and duplicate question ids — and verify `quiz.gatesProgress` / `quiz.showFeedback` are booleans. Previously only `pageConfig` object literals were inspected. Dynamic-expression props are skipped to avoid false positives.
+
+- **LMS data-contract bypass detection.** Build-time: errors on direct `tessera-quiz-complete` dispatch and `tessera-learn/runtime/*` imports, warns on quiz pages with no questions. Runtime: dev warning when a quiz mounts with zero questions registered through `useQuestion` — the custom-widget path static analysis can't see.
+
 ## 0.0.6
 
 ### Patch Changes

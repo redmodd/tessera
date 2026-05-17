@@ -36,7 +36,7 @@ function missingApiError(
     standard,
     `Tessera: this course is configured for ${label} but ${detail} ` +
       `The course must be launched from an LMS that provides the ${label} runtime. ` +
-      `If you are testing locally, run \`npm run preview\` instead, or set export.standard to "web".`
+      `If you are testing locally, run \`npm run dev\` instead, or set export.standard to "web".`
   );
 }
 

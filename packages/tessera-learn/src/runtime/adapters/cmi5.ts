@@ -1,6 +1,10 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
+import {
+  formatResponse,
+  formatCorrectPattern,
+  XAPI_INTERACTION_FORMAT,
+} from '../interaction-format.js';
 import { formatISO8601Duration } from './retry.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
@@ -139,8 +143,8 @@ export class CMI5Adapter implements PersistenceAdapter {
   #score: number | null = null;
   #durationSeconds = 0;
   #state: SavedState | null = null;
-  #completedSent = false;
-  #successSent = false;
+  #completedEmitted = false;
+  #lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
   #terminated = false;
 
   // cmi5 §8 launch params. masteryScore (when present) overrides the
@@ -240,13 +244,28 @@ export class CMI5Adapter implements PersistenceAdapter {
     // Basic credential (already base64); we don't re-encode.
     let token = '';
     if (text.startsWith('{')) {
+      let parsed: unknown;
       try {
-        const parsed = JSON.parse(text);
-        if (parsed && typeof parsed['auth-token'] === 'string') {
-          token = parsed['auth-token'].trim();
-        }
+        parsed = JSON.parse(text);
       } catch {
-        // fall through to legacy parsing
+        parsed = undefined;
+      }
+      if (parsed && typeof parsed === 'object') {
+        const obj = parsed as Record<string, unknown>;
+        if (typeof obj['auth-token'] === 'string') {
+          token = (obj['auth-token'] as string).trim();
+        } else {
+          const code = typeof obj['error-code'] === 'string' ? obj['error-code'] : undefined;
+          const errText = typeof obj['error-text'] === 'string' ? obj['error-text'] : undefined;
+          const detail =
+            code !== undefined || errText !== undefined
+              ? ` (error-code=${code ?? 'unknown'}${errText ? `: ${errText}` : ''})`
+              : '';
+          throw new Error(
+            `Tessera cmi5: fetch URL returned a JSON response without an 'auth-token' field${detail}. ` +
+              'The cmi5 fetch URL is single-use (§8.2.3.1); reload from the LMS to obtain a fresh launch.'
+          );
+        }
       }
     }
     if (!token) {
@@ -434,11 +453,21 @@ export class CMI5Adapter implements PersistenceAdapter {
     this.#score = Math.max(0, Math.min(100, score));
   }
 
+  seedLifecycle(
+    completion: 'incomplete' | 'complete',
+    success: 'unknown' | 'passed' | 'failed'
+  ): void {
+    if (completion === 'complete') this.#completedEmitted = true;
+    if (success === 'passed' || success === 'failed') {
+      this.#lastSuccessEmitted = success;
+    }
+  }
+
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    if (status !== 'complete' || this.#completedSent || !this.#publisher) return;
+    if (status !== 'complete' || this.#completedEmitted || !this.#publisher) return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Completed.
     if (this.#launchMode !== 'Normal') return;
-    this.#completedSent = true;
+    this.#completedEmitted = true;
     // cmi5 §9.5.1 — `score` MUST NOT appear on Completed (Passed/Failed only).
     const result: Record<string, unknown> = {
       completion: true,
@@ -457,10 +486,11 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
-    if (status === 'unknown' || this.#successSent || !this.#publisher) return;
+    if (status === 'unknown' || !this.#publisher) return;
+    if (status === this.#lastSuccessEmitted) return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Passed/Failed.
     if (this.#launchMode !== 'Normal') return;
-    this.#successSent = true;
+    this.#lastSuccessEmitted = status;
 
     const verb = status === 'passed' ? VERBS.passed : VERBS.failed;
     const verbName = status === 'passed' ? 'passed' : 'failed';
@@ -518,8 +548,8 @@ export class CMI5Adapter implements PersistenceAdapter {
     correct: boolean | null
   ): void {
     if (!this.#publisher) return;
-    const response = formatResponse(interaction);
-    const pattern = formatCorrectPattern(interaction);
+    const response = formatResponse(interaction, XAPI_INTERACTION_FORMAT);
+    const pattern = formatCorrectPattern(interaction, XAPI_INTERACTION_FORMAT);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,

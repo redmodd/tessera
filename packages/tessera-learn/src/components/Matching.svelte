@@ -1,5 +1,5 @@
 <script>
-  import { getContext, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { slugFromQuestion, shuffle } from './util.js';
@@ -17,16 +17,12 @@
     weight = 1,
   } = $props();
 
-  const quiz = getContext('tessera-quiz');
-  const standalone = !quiz;
-
   let shuffledRight = $state([]);
   let matches = $state(new SvelteMap());
   // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
   let rightToLeft = $state(new SvelteMap());
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
-
 
   const pairColors = [
     '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
@@ -35,15 +31,6 @@
 
   function initShuffle() {
     shuffledRight = shuffle(pairs.map((p, i) => ({ text: p.right, originalIndex: i })));
-  }
-
-  if (standalone) {
-    initShuffle();
-  } else {
-    onMount(() => {
-      initShuffle();
-      quiz.setRender(myIndex, renderQuestion);
-    });
   }
 
   function checkAnswer(answer) {
@@ -63,7 +50,7 @@
     initShuffle();
   }
 
-  const handle = useQuestion({
+  const q = useQuestion({
     get id() { return id ?? `matching-${slugFromQuestion(question)}`; },
     get weight() { return weight; },
     get maxRetries() { return maxRetries; },
@@ -75,47 +62,37 @@
     reset: resetState,
   });
 
-  const myIndex = $derived(handle.quizIndex ?? -1);
+  // `q.mode` is fixed for the lifetime of the widget; capture it once so
+  // setup-time branches don't trip Svelte's "state_referenced_locally" warning.
+  const inQuiz = q.mode === 'quiz';
 
-  let isLocked = $derived(standalone ? false : quiz.isLockedCorrect(myIndex));
-  let quizLocked = $derived(standalone ? handle.submitted : quiz.isAnswerLocked(myIndex));
+  if (!inQuiz) {
+    initShuffle();
+  } else {
+    onMount(() => {
+      initShuffle();
+      q.setRender(renderQuestion);
+    });
+  }
 
   function handleLeftClick(leftIndex) {
-    if (standalone) {
-      if (handle.submitted) return;
-    } else {
-      if (quizLocked) return;
-    }
-
+    if (q.locked) return;
     if (selectedLeft === leftIndex) {
       selectedLeft = null;
       return;
     }
-
     selectedLeft = leftIndex;
-
-    if (selectedRight !== null) {
-      createMatch(leftIndex, selectedRight);
-    }
+    if (selectedRight !== null) createMatch(leftIndex, selectedRight);
   }
 
   function handleRightClick(rightOriginalIndex) {
-    if (standalone) {
-      if (handle.submitted) return;
-    } else {
-      if (quizLocked) return;
-    }
-
+    if (q.locked) return;
     if (selectedRight === rightOriginalIndex) {
       selectedRight = null;
       return;
     }
-
     selectedRight = rightOriginalIndex;
-
-    if (selectedLeft !== null) {
-      createMatch(selectedLeft, selectedRight);
-    }
+    if (selectedLeft !== null) createMatch(selectedLeft, selectedRight);
   }
 
   function createMatch(leftIndex, rightOriginalIndex) {
@@ -134,27 +111,20 @@
     selectedLeft = null;
     selectedRight = null;
 
-    if (standalone) {
-      if (matches.size === pairs.length && !handle.submitted) {
-        handle.submit();
-      }
-    } else {
-      quiz.setAnswer(myIndex, new Map(matches));
+    if (inQuiz) {
+      q.setAnswer(new Map(matches));
+      if (matches.size === pairs.length) q.commit();
+    } else if (matches.size === pairs.length && !q.submitted) {
+      q.submit();
     }
   }
 
   function removeMatch(leftIndex) {
-    if (standalone) {
-      if (handle.submitted) return;
-    } else {
-      if (quizLocked) return;
-    }
+    if (q.locked) return;
     const right = matches.get(leftIndex);
     matches.delete(leftIndex);
     if (right !== undefined) rightToLeft.delete(right);
-    if (!standalone) {
-      quiz.setAnswer(myIndex, new Map(matches));
-    }
+    if (inQuiz) q.setAnswer(new Map(matches));
   }
 
   function getMatchColor(leftIndex) {
@@ -178,9 +148,6 @@
   function isMatchCorrect(leftIndex) {
     return matches.get(leftIndex) === leftIndex;
   }
-
-  let showFeedback = $derived(standalone ? handle.submitted : quiz.feedbackVisible(myIndex));
-  let isDisabled = $derived(standalone ? handle.submitted : quizLocked);
 </script>
 
 {#snippet matchingContent()}
@@ -194,8 +161,8 @@
         {@const color = getMatchColor(i)}
         {@const isSelected = selectedLeft === i}
         {@const matched = matches.has(i)}
-        {@const correctMatch = showFeedback && matched && isMatchCorrect(i)}
-        {@const wrongMatch = showFeedback && matched && !isMatchCorrect(i)}
+        {@const correctMatch = q.feedbackVisible && matched && isMatchCorrect(i)}
+        {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
         <button
           class="tessera-matching-item left"
           class:selected={isSelected}
@@ -203,8 +170,8 @@
           class:correct={correctMatch}
           class:incorrect={wrongMatch}
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
-          onclick={() => matched && !isDisabled ? removeMatch(i) : handleLeftClick(i)}
-          disabled={isDisabled}
+          onclick={() => matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
+          disabled={q.locked}
           aria-label="{pair.left}{matched ? ' (matched, activate to unmatch)' : ''}"
         >
           {#if matched}
@@ -213,7 +180,7 @@
             </span>
           {/if}
           <span>{pair.left}</span>
-          {#if matched && !isDisabled}
+          {#if matched && !q.locked}
             <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
           {/if}
         </button>
@@ -233,7 +200,7 @@
           class:matched
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() => handleRightClick(item.originalIndex)}
-          disabled={isDisabled}
+          disabled={q.locked}
           aria-label="{item.text}{matched ? ' (matched)' : ''}"
         >
           {#if matched}
@@ -248,7 +215,7 @@
     </div>
   </div>
 
-  {#if showFeedback}
+  {#if q.feedbackVisible}
     {@const isCorrect = checkAnswer(matches)}
     <div class="tessera-matching-review">
       {#if isCorrect}
@@ -274,14 +241,14 @@
           <p class="tessera-matching-feedback incorrect">{incorrectFeedback}</p>
         {/if}
       {/if}
-      {#if standalone && handle.canRetry}
-        <RetryButton onclick={() => handle.retry()} />
+      {#if !inQuiz && q.canRetry}
+        <RetryButton onclick={() => q.retry()} />
       {/if}
     </div>
   {/if}
 {/snippet}
 
-{#if standalone}
+{#if !inQuiz}
   <div class="tessera-matching" aria-label={question}>
     {@render matchingContent()}
   </div>
@@ -289,7 +256,7 @@
 
 {#snippet renderQuestion()}
   <div class="tessera-matching" aria-label={question}>
-    {#if isLocked}
+    {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
     {@render matchingContent()}

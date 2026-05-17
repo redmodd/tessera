@@ -7,12 +7,12 @@
  * so there is no impedance mismatch when writing to an LMS.
  */
 export type Interaction =
-  | { type: 'choice';       response: string[]; correct?: string[] }
+  | { type: 'choice';       response: string[]; correct?: string[]; options?: string[] }
   | { type: 'true-false';   response: boolean;  correct?: boolean }
   | { type: 'fill-in';      response: string;   correct?: string[]; caseMatters?: boolean }
   | { type: 'long-fill-in'; response: string;   correct?: string[]; caseMatters?: boolean }
-  | { type: 'matching';     response: Array<[string, string]>; correct?: Array<[string, string]> }
-  | { type: 'sequencing';   response: string[]; correct?: string[] }
+  | { type: 'matching';     response: Array<[string, string]>; correct?: Array<[string, string]>; optionPairs?: { left: string[]; right: string[] } }
+  | { type: 'sequencing';   response: string[]; correct?: string[]; options?: string[] }
   | { type: 'numeric';      response: number;   correct?: { min?: number; max?: number } }
   | { type: 'likert';       response: string;   correct?: string }
   | { type: 'performance';  response: Array<[string, string | number]>; correct?: Array<[string, string | number]> }

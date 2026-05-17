@@ -366,6 +366,52 @@ describe('SCORM12Adapter', () => {
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Phobos.Mars,Europa.Jupiter');
     });
 
+    it('maps choice response/correct to option indexes when options is supplied', async () => {
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['speed-limit'],
+          correct: ['speed-limit'],
+          options: ['stop', 'yield', 'speed-limit', 'merge'],
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('2');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('2');
+    });
+
+    it('maps matching pairs to indexes via optionPairs', async () => {
+      adapter.reportInteraction(
+        'm1',
+        {
+          type: 'matching',
+          response: [['Phobos', 'Mars']],
+          correct: [['Phobos', 'Mars']],
+          optionPairs: { left: ['Phobos', 'Europa'], right: ['Mars', 'Jupiter'] },
+        },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('0.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('0.0');
+    });
+
+    it('falls back to slugging when options is not supplied', async () => {
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['speed-limit'], correct: ['speed-limit'] },
+        true
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.student_response']).toBe('speed_limit');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('speed_limit');
+    });
+
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
       adapter.reportInteraction(
         'n1',

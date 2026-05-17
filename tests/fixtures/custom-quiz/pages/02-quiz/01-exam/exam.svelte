@@ -5,7 +5,6 @@
       graded: true,
       gatesProgress: false,
       maxAttempts: 3,
-      showFeedback: true,
     },
   };
 </script>

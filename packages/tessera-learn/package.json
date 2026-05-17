@@ -1,6 +1,6 @@
 {
   "name": "tessera-learn",
-  "version": "0.0.6",
+  "version": "0.0.9",
   "description": "LMS tracking runtime for interactive learning content. One adapter layer (SCORM 1.2, SCORM 2004 4th Edition, cmi5, static Web), your choice of components.",
   "keywords": [
     "svelte",
@@ -33,7 +33,6 @@
     "src",
     "styles",
     "README.md",
-    "AGENTS.md",
     "LICENSE"
   ],
   "exports": {
@@ -52,6 +51,9 @@
     "./runtime/*": "./src/runtime/*"
   },
   "svelte": "./src/index.ts",
+  "bin": {
+    "tessera-validate": "./dist/plugin/cli.js"
+  },
   "engines": {
     "node": ">=24"
   },
@@ -65,7 +67,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
-    "svelte": "^5.55.5"
+    "svelte": "^5.55.7"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",

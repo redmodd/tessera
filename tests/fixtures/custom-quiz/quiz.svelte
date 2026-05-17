@@ -19,11 +19,10 @@
   <!-- All questions stacked. Each question widget calls useQuestion which
        registers its render snippet with the Quiz context. -->
   <ol class="custom-quiz-list">
-    {#each quiz.questions as q, i}
-      {@const renderFn = quiz.getRender(i)}
+    {#each quiz.questions as q (q.id)}
       <li class="custom-quiz-item" data-question-id={q.id}>
-        {#if renderFn}
-          {@render renderFn()}
+        {#if q.render}
+          {@render q.render()}
         {/if}
       </li>
     {/each}

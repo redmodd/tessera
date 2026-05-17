@@ -1,4 +1,4 @@
-import { getContext, setContext, onDestroy } from 'svelte';
+import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import {
@@ -8,8 +8,6 @@ import {
   getPageContext,
   requireUserStateStore,
 } from './contexts.js';
-import { buildQuizInteractions } from '../components/quiz-payload.js';
-import type { QuizContext } from '../components/quiz-payload.js';
 import {
   resolveFeedbackMode,
   resolveRetryStrategy,
@@ -17,79 +15,136 @@ import {
   type QuizQuestionResult,
 } from './quiz-policy.js';
 
+/**
+ * Per-question handle exposed to both the quiz shell (via `useQuiz().questions`)
+ * and the question widget (via `useQuestion()`). All state and operations for
+ * one question live on this object — no index plumbing.
+ */
+export interface Question {
+  /** Stable id used as the LMS interaction key. */
+  readonly id: string;
+  /** True once the quiz containing this question has been submitted. */
+  readonly submitted: boolean;
+  /** True/false once submitted; null while answering. */
+  readonly correct: boolean | null;
+  /** Current learner answer, or undefined if not yet answered. */
+  readonly answer: unknown;
+  /** Whether feedback should currently render for this question. */
+  readonly feedbackVisible: boolean;
+  /**
+   * True when the widget must treat its input as read-only — either because
+   * the quiz has been submitted, feedback is showing, or the answer is locked
+   * by a retry policy. Widgets should branch on this alone; the engine owns
+   * the composition.
+   */
+  readonly locked: boolean;
+  /**
+   * Narrow case of `locked`: the answer is preserved as "already correct" by
+   * a retry policy (e.g. `retryMode: 'incorrect-only'`). Use this to show an
+   * explicit banner; use `locked` to gate input.
+   */
+  readonly isLockedCorrect: boolean;
+  /** Snippet the widget registered with `setRender` (shell calls `{@render q.render()}`). */
+  readonly render: unknown;
+  /** Record the learner's current answer. Called from the widget on user input. */
+  setAnswer(answer: unknown): void;
+  /** Signal the answer is final; triggers the per-question LMS write. */
+  commit(): void;
+}
+
 export interface UseQuestionOptions {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
   /** Whether this question counts toward course success status. Default false. */
   graded?: boolean;
   /**
-   * Optional weight for quiz scoring — only used inside a `<Quiz>` (or `useQuiz`)
-   * host that aggregates with the weighted formula `Σ(w·correct)/Σ(w)*100`.
-   * Default 1; ignored in standalone mode.
+   * Optional weight for quiz scoring — used inside a quiz host that aggregates
+   * with the weighted formula `Σ(w·correct)/Σ(w)·100`. Default 1; ignored in
+   * standalone mode.
    */
   weight?: number;
-  /** Standalone retry cap. Default `Infinity`. Ignored inside a `<Quiz>`. */
+  /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
   /**
-   * Optional score override (0–100). Standalone mode only — per-question scoring
-   * inside a `<Quiz>` is the quiz's responsibility.
+   * Optional score override (0–100). Standalone mode only — per-question
+   * scoring inside a quiz is the quiz's responsibility.
    */
   score?: () => number;
   /** Optional reset handler invoked when the learner tries again. */
   reset?: () => void;
-  /** Optional Svelte snippet the parent `<Quiz>` renders for this question. Ignored in standalone mode. */
-  render?: unknown;
-}
-
-export interface UseQuestionHandle {
-  submit(): void;
-  reset(): void;
-  /** Standalone retry. No-op once `maxRetries` is hit or inside a `<Quiz>`. */
-  retry(): void;
-  readonly submitted: boolean;
-  readonly correct: boolean | null;
-  readonly canRetry: boolean;
-  readonly retryCount: number;
-  readonly mode: 'standalone' | 'quiz';
-  /** Index returned by the parent Quiz registration, used for per-question context reads. Undefined in standalone mode. */
-  readonly quizIndex: number | undefined;
 }
 
 /**
- * Register a question widget with the Tessera runtime. Works outside a `<Quiz>`
- * for inline practice, and inside a `<Quiz>` wrapper — the same hook drives both
- * modes. Inside a Quiz the handle's `submit()` is a no-op (the parent Quiz drives
+ * Question handle plus standalone-only operations. Inside a quiz, the
+ * standalone-only methods are no-ops (the quiz shell drives submission /
+ * retry). `mode` reflects which environment the widget mounted into.
+ */
+export interface UseQuestionHandle extends Question {
+  /** Standalone submit. No-op inside a quiz (the shell drives submission). */
+  submit(): void;
+  /** Reset the widget's own state. */
+  reset(): void;
+  /** Standalone retry. No-op once `maxRetries` is hit or inside a quiz. */
+  retry(): void;
+  readonly canRetry: boolean;
+  readonly retryCount: number;
+  readonly mode: 'standalone' | 'quiz';
+  /**
+   * Register a Svelte snippet for the quiz shell to render at its chosen
+   * location. Standalone widgets don't need this — they render their own UI.
+   */
+  setRender(render: unknown): void;
+}
+
+const TESSERA_QUIZ = 'tessera-quiz' as const;
+
+interface QuestionInternal extends Question {
+  setRender(render: unknown): void;
+}
+
+interface QuizContextValue {
+  registerQuestion(api: UseQuizQuestionApi): QuestionInternal;
+}
+
+/**
+ * Register a question widget with the Tessera runtime. Works outside a quiz
+ * for inline practice, and inside a quiz host — the same hook drives both
+ * modes. Inside a quiz, `submit()` is a no-op (the parent quiz drives
  * submission) and `submitted`/`correct` mirror the quiz's state.
  */
 export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
-  const quizCtx = getContext<QuizContext | undefined>('tessera-quiz');
+  const quizCtx = getContext<QuizContextValue | undefined>(TESSERA_QUIZ);
   const navCtx = getNavContext();
   const adapterCtx = getAdapterContext();
 
-  if (quizCtx?.registerQuestion) {
-    const quizIndex = quizCtx.registerQuestion({
+  if (quizCtx) {
+    const q = quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
       checkAnswer: () => isCorrectInteraction(opts.response()) === true,
       reset: opts.reset,
       interaction: () => opts.response(),
-      render: opts.render,
     });
     return {
+      get id() { return q.id; },
+      get submitted() { return q.submitted; },
+      get correct() { return q.correct; },
+      get answer() { return q.answer; },
+      get feedbackVisible() { return q.feedbackVisible; },
+      get locked() { return q.locked; },
+      get isLockedCorrect() { return q.isLockedCorrect; },
+      get render() { return q.render; },
+      setAnswer(a: unknown) { q.setAnswer(a); },
+      commit() { q.commit(); },
       submit() {},
       reset() { opts.reset?.(); },
       retry() {},
-      get submitted() { return quizCtx.submitted ?? false; },
-      get correct() {
-        if (!(quizCtx.submitted ?? false)) return null;
-        return isCorrectInteraction(opts.response());
-      },
       canRetry: false,
       retryCount: 0,
       mode: 'quiz' as const,
-      quizIndex,
+      setRender(render: unknown) { q.setRender(render); },
     };
   }
 
@@ -97,10 +152,25 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   let submitted = $state(false);
   let correct = $state<boolean | null>(null);
   let retryCount = $state(0);
+  let currentAnswer = $state<unknown>(undefined);
+
+  let committed = false;
+
+  function commit() {
+    const response = opts.response();
+    if (!response) return;
+    committed = true;
+    adapterCtx?.adapter.reportInteraction(
+      opts.id,
+      response,
+      isCorrectInteraction(response)
+    );
+  }
 
   function submit() {
     if (submitted) return;
     const response = opts.response();
+    currentAnswer = response.response;
     correct = isCorrectInteraction(response);
     const score = opts.score
       ? opts.score()
@@ -108,7 +178,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         ? 100
         : 0;
 
-    adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
+    if (!committed) {
+      adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
+      committed = true;
+    }
     if (opts.graded && navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
@@ -125,6 +198,8 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   function reset() {
     submitted = false;
     correct = null;
+    currentAnswer = undefined;
+    committed = false;
     opts.reset?.();
   }
 
@@ -135,22 +210,26 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   return {
+    get id() { return opts.id; },
+    get submitted() { return submitted; },
+    get correct() { return correct; },
+    get answer() { return currentAnswer; },
+    get feedbackVisible() { return submitted; },
+    get locked() { return submitted; },
+    get isLockedCorrect() { return submitted && correct === true && retryCount >= maxRetries; },
+    render: undefined,
+    setAnswer(a: unknown) { currentAnswer = a; },
+    commit,
     submit,
     reset,
     retry,
-    get submitted() { return submitted; },
-    get correct() { return correct; },
     get canRetry() { return retryCount < maxRetries; },
     get retryCount() { return retryCount; },
     mode: 'standalone' as const,
-    quizIndex: undefined,
+    setRender() {},
   };
 }
 
-/**
- * Access Tessera navigation imperatively — programmatic go-to, next/prev,
- * and the active page.
- */
 export function useNavigation() {
   const { nav, manifest } = requireNavContext('useNavigation()');
   return {
@@ -173,9 +252,6 @@ export function useNavigation() {
   };
 }
 
-/**
- * Access Tessera progress state imperatively.
- */
 export function useProgress() {
   const { progress } = requireNavContext('useProgress()');
   return {
@@ -191,19 +267,12 @@ export function useProgress() {
   };
 }
 
-// One dev warning per session, regardless of caller count.
 let warnedNonManualCompletion = false;
 
-/** Test-only: reset the once-per-session warning latch. */
 export function __resetUseCompletionWarning(): void {
   warnedNonManualCompletion = false;
 }
 
-/**
- * Trigger course completion from any component, and reactively read the
- * current completion status. Active under `completion.mode: "manual"`; a
- * no-op (with a one-shot dev warning) under any other mode.
- */
 export function useCompletion(): {
   markComplete(): void;
   readonly completionStatus: 'incomplete' | 'complete';
@@ -230,11 +299,6 @@ export function useCompletion(): {
   };
 }
 
-/**
- * Scoped persistence — save and restore per-widget state that survives reload.
- * Routes to whichever adapter the course is running under (localStorage, SCORM
- * suspend_data, or xAPI State API).
- */
 export function usePersistence<T = unknown>(key: string): {
   get(): T | null;
   set(value: T): void;
@@ -246,57 +310,63 @@ export function usePersistence<T = unknown>(key: string): {
   };
 }
 
-// ---------- useQuiz ----------
-
 /**
- * Per-question registration shape accepted by `useQuiz().registerQuestion`.
- * Mirrors the QuizQuestionApi used by built-in `<Quiz>` plus an optional
- * `weight` for the weighted score formula.
+ * Internal registration shape — `useQuestion` builds this and hands it to the
+ * quiz's `registerQuestion`. Not part of the public authoring API.
  */
 export interface UseQuizQuestionApi {
   id: string;
-  /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)*100`. */
+  /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)·100`. */
   weight?: number;
   checkAnswer: (answer?: unknown) => boolean;
   reset?: () => void;
-  /** Optional Svelte snippet the quiz host renders for this question. */
-  render?: unknown;
-  /** Optional — when present, included in the `tessera-quiz-complete` event payload. */
+  /** Returns the current Interaction payload for LMS reporting. */
   interaction?: () => Interaction;
-}
-
-export interface UseQuizQuestionView {
-  readonly id: string;
-  readonly correct: boolean | null;
-  readonly submitted: boolean;
 }
 
 export interface UseQuizHandle {
   readonly state: 'answering' | 'submitted' | 'reviewing';
-  readonly questions: UseQuizQuestionView[];
+  readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
   readonly score: number;
+  /** Resolved passing threshold (config + LMS mastery override). */
+  readonly passingScore: number;
   readonly attemptCount: number;
-  registerQuestion(api: UseQuizQuestionApi): number;
-  setAnswer(index: number, answer: unknown): void;
-  getAnswer(index: number): unknown;
   submit(): void;
   startReview(): void;
   exitReview(): void;
   retry(): void;
-  revealFeedback(index: number): void;
-  feedbackVisible(index: number): boolean;
-  setRender(index: number, render: unknown): void;
-  getRender(index: number): unknown;
-  isLockedCorrect(index: number): boolean;
+  /** Reveal feedback for the given question. */
+  revealFeedback(q: Question): void;
 }
 
 /**
- * Dev warning helper for quizzes that unmount with answered questions but no
- * submit() call. Exported so `use-quiz.test.ts` can exercise the warning code
- * path without relying on jsdom's onDestroy timing under vitest.
+ * Internal test/component seam. The implementation also exposes index-keyed
+ * methods on the returned object so unit tests can drive the engine directly
+ * and the built-in `<Quiz>` can iterate by index. NOT part of the public API
+ * — authors should use `quiz.questions[].setAnswer(...)` etc.
  */
+export interface UseQuizInternalHandle extends UseQuizHandle {
+  registerQuestion(api: UseQuizQuestionApi): Question;
+  setAnswer(index: number, answer: unknown): void;
+  getAnswer(index: number): unknown;
+  setRender(index: number, render: unknown): void;
+  getRender(index: number): unknown;
+  feedbackVisible(index: number): boolean;
+  revealFeedbackByIndex(index: number): void;
+  isLockedCorrect(index: number): boolean;
+}
+
+interface InternalQuestion {
+  id: string;
+  weight: number;
+  checkAnswer: (answer?: unknown) => boolean;
+  reset?: () => void;
+  interaction?: () => Interaction;
+  render: unknown;
+}
+
 export function __warnUnsubmittedQuiz(stats: {
   questionsCount: number;
   answersCount: number;
@@ -311,21 +381,17 @@ export function __warnUnsubmittedQuiz(stats: {
   );
 }
 
-/**
- * Programmatic quiz orchestration for custom quiz shells. Returns a handle
- * exposing the same state machine `<Quiz>` runs internally — register
- * questions, set answers, submit, review, retry — but with no template
- * baked in, so authors can build any UI on top.
- *
- * Reads quiz config from the `tessera-page` context (set by App.svelte) and
- * publishes a `tessera-quiz` context for `useQuestion` widgets to consume.
- *
- * The host element passed via `opts.element()` is what `tessera-quiz-*` DOM
- * events dispatch from. App.svelte's bridge listens on `#tessera-app` and
- * forwards `tessera-quiz-complete` into the persistence adapter.
- */
+export function __warnEmptyQuiz(questionsCount: number): void {
+  if (questionsCount > 0) return;
+  console.warn(
+    '[tessera] useQuiz: quiz mounted with no registered questions. Question widgets ' +
+      'must call useQuestion() to be scored and reported to the LMS.'
+  );
+}
+
 export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHandle {
   const pageCtx = getPageContext();
+  const adapterCtx = getAdapterContext();
   if (!pageCtx?.quiz) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).'
@@ -333,11 +399,9 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   }
   const quizConfig = pageCtx.quiz;
 
-  // Dev-mode warning: a second useQuiz on the same page silently overwrites
-  // the first quiz's pageIndex-keyed score. We can't prevent it (some pages
-  // really do compose multiple quiz hosts in dev experiments) but the
-  // multi-quiz writer should know.
-  const existing = getContext<unknown>('tessera-quiz');
+  // A second useQuiz on the same page silently overwrites the first quiz's
+  // pageIndex-keyed score; warn but don't prevent (some pages compose hosts).
+  const existing = getContext<unknown>(TESSERA_QUIZ);
   if (existing) {
     console.warn(
       '[tessera] useQuiz: a second quiz registered on this page; ' +
@@ -346,23 +410,13 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   }
 
   const maxAttempts = quizConfig.maxAttempts ?? Infinity;
-  const showFeedback = quizConfig.showFeedback ?? true;
-
   const policyCfg = quizConfig as QuizPolicyConfig;
   const feedbackPredicate = resolveFeedbackMode(policyCfg);
   const retryPredicate = resolveRetryStrategy(policyCfg);
-  // Lock the answer once feedback is revealed in 'immediate' mode and under any
-  // custom predicate (opaque; lock conservatively). 'review' mode is post-submit.
-  const revealsLockAnswer =
-    policyCfg.feedbackMode === 'immediate' ||
-    typeof policyCfg.feedbackMode === 'function';
 
-  interface InternalQuestion extends UseQuizQuestionApi {
-    weight: number;
-  }
-
-  let questions = $state<InternalQuestion[]>([]);
+  let internalQuestions = $state<InternalQuestion[]>([]);
   const answers = new Map<number, unknown>();
+  const reportedAnswers = new Map<number, string>();
   let answersVersion = $state(0);
   let submitted = $state(false);
   let reviewing = $state(false);
@@ -374,10 +428,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   const seenIds = new Set<string>();
 
-  const totalQuestions = $derived(questions.length);
-  // Match the built-in <Quiz> rule: every registered question has an entry in
-  // `answers`. We track the map via an explicit version counter rather than
-  // a reactive Map proxy so $derived reliably re-runs across `set()` calls.
+  const totalQuestions = $derived(internalQuestions.length);
   const allAnswered = $derived(
     (void answersVersion, totalQuestions > 0 && answers.size >= totalQuestions)
   );
@@ -389,67 +440,44 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   function dispatch(name: string, detail?: unknown): void {
     const el = opts.element();
-    if (!el) {
-      // Caller-side warning is the submit() path's responsibility; we stay
-      // silent here so question-answered pings don't spam logs.
-      return;
-    }
+    if (!el) return;
     el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
   }
 
-  function questionView(i: number): UseQuizQuestionView {
-    const q = questions[i];
-    return {
-      get id() { return q.id; },
-      get submitted() { return submitted; },
-      get correct() {
-        if (!submitted) return null;
-        const a = answers.has(i) ? answers.get(i) : undefined;
-        return q.checkAnswer(a);
-      },
-    };
-  }
-
-  // Stable view array — recompute when questions change.
-  const questionViews = $derived(questions.map((_q, i) => questionView(i)));
-
-  function registerQuestion(api: UseQuizQuestionApi): number {
-    if (seenIds.has(api.id)) {
-      console.warn(
-        `[tessera] useQuiz: duplicate question id "${api.id}" — ` +
-          'each question id must be unique within a quiz (LMS interaction records key by id).'
-      );
-    }
-    seenIds.add(api.id);
-    const internal: InternalQuestion = {
-      ...api,
-      weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
-    };
-    questions.push(internal);
-    return questions.length - 1;
-  }
-
-  function setAnswer(index: number, answer: unknown): void {
+  function setAnswerInternal(index: number, answer: unknown): void {
     answers.set(index, answer);
     answersVersion++;
     dispatch('tessera-quiz-question-answered', { index });
   }
 
-  function getAnswer(index: number): unknown {
-    void answersVersion; // keep reactive readers (e.g. tests) tracking
+  function commitInternal(index: number): void {
+    if (!adapterCtx) return;
+    const q = internalQuestions[index];
+    if (!q || typeof q.interaction !== 'function') return;
+    const interaction = q.interaction();
+    if (!interaction) return;
+    const fingerprint = JSON.stringify(interaction);
+    if (reportedAnswers.get(index) === fingerprint) return;
+    const answer = answers.has(index) ? answers.get(index) : undefined;
+    adapterCtx.adapter.reportInteraction(q.id, interaction, q.checkAnswer(answer));
+    reportedAnswers.set(index, fingerprint);
+  }
+
+  function getAnswerInternal(index: number): unknown {
+    void answersVersion;
     return answers.get(index);
   }
 
-  function setRender(index: number, render: unknown): void {
-    if (questions[index]) questions[index].render = render;
+  function setRenderInternal(index: number, render: unknown): void {
+    if (internalQuestions[index]) internalQuestions[index].render = render;
   }
 
-  function getRender(index: number): unknown {
-    return questions[index]?.render;
+  function getRenderInternal(index: number): unknown {
+    return internalQuestions[index]?.render;
   }
 
-  function feedbackVisible(index: number): boolean {
-    if (!showFeedback) return false;
+  function feedbackVisibleInternal(index: number): boolean {
+    if (policyCfg.feedbackMode === 'never') return false;
     return feedbackPredicate({
       questionIndex: index,
       submitted,
@@ -460,30 +488,69 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     });
   }
 
-  function revealFeedback(index: number): void {
-    if (!showFeedback) return;
-    // Replace the Set so the $state reference changes — `.add()` on a plain
-    // Set wouldn't trigger reactive readers.
+  function revealFeedbackInternal(index: number): void {
+    if (policyCfg.feedbackMode === 'never') return;
     const next = new Set(feedbackShown);
     next.add(index);
     feedbackShown = next;
   }
 
-  function isLockedCorrect(index: number): boolean {
+  function isLockedCorrectInternal(index: number): boolean {
     return lockedCorrect.has(index);
   }
 
-  /**
-   * Weighted rollup: Σ(w·correct)/Σ(w)·100, rounded.
-   * Default weight 1 collapses to the unweighted mean — that path is locked
-   * by the compliance test.
-   */
+  function makeQuestionHandle(i: number): QuestionInternal {
+    return {
+      get id() { return internalQuestions[i].id; },
+      get submitted() { return submitted; },
+      get correct() {
+        if (!submitted) return null;
+        const a = answers.has(i) ? answers.get(i) : undefined;
+        return internalQuestions[i].checkAnswer(a);
+      },
+      get answer() { return getAnswerInternal(i); },
+      get feedbackVisible() { return feedbackVisibleInternal(i); },
+      get locked() {
+        return submitted || feedbackVisibleInternal(i) || isLockedCorrectInternal(i);
+      },
+      get isLockedCorrect() { return isLockedCorrectInternal(i); },
+      get render() { return getRenderInternal(i); },
+      setAnswer(a: unknown) { setAnswerInternal(i, a); },
+      commit() { commitInternal(i); },
+      setRender(r: unknown) { setRenderInternal(i, r); },
+    };
+  }
+
+  let questionHandles = $state<QuestionInternal[]>([]);
+
+  function registerQuestion(api: UseQuizQuestionApi): QuestionInternal {
+    if (seenIds.has(api.id)) {
+      console.warn(
+        `[tessera] useQuiz: duplicate question id "${api.id}" — ` +
+          'each question id must be unique within a quiz (LMS interaction records key by id).'
+      );
+    }
+    seenIds.add(api.id);
+    const internal: InternalQuestion = {
+      id: api.id,
+      weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
+      checkAnswer: api.checkAnswer,
+      reset: api.reset,
+      interaction: api.interaction,
+      render: undefined,
+    };
+    internalQuestions.push(internal);
+    const handle = makeQuestionHandle(internalQuestions.length - 1);
+    questionHandles.push(handle);
+    return handle;
+  }
+
   function computeScore(): { rounded: number; correctCount: number } {
     let weighted = 0;
     let totalWeight = 0;
     let correctCount = 0;
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
+    for (let i = 0; i < internalQuestions.length; i++) {
+      const q = internalQuestions[i];
       const a = answers.has(i) ? answers.get(i) : undefined;
       const ok = q.checkAnswer(a);
       totalWeight += q.weight;
@@ -511,15 +578,16 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     }
     el.dispatchEvent(new CustomEvent('tessera-quiz-before-submit', { bubbles: true }));
 
+    for (let i = 0; i < internalQuestions.length; i++) commitInternal(i);
+
     const { rounded } = computeScore();
     score = rounded;
     submitted = true;
     attemptCount++;
 
-    const interactions = buildQuizInteractions(questions, answers);
     el.dispatchEvent(
       new CustomEvent('tessera-quiz-complete', {
-        detail: { score: rounded, interactions },
+        detail: { score: rounded },
         bubbles: true,
       })
     );
@@ -537,12 +605,12 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   function retry(): void {
     if (!canRetry) return;
     const results: QuizQuestionResult[] = [];
-    for (let i = 0; i < questions.length; i++) {
+    for (let i = 0; i < internalQuestions.length; i++) {
       const a = answers.has(i) ? answers.get(i) : undefined;
       results.push({
-        interaction: questions[i].interaction?.() ?? ({} as never),
-        correct: questions[i].checkAnswer(a),
-        weight: questions[i].weight,
+        interaction: internalQuestions[i].interaction?.() ?? ({} as never),
+        correct: internalQuestions[i].checkAnswer(a),
+        weight: internalQuestions[i].weight,
       });
     }
     const newLocked = retryPredicate(results);
@@ -552,9 +620,10 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     }
     lockedCorrect = newLocked;
     answers.clear();
+    reportedAnswers.clear();
     for (const [i, a] of preserved) answers.set(i, a);
-    for (let i = 0; i < questions.length; i++) {
-      if (!newLocked.has(i) && questions[i].reset) questions[i].reset!();
+    for (let i = 0; i < internalQuestions.length; i++) {
+      if (!newLocked.has(i) && internalQuestions[i].reset) internalQuestions[i].reset!();
     }
     answersVersion++;
     feedbackShown = new Set();
@@ -564,53 +633,47 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     dispatch('tessera-quiz-retry');
   }
 
-  // Publish the same `tessera-quiz` context the built-in <Quiz> sets, so
-  // existing useQuestion widgets work inside a custom quiz shell without
-  // changes.
-  setContext('tessera-quiz', {
-    get registerQuestion() { return registerQuestion; },
-    get setRender() { return setRender; },
-    get setAnswer() { return setAnswer; },
-    get getAnswer() { return getAnswer; },
-    get submitted() { return submitted; },
-    get reviewing() { return reviewing; },
-    get showFeedback() { return showFeedback; },
-    get feedbackVisible() { return feedbackVisible; },
-    get isAnswerLocked() {
-      return (i: number) =>
-        submitted ||
-        lockedCorrect.has(i) ||
-        (revealsLockAnswer && feedbackShown.has(i));
-    },
-    get isLockedCorrect() { return (i: number) => lockedCorrect.has(i); },
+  function revealFeedback(q: Question): void {
+    const index = internalQuestions.findIndex((iq) => iq.id === q.id);
+    if (index >= 0) revealFeedbackInternal(index);
+  }
+
+  setContext<QuizContextValue>(TESSERA_QUIZ, { registerQuestion });
+
+  onMount(() => {
+    if (!import.meta.env?.DEV) return;
+    void tick().then(() => __warnEmptyQuiz(internalQuestions.length));
   });
 
   onDestroy(() => {
     __warnUnsubmittedQuiz({
-      questionsCount: questions.length,
+      questionsCount: internalQuestions.length,
       answersCount: answers.size,
       submitCalled,
     });
   });
 
-  return {
+  const handle: UseQuizInternalHandle = {
     get state() { return state; },
-    get questions() { return questionViews; },
+    get questions() { return questionHandles; },
     get canSubmit() { return canSubmit; },
     get canRetry() { return canRetry; },
     get score() { return score; },
+    get passingScore() { return pageCtx.passingScore; },
     get attemptCount() { return attemptCount; },
-    registerQuestion,
-    setAnswer,
-    getAnswer,
     submit,
     startReview,
     exitReview,
     retry,
     revealFeedback,
-    feedbackVisible,
-    setRender,
-    getRender,
-    isLockedCorrect,
+    registerQuestion,
+    setAnswer: setAnswerInternal,
+    getAnswer: getAnswerInternal,
+    setRender: setRenderInternal,
+    getRender: getRenderInternal,
+    feedbackVisible: feedbackVisibleInternal,
+    revealFeedbackByIndex: revealFeedbackInternal,
+    isLockedCorrect: isLockedCorrectInternal,
   };
+  return handle;
 }

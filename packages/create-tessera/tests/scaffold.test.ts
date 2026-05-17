@@ -130,8 +130,9 @@ describe('create-tessera CLI', () => {
     expect(pkg.name).toBe('my-course');
     expect(pkg.private).toBe(true);
     expect(pkg.type).toBe('module');
-    expect(pkg.scripts.preview).toBe('vite dev');
+    expect(pkg.scripts.dev).toBe('vite dev');
     expect(pkg.scripts.export).toBe('vite build');
+    expect(pkg.scripts.validate).toBe('tessera-validate');
     expect(pkg.dependencies['tessera-learn']).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
   });
@@ -276,6 +277,13 @@ describe('create-tessera CLI', () => {
       expect(existsSync(resolve(projectDir, 'AGENTS.md'))).toBe(true);
       expect(existsSync(resolve(projectDir, 'package.json'))).toBe(true);
       expect(existsSync(resolve(projectDir, 'vite.config.js'))).toBe(true);
+    });
+
+    it('scaffolds empty styles/ and assets/ folders', () => {
+      runCLI('bare-course --template=bare', testDir);
+      const projectDir = resolve(testDir, 'bare-course');
+      expect(existsSync(resolve(projectDir, 'styles/.gitkeep'))).toBe(true);
+      expect(existsSync(resolve(projectDir, 'assets/.gitkeep'))).toBe(true);
     });
   });
 });
