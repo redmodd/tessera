@@ -137,18 +137,25 @@
   }
 
   // ---- Branding ----
+  // Two sentinels so the validity check doesn't false-positive when the
+  // input happens to normalize to the initial fillStyle ("#000000").
   function parseColor(color) {
     if (typeof CSS !== 'undefined' && CSS.supports && !CSS.supports('color', color)) {
       return null;
     }
-    const el = document.createElement('span');
-    el.style.color = color;
-    document.documentElement.appendChild(el);
-    const computed = getComputedStyle(el).color;
-    el.remove();
-    const match = computed.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-    if (!match) return null;
-    return { r: +match[1], g: +match[2], b: +match[3] };
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = color;
+    const onBlack = ctx.fillStyle;
+    ctx.fillStyle = '#fff';
+    ctx.fillStyle = color;
+    const onWhite = ctx.fillStyle;
+    if (onBlack !== onWhite) return null;
+    const hex = String(onBlack).match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hex) return { r: parseInt(hex[1], 16), g: parseInt(hex[2], 16), b: parseInt(hex[3], 16) };
+    const rgba = String(onBlack).match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    return rgba ? { r: +rgba[1], g: +rgba[2], b: +rgba[3] } : null;
   }
 
   function rgbToHsl(r, g, b) {
