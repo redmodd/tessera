@@ -4,6 +4,12 @@ declare module 'virtual:tessera-layout' {
   export default layout;
 }
 
+declare module 'virtual:tessera-adapter' {
+  import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
+  import type { CourseConfig } from 'tessera-learn/runtime/types.js';
+  export function createAdapter(config: CourseConfig): PersistenceAdapter;
+}
+
 interface ImportMetaEnv {
   readonly DEV: boolean;
   readonly PROD: boolean;

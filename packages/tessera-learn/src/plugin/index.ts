@@ -39,6 +39,7 @@ export function tesseraPlugin() {
     tesseraManifestPlugin(manifestRef),
     tesseraLayoutPlugin(),
     tesseraQuizPlugin(),
+    tesseraAdapterPlugin(),
     tesseraFirstPagePreloadPlugin(manifestRef),
     tesseraExportPlugin(),
   ];
@@ -478,6 +479,93 @@ function tesseraManifestPlugin(manifestRef: { current: Manifest | null; root: st
         return `export default JSON.parse(atob("${b64}"));`;
       }
       return null;
+    },
+  };
+}
+
+const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
+const RESOLVED_ADAPTER_ID = '\0' + VIRTUAL_ADAPTER_ID;
+
+function tesseraAdapterPlugin(): Plugin {
+  let projectRoot: string;
+  let isBuild = false;
+
+  return {
+    name: 'tessera:adapter',
+    enforce: 'pre',
+
+    configResolved(config: ResolvedConfig) {
+      projectRoot = config.root;
+      isBuild = config.command === 'build';
+    },
+
+    resolveId(id) {
+      if (id === VIRTUAL_ADAPTER_ID) return RESOLVED_ADAPTER_ID;
+      return null;
+    },
+
+    load(id) {
+      if (id !== RESOLVED_ADAPTER_ID) return null;
+
+      // In dev, defer to the runtime selector so its WebAdapter fallback
+      // for unreachable LMS APIs keeps working.
+      if (!isBuild) {
+        return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
+      }
+
+      let standard = 'web';
+      const configPath = resolve(projectRoot, 'course.config.js');
+      if (existsSync(configPath)) {
+        const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
+        if (objectStr) {
+          try {
+            const parsed = JSON5.parse(objectStr);
+            if (typeof parsed?.export?.standard === 'string') standard = parsed.export.standard;
+          } catch {}
+        }
+      }
+
+      switch (standard) {
+        case 'scorm12':
+          return `
+import { SCORM12Adapter } from 'tessera-learn/runtime/adapters/scorm12.js';
+import { findSCORM12API } from 'tessera-learn/runtime/adapters/discovery.js';
+import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
+export function createAdapter() {
+  const api = findSCORM12API();
+  if (!api) throw new LMSAdapterError('scorm12', 'Tessera: SCORM 1.2 API not found in window.parent/opener chain. Course must be launched from a SCORM 1.2 LMS.');
+  return new SCORM12Adapter(api);
+}
+`;
+        case 'scorm2004':
+          return `
+import { SCORM2004Adapter } from 'tessera-learn/runtime/adapters/scorm2004.js';
+import { findSCORM2004API } from 'tessera-learn/runtime/adapters/discovery.js';
+import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
+export function createAdapter() {
+  const api = findSCORM2004API();
+  if (!api) throw new LMSAdapterError('scorm2004', 'Tessera: SCORM 2004 API not found in window.parent/opener chain. Course must be launched from a SCORM 2004 LMS.');
+  return new SCORM2004Adapter(api);
+}
+`;
+        case 'cmi5':
+          return `
+import { CMI5Adapter } from 'tessera-learn/runtime/adapters/cmi5.js';
+import { hasCMI5LaunchParams } from 'tessera-learn/runtime/adapters/discovery.js';
+import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
+export function createAdapter() {
+  if (!hasCMI5LaunchParams()) throw new LMSAdapterError('cmi5', 'Tessera: cmi5 launch parameters not present on URL. Course must be launched from a cmi5-compliant LMS.');
+  return new CMI5Adapter();
+}
+`;
+        default:
+          return `
+import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
+export function createAdapter(config) {
+  return new WebAdapter(config);
+}
+`;
+      }
     },
   };
 }

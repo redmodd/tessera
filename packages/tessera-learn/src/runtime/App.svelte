@@ -11,7 +11,7 @@
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
   import { DurationTracker } from './duration.js';
-  import { createAdapter } from './adapters/index.js';
+  import { createAdapter } from 'virtual:tessera-adapter';
   import { buildXAPIClient } from './xapi/setup.js';
   import { registerXAPIClient } from './xapi/registry.js';
   import { TESSERA_PAGE, TESSERA_NAV, TESSERA_ADAPTER, TESSERA_USER_STATE } from './contexts.js';
