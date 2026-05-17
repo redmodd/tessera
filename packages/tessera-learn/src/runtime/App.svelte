@@ -5,7 +5,7 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import { onMount, onDestroy, setContext, untrack } from 'svelte';
-  import LoadingSkeleton from './LoadingSkeleton.svelte';
+  import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
@@ -463,9 +463,7 @@
 </script>
 
 {#snippet page()}
-  {#if pageLoading}
-    <LoadingSkeleton />
-  {:else if pageError}
+  {#if pageError}
     <ErrorPage error={pageError} onretry={retryPage} />
   {:else if PageComponent}
     {#if pageContext.quiz}
@@ -479,6 +477,7 @@
 {/snippet}
 
 <div id="tessera-app" data-chrome={chromeMode}>
+  <LoadingBar active={pageLoading} />
   {#if UserLayout}
     <UserLayout {page} />
   {:else if chromeMode === 'custom'}
