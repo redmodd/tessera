@@ -1,4 +1,5 @@
 import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
+import { SvelteSet } from 'svelte/reactivity';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import {
@@ -422,8 +423,8 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   let reviewing = $state(false);
   let score = $state(0);
   let attemptCount = $state(0);
-  let feedbackShown = $state(new Set<number>());
-  let lockedCorrect = $state(new Set<number>());
+  const feedbackShown = new SvelteSet<number>();
+  const lockedCorrect = new SvelteSet<number>();
   let submitCalled = false;
 
   const seenIds = new Set<string>();
@@ -490,9 +491,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   function revealFeedbackInternal(index: number): void {
     if (policyCfg.feedbackMode === 'never') return;
-    const next = new Set(feedbackShown);
-    next.add(index);
-    feedbackShown = next;
+    feedbackShown.add(index);
   }
 
   function isLockedCorrectInternal(index: number): boolean {
@@ -618,7 +617,8 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
     for (const i of newLocked) {
       if (answers.has(i)) preserved.set(i, answers.get(i));
     }
-    lockedCorrect = newLocked;
+    lockedCorrect.clear();
+    for (const i of newLocked) lockedCorrect.add(i);
     answers.clear();
     reportedAnswers.clear();
     for (const [i, a] of preserved) answers.set(i, a);
@@ -626,7 +626,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
       if (!newLocked.has(i) && internalQuestions[i].reset) internalQuestions[i].reset!();
     }
     answersVersion++;
-    feedbackShown = new Set();
+    feedbackShown.clear();
     submitted = false;
     reviewing = false;
     score = 0;
