@@ -24,8 +24,11 @@
   // can reach it.
   let xapiClient = null;
 
+  const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
+  const gradedQuizIndexSet = new Set(gradedQuizIndices);
+
   // ---- State classes ----
-  const progress = new ProgressState();
+  const progress = new ProgressState(gradedQuizIndexSet);
   const nav = new NavigationState(manifest, progress, config);
   nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
@@ -33,8 +36,6 @@
   const onIdle = typeof window !== 'undefined' && window.requestIdleCallback
     ? window.requestIdleCallback.bind(window)
     : (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1);
-
-  const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
 
   // Page loading state
   let PageComponent = $state(null);
@@ -112,8 +113,8 @@
       ) {
         progress.markCompleteManually();
       }
-      progress.recalculateCompletion(manifest, config);
-      progress.recalculateSuccess(manifest, config);
+      progress.recalculateCompletion(manifest.totalPages, config);
+      progress.recalculateSuccess(config);
       onIdle(() => nav.prefetch(index + 1));
     }).catch(err => {
       if (gen !== loadGeneration) return; // stale
@@ -185,8 +186,8 @@
     const { score } = e.detail;
     const pageIndex = nav.currentPageIndex;
     progress.quizCompleted(pageIndex, score);
-    progress.recalculateCompletion(manifest, config);
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateCompletion(manifest.totalPages, config);
+    progress.recalculateSuccess(config);
   }
 
   // ---- Persistence: serialize / restore ----
@@ -255,8 +256,8 @@
       progress.markCompleteManually();
     }
     // Recalculate derived state
-    progress.recalculateCompletion(manifest, config);
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateCompletion(manifest.totalPages, config);
+    progress.recalculateSuccess(config);
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
       nav.goToPage(saved.b);

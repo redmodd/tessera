@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createManifest, createConfig } from './helpers.js';
+import { createManifest, createConfig, gradedQuizIndices } from './helpers.js';
 import { NavigationState, isPageComplete } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 
@@ -10,7 +10,7 @@ describe('Quiz integration with navigation gating', () => {
       2: { graded: true, gatesProgress: true },
     });
     const config = createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const nav = new NavigationState(manifest, progress, config);
 
     // Pages 0, 1 are accessible
@@ -40,7 +40,7 @@ describe('Quiz integration with navigation gating', () => {
       navigation: { mode: 'sequential' },
       scoring: { passingScore: 70 },
     });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const nav = new NavigationState(manifest, progress, config);
 
     // Visit page 0
@@ -69,7 +69,7 @@ describe('Quiz integration with navigation gating', () => {
       1: { graded: true, gatesProgress: false },
     });
     const config = createConfig({ scoring: { passingScore: 70 } });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
 
     // Quiz not attempted
     expect(isPageComplete(1, manifest, progress, config)).toBe(false);
@@ -85,23 +85,23 @@ describe('Quiz integration with navigation gating', () => {
       3: { graded: true, gatesProgress: false },
     });
     const config = createConfig({ scoring: { passingScore: 70 } });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
 
     // No quizzes attempted yet — successStatus stays 'unknown' so we don't
     // mark a course "failed" before the learner has had a chance to start.
     // (Once *any* graded score is recorded, unattempted siblings count as 0.)
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateSuccess(config);
     expect(progress.successStatus).toBe('unknown');
 
     // One quiz completed with 90%
     progress.quizCompleted(1, 90);
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateSuccess(config);
     // Average = (90 + 0) / 2 = 45 (unattempted counts as 0)
     expect(progress.successStatus).toBe('failed');
 
     // Both quizzes completed
     progress.quizCompleted(3, 80);
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateSuccess(config);
     // Average = (90 + 80) / 2 = 85
     expect(progress.successStatus).toBe('passed');
   });
@@ -115,20 +115,20 @@ describe('Quiz integration with navigation gating', () => {
       completion: { mode: 'quiz' },
       scoring: { passingScore: 70 },
     });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
 
-    progress.recalculateCompletion(manifest, config);
+    progress.recalculateCompletion(manifest.totalPages, config);
     expect(progress.completionStatus).toBe('incomplete');
 
     // First quiz passes
     progress.quizCompleted(1, 80);
-    progress.recalculateCompletion(manifest, config);
+    progress.recalculateCompletion(manifest.totalPages, config);
     // Average = (80 + 0) / 2 = 40 < 70
     expect(progress.completionStatus).toBe('incomplete');
 
     // Second quiz passes
     progress.quizCompleted(3, 90);
-    progress.recalculateCompletion(manifest, config);
+    progress.recalculateCompletion(manifest.totalPages, config);
     // Average = (80 + 90) / 2 = 85 >= 70
     expect(progress.completionStatus).toBe('complete');
   });
@@ -138,10 +138,10 @@ describe('Quiz integration with navigation gating', () => {
       1: { graded: false, gatesProgress: false },
     });
     const config = createConfig({ scoring: { passingScore: 70 } });
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
 
     progress.quizCompleted(1, 100);
-    progress.recalculateSuccess(manifest, config);
+    progress.recalculateSuccess(config);
     // No graded quizzes → unknown
     expect(progress.successStatus).toBe('unknown');
   });

@@ -185,8 +185,8 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     if (opts.graded && navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
-      navCtx.progress.recalculateCompletion(navCtx.manifest, navCtx.config);
-      navCtx.progress.recalculateSuccess(navCtx.manifest, navCtx.config);
+      navCtx.progress.recalculateCompletion(navCtx.manifest.totalPages, navCtx.config);
+      navCtx.progress.recalculateSuccess(navCtx.config);
     } else if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, false);
@@ -291,7 +291,7 @@ export function useCompletion(): {
         return;
       }
       progress.markCompleteManually();
-      progress.recalculateSuccess(manifest, config);
+      progress.recalculateSuccess(config);
     },
     get completionStatus() {
       return progress.completionStatus;

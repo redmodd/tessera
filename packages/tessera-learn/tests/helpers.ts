@@ -1,6 +1,10 @@
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 
+export function gradedQuizIndices(manifest: Manifest): Set<number> {
+  return new Set(manifest.pages.filter(p => p.quiz?.graded).map(p => p.index));
+}
+
 export function createManifest(
   pageCount: number,
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {}

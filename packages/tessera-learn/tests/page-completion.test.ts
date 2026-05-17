@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isPageComplete } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
-import { createConfig } from './helpers.js';
+import { createConfig, gradedQuizIndices } from './helpers.js';
 
 function createPage(index: number, quiz: ManifestPage['quiz'] = null): ManifestPage {
   return {
@@ -30,7 +30,7 @@ describe('isPageComplete', () => {
   it('informational page is complete when visited', () => {
     const page = createPage(0);
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig();
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -42,7 +42,7 @@ describe('isPageComplete', () => {
   it('non-gating quiz page is complete when answered', () => {
     const page = createPage(0, { graded: true, gatesProgress: false, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig();
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -54,7 +54,7 @@ describe('isPageComplete', () => {
   it('gating quiz page is complete only when passed', () => {
     const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 70 } });
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -69,7 +69,7 @@ describe('isPageComplete', () => {
   it('gating quiz uses config passingScore', () => {
     const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState();
+    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 90 } });
 
     progress.quizCompleted(0, 85);

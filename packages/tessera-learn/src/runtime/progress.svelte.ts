@@ -1,8 +1,13 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 
 export class ProgressState {
+  #quizGradedIndices: ReadonlySet<number>;
+
+  constructor(quizGradedIndices: ReadonlySet<number>) {
+    this.#quizGradedIndices = quizGradedIndices;
+  }
+
   visitedPages = $state(new SvelteSet<number>());
   quizScores = $state(new SvelteMap<number, number>());
   /**
@@ -114,17 +119,17 @@ export class ProgressState {
     return sum / pageMap.size;
   }
 
-  recalculateCompletion(manifest: Manifest, config: CourseConfig) {
+  recalculateCompletion(totalPages: number, config: CourseConfig) {
     if (this.#manuallyCompleted) return;
     if (config.completion.mode === 'manual') return;
     if (config.completion.mode === 'percentage') {
       const threshold = config.completion.percentageThreshold ?? 100;
-      const percent = manifest.totalPages > 0
-        ? (this.visitedPages.size / manifest.totalPages) * 100
+      const percent = totalPages > 0
+        ? (this.visitedPages.size / totalPages) * 100
         : 0;
       this.completionStatus = percent >= threshold ? 'complete' : 'incomplete';
     } else if (config.completion.mode === 'quiz') {
-      const { indices } = this.#gradedPages(manifest);
+      const { indices } = this.#gradedPages();
       if (indices.length === 0) {
         this.completionStatus = 'incomplete';
         return;
@@ -134,7 +139,7 @@ export class ProgressState {
     }
   }
 
-  recalculateSuccess(manifest: Manifest, config: CourseConfig) {
+  recalculateSuccess(config: CourseConfig) {
     if (config.completion.mode === 'manual') {
       const want = config.completion.requireSuccessStatus;
       // Stay 'unknown' until manual mark fires, so a learner who never
@@ -143,7 +148,7 @@ export class ProgressState {
       return;
     }
 
-    const { indices, attempted } = this.#gradedPages(manifest);
+    const { indices, attempted } = this.#gradedPages();
 
     if (indices.length === 0) {
       this.successStatus = 'unknown';
@@ -163,9 +168,10 @@ export class ProgressState {
    * plus pages with at least one graded standalone question (deduped).
    * `attempted` is true if any of those pages has a recorded score.
    */
-  #gradedPages(manifest: Manifest): { indices: number[]; attempted: boolean } {
-    const quizPages = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
-    const indices = [...new Set([...quizPages, ...this.gradedStandalonePages])];
+  #gradedPages(): { indices: number[]; attempted: boolean } {
+    const merged = new Set(this.#quizGradedIndices);
+    for (const i of this.gradedStandalonePages) merged.add(i);
+    const indices = [...merged];
     const attempted = indices.some(i => this.#hasScore(i));
     return { indices, attempted };
   }
