@@ -29,7 +29,7 @@ function resolveStylesDir(): string {
 export function tesseraPlugin() {
   return [
     svelte({
-      compilerOptions: { css: 'injected' },
+      compilerOptions: { css: 'external' },
     }),
     tesseraValidationPlugin(),
     tesseraEntryPlugin(),
