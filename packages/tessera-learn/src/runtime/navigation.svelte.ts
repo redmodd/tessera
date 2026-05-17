@@ -43,7 +43,20 @@ export class NavigationState {
   // per-page `isPageLocked` calls stay O(1). Without this, sequential mode
   // is O(n²) per render (each `isPageLocked` walks all earlier pages).
   // Recomputed once per relevant state change.
-  #lockedSet = $derived.by<Set<number>>(() => this.#computeLockedSet());
+  #prevLockedSet: Set<number> | null = null;
+  #lockedSet = $derived.by<Set<number>>(() => {
+    const next = this.#computeLockedSet();
+    const prev = this.#prevLockedSet;
+    if (prev && prev.size === next.size) {
+      let same = true;
+      for (const i of next) {
+        if (!prev.has(i)) { same = false; break; }
+      }
+      if (same) return prev;
+    }
+    this.#prevLockedSet = next;
+    return next;
+  });
 
   constructor(manifest: Manifest, progress: ProgressState, config: CourseConfig) {
     this.manifest = manifest;
