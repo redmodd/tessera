@@ -635,17 +635,15 @@ function tesseraFirstPagePreloadPlugin(manifestRef: { current: Manifest | null; 
         if (!firstPagePath || !ctx.bundle) return;
         const normalized = resolve(manifestRef.root, firstPagePath.replace(/^\//, '')).replace(/\\/g, '/');
         const chunk = Object.values(ctx.bundle).find(
-          (c): c is import('rollup').OutputChunk =>
+          (c): c is import('vite').Rollup.OutputChunk =>
             c.type === 'chunk' && !!c.facadeModuleId && c.facadeModuleId.replace(/\\/g, '/') === normalized
         );
         if (!chunk) return;
-        return {
-          tags: [{
-            tag: 'link',
-            attrs: { rel: 'modulepreload', href: `./${chunk.fileName}` },
-            injectTo: 'head',
-          }],
-        };
+        return [{
+          tag: 'link',
+          attrs: { rel: 'modulepreload', href: `./${chunk.fileName}` },
+          injectTo: 'head',
+        }];
       },
     },
   };
