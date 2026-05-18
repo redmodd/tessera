@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.0.11
+
+### Patch Changes
+
+- - Bump the scaffolded `tessera-learn` pin to `^0.0.10` so newly-created projects pick up the CSS extraction + tree-shaking, adapter/xAPI gating, first-page preload, no-flash navigation, and next-page prefetch.
+
 ## 0.0.10
 
 ### Patch Changes

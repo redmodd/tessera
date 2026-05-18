@@ -1,6 +1,6 @@
 {
   "name": "create-tessera",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Scaffold a new Tessera course.",
   "keywords": [
     "tessera",
@@ -27,7 +27,7 @@
   "bin": {
     "create-tessera": "./dist/index.js"
   },
-  "tesseraVersion": "^0.0.9",
+  "tesseraVersion": "^0.0.10",
   "files": [
     "dist",
     "AGENTS.md",

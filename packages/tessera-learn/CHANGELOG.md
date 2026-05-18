@@ -1,5 +1,23 @@
 # tessera-learn
 
+## 0.0.10
+
+### Patch Changes
+
+- - **Smaller bundle for non-LMS courses.** Component CSS is now extracted and code-split alongside its JS chunks rather than injected at runtime; per-component styles for Carousel/Video/Audio/Matching/Sorting/FillInTheBlank no longer ship in the entry chunk. The package declares `"sideEffects": ["**/*.css"]` so Rollup can tree-shake unused component re-exports from a `bare`-template course.
+
+  - **Selected LMS adapter only.** A `web` course no longer ships SCORM 1.2 + SCORM 2004 + cmi5 adapters and their dialect tables. The plugin emits only the adapter matching `export.standard`; dev mode still falls back to `WebAdapter` when the LMS API is unreachable.
+
+  - **xAPI client gate.** When the build targets `web` / `scorm12` / `scorm2004` with no `xapi:` config, the entire `xapi/` subtree (publisher, validation, client, agent-rules, derive-actor, version, uuid, types) drops from the bundle. cmi5 keeps the real client because its adapter shares the publisher queue.
+
+  - **First page chunk preloaded.** The plugin emits a `<link rel="modulepreload">` for the first page's chunk so the browser fetches it in parallel with the entry rather than waiting for the entry to mount.
+
+  - **No flash-of-blank on cached navigation.** The outgoing page stays mounted until the next module resolves; `PageComponent`, `pageContext.quiz`, and `pageError` no longer flip synchronously before the await. Cached navigations swap in place.
+
+  - **Next page prefetched.** After each `loadPage` resolves, `requestIdleCallback` warms the next reachable chunk. `pointerenter` / `focusin` on the Next button and sidebar links cover sub-100ms intent for mouse, stylus, and keyboard users.
+
+  - **Runtime micro-perf.** `parseColor` replaces its DOM-insertion trick with canvas normalization (no forced style recalc on first paint). Quiz `feedbackShown` / `lockedCorrect` use `SvelteSet` so revealing one question only re-runs consumers reading that specific index. The navigation locked-page set is deduped by membership so consumers don't re-run when contents are unchanged.
+
 ## 0.0.9
 
 ### Patch Changes
