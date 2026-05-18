@@ -62,6 +62,10 @@ Every scaffolded project ships with `AGENTS.md` at its root. Your agent will rea
 
 *Want a minimal starting point with no reference components?* `npm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
 
+## Updating an existing project
+
+From a project root, `npx create-tessera@latest upgrade` pulls in the latest framework files without touching your authored content. Add `--dry-run` to preview. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#upgrading-an-existing-project) for details.
+
 ## Authoring with AI
 
 Once your project is running, ask the agent for what you want:
