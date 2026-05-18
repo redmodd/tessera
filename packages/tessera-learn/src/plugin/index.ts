@@ -628,16 +628,25 @@ function tesseraFirstPagePreloadPlugin(manifestRef: { current: Manifest | null; 
   return {
     name: 'tessera:first-page-preload',
     apply: 'build',
-    transformIndexHtml(html, ctx) {
-      const firstPagePath = manifestRef.current?.pages[0]?.importPath;
-      if (!firstPagePath || !ctx.bundle) return html;
-      const normalized = resolve(manifestRef.root, firstPagePath.replace(/^\//, '')).replace(/\\/g, '/');
-      const chunk = Object.values(ctx.bundle).find(
-        (c): c is import('rollup').OutputChunk =>
-          c.type === 'chunk' && !!c.facadeModuleId && c.facadeModuleId.replace(/\\/g, '/') === normalized
-      );
-      if (!chunk) return html;
-      return html.replace('</head>', `  <link rel="modulepreload" href="./${chunk.fileName}">\n  </head>`);
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, ctx) {
+        const firstPagePath = manifestRef.current?.pages[0]?.importPath;
+        if (!firstPagePath || !ctx.bundle) return;
+        const normalized = resolve(manifestRef.root, firstPagePath.replace(/^\//, '')).replace(/\\/g, '/');
+        const chunk = Object.values(ctx.bundle).find(
+          (c): c is import('rollup').OutputChunk =>
+            c.type === 'chunk' && !!c.facadeModuleId && c.facadeModuleId.replace(/\\/g, '/') === normalized
+        );
+        if (!chunk) return;
+        return {
+          tags: [{
+            tag: 'link',
+            attrs: { rel: 'modulepreload', href: `./${chunk.fileName}` },
+            injectTo: 'head',
+          }],
+        };
+      },
     },
   };
 }

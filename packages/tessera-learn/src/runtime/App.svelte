@@ -24,11 +24,12 @@
   // can reach it.
   let xapiClient = null;
 
-  const gradedQuizIndices = manifest.pages.filter(p => p.quiz?.graded).map(p => p.index);
-  const gradedQuizIndexSet = new Set(gradedQuizIndices);
+  const gradedQuizIndices = new Set(
+    manifest.pages.filter(p => p.quiz?.graded).map(p => p.index)
+  );
 
   // ---- State classes ----
-  const progress = new ProgressState(gradedQuizIndexSet);
+  const progress = new ProgressState(gradedQuizIndices);
   const nav = new NavigationState(manifest, progress, config);
   nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
@@ -308,14 +309,21 @@
   $effect(() => {
     const scores = progress.quizScores;
     if (!persistenceReady || scores.size === 0) return;
-    if (gradedQuizIndices.length === 0) return;
+    if (gradedQuizIndices.size === 0) return;
 
-    const completedGraded = gradedQuizIndices.filter(i => scores.has(i));
-    if (completedGraded.length === 0) return;
+    let sum = 0;
+    let attempted = false;
+    for (const i of gradedQuizIndices) {
+      if (scores.has(i)) {
+        sum += scores.get(i) ?? 0;
+        attempted = true;
+      }
+    }
+    if (!attempted) return;
 
     // Divide by total graded count — incomplete quizzes count as 0, matching
     // the recalculateSuccess logic in progress.svelte.ts.
-    const average = completedGraded.reduce((sum, i) => sum + (scores.get(i) ?? 0), 0) / gradedQuizIndices.length;
+    const average = sum / gradedQuizIndices.size;
 
     untrack(() => {
       adapter.setScore(Math.round(average));

@@ -39,10 +39,10 @@ export class NavigationState {
     return !this.isPageLocked(next);
   });
 
-  // Cache locked-page lookup as a single derived Set so the sidebar's
-  // per-page `isPageLocked` calls stay O(1). Without this, sequential mode
-  // is O(n²) per render (each `isPageLocked` walks all earlier pages).
-  // Recomputed once per relevant state change.
+  // Memo cache so the derived can return a stable Set reference when
+  // membership is unchanged (two Sets with identical contents are not `===`).
+  // Must NOT be `$state` — that would make this a reactive-state mutation
+  // from inside a derived.
   #prevLockedSet: Set<number> | null = null;
   #lockedSet = $derived.by<Set<number>>(() => {
     const next = this.#computeLockedSet();
