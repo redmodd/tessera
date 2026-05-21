@@ -327,12 +327,10 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would fr
 | `graded` | `boolean` | `false` | Whether the score counts toward course success |
 | `gatesProgress` | `boolean` | `false` | Whether passing is required to access the next page |
 | `maxAttempts` | `number` | `Infinity` | Max attempts |
-| `feedbackMode` | `"review" \| "immediate" \| "never" \| (state) => boolean` | `"review"` | When feedback renders. See below. |
-| `retryMode` | `"full" \| "incorrect-only" \| (results) => Set<number>` | `"full"` | Enum sugar or a predicate that returns the set of question indices to lock as "already correct" on retry. |
-| `canSubmit` | `(answered, total) => boolean` | all-answered | Custom Submit gate. Default requires every question to have an answer. |
-| `score` | `(results) => number` | weighted-correct % | Returns 0–100. Default: `Σ(weight × correct) / Σ(weight) × 100`. |
+| `feedbackMode` | `"review" \| "immediate" \| "never"` | `"review"` | When feedback renders. See below. |
+| `retryMode` | `"full" \| "incorrect-only"` | `"full"` | `"full"` resets every answer on retry; `"incorrect-only"` keeps questions the learner already got right locked as correct. |
 
-`feedbackMode` values: `"immediate"` reveals after the shell calls `revealFeedback(q)` and locks the answer; `"review"` shows feedback only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button). A predicate gets full control over per-question reveal.
+`feedbackMode` values: `"immediate"` reveals after the shell calls `revealFeedback(q)` and locks the answer; `"review"` shows feedback only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button).
 
 `gatesProgress: true` blocks navigation to the next page until the learner passes. Works in both `free` and `sequential` navigation modes.
 
@@ -346,6 +344,8 @@ Pass `weight` to `useQuestion` (and through built-in widget props) to change how
 ```
 
 Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page — the same widget answered the same way produces the same page score either way.
+
+The page-level score is the weighted-correct percentage: `Σ(weight × correct) / Σ(weight) × 100`, rounded. With every weight at the default 1 this is the plain correct-count percentage.
 
 The LMS still sees each question as a single pass/fail interaction; weights only affect the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*`.
 
