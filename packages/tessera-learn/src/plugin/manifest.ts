@@ -173,11 +173,14 @@ export function extractPageConfig(filePath: string): { title?: string; quiz?: Qu
 }
 
 /**
- * Extract an object literal from source starting at the opening brace.
- * Tracks brace depth to find the matching closing brace.
+ * Extract a balanced `{...}` or `[...]` span starting at the opening bracket,
+ * skipping strings and comments. Returns the substring (inclusive) or null if
+ * the open char is wrong or no matching close is found. Shared by manifest
+ * extraction, _meta/pageConfig parsing, and the validator's tag-prop parser.
  */
 export function extractObjectLiteral(source: string, startIndex: number): string | null {
-  if (source[startIndex] !== '{') return null;
+  const open = source[startIndex];
+  if (open !== '{' && open !== '[') return null;
 
   let depth = 0;
   let inString: string | null = null;
@@ -222,8 +225,8 @@ export function extractObjectLiteral(source: string, startIndex: number): string
       continue;
     }
 
-    if (char === '{') depth++;
-    if (char === '}') {
+    if (char === '{' || char === '[') depth++;
+    if (char === '}' || char === ']') {
       depth--;
       if (depth === 0) {
         return source.slice(startIndex, i + 1);
