@@ -6,6 +6,5 @@ export function tesseraLayoutPlugin(): Plugin {
     name: 'tessera:layout',
     virtualId: 'virtual:tessera-layout',
     projectFile: 'layout.svelte',
-    fallback: 'export default null;',
   });
 }
