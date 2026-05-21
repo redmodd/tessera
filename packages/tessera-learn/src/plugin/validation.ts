@@ -3,6 +3,7 @@ import { resolve, relative } from 'node:path';
 import JSON5 from 'json5';
 import {
   extractDefaultExportObjectLiteral,
+  extractObjectLiteral,
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
@@ -827,39 +828,6 @@ type PropValue =
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
-/** Extract a balanced {...} or [...] span starting at startIndex, or null. */
-function extractBalanced(source: string, startIndex: number): string | null {
-  const open = source[startIndex];
-  if (open !== '{' && open !== '[') return null;
-  let depth = 0;
-  let inString: string | null = null;
-  let escaped = false;
-  for (let i = startIndex; i < source.length; i++) {
-    const char = source[i];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === '\\' && inString) {
-      escaped = true;
-      continue;
-    }
-    if (inString) {
-      if (char === inString) inString = null;
-      continue;
-    }
-    if (char === '"' || char === "'" || char === '`') {
-      inString = char;
-      continue;
-    }
-    if (char === '{' || char === '[') depth++;
-    if (char === '}' || char === ']') {
-      depth--;
-      if (depth === 0) return source.slice(startIndex, i + 1);
-    }
-  }
-  return null;
-}
 
 /**
  * Parse the props of an opening tag starting just after the component name.
@@ -877,7 +845,7 @@ function parseTagProps(content: string, start: number): Map<string, PropValue> |
     if (c === '/' && content[i + 1] === '>') return props;
     // Spread / shorthand expression — skip the whole {...} block.
     if (c === '{') {
-      const block = extractBalanced(content, i);
+      const block = extractObjectLiteral(content, i);
       if (!block) return null;
       i += block.length;
       continue;
@@ -900,7 +868,7 @@ function parseTagProps(content: string, start: number): Map<string, PropValue> |
       props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
       i = end + 1;
     } else if (v === '{') {
-      const block = extractBalanced(content, i);
+      const block = extractObjectLiteral(content, i);
       if (!block) return null;
       props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
       i += block.length;
