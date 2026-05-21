@@ -7,15 +7,10 @@
    * @prop {string} alt - Alt text (required for accessibility)
    * @prop {string} [caption] - Optional caption below image
    */
-  let { src, alt, caption = '' } = $props();
+  import { resolveAsset } from './util.js';
 
-  // Resolve $assets/ prefix to the assets directory.
-  // In dev, Vite serves from project root so /assets/ works.
-  // In build, the Vite alias handles JS imports but not HTML attrs,
-  // so we rewrite to a root-relative path that Vite can serve.
-  let resolvedSrc = $derived(
-    src.startsWith('$assets/') ? src.replace('$assets/', '/assets/') : src
-  );
+  let { src, alt, caption = '' } = $props();
+  let resolvedSrc = $derived(resolveAsset(src));
 </script>
 
 <figure class="tessera-image">
