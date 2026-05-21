@@ -307,23 +307,11 @@
   // ---- Persistence: report score/completion/success to adapter ----
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
   $effect(() => {
-    const scores = progress.quizScores;
-    if (!persistenceReady || scores.size === 0) return;
-    if (gradedQuizIndices.size === 0) return;
+    void progress.version;
+    if (!persistenceReady) return;
 
-    let sum = 0;
-    let attempted = false;
-    for (const i of gradedQuizIndices) {
-      if (scores.has(i)) {
-        sum += scores.get(i) ?? 0;
-        attempted = true;
-      }
-    }
+    const { average, attempted } = progress.gradedScore();
     if (!attempted) return;
-
-    // Divide by total graded count — incomplete quizzes count as 0, matching
-    // the recalculateSuccess logic in progress.svelte.ts.
-    const average = sum / gradedQuizIndices.size;
 
     untrack(() => {
       adapter.setScore(Math.round(average));
