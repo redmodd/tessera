@@ -7,7 +7,7 @@ import {
   readSourceFileCached,
   ensureSvelteSuffix,
 } from './manifest.js';
-import { validateAgent } from '../runtime/xapi/agent-rules.js';
+import { validateAgent, validateAuthCredential } from '../runtime/xapi/agent-rules.js';
 
 // ---------- Types ----------
 
@@ -355,21 +355,16 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // auth — required for explicit endpoints.
+  // auth — required for explicit endpoints. Credential-shape rules
+  // (non-empty, Basic-not-header, no Bearer) are shared with the runtime
+  // publisher via validateAuthCredential so the two can't drift.
   const auth = entry.auth;
   if (auth === undefined) {
     errors.push(`course.config.js: ${label}.auth is required`);
   } else if (typeof auth === 'string') {
-    if (!auth) {
-      errors.push(`course.config.js: ${label}.auth must be a non-empty string`);
-    } else if (/^basic\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.`
-      );
-    } else if (/^bearer\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth: Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.`
-      );
+    const authErr = validateAuthCredential(auth);
+    if (authErr) {
+      errors.push(`course.config.js: ${label}.auth: ${authErr}`);
     } else {
       warnings.push(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +

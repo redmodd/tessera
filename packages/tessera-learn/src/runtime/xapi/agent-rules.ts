@@ -81,10 +81,10 @@ export function validateAgent(actor: unknown): string | null {
  */
 export function validateAuthCredential(auth: string): string | null {
   if (typeof auth !== 'string' || !auth) {
-    return 'auth must be a non-empty string';
+    return 'must be a non-empty string';
   }
   if (/^basic\s/i.test(auth)) {
-    return "auth must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
+    return "must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
   }
   if (/^bearer\s/i.test(auth)) {
     return 'Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.';
