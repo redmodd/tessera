@@ -228,6 +228,16 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   } catch {}
 }
 
+/** Packaged (zipped) export targets: which manifest file to write and how. */
+const PACKAGED_EXPORTS: Record<
+  'scorm12' | 'scorm2004' | 'cmi5',
+  { manifestFile: string; label: string; generate: (config: ExportConfig, distDir: string) => string }
+> = {
+  scorm12: { manifestFile: 'imsmanifest.xml', label: 'SCORM 1.2', generate: generateSCORM12Manifest },
+  scorm2004: { manifestFile: 'imsmanifest.xml', label: 'SCORM 2004', generate: generateSCORM2004Manifest },
+  cmi5: { manifestFile: 'cmi5.xml', label: 'CMI5', generate: (config) => generateCMI5Xml(config) },
+};
+
 export async function runExport(
   projectRoot: string,
   config: ExportConfig
@@ -239,47 +249,19 @@ export async function runExport(
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
 
-  switch (standard) {
-    case 'web': {
-      // Compute dist size
-      const files = collectFiles(distDir);
-      let totalSize = 0;
-      for (const f of files) {
-        totalSize += statSync(resolve(distDir, f)).size;
-      }
-      console.log(`✓ Web export: dist/ (${formatSize(totalSize)})`);
-      break;
-    }
-
-    case 'scorm12': {
-      const manifest = generateSCORM12Manifest(config, distDir);
-      writeFileSync(resolve(distDir, 'imsmanifest.xml'), manifest, 'utf-8');
-      cleanOldZips(projectRoot, slug);
-      const zipSize = await createZip(distDir, zipPath);
-      console.log(
-        `✓ SCORM 1.2 export: ${zipName} (${formatSize(zipSize)})`
-      );
-      break;
-    }
-
-    case 'scorm2004': {
-      const manifest = generateSCORM2004Manifest(config, distDir);
-      writeFileSync(resolve(distDir, 'imsmanifest.xml'), manifest, 'utf-8');
-      cleanOldZips(projectRoot, slug);
-      const zipSize = await createZip(distDir, zipPath);
-      console.log(
-        `✓ SCORM 2004 export: ${zipName} (${formatSize(zipSize)})`
-      );
-      break;
-    }
-
-    case 'cmi5': {
-      const xml = generateCMI5Xml(config);
-      writeFileSync(resolve(distDir, 'cmi5.xml'), xml, 'utf-8');
-      cleanOldZips(projectRoot, slug);
-      const zipSize = await createZip(distDir, zipPath);
-      console.log(`✓ CMI5 export: ${zipName} (${formatSize(zipSize)})`);
-      break;
-    }
+  if (standard === 'web') {
+    const files = collectFiles(distDir);
+    let totalSize = 0;
+    for (const f of files) totalSize += statSync(resolve(distDir, f)).size;
+    console.log(`✓ Web export: dist/ (${formatSize(totalSize)})`);
+    return;
   }
+
+  const spec = PACKAGED_EXPORTS[standard as keyof typeof PACKAGED_EXPORTS];
+  if (!spec) return; // unknown standard — the validator rejects these upstream
+
+  writeFileSync(resolve(distDir, spec.manifestFile), spec.generate(config, distDir), 'utf-8');
+  cleanOldZips(projectRoot, slug);
+  const zipSize = await createZip(distDir, zipPath);
+  console.log(`✓ ${spec.label} export: ${zipName} (${formatSize(zipSize)})`);
 }
