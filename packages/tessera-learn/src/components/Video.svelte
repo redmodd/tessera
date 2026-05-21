@@ -8,8 +8,10 @@
    * @prop {string} [title] - Accessible label for the video
    */
   import { onMount } from 'svelte';
+  import { resolveAsset } from './util.js';
 
   let { src, title = '' } = $props();
+  let resolvedSrc = $derived(resolveAsset(src));
   let containerRef = $state(null);
   let visible = $state(false);
 
@@ -61,7 +63,7 @@
     {:else}
       <!-- svelte-ignore a11y_media_has_caption -->
       <video controls class="tessera-video-native" aria-label={title}>
-        <source {src} />
+        <source src={resolvedSrc} />
         Your browser does not support the video element.
       </video>
     {/if}
