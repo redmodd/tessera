@@ -4,10 +4,11 @@
    * Embeds YouTube/Vimeo via iframe or local video files.
    * Lazy-loads via IntersectionObserver.
    *
-   * @prop {string} src - Video URL (YouTube, Vimeo, or direct video file)
+   * @prop {string} src - Video URL (YouTube, Vimeo, direct video file, or $assets/ path)
    * @prop {string} [title] - Accessible label for the video
    */
   import { onMount } from 'svelte';
+  import { resolveAsset } from './util.js';
 
   let { src, title = '' } = $props();
   let containerRef = $state(null);
@@ -27,6 +28,7 @@
   });
 
   let isEmbed = $derived(embedUrl !== null);
+  let nativeSrc = $derived(resolveAsset(src));
 
   onMount(() => {
     if (!containerRef) return;
@@ -61,7 +63,7 @@
     {:else}
       <!-- svelte-ignore a11y_media_has_caption -->
       <video controls class="tessera-video-native" aria-label={title}>
-        <source {src} />
+        <source src={nativeSrc} />
         Your browser does not support the video element.
       </video>
     {/if}
