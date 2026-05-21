@@ -1137,7 +1137,7 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written *explicitly* when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
 
-**LMS-supplied thresholds.** `cmi.scaled_passing_score` (§4.2.4.3) and `cmi.completion_threshold` (§4.2.4.4) are read on init and exposed via `adapter.getMasteryScore()` / `getCompletionThreshold()`. `App.svelte` picks up `masteryScore` and overrides `scoring.passingScore` for the launch — parity with cmi5's launch-time mastery.
+**LMS-supplied thresholds.** `cmi.scaled_passing_score` (§4.2.4.3) is read on init and exposed via `adapter.getMasteryScore()`. `App.svelte` picks up `masteryScore` and overrides `scoring.passingScore` for the launch — parity with cmi5's launch-time mastery.
 
 **Launch mode (§4.2.1.5).** `cmi.mode` is read on init. In `browse` and `review` launches every learner-record write is silently suppressed (`setScore` / `setCompletionStatus` / `setSuccessStatus` / `setExit` / `setDuration` / `reportInteraction` / `saveState` — including the `cmi.suspend_data` write). Mirrors cmi5's launchMode handling; exposed via `adapter.getLaunchMode()`.
 
@@ -1163,13 +1163,13 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Context per Defined Statement.** Categories: `cmi5` Category Activity on every Defined Statement (§9.6.2.1); plus `moveOn` Category on Completed / Passed / Failed (§9.6.2.2). Extensions: `sessionid` (§9.6.3.1) on every statement (Defined and Allowed) — value sourced from `LMS.LaunchData.contextTemplate` when supplied, else minted UUID. `masteryScore` extension on Passed / Failed only (§9.6.3.2). The full `contextTemplate` from `LMS.LaunchData` is merged in (§9.6.2 makes it the AU's base context; §10.2.1 says AU MUST NOT overwrite template values, so the AU's categories are concatenated and deduped against the template's, never replacing them).
 
-**`LMS.LaunchData` (§10).** Fetched once at init from the State API under `stateId='LMS.LaunchData'`. The AU reads `contextTemplate`, `launchMode`, `returnURL`, `launchParameters`, `masteryScore`, and `moveOn` from it. LaunchData values override anything parsed from the launch URL (§10.2.4 makes LaunchData authoritative). When the document is absent, statements ship without the LMS-supplied Publisher Activity and may be rejected by strict LRSes — a console warning fires.
+**`LMS.LaunchData` (§10).** Fetched once at init from the State API under `stateId='LMS.LaunchData'`. The AU reads `contextTemplate`, `launchMode`, `returnURL`, and `masteryScore` from it. LaunchData values override anything parsed from the launch URL (§10.2.4 makes LaunchData authoritative). When the document is absent, statements ship without the LMS-supplied Publisher Activity and may be rejected by strict LRSes — a console warning fires.
 
-**Learner Preferences (§11).** `cmi5LearnerPreferences` from the Agent Profile API, fetched *before* Initialized — strict LRSes (SCORM Cloud) track that the GET happened and reject Initialized otherwise. A 404 here is normal (no preferences set); only the GET itself is required. Exposed to author code via `adapter.getLearnerPreferences()`.
+**Learner Preferences (§11).** `cmi5LearnerPreferences` from the Agent Profile API, fetched *before* Initialized — strict LRSes (SCORM Cloud) track that the GET happened and reject Initialized otherwise. A 404 here is normal (no preferences set); only the GET itself is required, and the response body is not consumed.
 
 **Launch mode (§10.2.2).** "Normal" launches emit the full lifecycle. "Browse" and "Review" launches emit only Initialized and Terminated — every other Defined Statement is silently suppressed. Exposed via `adapter.getLaunchMode()`.
 
-**Return URL (§10.2.6).** `adapter.exit()` is the explicit-exit path: calls `terminate()`, awaits the publisher queue so Terminated lands before navigation, then `window.location.assign(returnURL)`. The page-unload `terminate()` path can't redirect (the browser is already navigating). Bare `getReturnURL()` is available for authors who want to inspect the URL without triggering exit.
+**Return URL (§10.2.6).** `adapter.exit()` is the explicit-exit path: calls `terminate()`, awaits the publisher queue so Terminated lands before navigation, then `window.location.assign(returnURL)`. The page-unload `terminate()` path can't redirect (the browser is already navigating).
 
 **State persistence.** `tessera-state` document via the State API, keyed by `activityId` + `agent` + `registration?` + `stateId='tessera-state'` (distinct from the LMS-owned `LMS.LaunchData` and `cmi5LearnerPreferences` documents). Writes chain onto the publisher's queue so the suspend payload lands before Terminated.
 

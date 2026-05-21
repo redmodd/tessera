@@ -79,8 +79,7 @@ describe('CMI5Adapter', () => {
 
   function setupInitMocks(
     savedState?: SavedState,
-    launchData?: Record<string, unknown> | null,
-    learnerPreferences?: Record<string, unknown> | null
+    launchData?: Record<string, unknown> | null
   ) {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       // Token fetch
@@ -98,7 +97,6 @@ describe('CMI5Adapter', () => {
       }
       // Agent Profile GET (Learner Preferences)
       if (url.includes('agents/profile')) {
-        if (learnerPreferences) return { ok: true, json: async () => learnerPreferences };
         return { ok: false, status: 404 };
       }
       // Statements POST (Initialized, Answered, etc.)

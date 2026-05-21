@@ -72,17 +72,9 @@ interface CMI5LaunchData {
   };
   launchMode?: CMI5LaunchMode;
   launchMethod?: 'OwnWindow' | 'AnyWindow';
-  launchParameters?: string;
   returnURL?: string;
   masteryScore?: number;
   entitlementKey?: Record<string, string>;
-  [k: string]: unknown;
-}
-
-/** cmi5 §11.1 Learner Preferences Agent Profile document. */
-interface CMI5LearnerPreferences {
-  languagePreference?: string;
-  audioPreference?: 'on' | 'off';
   [k: string]: unknown;
 }
 
@@ -167,7 +159,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       }
     }
 
-
     // Malformed actor JSON is a launch-time failure: an empty {} actor
     // would fail every Identified-Agent check downstream and produce
     // confusing 400s on every send. Fail loud here instead.
@@ -248,9 +239,9 @@ export class CMI5Adapter implements PersistenceAdapter {
 
     // cmi5 §10 — LaunchData is the only spec-defined channel for the
     // session id (§9.6.3.1) and Publisher Activity (§9.6.2.3) the LRS
-    // validates against, plus launchMode/returnURL/launchParameters/
-    // masteryScore/moveOn (§10.2). LaunchData values override the URL
-    // masteryScore parsed earlier (§10.2.4 makes it authoritative).
+    // validates against, plus launchMode/returnURL/masteryScore (§10.2).
+    // LaunchData values override the URL masteryScore parsed earlier
+    // (§10.2.4 makes it authoritative).
     this.#launchData = await this.#fetchLaunchData();
     const tmpl = this.#launchData?.contextTemplate ?? {};
     let sessionId: string | undefined;
@@ -664,15 +655,16 @@ export class CMI5Adapter implements PersistenceAdapter {
     return null;
   }
 
-  /** GET cmi5 §11.1 Learner Preferences. 404 is normal (no prefs set). */
-  async #fetchLearnerPreferences(): Promise<CMI5LearnerPreferences | null> {
+  /**
+   * GET cmi5 §11.1 Learner Preferences. The GET itself is the §11
+   * obligation (it must precede Initialized); the response body is not
+   * consumed. 404 is normal (no prefs set).
+   */
+  async #fetchLearnerPreferences(): Promise<void> {
     try {
       const url = this.#buildAgentProfileUrl(CMI5_LEARNER_PREFS_PROFILE_ID);
       const resp = await this.#xapiFetch(url, { method: 'GET' });
-      if (resp.ok) {
-        return (await resp.json()) as CMI5LearnerPreferences;
-      }
-      if (resp.status !== 404) {
+      if (!resp.ok && resp.status !== 404) {
         console.warn(
           `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) returned ${resp.status}.`
         );
@@ -682,7 +674,6 @@ export class CMI5Adapter implements PersistenceAdapter {
         `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) failed (${err instanceof Error ? err.message : String(err)}).`
       );
     }
-    return null;
   }
 
   async #xapiFetch(url: string, options: RequestInit = {}): Promise<Response> {
