@@ -7,7 +7,11 @@ import {
   readSourceFileCached,
   ensureSvelteSuffix,
 } from './manifest.js';
-import { validateAgent, validateAuthCredential } from '../runtime/xapi/agent-rules.js';
+import {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from '../runtime/xapi/agent-rules.js';
 
 // ---------- Types ----------
 
@@ -355,16 +359,14 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // auth — required for explicit endpoints. Credential-shape rules
-  // (non-empty, Basic-not-header, no Bearer) are shared with the runtime
-  // publisher via validateAuthCredential so the two can't drift.
+  // auth — required for explicit endpoints.
   const auth = entry.auth;
   if (auth === undefined) {
     errors.push(`course.config.js: ${label}.auth is required`);
   } else if (typeof auth === 'string') {
     const authErr = validateAuthCredential(auth);
     if (authErr) {
-      errors.push(`course.config.js: ${label}.auth: ${authErr}`);
+      errors.push(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
     } else {
       warnings.push(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
@@ -406,10 +408,7 @@ function validateSingleXAPIEntry(
   } else if (typeof actor === 'object' && actor !== null) {
     const err = validateAgent(actor);
     if (err) {
-      const joined = err.startsWith('.')
-        ? `${label}.actor${err}`
-        : `${label}.actor ${err}`;
-      errors.push(`course.config.js: ${joined}`);
+      errors.push(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
     }
   } else if (typeof actor !== 'function') {
     errors.push(

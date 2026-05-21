@@ -7,6 +7,11 @@
  * Keeping the rules in one place prevents the two callsites from drifting.
  */
 
+/** Join a field label with a validator suffix: `.foo` chains, others get `: `. */
+export function joinFieldError(label: string, suffix: string): string {
+  return suffix.startsWith('.') ? `${label}${suffix}` : `${label}: ${suffix}`;
+}
+
 /**
  * Validate that a candidate is an Identified Agent per xAPI 1.0.3.
  * Returns null on success or a human-readable error suffix on failure.
