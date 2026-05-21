@@ -6,6 +6,7 @@ import {
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
+  readCourseConfig,
 } from './manifest.js';
 import { validateAgent } from '../runtime/xapi/agent-rules.js';
 
@@ -55,7 +56,7 @@ export function validateProject(projectRoot: string): ValidationResult {
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(configPath, errors, warnings);
+  const config = parseConfig(projectRoot, errors, warnings);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -97,27 +98,25 @@ interface ParsedConfig {
 }
 
 function parseConfig(
-  configPath: string,
+  projectRoot: string,
   errors: string[],
   warnings: string[]
 ): ParsedConfig | null {
-  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(configPath));
-  if (!objectStr) {
-    errors.push(
-      'course.config.js: could not parse — must use `export default { ... }` syntax'
-    );
+  const read = readCourseConfig(projectRoot);
+  if (!read.ok) {
+    // 'missing' can't occur — validateProject checks existsSync first.
+    if (read.reason === 'no-export') {
+      errors.push(
+        'course.config.js: could not parse — must use `export default { ... }` syntax'
+      );
+    } else if (read.reason === 'parse-error') {
+      errors.push(
+        'course.config.js: syntax error — must export a static object literal'
+      );
+    }
     return null;
   }
-
-  let config: ParsedConfig;
-  try {
-    config = JSON5.parse(objectStr);
-  } catch {
-    errors.push(
-      'course.config.js: syntax error — must export a static object literal'
-    );
-    return null;
-  }
+  const config = read.config as ParsedConfig;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
