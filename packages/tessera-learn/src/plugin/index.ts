@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { existsSync, readdirSync, statSync, writeFileSync, unlinkSync, cpSync, mkdirSync } from 'node:fs';
 import { generateManifest, readCourseConfig } from './manifest.js';
 import type { Manifest } from './manifest.js';
-import { validateProject } from './validation.js';
+import { validateProject, reportValidationIssues } from './validation.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
@@ -324,18 +324,11 @@ function tesseraValidationPlugin(): Plugin {
 }
 
 function runValidation(projectRoot: string): void {
-  const { errors, warnings } = validateProject(projectRoot);
-
-  for (const warning of warnings) {
-    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
-  }
-
-  if (errors.length > 0) {
-    for (const error of errors) {
-      console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
-    }
+  const result = validateProject(projectRoot);
+  reportValidationIssues(result);
+  if (result.errors.length > 0) {
     throw new Error(
-      `Tessera validation failed with ${errors.length} error(s). Fix the errors above to continue.`
+      `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`
     );
   }
 }

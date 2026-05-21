@@ -22,6 +22,16 @@ export interface ValidationResult {
   warnings: string[];
 }
 
+/** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
+export function reportValidationIssues({ errors, warnings }: ValidationResult): void {
+  for (const warning of warnings) {
+    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
+  }
+  for (const error of errors) {
+    console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
+  }
+}
+
 // Known top-level config fields
 const KNOWN_CONFIG_FIELDS = new Set([
   'title',

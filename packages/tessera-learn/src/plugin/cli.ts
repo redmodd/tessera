@@ -1,15 +1,10 @@
 #!/usr/bin/env node
-import { validateProject } from './validation.js';
+import { validateProject, reportValidationIssues } from './validation.js';
 
 const projectRoot = process.cwd();
 const { errors, warnings } = validateProject(projectRoot);
 
-for (const warning of warnings) {
-  console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
-}
-for (const error of errors) {
-  console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
-}
+reportValidationIssues({ errors, warnings });
 
 if (errors.length > 0) {
   const summary =
