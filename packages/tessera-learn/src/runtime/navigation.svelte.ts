@@ -1,6 +1,7 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 import { ProgressState } from './progress.svelte.js';
+import { resolveAccess } from './access.js';
 
 export function isPageComplete(
   index: number,
@@ -99,50 +100,22 @@ export class NavigationState {
     return this.#lockedSet.has(index);
   }
 
-  // Compute the locked set in a single forward pass. The built-in modes are
-  // expressed inline (rather than calling resolveAccess/freeAccess/sequential
-  // per page) so the whole walk is O(n). Custom predicates fall back to a
-  // per-page evaluation since their semantics are arbitrary — but it still
-  // runs once per state change rather than once per page per render.
+  // Resolve the access predicate once (custom canAccess, or the free /
+  // sequential preset) and evaluate it per page. Runs once per state change
+  // — the presets are the single source of truth for the gating rules.
   #computeLockedSet(): Set<number> {
     const total = this.manifest.totalPages;
     const locked = new Set<number>();
-
-    if (this.#config.navigation.canAccess) {
-      const fn = this.#config.navigation.canAccess;
-      for (let i = 0; i < total; i++) {
-        if (!fn({
-          pageIndex: i,
-          page: this.manifest.pages[i],
-          manifest: this.manifest,
-          progress: this.#progress,
-          config: this.#config,
-        })) {
-          locked.add(i);
-        }
-      }
-      return locked;
-    }
-
-    if (this.#config.navigation.mode === 'sequential') {
-      // Once any page is incomplete, every later page is locked.
-      for (let i = 1; i < total; i++) {
-        if (!isPageComplete(i - 1, this.manifest, this.#progress, this.#config)) {
-          for (let k = i; k < total; k++) locked.add(k);
-          return locked;
-        }
-      }
-      return locked;
-    }
-
-    // Free mode: a page is locked iff its most-recent gating quiz is unmet.
-    let lastGatingUnmet = false;
+    const access = resolveAccess(this.#config);
     for (let i = 0; i < total; i++) {
-      if (lastGatingUnmet) locked.add(i);
-      const page = this.manifest.pages[i];
-      if (page.quiz?.gatesProgress) {
-        const score = this.#progress.quizScores.get(i) ?? 0;
-        lastGatingUnmet = score < this.#config.scoring.passingScore;
+      if (!access({
+        pageIndex: i,
+        page: this.manifest.pages[i],
+        manifest: this.manifest,
+        progress: this.#progress,
+        config: this.#config,
+      })) {
+        locked.add(i);
       }
     }
     return locked;
