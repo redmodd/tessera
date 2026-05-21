@@ -71,63 +71,68 @@
   }
 </script>
 
-{#if !inQuiz}
-  <div class="tessera-fitb">
-    <label class="tessera-fitb-question" for={inputId}>{question}</label>
+{#snippet fitbContent()}
+  <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
-    <div class="tessera-fitb-input-wrapper">
-      <input
-        type="text"
-        id={inputId}
-        class="tessera-fitb-input"
-        class:correct={q.submitted && checkAnswer(inputValue)}
-        class:incorrect={q.submitted && !checkAnswer(inputValue)}
-        value={inputValue}
-        oninput={handleInput}
-        onkeydown={handleKeydown}
-        disabled={q.submitted}
-        placeholder="Type your answer..."
-        autocomplete="off"
-      />
-      {#if !q.submitted}
-        <button
-          class="tessera-btn-primary tessera-fitb-check-btn"
-          disabled={!inputValue.trim()}
-          onclick={() => { q.submit(); }}
-        >
-          Check
-        </button>
+  <div class="tessera-fitb-input-wrapper">
+    <input
+      type="text"
+      id={inputId}
+      class="tessera-fitb-input"
+      class:correct={q.feedbackVisible && checkAnswer(inputValue)}
+      class:incorrect={q.feedbackVisible && !checkAnswer(inputValue)}
+      value={inputValue}
+      oninput={handleInput}
+      onkeydown={handleKeydown}
+      onblur={handleBlur}
+      disabled={q.locked}
+      placeholder="Type your answer..."
+      autocomplete="off"
+    />
+    {#if !inQuiz && !q.submitted}
+      <button
+        class="tessera-btn-primary tessera-fitb-check-btn"
+        disabled={!inputValue.trim()}
+        onclick={() => { q.submit(); }}
+      >
+        Check
+      </button>
+    {/if}
+  </div>
+
+  {#if q.feedbackVisible}
+    {@const isCorrect = checkAnswer(inputValue)}
+    <div class="tessera-fitb-review">
+      {#if isCorrect}
+        <div class="tessera-fitb-result correct">
+          <ResultIcon kind="correct" />
+          Correct
+        </div>
+        {#if correctFeedback}
+          <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
+        {/if}
+      {:else}
+        <div class="tessera-fitb-result incorrect">
+          <ResultIcon kind="incorrect" />
+          Incorrect
+        </div>
+        <p class="tessera-fitb-correct-answer">
+          Correct answer{answers.length > 1 ? 's' : ''}: {answers.join(', ')}
+        </p>
+        {#if incorrectFeedback}
+          <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
+        {/if}
+      {/if}
+      {#if !inQuiz && q.canRetry}
+        <RetryButton onclick={() => q.retry()} />
       {/if}
     </div>
+  {/if}
+{/snippet}
 
-    {#if q.submitted}
-      {@const isCorrect = checkAnswer(inputValue)}
-      <div class="tessera-fitb-review">
-        {#if isCorrect}
-          <div class="tessera-fitb-result correct">
-            <ResultIcon kind="correct" />
-            Correct
-          </div>
-          {#if correctFeedback}
-            <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
-          {/if}
-        {:else}
-          <div class="tessera-fitb-result incorrect">
-            <ResultIcon kind="incorrect" />
-            Incorrect
-          </div>
-          <p class="tessera-fitb-correct-answer">
-            Correct answer{answers.length > 1 ? 's' : ''}: {answers.join(', ')}
-          </p>
-          {#if incorrectFeedback}
-            <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
-          {/if}
-        {/if}
-        {#if q.canRetry}
-          <RetryButton onclick={() => q.retry()} />
-        {/if}
-      </div>
-    {/if}
+{#if !inQuiz}
+  <div class="tessera-fitb">
+    {@render fitbContent()}
   </div>
 {/if}
 
@@ -136,50 +141,7 @@
     {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
-    <label class="tessera-fitb-question" for={inputId}>{question}</label>
-
-    <div class="tessera-fitb-input-wrapper">
-      <input
-        type="text"
-        id={inputId}
-        class="tessera-fitb-input"
-        class:correct={q.feedbackVisible && checkAnswer(q.answer)}
-        class:incorrect={q.feedbackVisible && !checkAnswer(q.answer)}
-        value={q.locked ? (q.answer ?? '') : inputValue}
-        oninput={handleInput}
-        onblur={handleBlur}
-        disabled={q.locked}
-        placeholder="Type your answer..."
-        autocomplete="off"
-      />
-    </div>
-
-    {#if q.feedbackVisible}
-      {@const userAnswer = q.answer}
-      {@const isCorrect = checkAnswer(userAnswer)}
-      <div class="tessera-fitb-review">
-        {#if isCorrect}
-          <div class="tessera-fitb-result correct">
-            <ResultIcon kind="correct" />
-            Correct
-          </div>
-          {#if correctFeedback}
-            <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
-          {/if}
-        {:else}
-          <div class="tessera-fitb-result incorrect">
-            <ResultIcon kind="incorrect" />
-            Incorrect
-          </div>
-          <p class="tessera-fitb-correct-answer">
-            Correct answer{answers.length > 1 ? 's' : ''}: {answers.join(', ')}
-          </p>
-          {#if incorrectFeedback}
-            <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
-          {/if}
-        {/if}
-      </div>
-    {/if}
+    {@render fitbContent()}
   </div>
 {/snippet}
 
