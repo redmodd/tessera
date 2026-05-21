@@ -5,7 +5,7 @@ import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
-} from './retry.js';
+} from './format.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -73,6 +73,10 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     return this.#masteryScore;
   }
 
+  get #canWrite(): boolean {
+    return this.#mode === 'normal';
+  }
+
   #readMode(): SCORM2004Mode {
     try {
       const v = this.api.GetValue('cmi.mode');
@@ -95,7 +99,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   saveState(state: SavedState): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     super.saveState(state);
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.queue.enqueue(
@@ -105,7 +109,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setDuration(seconds: number): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     super.setDuration(seconds);
   }
 
@@ -114,12 +118,12 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     interaction: import('../interaction.js').Interaction,
     correct: boolean | null
   ): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     super.reportInteraction(questionId, interaction, correct);
   }
 
   setScore(score: number): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     const raw = formatReal107(score);
     // §4.2.4.3.5 — score.scaled is bounded to [-1, 1].
     const scaled = formatReal107(Math.max(0, Math.min(1, score / 100)));
@@ -142,7 +146,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     const value = status === 'complete' ? 'completed' : 'incomplete';
     this.queue.enqueue(
       () => this.api.SetValue('cmi.completion_status', value),
@@ -158,7 +162,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
     // a null status to "passed".
     this.queue.enqueue(
@@ -168,7 +172,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
-    if (this.#mode !== 'normal') return;
+    if (!this.#canWrite) return;
     this.queue.enqueue(
       () => this.api.SetValue('cmi.exit', mode),
       'cmi.exit'
