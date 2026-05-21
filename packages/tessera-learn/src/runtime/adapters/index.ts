@@ -60,40 +60,39 @@ export interface CreateAdapterOptions {
  * In dev mode, missing APIs warn and fall back to `WebAdapter` so authors
  * can still iterate locally.
  */
+type LMSStandard = 'scorm12' | 'scorm2004' | 'cmi5';
+
+/** Per-standard LMS detection. `detect` returns an adapter when the LMS runtime is reachable, else null. */
+const LMS_ADAPTERS: Record<LMSStandard, { detect: () => PersistenceAdapter | null; label: string }> = {
+  scorm12: {
+    detect: () => { const api = findSCORM12API(); return api ? new SCORM12Adapter(api) : null; },
+    label: 'SCORM 1.2 API',
+  },
+  scorm2004: {
+    detect: () => { const api = findSCORM2004API(); return api ? new SCORM2004Adapter(api) : null; },
+    label: 'SCORM 2004 API',
+  },
+  cmi5: {
+    detect: () => (hasCMI5LaunchParams() ? new CMI5Adapter() : null),
+    label: 'cmi5 launch parameters',
+  },
+};
+
 export function createAdapter(
   config: CourseConfig,
   options: CreateAdapterOptions = {}
 ): PersistenceAdapter {
   const allowFallback =
     options.allowFallback ?? import.meta.env?.DEV === true;
-  switch (config.export?.standard) {
-    case 'scorm12': {
-      const api = findSCORM12API();
-      if (api) return new SCORM12Adapter(api);
-      if (!allowFallback) throw missingApiError('scorm12');
-      console.warn(
-        'Tessera (dev): SCORM 1.2 API not found — falling back to localStorage'
-      );
-      return new WebAdapter(config);
-    }
-    case 'scorm2004': {
-      const api = findSCORM2004API();
-      if (api) return new SCORM2004Adapter(api);
-      if (!allowFallback) throw missingApiError('scorm2004');
-      console.warn(
-        'Tessera (dev): SCORM 2004 API not found — falling back to localStorage'
-      );
-      return new WebAdapter(config);
-    }
-    case 'cmi5': {
-      if (hasCMI5LaunchParams()) return new CMI5Adapter();
-      if (!allowFallback) throw missingApiError('cmi5');
-      console.warn(
-        'Tessera (dev): cmi5 launch parameters not found — falling back to localStorage'
-      );
-      return new WebAdapter(config);
-    }
-    default:
-      return new WebAdapter(config);
+  const standard = config.export?.standard;
+  if (standard === 'scorm12' || standard === 'scorm2004' || standard === 'cmi5') {
+    const entry = LMS_ADAPTERS[standard];
+    const adapter = entry.detect();
+    if (adapter) return adapter;
+    if (!allowFallback) throw missingApiError(standard);
+    console.warn(
+      `Tessera (dev): ${entry.label} not found — falling back to localStorage`
+    );
   }
+  return new WebAdapter(config);
 }

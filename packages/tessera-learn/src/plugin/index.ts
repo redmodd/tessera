@@ -2,11 +2,10 @@ import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, unlinkSync, cpSync, mkdirSync } from 'node:fs';
-import { generateManifest, extractDefaultExportObjectLiteral } from './manifest.js';
-import JSON5 from 'json5';
+import { existsSync, readdirSync, statSync, writeFileSync, unlinkSync, cpSync, mkdirSync } from 'node:fs';
+import { generateManifest, readCourseConfig } from './manifest.js';
 import type { Manifest } from './manifest.js';
-import { validateProject } from './validation.js';
+import { validateProject, reportValidationIssues } from './validation.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
@@ -234,15 +233,9 @@ function tesseraConfigPlugin(): Plugin {
     load(id) {
       if (id === RESOLVED_CONFIG_ID) {
         const configPath = resolve(projectRoot, 'course.config.js');
-        let userConfig: Record<string, any> = {};
-
-        if (existsSync(configPath)) {
-          this.addWatchFile(configPath);
-          const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
-          if (objectStr) {
-            try { userConfig = JSON5.parse(objectStr); } catch {}
-          }
-        }
+        if (existsSync(configPath)) this.addWatchFile(configPath);
+        const read = readCourseConfig(projectRoot);
+        const userConfig: Record<string, any> = read.ok ? read.config : {};
 
         const { completion, passingScore } = completionDefaults(userConfig.completion?.mode);
         const merged = {
@@ -334,18 +327,11 @@ function tesseraValidationPlugin(): Plugin {
 }
 
 function runValidation(projectRoot: string): void {
-  const { errors, warnings } = validateProject(projectRoot);
-
-  for (const warning of warnings) {
-    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
-  }
-
-  if (errors.length > 0) {
-    for (const error of errors) {
-      console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
-    }
+  const result = validateProject(projectRoot);
+  reportValidationIssues(result);
+  if (result.errors.length > 0) {
     throw new Error(
-      `Tessera validation failed with ${errors.length} error(s). Fix the errors above to continue.`
+      `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`
     );
   }
 }
@@ -368,33 +354,27 @@ function tesseraExportPlugin(): Plugin {
     async closeBundle() {
       if (!isBuild) return;
 
-      const configPath = resolve(projectRoot, 'course.config.js');
-      if (!existsSync(configPath)) {
-        // Validation already required course.config.js — getting here means
-        // the file vanished mid-build. Surface that loudly rather than
-        // shipping a bundle with no LMS export silently.
+      const read = readCourseConfig(projectRoot);
+      if (!read.ok) {
+        // Validation already required a parseable course.config.js — getting
+        // here means it vanished or broke mid-build. Surface that loudly
+        // rather than shipping a bundle with no LMS export silently.
+        if (read.reason === 'missing') {
+          throw new Error(
+            '[tessera:export] course.config.js not found at closeBundle. The file must exist for the export step to run.'
+          );
+        }
+        if (read.reason === 'no-export') {
+          throw new Error(
+            '[tessera:export] course.config.js: could not locate `export default { ... }`. Cannot determine export.standard.'
+          );
+        }
         throw new Error(
-          '[tessera:export] course.config.js not found at closeBundle. The file must exist for the export step to run.'
+          `[tessera:export] course.config.js: failed to parse export-default object literal — ${(read.error as Error).message}`
         );
       }
 
-      const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
-      if (!objectStr) {
-        throw new Error(
-          '[tessera:export] course.config.js: could not locate `export default { ... }`. Cannot determine export.standard.'
-        );
-      }
-
-      let config: any;
-      try {
-        config = JSON5.parse(objectStr);
-      } catch (err) {
-        throw new Error(
-          `[tessera:export] course.config.js: failed to parse export-default object literal — ${(err as Error).message}`
-        );
-      }
-
-      await runExport(projectRoot, config);
+      await runExport(projectRoot, read.config as Parameters<typeof runExport>[1]);
     },
   };
 }
@@ -518,15 +498,9 @@ function tesseraAdapterPlugin(): Plugin {
       }
 
       let standard = 'web';
-      const configPath = resolve(projectRoot, 'course.config.js');
-      if (existsSync(configPath)) {
-        const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
-        if (objectStr) {
-          try {
-            const parsed = JSON5.parse(objectStr);
-            if (typeof parsed?.export?.standard === 'string') standard = parsed.export.standard;
-          } catch {}
-        }
+      const read = readCourseConfig(projectRoot);
+      if (read.ok && typeof read.config.export?.standard === 'string') {
+        standard = read.config.export.standard;
       }
 
       switch (standard) {
@@ -604,16 +578,10 @@ function tesseraXAPISetupPlugin(): Plugin {
 
       let standard = 'web';
       let hasXapi = false;
-      const configPath = resolve(projectRoot, 'course.config.js');
-      if (existsSync(configPath)) {
-        const objectStr = extractDefaultExportObjectLiteral(readFileSync(configPath, 'utf-8'));
-        if (objectStr) {
-          try {
-            const parsed = JSON5.parse(objectStr);
-            if (typeof parsed?.export?.standard === 'string') standard = parsed.export.standard;
-            hasXapi = parsed?.xapi != null;
-          } catch {}
-        }
+      const read = readCourseConfig(projectRoot);
+      if (read.ok) {
+        if (typeof read.config.export?.standard === 'string') standard = read.config.export.standard;
+        hasXapi = read.config.xapi != null;
       }
 
       // cmi5 needs the publisher regardless of explicit xapi config (cmi5

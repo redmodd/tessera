@@ -9,7 +9,6 @@
   import { resolveAsset } from './util.js';
 
   let { src, title = '' } = $props();
-
   let resolvedSrc = $derived(resolveAsset(src));
 </script>
 
