@@ -58,9 +58,8 @@
 
   function getOptionClass(optIndex) {
     if (!q.feedbackVisible) return '';
-    const answer = inQuiz ? q.answer : selectedOption;
     if (isCorrectOption(optIndex)) return 'correct';
-    if (optIndex === answer && !isCorrectOption(optIndex)) return 'incorrect';
+    if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
     return '';
   }
 </script>
