@@ -306,6 +306,7 @@
 
   // ---- Persistence: report score/completion/success to adapter ----
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
+  let prevReportedScore = $state(null);
   $effect(() => {
     void progress.version;
     if (!persistenceReady) return;
@@ -313,8 +314,12 @@
     const { average, attempted } = progress.gradedScore();
     if (!attempted) return;
 
+    const rounded = Math.round(average);
+    if (rounded === prevReportedScore) return;
+    prevReportedScore = rounded;
+
     untrack(() => {
-      adapter.setScore(Math.round(average));
+      adapter.setScore(rounded);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
         adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
