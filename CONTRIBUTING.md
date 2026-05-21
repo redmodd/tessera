@@ -26,16 +26,16 @@ See [TESTING.md](./TESTING.md) for the test layout, single-file runs, the varian
 ```
 packages/
   tessera-learn/     # Framework runtime + Vite plugin
-  create-tessera/    # Scaffolder
+  create-tessera/    # Scaffolder (owns the course authoring guide)
 tests/
   e2e/               # Playwright specs
   fixtures/          # Course projects used by e2e (committed)
-AGENTS.md            # Course authoring guide
+AGENTS.md            # Monorepo dev guide (working on Tessera itself)
 ```
 
-## Editing AGENTS.md
+## Editing the authoring guide
 
-Edit `AGENTS.md` at the repo root **only**. The `pnpm build` step (`scripts/sync-agents-md.mjs`) copies it into `packages/create-tessera/` so it ships with the scaffolder and lands in every scaffolded project. `pnpm sync:agents:check` (run by `pnpm test`) fails CI if the package copy has drifted from the root.
+The course authoring guide lives at `packages/create-tessera/AGENTS.md`. Edit it there — it's published with the scaffolder (via the package `files` field) and copied into every scaffolded project by `packages/create-tessera/src/index.ts` (and overwritten by `create-tessera upgrade`). The repo-root `AGENTS.md` is a separate document: the monorepo dev guide for working on Tessera itself.
 
 ## Branch + commit style
 
