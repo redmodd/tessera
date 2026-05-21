@@ -48,13 +48,11 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 /**
  * Per §4.2.1.5, the SCO MUST NOT alter the learner record in `browse` or
  * `review` mode — every write below is gated on `#mode === 'normal'`.
- * `#masteryScore` (§4.2.4.3) and `#completionThreshold` (§4.2.4.4) are
- * LMS-supplied thresholds in [0,1].
+ * `#masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
   #masteryScore: number | null = null;
-  #completionThreshold: number | null = null;
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);
@@ -64,9 +62,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     await super.init();
     this.#mode = this.#readMode();
     this.#masteryScore = this.#readScaledThreshold('cmi.scaled_passing_score');
-    this.#completionThreshold = this.#readScaledThreshold(
-      'cmi.completion_threshold'
-    );
   }
 
   getLaunchMode(): SCORM2004Mode {
@@ -76,10 +71,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   /** Read by App.svelte to override `course.config.js scoring.passingScore`. */
   getMasteryScore(): number | null {
     return this.#masteryScore;
-  }
-
-  getCompletionThreshold(): number | null {
-    return this.#completionThreshold;
   }
 
   get #canWrite(): boolean {

@@ -3,17 +3,33 @@ import { resolve, relative } from 'node:path';
 import JSON5 from 'json5';
 import {
   extractDefaultExportObjectLiteral,
+  extractObjectLiteral,
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
+  readCourseConfig,
 } from './manifest.js';
-import { validateAgent } from '../runtime/xapi/agent-rules.js';
+import {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from '../runtime/xapi/agent-rules.js';
 
 // ---------- Types ----------
 
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
+}
+
+/** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
+export function reportValidationIssues({ errors, warnings }: ValidationResult): void {
+  for (const warning of warnings) {
+    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
+  }
+  for (const error of errors) {
+    console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
+  }
 }
 
 // Known top-level config fields
@@ -55,7 +71,7 @@ export function validateProject(projectRoot: string): ValidationResult {
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(configPath, errors, warnings);
+  const config = parseConfig(projectRoot, errors, warnings);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -97,27 +113,25 @@ interface ParsedConfig {
 }
 
 function parseConfig(
-  configPath: string,
+  projectRoot: string,
   errors: string[],
   warnings: string[]
 ): ParsedConfig | null {
-  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(configPath));
-  if (!objectStr) {
-    errors.push(
-      'course.config.js: could not parse — must use `export default { ... }` syntax'
-    );
+  const read = readCourseConfig(projectRoot);
+  if (!read.ok) {
+    // 'missing' can't occur — validateProject checks existsSync first.
+    if (read.reason === 'no-export') {
+      errors.push(
+        'course.config.js: could not parse — must use `export default { ... }` syntax'
+      );
+    } else if (read.reason === 'parse-error') {
+      errors.push(
+        'course.config.js: syntax error — must export a static object literal'
+      );
+    }
     return null;
   }
-
-  let config: ParsedConfig;
-  try {
-    config = JSON5.parse(objectStr);
-  } catch {
-    errors.push(
-      'course.config.js: syntax error — must export a static object literal'
-    );
-    return null;
-  }
+  const config = read.config as ParsedConfig;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
@@ -360,16 +374,9 @@ function validateSingleXAPIEntry(
   if (auth === undefined) {
     errors.push(`course.config.js: ${label}.auth is required`);
   } else if (typeof auth === 'string') {
-    if (!auth) {
-      errors.push(`course.config.js: ${label}.auth must be a non-empty string`);
-    } else if (/^basic\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.`
-      );
-    } else if (/^bearer\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth: Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.`
-      );
+    const authErr = validateAuthCredential(auth);
+    if (authErr) {
+      errors.push(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
     } else {
       warnings.push(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
@@ -411,10 +418,7 @@ function validateSingleXAPIEntry(
   } else if (typeof actor === 'object' && actor !== null) {
     const err = validateAgent(actor);
     if (err) {
-      const joined = err.startsWith('.')
-        ? `${label}.actor${err}`
-        : `${label}.actor ${err}`;
-      errors.push(`course.config.js: ${joined}`);
+      errors.push(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
     }
   } else if (typeof actor !== 'function') {
     errors.push(
@@ -834,39 +838,6 @@ type PropValue =
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
-/** Extract a balanced {...} or [...] span starting at startIndex, or null. */
-function extractBalanced(source: string, startIndex: number): string | null {
-  const open = source[startIndex];
-  if (open !== '{' && open !== '[') return null;
-  let depth = 0;
-  let inString: string | null = null;
-  let escaped = false;
-  for (let i = startIndex; i < source.length; i++) {
-    const char = source[i];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === '\\' && inString) {
-      escaped = true;
-      continue;
-    }
-    if (inString) {
-      if (char === inString) inString = null;
-      continue;
-    }
-    if (char === '"' || char === "'" || char === '`') {
-      inString = char;
-      continue;
-    }
-    if (char === '{' || char === '[') depth++;
-    if (char === '}' || char === ']') {
-      depth--;
-      if (depth === 0) return source.slice(startIndex, i + 1);
-    }
-  }
-  return null;
-}
 
 /**
  * Parse the props of an opening tag starting just after the component name.
@@ -884,7 +855,7 @@ function parseTagProps(content: string, start: number): Map<string, PropValue> |
     if (c === '/' && content[i + 1] === '>') return props;
     // Spread / shorthand expression — skip the whole {...} block.
     if (c === '{') {
-      const block = extractBalanced(content, i);
+      const block = extractObjectLiteral(content, i);
       if (!block) return null;
       i += block.length;
       continue;
@@ -907,7 +878,7 @@ function parseTagProps(content: string, start: number): Map<string, PropValue> |
       props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
       i = end + 1;
     } else if (v === '{') {
-      const block = extractBalanced(content, i);
+      const block = extractObjectLiteral(content, i);
       if (!block) return null;
       props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
       i += block.length;

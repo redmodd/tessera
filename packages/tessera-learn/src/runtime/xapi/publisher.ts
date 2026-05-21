@@ -12,6 +12,7 @@ import {
   validatePartialStatement,
   validateAgent,
   validateAuthCredential,
+  joinFieldError,
   XAPIConfigError,
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
@@ -19,16 +20,6 @@ import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 /** cmi5 §9.6.2 — well-known IRI owned by ADL for the cmi5 session id extension. */
 const CMI5_SESSIONID_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
-
-/**
- * Combine a field label (e.g. `xapi.actor`) with the prefix-friendly suffix
- * returned by `validateAgent`. Sub-field suffixes start with `.` and chain
- * directly (`xapi.actor.mbox …`); top-level messages get a `: ` separator
- * (`xapi.actor: must be an object`).
- */
-function joinFieldError(label: string, suffix: string): string {
-  return suffix.startsWith('.') ? `${label}${suffix}` : `${label}: ${suffix}`;
-}
 
 export interface XAPIPublisherOptions {
   /** Resolved http(s) endpoint URL. The 'lms' sentinel is a config-layer concept and never reaches the publisher. */

@@ -1,5 +1,5 @@
 import type { PartialStatement } from './types.js';
-export { validateAgent, validateAuthCredential } from './agent-rules.js';
+export { validateAgent, validateAuthCredential, joinFieldError } from './agent-rules.js';
 
 /** Thrown for runtime-validation failures (auth/actor resolver misuse). */
 export class XAPIConfigError extends Error {

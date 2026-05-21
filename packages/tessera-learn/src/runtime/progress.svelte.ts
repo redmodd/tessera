@@ -164,6 +164,15 @@ export class ProgressState {
   }
 
   /**
+   * Effective graded score for LMS reporting — same union and averaging as
+   * recalculateSuccess, so score and success status can't disagree.
+   */
+  gradedScore(): { average: number; attempted: boolean } {
+    const { indices, attempted } = this.#gradedPages();
+    return { average: this.#gradedAverage(indices), attempted };
+  }
+
+  /**
    * Union of pages that contribute to graded scoring: pageConfig graded quizzes
    * plus pages with at least one graded standalone question (deduped).
    * `attempted` is true if any of those pages has a recorded score.

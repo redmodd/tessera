@@ -58,62 +58,65 @@
 
   function getOptionClass(optIndex) {
     if (!q.feedbackVisible) return '';
-    const answer = inQuiz ? q.answer : selectedOption;
     if (isCorrectOption(optIndex)) return 'correct';
-    if (optIndex === answer && !isCorrectOption(optIndex)) return 'incorrect';
+    if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
     return '';
   }
 </script>
 
+{#snippet mcContent()}
+  <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
+
+  <div class="tessera-mc-options">
+    {#each options as option, i}
+      {@const optionId = `${groupId}-opt-${i}`}
+      {@const isSelected = selectedOption === i}
+      {@const stateClass = getOptionClass(i)}
+      <label
+        class="tessera-mc-option {stateClass}"
+        class:selected={isSelected}
+        for={optionId}
+      >
+        <input
+          type="radio"
+          id={optionId}
+          name={groupId}
+          value={i}
+          checked={isSelected}
+          disabled={q.locked}
+          onchange={() => handleSelect(i)}
+        />
+        <span class="tessera-mc-radio-custom"></span>
+        <span class="tessera-mc-option-text">{option}</span>
+
+        {#if q.feedbackVisible}
+          {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
+            <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
+          {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
+            <span class="tessera-mc-feedback incorrect">{optionFeedback[i] || incorrectFeedback}</span>
+          {:else if optionFeedback[i]}
+            <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
+          {/if}
+        {/if}
+      </label>
+    {/each}
+  </div>
+
+  {#if q.feedbackVisible}
+    {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
+      <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
+    {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
+      <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
+    {/if}
+    {#if !inQuiz && q.canRetry}
+      <RetryButton onclick={() => q.retry()} />
+    {/if}
+  {/if}
+{/snippet}
+
 {#if !inQuiz}
   <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
-    <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
-
-    <div class="tessera-mc-options">
-      {#each options as option, i}
-        {@const optionId = `${groupId}-opt-${i}`}
-        {@const isSelected = selectedOption === i}
-        {@const stateClass = getOptionClass(i)}
-        <label
-          class="tessera-mc-option {stateClass}"
-          class:selected={isSelected}
-          for={optionId}
-        >
-          <input
-            type="radio"
-            id={optionId}
-            name={groupId}
-            value={i}
-            checked={isSelected}
-            disabled={q.submitted}
-            onchange={() => handleSelect(i)}
-          />
-          <span class="tessera-mc-radio-custom"></span>
-          <span class="tessera-mc-option-text">{option}</span>
-
-          {#if q.submitted}
-            {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
-              <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
-            {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
-              <span class="tessera-mc-feedback incorrect">{optionFeedback[i] || incorrectFeedback}</span>
-            {:else if optionFeedback[i]}
-              <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
-            {/if}
-          {/if}
-        </label>
-      {/each}
-    </div>
-
-    {#if q.submitted}
-      {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
-        <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-      {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
-        <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
-      {/if}
-      {#if q.canRetry}
-        <RetryButton onclick={() => q.retry()} />
-      {/if}
-    {/if}
+    {@render mcContent()}
   </div>
 {/if}
 
@@ -122,51 +125,7 @@
     {#if q.isLockedCorrect}
       <LockedBanner />
     {/if}
-    <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
-
-    <div class="tessera-mc-options">
-      {#each options as option, i}
-        {@const optionId = `${groupId}-opt-${i}`}
-        {@const isSelected = (q.locked ? q.answer : selectedOption) === i}
-        {@const stateClass = getOptionClass(i)}
-        <label
-          class="tessera-mc-option {stateClass}"
-          class:selected={isSelected}
-          for={optionId}
-        >
-          <input
-            type="radio"
-            id={optionId}
-            name={groupId}
-            value={i}
-            checked={isSelected}
-            disabled={q.locked}
-            onchange={() => handleSelect(i)}
-          />
-          <span class="tessera-mc-radio-custom"></span>
-          <span class="tessera-mc-option-text">{option}</span>
-
-          {#if q.feedbackVisible}
-            {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
-              <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
-            {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
-              <span class="tessera-mc-feedback incorrect">{optionFeedback[i] || incorrectFeedback}</span>
-            {:else if optionFeedback[i]}
-              <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
-            {/if}
-          {/if}
-        </label>
-      {/each}
-    </div>
-
-    {#if q.feedbackVisible}
-      {@const answer = q.answer}
-      {#if answer === correct && correctFeedback && !optionFeedback[answer]}
-        <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-      {:else if answer !== correct && incorrectFeedback && !optionFeedback[answer]}
-        <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
-      {/if}
-    {/if}
+    {@render mcContent()}
   </div>
 {/snippet}
 
