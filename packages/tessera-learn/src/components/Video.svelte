@@ -4,7 +4,7 @@
    * Embeds YouTube/Vimeo via iframe or local video files.
    * Lazy-loads via IntersectionObserver.
    *
-   * @prop {string} src - Video URL (YouTube, Vimeo, or direct video file)
+   * @prop {string} src - Video URL (YouTube, Vimeo, direct video file, or $assets/ path)
    * @prop {string} [title] - Accessible label for the video
    */
   import { onMount } from 'svelte';

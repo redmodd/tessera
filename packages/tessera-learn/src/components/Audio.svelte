@@ -3,7 +3,7 @@
    * @component Audio
    * Native audio player with optional title label.
    *
-   * @prop {string} src - Audio file URL
+   * @prop {string} src - Audio file URL (supports $assets/ paths)
    * @prop {string} [title] - Label displayed above the player
    */
   import { resolveAsset } from './util.js';
