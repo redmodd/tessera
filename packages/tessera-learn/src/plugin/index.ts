@@ -206,6 +206,9 @@ function tesseraConfigPlugin(): Plugin {
 
       return {
         base: './',
+        build: {
+          assetsDir: 'tessera',
+        },
         resolve: {
           alias: {
             '$assets': resolve(root, 'assets'),
