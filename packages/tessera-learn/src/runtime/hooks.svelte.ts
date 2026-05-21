@@ -12,7 +12,6 @@ import {
 import {
   resolveFeedbackMode,
   resolveRetryStrategy,
-  type QuizPolicyConfig,
   type QuizQuestionResult,
 } from './quiz-policy.js';
 
@@ -411,9 +410,8 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   }
 
   const maxAttempts = quizConfig.maxAttempts ?? Infinity;
-  const policyCfg = quizConfig as QuizPolicyConfig;
-  const feedbackPredicate = resolveFeedbackMode(policyCfg);
-  const retryPredicate = resolveRetryStrategy(policyCfg);
+  const feedbackPredicate = resolveFeedbackMode(quizConfig);
+  const retryPredicate = resolveRetryStrategy(quizConfig);
 
   let internalQuestions = $state<InternalQuestion[]>([]);
   const answers = new Map<number, unknown>();
@@ -478,7 +476,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   }
 
   function feedbackVisibleInternal(index: number): boolean {
-    if (policyCfg.feedbackMode === 'never') return false;
+    if (quizConfig.feedbackMode === 'never') return false;
     return feedbackPredicate({
       questionIndex: index,
       submitted,
@@ -490,7 +488,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   }
 
   function revealFeedbackInternal(index: number): void {
-    if (policyCfg.feedbackMode === 'never') return;
+    if (quizConfig.feedbackMode === 'never') return;
     feedbackShown.add(index);
   }
 

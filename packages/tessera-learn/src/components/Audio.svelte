@@ -3,10 +3,13 @@
    * @component Audio
    * Native audio player with optional title label.
    *
-   * @prop {string} src - Audio file URL
+   * @prop {string} src - Audio file URL (supports $assets/ paths)
    * @prop {string} [title] - Label displayed above the player
    */
+  import { resolveAsset } from './util.js';
+
   let { src, title = '' } = $props();
+  let resolvedSrc = $derived(resolveAsset(src));
 </script>
 
 <div class="tessera-audio">
@@ -14,7 +17,7 @@
     <div class="tessera-audio-title">{title}</div>
   {/if}
   <audio controls preload="metadata" aria-label={title || 'Audio player'} class="tessera-audio-player">
-    <source {src} />
+    <source src={resolvedSrc} />
     Your browser does not support the audio element.
   </audio>
 </div>

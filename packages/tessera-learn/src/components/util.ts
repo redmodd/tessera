@@ -7,6 +7,7 @@
  * same alias semantics.
  */
 export function resolveAsset(src: string): string {
+  if (!src) return src;
   return src.startsWith('$assets/') ? src.replace('$assets/', './assets/') : src;
 }
 

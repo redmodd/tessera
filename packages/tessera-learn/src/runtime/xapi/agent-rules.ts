@@ -7,6 +7,11 @@
  * Keeping the rules in one place prevents the two callsites from drifting.
  */
 
+/** Join a field label with a validator suffix: `.foo` chains, others get `: `. */
+export function joinFieldError(label: string, suffix: string): string {
+  return suffix.startsWith('.') ? `${label}${suffix}` : `${label}: ${suffix}`;
+}
+
 /**
  * Validate that a candidate is an Identified Agent per xAPI 1.0.3.
  * Returns null on success or a human-readable error suffix on failure.
@@ -81,10 +86,10 @@ export function validateAgent(actor: unknown): string | null {
  */
 export function validateAuthCredential(auth: string): string | null {
   if (typeof auth !== 'string' || !auth) {
-    return 'auth must be a non-empty string';
+    return 'must be a non-empty string';
   }
   if (/^basic\s/i.test(auth)) {
-    return "auth must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
+    return "must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
   }
   if (/^bearer\s/i.test(auth)) {
     return 'Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.';

@@ -344,6 +344,57 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('gradedScore — LMS-reported score', () => {
+    it('is unattempted when nothing graded is recorded', () => {
+      const manifest = createManifest(5, { 1: { graded: true } });
+      const progress = new ProgressState(gradedQuizIndices(manifest));
+
+      expect(progress.gradedScore().attempted).toBe(false);
+    });
+
+    it('includes graded standalone questions', () => {
+      const manifest = createManifest(5);
+      const progress = new ProgressState(gradedQuizIndices(manifest));
+
+      progress.markStandaloneQuestion(2, 'q1', 80, true);
+
+      expect(progress.gradedScore()).toEqual({ average: 80, attempted: true });
+    });
+
+    it('excludes non-graded standalone questions', () => {
+      const manifest = createManifest(5);
+      const progress = new ProgressState(gradedQuizIndices(manifest));
+
+      progress.markStandaloneQuestion(2, 'q1', 100, false);
+
+      expect(progress.gradedScore().attempted).toBe(false);
+    });
+
+    it('averages quizzes and graded standalone pages together', () => {
+      const manifest = createManifest(5, { 1: { graded: true } });
+      const progress = new ProgressState(gradedQuizIndices(manifest));
+
+      progress.quizCompleted(1, 100);
+      progress.markStandaloneQuestion(3, 'q1', 60, true);
+
+      // (100 + 60) / 2 = 80
+      expect(progress.gradedScore().average).toBe(80);
+    });
+
+    it('matches the average recalculateSuccess uses', () => {
+      const manifest = createManifest(5, { 1: { graded: true } });
+      const config = createConfig({ scoring: { passingScore: 80 } });
+      const progress = new ProgressState(gradedQuizIndices(manifest));
+
+      progress.quizCompleted(1, 90);
+      progress.markStandaloneQuestion(3, 'q1', 70, true);
+
+      const { average } = progress.gradedScore();
+      progress.recalculateSuccess(config);
+      expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
+    });
+  });
+
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {
     it('graded standalone pages count toward completion in quiz mode', () => {
       const manifest = createManifest(5);

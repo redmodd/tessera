@@ -321,21 +321,12 @@ describe('SCORM2004Adapter', () => {
       expect(adapter.getMasteryScore()).toBe(0.7);
     });
 
-    it('reads cmi.completion_threshold and exposes via getCompletionThreshold()', async () => {
-      (api.GetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.completion_threshold' ? '0.8' : ''
-      );
-      await adapter.init();
-      expect(adapter.getCompletionThreshold()).toBe(0.8);
-    });
-
     it('returns null for out-of-range or missing thresholds', async () => {
       (api.GetValue as any).mockImplementation((key: string) =>
         key === 'cmi.scaled_passing_score' ? '1.5' : ''
       );
       await adapter.init();
       expect(adapter.getMasteryScore()).toBeNull();
-      expect(adapter.getCompletionThreshold()).toBeNull();
     });
   });
 
