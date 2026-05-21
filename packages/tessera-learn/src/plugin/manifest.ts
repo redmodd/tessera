@@ -105,6 +105,29 @@ export function extractDefaultExportObjectLiteral(source: string): string | null
   return extractObjectLiteral(source, startIndex);
 }
 
+export type CourseConfigRead =
+  | { ok: true; config: Record<string, any> }
+  | { ok: false; reason: 'missing' | 'no-export' | 'parse-error'; error?: unknown };
+
+/**
+ * Read and JSON5-parse the `export default { ... }` literal from a project's
+ * course.config.js. Shared by the build plugin and the validator so the read,
+ * cache, and parse rules live in one place. The discriminated `reason` lets
+ * callers that care (export, validation) emit precise errors while callers
+ * that just need a value can fall back on `!ok`.
+ */
+export function readCourseConfig(projectRoot: string): CourseConfigRead {
+  const configPath = resolve(projectRoot, 'course.config.js');
+  if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
+  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(configPath));
+  if (!objectStr) return { ok: false, reason: 'no-export' };
+  try {
+    return { ok: true, config: JSON5.parse(objectStr) };
+  } catch (error) {
+    return { ok: false, reason: 'parse-error', error };
+  }
+}
+
 /**
  * Read a _meta.js file and extract its default export object.
  * Uses the same JSON5 approach as pageConfig extraction — find the object literal
