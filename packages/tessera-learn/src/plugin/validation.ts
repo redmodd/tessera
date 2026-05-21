@@ -8,7 +8,11 @@ import {
   ensureSvelteSuffix,
   readCourseConfig,
 } from './manifest.js';
-import { validateAgent } from '../runtime/xapi/agent-rules.js';
+import {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from '../runtime/xapi/agent-rules.js';
 
 // ---------- Types ----------
 
@@ -359,16 +363,9 @@ function validateSingleXAPIEntry(
   if (auth === undefined) {
     errors.push(`course.config.js: ${label}.auth is required`);
   } else if (typeof auth === 'string') {
-    if (!auth) {
-      errors.push(`course.config.js: ${label}.auth must be a non-empty string`);
-    } else if (/^basic\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.`
-      );
-    } else if (/^bearer\s/i.test(auth)) {
-      errors.push(
-        `course.config.js: ${label}.auth: Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.`
-      );
+    const authErr = validateAuthCredential(auth);
+    if (authErr) {
+      errors.push(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
     } else {
       warnings.push(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
@@ -410,10 +407,7 @@ function validateSingleXAPIEntry(
   } else if (typeof actor === 'object' && actor !== null) {
     const err = validateAgent(actor);
     if (err) {
-      const joined = err.startsWith('.')
-        ? `${label}.actor${err}`
-        : `${label}.actor ${err}`;
-      errors.push(`course.config.js: ${joined}`);
+      errors.push(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
     }
   } else if (typeof actor !== 'function') {
     errors.push(
