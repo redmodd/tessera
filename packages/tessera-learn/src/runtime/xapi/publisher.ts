@@ -13,7 +13,6 @@ import {
   validateAgent,
   validateAuthCredential,
   XAPIConfigError,
-  XAPIStatementError,
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 

@@ -4,7 +4,7 @@ import {
 } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
-import { formatHHMMSS, formatReal107 } from './retry.js';
+import { formatHHMMSS, formatReal107 } from './format.js';
 
 /**
  * SCORM 1.2 API interface.

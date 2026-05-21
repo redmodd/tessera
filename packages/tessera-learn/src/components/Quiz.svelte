@@ -1,13 +1,14 @@
 <script>
   import { getContext } from 'svelte';
   import { useQuiz } from '../runtime/hooks.svelte.js';
+  import { TESSERA_PAGE } from '../runtime/contexts.js';
 
   let { children } = $props();
   let quizElement = $state(null);
 
   const handle = useQuiz({ element: () => quizElement });
 
-  const pageCtx = getContext('tessera-page');
+  const pageCtx = getContext(TESSERA_PAGE);
   let quizConfig = $derived(pageCtx?.quiz ?? {});
   let feedbackDisabled = $derived(quizConfig.feedbackMode === 'never');
   let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);

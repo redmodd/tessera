@@ -5,7 +5,7 @@ import {
   formatCorrectPattern,
   XAPI_INTERACTION_FORMAT,
 } from '../interaction-format.js';
-import { formatISO8601Duration } from './retry.js';
+import { formatISO8601Duration } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import type { XAPIAgent } from '../xapi/types.js';
