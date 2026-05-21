@@ -581,24 +581,6 @@ describe('CMI5Adapter', () => {
       warn.mockRestore();
     });
 
-    it('parses moveOn and defaults to NotApplicable', async () => {
-      setSearchParams({ ...baseLaunchParams, moveOn: 'CompletedAndPassed' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getMoveOn()).toBe('CompletedAndPassed');
-    });
-
-    it('falls back to NotApplicable for unrecognized moveOn value', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setSearchParams({ ...baseLaunchParams, moveOn: 'WhateverElse' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getMoveOn()).toBe('NotApplicable');
-      warn.mockRestore();
-    });
-
     it('does NOT attach masteryscore extension to Completed (§9.6.3.2 scopes it to Passed/Failed)', async () => {
       setSearchParams({ ...baseLaunchParams, masteryScore: '0.7' });
       setupInitMocks();
@@ -947,17 +929,11 @@ describe('CMI5Adapter', () => {
         .find((b: any) => b?.verb?.id === verbId);
     }
 
-    it('exposes launchMode / returnURL / launchParameters from LaunchData via getters', async () => {
-      setupInitMocks(undefined, {
-        launchMode: 'Review',
-        returnURL: 'https://lms.example.com/learner/done',
-        launchParameters: 'foo=bar&baz=qux',
-      });
+    it('exposes launchMode from LaunchData via getter', async () => {
+      setupInitMocks(undefined, { launchMode: 'Review' });
       adapter = new CMI5Adapter();
       await adapter.init();
       expect(adapter.getLaunchMode()).toBe('Review');
-      expect(adapter.getReturnURL()).toBe('https://lms.example.com/learner/done');
-      expect(adapter.getLaunchParameters()).toBe('foo=bar&baz=qux');
     });
 
     it('defaults launchMode to Normal when LaunchData is absent', async () => {
@@ -965,7 +941,6 @@ describe('CMI5Adapter', () => {
       adapter = new CMI5Adapter();
       await adapter.init();
       expect(adapter.getLaunchMode()).toBe('Normal');
-      expect(adapter.getReturnURL()).toBeUndefined();
     });
 
     it('rejects invalid launchMode values and falls back to Normal', async () => {
@@ -1022,19 +997,6 @@ describe('CMI5Adapter', () => {
       expect(findStatement('http://adlnet.gov/expapi/verbs/suspended')).toBeUndefined();
       // Terminated is always allowed.
       expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
-    });
-
-    it('exposes learner preferences from the Agent Profile (§11)', async () => {
-      setupInitMocks(undefined, null, {
-        languagePreference: 'fr-CA',
-        audioPreference: 'off',
-      });
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getLearnerPreferences()).toEqual({
-        languagePreference: 'fr-CA',
-        audioPreference: 'off',
-      });
     });
 
     it('fetches Learner Preferences BEFORE sending Initialized (§11)', async () => {

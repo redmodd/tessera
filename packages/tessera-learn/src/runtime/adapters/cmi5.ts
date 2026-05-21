@@ -41,21 +41,6 @@ const CMI5_CATEGORY_CMI5 =
 const CMI5_CATEGORY_MOVEON =
   'https://w3id.org/xapi/cmi5/context/categories/moveon';
 
-export type CMI5MoveOn =
-  | 'Passed'
-  | 'Completed'
-  | 'CompletedAndPassed'
-  | 'CompletedOrPassed'
-  | 'NotApplicable';
-
-const VALID_MOVE_ON: ReadonlySet<CMI5MoveOn> = new Set([
-  'Passed',
-  'Completed',
-  'CompletedAndPassed',
-  'CompletedOrPassed',
-  'NotApplicable',
-]);
-
 /** cmi5 §10.2.2 — launch mode dictates which Defined Statements the AU may emit. */
 export type CMI5LaunchMode = 'Normal' | 'Browse' | 'Review';
 const VALID_LAUNCH_MODE: ReadonlySet<CMI5LaunchMode> = new Set([
@@ -90,7 +75,6 @@ interface CMI5LaunchData {
   launchParameters?: string;
   returnURL?: string;
   masteryScore?: number;
-  moveOn?: CMI5MoveOn;
   entitlementKey?: Record<string, string>;
   [k: string]: unknown;
 }
@@ -148,10 +132,8 @@ export class CMI5Adapter implements PersistenceAdapter {
   #terminated = false;
 
   // cmi5 §8 launch params. masteryScore (when present) overrides the
-  // course's manifest passingScore for this launch — the LMS is the
-  // authority. moveOn drives the optional Satisfied statement (§9.5.3).
+  // course's manifest passingScore for this launch — the LMS is the authority.
   #masteryScore: number | null = null;
-  #moveOn: CMI5MoveOn = 'NotApplicable';
 
   // cmi5 §10 LMS.LaunchData. `contextTemplate` is the AU's base context
   // (§9.6.2) — Publisher Activity and session id live there, and strict
@@ -161,10 +143,6 @@ export class CMI5Adapter implements PersistenceAdapter {
   #launchMode: CMI5LaunchMode = 'Normal';
   /** cmi5 §10.2.6 — AU redirects here on `exit()`. */
   #returnURL: string | undefined;
-  /** cmi5 §10.2.3 — opaque per-launch content config string. */
-  #launchParameters: string | undefined;
-  /** cmi5 §11.1 Learner Preferences. */
-  #learnerPreferences: CMI5LearnerPreferences | null = null;
 
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
@@ -189,16 +167,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       }
     }
 
-    const rawMoveOn = params.get('moveOn');
-    if (rawMoveOn !== null && rawMoveOn !== '') {
-      if (VALID_MOVE_ON.has(rawMoveOn as CMI5MoveOn)) {
-        this.#moveOn = rawMoveOn as CMI5MoveOn;
-      } else {
-        console.warn(
-          `Tessera cmi5: launch parameter 'moveOn' is not a recognized value (got "${rawMoveOn}"); defaulting to NotApplicable.`
-        );
-      }
-    }
 
     // Malformed actor JSON is a launch-time failure: an empty {} actor
     // would fail every Identified-Agent check downstream and produce
@@ -303,9 +271,6 @@ export class CMI5Adapter implements PersistenceAdapter {
       ) {
         this.#returnURL = this.#launchData.returnURL;
       }
-      if (typeof this.#launchData.launchParameters === 'string') {
-        this.#launchParameters = this.#launchData.launchParameters;
-      }
       if (
         typeof this.#launchData.masteryScore === 'number' &&
         Number.isFinite(this.#launchData.masteryScore) &&
@@ -314,18 +279,12 @@ export class CMI5Adapter implements PersistenceAdapter {
       ) {
         this.#masteryScore = this.#launchData.masteryScore;
       }
-      if (
-        typeof this.#launchData.moveOn === 'string' &&
-        VALID_MOVE_ON.has(this.#launchData.moveOn)
-      ) {
-        this.#moveOn = this.#launchData.moveOn;
-      }
     }
 
     // cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict
     // LRSes track the GET and reject Initialized otherwise. A 404 here
     // is legitimate (no prefs set); the GET itself is what's required.
-    this.#learnerPreferences = await this.#fetchLearnerPreferences();
+    await this.#fetchLearnerPreferences();
 
     this.#publisher = new XAPIPublisher({
       endpoint: this.#endpoint,
@@ -391,29 +350,9 @@ export class CMI5Adapter implements PersistenceAdapter {
     return this.#masteryScore;
   }
 
-  /** LMS-supplied moveOn criterion (defaults to "NotApplicable"). */
-  getMoveOn(): CMI5MoveOn {
-    return this.#moveOn;
-  }
-
   /** cmi5 §10.2.2 — "Normal" is the only mode where progress-bearing Defined Statements are permitted. */
   getLaunchMode(): CMI5LaunchMode {
     return this.#launchMode;
-  }
-
-  /** cmi5 §10.2.6 — URL the AU navigates to on `exit()`. Returns undefined when the LMS didn't supply one. */
-  getReturnURL(): string | undefined {
-    return this.#returnURL;
-  }
-
-  /** cmi5 §10.2.3 — opaque per-launch content-config string. */
-  getLaunchParameters(): string | undefined {
-    return this.#launchParameters;
-  }
-
-  /** cmi5 §11.1 Learner Preferences. Null when the LMS didn't publish one. */
-  getLearnerPreferences(): CMI5LearnerPreferences | null {
-    return this.#learnerPreferences;
   }
 
   getState(): SavedState | null {
