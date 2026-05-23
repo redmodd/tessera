@@ -68,11 +68,12 @@ run('pnpm --filter create-tessera build', REPO_ROOT);
 run('pnpm --filter tessera-learn build', REPO_ROOT);
 
 const packDir = mkdtempSync(join(tmpdir(), 'tessera-pack-'));
-run(`pnpm --filter tessera-learn pack --pack-destination ${packDir}`, REPO_ROOT);
-const tarball = join(
-  packDir,
-  readdirSync(packDir).find((f) => /^tessera-learn-.*\.tgz$/.test(f))
-);
+run(`pnpm --filter tessera-learn pack --pack-destination "${packDir}"`, REPO_ROOT);
+const tgz = readdirSync(packDir).find((f) => /^tessera-learn-.*\.tgz$/.test(f));
+if (!tgz) {
+  throw new Error(`no tessera-learn tarball produced in ${packDir}`);
+}
+const tarball = join(packDir, tgz);
 console.log(`\nLocal tessera-learn tarball: ${tarball}`);
 
 for (const template of TEMPLATES) {
@@ -80,10 +81,10 @@ for (const template of TEMPLATES) {
   const name = `${template}-course`;
   const projectDir = join(work, name);
 
-  run(`node ${CLI} ${name} --template=${template}`, work);
+  run(`node "${CLI}" ${name} --template=${template}`, work);
   // Installs the tarball as tessera-learn (overriding the registry pin) plus the
   // registry devDeps in one shot.
-  run(`npm install ${tarball}`, projectDir);
+  run(`npm install "${tarball}"`, projectDir);
 
   for (const standard of STANDARDS) {
     setStandard(projectDir, standard);
