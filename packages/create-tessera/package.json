@@ -42,6 +42,7 @@
     "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:templates": "node scripts/e2e.mjs",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
