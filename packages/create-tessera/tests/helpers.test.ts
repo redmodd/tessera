@@ -1,5 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { parseArgs, validateProjectName, toTitleCase } from '../src/index.ts';
+import { describe, it, expect, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  parseArgs,
+  validateProjectName,
+  toTitleCase,
+  detectPackageManager,
+  FRAMEWORK_SCRIPTS,
+} from '../src/index.ts';
+
+const PKG_ROOT = resolve(__dirname, '..');
 
 describe('parseArgs', () => {
   it('returns help when --help is passed', () => {
@@ -78,5 +88,62 @@ describe('toTitleCase', () => {
 
   it('drops empty segments from runs of separators', () => {
     expect(toTitleCase('foo--bar')).toBe('Foo Bar');
+  });
+
+  it('titlecases validated names to characters safe to embed unescaped', () => {
+    const names = ['my-course', 'my_course', 'course.v2', 'a.b-c_d', '1course', 'x'];
+    for (const n of names) {
+      expect(validateProjectName(n)).toBeNull();
+      expect(toTitleCase(n)).toMatch(/^[A-Za-z0-9 ]*$/);
+    }
+  });
+});
+
+describe('detectPackageManager', () => {
+  const original = process.env.npm_config_user_agent;
+  afterEach(() => {
+    if (original === undefined) delete process.env.npm_config_user_agent;
+    else process.env.npm_config_user_agent = original;
+  });
+
+  function withUA(ua: string | undefined) {
+    if (ua === undefined) delete process.env.npm_config_user_agent;
+    else process.env.npm_config_user_agent = ua;
+    return detectPackageManager();
+  }
+
+  it('detects pnpm', () => {
+    expect(withUA('pnpm/9.0.0 npm/? node/v24.0.0')).toBe('pnpm');
+  });
+  it('detects yarn', () => {
+    expect(withUA('yarn/4.1.0 npm/? node/v24.0.0')).toBe('yarn');
+  });
+  it('detects bun', () => {
+    expect(withUA('bun/1.1.0 npm/? node/v24.0.0')).toBe('bun');
+  });
+  it('detects npm', () => {
+    expect(withUA('npm/10.5.0 node/v24.0.0')).toBe('npm');
+  });
+  it('falls back to npm when the user agent is empty or unset', () => {
+    expect(withUA('')).toBe('npm');
+    expect(withUA(undefined)).toBe('npm');
+  });
+});
+
+describe('template ⇄ code invariants', () => {
+  it('base/package.json scripts match FRAMEWORK_SCRIPTS', () => {
+    const pkg = JSON.parse(
+      readFileSync(resolve(PKG_ROOT, 'templates/base/package.json'), 'utf-8')
+    );
+    expect(pkg.scripts).toEqual(FRAMEWORK_SCRIPTS);
+  });
+
+  it('files upgrade reads verbatim are token-free', () => {
+    const TOKEN = /__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/;
+    for (const f of ['templates/base/vite.config.js']) {
+      expect(TOKEN.test(readFileSync(resolve(PKG_ROOT, f), 'utf-8'))).toBe(
+        false
+      );
+    }
   });
 });

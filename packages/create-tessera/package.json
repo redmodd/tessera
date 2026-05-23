@@ -30,6 +30,7 @@
   "tesseraVersion": "^0.0.11",
   "files": [
     "dist",
+    "templates",
     "AGENTS.md",
     "README.md",
     "LICENSE"

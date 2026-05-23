@@ -206,6 +206,31 @@ describe('create-tessera CLI', () => {
     expect(content).toContain('.DS_Store');
   });
 
+  it('renames dotfiles on copy (.gitignore / .gitkeep, never the underscore form)', () => {
+    runCLI('dotfile-course', testDir);
+    const projectDir = resolve(testDir, 'dotfile-course');
+    expect(existsSync(resolve(projectDir, '.gitignore'))).toBe(true);
+    expect(existsSync(resolve(projectDir, '_gitignore'))).toBe(false);
+    expect(existsSync(resolve(projectDir, 'assets/.gitkeep'))).toBe(true);
+    expect(existsSync(resolve(projectDir, 'assets/_gitkeep'))).toBe(false);
+  });
+
+  it('tailors the "Next steps" hint to npm_config_user_agent', () => {
+    const stdout = execSync(`node ${CLI_PATH} pnpm-course`, {
+      cwd: testDir,
+      encoding: 'utf-8',
+      timeout: 30000,
+      env: {
+        ...process.env,
+        npm_config_yes: 'true',
+        npm_config_user_agent: 'pnpm/9.0.0 npm/? node/v24.0.0',
+      },
+    });
+    expect(stdout).toContain('pnpm install');
+    expect(stdout).toContain('pnpm dev');
+    expect(stdout).not.toContain('npm run dev');
+  });
+
   it('errors on unknown --template value', () => {
     const { stderr, exitCode } = runCLI('my-course --template=fancy', testDir);
     expect(exitCode).toBe(1);
