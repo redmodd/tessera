@@ -23,9 +23,9 @@ function createTestDir(): string {
 const PKG_ROOT = resolve(__dirname, '..');
 const CLI_PATH = resolve(PKG_ROOT, 'dist', 'index.js');
 
-const TESSERA_VERSION: string = JSON.parse(
-  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')
-).tesseraVersion;
+const TESSERA_VERSION: string =
+  '^' +
+  JSON.parse(readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')).version;
 
 function runCLI(
   args: string,
