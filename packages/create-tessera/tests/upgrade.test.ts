@@ -23,9 +23,9 @@ function createTestDir(): string {
 const PKG_ROOT = resolve(__dirname, '..');
 const CLI_PATH = resolve(PKG_ROOT, 'dist', 'index.js');
 
-const TESSERA_VERSION: string =
-  '^' +
-  JSON.parse(readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')).version;
+const TESSERA_VERSION: string = JSON.parse(
+  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')
+).version;
 
 function runCLI(
   args: string,
@@ -47,7 +47,7 @@ function runCLI(
 
 interface SeedOptions {
   scripts?: Record<string, string>;
-  tesseraVersion?: string | null;
+  tesseraDep?: string | null;
   agentsMd?: string;
   viteConfig?: string;
 }
@@ -60,8 +60,8 @@ function seedProject(dir: string, opts: SeedOptions = {}) {
     scripts: opts.scripts ?? {},
     dependencies: {},
   };
-  if (opts.tesseraVersion !== null) {
-    pkg.dependencies['tessera-learn'] = opts.tesseraVersion ?? '^0.0.1';
+  if (opts.tesseraDep !== null) {
+    pkg.dependencies['tessera-learn'] = opts.tesseraDep ?? '^0.0.1';
   }
   writeFileSync(
     resolve(dir, 'package.json'),
@@ -139,7 +139,7 @@ describe('create-tessera upgrade', () => {
   it('pins tessera-learn to the version the CLI ships', () => {
     seedProject(testDir, {
       scripts: { dev: 'vite dev', export: 'vite build', validate: 'tessera-validate' },
-      tesseraVersion: '^0.0.1',
+      tesseraDep: '^0.0.1',
     });
     const { stdout } = runCLI('upgrade', testDir);
     expect(stdout).toContain('set tessera-learn');
@@ -149,7 +149,7 @@ describe('create-tessera upgrade', () => {
   it('overwrites framework-owned AGENTS.md and vite.config.js', () => {
     seedProject(testDir, {
       scripts: { dev: 'vite dev', export: 'vite build', validate: 'tessera-validate' },
-      tesseraVersion: TESSERA_VERSION,
+      tesseraDep: TESSERA_VERSION,
       agentsMd: '# stale agents file\n',
       viteConfig: '// stale vite config\n',
     });
@@ -167,7 +167,7 @@ describe('create-tessera upgrade', () => {
   });
 
   it('fails when package.json has no tessera-learn dependency', () => {
-    seedProject(testDir, { tesseraVersion: null });
+    seedProject(testDir, { tesseraDep: null });
     const { exitCode, stderr } = runCLI('upgrade', testDir);
     expect(exitCode).toBe(1);
     expect(stderr).toContain('does not look like a Tessera project');

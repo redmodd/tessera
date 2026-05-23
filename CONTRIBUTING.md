@@ -68,6 +68,8 @@ pnpm changeset
 
 Pick the affected packages, choose `patch` / `minor` / `major`, and write a one-line summary aimed at end users. Commit the generated file in `.changeset/`.
 
+`create-tessera` and `tessera-learn` are version-locked (changesets `fixed`): a changeset for either one releases **both** at the same new version, so they always share a version number. This is what lets `create-tessera` pin `tessera-learn` to its own version.
+
 Internal changes (docs, CI, refactors with no API impact) don't need a changeset.
 
 A "Version Packages" PR is opened automatically once changesets land on `main`. Merging it triggers the publish workflow.
