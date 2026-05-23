@@ -40,7 +40,7 @@ The scaffolder creates a new directory with:
 
 Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise, plus a project `README.md`.
 
-Then:
+Then. Commands below use `npm`; substitute your package manager (`pnpm`, `yarn`, or `bun`) if you used one.
 
 ```bash
 cd my-course

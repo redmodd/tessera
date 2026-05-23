@@ -34,6 +34,8 @@ node --version    # should print v24.x.x or higher
 
 ## Quick start
 
+Commands below use `npm`; substitute your package manager (`pnpm`, `yarn`, or `bun`) if you used one.
+
 ```bash
 npm create tessera@latest my-course
 cd my-course

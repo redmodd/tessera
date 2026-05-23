@@ -6,6 +6,8 @@ default — bring your own UI.
 
 ## Run locally
 
+Commands below use `npm`; substitute your package manager (`pnpm`, `yarn`, or `bun`) if you used one.
+
 ```bash
 npm install
 npm run dev
