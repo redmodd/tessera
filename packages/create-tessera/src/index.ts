@@ -4,6 +4,7 @@ import {
   writeFileSync,
   copyFileSync,
   readFileSync,
+  readdirSync,
 } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,18 +100,15 @@ export function toTitleCase(slug: string): string {
     .join(' ');
 }
 
-function write(path: string, content: string) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
-}
-
 function copyAgentsMd(dest: string) {
   copyFileSync(resolve(PKG_ROOT, 'AGENTS.md'), dest);
 }
 
 // Framework-owned npm scripts — reserved names. The scaffold writes them
-// verbatim and `upgrade` reconciles them against an existing package.json.
-const FRAMEWORK_SCRIPTS: Record<string, string> = {
+// verbatim (via base/package.json) and `upgrade` reconciles them against an
+// existing package.json. base/package.json's "scripts" must match this map; a
+// unit test enforces the two stay in sync.
+export const FRAMEWORK_SCRIPTS: Record<string, string> = {
   dev: 'vite dev',
   export: 'vite build',
   validate: 'tessera-validate',
@@ -128,247 +126,81 @@ const SCRIPT_MIGRATIONS: ScriptMigration[] = [
   { stale: 'preview', oldValue: 'vite dev', replacedBy: 'dev' },
 ];
 
-function packageJson(name: string): string {
-  const pkg = {
-    name,
-    private: true,
-    type: 'module',
-    scripts: { ...FRAMEWORK_SCRIPTS },
-    dependencies: {
-      'tessera-learn': TESSERA_VERSION,
-    },
-    devDependencies: {
-      '@sveltejs/vite-plugin-svelte': '^7.1.2',
-      svelte: '^5.0.0',
-      vite: '^8.0.0',
-    },
-  };
-  return JSON.stringify(pkg, null, 2) + '\n';
+// Tokens substituted into text template files as they are copied. Delimiters use
+// __UPPER__ so they cannot collide with Svelte `{...}` or JS `${...}`.
+interface Tokens {
+  __PROJECT_NAME__: string; // validated slug
+  __PROJECT_TITLE__: string; // toTitleCase(slug)
+  __TESSERA_VERSION__: string; // TESSERA_VERSION
 }
 
-const VITE_CONFIG = `import { tesseraPlugin } from 'tessera-learn/plugin';
-
-export default {
-  plugins: [tesseraPlugin()],
+// npm's tarball packing strips/renames leading-dot files, so templates store
+// them prefixed and we restore the dot on copy. (create-vite convention.)
+const RENAME: Record<string, string> = {
+  _gitignore: '.gitignore',
+  _gitkeep: '.gitkeep',
 };
-`;
 
-const GITIGNORE = `node_modules
-dist
-.DS_Store
-*.log
-.env
-.env.local
-`;
+// Text files get token substitution; everything else (renamed dotfiles, future
+// binary assets like a logo) is copied byte-for-byte so it is never mangled by
+// applyTokens.
+const TEXT = /\.(svelte|js|ts|json|css|md|html)$/;
 
-function defaultCourseConfig(title: string): string {
-  return `export default {
-  title: ${JSON.stringify(title)},
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  branding: {
-    primaryColor: "#0066cc",
-  },
-  export: { standard: "web" },
-};
-`;
+function applyTokens(s: string, t: Tokens): string {
+  return s.replace(/__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/g, (m) =>
+    t[m as keyof Tokens]
+  );
 }
 
-function bareCourseConfig(title: string): string {
-  return `export default {
-  title: ${JSON.stringify(title)},
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};
-`;
+function copyTemplate(srcDir: string, destDir: string, tokens: Tokens) {
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    const src = join(srcDir, entry.name);
+    const dest = join(destDir, RENAME[entry.name] ?? entry.name);
+    if (entry.isDirectory()) {
+      mkdirSync(dest, { recursive: true });
+      copyTemplate(src, dest, tokens);
+    } else if (TEXT.test(entry.name)) {
+      writeFileSync(dest, applyTokens(readFileSync(src, 'utf-8'), tokens));
+    } else {
+      copyFileSync(src, dest);
+    }
+  }
 }
 
-function welcomePage(title: string): string {
-  return `<script module>
-  export const pageConfig = { title: "Welcome" };
-</script>
-
-<h1>Welcome to ${title}</h1>
-
-<p>
-  This is a basic demo page of your Tessera course.
-</p>
-
-<p>
-  Point your agent to <code>AGENTS.md</code> at the project root for the authoring guide.
-</p>
-`;
-}
-
-const DEFAULT_CUSTOM_CSS = `/* Project-level CSS overrides.
- * Imported automatically by Tessera. Use this file for tweaks on top of the
- * default theme. For deeper customisation, see the "Theming" section in
- * AGENTS.md.
- */
-`;
-
-function bareLayout(title: string): string {
-  return `<script>
-  import { useNavigation, useProgress } from 'tessera-learn';
-
-  let { page } = $props();
-  const nav = useNavigation();
-  const progress = useProgress();
-</script>
-
-<header>
-  <h1>${title}</h1>
-  <span>{progress.visitedPages.size} / {nav.pages.length}</span>
-</header>
-
-<main>
-  {@render page()}
-</main>
-
-<footer>
-  <button disabled={!nav.canGoPrev} onclick={() => nav.prev()}>Previous</button>
-  <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next</button>
-</footer>
-`;
-}
-
-function bareIntro(title: string): string {
-  return `<script module>
-  export const pageConfig = { title: "Intro" };
-</script>
-
-<h1>${title}</h1>
-
-<p>
-  This is a bare Tessera project. The shell around this page is rendered by the
-  <code>layout.svelte</code> at the project root — replace it to fit your design.
-</p>
-`;
-}
-
-const BARE_CHECK = `<script module>
-  export const pageConfig = { title: "Check" };
-</script>
-
-<script>
-  import { useQuestion } from 'tessera-learn';
-
-  let selected = $state(null);
-
-  const q = useQuestion({
-    id: 'check-1',
-    response: () => ({
-      type: 'choice',
-      response: selected !== null ? [selected] : [],
-      correct: ['a'],
-    }),
-    reset: () => { selected = null; },
-  });
-</script>
-
-<h1>Quick check</h1>
-
-<p>Tessera locks the data contract. Which option captures that?</p>
-
-<fieldset disabled={q.submitted}>
-  <label>
-    <input type="radio" bind:group={selected} value="a" />
-    Tessera locks the data contract.
-  </label>
-  <label>
-    <input type="radio" bind:group={selected} value="b" />
-    Tessera locks the presentation.
-  </label>
-</fieldset>
-
-<button onclick={() => q.submit()} disabled={q.submitted || selected === null}>
-  Submit
-</button>
-
-{#if q.submitted}
-  <p>{q.correct ? 'Correct.' : 'Not quite — review the intro.'}</p>
-{/if}
-`;
-
-function bareReadme(title: string): string {
-  return `# ${title}
-
-Bare Tessera project. The course shell lives in \`layout.svelte\` at the project
-root and pages live under \`pages/\`. Built-in components are not imported by
-default — bring your own UI.
-
-## Run locally
-
-\`\`\`bash
-npm install
-npm run dev
-\`\`\`
-
-## Structure
-
-- \`layout.svelte\` — course shell (header / main / footer)
-- \`pages/\` — sections → lessons → \`.svelte\` pages
-- \`course.config.js\` — title, navigation, completion, scoring, export target
-- \`AGENTS.md\` — authoring guide
-
-## Build
-
-\`\`\`bash
-npm run export
-\`\`\`
-`;
-}
-
-function scaffoldDefault(dir: string, name: string, title: string) {
-  write(join(dir, 'package.json'), packageJson(name));
-  write(join(dir, 'vite.config.js'), VITE_CONFIG);
-  write(join(dir, 'course.config.js'), defaultCourseConfig(title));
-  write(join(dir, '.gitignore'), GITIGNORE);
+// Layer base/ then the chosen variant; the variant wins on path collisions, but
+// in practice the dirs are disjoint, so this is purely additive. AGENTS.md lives
+// at the package root (canonical, framework-owned) and is copied separately.
+function scaffold(dir: string, template: Template, tokens: Tokens) {
+  copyTemplate(resolve(PKG_ROOT, 'templates/base'), dir, tokens);
+  copyTemplate(resolve(PKG_ROOT, 'templates', template), dir, tokens);
   copyAgentsMd(join(dir, 'AGENTS.md'));
-
-  write(
-    join(dir, 'pages/01-getting-started/_meta.js'),
-    `export default { title: "Getting Started" };\n`
-  );
-  write(
-    join(dir, 'pages/01-getting-started/01-welcome/_meta.js'),
-    `export default { title: "Welcome", pages: ["welcome"] };\n`
-  );
-  write(
-    join(dir, 'pages/01-getting-started/01-welcome/welcome.svelte'),
-    welcomePage(title)
-  );
-
-  write(join(dir, 'styles/custom.css'), DEFAULT_CUSTOM_CSS);
-  write(join(dir, 'assets/.gitkeep'), '');
 }
 
-function scaffoldBare(dir: string, name: string, title: string) {
-  write(join(dir, 'package.json'), packageJson(name));
-  write(join(dir, 'vite.config.js'), VITE_CONFIG);
-  write(join(dir, 'course.config.js'), bareCourseConfig(title));
-  write(join(dir, '.gitignore'), GITIGNORE);
-  copyAgentsMd(join(dir, 'AGENTS.md'));
-  write(join(dir, 'README.md'), bareReadme(title));
-  write(join(dir, 'layout.svelte'), bareLayout(title));
+// Package-manager-aware post-scaffold hints. Detection keys off the
+// npm_config_user_agent every PM sets when running `create`; a miss falls back
+// to npm with no functional impact (the hint is cosmetic).
+type PM = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
-  write(
-    join(dir, 'pages/01-course/_meta.js'),
-    `export default { title: "Course" };\n`
-  );
-  write(
-    join(dir, 'pages/01-course/01-lesson/_meta.js'),
-    `export default { title: "Lesson", pages: ["intro", "check"] };\n`
-  );
-  write(join(dir, 'pages/01-course/01-lesson/intro.svelte'), bareIntro(title));
-  write(join(dir, 'pages/01-course/01-lesson/check.svelte'), BARE_CHECK);
-
-  write(join(dir, 'styles/.gitkeep'), '');
-  write(join(dir, 'assets/.gitkeep'), '');
+export function detectPackageManager(): PM {
+  const ua = process.env.npm_config_user_agent ?? '';
+  if (ua.startsWith('pnpm')) return 'pnpm';
+  if (ua.startsWith('yarn')) return 'yarn';
+  if (ua.startsWith('bun')) return 'bun';
+  return 'npm';
 }
+
+const INSTALL: Record<PM, string> = {
+  npm: 'npm install',
+  pnpm: 'pnpm install',
+  yarn: 'yarn',
+  bun: 'bun install',
+};
+const RUN: Record<PM, string> = {
+  npm: 'npm run',
+  pnpm: 'pnpm',
+  yarn: 'yarn',
+  bun: 'bun run',
+};
 
 function fail(message: string): never {
   process.stderr.write(`Error: ${message}\n\n`);
@@ -459,7 +291,8 @@ function upgrade(dryRun: boolean) {
     writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
   }
 
-  // Framework-owned files: straight overwrite.
+  // Framework-owned files: straight overwrite. These are read verbatim (no token
+  // substitution), so they must stay token-free; a unit test enforces that.
   const overwrites: { name: string; dest: string; content: string }[] = [
     {
       name: 'AGENTS.md',
@@ -469,7 +302,10 @@ function upgrade(dryRun: boolean) {
     {
       name: 'vite.config.js',
       dest: resolve(cwd, 'vite.config.js'),
-      content: VITE_CONFIG,
+      content: readFileSync(
+        resolve(PKG_ROOT, 'templates/base/vite.config.js'),
+        'utf-8'
+      ),
     },
   ];
 
@@ -544,14 +380,15 @@ function main() {
 
   mkdirSync(projectDir, { recursive: true });
 
-  if (args.template === 'bare') {
-    scaffoldBare(projectDir, name, title);
-  } else {
-    scaffoldDefault(projectDir, name, title);
-  }
+  scaffold(projectDir, args.template, {
+    __PROJECT_NAME__: name,
+    __PROJECT_TITLE__: title,
+    __TESSERA_VERSION__: TESSERA_VERSION,
+  });
 
+  const pm = detectPackageManager();
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  npm install\n  npm run dev\n`
+    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  ${INSTALL[pm]}\n  ${RUN[pm]} dev\n`
   );
 }
 

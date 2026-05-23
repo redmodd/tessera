@@ -1,0 +1,18 @@
+{
+  "name": "__PROJECT_NAME__",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "export": "vite build",
+    "validate": "tessera-validate"
+  },
+  "dependencies": {
+    "tessera-learn": "__TESSERA_VERSION__"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "svelte": "^5.0.0",
+    "vite": "^8.0.0"
+  }
+}
