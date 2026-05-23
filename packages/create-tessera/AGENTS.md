@@ -8,7 +8,7 @@ Build a course with built-in components, your own (via the hooks), or any mix. T
 
 ## Running the project
 
-From the project root. Commands below use `npm`; substitute your package manager (`pnpm`, `yarn`, or `bun`) if you used one.
+From the project root (commands below use `npm`; substitute your package manager — `pnpm`, `yarn`, or `bun` — if you used one):
 
 ```bash
 npm install            # first time only
