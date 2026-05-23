@@ -8,11 +8,12 @@
   let selected = $state(null);
 
   const q = useQuestion({
-    id: 'check-1',
+    id: 'check_1',
     response: () => ({
       type: 'choice',
       response: selected !== null ? [selected] : [],
-      correct: ['a'],
+      correct: ['contract'],
+      options: ['contract', 'presentation'],
     }),
     reset: () => { selected = null; },
   });
@@ -24,11 +25,11 @@
 
 <fieldset disabled={q.submitted}>
   <label>
-    <input type="radio" bind:group={selected} value="a" />
+    <input type="radio" bind:group={selected} value="contract" />
     Tessera locks the data contract.
   </label>
   <label>
-    <input type="radio" bind:group={selected} value="b" />
+    <input type="radio" bind:group={selected} value="presentation" />
     Tessera locks the presentation.
   </label>
 </fieldset>

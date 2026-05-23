@@ -286,14 +286,11 @@ describe('create-tessera CLI', () => {
       expect(config).not.toContain('branding');
     });
 
-    it('writes README.md pointing at the bare structure', () => {
+    it('does not scaffold a README (authors add their own)', () => {
       runCLI('bare-course --template=bare', testDir);
-      const readme = readFileSync(
-        resolve(testDir, 'bare-course', 'README.md'),
-        'utf-8'
-      );
-      expect(readme).toContain('Bare Tessera project');
-      expect(readme).toContain('layout.svelte');
+      expect(
+        existsSync(resolve(testDir, 'bare-course', 'README.md'))
+      ).toBe(false);
     });
 
     it('still writes AGENTS.md, package.json, vite.config.js', () => {

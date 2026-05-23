@@ -38,9 +38,9 @@ The scaffolder creates a new directory with:
 - `AGENTS.md`: the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
 - `.gitignore`
 
-Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise, plus a project `README.md`.
+Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise.
 
-Then:
+Then (commands below use `npm`; substitute your package manager — `pnpm`, `yarn`, or `bun` — if you used one):
 
 ```bash
 cd my-course

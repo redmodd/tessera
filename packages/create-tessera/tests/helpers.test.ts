@@ -140,7 +140,7 @@ describe('template ⇄ code invariants', () => {
 
   it('files upgrade reads verbatim are token-free', () => {
     const TOKEN = /__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/;
-    for (const f of ['templates/base/vite.config.js']) {
+    for (const f of ['templates/base/vite.config.js', 'AGENTS.md']) {
       expect(TOKEN.test(readFileSync(resolve(PKG_ROOT, f), 'utf-8'))).toBe(
         false
       );
