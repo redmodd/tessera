@@ -13,8 +13,12 @@ const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const ownPkg = JSON.parse(
   readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')
-) as { tesseraVersion?: string };
-const TESSERA_VERSION = ownPkg.tesseraVersion ?? 'latest';
+) as { version: string };
+// create-tessera and tessera-learn release in lockstep via the changesets
+// `fixed` group (not `linked`, which would not co-publish tessera-learn), so the
+// version this CLI ships at always has a matching published tessera-learn to pin
+// into scaffolded and upgraded projects.
+const TESSERA_VERSION = ownPkg.version;
 
 const USAGE = `Usage: create-tessera <project-name> [--template=<default|bare>]
        create-tessera upgrade [--dry-run]
