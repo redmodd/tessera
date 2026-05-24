@@ -14,7 +14,7 @@ export interface PersistenceAdapter {
   /** Tell the adapter what was already emitted in prior sessions, so it skips re-emitting on resume. */
   seedLifecycle?(
     completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed'
+    success: 'unknown' | 'passed' | 'failed',
   ): void;
   setDuration(seconds: number): void;
   /**
@@ -31,7 +31,7 @@ export interface PersistenceAdapter {
   reportInteraction(
     questionId: string,
     interaction: Interaction,
-    correct: boolean | null
+    correct: boolean | null,
   ): void;
   commit(): void;
   terminate(): void;

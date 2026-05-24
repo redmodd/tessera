@@ -1,5 +1,9 @@
 import type { PartialStatement } from './types.js';
-export { validateAgent, validateAuthCredential, joinFieldError } from './agent-rules.js';
+export {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from './agent-rules.js';
 
 /** Thrown for runtime-validation failures (auth/actor resolver misuse). */
 export class XAPIConfigError extends Error {
@@ -32,7 +36,7 @@ export function validatePartialStatement(partial: PartialStatement): void {
   if (!partial || typeof partial !== 'object') {
     throw new XAPIStatementError(
       'sendStatement: partial statement must be an object',
-      partial
+      partial,
     );
   }
   if (
@@ -43,7 +47,7 @@ export function validatePartialStatement(partial: PartialStatement): void {
   ) {
     throw new XAPIStatementError(
       'sendStatement: verb.id is required and must be a non-empty string',
-      partial
+      partial,
     );
   }
   if (partial.object !== undefined) {
@@ -55,16 +59,21 @@ export function validatePartialStatement(partial: PartialStatement): void {
     ) {
       throw new XAPIStatementError(
         'sendStatement: object.id must be a non-empty string when object is supplied',
-        partial
+        partial,
       );
     }
   }
   const scaled = partial.result?.score?.scaled;
   if (scaled !== undefined) {
-    if (typeof scaled !== 'number' || !Number.isFinite(scaled) || scaled < -1 || scaled > 1) {
+    if (
+      typeof scaled !== 'number' ||
+      !Number.isFinite(scaled) ||
+      scaled < -1 ||
+      scaled > 1
+    ) {
       throw new XAPIStatementError(
         `sendStatement: result.score.scaled must be a number in [-1, 1], got ${scaled}`,
-        partial
+        partial,
       );
     }
   }

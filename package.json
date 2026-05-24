@@ -7,7 +7,10 @@
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "test:e2e": "playwright test",
-    "lint": "pnpm -r lint",
+    "lint": "eslint .",
+    "check": "pnpm -r check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"
@@ -15,8 +18,17 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
     "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.17.1",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-svelte": "^4.0.1",
+    "svelte-eslint-parser": "^1.6.1",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
     "vitest": "^4.1.6"
   },
   "engines": {

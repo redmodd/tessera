@@ -66,7 +66,7 @@ describe('createAdapter', () => {
     const adapter = createAdapter(makeConfig('scorm12'));
     expect(adapter).toBeInstanceOf(WebAdapter);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('SCORM 1.2 API not found')
+      expect.stringContaining('SCORM 1.2 API not found'),
     );
     warnSpy.mockRestore();
   });
@@ -91,18 +91,22 @@ describe('createAdapter', () => {
     const adapter = createAdapter(makeConfig('scorm2004'));
     expect(adapter).toBeInstanceOf(WebAdapter);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('SCORM 2004 API not found')
+      expect.stringContaining('SCORM 2004 API not found'),
     );
     warnSpy.mockRestore();
   });
 
   it('falls back to WebAdapter for cmi5 when launch params not found (dev)', () => {
-    Object.defineProperty(window, 'location', { value: new URL('http://localhost/'), writable: true, configurable: true });
+    Object.defineProperty(window, 'location', {
+      value: new URL('http://localhost/'),
+      writable: true,
+      configurable: true,
+    });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(WebAdapter);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('cmi5 launch parameters not found')
+      expect.stringContaining('cmi5 launch parameters not found'),
     );
     warnSpy.mockRestore();
   });
@@ -115,7 +119,11 @@ describe('createAdapter', () => {
       actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
       registration: 'reg-123',
     });
-    Object.defineProperty(window, 'location', { value: new URL(`http://localhost/?${params.toString()}`), writable: true, configurable: true });
+    Object.defineProperty(window, 'location', {
+      value: new URL(`http://localhost/?${params.toString()}`),
+      writable: true,
+      configurable: true,
+    });
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(CMI5Adapter);
   });
@@ -123,7 +131,7 @@ describe('createAdapter', () => {
   describe('production fail-loud (allowFallback: false)', () => {
     it('throws LMSAdapterError for scorm12 when API missing', () => {
       expect(() =>
-        createAdapter(makeConfig('scorm12'), { allowFallback: false })
+        createAdapter(makeConfig('scorm12'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
       try {
         createAdapter(makeConfig('scorm12'), { allowFallback: false });
@@ -136,7 +144,7 @@ describe('createAdapter', () => {
 
     it('throws LMSAdapterError for scorm2004 when API missing', () => {
       expect(() =>
-        createAdapter(makeConfig('scorm2004'), { allowFallback: false })
+        createAdapter(makeConfig('scorm2004'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
     });
 
@@ -147,7 +155,7 @@ describe('createAdapter', () => {
         configurable: true,
       });
       expect(() =>
-        createAdapter(makeConfig('cmi5'), { allowFallback: false })
+        createAdapter(makeConfig('cmi5'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
     });
 

@@ -47,7 +47,9 @@ describe('ProgressState', () => {
   describe('recalculateCompletion — percentage mode', () => {
     it('incomplete when below threshold', () => {
       const manifest = createManifest(10);
-      const config = createConfig({ completion: { mode: 'percentage', percentageThreshold: 80 } });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 80 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       for (let i = 0; i < 7; i++) progress.markVisited(i);
@@ -58,7 +60,9 @@ describe('ProgressState', () => {
 
     it('complete when at threshold', () => {
       const manifest = createManifest(10);
-      const config = createConfig({ completion: { mode: 'percentage', percentageThreshold: 80 } });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 80 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       for (let i = 0; i < 8; i++) progress.markVisited(i);
@@ -69,7 +73,9 @@ describe('ProgressState', () => {
 
     it('complete when above threshold', () => {
       const manifest = createManifest(10);
-      const config = createConfig({ completion: { mode: 'percentage', percentageThreshold: 80 } });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 80 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       for (let i = 0; i < 10; i++) progress.markVisited(i);
@@ -80,7 +86,9 @@ describe('ProgressState', () => {
 
     it('complete with 100% threshold when all pages visited', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ completion: { mode: 'percentage', percentageThreshold: 100 } });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 100 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       for (let i = 0; i < 5; i++) progress.markVisited(i);
@@ -92,8 +100,14 @@ describe('ProgressState', () => {
 
   describe('recalculateCompletion — quiz mode', () => {
     it('incomplete when no quizzes attempted', () => {
-      const manifest = createManifest(5, { 2: { graded: true }, 4: { graded: true } });
-      const config = createConfig({ completion: { mode: 'quiz' }, scoring: { passingScore: 70 } });
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       progress.recalculateCompletion(manifest.totalPages, config);
@@ -101,8 +115,14 @@ describe('ProgressState', () => {
     });
 
     it('incomplete when average below passing score (unattempted count as 0)', () => {
-      const manifest = createManifest(5, { 2: { graded: true }, 4: { graded: true } });
-      const config = createConfig({ completion: { mode: 'quiz' }, scoring: { passingScore: 70 } });
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       progress.quizCompleted(2, 90);
@@ -112,8 +132,14 @@ describe('ProgressState', () => {
     });
 
     it('complete when average meets passing score', () => {
-      const manifest = createManifest(5, { 2: { graded: true }, 4: { graded: true } });
-      const config = createConfig({ completion: { mode: 'quiz' }, scoring: { passingScore: 70 } });
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       progress.quizCompleted(2, 90);
@@ -125,7 +151,10 @@ describe('ProgressState', () => {
 
     it('incomplete when no graded quizzes exist', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ completion: { mode: 'quiz' }, scoring: { passingScore: 70 } });
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
       progress.recalculateCompletion(manifest.totalPages, config);
@@ -153,7 +182,10 @@ describe('ProgressState', () => {
     });
 
     it('computes passed when average meets passing score', () => {
-      const manifest = createManifest(5, { 2: { graded: true }, 4: { graded: true } });
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
       const config = createConfig({ scoring: { passingScore: 70 } });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 
@@ -165,7 +197,10 @@ describe('ProgressState', () => {
     });
 
     it('computes failed when average below passing score', () => {
-      const manifest = createManifest(5, { 2: { graded: true }, 4: { graded: true } });
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
       const config = createConfig({ scoring: { passingScore: 70 } });
       const progress = new ProgressState(gradedQuizIndices(manifest));
 

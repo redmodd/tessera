@@ -43,7 +43,7 @@ export class XAPIClient {
    */
   sendStatement(
     partial: PartialStatement,
-    options?: SendStatementOptions
+    options?: SendStatementOptions,
   ): Promise<SendStatementResult> {
     try {
       validatePartialStatement(partial);
@@ -59,8 +59,8 @@ export class XAPIClient {
     if (this.#publishers.every(blocked)) {
       return Promise.reject(
         new XAPIConfigError(
-          'XAPIClient.sendStatement: page is unloading; author statements queued during unload are dropped to keep Terminated last (cmi5 §9.3.6).'
-        )
+          'XAPIClient.sendStatement: page is unloading; author statements queued during unload are dropped to keep Terminated last (cmi5 §9.3.6).',
+        ),
       );
     }
     const id = uuidv4();
@@ -80,9 +80,9 @@ export class XAPIClient {
             endpoint: pub.getEndpoint(),
             ok: false,
             error: new XAPIConfigError(
-              'destination skipped: cmi5 publisher is unloading; statement dropped to keep Terminated last (cmi5 §9.3.6).'
+              'destination skipped: cmi5 publisher is unloading; statement dropped to keep Terminated last (cmi5 §9.3.6).',
             ),
-          })
+          }),
         );
         continue;
       }

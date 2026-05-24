@@ -51,7 +51,10 @@ export function viteBin(fixture: FixtureName): string {
  * stdout/stderr to the error object but the default error message is just
  * "Command failed: ..." — useless for debugging a parallel build that died.
  */
-async function run(cmd: string, opts: { cwd: string; timeout: number }): Promise<void> {
+async function run(
+  cmd: string,
+  opts: { cwd: string; timeout: number },
+): Promise<void> {
   try {
     await execAsync(cmd, opts);
   } catch (err) {
@@ -62,7 +65,10 @@ async function run(cmd: string, opts: { cwd: string; timeout: number }): Promise
   }
 }
 
-async function buildVariant(fixtureName: FixtureName, standard: Standard): Promise<void> {
+async function buildVariant(
+  fixtureName: FixtureName,
+  standard: Standard,
+): Promise<void> {
   const spec = FIXTURES[fixtureName];
   const dir = variantDir(fixtureName, standard);
   cpSync(spec.source, dir, {
@@ -77,18 +83,25 @@ async function buildVariant(fixtureName: FixtureName, standard: Standard): Promi
   // `import { tesseraPlugin } from 'tessera-learn/plugin'` in the variant's
   // vite.config.js cannot resolve — tessera-learn is a workspace symlink at
   // <fixture>/node_modules/tessera-learn and is not hoisted to the repo root.
-  symlinkSync(resolve(spec.source, 'node_modules'), resolve(dir, 'node_modules'), 'dir');
+  symlinkSync(
+    resolve(spec.source, 'node_modules'),
+    resolve(dir, 'node_modules'),
+    'dir',
+  );
 
   const configPath = resolve(dir, 'course.config.js');
   const original = readFileSync(configPath, 'utf-8');
-  const pattern = /export:\s*\{\s*standard:\s*"[^"]*"\s*\}/;
+  const pattern = /export:\s*\{\s*standard:\s*["'][^"']*["']\s*\}/;
   if (!pattern.test(original)) {
     throw new Error(
       `[e2e globalSetup] ${fixtureName}/course.config.js: failed to substitute export.standard for "${standard}". ` +
-        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*"[^"]*"\\s*\\}/.`,
+        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*["'][^"']*["']\\s*\\}/.`,
     );
   }
-  const patched = original.replace(pattern, `export: { standard: "${standard}" }`);
+  const patched = original.replace(
+    pattern,
+    `export: { standard: '${standard}' }`,
+  );
   writeFileSync(configPath, patched);
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
@@ -99,7 +112,10 @@ async function buildVariant(fixtureName: FixtureName, standard: Standard): Promi
 }
 
 export default async function globalSetup(): Promise<void> {
-  for (const [name, spec] of Object.entries(FIXTURES) as [FixtureName, FixtureSpec][]) {
+  for (const [name, spec] of Object.entries(FIXTURES) as [
+    FixtureName,
+    FixtureSpec,
+  ][]) {
     const bin = viteBin(name);
     if (!existsSync(bin)) {
       throw new Error(

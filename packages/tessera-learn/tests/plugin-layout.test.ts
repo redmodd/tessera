@@ -9,12 +9,16 @@ describe('tessera:layout virtual module', () => {
   let projectRoot: string;
 
   beforeEach(() => {
-    projectRoot = resolve(tmpdir(), `tessera-layout-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    projectRoot = resolve(
+      tmpdir(),
+      `tessera-layout-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     mkdirSync(projectRoot, { recursive: true });
   });
 
   afterEach(() => {
-    if (existsSync(projectRoot)) rmSync(projectRoot, { recursive: true, force: true });
+    if (existsSync(projectRoot))
+      rmSync(projectRoot, { recursive: true, force: true });
   });
 
   function makePlugin() {
@@ -26,7 +30,10 @@ describe('tessera:layout virtual module', () => {
 
   it('resolveId maps the public id to a resolved id', () => {
     const plugin = makePlugin();
-    const resolved = (plugin as any).resolveId.call({}, 'virtual:tessera-layout');
+    const resolved = (plugin as any).resolveId.call(
+      {},
+      'virtual:tessera-layout',
+    );
     expect(resolved).toBe('\0virtual:tessera-layout');
     expect((plugin as any).resolveId.call({}, 'something-else')).toBeNull();
   });
@@ -35,8 +42,12 @@ describe('tessera:layout virtual module', () => {
     const plugin = makePlugin();
     const watched: string[] = [];
     const code = (plugin as any).load.call(
-      { addWatchFile(p: string) { watched.push(p); } },
-      '\0virtual:tessera-layout'
+      {
+        addWatchFile(p: string) {
+          watched.push(p);
+        },
+      },
+      '\0virtual:tessera-layout',
     );
     expect(typeof code).toBe('string');
     expect(code).toMatch(/export\s+default\s+null/);
@@ -52,8 +63,12 @@ describe('tessera:layout virtual module', () => {
     const plugin = makePlugin();
     const watched: string[] = [];
     const code = (plugin as any).load.call(
-      { addWatchFile(p: string) { watched.push(p); } },
-      '\0virtual:tessera-layout'
+      {
+        addWatchFile(p: string) {
+          watched.push(p);
+        },
+      },
+      '\0virtual:tessera-layout',
     );
 
     expect(typeof code).toBe('string');
@@ -65,7 +80,10 @@ describe('tessera:layout virtual module', () => {
 
   it('load() ignores ids that are not the resolved virtual id', () => {
     const plugin = makePlugin();
-    const code = (plugin as any).load.call({ addWatchFile() {} }, 'some-other-id');
+    const code = (plugin as any).load.call(
+      { addWatchFile() {} },
+      'some-other-id',
+    );
     expect(code).toBeNull();
   });
 });

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createManifest, createConfig, gradedQuizIndices } from './helpers.js';
-import { NavigationState, isPageComplete } from '../src/runtime/navigation.svelte.js';
+import {
+  NavigationState,
+  isPageComplete,
+} from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 
 describe('Quiz integration with navigation gating', () => {
@@ -9,7 +12,10 @@ describe('Quiz integration with navigation gating', () => {
     const manifest = createManifest(5, {
       2: { graded: true, gatesProgress: true },
     });
-    const config = createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } });
+    const config = createConfig({
+      navigation: { mode: 'free' },
+      scoring: { passingScore: 70 },
+    });
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const nav = new NavigationState(manifest, progress, config);
 

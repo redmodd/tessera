@@ -1,0 +1,9 @@
+**/dist/**
+**/coverage/**
+**/test-results/**
+**/playwright-report/**
+**/.vite/**
+tests/.e2e-variants/**
+pnpm-lock.yaml
+CHANGELOG.md
+*.tsbuildinfo

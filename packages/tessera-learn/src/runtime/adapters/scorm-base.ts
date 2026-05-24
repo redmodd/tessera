@@ -71,11 +71,11 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       () => this.dialect.initialize(this.api),
       undefined,
       this.errorReporter,
-      'Initialize'
+      'Initialize',
     );
     if (!initialized) {
       console.warn(
-        'Tessera: LMS Initialize failed — all subsequent persistence calls will fail with error 301 (Not Initialized). Reload the launch from the LMS.'
+        'Tessera: LMS Initialize failed — all subsequent persistence calls will fail with error 301 (Not Initialized). Reload the launch from the LMS.',
       );
       return;
     }
@@ -86,7 +86,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     } catch (err) {
       console.warn(
         'Tessera: LMS threw on GetValue(cmi.suspend_data); resume disabled for this launch',
-        err
+        err,
       );
     }
     if (raw && raw.trim()) {
@@ -95,7 +95,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       } catch (err) {
         console.warn(
           'Tessera: cmi.suspend_data is not valid JSON; resume disabled for this launch (the LMS may have truncated a prior write)',
-          err
+          err,
         );
         this.#state = null;
       }
@@ -103,13 +103,13 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
 
     // n indexing must continue from _count — restarting at 0 would overwrite
     // the prior session's records (the LMS uses n as the array key).
-    let countRaw = '';
+    let countRaw: string;
     try {
       countRaw = this.dialect.getValue(this.api, 'cmi.interactions._count');
     } catch (err) {
       console.warn(
         'Tessera: LMS threw on GetValue(cmi.interactions._count); new interactions will be written from index 0 and may overwrite prior session records',
-        err
+        err,
       );
       return;
     }
@@ -119,7 +119,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       this.interactionCount = n;
     } else {
       console.warn(
-        `Tessera: LMS returned non-numeric cmi.interactions._count="${countRaw}"; new interactions will be written from index 0 and may overwrite prior session records`
+        `Tessera: LMS returned non-numeric cmi.interactions._count="${countRaw}"; new interactions will be written from index 0 and may overwrite prior session records`,
       );
     }
   }
@@ -141,12 +141,12 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
           `${this.dialect.suspendDataLimitLabel} limit. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +
-          `larger-limit standard (scorm2004/cmi5).`
+          `larger-limit standard (scorm2004/cmi5).`,
       );
     }
     this.queue.enqueue(
       () => this.dialect.setValue(this.api, 'cmi.suspend_data', json),
-      'cmi.suspend_data'
+      'cmi.suspend_data',
     );
   }
 
@@ -155,14 +155,14 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     this.queue.enqueue(
       () =>
         this.dialect.setValue(this.api, this.dialect.sessionTimeKey, formatted),
-      this.dialect.sessionTimeKey
+      this.dialect.sessionTimeKey,
     );
   }
 
   reportInteraction(
     questionId: string,
     interaction: Interaction,
-    correct: boolean | null
+    correct: boolean | null,
   ): void {
     const n = this.interactionCount++;
     const fields = buildScormInteractionFields(
@@ -177,12 +177,12 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
         typeValue: this.dialect.interactionFields.typeValue(interaction.type),
         resultLabels: this.dialect.interactionFields.resultLabels,
         format: this.dialect.interactionFields.format,
-      }
+      },
     );
     for (const [key, value] of fields) {
       this.queue.enqueue(
         () => this.dialect.setValue(this.api, key, value),
-        key
+        key,
       );
     }
   }
@@ -196,11 +196,15 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     this.#terminated = true;
     // Async retries can't run during page unload — drain + commit + finish synchronously.
     this.queue.drainSync();
-    callSyncOrWarn(() => this.dialect.commit(this.api), 'Commit', this.errorReporter);
+    callSyncOrWarn(
+      () => this.dialect.commit(this.api),
+      'Commit',
+      this.errorReporter,
+    );
     callSyncOrWarn(
       () => this.dialect.terminate(this.api),
       'Terminate',
-      this.errorReporter
+      this.errorReporter,
     );
   }
 

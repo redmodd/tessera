@@ -9,11 +9,23 @@
   --tessera-bg-secondary: #f9fafb;
   --tessera-border: #e5e7eb;
   --tessera-success: #16a34a;
-  --tessera-success-bg: color-mix(in srgb, var(--tessera-success) 8%, transparent);
-  --tessera-success-border: color-mix(in srgb, var(--tessera-success) 25%, transparent);
+  --tessera-success-bg: color-mix(
+    in srgb,
+    var(--tessera-success) 8%,
+    transparent
+  );
+  --tessera-success-border: color-mix(
+    in srgb,
+    var(--tessera-success) 25%,
+    transparent
+  );
   --tessera-error: #dc2626;
   --tessera-error-bg: color-mix(in srgb, var(--tessera-error) 8%, transparent);
-  --tessera-error-border: color-mix(in srgb, var(--tessera-error) 25%, transparent);
+  --tessera-error-border: color-mix(
+    in srgb,
+    var(--tessera-error) 25%,
+    transparent
+  );
   --tessera-warning: #d97706;
 
   /* Typography */

@@ -67,24 +67,23 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     super.saveState(state);
     // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
     this.queue.enqueue(
-      () =>
-        this.api.LMSSetValue('cmi.core.lesson_location', String(state.b)),
-      'cmi.core.lesson_location'
+      () => this.api.LMSSetValue('cmi.core.lesson_location', String(state.b)),
+      'cmi.core.lesson_location',
     );
   }
 
   setScore(score: number): void {
     this.queue.enqueue(
       () => this.api.LMSSetValue('cmi.core.score.raw', formatReal107(score)),
-      'cmi.core.score.raw'
+      'cmi.core.score.raw',
     );
     this.queue.enqueue(
       () => this.api.LMSSetValue('cmi.core.score.min', '0'),
-      'cmi.core.score.min'
+      'cmi.core.score.min',
     );
     this.queue.enqueue(
       () => this.api.LMSSetValue('cmi.core.score.max', '100'),
-      'cmi.core.score.max'
+      'cmi.core.score.max',
     );
   }
 
@@ -104,7 +103,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     const value = this.#successStatus ?? this.#completionStatus;
     this.queue.enqueue(
       () => this.api.LMSSetValue('cmi.core.lesson_status', value),
-      'cmi.core.lesson_status'
+      'cmi.core.lesson_status',
     );
   }
 
@@ -113,7 +112,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     const value = mode === 'suspend' ? 'suspend' : '';
     this.queue.enqueue(
       () => this.api.LMSSetValue('cmi.core.exit', value),
-      'cmi.core.exit'
+      'cmi.core.exit',
     );
   }
 }

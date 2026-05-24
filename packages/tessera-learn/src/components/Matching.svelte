@@ -18,19 +18,29 @@
   } = $props();
 
   let shuffledRight = $state([]);
-  let matches = $state(new SvelteMap());
+  const matches = new SvelteMap();
   // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
-  let rightToLeft = $state(new SvelteMap());
+  const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
 
   const pairColors = [
-    '#2563eb', '#9333ea', '#0891b2', '#c2410c', '#4f46e5',
-    '#0d9488', '#b91c1c', '#7c3aed', '#0369a1', '#a16207',
+    '#2563eb',
+    '#9333ea',
+    '#0891b2',
+    '#c2410c',
+    '#4f46e5',
+    '#0d9488',
+    '#b91c1c',
+    '#7c3aed',
+    '#0369a1',
+    '#a16207',
   ];
 
   function initShuffle() {
-    shuffledRight = shuffle(pairs.map((p, i) => ({ text: p.right, originalIndex: i })));
+    shuffledRight = shuffle(
+      pairs.map((p, i) => ({ text: p.right, originalIndex: i })),
+    );
   }
 
   function checkAnswer(answer) {
@@ -43,17 +53,23 @@
   }
 
   function resetState() {
-    matches = new SvelteMap();
-    rightToLeft = new SvelteMap();
+    matches.clear();
+    rightToLeft.clear();
     selectedLeft = null;
     selectedRight = null;
     initShuffle();
   }
 
   const q = useQuestion({
-    get id() { return id ?? `matching-${slugFromQuestion(question)}`; },
-    get weight() { return weight; },
-    get maxRetries() { return maxRetries; },
+    get id() {
+      return id ?? `matching-${slugFromQuestion(question)}`;
+    },
+    get weight() {
+      return weight;
+    },
+    get maxRetries() {
+      return maxRetries;
+    },
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
@@ -157,11 +173,12 @@
     <!-- Left column -->
     <div class="tessera-matching-column">
       <div class="tessera-matching-column-header">Match from</div>
-      {#each pairs as pair, i}
+      {#each pairs as pair, i (i)}
         {@const color = getMatchColor(i)}
         {@const isSelected = selectedLeft === i}
         {@const matched = matches.has(i)}
-        {@const correctMatch = q.feedbackVisible && matched && isMatchCorrect(i)}
+        {@const correctMatch =
+          q.feedbackVisible && matched && isMatchCorrect(i)}
         {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
         <button
           class="tessera-matching-item left"
@@ -170,9 +187,12 @@
           class:correct={correctMatch}
           class:incorrect={wrongMatch}
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
-          onclick={() => matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
+          onclick={() =>
+            matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
           disabled={q.locked}
-          aria-label="{pair.left}{matched ? ' (matched, activate to unmatch)' : ''}"
+          aria-label="{pair.left}{matched
+            ? ' (matched, activate to unmatch)'
+            : ''}"
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -190,7 +210,7 @@
     <!-- Right column -->
     <div class="tessera-matching-column">
       <div class="tessera-matching-column-header">Match to</div>
-      {#each shuffledRight as item}
+      {#each shuffledRight as item (item.originalIndex)}
         {@const color = getRightMatchColor(item.originalIndex)}
         {@const isSelected = selectedRight === item.originalIndex}
         {@const matched = isRightMatched(item.originalIndex)}
@@ -233,8 +253,10 @@
         </div>
         <div class="tessera-matching-correct-pairs">
           <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
-          {#each pairs as pair}
-            <p class="tessera-matching-correct-pair">{pair.left} → {pair.right}</p>
+          {#each pairs as pair, i (i)}
+            <p class="tessera-matching-correct-pair">
+              {pair.left} → {pair.right}
+            </p>
           {/each}
         </div>
         {#if incorrectFeedback}
@@ -306,7 +328,10 @@
     border-radius: 8px;
     background: var(--tessera-bg);
     cursor: pointer;
-    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    transition:
+      border-color 0.2s,
+      background 0.2s,
+      transform 0.1s;
     font-size: 0.9375rem;
     font-family: var(--tessera-font-family);
     color: var(--tessera-text);
@@ -326,7 +351,11 @@
   }
 
   .tessera-matching-item.matched {
-    background: color-mix(in srgb, var(--match-color, var(--tessera-primary)) 8%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--match-color, var(--tessera-primary)) 8%,
+      transparent
+    );
   }
 
   .tessera-matching-item.correct {

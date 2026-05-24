@@ -82,15 +82,15 @@ pnpm exec playwright show-report
 
 Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Seven projects each target a different fixture / mode on its own port:
 
-| Project          | Port  | Fixture                         | Specs                           |
-| ---------------- | ----- | ------------------------------- | ------------------------------- |
-| `free-mode`      | 5180  | `tests/fixtures/free`           | most non-mode-specific specs    |
-| `sequential-mode`| 5181  | `tests/fixtures/sequential`     | `sequential.spec.ts`            |
-| `custom-layout`  | 5182  | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`       |
-| `custom-quiz`    | 5183  | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`           |
-| `mobile`         | 5180  | `tests/fixtures/free` (375x667) | `mobile.spec.ts`                |
-| `export`         | n/a   | pre-built variants              | `export.spec.ts`                |
-| `lms`            | n/a   | pre-built variants              | `lms-roundtrip.spec.ts`         |
+| Project           | Port | Fixture                         | Specs                        |
+| ----------------- | ---- | ------------------------------- | ---------------------------- |
+| `free-mode`       | 5180 | `tests/fixtures/free`           | most non-mode-specific specs |
+| `sequential-mode` | 5181 | `tests/fixtures/sequential`     | `sequential.spec.ts`         |
+| `custom-layout`   | 5182 | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`    |
+| `custom-quiz`     | 5183 | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`        |
+| `mobile`          | 5180 | `tests/fixtures/free` (375x667) | `mobile.spec.ts`             |
+| `export`          | n/a  | pre-built variants              | `export.spec.ts`             |
+| `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`      |
 
 ### The variant pre-build
 

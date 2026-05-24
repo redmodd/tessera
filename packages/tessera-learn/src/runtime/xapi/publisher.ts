@@ -127,7 +127,7 @@ export class XAPIPublisher {
     }
     if (!/^https?:\/\//i.test(opts.endpoint)) {
       throw new XAPIConfigError(
-        'XAPIPublisher: endpoint must be an absolute http(s) URL'
+        'XAPIPublisher: endpoint must be an absolute http(s) URL',
       );
     }
     if (!opts.activityId) {
@@ -173,7 +173,7 @@ export class XAPIPublisher {
         resolved = await this.#actorValue();
       } catch (err) {
         throw new XAPIConfigError(
-          `xapi.actor resolver threw: ${err instanceof Error ? err.message : String(err)}`
+          `xapi.actor resolver threw: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
       const err = validateAgent(resolved);
@@ -199,7 +199,7 @@ export class XAPIPublisher {
   getActor(): XAPIAgent {
     if (!this.#cachedActor) {
       throw new XAPIConfigError(
-        'XAPIPublisher.getActor() called before init() resolved. Await publisher.init() before reading the actor.'
+        'XAPIPublisher.getActor() called before init() resolved. Await publisher.init() before reading the actor.',
       );
     }
     return this.#cachedActor;
@@ -231,7 +231,7 @@ export class XAPIPublisher {
   buildStatement(partial: PartialStatement, opts?: { id?: string }): Statement {
     if (!this.#cachedActor) {
       throw new XAPIConfigError(
-        'XAPIPublisher.buildStatement() called before init() resolved.'
+        'XAPIPublisher.buildStatement() called before init() resolved.',
       );
     }
     const userCtx = partial.context ?? {};
@@ -274,7 +274,8 @@ export class XAPIPublisher {
       timestamp: new Date().toISOString(),
     };
     if (partial.result !== undefined) statement.result = partial.result;
-    if (partial.attachments !== undefined) statement.attachments = partial.attachments;
+    if (partial.attachments !== undefined)
+      statement.attachments = partial.attachments;
     return statement;
   }
 
@@ -289,7 +290,7 @@ export class XAPIPublisher {
    */
   sendStatement(
     partial: PartialStatement,
-    options?: SendStatementOptions & { id?: string }
+    options?: SendStatementOptions & { id?: string },
   ): Promise<SendStatementResult> {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
@@ -306,8 +307,8 @@ export class XAPIPublisher {
     if (!this.#cachedActor) {
       return Promise.reject(
         new XAPIConfigError(
-          'XAPIPublisher.sendStatement() called before init() resolved.'
-        )
+          'XAPIPublisher.sendStatement() called before init() resolved.',
+        ),
       );
     }
     const statement = this.buildStatement(partial, { id: options?.id });
@@ -326,7 +327,7 @@ export class XAPIPublisher {
    */
   enqueueBuilt(
     statementOrBatch: Statement | Statement[],
-    options?: SendStatementOptions
+    options?: SendStatementOptions,
   ): Promise<DestinationOutcome> {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
@@ -336,7 +337,7 @@ export class XAPIPublisher {
         endpoint: this.#endpoint,
         ok: false,
         error: new XAPIConfigError(
-          `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`
+          `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`,
         ),
       });
     }
@@ -345,7 +346,7 @@ export class XAPIPublisher {
       console.warn(
         `Tessera: xAPI publisher queue depth ${this.#queueDepth} (>= ${QUEUE_DEPTH_WARN}). ` +
           `Each pending statement is retained in the promise chain's closure until it drains; ` +
-          `consider rate-limiting authoring sends or batching before sendStatement.`
+          `consider rate-limiting authoring sends or batching before sendStatement.`,
       );
     }
     this.#queueDepth++;
@@ -367,7 +368,7 @@ export class XAPIPublisher {
           status: outcome.status,
           error: outcome.error,
         });
-      })
+      }),
     );
     return outcomePromise;
   }
@@ -385,7 +386,9 @@ export class XAPIPublisher {
       resolveTask = r;
     });
     this.#queue = this.#queue.then(() =>
-      fn().catch(() => {}).then(() => resolveTask())
+      fn()
+        .catch(() => {})
+        .then(() => resolveTask()),
     );
     return taskPromise;
   }
@@ -413,7 +416,7 @@ export class XAPIPublisher {
 
   #sendWithRetry(
     statementOrBatch: Statement | Statement[],
-    options?: SendStatementOptions
+    options?: SendStatementOptions,
   ): Promise<SendOutcome> {
     const body = JSON.stringify(statementOrBatch);
     const retry = options?.retry !== false; // default: retry enabled
@@ -432,7 +435,7 @@ export class XAPIPublisher {
           `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
             `over the 64 KiB keepalive cap. The browser may silently drop this ` +
             `request during unload. Reduce per-statement size or split sends ` +
-            `before terminate.`
+            `before terminate.`,
         );
       }
       return this.#sendOnce(body, keepalive).then((outcome) => {
@@ -447,9 +450,9 @@ export class XAPIPublisher {
           return outcome;
         }
         if (isFinal) return outcome;
-        return new Promise<void>((r) =>
-          setTimeout(r, backoffMs(n))
-        ).then(() => attempt(n + 1));
+        return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
+          attempt(n + 1),
+        );
       });
     };
 
@@ -461,7 +464,7 @@ export class XAPIPublisher {
       return Promise.resolve({
         ok: false,
         error: new XAPIConfigError(
-          'xapi.auth was rejected by the LRS twice in a row; refusing further sends for the publisher lifetime. Reload the runtime to retry.'
+          'xapi.auth was rejected by the LRS twice in a row; refusing further sends for the publisher lifetime. Reload the runtime to retry.',
         ),
       });
     }
@@ -482,7 +485,7 @@ export class XAPIPublisher {
   #fetchWithToken(
     token: string,
     body: string,
-    keepalive: boolean
+    keepalive: boolean,
   ): Promise<SendOutcome> {
     const headers = new Headers();
     if (token) headers.set('Authorization', `Basic ${token}`);
@@ -504,7 +507,7 @@ export class XAPIPublisher {
   #handleResponse(
     resp: Response,
     body: string,
-    keepalive: boolean
+    keepalive: boolean,
   ): Promise<SendOutcome> | SendOutcome {
     if (resp.ok || resp.status === 409) {
       return { ok: true, status: resp.status };
@@ -540,7 +543,7 @@ export class XAPIPublisher {
               ok: false,
               status: 401,
               error: new Error(
-                'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead'
+                'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
               ),
             };
           }
@@ -555,7 +558,7 @@ export class XAPIPublisher {
             ok: false,
             status: 401,
             error: err instanceof Error ? err : new Error(String(err)),
-          })
+          }),
         );
     }
     // Append the LRS body to the error message so callers see the
@@ -573,14 +576,14 @@ export class XAPIPublisher {
         ok: false,
         status: resp.status,
         error: new Error(
-          `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`
+          `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
         ),
       }),
       (): SendOutcome => ({
         ok: false,
         status: resp.status,
         error: new Error(`LRS responded ${resp.status}`),
-      })
+      }),
     );
   }
 
@@ -593,7 +596,8 @@ export class XAPIPublisher {
       // where the LMS fetch URL produced no token); otherwise revalidate.
       if (this.#authValue.length > 0) {
         const err = validateAuthCredential(this.#authValue);
-        if (err) return Promise.reject(new XAPIConfigError(`xapi.auth: ${err}`));
+        if (err)
+          return Promise.reject(new XAPIConfigError(`xapi.auth: ${err}`));
       }
       this.#cachedAuth = this.#authValue;
       return Promise.resolve(this.#cachedAuth);
@@ -603,7 +607,7 @@ export class XAPIPublisher {
       .then((resolved) => {
         if (typeof resolved !== 'string' || !resolved) {
           throw new XAPIConfigError(
-            'xapi.auth resolver must return a non-empty string'
+            'xapi.auth resolver must return a non-empty string',
           );
         }
         const err = validateAuthCredential(resolved);
@@ -614,9 +618,8 @@ export class XAPIPublisher {
       .catch((err) => {
         if (err instanceof XAPIConfigError) throw err;
         throw new XAPIConfigError(
-          `xapi.auth resolver threw: ${err instanceof Error ? err.message : String(err)}`
+          `xapi.auth resolver threw: ${err instanceof Error ? err.message : String(err)}`,
         );
       });
   }
 }
-

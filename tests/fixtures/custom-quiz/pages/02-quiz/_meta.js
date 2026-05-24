@@ -1,1 +1,1 @@
-export default { title: "Assessment" };
+export default { title: 'Assessment' };

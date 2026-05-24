@@ -51,7 +51,7 @@ export class WebAdapter implements PersistenceAdapter {
   reportInteraction(
     _questionId: string,
     _interaction: Interaction,
-    _correct: boolean | null
+    _correct: boolean | null,
   ): void {
     // Web adapter has no external LMS; learner interaction data lives only
     // in memory. Authors who want to persist per-question state can use

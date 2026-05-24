@@ -8,7 +8,12 @@ import {
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig, gradedQuizIndices } from './helpers.js';
 
-function ctx(pageIndex: number, manifest: ReturnType<typeof createManifest>, progress: ProgressState, config: ReturnType<typeof createConfig>) {
+function ctx(
+  pageIndex: number,
+  manifest: ReturnType<typeof createManifest>,
+  progress: ProgressState,
+  config: ReturnType<typeof createConfig>,
+) {
   return {
     pageIndex,
     page: manifest.pages[pageIndex],
@@ -27,14 +32,18 @@ describe('freeAccess', () => {
   });
 
   it('locks a page behind a failing gating quiz', () => {
-    const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
+    const manifest = createManifest(5, {
+      2: { graded: true, gatesProgress: true },
+    });
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 70 } });
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(false);
   });
 
   it('unlocks pages once the gating quiz is passed', () => {
-    const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
+    const manifest = createManifest(5, {
+      2: { graded: true, gatesProgress: true },
+    });
     const progress = new ProgressState(gradedQuizIndices(manifest));
     progress.quizCompleted(2, 80);
     const config = createConfig({ scoring: { passingScore: 70 } });
@@ -54,7 +63,9 @@ describe('freeAccess', () => {
   });
 
   it('treats non-gating quizzes as transparent', () => {
-    const manifest = createManifest(5, { 2: { graded: true, gatesProgress: false } });
+    const manifest = createManifest(5, {
+      2: { graded: true, gatesProgress: false },
+    });
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 70 } });
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
@@ -99,16 +110,22 @@ describe('sequentialAccess', () => {
 
 describe('resolveAccess', () => {
   it('returns freeAccess by default', () => {
-    expect(resolveAccess(createConfig({ navigation: { mode: 'free' } }))).toBe(freeAccess);
+    expect(resolveAccess(createConfig({ navigation: { mode: 'free' } }))).toBe(
+      freeAccess,
+    );
   });
 
   it('returns sequentialAccess for sequential mode', () => {
-    expect(resolveAccess(createConfig({ navigation: { mode: 'sequential' } }))).toBe(sequentialAccess);
+    expect(
+      resolveAccess(createConfig({ navigation: { mode: 'sequential' } })),
+    ).toBe(sequentialAccess);
   });
 
   it('honors a custom canAccess over the preset', () => {
     const custom: AccessFn = () => false;
-    const config = createConfig({ navigation: { mode: 'free', canAccess: custom } });
+    const config = createConfig({
+      navigation: { mode: 'free', canAccess: custom },
+    });
     expect(resolveAccess(config)).toBe(custom);
   });
 
@@ -117,7 +134,8 @@ describe('resolveAccess', () => {
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ navigation: { mode: 'sequential' } });
 
-    const custom: AccessFn = (c) => sequentialAccess(c) && c.progress.visitedPages.has(0);
+    const custom: AccessFn = (c) =>
+      sequentialAccess(c) && c.progress.visitedPages.has(0);
 
     expect(custom(ctx(1, manifest, progress, config))).toBe(false);
     progress.markVisited(0);

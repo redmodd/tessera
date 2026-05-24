@@ -1,5 +1,5 @@
 ---
-"create-tessera": patch
+'create-tessera': patch
 ---
 
 Move scaffolder templates from inline string literals to real on-disk template

@@ -1,6 +1,7 @@
 <script>
   import ResultIcon from './ResultIcon.svelte';
-  let { message = 'You already got this one right — click Next to continue.' } = $props();
+  let { message = 'You already got this one right — click Next to continue.' } =
+    $props();
 </script>
 
 <div class="tessera-quiz-locked-banner">

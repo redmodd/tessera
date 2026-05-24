@@ -45,7 +45,10 @@ export function validateAgent(actor: unknown): string | null {
     }
   }
   if (a.mbox_sha1sum !== undefined) {
-    if (typeof a.mbox_sha1sum !== 'string' || !/^[0-9a-f]{40}$/i.test(a.mbox_sha1sum)) {
+    if (
+      typeof a.mbox_sha1sum !== 'string' ||
+      !/^[0-9a-f]{40}$/i.test(a.mbox_sha1sum)
+    ) {
       return '.mbox_sha1sum must be a 40-character hex string';
     }
   }

@@ -14,7 +14,9 @@
   let touchEndX = 0;
 
   const ctx = {
-    get currentSlide() { return currentSlide; },
+    get currentSlide() {
+      return currentSlide;
+    },
     register() {
       const index = totalSlides;
       totalSlides++;
@@ -37,8 +39,14 @@
   }
 
   function handleKeydown(e) {
-    if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
-    if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') {
+      prev();
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowRight') {
+      next();
+      e.preventDefault();
+    }
   }
 
   function handleTouchStart(e) {
@@ -71,7 +79,10 @@
   tabindex="0"
 >
   <div class="tessera-carousel-viewport">
-    <div class="tessera-carousel-track" style="transform: translateX(-{currentSlide * 100}%)">
+    <div
+      class="tessera-carousel-track"
+      style="transform: translateX(-{currentSlide * 100}%)"
+    >
       {@render children?.()}
     </div>
   </div>
@@ -86,8 +97,12 @@
       ‹
     </button>
 
-    <div class="tessera-carousel-dots" role="tablist" aria-label="Slide indicators">
-      {#each dots as dot}
+    <div
+      class="tessera-carousel-dots"
+      role="tablist"
+      aria-label="Slide indicators"
+    >
+      {#each dots as dot (dot)}
         <button
           class="tessera-carousel-dot"
           class:active={dot === currentSlide}
@@ -148,8 +163,9 @@
     border: 1px solid var(--tessera-border);
     border-radius: 50%;
     cursor: pointer;
-    transition: background-color var(--tessera-transition-fast),
-                color var(--tessera-transition-fast);
+    transition:
+      background-color var(--tessera-transition-fast),
+      color var(--tessera-transition-fast);
   }
 
   .tessera-carousel-arrow:hover:not(:disabled) {

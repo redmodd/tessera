@@ -4,9 +4,12 @@ import AxeBuilder from '@axe-core/playwright';
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content');
   await page
-    .waitForFunction(() => !document.querySelector('.tessera-loading-skeleton'), {
-      timeout: 5000,
-    })
+    .waitForFunction(
+      () => !document.querySelector('.tessera-loading-skeleton'),
+      {
+        timeout: 5000,
+      },
+    )
     .catch(() => {});
 }
 
@@ -19,12 +22,16 @@ const primaryBtn = (page: Page) =>
   page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
 async function answerMultipleChoice(page: Page, optionIndex: number) {
-  const radios = page.locator('.tessera-quiz-question-wrapper.active .tessera-mc-option');
+  const radios = page.locator(
+    '.tessera-quiz-question-wrapper.active .tessera-mc-option',
+  );
   await radios.nth(optionIndex).click();
 }
 
 async function answerFillInTheBlank(page: Page, text: string) {
-  const input = page.locator('.tessera-quiz-question-wrapper.active input[type="text"]');
+  const input = page.locator(
+    '.tessera-quiz-question-wrapper.active input[type="text"]',
+  );
   await input.fill(text);
 }
 
@@ -45,7 +52,10 @@ async function answerMatching(page: Page, matchMap: Record<string, string>) {
     const targetRight = matchMap[leftText || ''];
     if (!targetRight) continue;
     await leftItems.nth(i).click();
-    await activeQ.locator('.tessera-matching-item.right', { hasText: targetRight }).first().click();
+    await activeQ
+      .locator('.tessera-matching-item.right', { hasText: targetRight })
+      .first()
+      .click();
     expected++;
     await expect(matched).toHaveCount(expected);
   }
@@ -83,7 +93,7 @@ async function completeGradedQuiz(
     mc?: number;
     fill?: string;
     matchMap?: Record<string, string>;
-  } = {}
+  } = {},
 ) {
   const progress = page.locator('.tessera-quiz-progress-desktop').first();
 
@@ -117,29 +127,43 @@ test.describe('Quiz — Graded Assessment', () => {
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
   });
 
-  test('quiz shows first question with progress indicator', async ({ page }) => {
+  test('quiz shows first question with progress indicator', async ({
+    page,
+  }) => {
     const progress = page.locator('.tessera-quiz-progress');
     await expect(progress).toContainText(/1.*3/);
 
-    const activeQuestion = page.locator('.tessera-quiz-question-wrapper.active');
+    const activeQuestion = page.locator(
+      '.tessera-quiz-question-wrapper.active',
+    );
     await expect(activeQuestion).toBeVisible();
   });
 
-  test('complete quiz with all correct answers — score 100%', async ({ page }) => {
+  test('complete quiz with all correct answers — score 100%', async ({
+    page,
+  }) => {
     await completeGradedQuiz(page);
 
-    await expect(page.locator('.tessera-quiz-score-value')).toContainText('100%');
-    await expect(page.locator('.tessera-quiz-score-label')).toContainText('Passed');
+    await expect(page.locator('.tessera-quiz-score-value')).toContainText(
+      '100%',
+    );
+    await expect(page.locator('.tessera-quiz-score-label')).toContainText(
+      'Passed',
+    );
   });
 
-  test('complete quiz with wrong answers — shows correct score', async ({ page }) => {
+  test('complete quiz with wrong answers — shows correct score', async ({
+    page,
+  }) => {
     await completeGradedQuiz(page, {
       mc: 0,
       fill: 'green',
       matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
     });
 
-    const scoreText = await page.locator('.tessera-quiz-score-value').textContent();
+    const scoreText = await page
+      .locator('.tessera-quiz-score-value')
+      .textContent();
     const scoreNum = parseInt(scoreText || '0', 10);
     expect(scoreNum).toBeLessThan(100);
   });
@@ -167,9 +191,9 @@ test.describe('Quiz — Graded Assessment', () => {
     await retryBtn.click();
 
     // Back to question 1 — wait for the progress text to reflect it.
-    await expect(page.locator('.tessera-quiz-progress-desktop').first()).toContainText(
-      'Question 1 of 3'
-    );
+    await expect(
+      page.locator('.tessera-quiz-progress-desktop').first(),
+    ).toContainText('Question 1 of 3');
   });
 
   test('maxAttempts exhausted — retry button disappears', async ({ page }) => {
@@ -183,13 +207,15 @@ test.describe('Quiz — Graded Assessment', () => {
       await completeGradedQuiz(page, wrongOpts);
 
       if (attempt < 2) {
-        const retryBtn = page.locator('.tessera-quiz-btn', { hasText: 'Retry' });
+        const retryBtn = page.locator('.tessera-quiz-btn', {
+          hasText: 'Retry',
+        });
         await expect(retryBtn).toBeVisible();
         await retryBtn.click();
         // Wait for the quiz to be back at question 1 before the next attempt.
-        await expect(page.locator('.tessera-quiz-progress-desktop').first()).toContainText(
-          'Question 1 of 3'
-        );
+        await expect(
+          page.locator('.tessera-quiz-progress-desktop').first(),
+        ).toContainText('Question 1 of 3');
       }
     }
 
@@ -213,7 +239,9 @@ test.describe('Quiz — Gating', () => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const conclusionPage = page.locator('.tessera-nav-page', { hasText: 'Conclusion' });
+    const conclusionPage = page.locator('.tessera-nav-page', {
+      hasText: 'Conclusion',
+    });
     await expect(conclusionPage).toHaveAttribute('aria-disabled', 'true');
 
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
@@ -224,7 +252,9 @@ test.describe('Quiz — Gating', () => {
       fill: 'wrong',
       matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
     });
-    await expect(page.locator('.tessera-quiz-score-label')).toContainText('Not Passed');
+    await expect(page.locator('.tessera-quiz-score-label')).toContainText(
+      'Not Passed',
+    );
 
     await expect(conclusionPage).toHaveAttribute('aria-disabled', 'true');
     await expect(nextBtn).toBeDisabled();
@@ -234,11 +264,15 @@ test.describe('Quiz — Gating', () => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const conclusionPage = page.locator('.tessera-nav-page', { hasText: 'Conclusion' });
+    const conclusionPage = page.locator('.tessera-nav-page', {
+      hasText: 'Conclusion',
+    });
     await expect(conclusionPage).toHaveAttribute('aria-disabled', 'true');
 
     await completeGradedQuiz(page);
-    await expect(page.locator('.tessera-quiz-score-label')).toContainText('Passed');
+    await expect(page.locator('.tessera-quiz-score-label')).toContainText(
+      'Passed',
+    );
 
     await expect(conclusionPage).not.toHaveAttribute('aria-disabled', 'true');
 
@@ -247,7 +281,9 @@ test.describe('Quiz — Gating', () => {
 
     await nextBtn.click();
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Congratulations');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Congratulations',
+    );
   });
 });
 
@@ -263,7 +299,9 @@ test.describe('Quiz — Accessibility', () => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const results = await new AxeBuilder({ page }).include('.tessera-quiz').analyze();
+    const results = await new AxeBuilder({ page })
+      .include('.tessera-quiz')
+      .analyze();
     expect(results.violations).toEqual([]);
   });
 
@@ -272,7 +310,9 @@ test.describe('Quiz — Accessibility', () => {
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
     await completeGradedQuiz(page);
 
-    const results = await new AxeBuilder({ page }).include('.tessera-quiz-results').analyze();
+    const results = await new AxeBuilder({ page })
+      .include('.tessera-quiz-results')
+      .analyze();
     expect(results.violations).toEqual([]);
   });
 });

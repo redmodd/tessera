@@ -1,5 +1,5 @@
 <script context="module">
-  export const pageConfig = { title: "Callouts & Images" };
+  export const pageConfig = { title: 'Callouts & Images' };
 </script>
 
 <script>

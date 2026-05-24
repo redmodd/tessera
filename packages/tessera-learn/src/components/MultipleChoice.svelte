@@ -23,15 +23,23 @@
   const groupId = `mc-${componentId}`;
 
   const q = useQuestion({
-    get id() { return id ?? `mc-${slugFromQuestion(question)}`; },
-    get weight() { return weight; },
-    get maxRetries() { return maxRetries; },
+    get id() {
+      return id ?? `mc-${slugFromQuestion(question)}`;
+    },
+    get weight() {
+      return weight;
+    },
+    get maxRetries() {
+      return maxRetries;
+    },
     response: () => ({
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],
       correct: [String(correct)],
     }),
-    reset: () => { selectedOption = null; },
+    reset: () => {
+      selectedOption = null;
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture once.
@@ -59,7 +67,8 @@
   function getOptionClass(optIndex) {
     if (!q.feedbackVisible) return '';
     if (isCorrectOption(optIndex)) return 'correct';
-    if (optIndex === selectedOption && !isCorrectOption(optIndex)) return 'incorrect';
+    if (optIndex === selectedOption && !isCorrectOption(optIndex))
+      return 'incorrect';
     return '';
   }
 </script>
@@ -68,7 +77,7 @@
   <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
   <div class="tessera-mc-options">
-    {#each options as option, i}
+    {#each options as option, i (i)}
       {@const optionId = `${groupId}-opt-${i}`}
       {@const isSelected = selectedOption === i}
       {@const stateClass = getOptionClass(i)}
@@ -91,9 +100,13 @@
 
         {#if q.feedbackVisible}
           {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback correct">{optionFeedback[i] || correctFeedback}</span>
+            <span class="tessera-mc-feedback correct"
+              >{optionFeedback[i] || correctFeedback}</span
+            >
           {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback incorrect">{optionFeedback[i] || incorrectFeedback}</span>
+            <span class="tessera-mc-feedback incorrect"
+              >{optionFeedback[i] || incorrectFeedback}</span
+            >
           {:else if optionFeedback[i]}
             <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
           {/if}
@@ -106,7 +119,9 @@
     {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
       <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
     {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
-      <div class="tessera-mc-overall-feedback incorrect">{incorrectFeedback}</div>
+      <div class="tessera-mc-overall-feedback incorrect">
+        {incorrectFeedback}
+      </div>
     {/if}
     {#if !inQuiz && q.canRetry}
       <RetryButton onclick={() => q.retry()} />
@@ -155,7 +170,9 @@
     border: 2px solid var(--tessera-border);
     border-radius: 8px;
     cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
     flex-wrap: wrap;
     min-height: 44px;
   }
@@ -180,7 +197,7 @@
     background: var(--tessera-error-bg);
   }
 
-  .tessera-mc-option input[type="radio"] {
+  .tessera-mc-option input[type='radio'] {
     position: absolute;
     opacity: 0;
     width: 0;
@@ -194,7 +211,9 @@
     border: 2px solid var(--tessera-border);
     border-radius: 50%;
     margin-top: 2px;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
     position: relative;
   }
 
@@ -238,7 +257,8 @@
   .tessera-mc-feedback {
     width: 100%;
     font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) 0 0 calc(20px + var(--tessera-spacing-md));
+    padding: var(--tessera-spacing-sm) 0 0
+      calc(20px + var(--tessera-spacing-md));
     line-height: 1.4;
   }
 

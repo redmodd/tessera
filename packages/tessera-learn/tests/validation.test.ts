@@ -10,7 +10,10 @@ let counter = 0;
 
 function createTestDir(): string {
   counter++;
-  const dir = resolve(tmpdir(), `tessera-validation-test-${Date.now()}-${counter}`);
+  const dir = resolve(
+    tmpdir(),
+    `tessera-validation-test-${Date.now()}-${counter}`,
+  );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -39,25 +42,21 @@ function createValidProject(root: string): void {
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
   );
   mkdirp(root, 'assets');
   mkdirp(root, 'pages', '01-section', '01-lesson');
   writeFile(
     root,
     'pages/01-section/_meta.js',
-    'export default { title: "Section" };'
+    'export default { title: "Section" };',
   );
   writeFile(
     root,
     'pages/01-section/01-lesson/_meta.js',
-    'export default { title: "Lesson" };'
+    'export default { title: "Lesson" };',
   );
-  writeFile(
-    root,
-    'pages/01-section/01-lesson/page.svelte',
-    '<h1>Hello</h1>'
-  );
+  writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hello</h1>');
 }
 
 beforeEach(() => {
@@ -98,11 +97,11 @@ describe('config validation', () => {
   scoring: { passingScore: 70 },
   export: { standard: "web" },
   unknownField: true,
-};`
+};`,
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('unknown field "unknownField"')
+      expect.stringContaining('unknown field "unknownField"'),
     );
   });
 
@@ -116,11 +115,13 @@ describe('config validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"navigation.mode" must be "free" or "sequential", got "chaos"')
+      expect.stringContaining(
+        '"navigation.mode" must be "free" or "sequential", got "chaos"',
+      ),
     );
   });
 
@@ -134,11 +135,13 @@ describe('config validation', () => {
   completion: { mode: "everything" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.mode" must be "quiz", "percentage", or "manual", got "everything"')
+      expect.stringContaining(
+        '"completion.mode" must be "quiz", "percentage", or "manual", got "everything"',
+      ),
     );
   });
 
@@ -152,11 +155,13 @@ describe('config validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "tin-can" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "tin-can"')
+      expect.stringContaining(
+        '"export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "tin-can"',
+      ),
     );
   });
 
@@ -170,11 +175,11 @@ describe('config validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: 150 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"scoring.passingScore" must be 0–100, got 150')
+      expect.stringContaining('"scoring.passingScore" must be 0–100, got 150'),
     );
   });
 
@@ -188,11 +193,11 @@ describe('config validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: -10 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"scoring.passingScore" must be 0–100, got -10')
+      expect.stringContaining('"scoring.passingScore" must be 0–100, got -10'),
     );
   });
 
@@ -206,25 +211,33 @@ describe('config validation', () => {
   completion: { mode: "percentage", percentageThreshold: 200 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.percentageThreshold" must be 0–100, got 200')
+      expect.stringContaining(
+        '"completion.percentageThreshold" must be 0–100, got 200',
+      ),
     );
   });
 
   it('errors on unparseable config', () => {
     writeFile(testRoot, 'course.config.js', 'this is not valid JS;');
     mkdirp(testRoot, 'pages', '01-s', '01-l');
-    writeFile(testRoot, 'pages/01-s/_meta.js', 'export default { title: "S" };');
-    writeFile(testRoot, 'pages/01-s/01-l/_meta.js', 'export default { title: "L" };');
+    writeFile(
+      testRoot,
+      'pages/01-s/_meta.js',
+      'export default { title: "S" };',
+    );
+    writeFile(
+      testRoot,
+      'pages/01-s/01-l/_meta.js',
+      'export default { title: "L" };',
+    );
     writeFile(testRoot, 'pages/01-s/01-l/p.svelte', '<p>Hi</p>');
 
     const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining('could not parse')
-    );
+    expect(errors).toContainEqual(expect.stringContaining('could not parse'));
   });
 });
 
@@ -233,14 +246,10 @@ describe('config validation', () => {
 describe('_meta.js validation', () => {
   it('errors on _meta.js with syntax error', () => {
     createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'this is broken {'
-    );
+    writeFile(testRoot, 'pages/01-section/_meta.js', 'this is broken {');
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('_meta.js: syntax error')
+      expect.stringContaining('_meta.js: syntax error'),
     );
   });
 
@@ -249,11 +258,11 @@ describe('_meta.js validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/_meta.js',
-      'export default { pages: ["page"] };'
+      'export default { pages: ["page"] };',
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('_meta.js: missing required "title" field')
+      expect.stringContaining('_meta.js: missing required "title" field'),
     );
   });
 
@@ -262,11 +271,13 @@ describe('_meta.js validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "Lesson", pages: ["page", "missing-page"] };'
+      'export default { title: "Lesson", pages: ["page", "missing-page"] };',
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('pages array lists "missing-page" but missing-page.svelte not found')
+      expect.stringContaining(
+        'pages array lists "missing-page" but missing-page.svelte not found',
+      ),
     );
   });
 });
@@ -282,11 +293,11 @@ describe('pageConfig validation', () => {
       `<script context="module">
 export const pageConfig = getConfig();
 </script>
-<h1>Hello</h1>`
+<h1>Hello</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('pageConfig must be a static object literal')
+      expect.stringContaining('pageConfig must be a static object literal'),
     );
   });
 
@@ -299,11 +310,11 @@ export const pageConfig = getConfig();
 const cfg = { title: "Hello" };
 export const pageConfig = cfg;
 </script>
-<h1>Hello</h1>`
+<h1>Hello</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('pageConfig must be a static object literal')
+      expect.stringContaining('pageConfig must be a static object literal'),
     );
   });
 
@@ -315,11 +326,11 @@ export const pageConfig = cfg;
       `<script context="module">
 export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
 </script>
-<h1>Hello</h1>`
+<h1>Hello</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('pageConfig must be a static object literal')
+      expect.stringContaining('pageConfig must be a static object literal'),
     );
   });
 
@@ -331,11 +342,13 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.maxAttempts must be a positive number or Infinity, got -1')
+      expect.stringContaining(
+        'quiz.maxAttempts must be a positive number or Infinity, got -1',
+      ),
     );
   });
 
@@ -347,11 +360,13 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: 0 } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.maxAttempts must be a positive number or Infinity, got 0')
+      expect.stringContaining(
+        'quiz.maxAttempts must be a positive number or Infinity, got 0',
+      ),
     );
   });
 
@@ -363,7 +378,7 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: 0 } };
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: Infinity, graded: true } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('maxAttempts'))).toHaveLength(0);
@@ -377,11 +392,11 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: Infinity, graded
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.graded must be a boolean, got string')
+      expect.stringContaining('quiz.graded must be a boolean, got string'),
     );
   });
 
@@ -393,14 +408,15 @@ export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.gatesProgress must be a boolean, got string')
+      expect.stringContaining(
+        'quiz.gatesProgress must be a boolean, got string',
+      ),
     );
   });
-
 });
 
 // ---- Structure Validation ----
@@ -415,12 +431,10 @@ describe('structure validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining('No pages found')
-    );
+    expect(errors).toContainEqual(expect.stringContaining('No pages found'));
   });
 
   it('errors on empty course (empty pages dir)', () => {
@@ -432,13 +446,11 @@ describe('structure validation', () => {
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     mkdirp(testRoot, 'pages');
     const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining('No pages found')
-    );
+    expect(errors).toContainEqual(expect.stringContaining('No pages found'));
   });
 
   it('warns on stray .svelte file at pages root', () => {
@@ -446,17 +458,25 @@ describe('structure validation', () => {
     writeFile(testRoot, 'pages/stray.svelte', '<p>Stray</p>');
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('stray.svelte: this file is outside the section/lesson structure')
+      expect.stringContaining(
+        'stray.svelte: this file is outside the section/lesson structure',
+      ),
     );
   });
 
   it('treats section-level .svelte files as flat-mode pages', () => {
     createValidProject(testRoot);
-    writeFile(testRoot, 'pages/01-section/flat-page.svelte', '<p>Flat page</p>');
+    writeFile(
+      testRoot,
+      'pages/01-section/flat-page.svelte',
+      '<p>Flat page</p>',
+    );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toEqual([]);
     expect(warnings).not.toContainEqual(
-      expect.stringContaining('flat-page.svelte: this file is outside the section/lesson structure')
+      expect.stringContaining(
+        'flat-page.svelte: this file is outside the section/lesson structure',
+      ),
     );
   });
 
@@ -465,16 +485,18 @@ describe('structure validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "Lesson", pages: ["page"] };'
+      'export default { title: "Lesson", pages: ["page"] };',
     );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/extras.svelte',
-      '<h1>Extra</h1>'
+      '<h1>Extra</h1>',
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('extras.svelte: not listed in _meta.js pages array')
+      expect.stringContaining(
+        'extras.svelte: not listed in _meta.js pages array',
+      ),
     );
   });
 });
@@ -487,11 +509,13 @@ describe('asset reference validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      '<img src="$assets/missing.png" />'
+      '<img src="$assets/missing.png" />',
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('"$assets/missing.png" not found in assets/ directory')
+      expect.stringContaining(
+        '"$assets/missing.png" not found in assets/ directory',
+      ),
     );
   });
 
@@ -501,12 +525,12 @@ describe('asset reference validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      '<img src="$assets/logo.png" />'
+      '<img src="$assets/logo.png" />',
     );
     const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('$assets/logo.png'))
-    ).toHaveLength(0);
+    expect(warnings.filter((w) => w.includes('$assets/logo.png'))).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -521,11 +545,13 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="Pick one" options={["a", "b"]} />`
+<MultipleChoice question="Pick one" options={["a", "b"]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('<MultipleChoice> is missing required prop "correct"')
+      expect.stringContaining(
+        '<MultipleChoice> is missing required prop "correct"',
+      ),
     );
   });
 
@@ -533,11 +559,11 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="Q" options={["a", "b", "c"]} correct={5} />`
+<MultipleChoice question="Q" options={["a", "b", "c"]} correct={5} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('correct={5} is out of range for 3 options')
+      expect.stringContaining('correct={5} is out of range for 3 options'),
     );
   });
 
@@ -545,7 +571,7 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="Q" options={["a", "b", "c"]} correct={2} />`
+<MultipleChoice question="Q" options={["a", "b", "c"]} correct={2} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
@@ -559,7 +585,7 @@ describe('question component validation', () => {
   let opts = ["a", "b"];
   let answer = 9;
 </script>
-<MultipleChoice question="Q" options={opts} correct={answer} />`
+<MultipleChoice question="Q" options={opts} correct={answer} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
@@ -569,11 +595,11 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { Sorting } from 'tessera-learn';</script>
-<Sorting question="Q" items={["x", "y", "z"]} targets={["A", "B"]} correct={[0, 1]} />`
+<Sorting question="Q" items={["x", "y", "z"]} targets={["A", "B"]} correct={[0, 1]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('correct has 2 entries but items has 3')
+      expect.stringContaining('correct has 2 entries but items has 3'),
     );
   });
 
@@ -581,11 +607,11 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { Sorting } from 'tessera-learn';</script>
-<Sorting question="Q" items={["x", "y"]} targets={["A", "B"]} correct={[0, 4]} />`
+<Sorting question="Q" items={["x", "y"]} targets={["A", "B"]} correct={[0, 4]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('correct contains 4, out of range for 2 targets')
+      expect.stringContaining('correct contains 4, out of range for 2 targets'),
     );
   });
 
@@ -594,11 +620,11 @@ describe('question component validation', () => {
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="q1" question="A" options={["a", "b"]} correct={0} />
-<MultipleChoice id="q1" question="B" options={["a", "b"]} correct={1} />`
+<MultipleChoice id="q1" question="B" options={["a", "b"]} correct={1} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('duplicate question id "q1"')
+      expect.stringContaining('duplicate question id "q1"'),
     );
   });
 
@@ -606,11 +632,11 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { Matching } from 'tessera-learn';</script>
-<Matching question="Match them" />`
+<Matching question="Match them" />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('<Matching> is missing required prop "pairs"')
+      expect.stringContaining('<Matching> is missing required prop "pairs"'),
     );
   });
 
@@ -618,11 +644,13 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { Matching } from 'tessera-learn';</script>
-<Matching question="Q" pairs={[{ left: "France" }]} />`
+<Matching question="Q" pairs={[{ left: "France" }]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('<Matching> pairs must be an array of { left: string, right: string }')
+      expect.stringContaining(
+        '<Matching> pairs must be an array of { left: string, right: string }',
+      ),
     );
   });
 
@@ -630,7 +658,7 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { Matching } from 'tessera-learn';</script>
-<Matching question="Q" pairs={[{ left: "France", right: "Paris" }]} />`
+<Matching question="Q" pairs={[{ left: "France", right: "Paris" }]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('Matching'))).toHaveLength(0);
@@ -640,11 +668,13 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers={["Oxygen", 8]} />`
+<FillInTheBlank question="Q" answers={["Oxygen", 8]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('<FillInTheBlank> answers must be an array of strings')
+      expect.stringContaining(
+        '<FillInTheBlank> answers must be an array of strings',
+      ),
     );
   });
 
@@ -652,11 +682,11 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers={[]} />`
+<FillInTheBlank question="Q" answers={[]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('<FillInTheBlank> answers must not be empty')
+      expect.stringContaining('<FillInTheBlank> answers must not be empty'),
     );
   });
 });
@@ -676,11 +706,11 @@ describe('contract bypass detection', () => {
     el.dispatchEvent(new CustomEvent('tessera-quiz-complete', { detail: {} }));
   }
 </script>
-<h1>Page</h1>`
+<h1>Page</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('dispatches "tessera-quiz-complete" directly')
+      expect.stringContaining('dispatches "tessera-quiz-complete" directly'),
     );
   });
 
@@ -690,11 +720,11 @@ describe('contract bypass detection', () => {
       `<script>
   import { something } from 'tessera-learn/runtime/hooks.svelte.js';
 </script>
-<h1>Page</h1>`
+<h1>Page</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('imports from tessera-learn/runtime/*')
+      expect.stringContaining('imports from tessera-learn/runtime/*'),
     );
   });
 
@@ -705,11 +735,13 @@ describe('contract bypass detection', () => {
       'quiz.svelte',
       `<script>
   import { internal } from 'tessera-learn/runtime/hooks.svelte.js';
-</script>`
+</script>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.svelte: imports from tessera-learn/runtime/*')
+      expect.stringContaining(
+        'quiz.svelte: imports from tessera-learn/runtime/*',
+      ),
     );
   });
 
@@ -719,11 +751,13 @@ describe('contract bypass detection', () => {
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
-<h1>Empty quiz</h1>`
+<h1>Empty quiz</h1>`,
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('quiz page has no question components or useQuestion() calls')
+      expect.stringContaining(
+        'quiz page has no question components or useQuestion() calls',
+      ),
     );
   });
 
@@ -734,11 +768,11 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`,
     );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.filter((w) => w.includes('quiz page has no question'))
+      warnings.filter((w) => w.includes('quiz page has no question')),
     ).toHaveLength(0);
   });
 
@@ -752,11 +786,11 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   import { useQuestion } from 'tessera-learn';
   const q = useQuestion({ id: 'q1', response: () => ({ type: 'other', response: [] }) });
 </script>
-<h1>Custom question</h1>`
+<h1>Custom question</h1>`,
     );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.filter((w) => w.includes('quiz page has no question'))
+      warnings.filter((w) => w.includes('quiz page has no question')),
     ).toHaveLength(0);
   });
 
@@ -769,11 +803,11 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 <script>
   import CustomRound from '../components/CustomRound.svelte';
 </script>
-{#each [1, 2, 3] as i}<CustomRound {i} />{/each}`
+{#each [1, 2, 3] as i}<CustomRound {i} />{/each}`,
     );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.filter((w) => w.includes('quiz page has no question'))
+      warnings.filter((w) => w.includes('quiz page has no question')),
     ).toHaveLength(0);
   });
 });
@@ -791,11 +825,13 @@ describe('cross-cutting validation', () => {
   completion: { mode: "quiz" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('completion.mode is "quiz" but no pages have quiz config with graded: true')
+      expect.stringContaining(
+        'completion.mode is "quiz" but no pages have quiz config with graded: true',
+      ),
     );
   });
 
@@ -809,7 +845,7 @@ describe('cross-cutting validation', () => {
   completion: { mode: "quiz" },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     writeFile(
       testRoot,
@@ -817,11 +853,11 @@ describe('cross-cutting validation', () => {
       `<script context="module">
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
-<h1>Quiz</h1>`
+<h1>Quiz</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(
-      errors.filter((e) => e.includes('completion.mode is "quiz"'))
+      errors.filter((e) => e.includes('completion.mode is "quiz"')),
     ).toHaveLength(0);
   });
 
@@ -835,19 +871,19 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "scorm12" },
-};`
+};`,
     );
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
     writeFile(
       testRoot,
       'pages/01-section/_meta.js',
-      'export default { title: "Section" };'
+      'export default { title: "Section" };',
     );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "Lesson" };'
+      'export default { title: "Lesson" };',
     );
 
     // Create 1000 pages to trigger the warning
@@ -855,13 +891,13 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       writeFile(
         testRoot,
         `pages/01-section/01-lesson/page-${String(i).padStart(4, '0')}.svelte`,
-        `<h1>Page ${i}</h1>`
+        `<h1>Page ${i}</h1>`,
       );
     }
 
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('may exceed the 4096-byte limit')
+      expect.stringContaining('may exceed the 4096-byte limit'),
     );
   });
 
@@ -875,11 +911,9 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
   export: { standard: "scorm12" },
-};`
+};`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('SCORM 1.2'))
-    ).toHaveLength(0);
+    expect(warnings.filter((w) => w.includes('SCORM 1.2'))).toHaveLength(0);
   });
 });

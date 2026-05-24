@@ -34,7 +34,9 @@ export interface FeedbackVisibilityState {
 }
 
 export type FeedbackModePredicate = (state: FeedbackVisibilityState) => boolean;
-export type RetryStrategyPredicate = (results: QuizQuestionResult[]) => Set<number>;
+export type RetryStrategyPredicate = (
+  results: QuizQuestionResult[],
+) => Set<number>;
 
 /**
  * Resolve the configured feedback policy into the "should this question's
@@ -43,7 +45,9 @@ export type RetryStrategyPredicate = (results: QuizQuestionResult[]) => Set<numb
  *  - `'review'` (default) — visible only while reviewing.
  *  - `'never'` — never visible (`useQuiz` short-circuits before calling here).
  */
-export function resolveFeedbackMode(cfg: QuizConfig | undefined | null): FeedbackModePredicate {
+export function resolveFeedbackMode(
+  cfg: QuizConfig | undefined | null,
+): FeedbackModePredicate {
   const mode = cfg?.feedbackMode;
   if (mode === 'immediate') return (s) => s.revealed || s.reviewing;
   if (mode === 'never') return () => false;
@@ -56,7 +60,9 @@ export function resolveFeedbackMode(cfg: QuizConfig | undefined | null): Feedbac
  *  - `'incorrect-only'` — keep questions the learner got right.
  *  - `'full'` (default) — reset everything.
  */
-export function resolveRetryStrategy(cfg: QuizConfig | undefined | null): RetryStrategyPredicate {
+export function resolveRetryStrategy(
+  cfg: QuizConfig | undefined | null,
+): RetryStrategyPredicate {
   if (cfg?.retryMode === 'incorrect-only') {
     return (results) => {
       const locked = new Set<number>();

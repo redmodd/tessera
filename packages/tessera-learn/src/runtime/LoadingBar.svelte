@@ -14,9 +14,13 @@
       // next frame so the CSS transition from width:0 → 90% actually fires.
       const appearTimer = setTimeout(() => {
         visible = true;
-        requestAnimationFrame(() => { appeared = true; });
+        requestAnimationFrame(() => {
+          appeared = true;
+        });
       }, 100);
-      const slowTimer = setTimeout(() => { showSlowMessage = true; }, 5000);
+      const slowTimer = setTimeout(() => {
+        showSlowMessage = true;
+      }, 5000);
       return () => {
         clearTimeout(appearTimer);
         clearTimeout(slowTimer);
@@ -38,7 +42,12 @@
 </script>
 
 {#if visible}
-  <div class="tessera-loading-bar" class:appear={appeared} class:complete aria-hidden="true">
+  <div
+    class="tessera-loading-bar"
+    class:appear={appeared}
+    class:complete
+    aria-hidden="true"
+  >
     <div class="tessera-loading-bar-fill"></div>
   </div>
   {#if showSlowMessage}

@@ -1,1 +1,1 @@
-export default { title: "Welcome", pages: ["welcome", "objectives"] };
+export default { title: 'Welcome', pages: ['welcome', 'objectives'] };

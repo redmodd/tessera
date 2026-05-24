@@ -24,29 +24,37 @@ function lmsCallSucceeded(result: unknown): boolean {
 
 function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   if (!reporter) return '';
-  try { return reporter.code(); } catch { return ''; }
+  try {
+    return reporter.code();
+  } catch {
+    return '';
+  }
 }
 
 function logRetryGiveUp(
   errorReporter: LMSErrorReporter | undefined,
   lastErrCode: string,
-  context: string | undefined
+  context: string | undefined,
 ): void {
   const ctx = context ? ` [${context}]` : '';
   console.warn(
-    `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`
+    `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
   );
 }
 
 export function formatLMSErrorDetail(
   errorReporter: LMSErrorReporter | undefined,
-  code: string
+  code: string,
 ): string {
   if (!errorReporter || !code || code === '0') return '';
   let msg = '';
   let diag = '';
-  try { msg = errorReporter.message(code); } catch {}
-  try { diag = errorReporter.diagnostic?.(code) ?? ''; } catch {}
+  try {
+    msg = errorReporter.message(code);
+  } catch {}
+  try {
+    diag = errorReporter.diagnostic?.(code) ?? '';
+  } catch {}
   let detail = ` (LMS error ${code}`;
   if (msg) detail += `: ${msg}`;
   if (diag && diag !== msg) detail += ` — ${diag}`;
@@ -56,24 +64,21 @@ export function formatLMSErrorDetail(
 
 /** Sync call that warns with the LMS error code on failure (terminate-path). */
 export function callSyncOrWarn(
-  fn: () => any,
+  fn: () => unknown,
   context: string,
-  errorReporter?: LMSErrorReporter
+  errorReporter?: LMSErrorReporter,
 ): boolean {
-  let ok = false;
+  let ok: boolean;
   try {
     ok = lmsCallSucceeded(fn());
   } catch (err) {
-    console.warn(
-      `Tessera: LMS call threw [${context}] during terminate`,
-      err
-    );
+    console.warn(`Tessera: LMS call threw [${context}] during terminate`, err);
     return false;
   }
   if (!ok) {
     const code = readLastErrorCode(errorReporter);
     console.warn(
-      `Tessera: LMS call failed [${context}] during terminate${formatLMSErrorDetail(errorReporter, code)}`
+      `Tessera: LMS call failed [${context}] during terminate${formatLMSErrorDetail(errorReporter, code)}`,
     );
   }
   return ok;
@@ -95,10 +100,10 @@ export function callSyncOrWarn(
  * for SCORM adapters where the underlying API calls are synchronous.
  */
 export async function withRetry(
-  fn: () => any,
+  fn: () => unknown,
   maxRetries = RETRY_ATTEMPTS,
   errorReporter?: LMSErrorReporter,
-  context?: string
+  context?: string,
 ): Promise<boolean> {
   let lastErrCode = '';
   let threw = false;
@@ -128,7 +133,7 @@ export async function withRetry(
  * Synchronous single-attempt LMS call. Used during page unload
  * where async retries cannot run.
  */
-export function callSync(fn: () => any): boolean {
+export function callSync(fn: () => unknown): boolean {
   try {
     return lmsCallSucceeded(fn());
   } catch {
@@ -143,7 +148,7 @@ export function callSync(fn: () => any): boolean {
  * the failed operation on the next flush trigger.
  */
 interface QueueEntry {
-  fn: () => any;
+  fn: () => unknown;
   context?: string;
 }
 
@@ -164,10 +169,10 @@ export class WriteQueue {
   /**
    * Enqueue an operation and trigger a flush.
    */
-  enqueue(fn: () => any, context?: string): void {
+  enqueue(fn: () => unknown, context?: string): void {
     this.#queue.push({ fn, context });
     if (!this.#flushing) {
-      this.#flush();
+      void this.#flush();
     }
   }
 

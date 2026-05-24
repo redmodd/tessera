@@ -16,7 +16,12 @@
   {#if title}
     <div class="tessera-audio-title">{title}</div>
   {/if}
-  <audio controls preload="metadata" aria-label={title || 'Audio player'} class="tessera-audio-player">
+  <audio
+    controls
+    preload="metadata"
+    aria-label={title || 'Audio player'}
+    class="tessera-audio-player"
+  >
     <source src={resolvedSrc} />
     Your browser does not support the audio element.
   </audio>

@@ -33,10 +33,7 @@ describe('withRetry', () => {
   });
 
   it('retries on "false" string return value', async () => {
-    const fn = vi
-      .fn()
-      .mockReturnValueOnce('false')
-      .mockReturnValueOnce('true');
+    const fn = vi.fn().mockReturnValueOnce('false').mockReturnValueOnce('true');
     const result = await withRetry(fn, 3);
     expect(result).toBe(true);
     expect(fn).toHaveBeenCalledTimes(2);
@@ -61,7 +58,7 @@ describe('withRetry', () => {
     expect(result).toBe(false);
     expect(fn).toHaveBeenCalledTimes(3);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('LMS call failed after retries')
+      expect.stringContaining('LMS call failed after retries'),
     );
     warnSpy.mockRestore();
   });
@@ -91,7 +88,7 @@ describe('callSync', () => {
     expect(
       callSync(() => {
         throw new Error('fail');
-      })
+      }),
     ).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 <script context="module">
-  export const pageConfig = { title: "Page Two" };
+  export const pageConfig = { title: 'Page Two' };
 </script>
 
 <h1>Page Two</h1>

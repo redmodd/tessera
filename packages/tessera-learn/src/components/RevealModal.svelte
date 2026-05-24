@@ -7,8 +7,6 @@
    * @prop {import('svelte').Snippet} trigger - Trigger content snippet
    * @prop {import('svelte').Snippet} content - Modal body snippet
    */
-  import { onMount } from 'svelte';
-
   let { trigger, content, title = '' } = $props();
   let open = $state(false);
   let modalRef = $state(null);
@@ -23,13 +21,6 @@
     open = false;
     if (previousFocus && typeof previousFocus.focus === 'function') {
       previousFocus.focus();
-    }
-  }
-
-  function handleTriggerKey(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      openModal();
     }
   }
 
@@ -48,7 +39,7 @@
     // Focus trap
     if (e.key === 'Tab' && modalRef) {
       const focusable = modalRef.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (focusable.length === 0) return;
 
@@ -76,7 +67,7 @@
       queueMicrotask(() => {
         if (modalRef) {
           const firstFocusable = modalRef.querySelector(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
           );
           if (firstFocusable) firstFocusable.focus();
           else modalRef.focus();
@@ -90,10 +81,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  class="tessera-reveal-trigger"
-  onclick={openModal}
->
+<div class="tessera-reveal-trigger" onclick={openModal}>
   {@render trigger()}
 </div>
 
@@ -118,7 +106,11 @@
       <div class="tessera-modal-body">
         {@render content()}
       </div>
-      <button class="tessera-modal-close" onclick={closeModal} aria-label="Close modal">
+      <button
+        class="tessera-modal-close"
+        onclick={closeModal}
+        aria-label="Close modal"
+      >
         ✕
       </button>
     </div>
@@ -194,8 +186,9 @@
     color: var(--tessera-text-light);
     cursor: pointer;
     border-radius: 6px;
-    transition: background-color var(--tessera-transition-fast),
-                color var(--tessera-transition-fast);
+    transition:
+      background-color var(--tessera-transition-fast),
+      color var(--tessera-transition-fast);
   }
 
   .tessera-modal-close:hover {
@@ -209,13 +202,23 @@
   }
 
   @keyframes tessera-modal-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes tessera-modal-slide-in {
-    from { transform: translateY(10px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 
   @media (max-width: 640px) {

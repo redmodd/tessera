@@ -86,7 +86,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   #readScaledThreshold(key: string): number | null {
-    let raw = '';
+    let raw: string;
     try {
       raw = this.api.GetValue(key);
     } catch {
@@ -104,7 +104,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.queue.enqueue(
       () => this.api.SetValue('cmi.location', String(state.b)),
-      'cmi.location'
+      'cmi.location',
     );
   }
 
@@ -116,7 +116,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   reportInteraction(
     questionId: string,
     interaction: import('../interaction.js').Interaction,
-    correct: boolean | null
+    correct: boolean | null,
   ): void {
     if (!this.#canWrite) return;
     super.reportInteraction(questionId, interaction, correct);
@@ -129,19 +129,19 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     const scaled = formatReal107(Math.max(0, Math.min(1, score / 100)));
     this.queue.enqueue(
       () => this.api.SetValue('cmi.score.raw', raw),
-      'cmi.score.raw'
+      'cmi.score.raw',
     );
     this.queue.enqueue(
       () => this.api.SetValue('cmi.score.min', '0'),
-      'cmi.score.min'
+      'cmi.score.min',
     );
     this.queue.enqueue(
       () => this.api.SetValue('cmi.score.max', '100'),
-      'cmi.score.max'
+      'cmi.score.max',
     );
     this.queue.enqueue(
       () => this.api.SetValue('cmi.score.scaled', scaled),
-      'cmi.score.scaled'
+      'cmi.score.scaled',
     );
   }
 
@@ -150,13 +150,13 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     const value = status === 'complete' ? 'completed' : 'incomplete';
     this.queue.enqueue(
       () => this.api.SetValue('cmi.completion_status', value),
-      'cmi.completion_status'
+      'cmi.completion_status',
     );
     // §4.2.4.2 — writing 1.0 surfaces a "100%" reading on LMS dashboards.
     if (status === 'complete') {
       this.queue.enqueue(
         () => this.api.SetValue('cmi.progress_measure', '1'),
-        'cmi.progress_measure'
+        'cmi.progress_measure',
       );
     }
   }
@@ -167,15 +167,12 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     // a null status to "passed".
     this.queue.enqueue(
       () => this.api.SetValue('cmi.success_status', status),
-      'cmi.success_status'
+      'cmi.success_status',
     );
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
     if (!this.#canWrite) return;
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.exit', mode),
-      'cmi.exit'
-    );
+    this.queue.enqueue(() => this.api.SetValue('cmi.exit', mode), 'cmi.exit');
   }
 }

@@ -50,7 +50,7 @@ describe('SCORM2004Adapter', () => {
       d: 100,
     };
     (api.GetValue as any).mockImplementation((key: string) =>
-      key === 'cmi.suspend_data' ? JSON.stringify(state) : ''
+      key === 'cmi.suspend_data' ? JSON.stringify(state) : '',
     );
     await adapter.init();
     expect(adapter.getState()).toEqual(state);
@@ -66,7 +66,9 @@ describe('SCORM2004Adapter', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
-    expect(warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0])))).toBe(true);
+    expect(
+      warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
+    ).toBe(true);
     warn.mockRestore();
   });
 
@@ -82,7 +84,7 @@ describe('SCORM2004Adapter', () => {
     await flush();
     expect(api.SetValue).toHaveBeenCalledWith(
       'cmi.suspend_data',
-      JSON.stringify(state)
+      JSON.stringify(state),
     );
   });
 
@@ -101,7 +103,9 @@ describe('SCORM2004Adapter', () => {
       adapter.saveState(state);
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toMatch(/SCORM 2004 4E cmi\.suspend_data 64000/);
+      expect(warn.mock.calls[0][0]).toMatch(
+        /SCORM 2004 4E cmi\.suspend_data 64000/,
+      );
       warn.mockRestore();
     });
 
@@ -135,10 +139,10 @@ describe('SCORM2004Adapter', () => {
     adapter.setScore((7 / 11) * 100);
     await flush();
     const rawCall = (api.SetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.score.raw'
+      ([k]: [string]) => k === 'cmi.score.raw',
     );
     const scaledCall = (api.SetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.score.scaled'
+      ([k]: [string]) => k === 'cmi.score.scaled',
     );
     expect(rawCall[1]).toBe('63.6363636');
     expect(scaledCall[1]).toBe('0.6363636');
@@ -148,7 +152,7 @@ describe('SCORM2004Adapter', () => {
     adapter.setScore(150);
     await flush();
     const scaledCall = (api.SetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.score.scaled'
+      ([k]: [string]) => k === 'cmi.score.scaled',
     );
     expect(scaledCall[1]).toBe('1');
   });
@@ -158,7 +162,7 @@ describe('SCORM2004Adapter', () => {
     await flush();
     expect(api.SetValue).toHaveBeenCalledWith(
       'cmi.completion_status',
-      'completed'
+      'completed',
     );
   });
 
@@ -167,7 +171,7 @@ describe('SCORM2004Adapter', () => {
     await flush();
     expect(api.SetValue).toHaveBeenCalledWith(
       'cmi.completion_status',
-      'incomplete'
+      'incomplete',
     );
   });
 
@@ -202,10 +206,7 @@ describe('SCORM2004Adapter', () => {
     adapter.terminate();
 
     expect(api.SetValue).toHaveBeenCalledWith('cmi.score.raw', '90');
-    expect(api.SetValue).toHaveBeenCalledWith(
-      'cmi.session_time',
-      'PT1M40S'
-    );
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.session_time', 'PT1M40S');
     expect(api.Commit).toHaveBeenCalledWith('');
     expect(api.Terminate).toHaveBeenCalledWith('');
   });
@@ -218,12 +219,10 @@ describe('SCORM2004Adapter', () => {
 
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
-    (api.SetValue as any).mockImplementation(
-      (key: string, _value: string) => {
-        order.push(key);
-        return 'true';
-      }
-    );
+    (api.SetValue as any).mockImplementation((key: string, _value: string) => {
+      order.push(key);
+      return 'true';
+    });
 
     adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
     adapter.setScore(85);
@@ -254,7 +253,7 @@ describe('SCORM2004Adapter', () => {
     adapter.setCompletionStatus('incomplete');
     await flush();
     const progressCalls = (api.SetValue as any).mock.calls.filter(
-      ([k]: [string]) => k === 'cmi.progress_measure'
+      ([k]: [string]) => k === 'cmi.progress_measure',
     );
     expect(progressCalls).toHaveLength(0);
   });
@@ -262,12 +261,12 @@ describe('SCORM2004Adapter', () => {
   describe('cmi.mode honoring (browse / review launches)', () => {
     function mockReview(): void {
       (api.GetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.mode' ? 'review' : ''
+        key === 'cmi.mode' ? 'review' : '',
       );
     }
     function mockBrowse(): void {
       (api.GetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.mode' ? 'browse' : ''
+        key === 'cmi.mode' ? 'browse' : '',
       );
     }
     function settersDidNotFire(): void {
@@ -296,7 +295,11 @@ describe('SCORM2004Adapter', () => {
       adapter.setDuration(100);
       adapter.setExit('normal');
       adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
-      adapter.reportInteraction('q1', { type: 'true-false', response: true }, true);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'true-false', response: true },
+        true,
+      );
       await flush();
       settersDidNotFire();
     });
@@ -315,7 +318,7 @@ describe('SCORM2004Adapter', () => {
   describe('LMS-supplied thresholds', () => {
     it('reads cmi.scaled_passing_score and exposes via getMasteryScore()', async () => {
       (api.GetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.scaled_passing_score' ? '0.7' : ''
+        key === 'cmi.scaled_passing_score' ? '0.7' : '',
       );
       await adapter.init();
       expect(adapter.getMasteryScore()).toBe(0.7);
@@ -323,7 +326,7 @@ describe('SCORM2004Adapter', () => {
 
     it('returns null for out-of-range or missing thresholds', async () => {
       (api.GetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.scaled_passing_score' ? '1.5' : ''
+        key === 'cmi.scaled_passing_score' ? '1.5' : '',
       );
       await adapter.init();
       expect(adapter.getMasteryScore()).toBeNull();
@@ -333,7 +336,9 @@ describe('SCORM2004Adapter', () => {
   describe('reportInteraction', () => {
     function setValuesFor(prefix: string): Record<string, string> {
       const result: Record<string, string> = {};
-      for (const call of (api.SetValue as any).mock.calls as Array<[string, string]>) {
+      for (const call of (api.SetValue as any).mock.calls as Array<
+        [string, string]
+      >) {
         if (call[0].startsWith(prefix)) result[call[0]] = call[1];
       }
       return result;
@@ -343,7 +348,7 @@ describe('SCORM2004Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a', 'b'], correct: ['a'] },
-        false
+        false,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -353,14 +358,16 @@ describe('SCORM2004Adapter', () => {
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
       expect(v['cmi.interactions.0.result']).toBe('incorrect');
       // Zone-free, second-resolution — see formatISO8601Timestamp tests.
-      expect(v['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+      expect(v['cmi.interactions.0.timestamp']).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
+      );
     });
 
     it('writes true-false interaction', async () => {
       adapter.reportInteraction(
         'tf1',
         { type: 'true-false', response: true, correct: true },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -374,13 +381,15 @@ describe('SCORM2004Adapter', () => {
       adapter.reportInteraction(
         'fi1',
         { type: 'fill-in', response: 'Paris', correct: ['Paris', 'paris'] },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('fill-in');
       expect(v['cmi.interactions.0.learner_response']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris[,]paris');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'Paris[,]paris',
+      );
     });
 
     it('writes matching interaction', async () => {
@@ -388,23 +397,35 @@ describe('SCORM2004Adapter', () => {
         'm1',
         {
           type: 'matching',
-          response: [['a', '1'], ['b', '2']],
-          correct: [['a', '1'], ['b', '2']],
+          response: [
+            ['a', '1'],
+            ['b', '2'],
+          ],
+          correct: [
+            ['a', '1'],
+            ['b', '2'],
+          ],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('matching');
       expect(v['cmi.interactions.0.learner_response']).toBe('a[.]1[,]b[.]2');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a[.]1[,]b[.]2');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'a[.]1[,]b[.]2',
+      );
     });
 
     it('writes sequencing interaction', async () => {
       adapter.reportInteraction(
         's1',
-        { type: 'sequencing', response: ['x', 'y', 'z'], correct: ['x', 'y', 'z'] },
-        true
+        {
+          type: 'sequencing',
+          response: ['x', 'y', 'z'],
+          correct: ['x', 'y', 'z'],
+        },
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -420,15 +441,15 @@ describe('SCORM2004Adapter', () => {
           response: ['Sputnik 1 launched', 'Apollo 8\'s "Earthrise" photo'],
           correct: ['Sputnik 1 launched', 'Apollo 8\'s "Earthrise" photo'],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.learner_response']).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo'
+        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
       );
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo'
+        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
       );
     });
 
@@ -441,25 +462,29 @@ describe('SCORM2004Adapter', () => {
           correct: ['speed-limit'],
           options: ['stop', 'yield', 'speed-limit', 'merge'],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.learner_response']).toBe('speed-limit');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('speed-limit');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'speed-limit',
+      );
     });
 
     it('writes numeric interaction', async () => {
       adapter.reportInteraction(
         'n1',
         { type: 'numeric', response: 7, correct: { min: 5, max: 10 } },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('numeric');
       expect(v['cmi.interactions.0.learner_response']).toBe('7');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('5[:]10');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        '5[:]10',
+      );
     });
 
     it('writes performance interaction', async () => {
@@ -467,39 +492,63 @@ describe('SCORM2004Adapter', () => {
         'p1',
         {
           type: 'performance',
-          response: [['stepA', 1], ['stepB', 'x']],
-          correct: [['stepA', 1], ['stepB', 'x']],
+          response: [
+            ['stepA', 1],
+            ['stepB', 'x'],
+          ],
+          correct: [
+            ['stepA', 1],
+            ['stepB', 'x'],
+          ],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('performance');
-      expect(v['cmi.interactions.0.learner_response']).toBe('stepA[.]1[,]stepB[.]x');
+      expect(v['cmi.interactions.0.learner_response']).toBe(
+        'stepA[.]1[,]stepB[.]x',
+      );
     });
 
     it('omits correct_responses when no correct provided', async () => {
       adapter.reportInteraction(
         'q1',
         { type: 'likert', response: 'agree' },
-        null
+        null,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined();
+      expect(
+        v['cmi.interactions.0.correct_responses.0.pattern'],
+      ).toBeUndefined();
       expect(v['cmi.interactions.0.result']).toBeUndefined();
     });
 
     it('increments index across multiple interactions', async () => {
-      adapter.reportInteraction('q1', { type: 'other', response: 'a', correct: 'a' }, true);
-      adapter.reportInteraction('q2', { type: 'other', response: 'b', correct: 'b' }, true);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'other', response: 'a', correct: 'a' },
+        true,
+      );
+      adapter.reportInteraction(
+        'q2',
+        { type: 'other', response: 'b', correct: 'b' },
+        true,
+      );
       await flush();
-      expect((api.SetValue as any).mock.calls.some(
-        (c: [string, string]) => c[0] === 'cmi.interactions.0.id' && c[1] === 'q1'
-      )).toBe(true);
-      expect((api.SetValue as any).mock.calls.some(
-        (c: [string, string]) => c[0] === 'cmi.interactions.1.id' && c[1] === 'q2'
-      )).toBe(true);
+      expect(
+        (api.SetValue as any).mock.calls.some(
+          (c: [string, string]) =>
+            c[0] === 'cmi.interactions.0.id' && c[1] === 'q1',
+        ),
+      ).toBe(true);
+      expect(
+        (api.SetValue as any).mock.calls.some(
+          (c: [string, string]) =>
+            c[0] === 'cmi.interactions.1.id' && c[1] === 'q2',
+        ),
+      ).toBe(true);
     });
   });
 });

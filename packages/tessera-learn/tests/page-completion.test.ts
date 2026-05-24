@@ -4,7 +4,10 @@ import { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
 import { createConfig, gradedQuizIndices } from './helpers.js';
 
-function createPage(index: number, quiz: ManifestPage['quiz'] = null): ManifestPage {
+function createPage(
+  index: number,
+  quiz: ManifestPage['quiz'] = null,
+): ManifestPage {
   return {
     index,
     title: `Page ${index}`,
@@ -16,11 +19,13 @@ function createPage(index: number, quiz: ManifestPage['quiz'] = null): ManifestP
 
 function createManifestFromPages(pages: ManifestPage[]) {
   return {
-    sections: [{
-      title: 'Section',
-      slug: 'section',
-      lessons: [{ title: 'Lesson', slug: 'lesson', pages }],
-    }],
+    sections: [
+      {
+        title: 'Section',
+        slug: 'section',
+        lessons: [{ title: 'Lesson', slug: 'lesson', pages }],
+      },
+    ],
     pages,
     totalPages: pages.length,
   };
@@ -40,7 +45,11 @@ describe('isPageComplete', () => {
   });
 
   it('non-gating quiz page is complete when answered', () => {
-    const page = createPage(0, { graded: true, gatesProgress: false, maxAttempts: 3 });
+    const page = createPage(0, {
+      graded: true,
+      gatesProgress: false,
+      maxAttempts: 3,
+    });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig();
@@ -52,7 +61,11 @@ describe('isPageComplete', () => {
   });
 
   it('gating quiz page is complete only when passed', () => {
-    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
+    const page = createPage(0, {
+      graded: true,
+      gatesProgress: true,
+      maxAttempts: 3,
+    });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 70 } });
@@ -67,7 +80,11 @@ describe('isPageComplete', () => {
   });
 
   it('gating quiz uses config passingScore', () => {
-    const page = createPage(0, { graded: true, gatesProgress: true, maxAttempts: 3 });
+    const page = createPage(0, {
+      graded: true,
+      gatesProgress: true,
+      maxAttempts: 3,
+    });
     const manifest = createManifestFromPages([page]);
     const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 90 } });

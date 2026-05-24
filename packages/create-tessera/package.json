@@ -39,6 +39,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "check": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:templates": "node scripts/e2e.mjs",

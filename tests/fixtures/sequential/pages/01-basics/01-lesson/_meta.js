@@ -1,1 +1,4 @@
-export default { title: "Lesson One", pages: ["page-one", "page-two", "page-three"] };
+export default {
+  title: 'Lesson One',
+  pages: ['page-one', 'page-two', 'page-three'],
+};

@@ -52,7 +52,7 @@ describe('SCORM12Adapter', () => {
       d: 100,
     };
     (api.LMSGetValue as any).mockImplementation((key: string) =>
-      key === 'cmi.suspend_data' ? JSON.stringify(state) : ''
+      key === 'cmi.suspend_data' ? JSON.stringify(state) : '',
     );
     await adapter.init();
     expect(adapter.getState()).toEqual(state);
@@ -68,7 +68,9 @@ describe('SCORM12Adapter', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
-    expect(warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0])))).toBe(true);
+    expect(
+      warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
+    ).toBe(true);
     warn.mockRestore();
   });
 
@@ -86,7 +88,7 @@ describe('SCORM12Adapter', () => {
     await flush();
     expect(api.LMSSetValue).toHaveBeenCalledWith(
       'cmi.suspend_data',
-      JSON.stringify(state)
+      JSON.stringify(state),
     );
   });
 
@@ -94,7 +96,10 @@ describe('SCORM12Adapter', () => {
     await adapter.init();
     adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
     await flush();
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_location', '4');
+    expect(api.LMSSetValue).toHaveBeenCalledWith(
+      'cmi.core.lesson_location',
+      '4',
+    );
   });
 
   describe('suspend_data size guard', () => {
@@ -107,7 +112,9 @@ describe('SCORM12Adapter', () => {
       adapter.saveState(state);
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toMatch(/SCORM 1\.2 cmi\.suspend_data 4096/);
+      expect(warn.mock.calls[0][0]).toMatch(
+        /SCORM 1\.2 cmi\.suspend_data 4096/,
+      );
       warn.mockRestore();
     });
 
@@ -134,7 +141,7 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.suspend_data',
-        JSON.stringify(state)
+        JSON.stringify(state),
       );
     });
   });
@@ -154,7 +161,7 @@ describe('SCORM12Adapter', () => {
     adapter.setScore((7 / 11) * 100);
     await flush();
     const rawCall = (api.LMSSetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.core.score.raw'
+      ([k]: [string]) => k === 'cmi.core.score.raw',
     );
     expect(rawCall[1]).toBe('63.6363636');
   });
@@ -167,7 +174,7 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.core.lesson_status',
-        'incomplete'
+        'incomplete',
       );
     });
 
@@ -176,7 +183,7 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.core.lesson_status',
-        'completed'
+        'completed',
       );
     });
 
@@ -185,7 +192,7 @@ describe('SCORM12Adapter', () => {
       adapter.setSuccessStatus('passed');
       await flush();
       const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status'
+        (c: string[]) => c[0] === 'cmi.core.lesson_status',
       );
       expect(calls[calls.length - 1][1]).toBe('passed');
     });
@@ -195,7 +202,7 @@ describe('SCORM12Adapter', () => {
       adapter.setSuccessStatus('failed');
       await flush();
       const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status'
+        (c: string[]) => c[0] === 'cmi.core.lesson_status',
       );
       expect(calls[calls.length - 1][1]).toBe('failed');
     });
@@ -205,7 +212,7 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('incomplete');
       await flush();
       const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status'
+        (c: string[]) => c[0] === 'cmi.core.lesson_status',
       );
       // Success status still takes priority
       expect(calls[calls.length - 1][1]).toBe('passed');
@@ -219,7 +226,7 @@ describe('SCORM12Adapter', () => {
     await flush();
     expect(api.LMSSetValue).toHaveBeenCalledWith(
       'cmi.core.session_time',
-      '0001:01:01.00'
+      '0001:01:01.00',
     );
   });
 
@@ -241,7 +248,7 @@ describe('SCORM12Adapter', () => {
     expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.raw', '90');
     expect(api.LMSSetValue).toHaveBeenCalledWith(
       'cmi.core.session_time',
-      '0000:01:40.00'
+      '0000:01:40.00',
     );
     // Commit and Finish called synchronously
     expect(api.LMSCommit).toHaveBeenCalledWith('');
@@ -262,7 +269,7 @@ describe('SCORM12Adapter', () => {
       (key: string, _value: string) => {
         order.push(key);
         return 'true';
-      }
+      },
     );
 
     adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
@@ -294,7 +301,9 @@ describe('SCORM12Adapter', () => {
   describe('reportInteraction', () => {
     function setValuesFor(prefix: string): Record<string, string> {
       const result: Record<string, string> = {};
-      for (const call of (api.LMSSetValue as any).mock.calls as Array<[string, string]>) {
+      for (const call of (api.LMSSetValue as any).mock.calls as Array<
+        [string, string]
+      >) {
         if (call[0].startsWith(prefix)) result[call[0]] = call[1];
       }
       return result;
@@ -304,7 +313,7 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a', 'b'], correct: ['a'] },
-        false
+        false,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -324,19 +333,23 @@ describe('SCORM12Adapter', () => {
           response: ['88 Earth days', 'Iron-rich dust'],
           correct: ['88 Earth days'],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('88_Earth_days,Iron_rich_dust');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('88_Earth_days');
+      expect(v['cmi.interactions.0.student_response']).toBe(
+        '88_Earth_days,Iron_rich_dust',
+      );
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        '88_Earth_days',
+      );
     });
 
     it('encodes true-false as t/f per SCORM 1.2', async () => {
       adapter.reportInteraction(
         'tf1',
         { type: 'true-false', response: true, correct: false },
-        false
+        false,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -358,12 +371,16 @@ describe('SCORM12Adapter', () => {
             ['Europa', 'Jupiter'],
           ],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('Phobos.Mars,Europa.Jupiter');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Phobos.Mars,Europa.Jupiter');
+      expect(v['cmi.interactions.0.student_response']).toBe(
+        'Phobos.Mars,Europa.Jupiter',
+      );
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'Phobos.Mars,Europa.Jupiter',
+      );
     });
 
     it('maps choice response/correct to option indexes when options is supplied', async () => {
@@ -375,7 +392,7 @@ describe('SCORM12Adapter', () => {
           correct: ['speed-limit'],
           options: ['stop', 'yield', 'speed-limit', 'merge'],
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -390,9 +407,12 @@ describe('SCORM12Adapter', () => {
           type: 'matching',
           response: [['Phobos', 'Mars']],
           correct: [['Phobos', 'Mars']],
-          optionPairs: { left: ['Phobos', 'Europa'], right: ['Mars', 'Jupiter'] },
+          optionPairs: {
+            left: ['Phobos', 'Europa'],
+            right: ['Mars', 'Jupiter'],
+          },
         },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -404,24 +424,28 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['speed-limit'], correct: ['speed-limit'] },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.student_response']).toBe('speed_limit');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('speed_limit');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'speed_limit',
+      );
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
       adapter.reportInteraction(
         'n1',
         { type: 'numeric', response: 22, correct: { min: 19, max: 25 } },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.student_response']).toBe('22');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined();
+      expect(
+        v['cmi.interactions.0.correct_responses.0.pattern'],
+      ).toBeUndefined();
       // result still tells the LMS pass/fail
       expect(v['cmi.interactions.0.result']).toBe('correct');
     });
@@ -430,7 +454,7 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'n2',
         { type: 'numeric', response: 7, correct: { min: 7, max: 7 } },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -440,8 +464,12 @@ describe('SCORM12Adapter', () => {
     it('maps long-fill-in to fill-in (SCORM 1.2 has no long-fill-in type)', async () => {
       adapter.reportInteraction(
         'lf1',
-        { type: 'long-fill-in', response: 'a long answer', correct: ['a long answer'] },
-        true
+        {
+          type: 'long-fill-in',
+          response: 'a long answer',
+          correct: ['a long answer'],
+        },
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -452,7 +480,7 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'o1',
         { type: 'other', response: 'x', correct: 'x' },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -463,7 +491,7 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'true-false', response: true, correct: true },
-        true
+        true,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
@@ -474,11 +502,13 @@ describe('SCORM12Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'likert', response: 'agree' },
-        null
+        null,
       );
       await flush();
       const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined();
+      expect(
+        v['cmi.interactions.0.correct_responses.0.pattern'],
+      ).toBeUndefined();
       expect(v['cmi.interactions.0.result']).toBeUndefined();
     });
   });
@@ -505,7 +535,7 @@ describe('SCORM12Adapter', () => {
     it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       (api.LMSGetValue as any).mockImplementation((key: string) =>
-        key === 'cmi.interactions._count' ? 'NaN' : ''
+        key === 'cmi.interactions._count' ? 'NaN' : '',
       );
       await adapter.init();
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
@@ -546,7 +576,7 @@ describe('SCORM12Adapter', () => {
       (api.LMSGetLastError as any).mockReturnValue('405');
       (api.LMSGetErrorString as any).mockReturnValue('Incorrect Data Type');
       (api.LMSGetDiagnostic as any).mockReturnValue(
-        'student_response invalid CMIFeedback'
+        'student_response invalid CMIFeedback',
       );
       adapter.setScore(85);
       await new Promise((r) => setTimeout(r, 1000));

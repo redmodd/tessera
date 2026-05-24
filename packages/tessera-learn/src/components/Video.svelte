@@ -15,7 +15,8 @@
   let containerRef = $state(null);
   let visible = $state(false);
 
-  const youtubeRegex = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const youtubeRegex =
+    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const vimeoRegex = /vimeo\.com\/(?:video\/)?(\d+)/;
 
   let embedUrl = $derived.by(() => {
@@ -40,7 +41,7 @@
           observer.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '200px' },
     );
 
     observer.observe(containerRef);
@@ -48,7 +49,11 @@
   });
 </script>
 
-<div class="tessera-video" bind:this={containerRef} aria-label={title || 'Video'}>
+<div
+  class="tessera-video"
+  bind:this={containerRef}
+  aria-label={title || 'Video'}
+>
   {#if visible}
     {#if isEmbed}
       <div class="tessera-video-embed">
@@ -61,7 +66,6 @@
         ></iframe>
       </div>
     {:else}
-      <!-- svelte-ignore a11y_media_has_caption -->
       <video controls class="tessera-video-native" aria-label={title}>
         <source src={resolvedSrc} />
         Your browser does not support the video element.

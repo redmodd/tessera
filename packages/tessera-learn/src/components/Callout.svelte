@@ -23,7 +23,11 @@
   };
 </script>
 
-<div class="tessera-callout tessera-callout-{type}" role="note" aria-label={labels[type]}>
+<div
+  class="tessera-callout tessera-callout-{type}"
+  role="note"
+  aria-label={labels[type]}
+>
   <span class="tessera-callout-icon" aria-hidden="true">{icons[type]}</span>
   <div class="tessera-callout-content">
     {@render children?.()}

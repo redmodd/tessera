@@ -5,7 +5,12 @@ import AxeBuilder from '@axe-core/playwright';
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
   // Wait for loading skeleton to disappear
-  await page.waitForFunction(() => !document.querySelector('.tessera-loading-skeleton'), { timeout: 5000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => !document.querySelector('.tessera-loading-skeleton'),
+      { timeout: 5000 },
+    )
+    .catch(() => {});
 }
 
 // Helper: navigate via sidebar
@@ -29,20 +34,30 @@ test.describe('Navigation — Free Mode', () => {
 
   test('sidebar shows all sections and pages', async ({ page }) => {
     // Check sections exist
-    await expect(page.locator('.tessera-nav-section-title', { hasText: 'Introduction' })).toBeVisible();
-    await expect(page.locator('.tessera-nav-section-title', { hasText: 'Components' })).toBeVisible();
-    await expect(page.locator('.tessera-nav-section-title', { hasText: 'Assessment' })).toBeVisible();
+    await expect(
+      page.locator('.tessera-nav-section-title', { hasText: 'Introduction' }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.tessera-nav-section-title', { hasText: 'Components' }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.tessera-nav-section-title', { hasText: 'Assessment' }),
+    ).toBeVisible();
   });
 
   test('clicking a sidebar page loads that page content', async ({ page }) => {
     await clickSidebarPage(page, 'Objectives');
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
   });
 
   test('can click any page in free mode — no locking', async ({ page }) => {
     // Should be able to jump directly to a later page
     await clickSidebarPage(page, 'Accordion & Carousel');
-    await expect(page.locator('.tessera-content h1')).toContainText('Accordion & Carousel');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Accordion & Carousel',
+    );
 
     // Jump back to an earlier page
     await clickSidebarPage(page, 'Welcome');
@@ -50,7 +65,9 @@ test.describe('Navigation — Free Mode', () => {
   });
 
   test('prev button is disabled on first page', async ({ page }) => {
-    const prevBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Previous' });
+    const prevBtn = page.locator('.tessera-page-nav-btn', {
+      hasText: 'Previous',
+    });
     await expect(prevBtn).toBeDisabled();
   });
 
@@ -59,27 +76,37 @@ test.describe('Navigation — Free Mode', () => {
     await expect(nextBtn).toBeEnabled();
     await nextBtn.click();
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
   });
 
   test('prev/next navigate through all pages end-to-end', async ({ page }) => {
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
-    const prevBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Previous' });
+    const prevBtn = page.locator('.tessera-page-nav-btn', {
+      hasText: 'Previous',
+    });
 
     // Navigate forward a few pages
     await nextBtn.click(); // Page 2
     await waitForContent(page);
     await nextBtn.click(); // Page 3
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Callouts & Images');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Callouts & Images',
+    );
 
     // Navigate back
     await prevBtn.click(); // Page 2
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
   });
 
-  test('next button is disabled when further progress is gated', async ({ page }) => {
+  test('next button is disabled when further progress is gated', async ({
+    page,
+  }) => {
     // Navigate to the graded quiz page (has gatesProgress: true)
     // The page after it is locked until the quiz is passed
     await clickSidebarPage(page, 'Graded Assessment');
@@ -128,7 +155,9 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
   test('ArrowRight navigates to next page', async ({ page }) => {
     await page.keyboard.press('ArrowRight');
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
   });
 
   test('ArrowLeft navigates to previous page', async ({ page }) => {
@@ -183,7 +212,9 @@ test.describe('Navigation — Accessibility', () => {
   });
 
   test('sidebar passes axe audit', async ({ page }) => {
-    const results = await new AxeBuilder({ page }).include('.tessera-sidebar').analyze();
+    const results = await new AxeBuilder({ page })
+      .include('.tessera-sidebar')
+      .analyze();
     expect(results.violations).toEqual([]);
   });
 

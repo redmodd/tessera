@@ -20,7 +20,9 @@ export class ProgressState {
    * Tracked separately from `quizScores` because <Quiz> blocks score as a unit
    * while standalone questions score individually and average per page.
    */
-  standaloneQuestionScores = $state(new SvelteMap<number, Map<string, number>>());
+  standaloneQuestionScores = $state(
+    new SvelteMap<number, Map<string, number>>(),
+  );
   /**
    * Set of page indices that have at least one graded standalone question.
    * Pages in this set contribute to course success status via their standalone average.
@@ -96,7 +98,7 @@ export class ProgressState {
     pageIndex: number,
     questionId: string,
     score: number,
-    graded: boolean
+    graded: boolean,
   ) {
     let pageMap = this.standaloneQuestionScores.get(pageIndex);
     if (!pageMap) {
@@ -124,9 +126,8 @@ export class ProgressState {
     if (config.completion.mode === 'manual') return;
     if (config.completion.mode === 'percentage') {
       const threshold = config.completion.percentageThreshold ?? 100;
-      const percent = totalPages > 0
-        ? (this.visitedPages.size / totalPages) * 100
-        : 0;
+      const percent =
+        totalPages > 0 ? (this.visitedPages.size / totalPages) * 100 : 0;
       this.completionStatus = percent >= threshold ? 'complete' : 'incomplete';
     } else if (config.completion.mode === 'quiz') {
       const { indices } = this.#gradedPages();
@@ -135,7 +136,8 @@ export class ProgressState {
         return;
       }
       const average = this.#gradedAverage(indices);
-      this.completionStatus = average >= config.scoring.passingScore ? 'complete' : 'incomplete';
+      this.completionStatus =
+        average >= config.scoring.passingScore ? 'complete' : 'incomplete';
     }
   }
 
@@ -144,7 +146,8 @@ export class ProgressState {
       const want = config.completion.requireSuccessStatus;
       // Stay 'unknown' until manual mark fires, so a learner who never
       // finishes isn't reported as passed.
-      this.successStatus = this.#manuallyCompleted && want !== undefined ? want : 'unknown';
+      this.successStatus =
+        this.#manuallyCompleted && want !== undefined ? want : 'unknown';
       return;
     }
 
@@ -160,7 +163,8 @@ export class ProgressState {
       return;
     }
     const average = this.#gradedAverage(indices);
-    this.successStatus = average >= config.scoring.passingScore ? 'passed' : 'failed';
+    this.successStatus =
+      average >= config.scoring.passingScore ? 'passed' : 'failed';
   }
 
   /**
@@ -181,7 +185,7 @@ export class ProgressState {
     const merged = new Set(this.#quizGradedIndices);
     for (const i of this.gradedStandalonePages) merged.add(i);
     const indices = [...merged];
-    const attempted = indices.some(i => this.#hasScore(i));
+    const attempted = indices.some((i) => this.#hasScore(i));
     return { indices, attempted };
   }
 

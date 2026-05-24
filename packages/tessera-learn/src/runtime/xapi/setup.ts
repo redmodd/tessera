@@ -34,8 +34,8 @@ class XAPIDevFallbackError extends Error {
       "Tessera xAPI: xapi.endpoint is 'lms' but no cmi5 launch parameters " +
         '(fetch / endpoint / activityId / actor) were present on the URL. ' +
         'Either launch this course from a real LMS / SCORM Cloud, or ' +
-        "temporarily change xapi.endpoint to an explicit URL pointed at a " +
-        'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.'
+        'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
+        'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
     );
     this.name = 'XAPIDevFallbackError';
   }
@@ -72,14 +72,14 @@ class XAPISCORMDevFallbackError extends Error {
         'destination. Either supply xapi.actor explicitly in course.config.js, or launch from ' +
         'a real LMS / SCORM Cloud where ' +
         (standard === 'scorm12' ? 'cmi.core.student_id' : 'cmi.learner_id') +
-        ' is populated.'
+        ' is populated.',
     );
     this.name = 'XAPISCORMDevFallbackError';
   }
 }
 
 function makeSCORMDevFallbackPublisher(
-  standard: 'scorm12' | 'scorm2004'
+  standard: 'scorm12' | 'scorm2004',
 ): XAPIPublisher {
   return makeRejectingPublisher(() => new XAPISCORMDevFallbackError(standard));
 }
@@ -93,13 +93,13 @@ function makeSCORMDevFallbackPublisher(
 function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
-  adapter: PersistenceAdapter | null
+  adapter: PersistenceAdapter | null,
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
     if (config.export?.standard !== 'cmi5') {
       // Build-time validator should reject this; defense in depth at runtime.
       console.warn(
-        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under non-cmi5 export."
+        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under non-cmi5 export.",
       );
       return null;
     }
@@ -121,14 +121,17 @@ function resolveDestination(
     (actorOrResolver as { __scormDevFallback?: 'scorm12' | 'scorm2004' })
       .__scormDevFallback
   ) {
-    const std = (actorOrResolver as { __scormDevFallback: 'scorm12' | 'scorm2004' })
-      .__scormDevFallback;
+    const std = (
+      actorOrResolver as { __scormDevFallback: 'scorm12' | 'scorm2004' }
+    ).__scormDevFallback;
     return { kind: 'explicit', publisher: makeSCORMDevFallbackPublisher(std) };
   }
   const publisher = new XAPIPublisher({
     endpoint: explicit.endpoint,
     auth: explicit.auth,
-    actor: actorOrResolver as XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>),
+    actor: actorOrResolver as
+      | XAPIAgent
+      | (() => XAPIAgent | Promise<XAPIAgent>),
     activityId: explicit.activityId,
     registration: explicit.registration,
   });
@@ -145,7 +148,7 @@ function resolveDestination(
 function resolveExplicitActor(
   explicit: XAPIExplicitConfig,
   config: CourseConfig,
-  adapter: PersistenceAdapter | null
+  adapter: PersistenceAdapter | null,
 ):
   | XAPIAgent
   | (() => XAPIAgent | Promise<XAPIAgent>)
@@ -170,7 +173,7 @@ function resolveExplicitActor(
       return synthesizeSCORM12Actor(
         adapter.getAPI(),
         explicit.activityId,
-        explicit.actorAccountHomePage
+        explicit.actorAccountHomePage,
       );
     }
     // Adapter is the WebAdapter dev fallback. Mirror the cmi5 'lms'
@@ -184,14 +187,14 @@ function resolveExplicitActor(
       return synthesizeSCORM2004Actor(
         adapter.getAPI(),
         explicit.activityId,
-        explicit.actorAccountHomePage
+        explicit.actorAccountHomePage,
       );
     }
     return { __scormDevFallback: 'scorm2004' };
   }
   // Web export with no actor — build-time validator should have errored.
   console.warn(
-    'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.'
+    'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
   );
   return null;
 }
@@ -206,7 +209,7 @@ function resolveExplicitActor(
  */
 export async function buildXAPIClient(
   config: CourseConfig,
-  adapter: PersistenceAdapter | null
+  adapter: PersistenceAdapter | null,
 ): Promise<XAPIClient | null> {
   const raw = config.xapi;
   if (raw === undefined || raw === null) return null;
@@ -233,7 +236,7 @@ export async function buildXAPIClient(
       } catch (err) {
         console.warn(
           'Tessera xAPI: failed to initialize an explicit destination — skipping.',
-          err
+          err,
         );
       }
     }

@@ -14,7 +14,10 @@ declare module 'virtual:tessera-xapi-setup' {
   import type { CourseConfig } from 'tessera-learn/runtime/types.js';
   import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
   import type { XAPIClient } from 'tessera-learn/runtime/xapi/client.js';
-  export function buildXAPIClient(config: CourseConfig, adapter: PersistenceAdapter): Promise<XAPIClient | null>;
+  export function buildXAPIClient(
+    config: CourseConfig,
+    adapter: PersistenceAdapter,
+  ): Promise<XAPIClient | null>;
 }
 
 interface ImportMetaEnv {

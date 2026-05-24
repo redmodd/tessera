@@ -7,7 +7,7 @@ export function isPageComplete(
   index: number,
   manifest: Manifest,
   progress: ProgressState,
-  config: CourseConfig
+  config: CourseConfig,
 ): boolean {
   const page = manifest.pages[index];
   if (!page) return false;
@@ -51,7 +51,10 @@ export class NavigationState {
     if (prev && prev.size === next.size) {
       let same = true;
       for (const i of next) {
-        if (!prev.has(i)) { same = false; break; }
+        if (!prev.has(i)) {
+          same = false;
+          break;
+        }
       }
       if (same) return prev;
     }
@@ -59,7 +62,11 @@ export class NavigationState {
     return next;
   });
 
-  constructor(manifest: Manifest, progress: ProgressState, config: CourseConfig) {
+  constructor(
+    manifest: Manifest,
+    progress: ProgressState,
+    config: CourseConfig,
+  ) {
     this.manifest = manifest;
     this.#progress = progress;
     this.#config = config;
@@ -79,7 +86,7 @@ export class NavigationState {
     if (index < 0 || index >= this.manifest.totalPages) return;
     if (this.isPageLocked(index)) return;
     const page = this.manifest.pages[index];
-    this.#pageModules[page.importPath]?.();
+    void this.#pageModules[page.importPath]?.();
   }
 
   goToPage(index: number) {
@@ -108,13 +115,15 @@ export class NavigationState {
     const locked = new Set<number>();
     const access = resolveAccess(this.#config);
     for (let i = 0; i < total; i++) {
-      if (!access({
-        pageIndex: i,
-        page: this.manifest.pages[i],
-        manifest: this.manifest,
-        progress: this.#progress,
-        config: this.#config,
-      })) {
+      if (
+        !access({
+          pageIndex: i,
+          page: this.manifest.pages[i],
+          manifest: this.manifest,
+          progress: this.#progress,
+          config: this.#config,
+        })
+      ) {
         locked.add(i);
       }
     }

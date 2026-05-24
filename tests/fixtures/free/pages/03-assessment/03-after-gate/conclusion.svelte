@@ -1,6 +1,6 @@
 <script context="module">
   export const pageConfig = {
-    title: "Conclusion"
+    title: 'Conclusion',
   };
 </script>
 

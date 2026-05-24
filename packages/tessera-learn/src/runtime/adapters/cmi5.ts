@@ -26,7 +26,8 @@ const VERBS = {
   // registration state when Terminated lands without Completed.
 } as const;
 
-const CMI_INTERACTION_TYPE = 'http://adlnet.gov/expapi/activities/cmi.interaction';
+const CMI_INTERACTION_TYPE =
+  'http://adlnet.gov/expapi/activities/cmi.interaction';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -36,8 +37,7 @@ const CMI5_MASTERYSCORE_EXT =
 // "failed" MUST additionally carry the "moveOn" Category. Without these, an
 // LRS will accept the statement as an arbitrary xAPI verb but won't roll it
 // up into cmi5 lifecycle state — the LMS never sees the AU as completed.
-const CMI5_CATEGORY_CMI5 =
-  'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+const CMI5_CATEGORY_CMI5 = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 const CMI5_CATEGORY_MOVEON =
   'https://w3id.org/xapi/cmi5/context/categories/moveon';
 
@@ -80,14 +80,16 @@ interface CMI5LaunchData {
 
 /** `.then` handler that warns on LRS non-2xx. Publisher resolves successfully on 4xx/5xx (failure is in the outcome), so `.catch` alone misses them. */
 function warnOnLRSReject(
-  verbName: string
-): (res: { destinations?: Array<{ ok?: boolean; status?: number; error?: Error }> }) => void {
+  verbName: string,
+): (res: {
+  destinations?: Array<{ ok?: boolean; status?: number; error?: Error }>;
+}) => void {
   return (res) => {
     const dest = res.destinations?.[0];
     if (dest && !dest.ok) {
       console.warn(
         `Tessera cmi5: ${verbName} statement rejected by LRS (${dest.status ?? 'network error'})`,
-        dest.error
+        dest.error,
       );
     }
   };
@@ -154,7 +156,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         this.#masteryScore = m;
       } else {
         console.warn(
-          `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`
+          `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`,
         );
       }
     }
@@ -171,7 +173,8 @@ export class CMI5Adapter implements PersistenceAdapter {
       this.#actor = parsed as XAPIAgent;
     } catch (err) {
       throw new Error(
-        `Tessera cmi5: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`
+        `Tessera cmi5: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
+        { cause: err },
       );
     }
 
@@ -180,7 +183,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     // Fail loud at launch instead of dribbling errors per statement.
     if (!fetchUrl) {
       throw new Error(
-        "Tessera cmi5: launch parameter 'fetch' is missing. Cannot acquire LMS auth token."
+        "Tessera cmi5: launch parameter 'fetch' is missing. Cannot acquire LMS auth token.",
       );
     }
     let resp: Response;
@@ -188,12 +191,13 @@ export class CMI5Adapter implements PersistenceAdapter {
       resp = await fetch(fetchUrl, { method: 'POST' });
     } catch (err) {
       throw new Error(
-        `Tessera cmi5: fetch token request failed (${err instanceof Error ? err.message : String(err)}). The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`
+        `Tessera cmi5: fetch token request failed (${err instanceof Error ? err.message : String(err)}). The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`,
+        { cause: err },
       );
     }
     if (!resp.ok) {
       throw new Error(
-        `Tessera cmi5: fetch token request returned ${resp.status}. The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`
+        `Tessera cmi5: fetch token request returned ${resp.status}. The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`,
       );
     }
     const text = (await resp.text()).trim();
@@ -214,15 +218,21 @@ export class CMI5Adapter implements PersistenceAdapter {
         if (typeof obj['auth-token'] === 'string') {
           token = (obj['auth-token'] as string).trim();
         } else {
-          const code = typeof obj['error-code'] === 'string' ? obj['error-code'] : undefined;
-          const errText = typeof obj['error-text'] === 'string' ? obj['error-text'] : undefined;
+          const code =
+            typeof obj['error-code'] === 'string'
+              ? obj['error-code']
+              : undefined;
+          const errText =
+            typeof obj['error-text'] === 'string'
+              ? obj['error-text']
+              : undefined;
           const detail =
             code !== undefined || errText !== undefined
               ? ` (error-code=${code ?? 'unknown'}${errText ? `: ${errText}` : ''})`
               : '';
           throw new Error(
             `Tessera cmi5: fetch URL returned a JSON response without an 'auth-token' field${detail}. ` +
-              'The cmi5 fetch URL is single-use (§8.2.3.1); reload from the LMS to obtain a fresh launch.'
+              'The cmi5 fetch URL is single-use (§8.2.3.1); reload from the LMS to obtain a fresh launch.',
           );
         }
       }
@@ -233,7 +243,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     this.#authToken = token;
     if (!this.#authToken) {
       throw new Error(
-        'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.'
+        'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.',
       );
     }
 
@@ -311,12 +321,12 @@ export class CMI5Adapter implements PersistenceAdapter {
         this.#state = await resp.json();
       } else if (resp.status !== 404) {
         console.warn(
-          `Tessera cmi5: State API GET returned ${resp.status}; resume disabled for this launch.`
+          `Tessera cmi5: State API GET returned ${resp.status}; resume disabled for this launch.`,
         );
       }
     } catch (err) {
       console.warn(
-        `Tessera cmi5: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`
+        `Tessera cmi5: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`,
       );
       this.#state = null;
     }
@@ -355,7 +365,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     if (!this.#publisher) return;
     // Chain the State PUT onto the publisher's queue so it lands before
     // Terminated. We can't use sendStatement here (different URL/verb).
-    this.#publisher.chainTask(async () => {
+    void this.#publisher.chainTask(async () => {
       try {
         const resp = await this.#xapiFetch(this.#buildStateUrl(), {
           method: 'PUT',
@@ -364,7 +374,7 @@ export class CMI5Adapter implements PersistenceAdapter {
         });
         if (!resp.ok) {
           console.warn(
-            `Tessera cmi5: State API PUT returned ${resp.status}; learner progress did not persist.`
+            `Tessera cmi5: State API PUT returned ${resp.status}; learner progress did not persist.`,
           );
         }
       } catch (err) {
@@ -385,7 +395,7 @@ export class CMI5Adapter implements PersistenceAdapter {
 
   seedLifecycle(
     completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed'
+    success: 'unknown' | 'passed' | 'failed',
   ): void {
     if (completion === 'complete') this.#completedEmitted = true;
     if (success === 'passed' || success === 'failed') {
@@ -394,7 +404,8 @@ export class CMI5Adapter implements PersistenceAdapter {
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    if (status !== 'complete' || this.#completedEmitted || !this.#publisher) return;
+    if (status !== 'complete' || this.#completedEmitted || !this.#publisher)
+      return;
     // cmi5 §10.2.2 — Browse/Review launches MUST NOT emit Completed.
     if (this.#launchMode !== 'Normal') return;
     this.#completedEmitted = true;
@@ -435,14 +446,16 @@ export class CMI5Adapter implements PersistenceAdapter {
       // The author asserted the verb, so on contradiction we keep the
       // verb and drop the score (and warn).
       if (this.#masteryScore !== null) {
-        const violatesPassed = status === 'passed' && scaled < this.#masteryScore;
-        const violatesFailed = status === 'failed' && scaled >= this.#masteryScore;
+        const violatesPassed =
+          status === 'passed' && scaled < this.#masteryScore;
+        const violatesFailed =
+          status === 'failed' && scaled >= this.#masteryScore;
         if (violatesPassed || violatesFailed) {
           console.warn(
             `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to ` +
               `${status === 'passed' ? 'Passed' : 'Failed'} (masteryScore=${this.#masteryScore}); ` +
               `per cmi5 §9.3.${status === 'passed' ? '4' : '5'} the score would contradict the verb. ` +
-              `Statement will be sent without a score.`
+              `Statement will be sent without a score.`,
           );
         } else {
           result.score = { scaled };
@@ -475,7 +488,7 @@ export class CMI5Adapter implements PersistenceAdapter {
   reportInteraction(
     questionId: string,
     interaction: Interaction,
-    correct: boolean | null
+    correct: boolean | null,
   ): void {
     if (!this.#publisher) return;
     const response = formatResponse(interaction, XAPI_INTERACTION_FORMAT);
@@ -567,10 +580,13 @@ export class CMI5Adapter implements PersistenceAdapter {
    * for Passed/Failed (§9.6.3.2).
    */
   #cmi5Context(
-    opts: { moveOn?: boolean; mastery?: boolean } = {}
+    opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> {
     const tmpl = this.#launchData?.contextTemplate ?? {};
-    const tmplActivities = (tmpl.contextActivities ?? {}) as Record<string, unknown>;
+    const tmplActivities = (tmpl.contextActivities ?? {}) as Record<
+      string,
+      unknown
+    >;
 
     // Concat-dedupe category to preserve any template-supplied entries
     // (§10.2.1 forbids overwriting them).
@@ -582,8 +598,14 @@ export class CMI5Adapter implements PersistenceAdapter {
         category.push({ id, objectType: 'Activity' });
       }
     };
-    const templateCategory = Array.isArray((tmplActivities as { category?: unknown }).category)
-      ? ((tmplActivities as { category: Array<{ id: string; objectType?: string }> }).category)
+    const templateCategory = Array.isArray(
+      (tmplActivities as { category?: unknown }).category,
+    )
+      ? (
+          tmplActivities as {
+            category: Array<{ id: string; objectType?: string }>;
+          }
+        ).category
       : [];
     for (const c of templateCategory) {
       if (c && typeof c.id === 'string') push(c.id);
@@ -645,11 +667,11 @@ export class CMI5Adapter implements PersistenceAdapter {
       console.warn(
         `Tessera cmi5: LMS.LaunchData State GET returned ${resp.status}; ` +
           'cmi5 Defined Statements may be rejected by strict LRSes ' +
-          '(missing Publisher Activity / session id).'
+          '(missing Publisher Activity / session id).',
       );
     } catch (err) {
       console.warn(
-        `Tessera cmi5: LMS.LaunchData State GET failed (${err instanceof Error ? err.message : String(err)}).`
+        `Tessera cmi5: LMS.LaunchData State GET failed (${err instanceof Error ? err.message : String(err)}).`,
       );
     }
     return null;
@@ -666,12 +688,12 @@ export class CMI5Adapter implements PersistenceAdapter {
       const resp = await this.#xapiFetch(url, { method: 'GET' });
       if (!resp.ok && resp.status !== 404) {
         console.warn(
-          `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) returned ${resp.status}.`
+          `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) returned ${resp.status}.`,
         );
       }
     } catch (err) {
       console.warn(
-        `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) failed (${err instanceof Error ? err.message : String(err)}).`
+        `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) failed (${err instanceof Error ? err.message : String(err)}).`,
       );
     }
   }

@@ -8,14 +8,20 @@ describe('resolveAsset', () => {
   });
 
   it('only rewrites the leading prefix, not later occurrences', () => {
-    expect(resolveAsset('$assets/a/$assets/b.png')).toBe('./assets/a/$assets/b.png');
+    expect(resolveAsset('$assets/a/$assets/b.png')).toBe(
+      './assets/a/$assets/b.png',
+    );
   });
 
   it('passes through absolute and external URLs unchanged', () => {
     expect(resolveAsset('/assets/x.png')).toBe('/assets/x.png');
     expect(resolveAsset('./assets/x.png')).toBe('./assets/x.png');
-    expect(resolveAsset('https://cdn.example.com/x.png')).toBe('https://cdn.example.com/x.png');
-    expect(resolveAsset('https://youtu.be/dQw4w9WgXcQ')).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(resolveAsset('https://cdn.example.com/x.png')).toBe(
+      'https://cdn.example.com/x.png',
+    );
+    expect(resolveAsset('https://youtu.be/dQw4w9WgXcQ')).toBe(
+      'https://youtu.be/dQw4w9WgXcQ',
+    );
   });
 
   it('handles nullish input without throwing', () => {

@@ -36,7 +36,10 @@ interface HarnessRef {
 
 type ReportCall = ['reportInteraction', string, Interaction, boolean];
 
-function recordingAdapter(): { reportInteraction: (id: string, i: Interaction, c: boolean) => void; calls: ReportCall[] } {
+function recordingAdapter(): {
+  reportInteraction: (id: string, i: Interaction, c: boolean) => void;
+  calls: ReportCall[];
+} {
   const calls: ReportCall[] = [];
   return {
     calls,
@@ -47,12 +50,20 @@ function recordingAdapter(): { reportInteraction: (id: string, i: Interaction, c
 }
 
 function mountHarness(quizConfig: unknown, adapter: unknown) {
-  const ref: HarnessRef = { handle: null, element: null, events: [], thrown: null };
+  const ref: HarnessRef = {
+    handle: null,
+    element: null,
+    events: [],
+    thrown: null,
+  };
   const target = document.createElement('div');
   const host = document.createElement('div');
   target.appendChild(host);
   document.body.appendChild(target);
-  const component = mount(HarnessSvelte, { target, props: { ref, quizConfig, host, adapter } });
+  const component = mount(HarnessSvelte, {
+    target,
+    props: { ref, quizConfig, host, adapter },
+  });
   return { component, target, ref };
 }
 
@@ -66,7 +77,9 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
 
   afterEach(() => {
     for (const m of mountings) {
-      try { unmount(m.component); } catch {}
+      try {
+        unmount(m.component);
+      } catch {}
     }
     document.body.innerHTML = '';
   });
@@ -277,19 +290,21 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
         interaction: () => f.interaction,
       });
     }
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) q.setAnswer(i, '__answered__');
+    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
+      q.setAnswer(i, '__answered__');
     q.submit();
     expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length);
 
     q.retry();
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) q.setAnswer(i, '__answered__');
+    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
+      q.setAnswer(i, '__answered__');
     q.submit();
 
     expect(m.ref.events).toHaveLength(2);
     expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length * 2);
     const ids = adapter.calls.map((c) => c[1]);
     expect(ids.slice(0, ALL_INTERACTION_FIXTURES.length)).toEqual(
-      ids.slice(ALL_INTERACTION_FIXTURES.length)
+      ids.slice(ALL_INTERACTION_FIXTURES.length),
     );
   });
 
@@ -307,13 +322,19 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
         interaction: () => f.interaction,
       });
     }
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) q.setAnswer(i, '__answered__');
+    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
+      q.setAnswer(i, '__answered__');
     q.submit();
     expect(m.ref.events[0].score).toBe(90);
     expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length);
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
       const f = ALL_INTERACTION_FIXTURES[i];
-      expect(adapter.calls[i]).toEqual(['reportInteraction', f.id, f.interaction, f.expectedCorrect]);
+      expect(adapter.calls[i]).toEqual([
+        'reportInteraction',
+        f.id,
+        f.interaction,
+        f.expectedCorrect,
+      ]);
     }
   });
 
@@ -334,13 +355,19 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
         interaction: () => f.interaction,
       });
     }
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) q.setAnswer(i, '__answered__');
+    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
+      q.setAnswer(i, '__answered__');
     q.submit();
     // Σ(w·correct) / Σ(w) × 100 = (9 correct × 1 + 0 × 9) / (9 × 1 + 9) × 100 = 50
     expect(m.ref.events[0].score).toBe(50);
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
       const f = ALL_INTERACTION_FIXTURES[i];
-      expect(adapter.calls[i]).toEqual(['reportInteraction', f.id, f.interaction, f.expectedCorrect]);
+      expect(adapter.calls[i]).toEqual([
+        'reportInteraction',
+        f.id,
+        f.interaction,
+        f.expectedCorrect,
+      ]);
     }
   });
 });

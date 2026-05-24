@@ -39,7 +39,9 @@ test.describe('Export — Web', () => {
 });
 
 test.describe('Export — Serve Built Output', () => {
-  test('built dist/ serves and course loads with navigation', async ({ page }) => {
+  test('built dist/ serves and course loads with navigation', async ({
+    page,
+  }) => {
     const webDir = variantDir('free', 'web');
 
     // Start vite preview, capture the child process
@@ -57,7 +59,7 @@ test.describe('Export — Serve Built Output', () => {
           ready = true;
           break;
         } catch {
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 500));
         }
       }
       expect(ready).toBe(true);
@@ -71,7 +73,9 @@ test.describe('Export — Serve Built Output', () => {
       await expect(page.locator('.tessera-sidebar')).toBeVisible();
 
       // Navigation works
-      const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
+      const nextBtn = page.locator('.tessera-page-nav-btn', {
+        hasText: 'Next',
+      });
       await expect(nextBtn).toBeEnabled();
       await nextBtn.click();
       // `expect` polls — no need to sleep before asserting visibility.
@@ -103,7 +107,9 @@ test.describe('Export — SCORM 1.2', () => {
     expect(xml).toContain('E2E Test Course');
 
     // ZIP should exist at the variant root (runExport writes it next to dist/)
-    const zipFiles = (await execAsync(`ls ${scormDir}/*.zip 2>/dev/null || true`)).stdout.trim();
+    const zipFiles = (
+      await execAsync(`ls ${scormDir}/*.zip 2>/dev/null || true`)
+    ).stdout.trim();
     expect(zipFiles.length).toBeGreaterThan(0);
   });
 });

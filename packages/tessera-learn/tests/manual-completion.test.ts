@@ -41,8 +41,16 @@ function createBareProject(root: string, configBody: string): void {
   writeConfig(root, configBody);
   mkdirp(root, 'assets');
   mkdirp(root, 'pages', '01-section', '01-lesson');
-  writeFile(root, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-  writeFile(root, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+  writeFile(
+    root,
+    'pages/01-section/_meta.js',
+    'export default { title: "S" };',
+  );
+  writeFile(
+    root,
+    'pages/01-section/01-lesson/_meta.js',
+    'export default { title: "L" };',
+  );
   writeFile(root, 'pages/01-section/01-lesson/intro.svelte', '<h1>Intro</h1>');
   writeFile(root, 'pages/01-section/01-lesson/outro.svelte', '<h1>Outro</h1>');
 }
@@ -52,8 +60,16 @@ function createProjectWithCompletesOn(root: string, configBody: string): void {
   writeConfig(root, configBody);
   mkdirp(root, 'assets');
   mkdirp(root, 'pages', '01-section', '01-lesson');
-  writeFile(root, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-  writeFile(root, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+  writeFile(
+    root,
+    'pages/01-section/_meta.js',
+    'export default { title: "S" };',
+  );
+  writeFile(
+    root,
+    'pages/01-section/01-lesson/_meta.js',
+    'export default { title: "L" };',
+  );
   writeFile(root, 'pages/01-section/01-lesson/intro.svelte', '<h1>Intro</h1>');
   writeFile(
     root,
@@ -61,7 +77,7 @@ function createProjectWithCompletesOn(root: string, configBody: string): void {
     `<script module>
   export const pageConfig = { title: "Finale", completesOn: "view" };
 </script>
-<h1>Finale</h1>`
+<h1>Finale</h1>`,
   );
 }
 
@@ -99,11 +115,13 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "bogus" },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.mode" must be "quiz", "percentage", or "manual"')
+      expect.stringContaining(
+        '"completion.mode" must be "quiz", "percentage", or "manual"',
+      ),
     );
   });
 
@@ -115,7 +133,7 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", trigger: "page" },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toHaveLength(0);
@@ -129,13 +147,13 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", trigger: "page" },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view"'
-      )
+        'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view"',
+      ),
     );
   });
 
@@ -147,11 +165,13 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", trigger: "scroll" },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.trigger" must be "page" or omitted, got "scroll"')
+      expect.stringContaining(
+        '"completion.trigger" must be "page" or omitted, got "scroll"',
+      ),
     );
   });
 
@@ -172,7 +192,7 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", requireSuccessStatus: "${v}" },
   export: { standard: "web" },
-};`
+};`,
         );
         const { errors } = validateProject(dir);
         expect(errors).toHaveLength(0);
@@ -190,11 +210,13 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", requireSuccessStatus: "unknown" },
   export: { standard: "web" },
-};`
+};`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"completion.requireSuccessStatus" must be "passed" or "failed"')
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" must be "passed" or "failed"',
+      ),
     );
   });
 
@@ -202,40 +224,58 @@ describe('manual completion — validation', () => {
     writeConfig(testRoot, MANUAL_CONFIG);
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-    writeFile(testRoot, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "L" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/check.svelte',
       `<script module>
   export const pageConfig = { quiz: { graded: true, gatesProgress: false, maxAttempts: 3 } };
 </script>
-<h1>Check</h1>`
+<h1>Check</h1>`,
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toHaveLength(0);
-    expect(warnings.some((w) => /quiz\.graded is true under completion\.mode: "manual"/.test(w))).toBe(
-      true
-    );
+    expect(
+      warnings.some((w) =>
+        /quiz\.graded is true under completion\.mode: "manual"/.test(w),
+      ),
+    ).toBe(true);
   });
 
   it('errors when pageConfig.completesOn is not "view"', () => {
     writeConfig(testRoot, MANUAL_CONFIG);
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-    writeFile(testRoot, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "L" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/finale.svelte',
       `<script module>
   export const pageConfig = { completesOn: "scroll" };
 </script>
-<h1>Finale</h1>`
+<h1>Finale</h1>`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('pageConfig.completesOn must be "view"')
+      expect.stringContaining('pageConfig.completesOn must be "view"'),
     );
   });
 
@@ -247,10 +287,14 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual", percentageThreshold: 80 },
   export: { standard: "web" },
-};`
+};`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(warnings.some((w) => /"completion\.percentageThreshold" is ignored/.test(w))).toBe(true);
+    expect(
+      warnings.some((w) =>
+        /"completion\.percentageThreshold" is ignored/.test(w),
+      ),
+    ).toBe(true);
   });
 
   it('warns when completesOn is set under non-manual mode', () => {
@@ -262,34 +306,52 @@ describe('manual completion — validation', () => {
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
-};`
+};`,
     );
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-    writeFile(testRoot, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "L" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/finale.svelte',
       `<script module>
   export const pageConfig = { completesOn: "view" };
 </script>
-<h1>F</h1>`
+<h1>F</h1>`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(warnings.some((w) => /pageConfig\.completesOn is ignored/.test(w))).toBe(true);
+    expect(
+      warnings.some((w) => /pageConfig\.completesOn is ignored/.test(w)),
+    ).toBe(true);
   });
 
   it('warns when a page has both completesOn:"view" and a quiz block', () => {
     writeConfig(testRoot, MANUAL_CONFIG);
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
-    writeFile(testRoot, 'pages/01-section/01-lesson/_meta.js', 'export default { title: "L" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "L" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/intro.svelte',
-      '<h1>Intro</h1>'
+      '<h1>Intro</h1>',
     );
     writeFile(
       testRoot,
@@ -297,11 +359,13 @@ describe('manual completion — validation', () => {
       `<script module>
   export const pageConfig = { completesOn: "view", quiz: { graded: false, maxAttempts: 1 } };
 </script>
-<h1>F</h1>`
+<h1>F</h1>`,
     );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) => /completion fires on view, before the quiz can be answered/.test(w))
+      warnings.some((w) =>
+        /completion fires on view, before the quiz can be answered/.test(w),
+      ),
     ).toBe(true);
   });
 
@@ -313,15 +377,19 @@ describe('manual completion — validation', () => {
   navigation: { mode: "sequential" },
   completion: { mode: "manual" },
   export: { standard: "web" },
-};`
+};`,
     );
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L", pages: ["intro", "outro"] };'
+      'export default { title: "L", pages: ["intro", "outro"] };',
     );
     writeFile(
       testRoot,
@@ -329,12 +397,18 @@ describe('manual completion — validation', () => {
       `<script module>
   export const pageConfig = { completesOn: "view" };
 </script>
-<h1>Intro</h1>`
+<h1>Intro</h1>`,
     );
-    writeFile(testRoot, 'pages/01-section/01-lesson/outro.svelte', '<h1>Outro</h1>');
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/outro.svelte',
+      '<h1>Outro</h1>',
+    );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) => /first page — the course will complete immediately on launch/.test(w))
+      warnings.some((w) =>
+        /first page — the course will complete immediately on launch/.test(w),
+      ),
     ).toBe(true);
   });
 
@@ -346,15 +420,19 @@ describe('manual completion — validation', () => {
   navigation: { mode: "free" },
   completion: { mode: "manual" },
   export: { standard: "web" },
-};`
+};`,
     );
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(testRoot, 'pages/01-section/_meta.js', 'export default { title: "S" };');
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "S" };',
+    );
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L", pages: ["a"] };'
+      'export default { title: "L", pages: ["a"] };',
     );
     writeFile(
       testRoot,
@@ -362,11 +440,13 @@ describe('manual completion — validation', () => {
       `<script module>
   export const pageConfig = { completesOn: "view" };
 </script>
-<h1>A</h1>`
+<h1>A</h1>`,
     );
     const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) => /first page — the course will complete immediately on launch/.test(w))
+      warnings.some((w) =>
+        /first page — the course will complete immediately on launch/.test(w),
+      ),
     ).toBe(true);
   });
 
@@ -381,7 +461,9 @@ describe('manual completion — validation', () => {
 // 2. Progress state
 // ============================================================================
 
-function manualConfig(overrides: Partial<CourseConfig['completion']> = {}): CourseConfig {
+function manualConfig(
+  overrides: Partial<CourseConfig['completion']> = {},
+): CourseConfig {
   return createConfig({
     completion: { mode: 'manual', ...overrides } as CourseConfig['completion'],
     scoring: { passingScore: 0 },
@@ -475,7 +557,10 @@ vi.mock('svelte', async () => {
   };
 });
 
-import { useCompletion, __resetUseCompletionWarning } from '../src/runtime/hooks.svelte.js';
+import {
+  useCompletion,
+  __resetUseCompletionWarning,
+} from '../src/runtime/hooks.svelte.js';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
 
 function makeNavCtx(progress: ProgressState, config: CourseConfig) {
@@ -522,7 +607,9 @@ describe('manual completion — useCompletion hook', () => {
   });
 
   it('throws when called outside a Tessera course', () => {
-    expect(() => useCompletion()).toThrow(/must be called inside a Tessera course/);
+    expect(() => useCompletion()).toThrow(
+      /must be called inside a Tessera course/,
+    );
   });
 
   it('flips successStatus when requireSuccessStatus is set', () => {
@@ -542,8 +629,14 @@ describe('manual completion — useCompletion hook', () => {
 //    directly to verify per-standard behavior.
 // ============================================================================
 
-import { SCORM12Adapter, type SCORM12API } from '../src/runtime/adapters/scorm12.js';
-import { SCORM2004Adapter, type SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
+import {
+  SCORM12Adapter,
+  type SCORM12API,
+} from '../src/runtime/adapters/scorm12.js';
+import {
+  SCORM2004Adapter,
+  type SCORM2004API,
+} from '../src/runtime/adapters/scorm2004.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 
 function mockSCORM12(): SCORM12API {
@@ -593,7 +686,10 @@ describe('manual completion — adapter integration', () => {
     adapter.commit();
     await flush();
 
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_status', 'completed');
+    expect(api.LMSSetValue).toHaveBeenCalledWith(
+      'cmi.core.lesson_status',
+      'completed',
+    );
   });
 
   it('SCORM 1.2 writes lesson_status = passed when requireSuccessStatus = "passed"', async () => {
@@ -606,7 +702,10 @@ describe('manual completion — adapter integration', () => {
     adapter.commit();
     await flush();
 
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.lesson_status', 'passed');
+    expect(api.LMSSetValue).toHaveBeenCalledWith(
+      'cmi.core.lesson_status',
+      'passed',
+    );
   });
 
   it('SCORM 2004 writes completion_status + success_status independently', async () => {
@@ -619,7 +718,10 @@ describe('manual completion — adapter integration', () => {
     adapter.commit();
     await flush();
 
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.completion_status', 'completed');
+    expect(api.SetValue).toHaveBeenCalledWith(
+      'cmi.completion_status',
+      'completed',
+    );
     expect(api.SetValue).toHaveBeenCalledWith('cmi.success_status', 'unknown');
   });
 
@@ -633,7 +735,10 @@ describe('manual completion — adapter integration', () => {
     adapter.commit();
     await flush();
 
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.completion_status', 'completed');
+    expect(api.SetValue).toHaveBeenCalledWith(
+      'cmi.completion_status',
+      'completed',
+    );
     expect(api.SetValue).toHaveBeenCalledWith('cmi.success_status', 'passed');
   });
 
@@ -728,11 +833,14 @@ describe('manual completion — page trigger', () => {
     index: number,
     pages: ManifestPage[],
     progress: ProgressState,
-    config: CourseConfig
+    config: CourseConfig,
   ) {
     const manifest = { sections: [], pages, totalPages: pages.length };
     progress.markVisited(index);
-    if (pages[index].completesOn === 'view' && config.completion.mode === 'manual') {
+    if (
+      pages[index].completesOn === 'view' &&
+      config.completion.mode === 'manual'
+    ) {
       progress.markCompleteManually();
     }
     progress.recalculateCompletion(manifest.totalPages, config);
@@ -791,11 +899,14 @@ describe('manual completion — live success-status push', () => {
    * commit on change. The effect re-runs whenever its tracked reads change;
    * the test invokes it manually after each progress mutation.
    */
-  function makeStatusPusher(progress: ProgressState, adapter: {
-    setCompletionStatus(s: 'incomplete' | 'complete'): void;
-    setSuccessStatus(s: 'unknown' | 'passed' | 'failed'): void;
-    commit(): void;
-  }) {
+  function makeStatusPusher(
+    progress: ProgressState,
+    adapter: {
+      setCompletionStatus(s: 'incomplete' | 'complete'): void;
+      setSuccessStatus(s: 'unknown' | 'passed' | 'failed'): void;
+      commit(): void;
+    },
+  ) {
     let prevCompletion: 'incomplete' | 'complete' = progress.completionStatus;
     let prevSuccess: 'unknown' | 'passed' | 'failed' = progress.successStatus;
     return () => {
