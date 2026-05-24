@@ -30,7 +30,7 @@ function makeEngine(
   const reports: EngineProbe['reports'] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
-    passingScore: opts.passingScore ?? 70,
+    passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct) => reports.push({ id, interaction, correct }),
     // dispatch() returns false when the host element is null; model that with hostNull.
     dispatch: (name, detail) => {
@@ -104,6 +104,24 @@ describe('QuizEngine', () => {
 
     expect(completes(events)).toHaveLength(1);
     expect(completeScore(events)).toBe(50);
+  });
+
+  it('reads passingScore live so a late LMS mastery override is reflected', () => {
+    // App.svelte applies an LMS-supplied masteryScore to pageContext.passingScore
+    // *after* useQuiz() may already have mounted the quiz. The engine must read
+    // the threshold on each access, not snapshot it at construction, or the
+    // quiz's pass/fail UI diverges from the LMS success status.
+    let passingScore = 70;
+    const engine = new QuizEngine({
+      quizConfig: { graded: true } as QuizConfig,
+      passingScore: () => passingScore,
+      report: () => {},
+      dispatch: () => true,
+    });
+
+    expect(engine.passingScore).toBe(70);
+    passingScore = 80; // LMS mastery 0.8 lands during adapter.init()
+    expect(engine.passingScore).toBe(80);
   });
 
   it('reports each interaction to the adapter when the widget calls commit(), not on setAnswer', () => {

@@ -396,7 +396,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
 
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
-    passingScore: pageCtx.passingScore,
+    passingScore: () => pageCtx.passingScore,
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
     dispatch: (name, detail) => {

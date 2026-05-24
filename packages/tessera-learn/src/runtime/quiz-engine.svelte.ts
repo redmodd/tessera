@@ -22,8 +22,13 @@ import type {
  */
 export interface QuizEngineDeps {
   quizConfig: QuizConfig;
-  /** Resolved passing threshold (config + LMS mastery override). */
-  passingScore: number;
+  /**
+   * Live accessor for the resolved passing threshold (config + LMS mastery
+   * override). Read on each access rather than captured, because the cmi5/SCORM
+   * mastery override mutates `pageContext.passingScore` after `useQuiz()` may
+   * already have run.
+   */
+  passingScore: () => number;
   /** Wraps `adapterCtx.adapter.reportInteraction`; a no-op when there is no adapter. */
   report: (id: string, interaction: Interaction, correct: boolean | null) => void;
   /**
@@ -108,7 +113,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   get passingScore(): number {
-    return this.#deps.passingScore;
+    return this.#deps.passingScore();
   }
 
   get attemptCount(): number {
