@@ -80,11 +80,19 @@ export default tseslint.config(
     },
   },
 
-  // console.* in the shipped runtime is a deliberate-or-not decision.
+  // A stray console.log in the runtime ships to the learner's browser — flag it.
   {
-    files: ['packages/tessera-learn/src/**/*.{ts,svelte}'],
+    files: ['packages/tessera-learn/src/runtime/**/*.{ts,svelte}'],
     rules: {
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+
+  // The plugin/CLI is build-time Node tooling; stdout is its output channel.
+  {
+    files: ['packages/tessera-learn/src/plugin/**/*.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 
