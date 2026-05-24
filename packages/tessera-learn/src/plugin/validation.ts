@@ -14,6 +14,7 @@ import {
   validateAuthCredential,
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
+import { shortIdentifier } from '../runtime/interaction-format.js';
 
 // ---------- Types ----------
 
@@ -55,6 +56,8 @@ const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
+const VALID_FEEDBACK_MODES = ['review', 'immediate', 'never'];
+const VALID_RETRY_MODES = ['full', 'incorrect-only'];
 
 // ---------- Main ----------
 
@@ -79,7 +82,12 @@ export function validateProject(projectRoot: string): ValidationResult {
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
   const assetsDir = resolve(projectRoot, 'assets');
-  const pageResults = validatePages(pagesDir, assetsDir, projectRoot);
+  const pageResults = validatePages(
+    pagesDir,
+    assetsDir,
+    projectRoot,
+    config?.export?.standard,
+  );
   errors.push(...pageResults.errors);
   warnings.push(...pageResults.warnings);
 
@@ -147,6 +155,24 @@ function parseConfig(
         `course.config.js: unknown field "${key}" — will be ignored`,
       );
     }
+  }
+
+  // Validate title. The merge falls back to "Untitled Course" for a missing or
+  // empty string (warn), but a non-string is passed through truthy and ships
+  // verbatim (error).
+  if (config.title !== undefined && typeof config.title !== 'string') {
+    errors.push(
+      `course.config.js: "title" must be a string, got ${typeof config.title}`,
+    );
+  } else if (config.title === undefined || config.title.trim() === '') {
+    warnings.push(
+      'course.config.js: "title" is missing or empty — the course will ship as "Untitled Course"',
+    );
+  }
+
+  // Validate branding
+  if (config.branding !== undefined) {
+    validateBranding(config.branding, warnings);
   }
 
   // Validate navigation.mode
@@ -235,6 +261,73 @@ function parseConfig(
   }
 
   return config;
+}
+
+// ---------- Branding Validation ----------
+
+// Permissive approximation of the browser's accepted color set: hex 3/4/6/8,
+// rgb()/rgba()/hsl()/hsla(), or a bare keyword (named colors, transparent,
+// currentColor). parseColor's real check (App.svelte) is browser-only and the
+// runtime degrades gracefully, so an unrecognized value is advisory, never an
+// error — lean permissive to avoid rejecting values the browser would accept.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const FUNC_COLOR_RE = /^(?:rgb|rgba|hsl|hsla)\(.*\)$/i;
+const NAMED_COLOR_RE = /^[a-zA-Z]+$/;
+
+function isPlausibleColor(value: string): boolean {
+  const v = value.trim();
+  return (
+    HEX_COLOR_RE.test(v) || FUNC_COLOR_RE.test(v) || NAMED_COLOR_RE.test(v)
+  );
+}
+
+/**
+ * Format-only checks on the branding block — all advisory (warnings). The
+ * runtime failures are mild: an unresolved logo ships a broken <img src>, an
+ * unparseable color falls back to theme defaults. A11Y_CHECKER.md rule 1.7
+ * extends this same function with a contrast check on primaryColor.
+ */
+function validateBranding(raw: unknown, warnings: string[]): void {
+  if (raw === null || typeof raw !== 'object') {
+    warnings.push(
+      `course.config.js: "branding" must be an object, got ${raw === null ? 'null' : typeof raw} — will be ignored`,
+    );
+    return;
+  }
+  const branding = raw as Record<string, unknown>;
+
+  const logo = branding.logo;
+  if (logo !== undefined) {
+    if (typeof logo !== 'string') {
+      warnings.push(
+        `course.config.js: "branding.logo" must be a string, got ${typeof logo}`,
+      );
+    } else if (logo.startsWith('$assets/')) {
+      warnings.push(
+        'course.config.js: "branding.logo" starts with "$assets/", but branding paths are not asset-resolved — it will ship as a literal, broken src. Use a URL or a path relative to the deployed root.',
+      );
+    }
+  }
+
+  const primaryColor = branding.primaryColor;
+  if (primaryColor !== undefined) {
+    if (typeof primaryColor !== 'string') {
+      warnings.push(
+        `course.config.js: "branding.primaryColor" must be a string, got ${typeof primaryColor}`,
+      );
+    } else if (!isPlausibleColor(primaryColor)) {
+      warnings.push(
+        `course.config.js: "branding.primaryColor" "${primaryColor}" does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
+      );
+    }
+  }
+
+  const fontFamily = branding.fontFamily;
+  if (fontFamily !== undefined && typeof fontFamily !== 'string') {
+    warnings.push(
+      `course.config.js: "branding.fontFamily" must be a string, got ${typeof fontFamily}`,
+    );
+  }
 }
 
 // ---------- xAPI Config Validation ----------
@@ -542,6 +635,7 @@ function validatePageFile(
   errors: string[],
   warnings: string[],
   assetExistsCache: Map<string, boolean>,
+  exportStandard?: string,
 ): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
   const fileRel = relative(projectRoot, filePath);
   const content = readSourceFileCached(filePath);
@@ -560,7 +654,13 @@ function validatePageFile(
   const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
 
   validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
-  validateQuestionComponents(content, fileRel, errors);
+  validateQuestionComponents(
+    content,
+    fileRel,
+    errors,
+    warnings,
+    exportStandard,
+  );
   validateContractBypass(content, fileRel, errors);
   if (
     pageConfig?.quiz &&
@@ -591,6 +691,7 @@ function validatePages(
   pagesDir: string,
   assetsDir: string,
   projectRoot: string,
+  exportStandard?: string,
 ): PagesValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -653,6 +754,7 @@ function validatePages(
   for (const sectionName of sectionDirs) {
     const sectionPath = resolve(pagesDir, sectionName);
     const sectionRel = relative(projectRoot, sectionPath);
+    const pagesBeforeSection = totalPages;
 
     // Validate section _meta.js
     const sectionMeta = validateMetaFile(
@@ -695,6 +797,7 @@ function validatePages(
         errors,
         warnings,
         assetExistsCache,
+        exportStandard,
       );
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
@@ -765,12 +868,20 @@ function validatePages(
           errors,
           warnings,
           assetExistsCache,
+          exportStandard,
         );
         totalPages++;
         if (result.isQuiz) totalQuizzes++;
         if (result.isGradedQuiz) hasGradedQuiz = true;
         pages.push(result.page);
       }
+    }
+
+    // The page-count delta covers both the no-lessons and empty-lessons cases.
+    if (totalPages === pagesBeforeSection) {
+      warnings.push(
+        `${sectionRel}: section contributed no pages and will be empty`,
+      );
     }
   }
 
@@ -880,6 +991,23 @@ function validateQuizConfig(
       );
     }
   }
+
+  if (
+    cfg.feedbackMode !== undefined &&
+    !VALID_FEEDBACK_MODES.includes(cfg.feedbackMode as string)
+  ) {
+    errors.push(
+      `${fileRel}: quiz.feedbackMode must be "review", "immediate", or "never", got "${String(cfg.feedbackMode)}"`,
+    );
+  }
+  if (
+    cfg.retryMode !== undefined &&
+    !VALID_RETRY_MODES.includes(cfg.retryMode as string)
+  ) {
+    errors.push(
+      `${fileRel}: quiz.retryMode must be "full" or "incorrect-only", got "${String(cfg.retryMode)}"`,
+    );
+  }
 }
 
 // ---------- Question Component Validation ----------
@@ -973,10 +1101,13 @@ function validateQuestionComponents(
   content: string,
   fileRel: string,
   errors: string[],
+  warnings: string[],
+  exportStandard?: string,
 ): void {
   const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
   const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
   const seenIds = new Set<string>();
+  const seenSanitized = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = tagStartRe.exec(content)) !== null) {
     const name = m[1];
@@ -995,8 +1126,44 @@ function validateQuestionComponents(
         errors.push(
           `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`,
         );
+      } else if (exportStandard === 'scorm12') {
+        // scorm12-only: shortIdentifier strips non-alphanumerics, so distinct
+        // raw ids can collide after sanitization. Skip raw duplicates (already
+        // flagged above) to avoid double-reporting the same id.
+        const sane = shortIdentifier(idProp.value);
+        if (sane !== idProp.value) {
+          warnings.push(
+            `${fileRel}: question id "${idProp.value}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
+          );
+        }
+        if (seenSanitized.has(sane)) {
+          errors.push(
+            `${fileRel}: question id "${idProp.value}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
+          );
+        }
+        seenSanitized.add(sane);
       }
       seenIds.add(idProp.value);
+    }
+
+    const weightProp = props.get('weight');
+    if (weightProp?.kind === 'string') {
+      warnings.push(
+        `${fileRel}: <${name}> weight="${weightProp.value}" is a string and is ignored (treated as 1) — pass a number: weight={${weightProp.value}}`,
+      );
+    } else {
+      const weight = staticNumber(weightProp);
+      if (weight !== null) {
+        if (!Number.isFinite(weight)) {
+          errors.push(
+            `${fileRel}: <${name}> weight must be finite — a non-finite weight makes the weighted score NaN, got ${weight}`,
+          );
+        } else if (!(weight > 0)) {
+          warnings.push(
+            `${fileRel}: <${name}> weight ${weight} is not positive and is ignored (treated as 1)`,
+          );
+        }
+      }
     }
 
     if (name === 'MultipleChoice') {
@@ -1012,6 +1179,12 @@ function validateQuestionComponents(
             `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`,
           );
         }
+      }
+      const optionFeedback = staticArray(props.get('optionFeedback'));
+      if (options && optionFeedback && optionFeedback.length > options.length) {
+        warnings.push(
+          `${fileRel}: <MultipleChoice> optionFeedback has ${optionFeedback.length} entries but only ${options.length} options — the extra entries can never be shown`,
+        );
       }
     } else if (name === 'Sorting') {
       const items = staticArray(props.get('items'));
@@ -1155,6 +1328,17 @@ function crossValidate(
   if (config.completion?.mode === 'quiz' && !pageResults.hasGradedQuiz) {
     errors.push(
       'completion.mode is "quiz" but no pages have quiz config with graded: true',
+    );
+  }
+
+  // completion.mode "quiz" with an implicit pass threshold — the merge defaults
+  // to 70, so this is a nudge, not an error.
+  if (
+    config.completion?.mode === 'quiz' &&
+    config.scoring?.passingScore === undefined
+  ) {
+    warnings.push(
+      'completion.mode is "quiz" but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.',
     );
   }
 

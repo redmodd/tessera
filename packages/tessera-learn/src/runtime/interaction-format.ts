@@ -55,7 +55,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
  * underscore, max 250 chars. Strict validators (SCORM Cloud) reject raw
  * option labels with spaces or punctuation with error 405/406.
  */
-function shortIdentifier(value: string): string {
+export function shortIdentifier(value: string): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const trimmed = cleaned.slice(0, 250);
   return trimmed || '_';
