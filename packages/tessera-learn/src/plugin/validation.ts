@@ -23,7 +23,10 @@ export interface ValidationResult {
 }
 
 /** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
-export function reportValidationIssues({ errors, warnings }: ValidationResult): void {
+export function reportValidationIssues({
+  errors,
+  warnings,
+}: ValidationResult): void {
   for (const warning of warnings) {
     console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
   }
@@ -84,7 +87,11 @@ export function validateProject(projectRoot: string): ValidationResult {
   for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
-      validateContractBypass(readSourceFileCached(shellPath), shellFile, errors);
+      validateContractBypass(
+        readSourceFileCached(shellPath),
+        shellFile,
+        errors,
+      );
     }
   }
 
@@ -115,18 +122,18 @@ interface ParsedConfig {
 function parseConfig(
   projectRoot: string,
   errors: string[],
-  warnings: string[]
+  warnings: string[],
 ): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
       errors.push(
-        'course.config.js: could not parse — must use `export default { ... }` syntax'
+        'course.config.js: could not parse — must use `export default { ... }` syntax',
       );
     } else if (read.reason === 'parse-error') {
       errors.push(
-        'course.config.js: syntax error — must export a static object literal'
+        'course.config.js: syntax error — must export a static object literal',
       );
     }
     return null;
@@ -137,7 +144,7 @@ function parseConfig(
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
       warnings.push(
-        `course.config.js: unknown field "${key}" — will be ignored`
+        `course.config.js: unknown field "${key}" — will be ignored`,
       );
     }
   }
@@ -146,7 +153,7 @@ function parseConfig(
   if (config.navigation?.mode !== undefined) {
     if (!VALID_NAV_MODES.includes(config.navigation.mode)) {
       errors.push(
-        `course.config.js: "navigation.mode" must be "free" or "sequential", got "${config.navigation.mode}"`
+        `course.config.js: "navigation.mode" must be "free" or "sequential", got "${config.navigation.mode}"`,
       );
     }
   }
@@ -155,7 +162,7 @@ function parseConfig(
   if (config.completion?.mode !== undefined) {
     if (!VALID_COMPLETION_MODES.includes(config.completion.mode)) {
       errors.push(
-        `course.config.js: "completion.mode" must be "quiz", "percentage", or "manual", got "${config.completion.mode}"`
+        `course.config.js: "completion.mode" must be "quiz", "percentage", or "manual", got "${config.completion.mode}"`,
       );
     }
   }
@@ -163,11 +170,11 @@ function parseConfig(
   if (config.completion?.trigger !== undefined) {
     if (config.completion.mode !== 'manual') {
       warnings.push(
-        `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`
+        `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
     } else if (!VALID_MANUAL_TRIGGERS.includes(config.completion.trigger)) {
       errors.push(
-        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`
+        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`,
       );
     }
   }
@@ -175,11 +182,15 @@ function parseConfig(
   if (config.completion?.requireSuccessStatus !== undefined) {
     if (config.completion.mode !== 'manual') {
       warnings.push(
-        `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`
+        `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
-    } else if (!VALID_REQUIRE_SUCCESS_STATUS.includes(config.completion.requireSuccessStatus)) {
+    } else if (
+      !VALID_REQUIRE_SUCCESS_STATUS.includes(
+        config.completion.requireSuccessStatus,
+      )
+    ) {
       errors.push(
-        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`
+        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
       );
     }
   }
@@ -188,7 +199,7 @@ function parseConfig(
   if (config.export?.standard !== undefined) {
     if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
       errors.push(
-        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "${config.export.standard}"`
+        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "${config.export.standard}"`,
       );
     }
   }
@@ -198,7 +209,7 @@ function parseConfig(
     const score = config.scoring.passingScore;
     if (typeof score !== 'number' || score < 0 || score > 100) {
       errors.push(
-        `course.config.js: "scoring.passingScore" must be 0–100, got ${score}`
+        `course.config.js: "scoring.passingScore" must be 0–100, got ${score}`,
       );
     }
   }
@@ -208,7 +219,7 @@ function parseConfig(
     const threshold = config.completion.percentageThreshold;
     if (typeof threshold !== 'number' || threshold < 0 || threshold > 100) {
       errors.push(
-        `course.config.js: "completion.percentageThreshold" must be 0–100, got ${threshold}`
+        `course.config.js: "completion.percentageThreshold" must be 0–100, got ${threshold}`,
       );
     }
   }
@@ -219,7 +230,7 @@ function parseConfig(
       config.xapi,
       config.export?.standard ?? 'web',
       errors,
-      warnings
+      warnings,
     );
   }
 
@@ -228,14 +239,14 @@ function parseConfig(
 
 // ---------- xAPI Config Validation ----------
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SHA1_RE = /^[0-9a-f]{40}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function validateXAPIConfig(
   raw: unknown,
   standard: string,
   errors: string[],
-  warnings: string[]
+  warnings: string[],
 ): void {
   if (raw === undefined || raw === null) return;
 
@@ -246,7 +257,7 @@ function validateXAPIConfig(
   if (Array.isArray(raw)) {
     if (entries.length === 0) {
       errors.push(
-        'course.config.js: xapi must contain at least one destination, or be omitted'
+        'course.config.js: xapi must contain at least one destination, or be omitted',
       );
       return;
     }
@@ -255,11 +266,11 @@ function validateXAPIConfig(
       (e) =>
         e &&
         typeof e === 'object' &&
-        (e as { endpoint?: unknown }).endpoint === 'lms'
+        (e as { endpoint?: unknown }).endpoint === 'lms',
     ).length;
     if (lmsCount > 1) {
       errors.push(
-        "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one cmi5 launch-inherited destination is allowed"
+        "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one cmi5 launch-inherited destination is allowed",
       );
     }
     // Warn on duplicate explicit endpoints.
@@ -276,13 +287,13 @@ function validateXAPIConfig(
       if (count > 1) {
         warnings.push(
           `course.config.js: xapi has ${count} entries with endpoint "${ep}" — usually a copy-paste mistake; ` +
-            'fan-out to the same LRS with different actors/activityIds is supported but uncommon.'
+            'fan-out to the same LRS with different actors/activityIds is supported but uncommon.',
         );
       }
     }
   } else if (typeof raw !== 'object') {
     errors.push(
-      'course.config.js: xapi must be an object or an array of objects'
+      'course.config.js: xapi must be an object or an array of objects',
     );
     return;
   }
@@ -299,7 +310,7 @@ function validateXAPIConfig(
       label,
       standard,
       errors,
-      warnings
+      warnings,
     );
   }
 }
@@ -309,7 +320,7 @@ function validateSingleXAPIEntry(
   label: string,
   standard: string,
   errors: string[],
-  warnings: string[]
+  warnings: string[],
 ): void {
   const endpoint = entry.endpoint;
   if (endpoint === undefined) {
@@ -326,15 +337,21 @@ function validateSingleXAPIEntry(
     if (standard !== 'cmi5') {
       errors.push(
         `course.config.js: ${label}.endpoint: 'lms' requires export.standard: 'cmi5' (you have "${standard}"). ` +
-          'Either change the export standard or specify an explicit LRS endpoint.'
+          'Either change the export standard or specify an explicit LRS endpoint.',
       );
     }
     // Forbid extra fields — everything is inherited from the cmi5 launch.
-    const forbidden = ['auth', 'actor', 'activityId', 'registration', 'actorAccountHomePage'];
+    const forbidden = [
+      'auth',
+      'actor',
+      'activityId',
+      'registration',
+      'actorAccountHomePage',
+    ];
     for (const f of forbidden) {
       if (entry[f] !== undefined) {
         errors.push(
-          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the cmi5 launch.`
+          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the cmi5 launch.`,
         );
       }
     }
@@ -347,25 +364,25 @@ function validateSingleXAPIEntry(
     url = new URL(endpoint);
   } catch {
     errors.push(
-      `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got "${endpoint}"`
+      `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got "${endpoint}"`,
     );
     return;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     errors.push(
-      `course.config.js: ${label}.endpoint must use http: or https:, got "${url.protocol}"`
+      `course.config.js: ${label}.endpoint must use http: or https:, got "${url.protocol}"`,
     );
     return;
   }
   if (url.protocol === 'http:' && process.env.NODE_ENV === 'production') {
     warnings.push(
-      `course.config.js: ${label}.endpoint uses http:; LRS credentials will travel in cleartext. Use https in production.`
+      `course.config.js: ${label}.endpoint uses http:; LRS credentials will travel in cleartext. Use https in production.`,
     );
   }
   if (!endpoint.endsWith('/')) {
     warnings.push(
       `course.config.js: ${label}.endpoint should end with a slash to avoid concatenation surprises ` +
-        `(e.g. 'https://lrs.example.com/xapi/' not 'https://lrs.example.com/xapi'). Runtime normalizes regardless.`
+        `(e.g. 'https://lrs.example.com/xapi/' not 'https://lrs.example.com/xapi'). Runtime normalizes regardless.`,
     );
   }
 
@@ -376,16 +393,18 @@ function validateSingleXAPIEntry(
   } else if (typeof auth === 'string') {
     const authErr = validateAuthCredential(auth);
     if (authErr) {
-      errors.push(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
+      errors.push(
+        `course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`,
+      );
     } else {
       warnings.push(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
-          'For production, pass a function that fetches a short-lived token from a server endpoint.'
+          'For production, pass a function that fetches a short-lived token from a server endpoint.',
       );
     }
   } else if (typeof auth !== 'function') {
     errors.push(
-      `course.config.js: ${label}.auth must be a string or a function, got ${typeof auth}`
+      `course.config.js: ${label}.auth must be a string or a function, got ${typeof auth}`,
     );
   }
 
@@ -401,7 +420,7 @@ function validateSingleXAPIEntry(
       new URL(activityId);
     } catch {
       errors.push(
-        `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`
+        `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`,
       );
     }
   }
@@ -412,7 +431,7 @@ function validateSingleXAPIEntry(
     if (standard === 'web') {
       errors.push(
         `course.config.js: ${label}.actor is required for web export — there is no LMS to derive a learner identity from. ` +
-          'Provide either a static actor object or a function that resolves one (e.g. from your auth system).'
+          'Provide either a static actor object or a function that resolves one (e.g. from your auth system).',
       );
     }
   } else if (typeof actor === 'object' && actor !== null) {
@@ -422,7 +441,7 @@ function validateSingleXAPIEntry(
     }
   } else if (typeof actor !== 'function') {
     errors.push(
-      `course.config.js: ${label}.actor must be an object or function, got ${typeof actor}`
+      `course.config.js: ${label}.actor must be an object or function, got ${typeof actor}`,
     );
   }
 
@@ -432,25 +451,25 @@ function validateSingleXAPIEntry(
   if (aahp !== undefined) {
     if (typeof aahp !== 'string') {
       errors.push(
-        `course.config.js: ${label}.actorAccountHomePage must be a string`
+        `course.config.js: ${label}.actorAccountHomePage must be a string`,
       );
     } else {
       try {
         new URL(aahp);
       } catch {
         errors.push(
-          `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`
+          `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`,
         );
       }
     }
     if (actor !== undefined) {
       warnings.push(
-        `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`
+        `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
     if (standard === 'cmi5' || standard === 'web') {
       warnings.push(
-        `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`
+        `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
       );
     }
   }
@@ -462,7 +481,7 @@ function validateSingleXAPIEntry(
     (standard === 'scorm12' || standard === 'scorm2004') &&
     typeof activityId === 'string'
   ) {
-    let isHttp = false;
+    let isHttp: boolean;
     try {
       const u = new URL(activityId);
       isHttp = u.protocol === 'http:' || u.protocol === 'https:';
@@ -472,7 +491,7 @@ function validateSingleXAPIEntry(
     if (!isHttp && aahp === undefined) {
       errors.push(
         `course.config.js: ${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
-          `Provide ${label}.actorAccountHomePage explicitly.`
+          `Provide ${label}.actorAccountHomePage explicitly.`,
       );
     }
   }
@@ -482,12 +501,12 @@ function validateSingleXAPIEntry(
   if (registration !== undefined) {
     if (typeof registration !== 'string' || !UUID_RE.test(registration)) {
       errors.push(
-        `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`
+        `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
       );
     }
     if (standard !== 'cmi5') {
       warnings.push(
-        `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`
+        `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
       );
     }
   }
@@ -522,7 +541,7 @@ function validatePageFile(
   navIndex: number,
   errors: string[],
   warnings: string[],
-  assetExistsCache: Map<string, boolean>
+  assetExistsCache: Map<string, boolean>,
 ): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
   const fileRel = relative(projectRoot, filePath);
   const content = readSourceFileCached(filePath);
@@ -551,12 +570,18 @@ function validatePageFile(
   ) {
     warnings.push(
       `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
-        `the quiz will have nothing to score`
+        `the quiz will have nothing to score`,
     );
   }
 
   return {
-    page: { fileRel, navIndex, hasGradedQuiz: isGradedQuiz, hasQuiz: isQuiz, completesOnView },
+    page: {
+      fileRel,
+      navIndex,
+      hasGradedQuiz: isGradedQuiz,
+      hasQuiz: isQuiz,
+      completesOnView,
+    },
     isQuiz,
     isGradedQuiz,
   };
@@ -565,7 +590,7 @@ function validatePageFile(
 function validatePages(
   pagesDir: string,
   assetsDir: string,
-  projectRoot: string
+  projectRoot: string,
 ): PagesValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -578,9 +603,16 @@ function validatePages(
 
   if (!existsSync(pagesDir)) {
     errors.push(
-      'No pages found. Create at least one section with a lesson and page in pages/'
+      'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false, pages };
+    return {
+      errors,
+      warnings,
+      totalPages: 0,
+      totalQuizzes: 0,
+      hasGradedQuiz: false,
+      pages,
+    };
   }
 
   const topLevelEntries = readdirSync(pagesDir);
@@ -591,7 +623,7 @@ function validatePages(
     if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
       const relPath = relative(projectRoot, fullPath);
       warnings.push(
-        `${relPath}: this file is outside the section/lesson structure and will be ignored`
+        `${relPath}: this file is outside the section/lesson structure and will be ignored`,
       );
     }
   }
@@ -606,9 +638,16 @@ function validatePages(
 
   if (sectionDirs.length === 0) {
     errors.push(
-      'No pages found. Create at least one section with a lesson and page in pages/'
+      'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { errors, warnings, totalPages: 0, totalQuizzes: 0, hasGradedQuiz: false, pages };
+    return {
+      errors,
+      warnings,
+      totalPages: 0,
+      totalQuizzes: 0,
+      hasGradedQuiz: false,
+      pages,
+    };
   }
 
   for (const sectionName of sectionDirs) {
@@ -619,7 +658,7 @@ function validatePages(
     const sectionMeta = validateMetaFile(
       resolve(sectionPath, '_meta.js'),
       sectionRel,
-      errors
+      errors,
     );
 
     // Flat mode: .svelte files directly at section level are pages of an
@@ -636,9 +675,12 @@ function validatePages(
       for (const pageName of sectionMeta.pages) {
         const fileName = ensureSvelteSuffix(pageName);
         if (!sectionSvelteFiles.includes(fileName)) {
-          const metaRel = relative(projectRoot, resolve(sectionPath, '_meta.js'));
+          const metaRel = relative(
+            projectRoot,
+            resolve(sectionPath, '_meta.js'),
+          );
           errors.push(
-            `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`
+            `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
           );
         }
       }
@@ -652,7 +694,7 @@ function validatePages(
         totalPages,
         errors,
         warnings,
-        assetExistsCache
+        assetExistsCache,
       );
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
@@ -676,7 +718,7 @@ function validatePages(
       const meta = validateMetaFile(
         resolve(lessonPath, '_meta.js'),
         lessonRel,
-        errors
+        errors,
       );
 
       // Get .svelte files
@@ -689,9 +731,12 @@ function validatePages(
         for (const pageName of meta.pages) {
           const fileName = ensureSvelteSuffix(pageName);
           if (!svelteFiles.includes(fileName)) {
-            const metaRel = relative(projectRoot, resolve(lessonPath, '_meta.js'));
+            const metaRel = relative(
+              projectRoot,
+              resolve(lessonPath, '_meta.js'),
+            );
             errors.push(
-              `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`
+              `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
             );
           }
         }
@@ -704,7 +749,7 @@ function validatePages(
           if (!listedSet.has(file)) {
             const relPath = relative(projectRoot, resolve(lessonPath, file));
             warnings.push(
-              `${relPath}: not listed in _meta.js pages array — will be appended at end`
+              `${relPath}: not listed in _meta.js pages array — will be appended at end`,
             );
           }
         }
@@ -719,7 +764,7 @@ function validatePages(
           totalPages,
           errors,
           warnings,
-          assetExistsCache
+          assetExistsCache,
         );
         totalPages++;
         if (result.isQuiz) totalQuizzes++;
@@ -731,7 +776,7 @@ function validatePages(
 
   if (totalPages === 0) {
     errors.push(
-      'No pages found. Create at least one section with a lesson and page in pages/'
+      'No pages found. Create at least one section with a lesson and page in pages/',
     );
   }
 
@@ -743,15 +788,19 @@ function validatePages(
 function validateMetaFile(
   metaPath: string,
   parentRel: string,
-  errors: string[]
+  errors: string[],
 ): { title?: string; pages?: string[] } | null {
   if (!existsSync(metaPath)) return null;
 
   const metaRel = `${parentRel}/_meta.js`;
-  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(metaPath));
+  const objectStr = extractDefaultExportObjectLiteral(
+    readSourceFileCached(metaPath),
+  );
 
   if (!objectStr) {
-    errors.push(`${metaRel}: syntax error — must export default { title: "..." }`);
+    errors.push(
+      `${metaRel}: syntax error — must export default { title: "..." }`,
+    );
     return null;
   }
 
@@ -759,7 +808,9 @@ function validateMetaFile(
   try {
     meta = JSON5.parse(objectStr);
   } catch {
-    errors.push(`${metaRel}: syntax error — must export default { title: "..." }`);
+    errors.push(
+      `${metaRel}: syntax error — must export default { title: "..." }`,
+    );
     return null;
   }
 
@@ -775,13 +826,13 @@ function validateMetaFile(
 function validatePageConfig(
   content: string,
   fileRel: string,
-  errors: string[]
+  errors: string[],
 ): { title?: string; quiz?: unknown; completesOn?: unknown } | null {
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
     errors.push(
-      `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
+      `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
     );
   }
   return null;
@@ -790,27 +841,34 @@ function validatePageConfig(
 function validateCompletesOn(
   pageConfig: { completesOn?: unknown } | null,
   fileRel: string,
-  errors: string[]
+  errors: string[],
 ): boolean {
   if (!pageConfig || pageConfig.completesOn === undefined) return false;
   if (pageConfig.completesOn === 'view') return true;
   errors.push(
-    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`
+    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`,
   );
   return false;
 }
 
 // ---------- Quiz Config Validation ----------
 
-function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): void {
+function validateQuizConfig(
+  quiz: unknown,
+  fileRel: string,
+  errors: string[],
+): void {
   if (!quiz || typeof quiz !== 'object') return;
   const cfg = quiz as Record<string, unknown>;
 
   if (cfg.maxAttempts !== undefined) {
     const val = cfg.maxAttempts;
-    if (val !== Infinity && (typeof val !== 'number' || val <= 0 || !Number.isFinite(val))) {
+    if (
+      val !== Infinity &&
+      (typeof val !== 'number' || val <= 0 || !Number.isFinite(val))
+    ) {
       errors.push(
-        `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`
+        `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`,
       );
     }
   }
@@ -818,7 +876,7 @@ function validateQuizConfig(quiz: unknown, fileRel: string, errors: string[]): v
   for (const field of ['graded', 'gatesProgress']) {
     if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
       errors.push(
-        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`
+        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
       );
     }
   }
@@ -838,13 +896,15 @@ type PropValue =
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
-
 /**
  * Parse the props of an opening tag starting just after the component name.
  * Returns null if the tag can't be parsed cleanly — callers then skip it
  * rather than risk a false positive.
  */
-function parseTagProps(content: string, start: number): Map<string, PropValue> | null {
+function parseTagProps(
+  content: string,
+  start: number,
+): Map<string, PropValue> | null {
   const props = new Map<string, PropValue>();
   let i = start;
   while (i < content.length) {
@@ -912,7 +972,7 @@ function staticNumber(prop: PropValue | undefined): number | null {
 function validateQuestionComponents(
   content: string,
   fileRel: string,
-  errors: string[]
+  errors: string[],
 ): void {
   const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
   const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
@@ -933,7 +993,7 @@ function validateQuestionComponents(
     if (idProp?.kind === 'string') {
       if (seenIds.has(idProp.value)) {
         errors.push(
-          `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`
+          `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`,
         );
       }
       seenIds.add(idProp.value);
@@ -943,9 +1003,13 @@ function validateQuestionComponents(
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
       if (options && correct !== null) {
-        if (!Number.isInteger(correct) || correct < 0 || correct >= options.length) {
+        if (
+          !Number.isInteger(correct) ||
+          correct < 0 ||
+          correct >= options.length
+        ) {
           errors.push(
-            `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`
+            `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`,
           );
         }
       }
@@ -955,7 +1019,7 @@ function validateQuestionComponents(
       const correct = staticArray(props.get('correct'));
       if (items && correct && correct.length !== items.length) {
         errors.push(
-          `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`
+          `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`,
         );
       }
       if (targets && correct) {
@@ -967,7 +1031,7 @@ function validateQuestionComponents(
             idx >= targets.length
           ) {
             errors.push(
-              `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`
+              `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
             );
             break;
           }
@@ -981,11 +1045,11 @@ function validateQuestionComponents(
             typeof p !== 'object' ||
             p === null ||
             typeof (p as { left?: unknown }).left !== 'string' ||
-            typeof (p as { right?: unknown }).right !== 'string'
+            typeof (p as { right?: unknown }).right !== 'string',
         );
         if (bad) {
           errors.push(
-            `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`
+            `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`,
           );
         }
       }
@@ -996,7 +1060,7 @@ function validateQuestionComponents(
           errors.push(`${fileRel}: <FillInTheBlank> answers must not be empty`);
         } else if (answers.some((a) => typeof a !== 'string')) {
           errors.push(
-            `${fileRel}: <FillInTheBlank> answers must be an array of strings`
+            `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
           );
         }
       }
@@ -1011,7 +1075,7 @@ const QUIZ_COMPLETE_DISPATCH_RE =
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
 const HAS_QUESTION_TAG_RE = new RegExp(
-  `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`
+  `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );
 // Custom widget imported from a local `.svelte` file may wrap useQuestion.
 // Treat its presence as enough to suppress the "no questions" warning —
@@ -1026,18 +1090,18 @@ const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
 function validateContractBypass(
   content: string,
   fileRel: string,
-  errors: string[]
+  errors: string[],
 ): void {
   if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
     errors.push(
       `${fileRel}: dispatches "tessera-quiz-complete" directly — submit through ` +
-        `useQuiz().submit() so the result reaches the LMS`
+        `useQuiz().submit() so the result reaches the LMS`,
     );
   }
   if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
     errors.push(
       `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
-        `(useQuiz, useQuestion, useNavigation, …) instead`
+        `(useQuiz, useQuestion, useNavigation, …) instead`,
     );
   }
 }
@@ -1062,7 +1126,7 @@ function validateAssetRefs(
   fileRel: string,
   assetsDir: string,
   warnings: string[],
-  existsCache: Map<string, boolean>
+  existsCache: Map<string, boolean>,
 ): void {
   for (const assetPath of collectAssetRefs(content)) {
     const fullAssetPath = resolve(assetsDir, assetPath);
@@ -1073,7 +1137,7 @@ function validateAssetRefs(
     }
     if (!exists) {
       warnings.push(
-        `${fileRel}: "$assets/${assetPath}" not found in assets/ directory`
+        `${fileRel}: "$assets/${assetPath}" not found in assets/ directory`,
       );
     }
   }
@@ -1085,22 +1149,26 @@ function crossValidate(
   config: ParsedConfig,
   pageResults: PagesValidationResult,
   errors: string[],
-  warnings: string[]
+  warnings: string[],
 ): void {
   // completion.mode "quiz" but no graded quizzes
   if (config.completion?.mode === 'quiz' && !pageResults.hasGradedQuiz) {
     errors.push(
-      'completion.mode is "quiz" but no pages have quiz config with graded: true'
+      'completion.mode is "quiz" but no pages have quiz config with graded: true',
     );
   }
 
   const isManual = config.completion?.mode === 'manual';
   const completesOnPages = pageResults.pages.filter((p) => p.completesOnView);
 
-  if (isManual && config.completion?.trigger === 'page' && completesOnPages.length === 0) {
+  if (
+    isManual &&
+    config.completion?.trigger === 'page' &&
+    completesOnPages.length === 0
+  ) {
     errors.push(
       'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view". ' +
-        'Either add a completesOn page or remove the trigger field to drop the static check.'
+        'Either add a completesOn page or remove the trigger field to drop the static check.',
     );
   }
 
@@ -1110,8 +1178,8 @@ function crossValidate(
         warnings.push(
           `${page.fileRel}: quiz.graded is true under completion.mode: "manual". ` +
             'The score will be reported to the LMS for transcripts, but it will not drive ' +
-            'completion or success status — `markComplete()` / completesOn does. If that\'s ' +
-            'not what you want, set graded: false or change completion.mode.'
+            "completion or success status — `markComplete()` / completesOn does. If that's " +
+            'not what you want, set graded: false or change completion.mode.',
         );
       }
     }
@@ -1119,20 +1187,20 @@ function crossValidate(
 
   if (isManual && config.completion?.percentageThreshold !== undefined) {
     warnings.push(
-      'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"'
+      'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"',
     );
   }
   if (!isManual) {
     for (const page of completesOnPages) {
       warnings.push(
-        `${page.fileRel}: pageConfig.completesOn is ignored — completion.mode is "${config.completion?.mode ?? 'percentage'}"`
+        `${page.fileRel}: pageConfig.completesOn is ignored — completion.mode is "${config.completion?.mode ?? 'percentage'}"`,
       );
     }
   }
   for (const page of pageResults.pages) {
     if (page.completesOnView && page.hasQuiz) {
       warnings.push(
-        `${page.fileRel}: completion fires on view, before the quiz can be answered — likely a mistake`
+        `${page.fileRel}: completion fires on view, before the quiz can be answered — likely a mistake`,
       );
     }
   }
@@ -1141,7 +1209,7 @@ function crossValidate(
     const firstPage = pageResults.pages.find((p) => p.navIndex === 0);
     if (firstPage?.completesOnView) {
       warnings.push(
-        `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`
+        `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`,
       );
     }
   }
@@ -1163,11 +1231,11 @@ function crossValidate(
     for (let i = 0; i < pageResults.totalPages; i++) {
       visitedChars += String(i).length + 1; // digit chars + comma
     }
-    const overhead = 60;                                // top-level JSON overhead with all keys
-    const quizBytes = pageResults.totalQuizzes * 15;    // q: "NNN":100,
-    const chunkBytes = pageResults.totalPages * 12;     // c: "NNN":NN,
-    const standaloneBytes = pageResults.totalPages * 30;// s/gs: conservative buffer per page
-    const userStateBuffer = 256;                         // usePersistence headroom
+    const overhead = 60; // top-level JSON overhead with all keys
+    const quizBytes = pageResults.totalQuizzes * 15; // q: "NNN":100,
+    const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
+    const standaloneBytes = pageResults.totalPages * 30; // s/gs: conservative buffer per page
+    const userStateBuffer = 256; // usePersistence headroom
     const estimatedSize =
       overhead +
       visitedChars +
@@ -1178,7 +1246,7 @@ function crossValidate(
 
     if (estimatedSize > 3200) {
       warnings.push(
-        `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated SCORM 1.2 suspend_data ~${estimatedSize} bytes may exceed the 4096-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider using "scorm2004" or "cmi5".`
+        `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated SCORM 1.2 suspend_data ~${estimatedSize} bytes may exceed the 4096-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider using "scorm2004" or "cmi5".`,
       );
     }
   }

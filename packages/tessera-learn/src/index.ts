@@ -18,10 +18,7 @@ export {
   sequentialAccess,
   resolveAccess,
 } from './runtime/access.js';
-export type {
-  AccessFn,
-  AccessContext,
-} from './runtime/access.js';
+export type { AccessFn, AccessContext } from './runtime/access.js';
 
 // ---- xAPI ----
 export { useXAPI } from './runtime/xapi/registry.js';
@@ -40,9 +37,7 @@ export type {
 } from './runtime/xapi/types.js';
 
 // ---- Types ----
-export type {
-  Interaction,
-} from './runtime/interaction.js';
+export type { Interaction } from './runtime/interaction.js';
 export { isCorrect } from './runtime/interaction.js';
 export type {
   UseQuestionOptions,

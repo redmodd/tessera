@@ -98,14 +98,14 @@ Reach for `_meta.js` only when the override is real:
 
 ```js
 // section or lesson _meta.js: title override (folder name doesn't auto-derive to what you want)
-export default { title: "How to play" };  // folder is `01-intro`
+export default { title: 'How to play' }; // folder is `01-intro`
 ```
 
 ```js
 // lesson _meta.js: explicit page order
 export default {
-  title: "Welcome",
-  pages: ["welcome", "objectives"],
+  title: 'Welcome',
+  pages: ['welcome', 'objectives'],
 };
 ```
 
@@ -132,8 +132,7 @@ Each page is a `.svelte` file inside a lesson folder.
 ### Basic page
 
 ```svelte
-<h1>Welcome</h1>
-<p>Standard HTML works as-is.</p>
+<h1>Welcome</h1><p>Standard HTML works as-is.</p>
 ```
 
 ### Page configuration
@@ -145,7 +144,7 @@ Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) are a
 ```svelte
 <script module>
   export const pageConfig = {
-    title: "Introduction to the Topic",
+    title: 'Introduction to the Topic',
   };
 </script>
 
@@ -176,8 +175,8 @@ All components import from `tessera-learn`. Nothing is loaded automatically; imp
 
 Styled box for highlighting information.
 
-| Prop | Type | Default |
-|------|------|---------|
+| Prop   | Type                                          | Default  |
+| ------ | --------------------------------------------- | -------- |
 | `type` | `"info" \| "warning" \| "tip" \| "important"` | `"info"` |
 
 Children become the body. A11y: `role="note"` with type-appropriate `aria-label`.
@@ -190,14 +189,18 @@ Children become the body. A11y: `role="note"` with type-appropriate `aria-label`
 
 Lazy-loaded image with optional caption. Renders as `<figure>`/`<figcaption>`.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `src` | `string` | Image URL. `$assets/` prefix supported |
-| `alt` | `string` | **Required.** Alt text |
-| `caption` | `string` | Optional caption |
+| Prop      | Type     | Description                            |
+| --------- | -------- | -------------------------------------- |
+| `src`     | `string` | Image URL. `$assets/` prefix supported |
+| `alt`     | `string` | **Required.** Alt text                 |
+| `caption` | `string` | Optional caption                       |
 
 ```svelte
-<Image src="$assets/diagram.png" alt="System architecture diagram" caption="Figure 1" />
+<Image
+  src="$assets/diagram.png"
+  alt="System architecture diagram"
+  caption="Figure 1"
+/>
 ```
 
 ### Accordion / AccordionItem
@@ -221,9 +224,18 @@ Slide-based viewer. A11y: `role="region"`, `aria-roledescription="carousel"`, ar
 
 ```svelte
 <Carousel>
-  <CarouselSlide><h3>Step 1</h3><p>Plan.</p></CarouselSlide>
-  <CarouselSlide><h3>Step 2</h3><p>Build.</p></CarouselSlide>
-  <CarouselSlide><h3>Step 3</h3><p>Deploy.</p></CarouselSlide>
+  <CarouselSlide
+    ><h3>Step 1</h3>
+    <p>Plan.</p></CarouselSlide
+  >
+  <CarouselSlide
+    ><h3>Step 2</h3>
+    <p>Build.</p></CarouselSlide
+  >
+  <CarouselSlide
+    ><h3>Step 3</h3>
+    <p>Deploy.</p></CarouselSlide
+  >
 </Carousel>
 ```
 
@@ -231,11 +243,11 @@ Slide-based viewer. A11y: `role="region"`, `aria-roledescription="carousel"`, ar
 
 Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `content`. A11y: `role="dialog"`, `aria-modal="true"`, focus trap, Escape to close.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `title` | `string` | Modal label for screen readers |
+| Prop      | Type      | Description                       |
+| --------- | --------- | --------------------------------- |
+| `title`   | `string`  | Modal label for screen readers    |
 | `trigger` | `snippet` | Click target that opens the modal |
-| `content` | `snippet` | Modal body |
+| `content` | `snippet` | Modal body                        |
 
 ```svelte
 <RevealModal title="Details">
@@ -251,10 +263,10 @@ Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `c
 
 YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `src` | `string` | Video URL or `$assets/` path |
-| `title` | `string` | Accessible label |
+| Prop    | Type     | Description                  |
+| ------- | -------- | ---------------------------- |
+| `src`   | `string` | Video URL or `$assets/` path |
+| `title` | `string` | Accessible label             |
 
 ```svelte
 <Video src="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Intro" />
@@ -282,7 +294,7 @@ A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imp
 ```svelte
 <script module>
   export const pageConfig = {
-    title: "Module 1 Quiz",
+    title: 'Module 1 Quiz',
     quiz: { graded: true, maxAttempts: 3 },
   };
 </script>
@@ -294,14 +306,14 @@ A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imp
 <MultipleChoice
   id="q-planet"
   question="Which planet is closest to the Sun?"
-  options={["Venus", "Mercury", "Earth", "Mars"]}
+  options={['Venus', 'Mercury', 'Earth', 'Mars']}
   correct={1}
 />
 
 <FillInTheBlank
   id="q-symbol"
   question="What element has the symbol 'O'?"
-  answers={["Oxygen"]}
+  answers={['Oxygen']}
 />
 ```
 
@@ -322,13 +334,13 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would fr
 
 ### `pageConfig.quiz` fields
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `graded` | `boolean` | `false` | Whether the score counts toward course success |
-| `gatesProgress` | `boolean` | `false` | Whether passing is required to access the next page |
-| `maxAttempts` | `number` | `Infinity` | Max attempts |
-| `feedbackMode` | `"review" \| "immediate" \| "never"` | `"review"` | When feedback renders. See below. |
-| `retryMode` | `"full" \| "incorrect-only"` | `"full"` | `"full"` resets every answer on retry; `"incorrect-only"` keeps questions the learner already got right locked as correct. |
+| Field           | Type                                 | Default    | Description                                                                                                                |
+| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                             |
+| `gatesProgress` | `boolean`                            | `false`    | Whether passing is required to access the next page                                                                        |
+| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                               |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | When feedback renders. See below.                                                                                          |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `"full"` resets every answer on retry; `"incorrect-only"` keeps questions the learner already got right locked as correct. |
 
 `feedbackMode` values: `"immediate"` reveals after the shell calls `revealFeedback(q)` and locks the answer; `"review"` shows feedback only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button).
 
@@ -353,49 +365,49 @@ The LMS still sees each question as a single pass/fail interaction; weights only
 
 #### MultipleChoice
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `question` | `string` | Prompt |
-| `options` | `string[]` | Answer options |
-| `correct` | `number` | Index of correct option (0-based) |
-| `correctFeedback` | `string` | Optional |
-| `incorrectFeedback` | `string` | Optional |
-| `optionFeedback` | `string[]` | Optional per-option feedback |
-| `weight` | `number` | Page-level rollup weight (default `1`). See [Per-question weighting](#per-question-weighting). |
+| Prop                | Type       | Description                                                                                    |
+| ------------------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| `question`          | `string`   | Prompt                                                                                         |
+| `options`           | `string[]` | Answer options                                                                                 |
+| `correct`           | `number`   | Index of correct option (0-based)                                                              |
+| `correctFeedback`   | `string`   | Optional                                                                                       |
+| `incorrectFeedback` | `string`   | Optional                                                                                       |
+| `optionFeedback`    | `string[]` | Optional per-option feedback                                                                   |
+| `weight`            | `number`   | Page-level rollup weight (default `1`). See [Per-question weighting](#per-question-weighting). |
 
 ```svelte
 <MultipleChoice
   question="What is the capital of France?"
-  options={["London", "Berlin", "Paris", "Madrid"]}
+  options={['London', 'Berlin', 'Paris', 'Madrid']}
   correct={2}
 />
 ```
 
 #### FillInTheBlank
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `question` | `string` |  | Prompt |
-| `answers` | `string[]` |  | Acceptable answers |
-| `caseSensitive` | `boolean` | `false` | Comparison casing |
-| `weight` | `number` | `1` | Page-level rollup weight |
+| Prop            | Type       | Default | Description              |
+| --------------- | ---------- | ------- | ------------------------ |
+| `question`      | `string`   |         | Prompt                   |
+| `answers`       | `string[]` |         | Acceptable answers       |
+| `caseSensitive` | `boolean`  | `false` | Comparison casing        |
+| `weight`        | `number`   | `1`     | Page-level rollup weight |
 
 `answers` only needs distinct spellings; `caseSensitive: false` already handles case variants.
 
 ```svelte
 <FillInTheBlank
   question="What element has the symbol 'O'?"
-  answers={["Oxygen"]}
+  answers={['Oxygen']}
 />
 ```
 
 #### Matching
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `question` | `string` | Prompt |
-| `pairs` | `{left: string, right: string}[]` | Correct pairs |
-| `weight` | `number` | Page-level rollup weight (default `1`) |
+| Prop       | Type                              | Description                            |
+| ---------- | --------------------------------- | -------------------------------------- |
+| `question` | `string`                          | Prompt                                 |
+| `pairs`    | `{left: string, right: string}[]` | Correct pairs                          |
+| `weight`   | `number`                          | Page-level rollup weight (default `1`) |
 
 The right column is auto-shuffled. Click left then right to match (tap on mobile). Click a matched pair to unmatch. All pairs must be correct.
 
@@ -403,9 +415,9 @@ The right column is auto-shuffled. Click left then right to match (tap on mobile
 <Matching
   question="Match country to capital:"
   pairs={[
-    { left: "France", right: "Paris" },
-    { left: "Germany", right: "Berlin" },
-    { left: "Japan", right: "Tokyo" },
+    { left: 'France', right: 'Paris' },
+    { left: 'Germany', right: 'Berlin' },
+    { left: 'Japan', right: 'Tokyo' },
   ]}
 />
 ```
@@ -414,19 +426,19 @@ The right column is auto-shuffled. Click left then right to match (tap on mobile
 
 Drag-and-drop (or click-to-place) into labelled categories.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `question` | `string` | Prompt |
-| `items` | `string[]` | Items to sort |
-| `targets` | `string[]` | Category labels |
-| `correct` | `number[]` | For each item, the index of its correct target (parallel array) |
-| `weight` | `number` | Page-level rollup weight (default `1`) |
+| Prop       | Type       | Description                                                     |
+| ---------- | ---------- | --------------------------------------------------------------- |
+| `question` | `string`   | Prompt                                                          |
+| `items`    | `string[]` | Items to sort                                                   |
+| `targets`  | `string[]` | Category labels                                                 |
+| `correct`  | `number[]` | For each item, the index of its correct target (parallel array) |
+| `weight`   | `number`   | Page-level rollup weight (default `1`)                          |
 
 ```svelte
 <Sorting
   question="Sort each animal:"
-  items={["Dog", "Eagle", "Salmon", "Cat", "Robin", "Trout"]}
-  targets={["Mammals", "Birds", "Fish"]}
+  items={['Dog', 'Eagle', 'Salmon', 'Cat', 'Robin', 'Trout']}
+  targets={['Mammals', 'Birds', 'Fish']}
   correct={[0, 1, 2, 0, 1, 2]}
 />
 ```
@@ -435,15 +447,15 @@ Drag-and-drop (or click-to-place) into labelled categories.
 
 All four question components also work outside `<Quiz>` for inline practice. Standalone widgets render their own Check / Retry buttons.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `maxRetries` | `number` | `Infinity` | Max retries for standalone widgets |
-| `weight` | `number` | `1` | Per-question weight for page-level rollup |
+| Prop         | Type     | Default    | Description                               |
+| ------------ | -------- | ---------- | ----------------------------------------- |
+| `maxRetries` | `number` | `Infinity` | Max retries for standalone widgets        |
+| `weight`     | `number` | `1`        | Per-question weight for page-level rollup |
 
 ```svelte
 <MultipleChoice
   question="What color is the sky on a clear day?"
-  options={["Red", "Blue", "Green"]}
+  options={['Red', 'Blue', 'Green']}
   correct={1}
   maxRetries={2}
 />
@@ -471,7 +483,7 @@ Declare `completesOn: "view"` on any page. Completion fires the moment that page
 <script module>
   export const pageConfig = {
     title: "You're done",
-    completesOn: "view",
+    completesOn: 'view',
   };
 </script>
 
@@ -521,12 +533,12 @@ By default `successStatus` stays `"unknown"` under manual — the LMS sees compl
 completion: { mode: "manual", requireSuccessStatus: "passed" }  // or "failed"
 ```
 
-| Adapter        | What the LMS sees on `markComplete()` (no `requireSuccessStatus`)  |
-| -------------- | ------------------------------------------------------------------ |
-| SCORM 1.2      | `cmi.core.lesson_status = "completed"`                             |
+| Adapter        | What the LMS sees on `markComplete()` (no `requireSuccessStatus`)       |
+| -------------- | ----------------------------------------------------------------------- |
+| SCORM 1.2      | `cmi.core.lesson_status = "completed"`                                  |
 | SCORM 2004 4th | `cmi.completion_status = "completed"`, `cmi.success_status = "unknown"` |
-| cmi5           | **Completed** statement (no Passed / Failed)                       |
-| web            | `localStorage` only                                                |
+| cmi5           | **Completed** statement (no Passed / Failed)                            |
+| web            | `localStorage` only                                                     |
 
 With `requireSuccessStatus: "passed"`, SCORM 1.2 writes `lesson_status = "passed"`, SCORM 2004 writes `success_status = "passed"`, and cmi5 emits a **Passed** statement alongside **Completed**.
 
@@ -555,7 +567,9 @@ Drop files into `assets/`. Reference them with `$assets/` in built-in component 
 In CSS, use a relative path from `styles/`:
 
 ```css
-.bg { background-image: url('../assets/bg.png'); }
+.bg {
+  background-image: url('../assets/bg.png');
+}
 ```
 
 External URLs work too: `<Image src="https://example.com/img.jpg" alt="..." />`.
@@ -580,28 +594,37 @@ At build time the plugin copies `assets/` into `dist/assets/` so `$assets/foo.pn
 Pick by use case:
 
 **One-off reference — ES import (preferred):**
+
 ```svelte
 <script>
   import url from '$assets/diagram.svg?url';
 </script>
+
 <img src={url} alt="Diagram" />
 ```
+
 Build-time bundling, asset hashing, fails the build if missing.
 
 **Collection referenced by name — `import.meta.glob`:**
+
 ```js
 const signs = import.meta.glob('$assets/signs/*.svg', {
-  eager: true, query: '?url', import: 'default',
+  eager: true,
+  query: '?url',
+  import: 'default',
 });
 // then look up by full key:
 const url = signs[`/assets/signs/${filename}`];
 ```
+
 Use this when the asset is chosen at runtime by ID/filename. Same build-time guarantees as a single import.
 
 **Pure runtime string (last resort):**
+
 ```js
 const src = `./assets/signs/${filename}`;
 ```
+
 No build-time guarantees, but works when neither pattern above fits (e.g., filenames that come from server data). Equivalent to what `Image`/`Audio`/`Video` do internally.
 
 ---
@@ -614,25 +637,25 @@ Add `.css` files to `styles/`. They load after framework styles and override the
 
 Override these to theme globally:
 
-| Property | Default |
-|----------|---------|
-| `--tessera-primary` | `#2563eb` |
-| `--tessera-primary-light` | `#dbeafe` |
-| `--tessera-primary-dark` | `#1e40af` |
-| `--tessera-text` | `#1f2937` |
-| `--tessera-text-light` | `#6b7280` |
-| `--tessera-bg` | `#ffffff` |
-| `--tessera-bg-secondary` | `#f9fafb` |
-| `--tessera-border` | `#e5e7eb` |
-| `--tessera-success` | `#16a34a` |
-| `--tessera-error` | `#dc2626` |
-| `--tessera-warning` | `#d97706` |
-| `--tessera-font-family` | `'Inter', system-ui, sans-serif` |
-| `--tessera-font-size-base` | `1rem` |
-| `--tessera-line-height` | `1.6` |
+| Property                                       | Default                               |
+| ---------------------------------------------- | ------------------------------------- |
+| `--tessera-primary`                            | `#2563eb`                             |
+| `--tessera-primary-light`                      | `#dbeafe`                             |
+| `--tessera-primary-dark`                       | `#1e40af`                             |
+| `--tessera-text`                               | `#1f2937`                             |
+| `--tessera-text-light`                         | `#6b7280`                             |
+| `--tessera-bg`                                 | `#ffffff`                             |
+| `--tessera-bg-secondary`                       | `#f9fafb`                             |
+| `--tessera-border`                             | `#e5e7eb`                             |
+| `--tessera-success`                            | `#16a34a`                             |
+| `--tessera-error`                              | `#dc2626`                             |
+| `--tessera-warning`                            | `#d97706`                             |
+| `--tessera-font-family`                        | `'Inter', system-ui, sans-serif`      |
+| `--tessera-font-size-base`                     | `1rem`                                |
+| `--tessera-line-height`                        | `1.6`                                 |
 | `--tessera-spacing-sm` / `-md` / `-lg` / `-xl` | `0.5rem` / `1rem` / `1.5rem` / `2rem` |
-| `--tessera-sidebar-width` | `280px` |
-| `--tessera-content-max-width` | `800px` |
+| `--tessera-sidebar-width`                      | `280px`                               |
+| `--tessera-content-max-width`                  | `800px`                               |
 
 ```css
 :root {
@@ -650,34 +673,34 @@ Override these to theme globally:
 ```js
 export default {
   // Metadata
-  title: "My Course",              // required
-  description: "",
-  author: "",
-  version: "1.0.0",
+  title: 'My Course', // required
+  description: '',
+  author: '',
+  version: '1.0.0',
 
   branding: {
-    logo: "",                       // e.g., "$assets/logo.png"
-    primaryColor: "#2563eb",
-    fontFamily: "Inter, sans-serif",
+    logo: '', // e.g., "$assets/logo.png"
+    primaryColor: '#2563eb',
+    fontFamily: 'Inter, sans-serif',
   },
 
   navigation: {
-    mode: "free",                   // "free" or "sequential"
+    mode: 'free', // "free" or "sequential"
   },
 
   completion: {
-    mode: "percentage",             // "percentage" | "quiz" | "manual"
-    percentageThreshold: 100,       // 0–100 (percentage mode)
+    mode: 'percentage', // "percentage" | "quiz" | "manual"
+    percentageThreshold: 100, // 0–100 (percentage mode)
     // trigger: "page",              // (manual only) opt into build-time check
     // requireSuccessStatus: "passed", // (manual only) "passed" | "failed"
   },
 
   scoring: {
-    passingScore: 70,               // optional under "manual" (defaults to 0)
+    passingScore: 70, // optional under "manual" (defaults to 0)
   },
 
   export: {
-    standard: "web",                // "web" | "scorm12" | "scorm2004" | "cmi5"
+    standard: 'web', // "web" | "scorm12" | "scorm2004" | "cmi5"
   },
 };
 ```
@@ -719,8 +742,13 @@ export default {
     canAccess: (ctx) => {
       if (!sequentialAccess(ctx)) return false;
       if (ctx.page.slug === 'lesson-5') {
-        const i = ctx.manifest.pages.findIndex(p => p.slug === 'lesson-2-quiz');
-        return (ctx.progress.quizScores.get(i) ?? 0) >= ctx.config.scoring.passingScore;
+        const i = ctx.manifest.pages.findIndex(
+          (p) => p.slug === 'lesson-2-quiz',
+        );
+        return (
+          (ctx.progress.quizScores.get(i) ?? 0) >=
+          ctx.config.scoring.passingScore
+        );
       }
       return true;
     },
@@ -734,12 +762,12 @@ export default {
 
 `npm run export` (which wraps `vite build`) writes:
 
-| `export.standard` | What ships | Where |
-|-------------------|------------|-------|
-| `web` | Static site (HTML/CSS/JS + `assets/`) | `dist/` (host on any static file server) |
-| `scorm12` | SCORM 1.2 package | `dist/<course>-scorm12.zip` |
-| `scorm2004` | SCORM 2004 4th Edition package | `dist/<course>-scorm2004.zip` |
-| `cmi5` | cmi5 package (AU + manifest) | `dist/<course>-cmi5.zip` |
+| `export.standard` | What ships                            | Where                                    |
+| ----------------- | ------------------------------------- | ---------------------------------------- |
+| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (host on any static file server) |
+| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`              |
+| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip`            |
+| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`                 |
 
 For LMS exports, upload the zip via your LMS's import flow. For web export, the bundle is a self-contained static site. Drop `dist/` on Netlify, GitHub Pages, S3, or any static host.
 
@@ -779,11 +807,11 @@ interface Question {
   readonly correct: boolean | null;
   readonly answer: unknown;
   readonly feedbackVisible: boolean;
-  readonly locked: boolean;          // input must be read-only: submitted OR feedbackVisible OR isLockedCorrect
+  readonly locked: boolean; // input must be read-only: submitted OR feedbackVisible OR isLockedCorrect
   readonly isLockedCorrect: boolean; // narrow case: locked because retry policy preserved this as already-correct
-  readonly render: unknown;          // snippet the widget registered; shell calls {@render q.render()}
+  readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void;                    // signal the answer is final; triggers the per-question LMS write. Idempotent — a second call with the same answer is a no-op.
+  commit(): void; // signal the answer is final; triggers the per-question LMS write. Idempotent — a second call with the same answer is a no-op.
 }
 ```
 
@@ -816,21 +844,21 @@ Register a question widget so the runtime can submit, score, persist, and report
 
 ```ts
 function useQuestion(opts: {
-  id: string;                   // unique on the page; LMS interaction id
-  graded?: boolean;             // standalone only
-  response: () => Interaction;  // current learner answer; called on each commit() and on submit
-  score?: () => number;         // standalone-only override (0–100)
-  weight?: number;              // page-level rollup weight (default 1)
-  maxRetries?: number;          // standalone retry cap (default Infinity); ignored inside a quiz
+  id: string; // unique on the page; LMS interaction id
+  graded?: boolean; // standalone only
+  response: () => Interaction; // current learner answer; called on each commit() and on submit
+  score?: () => number; // standalone-only override (0–100)
+  weight?: number; // page-level rollup weight (default 1)
+  maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
   reset?: () => void;
 }): Question & {
-  submit(): void;               // standalone: triggers own check. quiz: no-op (shell drives).
+  submit(): void; // standalone: triggers own check. quiz: no-op (shell drives).
   reset(): void;
-  retry(): void;                // standalone only; no-op once maxRetries hit or inside a quiz
+  retry(): void; // standalone only; no-op once maxRetries hit or inside a quiz
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
-  setRender(render: unknown): void;   // registers the snippet for the parent shell to render
+  setRender(render: unknown): void; // registers the snippet for the parent shell to render
 };
 ```
 
@@ -847,7 +875,9 @@ function useQuestion(opts: {
       response: order,
       correct: ['Mercury', 'Venus', 'Earth', 'Mars'],
     }),
-    reset: () => { order = ['Mercury', 'Venus', 'Earth', 'Mars']; },
+    reset: () => {
+      order = ['Mercury', 'Venus', 'Earth', 'Mars'];
+    },
   });
 </script>
 
@@ -868,13 +898,13 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
   readonly score: number;
-  readonly passingScore: number;   // resolved at runtime (config + LMS mastery override)
+  readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  submit(): void;       // reports any uncommitted interactions, then dispatches tessera-quiz-complete
+  submit(): void; // reports any uncommitted interactions, then dispatches tessera-quiz-complete
   retry(): void;
   startReview(): void;
   exitReview(): void;
-  revealFeedback(q: Question): void;   // immediate-feedback flow
+  revealFeedback(q: Question): void; // immediate-feedback flow
 };
 ```
 
@@ -904,8 +934,8 @@ function useNavigation(): {
 ```ts
 function useProgress(): {
   readonly visitedPages: Set<number>;
-  readonly quizScores: Map<number, number>;            // pageIndex → score 0–100
-  readonly chunkProgress: Map<number, number>;         // pageIndex → highest revealed chunk index
+  readonly quizScores: Map<number, number>; // pageIndex → score 0–100
+  readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
   readonly successStatus: 'unknown' | 'passed' | 'failed';
   markVisited(pageIndex: number): void;
@@ -963,7 +993,7 @@ The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated und
 ```ts
 import { useXAPI } from 'tessera-learn';
 
-const xapi = useXAPI();             // XAPIClient | null
+const xapi = useXAPI(); // XAPIClient | null
 xapi?.sendStatement({
   verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
   object: { id: `${xapi.getActivityId()}#diagram-1` },
@@ -1000,12 +1030,12 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID is m
 
 ### Per-mode behaviour
 
-| Mode | `xapi` not set | `xapi.endpoint: 'lms'` | `xapi: {endpoint, ...}` (explicit) |
-|------|---------------|------------------------|-----------------------------------|
-| **cmi5** | `useXAPI()` → null | Inherits launch LRS; shares queue with lifecycle stream | Independent publisher; `actor` defaults to launch actor |
-| **scorm12** | `useXAPI()` → null | **Config error** | Independent publisher; `actor` derived from `cmi.core.student_id` |
-| **scorm2004** | `useXAPI()` → null | **Config error** | Independent publisher; `actor` derived from `cmi.learner_id` |
-| **web** | `useXAPI()` → null | **Config error** | Independent publisher; `actor` **required** in config |
+| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'`                                  | `xapi: {endpoint, ...}` (explicit)                                |
+| ------------- | ------------------ | ------------------------------------------------------- | ----------------------------------------------------------------- |
+| **cmi5**      | `useXAPI()` → null | Inherits launch LRS; shares queue with lifecycle stream | Independent publisher; `actor` defaults to launch actor           |
+| **scorm12**   | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` derived from `cmi.core.student_id` |
+| **scorm2004** | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` derived from `cmi.learner_id`      |
+| **web**       | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` **required** in config             |
 
 ### Actor resolution
 
@@ -1097,19 +1127,19 @@ The runtime translates author intent (page visits, quiz scores, completion, pers
 
 ### Cross-mode rollup
 
-| Runtime event | SCORM 1.2 | SCORM 2004 4th | cmi5 |
-|---------------|-----------|----------------|------|
-| Session start | `LMSInitialize("")`; read `cmi.suspend_data` and `cmi.interactions._count` | `Initialize("")`; read `cmi.suspend_data` and `cmi.interactions._count` | `POST` cmi5 `fetch` URL → token; `GET` `LMS.LaunchData` State (§10, → session id + Publisher Activity + launchMode + returnURL + masteryScore + moveOn); `GET` `cmi5LearnerPreferences` Agent Profile (§11); build publisher; send **Initialized**; `GET` `tessera-state` for resume |
-| State persisted (page visited, bookmark moved, chunk revealed, `usePersistence` write, etc.) | `LMSSetValue("cmi.suspend_data", json)` (microtask-coalesced) | `SetValue("cmi.suspend_data", json)` (microtask-coalesced) | State API `PUT` `tessera-state` document, chained on the publisher queue |
-| Graded quiz scored | `LMSSetValue("cmi.core.score.raw"\|"min"\|"max", …)` then `LMSSetValue("cmi.core.lesson_status", "passed"\|"failed")` | `SetValue("cmi.score.raw"\|"min"\|"max"\|"scaled", …)` then `SetValue("cmi.success_status", "passed"\|"failed")` | **Passed** or **Failed** statement, with `result.score.scaled` and `result.duration` (one-shot per session) |
-| Course completion changes | Funneled into `cmi.core.lesson_status` (only one field exists) | `SetValue("cmi.completion_status", "completed"\|"incomplete")` | **Completed** statement with `result.completion = true` and `result.duration` (one-shot per session). cmi5 §9.5.1 forbids `score` on Completed — the score rides on the subsequent **Passed**/**Failed** instead. |
-| Author marks complete (`completion.mode: "manual"`) | `cmi.core.lesson_status = "completed"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | `cmi.completion_status = "completed"`; `cmi.success_status = "unknown"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | **Completed** statement; **Passed**/**Failed** if `requireSuccessStatus` set |
-| Question answered (graded or standalone, inside or outside a quiz) | `cmi.interactions.{n}.id` / `student_response` / `result` / `time` / `type` (n continues from prior `_count`) | `cmi.interactions.{n}.id` / `learner_response` / `result` / `timestamp` / `type` (n continues from prior `_count`) | **Answered** statement; object `${activityId}#${questionId}`, definition `cmi.interaction` + `interactionType`, `result.response`, `result.success` |
-| Resume after reload | Read `cmi.suspend_data` on init; manifest is rebuilt from code, not LMS | Read `cmi.suspend_data` on init | State API `GET` `tessera-state`; lifecycle replays from where the prior session left off |
-| Author exit / unload | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously) | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously) | **Terminated** (always last on the wire, cmi5 §9.3.6). Explicit-exit path: `adapter.exit()` drains the queue then redirects to `returnURL` (§10.2.6). No Suspended verb — incomplete exit is signalled by Terminated without a preceding Completed; the LMS handles Abandoned and resume on next launch. |
-| Learner identity (xAPI actor synthesis) | `cmi.core.student_id` + `cmi.core.student_name` | `cmi.learner_id` + `cmi.learner_name` | Launch-supplied actor JSON (Identified Agent) |
-| Persistence cap | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB | 64000 chars per spec | LRS-defined (typically unbounded for State API documents) |
-| Score scale exposed to LMS | `score.raw` only (0–100) | `score.raw` (0–100) **and** `score.scaled` (0–1) | `result.score.scaled` (0–1) |
+| Runtime event                                                                                | SCORM 1.2                                                                                                             | SCORM 2004 4th                                                                                                                   | cmi5                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session start                                                                                | `LMSInitialize("")`; read `cmi.suspend_data` and `cmi.interactions._count`                                            | `Initialize("")`; read `cmi.suspend_data` and `cmi.interactions._count`                                                          | `POST` cmi5 `fetch` URL → token; `GET` `LMS.LaunchData` State (§10, → session id + Publisher Activity + launchMode + returnURL + masteryScore + moveOn); `GET` `cmi5LearnerPreferences` Agent Profile (§11); build publisher; send **Initialized**; `GET` `tessera-state` for resume                     |
+| State persisted (page visited, bookmark moved, chunk revealed, `usePersistence` write, etc.) | `LMSSetValue("cmi.suspend_data", json)` (microtask-coalesced)                                                         | `SetValue("cmi.suspend_data", json)` (microtask-coalesced)                                                                       | State API `PUT` `tessera-state` document, chained on the publisher queue                                                                                                                                                                                                                                 |
+| Graded quiz scored                                                                           | `LMSSetValue("cmi.core.score.raw"\|"min"\|"max", …)` then `LMSSetValue("cmi.core.lesson_status", "passed"\|"failed")` | `SetValue("cmi.score.raw"\|"min"\|"max"\|"scaled", …)` then `SetValue("cmi.success_status", "passed"\|"failed")`                 | **Passed** or **Failed** statement, with `result.score.scaled` and `result.duration` (one-shot per session)                                                                                                                                                                                              |
+| Course completion changes                                                                    | Funneled into `cmi.core.lesson_status` (only one field exists)                                                        | `SetValue("cmi.completion_status", "completed"\|"incomplete")`                                                                   | **Completed** statement with `result.completion = true` and `result.duration` (one-shot per session). cmi5 §9.5.1 forbids `score` on Completed — the score rides on the subsequent **Passed**/**Failed** instead.                                                                                        |
+| Author marks complete (`completion.mode: "manual"`)                                          | `cmi.core.lesson_status = "completed"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set)                       | `cmi.completion_status = "completed"`; `cmi.success_status = "unknown"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | **Completed** statement; **Passed**/**Failed** if `requireSuccessStatus` set                                                                                                                                                                                                                             |
+| Question answered (graded or standalone, inside or outside a quiz)                           | `cmi.interactions.{n}.id` / `student_response` / `result` / `time` / `type` (n continues from prior `_count`)         | `cmi.interactions.{n}.id` / `learner_response` / `result` / `timestamp` / `type` (n continues from prior `_count`)               | **Answered** statement; object `${activityId}#${questionId}`, definition `cmi.interaction` + `interactionType`, `result.response`, `result.success`                                                                                                                                                      |
+| Resume after reload                                                                          | Read `cmi.suspend_data` on init; manifest is rebuilt from code, not LMS                                               | Read `cmi.suspend_data` on init                                                                                                  | State API `GET` `tessera-state`; lifecycle replays from where the prior session left off                                                                                                                                                                                                                 |
+| Author exit / unload                                                                         | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously)         | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously)                    | **Terminated** (always last on the wire, cmi5 §9.3.6). Explicit-exit path: `adapter.exit()` drains the queue then redirects to `returnURL` (§10.2.6). No Suspended verb — incomplete exit is signalled by Terminated without a preceding Completed; the LMS handles Abandoned and resume on next launch. |
+| Learner identity (xAPI actor synthesis)                                                      | `cmi.core.student_id` + `cmi.core.student_name`                                                                       | `cmi.learner_id` + `cmi.learner_name`                                                                                            | Launch-supplied actor JSON (Identified Agent)                                                                                                                                                                                                                                                            |
+| Persistence cap                                                                              | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB                                                        | 64000 chars per spec                                                                                                             | LRS-defined (typically unbounded for State API documents)                                                                                                                                                                                                                                                |
+| Score scale exposed to LMS                                                                   | `score.raw` only (0–100)                                                                                              | `score.raw` (0–100) **and** `score.scaled` (0–1)                                                                                 | `result.score.scaled` (0–1)                                                                                                                                                                                                                                                                              |
 
 The SCORM adapter's internal `commit()` (the `LMSCommit` / `Commit` call) is microtask-coalesced — multiple state mutations within one tick collapse to a single API call. cmi5 statements are individual (no batched commit).
 
@@ -1135,7 +1165,7 @@ API discovery: walks `window.parent` / `window.opener` up to 10 levels looking f
 
 API discovery: `API_1484_11` via the same parent/opener walk.
 
-**Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written *explicitly* when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
+**Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written _explicitly_ when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
 
 **LMS-supplied thresholds.** `cmi.scaled_passing_score` (§4.2.4.3) is read on init and exposed via `adapter.getMasteryScore()`. `App.svelte` picks up `masteryScore` and overrides `scoring.passingScore` for the launch — parity with cmi5's launch-time mastery.
 
@@ -1157,7 +1187,7 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **Token fetch is single-use** (cmi5 §6.2). On failure, reload from the LMS to retry. The token is used as a `Basic` credential, not Bearer. If the fetch URL responds with the spec-defined `{"error-code":...,"error-text":...}` shape (§8.2.3 — typically the single-use violation on a refresh), `adapter.init()` throws with the LMS's error-code/text instead of stuffing the JSON blob into the `Basic` credential and 400-spamming the LRS.
 
-**Lifecycle order.** **Initialized** → **Answered** (one per question, as each widget calls `q.commit()`; uncommitted ones flush at submit) → **Completed** → **Passed** / **Failed** → **Terminated** (always last, cmi5 §9.3.6). Completed is one-shot per registration (never re-emitted on resume); Passed/Failed are re-emitted only on a *status transition* (e.g., a learner who failed in session 1 and passes in session 2 fires a fresh Passed in session 2, but a learner who passed before and resumes does not re-emit). The runtime seeds the adapter at restore time via `seedLifecycle()` so the LMS isn't spammed with duplicates that 403 as "completion status already determined." **Satisfied** and **Suspended** are not emitted by the AU — Satisfied is LMS-only (§9.3.9), and Suspended isn't a cmi5 verb (§9.3 enumerates nine; the LMS handles Abandoned / resume on relaunch).
+**Lifecycle order.** **Initialized** → **Answered** (one per question, as each widget calls `q.commit()`; uncommitted ones flush at submit) → **Completed** → **Passed** / **Failed** → **Terminated** (always last, cmi5 §9.3.6). Completed is one-shot per registration (never re-emitted on resume); Passed/Failed are re-emitted only on a _status transition_ (e.g., a learner who failed in session 1 and passes in session 2 fires a fresh Passed in session 2, but a learner who passed before and resumes does not re-emit). The runtime seeds the adapter at restore time via `seedLifecycle()` so the LMS isn't spammed with duplicates that 403 as "completion status already determined." **Satisfied** and **Suspended** are not emitted by the AU — Satisfied is LMS-only (§9.3.9), and Suspended isn't a cmi5 verb (§9.3 enumerates nine; the LMS handles Abandoned / resume on relaunch).
 
 **Required result fields.** Completed: `completion: true`, `duration` (no `score` — §9.5.1 forbids it). Passed: `success: true`, `duration`, `result.score.scaled` when known (§9.3.4 requires `scaled >= masteryScore` when present). Failed: `success: false`, `duration`, `result.score.scaled` when known (§9.3.5 requires `scaled < masteryScore` when present). Terminated: `duration` (§9.5.4.1). On contradiction the verb is preserved and the score is dropped with a console warning.
 
@@ -1165,7 +1195,7 @@ API discovery: `API_1484_11` via the same parent/opener walk.
 
 **`LMS.LaunchData` (§10).** Fetched once at init from the State API under `stateId='LMS.LaunchData'`. The AU reads `contextTemplate`, `launchMode`, `returnURL`, and `masteryScore` from it. LaunchData values override anything parsed from the launch URL (§10.2.4 makes LaunchData authoritative). When the document is absent, statements ship without the LMS-supplied Publisher Activity and may be rejected by strict LRSes — a console warning fires.
 
-**Learner Preferences (§11).** `cmi5LearnerPreferences` from the Agent Profile API, fetched *before* Initialized — strict LRSes (SCORM Cloud) track that the GET happened and reject Initialized otherwise. A 404 here is normal (no preferences set); only the GET itself is required, and the response body is not consumed.
+**Learner Preferences (§11).** `cmi5LearnerPreferences` from the Agent Profile API, fetched _before_ Initialized — strict LRSes (SCORM Cloud) track that the GET happened and reject Initialized otherwise. A 404 here is normal (no preferences set); only the GET itself is required, and the response body is not consumed.
 
 **Launch mode (§10.2.2).** "Normal" launches emit the full lifecycle. "Browse" and "Review" launches emit only Initialized and Terminated — every other Defined Statement is silently suppressed. Exposed via `adapter.getLaunchMode()`.
 
@@ -1235,7 +1265,7 @@ Learner connects a left-side label to a right-side label by drawing a line. Emit
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
 <script module>
-  export const pageConfig = { title: "Match the elements" };
+  export const pageConfig = { title: 'Match the elements' };
 </script>
 
 <script>
@@ -1250,9 +1280,15 @@ Learner connects a left-side label to a right-side label by drawing a line. Emit
     response: () => ({
       type: 'matching',
       response: pairs,
-      correct: [['Hydrogen', 'H'], ['Helium', 'He'], ['Lithium', 'Li']],
+      correct: [
+        ['Hydrogen', 'H'],
+        ['Helium', 'He'],
+        ['Lithium', 'Li'],
+      ],
     }),
-    reset: () => { pairs = []; },
+    reset: () => {
+      pairs = [];
+    },
   });
 
   function connect(l, r) {
@@ -1260,14 +1296,20 @@ Learner connects a left-side label to a right-side label by drawing a line. Emit
   }
 </script>
 
-<svg width="400" height="200" role="img" aria-label="Drag to match elements to their symbols">
+<svg
+  width="400"
+  height="200"
+  role="img"
+  aria-label="Drag to match elements to their symbols"
+>
   <!-- canvas + line-drawing UI calls connect(l, r) on drop -->
 </svg>
 
 {#if q.mode === 'standalone'}
   <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button>{/if}
+  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button
+    >{/if}
 {/if}
 ```
 
@@ -1285,7 +1327,7 @@ Replace the default sidebar with a horizontal topbar showing breadcrumb + progre
   const progress = useProgress();
 
   const percent = $derived(
-    Math.round((progress.visitedPages.size / nav.pages.length) * 100)
+    Math.round((progress.visitedPages.size / nav.pages.length) * 100),
   );
 </script>
 
@@ -1299,16 +1341,33 @@ Replace the default sidebar with a horizontal topbar showing breadcrumb + progre
 
 <nav class="footer">
   <button disabled={!nav.canGoPrev} onclick={() => nav.prev()}>← Back</button>
-  <select onchange={(e) => nav.goTo(e.currentTarget.value)} value={nav.currentPage.slug}>
+  <select
+    onchange={(e) => nav.goTo(e.currentTarget.value)}
+    value={nav.currentPage.slug}
+  >
     {#each nav.pages as p}<option value={p.slug}>{p.title}</option>{/each}
   </select>
   <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next →</button>
 </nav>
 
 <style>
-  .topbar { display: flex; gap: 1rem; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--tessera-border); }
-  .content { max-width: var(--tessera-content-max-width); margin: 0 auto; padding: 2rem; }
-  .footer { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-top: 1px solid var(--tessera-border); }
+  .topbar {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--tessera-border);
+  }
+  .content {
+    max-width: var(--tessera-content-max-width);
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .footer {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--tessera-border);
+  }
 </style>
 ```
 
@@ -1359,7 +1418,10 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 </script>
 
 <div bind:this={host} class="my-quiz">
-  <p>Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz.questions.length}</p>
+  <p>
+    Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz
+      .questions.length}
+  </p>
 
   {#each quiz.questions as q (q.id)}
     <section data-question-id={q.id}>
@@ -1368,7 +1430,9 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
   {/each}
 
   {#if quiz.state === 'answering'}
-    <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}>Submit</button>
+    <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
+      >Submit</button
+    >
   {:else if quiz.state === 'submitted'}
     <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
@@ -1402,7 +1466,9 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
       response: selected !== null ? [String(selected)] : [],
       correct: [String(correct)],
     }),
-    reset: () => { selected = null; },
+    reset: () => {
+      selected = null;
+    },
   });
 
   // Register the snippet the shell will render. mode === 'quiz' inside a quiz host;
@@ -1430,7 +1496,11 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
   </fieldset>
 
   {#if q.feedbackVisible}
-    <p>{q.answer === correct ? 'Correct.' : 'The right answer was ' + options[correct] + '.'}</p>
+    <p>
+      {q.answer === correct
+        ? 'Correct.'
+        : 'The right answer was ' + options[correct] + '.'}
+    </p>
   {/if}
 {/snippet}
 
@@ -1438,7 +1508,9 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
-    <button disabled={selected === null} onclick={() => q.submit()}>Check</button>
+    <button disabled={selected === null} onclick={() => q.submit()}
+      >Check</button
+    >
   {/if}
 {/if}
 ```
@@ -1452,7 +1524,7 @@ A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts t
 ```svelte
 <!-- pages/04-reflection/01-reflect/reflect.svelte -->
 <script module>
-  export const pageConfig = { title: "Reflection" };
+  export const pageConfig = { title: 'Reflection' };
 </script>
 
 <script>
@@ -1468,8 +1540,10 @@ A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts t
       response: answer,
       // No `correct`: any answer accepted; we just want completion.
     }),
-    score: () => answer.trim().length >= 50 ? 100 : 0,
-    reset: () => { answer = ''; },
+    score: () => (answer.trim().length >= 50 ? 100 : 0),
+    reset: () => {
+      answer = '';
+    },
   });
 </script>
 
@@ -1477,7 +1551,10 @@ A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts t
 <p>At least 50 characters required to pass.</p>
 
 <textarea bind:value={answer} rows="6" disabled={q.submitted}></textarea>
-<button onclick={() => q.submit()} disabled={q.submitted || answer.trim().length < 50}>
+<button
+  onclick={() => q.submit()}
+  disabled={q.submitted || answer.trim().length < 50}
+>
   Submit
 </button>
 
@@ -1493,7 +1570,7 @@ A page that reveals sections one at a time as the learner advances. `markChunk(p
 ```svelte
 <!-- pages/02-deep-dive/01-concepts/long-read.svelte -->
 <script module>
-  export const pageConfig = { title: "How it works" };
+  export const pageConfig = { title: 'How it works' };
 </script>
 
 <script>

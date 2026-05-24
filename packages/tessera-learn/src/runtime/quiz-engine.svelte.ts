@@ -30,7 +30,11 @@ export interface QuizEngineDeps {
    */
   passingScore: () => number;
   /** Wraps `adapterCtx.adapter.reportInteraction`; a no-op when there is no adapter. */
-  report: (id: string, interaction: Interaction, correct: boolean | null) => void;
+  report: (
+    id: string,
+    interaction: Interaction,
+    correct: boolean | null,
+  ) => void;
   /**
    * Wraps the host-element `CustomEvent` dispatch. Returns `false` when the host
    * element is null (the engine treats that as "no LMS bridge listener").
@@ -89,11 +93,17 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   get #allAnswered(): boolean {
     void this.#answersVersion;
-    return this.#totalQuestions > 0 && this.#answers.size >= this.#totalQuestions;
+    return (
+      this.#totalQuestions > 0 && this.#answers.size >= this.#totalQuestions
+    );
   }
 
   get state(): 'answering' | 'submitted' | 'reviewing' {
-    return this.#reviewing ? 'reviewing' : this.#submitted ? 'submitted' : 'answering';
+    return this.#reviewing
+      ? 'reviewing'
+      : this.#submitted
+        ? 'submitted'
+        : 'answering';
   }
 
   get questions(): ReadonlyArray<Question> {
@@ -121,7 +131,11 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   /** Dev-warning inputs the wrapper reads in onDestroy. */
-  get stats(): { questionsCount: number; answersCount: number; submitCalled: boolean } {
+  get stats(): {
+    questionsCount: number;
+    answersCount: number;
+    submitCalled: boolean;
+  } {
     return {
       questionsCount: this.#internalQuestions.length,
       answersCount: this.#answers.size,
@@ -133,7 +147,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     if (this.#seenIds.has(api.id)) {
       console.warn(
         `[tessera] useQuiz: duplicate question id "${api.id}" — ` +
-          'each question id must be unique within a quiz (LMS interaction records key by id).'
+          'each question id must be unique within a quiz (LMS interaction records key by id).',
       );
     }
     this.#seenIds.add(api.id);
@@ -163,7 +177,8 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   setRender(index: number, render: unknown): void {
-    if (this.#internalQuestions[index]) this.#internalQuestions[index].render = render;
+    if (this.#internalQuestions[index])
+      this.#internalQuestions[index].render = render;
   }
 
   getRender(index: number): unknown {
@@ -206,7 +221,7 @@ export class QuizEngine implements UseQuizInternalHandle {
       console.warn(
         '[tessera] useQuiz: submit() ran but the host element was null — no LMS bridge ' +
           'listener exists, so this score will not be persisted. Make sure your custom ' +
-          'quiz shell binds the element it passes to useQuiz({ element: () => ... }).'
+          'quiz shell binds the element it passes to useQuiz({ element: () => ... }).',
       );
       return;
     }
@@ -236,7 +251,8 @@ export class QuizEngine implements UseQuizInternalHandle {
     for (let i = 0; i < this.#internalQuestions.length; i++) {
       const a = this.#answers.has(i) ? this.#answers.get(i) : undefined;
       results.push({
-        interaction: this.#internalQuestions[i].interaction?.() ?? ({} as never),
+        interaction:
+          this.#internalQuestions[i].interaction?.() ?? ({} as never),
         correct: this.#internalQuestions[i].checkAnswer(a),
         weight: this.#internalQuestions[i].weight,
       });
@@ -252,7 +268,8 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#reportedAnswers.clear();
     for (const [i, a] of preserved) this.#answers.set(i, a);
     for (let i = 0; i < this.#internalQuestions.length; i++) {
-      if (!newLocked.has(i) && this.#internalQuestions[i].reset) this.#internalQuestions[i].reset!();
+      if (!newLocked.has(i) && this.#internalQuestions[i].reset)
+        this.#internalQuestions[i].reset!();
     }
     this.#answersVersion++;
     this.#feedbackShown.clear();
@@ -269,7 +286,9 @@ export class QuizEngine implements UseQuizInternalHandle {
     if (!interaction) return;
     const fingerprint = JSON.stringify(interaction);
     if (this.#reportedAnswers.get(index) === fingerprint) return;
-    const answer = this.#answers.has(index) ? this.#answers.get(index) : undefined;
+    const answer = this.#answers.has(index)
+      ? this.#answers.get(index)
+      : undefined;
     this.#deps.report(q.id, interaction, q.checkAnswer(answer));
     this.#reportedAnswers.set(index, fingerprint);
   }
@@ -289,7 +308,10 @@ export class QuizEngine implements UseQuizInternalHandle {
       }
     }
     if (totalWeight === 0) return { rounded: 0, correctCount: 0 };
-    return { rounded: Math.round((weighted / totalWeight) * 100), correctCount };
+    return {
+      rounded: Math.round((weighted / totalWeight) * 100),
+      correctCount,
+    };
   }
 
   #makeQuestionHandle(i: number): QuestionInternal {
@@ -313,7 +335,11 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.feedbackVisible(i);
       },
       get locked() {
-        return engine.#submitted || engine.feedbackVisible(i) || engine.isLockedCorrect(i);
+        return (
+          engine.#submitted ||
+          engine.feedbackVisible(i) ||
+          engine.isLockedCorrect(i)
+        );
       },
       get isLockedCorrect() {
         return engine.isLockedCorrect(i);

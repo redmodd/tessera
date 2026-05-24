@@ -4,14 +4,15 @@
   import { requireNavContext } from '../runtime/contexts.js';
 
   let { page } = $props();
-  const { nav, manifest, config, progress } = requireNavContext('DefaultLayout');
+  const { nav, manifest, config, progress } =
+    requireNavContext('DefaultLayout');
 
   let sidebarOpen = $state(false);
 
   let progressPercent = $derived(
     manifest.totalPages > 0
       ? Math.round((progress.visitedPages.size / manifest.totalPages) * 100)
-      : 0
+      : 0,
   );
 
   function toggleSidebar() {
@@ -25,11 +26,25 @@
   function handleKeyNav(e) {
     const tag = e.target?.tagName;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-    if (e.target?.closest('[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz')) return;
+    if (
+      e.target?.closest(
+        '[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz',
+      )
+    )
+      return;
 
-    if (e.key === 'ArrowLeft') { nav.goPrev(); e.preventDefault(); }
-    if (e.key === 'ArrowRight') { nav.goNext(); e.preventDefault(); }
-    if (e.key === 'Escape' && sidebarOpen) { closeSidebar(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') {
+      nav.goPrev();
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowRight') {
+      nav.goNext();
+      e.preventDefault();
+    }
+    if (e.key === 'Escape' && sidebarOpen) {
+      closeSidebar();
+      e.preventDefault();
+    }
   }
 
   onMount(() => {
@@ -63,7 +78,11 @@
 {/if}
 
 <div class="tessera-app" data-chrome="default">
-  <aside class="tessera-sidebar" class:open={sidebarOpen} aria-label="Course sidebar">
+  <aside
+    class="tessera-sidebar"
+    class:open={sidebarOpen}
+    aria-label="Course sidebar"
+  >
     <Sidebar
       {manifest}
       {config}
@@ -100,11 +119,21 @@
   </main>
 
   <footer class="tessera-progress" aria-label="Course progress">
-    <div class="tessera-progress-track" role="progressbar"
-         aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}
-         aria-label="Course progress">
-      <div class="tessera-progress-fill" style="width: {progressPercent}%"></div>
+    <div
+      class="tessera-progress-track"
+      role="progressbar"
+      aria-valuenow={progressPercent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Course progress"
+    >
+      <div
+        class="tessera-progress-fill"
+        style="width: {progressPercent}%"
+      ></div>
     </div>
-    <div class="tessera-progress-label">{progress.visitedPages.size} of {manifest.totalPages} pages</div>
+    <div class="tessera-progress-label">
+      {progress.visitedPages.size} of {manifest.totalPages} pages
+    </div>
   </footer>
 </div>

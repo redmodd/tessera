@@ -3,7 +3,12 @@ import AxeBuilder from '@axe-core/playwright';
 
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
-  await page.waitForFunction(() => !document.querySelector('.tessera-loading-skeleton'), { timeout: 5000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => !document.querySelector('.tessera-loading-skeleton'),
+      { timeout: 5000 },
+    )
+    .catch(() => {});
 }
 
 async function navigateToPage(page, pageTitle: string) {
@@ -81,7 +86,11 @@ test.describe('Component — Carousel', () => {
   });
 
   test('carousel prev/next buttons navigate slides', async ({ page }) => {
-    const nextArrow = page.locator('.tessera-carousel-next, [aria-label*="next" i], [aria-label*="Next"]').first();
+    const nextArrow = page
+      .locator(
+        '.tessera-carousel-next, [aria-label*="next" i], [aria-label*="Next"]',
+      )
+      .first();
     const dots = page.locator('.tessera-carousel-dot');
 
     if (await nextArrow.isVisible()) {
@@ -138,7 +147,10 @@ test.describe('Component — RevealModal', () => {
 
     const isInModal = await page.evaluate(() => {
       const active = document.activeElement;
-      return !!active?.closest('[role="dialog"]') || !!active?.closest('.tessera-modal-overlay');
+      return (
+        !!active?.closest('[role="dialog"]') ||
+        !!active?.closest('.tessera-modal-overlay')
+      );
     });
     expect(isInModal).toBe(true);
   });
@@ -148,7 +160,9 @@ test.describe('Component — RevealModal', () => {
     await expect(page.locator('[role="dialog"]')).toBeVisible();
 
     // Click on overlay (outside modal content)
-    await page.locator('.tessera-modal-overlay').click({ position: { x: 10, y: 10 } });
+    await page
+      .locator('.tessera-modal-overlay')
+      .click({ position: { x: 10, y: 10 } });
     await expect(page.locator('[role="dialog"]')).not.toBeVisible();
   });
 });

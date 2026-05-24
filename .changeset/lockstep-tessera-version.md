@@ -1,5 +1,5 @@
 ---
-"create-tessera": patch
+'create-tessera': patch
 ---
 
 Pin scaffolded and upgraded `tessera-learn` to the exact version create-tessera

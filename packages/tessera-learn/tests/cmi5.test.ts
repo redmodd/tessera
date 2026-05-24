@@ -79,7 +79,7 @@ describe('CMI5Adapter', () => {
 
   function setupInitMocks(
     savedState?: SavedState,
-    launchData?: Record<string, unknown> | null
+    launchData?: Record<string, unknown> | null,
   ) {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       // Token fetch
@@ -87,7 +87,10 @@ describe('CMI5Adapter', () => {
         return { ok: true, text: async () => 'test-auth-token' };
       }
       // State API GET
-      if (url.includes('activities/state') && (!options || options.method === 'GET')) {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
         if (url.includes('stateId=LMS.LaunchData')) {
           if (launchData) return { ok: true, json: async () => launchData };
           return { ok: false, status: 404 };
@@ -113,7 +116,7 @@ describe('CMI5Adapter', () => {
     await adapter.init();
     expect(mockFetch).toHaveBeenCalledWith(
       baseLaunchParams.fetch,
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 
@@ -123,7 +126,7 @@ describe('CMI5Adapter', () => {
     await adapter.init();
 
     const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const body = JSON.parse(statementCalls[0][1].body);
@@ -160,7 +163,7 @@ describe('CMI5Adapter', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const putCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[1]?.method === 'PUT'
+      (c: any[]) => c[1]?.method === 'PUT',
     );
     expect(putCalls.length).toBe(1);
     expect(putCalls[0][0]).toContain('activities/state');
@@ -181,8 +184,8 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const body = JSON.parse(statementCalls[0][1].body);
@@ -205,8 +208,8 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     expect(statementCalls.length).toBe(0);
   });
@@ -225,8 +228,8 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     const body = JSON.parse(statementCalls[0][1].body);
     expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/passed');
@@ -247,8 +250,8 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     const body = JSON.parse(statementCalls[0][1].body);
     expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/failed');
@@ -271,7 +274,7 @@ describe('CMI5Adapter', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
     );
     expect(statementCalls).toHaveLength(0);
   });
@@ -293,9 +296,11 @@ describe('CMI5Adapter', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
     );
-    const verbs = statementCalls.map((c: any[]) => JSON.parse(c[1].body).verb.id);
+    const verbs = statementCalls.map(
+      (c: any[]) => JSON.parse(c[1].body).verb.id,
+    );
     expect(verbs).toContain('http://adlnet.gov/expapi/verbs/passed');
     expect(verbs).toContain('http://adlnet.gov/expapi/verbs/completed');
   });
@@ -317,7 +322,7 @@ describe('CMI5Adapter', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST'
+      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
     );
     expect(statementCalls).toHaveLength(0);
   });
@@ -328,8 +333,8 @@ describe('CMI5Adapter', () => {
     await adapter.init();
 
     // Check that statements call includes auth header
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const headers = statementCalls[0][1].headers;
@@ -363,13 +368,22 @@ describe('CMI5Adapter', () => {
     await adapter.init();
 
     const initialized = mockFetch.mock.calls
-      .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; } })
-      .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized');
+      .map((c: any[]) => {
+        try {
+          return JSON.parse(c[1]?.body);
+        } catch {
+          return null;
+        }
+      })
+      .find(
+        (b: any) =>
+          b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
+      );
     expect(initialized).toBeDefined();
     expect(
       initialized.context.extensions[
         'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
-      ]
+      ],
     ).toBe(lmsSession);
     expect(initialized.context.contextActivities.grouping).toEqual([
       { id: publisherActivity },
@@ -384,13 +398,23 @@ describe('CMI5Adapter', () => {
     await adapter.init();
 
     const initialized = mockFetch.mock.calls
-      .map((c: any[]) => { try { return JSON.parse(c[1]?.body); } catch { return null; } })
-      .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized');
-    const sid = initialized?.context?.extensions?.[
-      'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
-    ];
+      .map((c: any[]) => {
+        try {
+          return JSON.parse(c[1]?.body);
+        } catch {
+          return null;
+        }
+      })
+      .find(
+        (b: any) =>
+          b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
+      );
+    const sid =
+      initialized?.context?.extensions?.[
+        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
+      ];
     expect(sid).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
   });
 
@@ -406,7 +430,10 @@ describe('CMI5Adapter', () => {
           text: async () => '{"auth-token": "spec-conformant-token"}',
         };
       }
-      if (url.includes('activities/state') && (!options || options.method === 'GET')) {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
         return { ok: false, status: 404 };
       }
       if (url.includes('statements')) {
@@ -417,8 +444,8 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     const headers = statementCalls[0][1].headers;
     expect(headers.get('Authorization')).toBe('Basic spec-conformant-token');
@@ -436,9 +463,11 @@ describe('CMI5Adapter', () => {
       return { ok: false, status: 404 };
     });
     adapter = new CMI5Adapter();
-    await expect(adapter.init()).rejects.toThrow(/error-code=1.*already been returned/);
+    await expect(adapter.init()).rejects.toThrow(
+      /error-code=1.*already been returned/,
+    );
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
-      c[0].includes('statements')
+      c[0].includes('statements'),
     );
     expect(statementCalls.length).toBe(0);
   });
@@ -448,8 +477,8 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0].includes('statements'),
     );
     const body = JSON.parse(statementCalls[0][1].body);
     expect(body.context.registration).toBe('reg-123');
@@ -488,17 +517,23 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0]?.includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0]?.includes('statements'),
     );
     expect(statementCalls.length).toBe(1);
     const terminated = JSON.parse(statementCalls[0][1].body);
-    expect(terminated.verb.id).toBe('http://adlnet.gov/expapi/verbs/terminated');
+    expect(terminated.verb.id).toBe(
+      'http://adlnet.gov/expapi/verbs/terminated',
+    );
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
     // Nothing with a "suspended" verb.
     const verbs = statementCalls.map((c: any[]) => {
-      try { return JSON.parse(c[1].body).verb.id; } catch { return null; }
+      try {
+        return JSON.parse(c[1].body).verb.id;
+      } catch {
+        return null;
+      }
     });
     expect(verbs).not.toContain('http://adlnet.gov/expapi/verbs/suspended');
   });
@@ -519,8 +554,8 @@ describe('CMI5Adapter', () => {
     adapter.terminate();
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0]?.includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0]?.includes('statements'),
     );
     expect(statementCalls.length).toBe(1);
     const body = JSON.parse(statementCalls[0][1].body);
@@ -544,8 +579,8 @@ describe('CMI5Adapter', () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0]?.includes('statements')
+    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+      c[0]?.includes('statements'),
     );
     expect(statementCalls.length).toBe(1);
   });
@@ -573,9 +608,11 @@ describe('CMI5Adapter', () => {
       adapter = new CMI5Adapter();
       await adapter.init();
       expect(adapter.getMasteryScore()).toBeNull();
-      expect(warn.mock.calls.some((c: any[]) =>
-        String(c[0]).includes("masteryScore")
-      )).toBe(true);
+      expect(
+        warn.mock.calls.some((c: any[]) =>
+          String(c[0]).includes('masteryScore'),
+        ),
+      ).toBe(true);
       warn.mockRestore();
     });
 
@@ -594,13 +631,20 @@ describe('CMI5Adapter', () => {
 
       const completed = mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
-        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed');
+        .find(
+          (b: any) =>
+            b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed',
+        );
       expect(completed).toBeDefined();
       const ext = completed?.context?.extensions ?? {};
       expect(
-        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore']
+        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
       ).toBeUndefined();
     });
 
@@ -618,13 +662,19 @@ describe('CMI5Adapter', () => {
 
       const failed = mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
-        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/failed');
+        .find(
+          (b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/failed',
+        );
       expect(
         failed.context.extensions[
           'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
-        ]
+        ],
       ).toBe(0.6);
     });
 
@@ -641,12 +691,19 @@ describe('CMI5Adapter', () => {
 
       const completed = mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
-        .find((b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed');
+        .find(
+          (b: any) =>
+            b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed',
+        );
       const ext = completed?.context?.extensions ?? {};
       expect(
-        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore']
+        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
       ).toBeUndefined();
     });
 
@@ -658,7 +715,12 @@ describe('CMI5Adapter', () => {
       // job is to emit Completed/Passed/Failed accurately and let the
       // LMS roll up. Exercising every combination of moveOn here
       // protects against a future "MAY send" comment slipping back in.
-      for (const moveOn of ['Passed', 'Completed', 'CompletedAndPassed', 'CompletedOrPassed']) {
+      for (const moveOn of [
+        'Passed',
+        'Completed',
+        'CompletedAndPassed',
+        'CompletedOrPassed',
+      ]) {
         setSearchParams({ ...baseLaunchParams, moveOn, masteryScore: '0.7' });
         setupInitMocks();
         adapter = new CMI5Adapter();
@@ -671,9 +733,16 @@ describe('CMI5Adapter', () => {
         adapter.setSuccessStatus('passed');
         await new Promise((r) => setTimeout(r, 50));
 
-        const verbs = mockFetch.mock.calls
-          .map((c: any[]) => { try { return JSON.parse(c[1]?.body)?.verb?.id; } catch { return null; }});
-        expect(verbs).not.toContain('https://w3id.org/xapi/adl/verbs/satisfied');
+        const verbs = mockFetch.mock.calls.map((c: any[]) => {
+          try {
+            return JSON.parse(c[1]?.body)?.verb?.id;
+          } catch {
+            return null;
+          }
+        });
+        expect(verbs).not.toContain(
+          'https://w3id.org/xapi/adl/verbs/satisfied',
+        );
       }
     });
   });
@@ -689,13 +758,19 @@ describe('CMI5Adapter', () => {
 
     function categoryIds(body: any): string[] {
       const cats = body?.context?.contextActivities?.category ?? [];
-      return cats.map((c: any) => c?.id).filter((id: any) => typeof id === 'string');
+      return cats
+        .map((c: any) => c?.id)
+        .filter((id: any) => typeof id === 'string');
     }
 
     function statementFor(verbId: string): any {
       return mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
         .find((b: any) => b?.verb?.id === verbId);
     }
@@ -704,7 +779,9 @@ describe('CMI5Adapter', () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
-      const initialized = statementFor('http://adlnet.gov/expapi/verbs/initialized');
+      const initialized = statementFor(
+        'http://adlnet.gov/expapi/verbs/initialized',
+      );
       expect(categoryIds(initialized)).toEqual([CMI5_CAT]);
     });
 
@@ -716,7 +793,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await new Promise((r) => setTimeout(r, 50));
-      const completed = statementFor('http://adlnet.gov/expapi/verbs/completed');
+      const completed = statementFor(
+        'http://adlnet.gov/expapi/verbs/completed',
+      );
       expect(categoryIds(completed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
@@ -750,7 +829,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
-      const terminated = statementFor('http://adlnet.gov/expapi/verbs/terminated');
+      const terminated = statementFor(
+        'http://adlnet.gov/expapi/verbs/terminated',
+      );
       expect(categoryIds(terminated)).toEqual([CMI5_CAT]);
     });
 
@@ -763,7 +844,7 @@ describe('CMI5Adapter', () => {
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a'], correct: ['a'] },
-        true
+        true,
       );
       await new Promise((r) => setTimeout(r, 50));
       const answered = statementFor('http://adlnet.gov/expapi/verbs/answered');
@@ -776,7 +857,7 @@ describe('CMI5Adapter', () => {
     async function initAndReport(
       questionId: string,
       interaction: any,
-      correct: boolean | null
+      correct: boolean | null,
     ): Promise<any> {
       setupInitMocks();
       adapter = new CMI5Adapter();
@@ -785,8 +866,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.reportInteraction(questionId, interaction, correct);
       await new Promise((r) => setTimeout(r, 50));
-      const statementCalls = mockFetch.mock.calls.filter(
-        (c: any[]) => c[0]?.includes('statements')
+      const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
+        c[0]?.includes('statements'),
       );
       expect(statementCalls.length).toBe(1);
       return JSON.parse(statementCalls[0][1].body);
@@ -796,12 +877,12 @@ describe('CMI5Adapter', () => {
       const body = await initAndReport(
         'q1',
         { type: 'choice', response: ['a', 'b'], correct: ['a'] },
-        false
+        false,
       );
       expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/answered');
       expect(body.object.id).toBe('https://example.com/course/1#q1');
       expect(body.object.definition.type).toBe(
-        'http://adlnet.gov/expapi/activities/cmi.interaction'
+        'http://adlnet.gov/expapi/activities/cmi.interaction',
       );
       expect(body.object.definition.interactionType).toBe('choice');
       expect(body.object.definition.correctResponsesPattern).toEqual(['a']);
@@ -812,11 +893,17 @@ describe('CMI5Adapter', () => {
     it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
       const body = await initAndReport(
         'q1',
-        { type: 'choice', response: ['speed-limit', 'no-entry'], correct: ['speed-limit'] },
-        true
+        {
+          type: 'choice',
+          response: ['speed-limit', 'no-entry'],
+          correct: ['speed-limit'],
+        },
+        true,
       );
       expect(body.result.response).toBe('speed-limit[,]no-entry');
-      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        'speed-limit',
+      ]);
     });
 
     it('ignores `options` for index mapping and keeps named identifiers in result.response', async () => {
@@ -828,17 +915,19 @@ describe('CMI5Adapter', () => {
           correct: ['speed-limit'],
           options: ['stop', 'yield', 'speed-limit', 'merge'],
         },
-        true
+        true,
       );
       expect(body.result.response).toBe('speed-limit');
-      expect(body.object.definition.correctResponsesPattern).toEqual(['speed-limit']);
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        'speed-limit',
+      ]);
     });
 
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',
         { type: 'likert', response: 'agree' },
-        null
+        null,
       );
       expect(body.object.definition.correctResponsesPattern).toBeUndefined();
       expect(body.result.success).toBeUndefined();
@@ -850,24 +939,34 @@ describe('CMI5Adapter', () => {
         'm1',
         {
           type: 'matching',
-          response: [['a', '1'], ['b', '2']],
-          correct: [['a', '1'], ['b', '2']],
+          response: [
+            ['a', '1'],
+            ['b', '2'],
+          ],
+          correct: [
+            ['a', '1'],
+            ['b', '2'],
+          ],
         },
-        true
+        true,
       );
       expect(body.object.definition.interactionType).toBe('matching');
       expect(body.result.response).toBe('a[.]1[,]b[.]2');
-      expect(body.object.definition.correctResponsesPattern).toEqual(['a[.]1[,]b[.]2']);
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        'a[.]1[,]b[.]2',
+      ]);
     });
 
     it('encodes numeric range with colon delimiter', async () => {
       const body = await initAndReport(
         'n1',
         { type: 'numeric', response: 7, correct: { min: 5, max: 10 } },
-        true
+        true,
       );
       expect(body.result.response).toBe('7');
-      expect(body.object.definition.correctResponsesPattern).toEqual(['5[:]10']);
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        '5[:]10',
+      ]);
     });
   });
 
@@ -875,7 +974,11 @@ describe('CMI5Adapter', () => {
     function findStatement(verbId: string): any {
       return mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
         .find((b: any) => b?.verb?.id === verbId);
     }
@@ -895,7 +998,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       await adapter.exit();
-      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
+      ).toBeDefined();
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
@@ -913,7 +1018,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       await adapter.exit();
-      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
+      ).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });
   });
@@ -922,7 +1029,11 @@ describe('CMI5Adapter', () => {
     function findStatement(verbId: string): any {
       return mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
         .find((b: any) => b?.verb?.id === verbId);
     }
@@ -968,7 +1079,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await new Promise((r) => setTimeout(r, 50));
-      expect(findStatement('http://adlnet.gov/expapi/verbs/completed')).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/completed'),
+      ).toBeUndefined();
     });
 
     it('does NOT emit Passed or Failed under launchMode=Review (§10.2.2)', async () => {
@@ -980,8 +1093,12 @@ describe('CMI5Adapter', () => {
       adapter.setScore(95);
       adapter.setSuccessStatus('passed');
       await new Promise((r) => setTimeout(r, 50));
-      expect(findStatement('http://adlnet.gov/expapi/verbs/passed')).toBeUndefined();
-      expect(findStatement('http://adlnet.gov/expapi/verbs/failed')).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/passed'),
+      ).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/failed'),
+      ).toBeUndefined();
     });
 
     it('does NOT emit Suspended under launchMode=Browse on terminate (§10.2.2)', async () => {
@@ -992,9 +1109,13 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
-      expect(findStatement('http://adlnet.gov/expapi/verbs/suspended')).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/suspended'),
+      ).toBeUndefined();
       // Terminated is always allowed.
-      expect(findStatement('http://adlnet.gov/expapi/verbs/terminated')).toBeDefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
+      ).toBeDefined();
     });
 
     it('fetches Learner Preferences BEFORE sending Initialized (§11)', async () => {
@@ -1009,15 +1130,22 @@ describe('CMI5Adapter', () => {
       await adapter.init();
 
       const callOrder = mockFetch.mock.calls.map((c: any[]) => c[0] as string);
-      const profileIdx = callOrder.findIndex((u) => u.includes('agents/profile'));
+      const profileIdx = callOrder.findIndex((u) =>
+        u.includes('agents/profile'),
+      );
       const initializedIdx = callOrder.findIndex(
-        (u, i) => u.includes('statements') &&
+        (u, i) =>
+          u.includes('statements') &&
           (() => {
             try {
-              return JSON.parse(mockFetch.mock.calls[i][1]?.body)?.verb?.id
-                === 'http://adlnet.gov/expapi/verbs/initialized';
-            } catch { return false; }
-          })()
+              return (
+                JSON.parse(mockFetch.mock.calls[i][1]?.body)?.verb?.id ===
+                'http://adlnet.gov/expapi/verbs/initialized'
+              );
+            } catch {
+              return false;
+            }
+          })(),
       );
       expect(profileIdx).toBeGreaterThanOrEqual(0);
       expect(initializedIdx).toBeGreaterThanOrEqual(0);
@@ -1029,7 +1157,11 @@ describe('CMI5Adapter', () => {
     function findStatement(verbId: string): any {
       return mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
         .find((b: any) => b?.verb?.id === verbId);
     }
@@ -1038,7 +1170,10 @@ describe('CMI5Adapter', () => {
       // cmi5 §10.2.1 — the AU MUST NOT overwrite contextTemplate values.
       // If the LMS pre-populates `category`, the AU must merge (concat
       // + dedupe), not replace.
-      const lmsCategory = { id: 'https://lms.example.com/cat/custom', objectType: 'Activity' };
+      const lmsCategory = {
+        id: 'https://lms.example.com/cat/custom',
+        objectType: 'Activity',
+      };
       setupInitMocks(undefined, {
         contextTemplate: {
           contextActivities: { category: [lmsCategory] },
@@ -1050,11 +1185,19 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await new Promise((r) => setTimeout(r, 50));
-      const completed = findStatement('http://adlnet.gov/expapi/verbs/completed');
-      const ids = completed.context.contextActivities.category.map((c: any) => c.id);
+      const completed = findStatement(
+        'http://adlnet.gov/expapi/verbs/completed',
+      );
+      const ids = completed.context.contextActivities.category.map(
+        (c: any) => c.id,
+      );
       expect(ids).toContain(lmsCategory.id);
-      expect(ids).toContain('https://w3id.org/xapi/cmi5/context/categories/cmi5');
-      expect(ids).toContain('https://w3id.org/xapi/cmi5/context/categories/moveon');
+      expect(ids).toContain(
+        'https://w3id.org/xapi/cmi5/context/categories/cmi5',
+      );
+      expect(ids).toContain(
+        'https://w3id.org/xapi/cmi5/context/categories/moveon',
+      );
     });
   });
 
@@ -1062,7 +1205,11 @@ describe('CMI5Adapter', () => {
     function findStatement(verbId: string): any {
       return mockFetch.mock.calls
         .map((c: any[]) => {
-          try { return JSON.parse(c[1]?.body); } catch { return null; }
+          try {
+            return JSON.parse(c[1]?.body);
+          } catch {
+            return null;
+          }
         })
         .find((b: any) => b?.verb?.id === verbId);
     }

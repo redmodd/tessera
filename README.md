@@ -15,7 +15,7 @@ Open your course in an AI coding assistant like [Claude Code](https://claude.com
 
 When you're done, one command packages your course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
 
-*Under the hood:* Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
+_Under the hood:_ Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ Every scaffolded project ships with `AGENTS.md` at its root. Your agent will rea
 
 ```svelte
 <script module>
-  export const pageConfig = { title: "Welcome" };
+  export const pageConfig = { title: 'Welcome' };
 </script>
 
 <script>
@@ -62,7 +62,7 @@ Every scaffolded project ships with `AGENTS.md` at its root. Your agent will rea
 <Callout type="tip"><p>Drop in components for richer content.</p></Callout>
 ```
 
-*Want a minimal starting point with no reference components?* `npm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
+_Want a minimal starting point with no reference components?_ `npm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
 
 ## Updating an existing project
 
@@ -72,7 +72,7 @@ From a project root, `npx create-tessera@latest upgrade` pulls in the latest fra
 
 Once your project is running, ask the agent for what you want:
 
-> *"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."*
+> _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
 `AGENTS.md` (at the root of your project) teaches the agent the conventions: how pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 

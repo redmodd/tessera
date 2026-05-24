@@ -19,19 +19,24 @@ interface EngineProbe {
   /** Every dispatched host event, in order. */
   events: Array<{ name: string; detail: unknown }>;
   /** Every interaction reported to the (injected) adapter, in order. */
-  reports: Array<{ id: string; interaction: Interaction; correct: boolean | null }>;
+  reports: Array<{
+    id: string;
+    interaction: Interaction;
+    correct: boolean | null;
+  }>;
 }
 
 function makeEngine(
   quizConfig: Partial<QuizConfig> = { graded: true },
-  opts: { passingScore?: number; hostNull?: boolean } = {}
+  opts: { passingScore?: number; hostNull?: boolean } = {},
 ): EngineProbe {
   const events: EngineProbe['events'] = [];
   const reports: EngineProbe['reports'] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
-    report: (id, interaction, correct) => reports.push({ id, interaction, correct }),
+    report: (id, interaction, correct) =>
+      reports.push({ id, interaction, correct }),
     // dispatch() returns false when the host element is null; model that with hostNull.
     dispatch: (name, detail) => {
       if (opts.hostNull) return false;
@@ -55,7 +60,11 @@ function tfQuestion(id: string, response: boolean, correct: boolean) {
   return {
     id,
     checkAnswer: () => response === correct,
-    interaction: (): Interaction => ({ type: 'true-false' as const, response, correct }),
+    interaction: (): Interaction => ({
+      type: 'true-false' as const,
+      response,
+      correct,
+    }),
   };
 }
 
@@ -137,7 +146,10 @@ describe('QuizEngine', () => {
     expect(reports.map((r) => [r.id, r.correct])).toEqual([['a', true]]);
 
     engine.questions[1].commit();
-    expect(reports.map((r) => [r.id, r.correct])).toEqual([['a', true], ['b', false]]);
+    expect(reports.map((r) => [r.id, r.correct])).toEqual([
+      ['a', true],
+      ['b', false],
+    ]);
 
     engine.submit();
     expect(reports).toHaveLength(2);
@@ -167,13 +179,20 @@ describe('QuizEngine', () => {
     engine.registerQuestion({
       id: 'a',
       checkAnswer: (answer) => answer === true,
-      interaction: () => ({ type: 'true-false', response: engine.getAnswer(0) === true, correct: true }),
+      interaction: () => ({
+        type: 'true-false',
+        response: engine.getAnswer(0) === true,
+        correct: true,
+      }),
     });
     engine.setAnswer(0, false);
     engine.questions[0].commit();
     engine.setAnswer(0, true);
     engine.questions[0].commit();
-    expect(reports.map((r) => [r.id, r.correct])).toEqual([['a', false], ['a', true]]);
+    expect(reports.map((r) => [r.id, r.correct])).toEqual([
+      ['a', false],
+      ['a', true],
+    ]);
   });
 
   it('is a no-op when commit() is called twice with the same answer', () => {
@@ -280,19 +299,30 @@ describe('QuizEngine', () => {
   });
 
   it('incorrect-only retry preserves correct answers and locks them', () => {
-    const { engine } = makeEngine({ graded: true, retryMode: 'incorrect-only' });
+    const { engine } = makeEngine({
+      graded: true,
+      retryMode: 'incorrect-only',
+    });
 
     const aResp = true;
     const bResp = false;
     engine.registerQuestion({
       id: 'a',
       checkAnswer: () => aResp === true,
-      interaction: () => ({ type: 'true-false', response: aResp, correct: true }),
+      interaction: () => ({
+        type: 'true-false',
+        response: aResp,
+        correct: true,
+      }),
     });
     engine.registerQuestion({
       id: 'b',
       checkAnswer: () => bResp === true,
-      interaction: () => ({ type: 'true-false', response: bResp, correct: true }),
+      interaction: () => ({
+        type: 'true-false',
+        response: bResp,
+        correct: true,
+      }),
     });
     engine.setAnswer(0, true);
     engine.setAnswer(1, false);
@@ -364,13 +394,21 @@ describe('QuizEngine', () => {
       id: 'a',
       weight: 3,
       checkAnswer: () => true,
-      interaction: () => ({ type: 'true-false', response: true, correct: true }),
+      interaction: () => ({
+        type: 'true-false',
+        response: true,
+        correct: true,
+      }),
     });
     engine.registerQuestion({
       id: 'b',
       weight: 1,
       checkAnswer: () => false,
-      interaction: () => ({ type: 'true-false', response: false, correct: true }),
+      interaction: () => ({
+        type: 'true-false',
+        response: false,
+        correct: true,
+      }),
     });
     engine.setAnswer(0, true);
     engine.setAnswer(1, false);
@@ -414,7 +452,9 @@ describe('QuizEngine', () => {
       engine.registerQuestion(tfQuestion('dup', true, true));
       engine.registerQuestion(tfQuestion('dup', false, true));
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /duplicate question id/i.test(a))
+        args.some(
+          (a) => typeof a === 'string' && /duplicate question id/i.test(a),
+        ),
       );
       expect(matched).toBe(true);
     } finally {
@@ -428,13 +468,18 @@ describe('QuizEngine', () => {
     // silently. (In the wrapper, a null host element produces this same false.)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { engine, events } = makeEngine({ graded: true }, { hostNull: true });
+      const { engine, events } = makeEngine(
+        { graded: true },
+        { hostNull: true },
+      );
       engine.registerQuestion(tfQuestion('a', true, true));
       engine.setAnswer(0, true);
       engine.submit();
       expect(completes(events)).toHaveLength(0);
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /host element was null/i.test(a))
+        args.some(
+          (a) => typeof a === 'string' && /host element was null/i.test(a),
+        ),
       );
       expect(matched).toBe(true);
     } finally {
@@ -455,9 +500,14 @@ interface HarnessRef {
 
 function mountHarness(
   quizConfig: unknown,
-  opts: { secondQuiz?: boolean; nullElement?: boolean; adapter?: unknown } = {}
+  opts: { secondQuiz?: boolean; nullElement?: boolean; adapter?: unknown } = {},
 ) {
-  const ref: HarnessRef = { handle: null, element: null, events: [], thrown: null };
+  const ref: HarnessRef = {
+    handle: null,
+    element: null,
+    events: [],
+    thrown: null,
+  };
   const target = document.createElement('div');
   const host = document.createElement('div');
   target.appendChild(host);
@@ -486,7 +536,9 @@ describe('useQuiz (Svelte wrapper)', () => {
 
   afterEach(() => {
     for (const m of mountings) {
-      try { unmount(m.component); } catch {}
+      try {
+        unmount(m.component);
+      } catch {}
     }
     document.body.innerHTML = '';
   });
@@ -531,7 +583,7 @@ describe('useQuiz (Svelte wrapper)', () => {
       expect(m.ref.handle).not.toBeNull();
       expect(m.ref.secondHandle).not.toBeNull();
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /second quiz/i.test(a))
+        args.some((a) => typeof a === 'string' && /second quiz/i.test(a)),
       );
       expect(matched).toBe(true);
     } finally {
@@ -546,17 +598,33 @@ describe('useQuiz (Svelte wrapper)', () => {
     // the e2e custom-quiz suite.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { __warnUnsubmittedQuiz } = await import('../src/runtime/hooks.svelte.js');
-      __warnUnsubmittedQuiz({ questionsCount: 2, answersCount: 1, submitCalled: false });
+      const { __warnUnsubmittedQuiz } =
+        await import('../src/runtime/hooks.svelte.js');
+      __warnUnsubmittedQuiz({
+        questionsCount: 2,
+        answersCount: 1,
+        submitCalled: false,
+      });
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /submit\(\) was never called/i.test(a))
+        args.some(
+          (a) =>
+            typeof a === 'string' && /submit\(\) was never called/i.test(a),
+        ),
       );
       expect(matched).toBe(true);
 
       // Inverse: nothing answered, or already submitted → no warning.
       warn.mockClear();
-      __warnUnsubmittedQuiz({ questionsCount: 2, answersCount: 0, submitCalled: false });
-      __warnUnsubmittedQuiz({ questionsCount: 2, answersCount: 1, submitCalled: true });
+      __warnUnsubmittedQuiz({
+        questionsCount: 2,
+        answersCount: 0,
+        submitCalled: false,
+      });
+      __warnUnsubmittedQuiz({
+        questionsCount: 2,
+        answersCount: 1,
+        submitCalled: true,
+      });
       expect(warn.mock.calls.length).toBe(0);
     } finally {
       warn.mockRestore();
@@ -569,10 +637,13 @@ describe('useQuiz (Svelte wrapper)', () => {
     // onMount timing reasons as the unmount warning above.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
+      const { __warnEmptyQuiz } =
+        await import('../src/runtime/hooks.svelte.js');
       __warnEmptyQuiz(0);
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /no registered questions/i.test(a))
+        args.some(
+          (a) => typeof a === 'string' && /no registered questions/i.test(a),
+        ),
       );
       expect(matched).toBe(true);
 

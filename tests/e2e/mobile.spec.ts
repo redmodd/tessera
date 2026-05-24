@@ -4,7 +4,12 @@ import { test, expect } from '@playwright/test';
 
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
-  await page.waitForFunction(() => !document.querySelector('.tessera-loading-skeleton'), { timeout: 5000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => !document.querySelector('.tessera-loading-skeleton'),
+      { timeout: 5000 },
+    )
+    .catch(() => {});
 }
 
 test.describe('Mobile Navigation', () => {
@@ -32,7 +37,9 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-sidebar')).toHaveClass(/open/);
   });
 
-  test('selecting a page closes sidebar and loads content', async ({ page }) => {
+  test('selecting a page closes sidebar and loads content', async ({
+    page,
+  }) => {
     // Open sidebar
     const hamburger = page.locator('.tessera-hamburger');
     await hamburger.click();
@@ -47,7 +54,9 @@ test.describe('Mobile Navigation', () => {
     await expect(sidebar).not.toHaveClass(/open/);
 
     // Content should update
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
   });
 
   test('prev/next buttons work on mobile', async ({ page }) => {
@@ -55,9 +64,13 @@ test.describe('Mobile Navigation', () => {
     await expect(nextBtn).toBeVisible();
     await nextBtn.click();
     await waitForContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Course Objectives');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
 
-    const prevBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Previous' });
+    const prevBtn = page.locator('.tessera-page-nav-btn', {
+      hasText: 'Previous',
+    });
     await prevBtn.click();
     await waitForContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
@@ -74,7 +87,9 @@ test.describe('Mobile Navigation', () => {
     await hamburger.click();
     await expect(page.locator('.tessera-sidebar')).toHaveClass(/open/);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
+      .click();
     await waitForContent(page);
     await page.waitForSelector('.tessera-carousel');
 
@@ -88,21 +103,39 @@ test.describe('Mobile Navigation', () => {
       const startX = 300;
       const endX = 50; // swipe left by 250px (> 50px threshold)
 
-      const touchStart = new Touch({ identifier: 1, target: el, screenX: startX, screenY: 200, clientX: startX, clientY: 200 });
-      const touchEnd = new Touch({ identifier: 1, target: el, screenX: endX, screenY: 200, clientX: endX, clientY: 200 });
+      const touchStart = new Touch({
+        identifier: 1,
+        target: el,
+        screenX: startX,
+        screenY: 200,
+        clientX: startX,
+        clientY: 200,
+      });
+      const touchEnd = new Touch({
+        identifier: 1,
+        target: el,
+        screenX: endX,
+        screenY: 200,
+        clientX: endX,
+        clientY: 200,
+      });
 
-      el.dispatchEvent(new TouchEvent('touchstart', {
-        bubbles: true,
-        cancelable: true,
-        changedTouches: [touchStart],
-        touches: [touchStart],
-      }));
-      el.dispatchEvent(new TouchEvent('touchend', {
-        bubbles: true,
-        cancelable: true,
-        changedTouches: [touchEnd],
-        touches: [],
-      }));
+      el.dispatchEvent(
+        new TouchEvent('touchstart', {
+          bubbles: true,
+          cancelable: true,
+          changedTouches: [touchStart],
+          touches: [touchStart],
+        }),
+      );
+      el.dispatchEvent(
+        new TouchEvent('touchend', {
+          bubbles: true,
+          cancelable: true,
+          changedTouches: [touchEnd],
+          touches: [],
+        }),
+      );
     });
 
     // Should advance to slide 2 — `expect` polls automatically.
@@ -115,7 +148,9 @@ test.describe('Mobile Navigation', () => {
     await hamburger.click();
     await expect(page.locator('.tessera-sidebar')).toHaveClass(/open/);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Callouts & Images' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
+      .click();
     await waitForContent(page);
     await page.waitForSelector('.tessera-callout');
 

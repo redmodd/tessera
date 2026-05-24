@@ -8,48 +8,86 @@ import { createManifest, createConfig, gradedQuizIndices } from './helpers.js';
 describe('NavigationState', () => {
   describe('goToPage', () => {
     it('updates currentPageIndex', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(3);
       expect(nav.currentPageIndex).toBe(3);
     });
 
     it('is a no-op for negative index', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(2);
       nav.goToPage(-1);
       expect(nav.currentPageIndex).toBe(2);
     });
 
     it('is a no-op for index beyond total pages', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(2);
       nav.goToPage(5);
       expect(nav.currentPageIndex).toBe(2);
     });
 
     it('is a no-op for index equal to total pages', () => {
-      const nav = new NavigationState(createManifest(3), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(3),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(3);
       expect(nav.currentPageIndex).toBe(0);
     });
 
     it('is a no-op for a locked page in free mode', () => {
-      const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
-      const nav = new NavigationState(manifest, new ProgressState(gradedQuizIndices(manifest)), createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const manifest = createManifest(5, {
+        2: { graded: true, gatesProgress: true },
+      });
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(gradedQuizIndices(manifest)),
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
       nav.goToPage(4); // locked behind quiz gate at index 2
       expect(nav.currentPageIndex).toBe(0);
     });
 
     it('is a no-op for a locked page in sequential mode', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig({ navigation: { mode: 'sequential' } }));
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
       nav.goToPage(3); // locked — page 0 not visited
       expect(nav.currentPageIndex).toBe(0);
     });
 
     it('allows navigating to a locked page after it is unlocked', () => {
-      const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(5, {
+        2: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       nav.goToPage(4);
       expect(nav.currentPageIndex).toBe(0); // still locked
@@ -62,12 +100,20 @@ describe('NavigationState', () => {
 
   describe('canGoPrev', () => {
     it('is false at index 0', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       expect(nav.canGoPrev).toBe(false);
     });
 
     it('is true when index > 0', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(1);
       expect(nav.canGoPrev).toBe(true);
     });
@@ -75,19 +121,36 @@ describe('NavigationState', () => {
 
   describe('canGoNext — free mode', () => {
     it('is true when not at last page', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig({ navigation: { mode: 'free' } }));
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'free' } }),
+      );
       expect(nav.canGoNext).toBe(true);
     });
 
     it('is false at last page', () => {
-      const nav = new NavigationState(createManifest(3), new ProgressState(new Set()), createConfig({ navigation: { mode: 'free' } }));
+      const nav = new NavigationState(
+        createManifest(3),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'free' } }),
+      );
       nav.goToPage(2);
       expect(nav.canGoNext).toBe(false);
     });
 
     it('is false when next page is behind a quiz gate', () => {
-      const manifest = createManifest(3, { 1: { graded: true, gatesProgress: true } });
-      const nav = new NavigationState(manifest, new ProgressState(gradedQuizIndices(manifest)), createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const manifest = createManifest(3, {
+        1: { graded: true, gatesProgress: true },
+      });
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(gradedQuizIndices(manifest)),
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       nav.goToPage(0);
       expect(nav.canGoNext).toBe(true); // page 1 is the quiz itself, not gated
@@ -97,9 +160,18 @@ describe('NavigationState', () => {
     });
 
     it('is true when next page quiz gate is passed', () => {
-      const manifest = createManifest(3, { 1: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(3, {
+        1: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       progress.quizCompleted(1, 80);
       nav.goToPage(1);
@@ -109,29 +181,55 @@ describe('NavigationState', () => {
 
   describe('canGoNext — sequential mode', () => {
     it('is false when current page not visited (informational)', () => {
-      const nav = new NavigationState(createManifest(3), new ProgressState(new Set()), createConfig({ navigation: { mode: 'sequential' } }));
+      const nav = new NavigationState(
+        createManifest(3),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
       expect(nav.canGoNext).toBe(false);
     });
 
     it('is true when current page is visited', () => {
       const progress = new ProgressState(new Set());
-      const nav = new NavigationState(createManifest(3), progress, createConfig({ navigation: { mode: 'sequential' } }));
+      const nav = new NavigationState(
+        createManifest(3),
+        progress,
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
       progress.markVisited(0);
       expect(nav.canGoNext).toBe(true);
     });
 
     it('is false when current page is a gating quiz not passed', () => {
-      const manifest = createManifest(3, { 0: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(3, {
+        0: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'sequential' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'sequential' },
+          scoring: { passingScore: 70 },
+        }),
+      );
       progress.quizCompleted(0, 50);
       expect(nav.canGoNext).toBe(false);
     });
 
     it('is true when current page is a gating quiz and passed', () => {
-      const manifest = createManifest(3, { 0: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(3, {
+        0: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'sequential' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'sequential' },
+          scoring: { passingScore: 70 },
+        }),
+      );
       progress.quizCompleted(0, 75);
       expect(nav.canGoNext).toBe(true);
     });
@@ -139,27 +237,43 @@ describe('NavigationState', () => {
 
   describe('goNext / goPrev', () => {
     it('goNext increments page index', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goNext();
       expect(nav.currentPageIndex).toBe(1);
     });
 
     it('goPrev decrements page index', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(3);
       nav.goPrev();
       expect(nav.currentPageIndex).toBe(2);
     });
 
     it('goNext is no-op at last page', () => {
-      const nav = new NavigationState(createManifest(3), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(3),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(2);
       nav.goNext();
       expect(nav.currentPageIndex).toBe(2);
     });
 
     it('goPrev is no-op at first page', () => {
-      const nav = new NavigationState(createManifest(3), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(3),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goPrev();
       expect(nav.currentPageIndex).toBe(0);
     });
@@ -167,15 +281,28 @@ describe('NavigationState', () => {
 
   describe('isPageLocked — free mode', () => {
     it('returns false for all pages with no quiz gates', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig({ navigation: { mode: 'free' } }));
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'free' } }),
+      );
       for (let i = 0; i < 5; i++) {
         expect(nav.isPageLocked(i)).toBe(false);
       }
     });
 
     it('locks pages after an unpassed gating quiz', () => {
-      const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
-      const nav = new NavigationState(manifest, new ProgressState(gradedQuizIndices(manifest)), createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const manifest = createManifest(5, {
+        2: { graded: true, gatesProgress: true },
+      });
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(gradedQuizIndices(manifest)),
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       expect(nav.isPageLocked(0)).toBe(false);
       expect(nav.isPageLocked(1)).toBe(false);
@@ -185,9 +312,18 @@ describe('NavigationState', () => {
     });
 
     it('unlocks pages after gating quiz is passed', () => {
-      const manifest = createManifest(5, { 2: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(5, {
+        2: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       progress.quizCompleted(2, 80);
       expect(nav.isPageLocked(3)).toBe(false);
@@ -200,7 +336,14 @@ describe('NavigationState', () => {
         3: { graded: true, gatesProgress: true },
       });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'free' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'free' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       progress.quizCompleted(1, 80);
       expect(nav.isPageLocked(2)).toBe(false);
@@ -212,7 +355,11 @@ describe('NavigationState', () => {
 
   describe('isPageLocked — sequential mode', () => {
     it('locks pages when preceding pages not visited', () => {
-      const nav = new NavigationState(createManifest(5), new ProgressState(new Set()), createConfig({ navigation: { mode: 'sequential' } }));
+      const nav = new NavigationState(
+        createManifest(5),
+        new ProgressState(new Set()),
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
       expect(nav.isPageLocked(0)).toBe(false);
       expect(nav.isPageLocked(1)).toBe(true);
       expect(nav.isPageLocked(2)).toBe(true);
@@ -220,7 +367,11 @@ describe('NavigationState', () => {
 
     it('unlocks pages as they are visited in order', () => {
       const progress = new ProgressState(new Set());
-      const nav = new NavigationState(createManifest(4), progress, createConfig({ navigation: { mode: 'sequential' } }));
+      const nav = new NavigationState(
+        createManifest(4),
+        progress,
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
 
       progress.markVisited(0);
       expect(nav.isPageLocked(1)).toBe(false);
@@ -231,9 +382,18 @@ describe('NavigationState', () => {
     });
 
     it('locks pages behind unpassed gating quiz even if visited', () => {
-      const manifest = createManifest(4, { 1: { graded: true, gatesProgress: true } });
+      const manifest = createManifest(4, {
+        1: { graded: true, gatesProgress: true },
+      });
       const progress = new ProgressState(gradedQuizIndices(manifest));
-      const nav = new NavigationState(manifest, progress, createConfig({ navigation: { mode: 'sequential' }, scoring: { passingScore: 70 } }));
+      const nav = new NavigationState(
+        manifest,
+        progress,
+        createConfig({
+          navigation: { mode: 'sequential' },
+          scoring: { passingScore: 70 },
+        }),
+      );
 
       progress.markVisited(0);
       expect(nav.isPageLocked(1)).toBe(false);
@@ -263,13 +423,21 @@ describe('NavigationState', () => {
 
   describe('empty manifest', () => {
     it('canGoNext and canGoPrev are both false', () => {
-      const nav = new NavigationState(createManifest(0), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(0),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       expect(nav.canGoNext).toBe(false);
       expect(nav.canGoPrev).toBe(false);
     });
 
     it('goToPage(0) is a no-op', () => {
-      const nav = new NavigationState(createManifest(0), new ProgressState(new Set()), createConfig());
+      const nav = new NavigationState(
+        createManifest(0),
+        new ProgressState(new Set()),
+        createConfig(),
+      );
       nav.goToPage(0);
       expect(nav.currentPageIndex).toBe(0);
     });

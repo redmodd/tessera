@@ -19,15 +19,15 @@
     weight = 1,
   } = $props();
 
-  let queue = $state([]);              // item indices not yet placed; queue[0] is current
-  let placements = $state(new SvelteMap()); // itemIdx → targetIdx
-  let dragOver = $state(null);         // target index highlighted during drag
+  let queue = $state([]); // item indices not yet placed; queue[0] is current
+  const placements = new SvelteMap(); // itemIdx → targetIdx
+  let dragOver = $state(null); // target index highlighted during drag
   let isDragging = $state(false);
-  let cardSelected = $state(false);    // current card selected via tap/click
+  let cardSelected = $state(false); // current card selected via tap/click
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i));
-    placements = new SvelteMap();
+    placements.clear();
     cardSelected = false;
     dragOver = null;
     isDragging = false;
@@ -50,12 +50,21 @@
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
   const q = useQuestion({
-    get id() { return id ?? `sorting-${slugFromQuestion(question)}`; },
-    get weight() { return weight; },
-    get maxRetries() { return maxRetries; },
+    get id() {
+      return id ?? `sorting-${slugFromQuestion(question)}`;
+    },
+    get weight() {
+      return weight;
+    },
+    get maxRetries() {
+      return maxRetries;
+    },
     response: () => ({
       type: 'matching',
-      response: [...placements.entries()].map(([i, t]) => [String(i), String(t)]),
+      response: [...placements.entries()].map(([i, t]) => [
+        String(i),
+        String(t),
+      ]),
       correct: items.map((_, i) => [String(i), String(correct[i])]),
     }),
     reset: resetState,
@@ -165,7 +174,6 @@
       onTargetClick(targetIdx);
     }
   }
-
 </script>
 
 {#snippet sortingContent()}
@@ -198,7 +206,9 @@
             {queue.length} of {items.length} to sort
           </p>
           {#if cardSelected}
-            <p class="tessera-sorting-hint">Click a target below to place this card</p>
+            <p class="tessera-sorting-hint">
+              Click a target below to place this card
+            </p>
           {/if}
         </div>
       {:else}
@@ -210,8 +220,11 @@
   {/if}
 
   <!-- Drop targets -->
-  <div class="tessera-sorting-targets" class:targets-active={cardSelected && !q.locked}>
-    {#each targets as targetLabel, targetIdx}
+  <div
+    class="tessera-sorting-targets"
+    class:targets-active={cardSelected && !q.locked}
+  >
+    {#each targets as targetLabel, targetIdx (targetIdx)}
       {@const targetItems = getItemsForTarget(targetIdx)}
       <div
         class="tessera-sorting-target"
@@ -220,7 +233,9 @@
         role="button"
         tabindex="0"
         aria-disabled={!(cardSelected && !q.locked)}
-        aria-label="Target: {targetLabel}{cardSelected && !q.locked ? ` (activate to place ${items[currentItemIdx]})` : ''}"
+        aria-label="Target: {targetLabel}{cardSelected && !q.locked
+          ? ` (activate to place ${items[currentItemIdx]})`
+          : ''}"
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
@@ -230,19 +245,23 @@
         <div class="tessera-sorting-target-label">{targetLabel}</div>
         {#if targetItems.length > 0}
           <div class="tessera-sorting-target-items">
-            {#each targetItems as itemIdx}
+            {#each targetItems as itemIdx (itemIdx)}
               <div
                 class="tessera-sorting-placed-item"
                 class:correct={q.feedbackVisible && isCorrectPlacement(itemIdx)}
-                class:incorrect={q.feedbackVisible && !isCorrectPlacement(itemIdx)}
+                class:incorrect={q.feedbackVisible &&
+                  !isCorrectPlacement(itemIdx)}
               >
                 <span class="tessera-sorting-item-text">{items[itemIdx]}</span>
                 {#if !q.locked}
                   <button
                     class="tessera-sorting-remove"
                     aria-label="Return '{items[itemIdx]}' to deck"
-                    onclick={(e) => { e.stopPropagation(); returnCard(itemIdx); }}
-                  >×</button>
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      returnCard(itemIdx);
+                    }}>×</button
+                  >
                 {:else if q.feedbackVisible}
                   <span class="tessera-sorting-item-icon" aria-hidden="true">
                     {isCorrectPlacement(itemIdx) ? '✓' : '✗'}
@@ -275,8 +294,10 @@
         </div>
         <div class="tessera-sorting-correct-list">
           <p class="tessera-sorting-correct-title">Correct arrangement:</p>
-          {#each items as item, i}
-            <p class="tessera-sorting-correct-item">{item} → {targets[correct[i]]}</p>
+          {#each items as item, i (i)}
+            <p class="tessera-sorting-correct-item">
+              {item} → {targets[correct[i]]}
+            </p>
           {/each}
         </div>
         {#if incorrectFeedback}
@@ -292,7 +313,10 @@
   <!-- Standalone Check button (shown once all cards are placed) -->
   {#if !inQuiz && !q.submitted && placements.size === items.length}
     <div class="tessera-sorting-actions">
-      <button class="tessera-btn-primary tessera-sorting-check" onclick={() => q.submit()}>
+      <button
+        class="tessera-btn-primary tessera-sorting-check"
+        onclick={() => q.submit()}
+      >
         Check Answer
       </button>
     </div>
@@ -359,7 +383,10 @@
     font-family: var(--tessera-font-family);
     color: var(--tessera-text);
     cursor: grab;
-    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    transition:
+      border-color 0.15s,
+      transform 0.15s,
+      box-shadow 0.15s;
     text-align: center;
     user-select: none;
   }
@@ -424,7 +451,9 @@
     border: 2px dashed var(--tessera-border);
     border-radius: 10px;
     background: var(--tessera-bg-secondary);
-    transition: border-color 0.15s, background 0.15s;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -478,7 +507,9 @@
     font-size: 0.875rem;
     font-family: var(--tessera-font-family);
     color: var(--tessera-text);
-    transition: border-color 0.15s, background 0.15s;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
     pointer-events: all;
   }
 
@@ -550,8 +581,12 @@
     margin-bottom: var(--tessera-spacing-sm);
   }
 
-  .tessera-sorting-result.correct { color: var(--tessera-success); }
-  .tessera-sorting-result.incorrect { color: var(--tessera-error); }
+  .tessera-sorting-result.correct {
+    color: var(--tessera-success);
+  }
+  .tessera-sorting-result.incorrect {
+    color: var(--tessera-error);
+  }
 
   .tessera-sorting-correct-list {
     margin: var(--tessera-spacing-sm) 0;

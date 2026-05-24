@@ -24,7 +24,12 @@ export type AccessFn = (ctx: AccessContext) => boolean;
  * Free-navigation preset. A page is accessible unless a preceding page declares
  * `pageConfig.quiz.gatesProgress` and the learner has not met the passing score.
  */
-export const freeAccess: AccessFn = ({ pageIndex, manifest, progress, config }) => {
+export const freeAccess: AccessFn = ({
+  pageIndex,
+  manifest,
+  progress,
+  config,
+}) => {
   for (let i = pageIndex - 1; i >= 0; i--) {
     const page = manifest.pages[i];
     if (page.quiz?.gatesProgress) {
@@ -38,7 +43,12 @@ export const freeAccess: AccessFn = ({ pageIndex, manifest, progress, config }) 
  * Sequential-navigation preset. A page is accessible only when every preceding
  * page is complete (visited or quiz-passed, per `isPageComplete`).
  */
-export const sequentialAccess: AccessFn = ({ pageIndex, manifest, progress, config }) => {
+export const sequentialAccess: AccessFn = ({
+  pageIndex,
+  manifest,
+  progress,
+  config,
+}) => {
   for (let i = 0; i < pageIndex; i++) {
     if (!isPageComplete(i, manifest, progress, config)) return false;
   }
@@ -51,5 +61,7 @@ export const sequentialAccess: AccessFn = ({ pageIndex, manifest, progress, conf
  */
 export function resolveAccess(config: CourseConfig): AccessFn {
   if (config.navigation.canAccess) return config.navigation.canAccess;
-  return config.navigation.mode === 'sequential' ? sequentialAccess : freeAccess;
+  return config.navigation.mode === 'sequential'
+    ? sequentialAccess
+    : freeAccess;
 }

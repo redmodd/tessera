@@ -1,0 +1,11 @@
+**/dist/**
+**/coverage/**
+**/test-results/**
+**/playwright-report/**
+**/.vite/**
+tests/.e2e-variants/**
+tests/fixtures/**
+packages/create-tessera/templates/**
+pnpm-lock.yaml
+CHANGELOG.md
+*.tsbuildinfo

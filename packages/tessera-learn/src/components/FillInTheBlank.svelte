@@ -25,7 +25,7 @@
   function checkAnswer(userAnswer) {
     if (!userAnswer || typeof userAnswer !== 'string') return false;
     const trimmed = userAnswer.trim();
-    return answers.some(acceptable => {
+    return answers.some((acceptable) => {
       const a = acceptable.trim();
       if (caseSensitive) return trimmed === a;
       return trimmed.toLowerCase() === a.toLowerCase();
@@ -33,16 +33,24 @@
   }
 
   const q = useQuestion({
-    get id() { return id ?? `fitb-${slugFromQuestion(question)}`; },
-    get weight() { return weight; },
-    get maxRetries() { return maxRetries; },
+    get id() {
+      return id ?? `fitb-${slugFromQuestion(question)}`;
+    },
+    get weight() {
+      return weight;
+    },
+    get maxRetries() {
+      return maxRetries;
+    },
     response: () => ({
       type: 'fill-in',
       response: inputValue,
       correct: Array.isArray(answers) ? answers : [answers],
       caseMatters: !!caseSensitive,
     }),
-    reset: () => { inputValue = ''; },
+    reset: () => {
+      inputValue = '';
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture once.
@@ -93,7 +101,9 @@
       <button
         class="tessera-btn-primary tessera-fitb-check-btn"
         disabled={!inputValue.trim()}
-        onclick={() => { q.submit(); }}
+        onclick={() => {
+          q.submit();
+        }}
       >
         Check
       </button>

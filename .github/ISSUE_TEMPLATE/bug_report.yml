@@ -21,21 +21,21 @@ body:
   - type: input
     id: tessera-version
     attributes:
-      label: "@redmondd/tessera version"
+      label: '@redmondd/tessera version'
     validations:
       required: true
   - type: input
     id: node-version
     attributes:
       label: Node version
-      placeholder: "e.g. 22.11.0"
+      placeholder: 'e.g. 22.11.0'
     validations:
       required: true
   - type: input
     id: lms
     attributes:
       label: LMS / runtime (if applicable)
-      placeholder: "e.g. Moodle 4.4, SCORM Cloud, Rustici Engine, browser only"
+      placeholder: 'e.g. Moodle 4.4, SCORM Cloud, Rustici Engine, browser only'
   - type: textarea
     id: logs
     attributes:

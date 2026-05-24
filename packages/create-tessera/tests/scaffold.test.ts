@@ -11,7 +11,7 @@ function createTestDir(): string {
   counter++;
   const dir = resolve(
     tmpdir(),
-    `tessera-scaffold-test-${Date.now()}-${counter}`
+    `tessera-scaffold-test-${Date.now()}-${counter}`,
   );
   mkdirSync(dir, { recursive: true });
   return dir;
@@ -20,7 +20,10 @@ function createTestDir(): string {
 // Path to the built CLI
 const CLI_PATH = resolve(__dirname, '..', 'dist', 'index.js');
 
-function runCLI(args: string, cwd: string): { stdout: string; stderr: string; output: string; exitCode: number } {
+function runCLI(
+  args: string,
+  cwd: string,
+): { stdout: string; stderr: string; output: string; exitCode: number } {
   try {
     const stdout = execSync(`node ${CLI_PATH} ${args}`, {
       cwd,
@@ -85,7 +88,7 @@ describe('create-tessera CLI', () => {
 
   it('creates project directory with all template files', () => {
     // Skip npm install to keep test fast
-    const { exitCode } = runCLI('test-course', testDir);
+    runCLI('test-course', testDir);
     // exitCode may be non-zero if npm install fails (tessera not published)
     // but the files should still be created
 
@@ -101,20 +104,20 @@ describe('create-tessera CLI', () => {
 
     // Pages structure
     expect(
-      existsSync(resolve(projectDir, 'pages/01-getting-started/_meta.js'))
+      existsSync(resolve(projectDir, 'pages/01-getting-started/_meta.js')),
     ).toBe(true);
     expect(
       existsSync(
-        resolve(projectDir, 'pages/01-getting-started/01-welcome/_meta.js')
-      )
+        resolve(projectDir, 'pages/01-getting-started/01-welcome/_meta.js'),
+      ),
     ).toBe(true);
     expect(
       existsSync(
         resolve(
           projectDir,
-          'pages/01-getting-started/01-welcome/welcome.svelte'
-        )
-      )
+          'pages/01-getting-started/01-welcome/welcome.svelte',
+        ),
+      ),
     ).toBe(true);
 
     // Styles & assets
@@ -141,7 +144,7 @@ describe('create-tessera CLI', () => {
     runCLI('my-course', testDir);
     const content = readFileSync(
       resolve(testDir, 'my-course', 'vite.config.js'),
-      'utf-8'
+      'utf-8',
     );
     expect(content).toContain("from 'tessera-learn/plugin'");
     expect(content).toContain('tesseraPlugin()');
@@ -151,7 +154,7 @@ describe('create-tessera CLI', () => {
     runCLI('my-awesome-course', testDir);
     const content = readFileSync(
       resolve(testDir, 'my-awesome-course', 'course.config.js'),
-      'utf-8'
+      'utf-8',
     );
     expect(content).toContain('title: "My Awesome Course"');
   });
@@ -162,9 +165,9 @@ describe('create-tessera CLI', () => {
       resolve(
         testDir,
         'my-course',
-        'pages/01-getting-started/01-welcome/welcome.svelte'
+        'pages/01-getting-started/01-welcome/welcome.svelte',
       ),
-      'utf-8'
+      'utf-8',
     );
     expect(content).toContain('Welcome to My Course');
     expect(content).toContain('pageConfig');
@@ -174,12 +177,8 @@ describe('create-tessera CLI', () => {
     runCLI('my-course', testDir);
 
     const sectionMeta = readFileSync(
-      resolve(
-        testDir,
-        'my-course',
-        'pages/01-getting-started/_meta.js'
-      ),
-      'utf-8'
+      resolve(testDir, 'my-course', 'pages/01-getting-started/_meta.js'),
+      'utf-8',
     );
     expect(sectionMeta).toContain('Getting Started');
 
@@ -187,9 +186,9 @@ describe('create-tessera CLI', () => {
       resolve(
         testDir,
         'my-course',
-        'pages/01-getting-started/01-welcome/_meta.js'
+        'pages/01-getting-started/01-welcome/_meta.js',
       ),
-      'utf-8'
+      'utf-8',
     );
     expect(lessonMeta).toContain('Welcome');
     expect(lessonMeta).toContain('pages:');
@@ -199,7 +198,7 @@ describe('create-tessera CLI', () => {
     runCLI('my-course', testDir);
     const content = readFileSync(
       resolve(testDir, 'my-course', '.gitignore'),
-      'utf-8'
+      'utf-8',
     );
     expect(content).toContain('node_modules');
     expect(content).toContain('dist');
@@ -254,7 +253,7 @@ describe('create-tessera CLI', () => {
       const checkPagePath = resolve(
         testDir,
         'bare-course',
-        'pages/01-course/01-lesson/check.svelte'
+        'pages/01-course/01-lesson/check.svelte',
       );
       expect(existsSync(checkPagePath)).toBe(true);
       const checkPage = readFileSync(checkPagePath, 'utf-8');
@@ -267,7 +266,7 @@ describe('create-tessera CLI', () => {
       const introPath = resolve(
         testDir,
         'bare-course',
-        'pages/01-course/01-lesson/intro.svelte'
+        'pages/01-course/01-lesson/intro.svelte',
       );
       const intro = readFileSync(introPath, 'utf-8');
       expect(intro).not.toContain('Callout');
@@ -279,7 +278,7 @@ describe('create-tessera CLI', () => {
       runCLI('bare-course --template=bare', testDir);
       const config = readFileSync(
         resolve(testDir, 'bare-course', 'course.config.js'),
-        'utf-8'
+        'utf-8',
       );
       expect(config).toContain('title: "Bare Course"');
       expect(config).toContain('export: { standard: "web" }');
@@ -288,9 +287,9 @@ describe('create-tessera CLI', () => {
 
     it('does not scaffold a README (authors add their own)', () => {
       runCLI('bare-course --template=bare', testDir);
-      expect(
-        existsSync(resolve(testDir, 'bare-course', 'README.md'))
-      ).toBe(false);
+      expect(existsSync(resolve(testDir, 'bare-course', 'README.md'))).toBe(
+        false,
+      );
     });
 
     it('still writes AGENTS.md, package.json, vite.config.js', () => {

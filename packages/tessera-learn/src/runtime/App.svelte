@@ -14,7 +14,12 @@
   import { createAdapter } from 'virtual:tessera-adapter';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
   import { registerXAPIClient } from './xapi/registry.js';
-  import { TESSERA_PAGE, TESSERA_NAV, TESSERA_ADAPTER, TESSERA_USER_STATE } from './contexts.js';
+  import {
+    TESSERA_PAGE,
+    TESSERA_NAV,
+    TESSERA_ADAPTER,
+    TESSERA_USER_STATE,
+  } from './contexts.js';
 
   // ---- Persistence ----
   const adapter = createAdapter(config);
@@ -25,7 +30,7 @@
   let xapiClient = null;
 
   const gradedQuizIndices = new Set(
-    manifest.pages.filter(p => p.quiz?.graded).map(p => p.index)
+    manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
   );
 
   // ---- State classes ----
@@ -34,9 +39,14 @@
   nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
 
-  const onIdle = typeof window !== 'undefined' && window.requestIdleCallback
-    ? window.requestIdleCallback.bind(window)
-    : (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1);
+  const onIdle =
+    typeof window !== 'undefined' && window.requestIdleCallback
+      ? window.requestIdleCallback.bind(window)
+      : (cb) =>
+          setTimeout(
+            () => cb({ didTimeout: false, timeRemaining: () => 50 }),
+            1,
+          );
 
   // Page loading state
   let PageComponent = $state(null);
@@ -45,7 +55,10 @@
   let retryKey = $state(0);
 
   // ---- Page context (reactive, read by Quiz in Step 8) ----
-  let pageContext = $state({ quiz: null, passingScore: config.scoring?.passingScore ?? 70 });
+  let pageContext = $state({
+    quiz: null,
+    passingScore: config.scoring?.passingScore ?? 70,
+  });
   setContext(TESSERA_PAGE, pageContext);
 
   // ---- Navigation context (read by custom chrome components) ----
@@ -54,7 +67,11 @@
   setContext(TESSERA_NAV, { nav, manifest, progress, config });
 
   // ---- Adapter context (read by useQuestion / usePersistence) ----
-  setContext(TESSERA_ADAPTER, { get adapter() { return adapter; } });
+  setContext(TESSERA_ADAPTER, {
+    get adapter() {
+      return adapter;
+    },
+  });
 
   // ---- User-scoped state (read/written by usePersistence) ----
   // Each call site namespaces under its own key. Persisted to SavedState.u.
@@ -74,7 +91,9 @@
   // Otherwise: "default" renders the built-in DefaultLayout; "custom" hides
   // the chrome entirely so a course-owned shell can take over.
   if (UserLayout && config.chrome === 'custom' && import.meta.env?.DEV) {
-    console.warn('[tessera] Both layout.svelte and chrome: "custom" are set. layout.svelte wins.');
+    console.warn(
+      '[tessera] Both layout.svelte and chrome: "custom" are set. layout.svelte wins.',
+    );
   }
   const chromeMode = UserLayout
     ? 'user'
@@ -94,35 +113,39 @@
 
     const loader = pageModules[page.importPath];
     if (!loader) {
-      console.error(`Tessera: No loader for page ${index} at ${page.importPath}`);
+      console.error(
+        `Tessera: No loader for page ${index} at ${page.importPath}`,
+      );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
       pageLoading = false;
       return;
     }
 
-    loader().then(mod => {
-      if (gen !== loadGeneration) return; // stale
-      pageError = null;
-      pageContext.quiz = page.quiz;
-      PageComponent = mod.default;
-      pageLoading = false;
-      progress.markVisited(index);
-      if (
-        manifest.pages[index].completesOn === 'view' &&
-        config.completion.mode === 'manual'
-      ) {
-        progress.markCompleteManually();
-      }
-      progress.recalculateCompletion(manifest.totalPages, config);
-      progress.recalculateSuccess(config);
-      onIdle(() => nav.prefetch(index + 1));
-    }).catch(err => {
-      if (gen !== loadGeneration) return; // stale
-      console.error(`Tessera: Failed to load page ${index}`, err);
-      pageError = err;
-      pageLoading = false;
-    });
+    loader()
+      .then((mod) => {
+        if (gen !== loadGeneration) return; // stale
+        pageError = null;
+        pageContext.quiz = page.quiz;
+        PageComponent = mod.default;
+        pageLoading = false;
+        progress.markVisited(index);
+        if (
+          manifest.pages[index].completesOn === 'view' &&
+          config.completion.mode === 'manual'
+        ) {
+          progress.markCompleteManually();
+        }
+        progress.recalculateCompletion(manifest.totalPages, config);
+        progress.recalculateSuccess(config);
+        onIdle(() => nav.prefetch(index + 1));
+      })
+      .catch((err) => {
+        if (gen !== loadGeneration) return; // stale
+        console.error(`Tessera: Failed to load page ${index}`, err);
+        pageError = err;
+        pageLoading = false;
+      });
   }
 
   // React to page index changes
@@ -141,7 +164,11 @@
   // Two sentinels so the validity check doesn't false-positive when the
   // input happens to normalize to the initial fillStyle ("#000000").
   function parseColor(color) {
-    if (typeof CSS !== 'undefined' && CSS.supports && !CSS.supports('color', color)) {
+    if (
+      typeof CSS !== 'undefined' &&
+      CSS.supports &&
+      !CSS.supports('color', color)
+    ) {
       return null;
     }
     const ctx = document.createElement('canvas').getContext('2d');
@@ -153,16 +180,30 @@
     ctx.fillStyle = color;
     const onWhite = ctx.fillStyle;
     if (onBlack !== onWhite) return null;
-    const hex = String(onBlack).match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (hex) return { r: parseInt(hex[1], 16), g: parseInt(hex[2], 16), b: parseInt(hex[3], 16) };
-    const rgba = String(onBlack).match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    const hex = String(onBlack).match(
+      /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i,
+    );
+    if (hex)
+      return {
+        r: parseInt(hex[1], 16),
+        g: parseInt(hex[2], 16),
+        b: parseInt(hex[3], 16),
+      };
+    const rgba = String(onBlack).match(
+      /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/,
+    );
     return rgba ? { r: +rgba[1], g: +rgba[2], b: +rgba[3] } : null;
   }
 
   function rgbToHsl(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b),
+      min = Math.min(r, g, b);
+    let h = 0,
+      s = 0,
+      l = (max + min) / 2;
     if (max !== min) {
       const d = max - min;
       s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -170,7 +211,11 @@
       else if (max === g) h = ((b - r) / d + 2) / 6;
       else h = ((r - g) / d + 4) / 6;
     }
-    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      l: Math.round(l * 100),
+    };
   }
 
   function applyBranding(cfg) {
@@ -180,9 +225,18 @@
       const rgb = parseColor(cfg.branding.primaryColor);
       if (rgb) {
         const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-        el.style.setProperty('--tessera-primary-light', `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, 90%)`);
-        el.style.setProperty('--tessera-primary-dark', `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, ${Math.max(hsl.l - 15, 10)}%)`);
-        el.style.setProperty('--tessera-focus-ring', `0 0 0 3px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`);
+        el.style.setProperty(
+          '--tessera-primary-light',
+          `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, 90%)`,
+        );
+        el.style.setProperty(
+          '--tessera-primary-dark',
+          `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, ${Math.max(hsl.l - 15, 10)}%)`,
+        );
+        el.style.setProperty(
+          '--tessera-focus-ring',
+          `0 0 0 3px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
+        );
       }
     }
     if (cfg.branding?.fontFamily) {
@@ -249,7 +303,12 @@
       for (const [pageKey, questions] of Object.entries(saved.s)) {
         const pageIndex = Number(pageKey);
         for (const [qid, score] of Object.entries(questions)) {
-          progress.markStandaloneQuestion(pageIndex, qid, Number(score), gradedSet.has(pageIndex));
+          progress.markStandaloneQuestion(
+            pageIndex,
+            qid,
+            Number(score),
+            gradedSet.has(pageIndex),
+          );
         }
       }
     }
@@ -322,7 +381,9 @@
       adapter.setScore(rounded);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
-        adapter.setSuccessStatus(average >= config.scoring.passingScore ? 'passed' : 'failed');
+        adapter.setSuccessStatus(
+          average >= config.scoring.passingScore ? 'passed' : 'failed',
+        );
       }
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
@@ -366,7 +427,9 @@
     // Tell SCORM whether this is a suspend-to-resume close or a normal
     // exit. cmi5/web adapters no-op. Must come before terminate() so the
     // value is committed in the same flush.
-    adapter.setExit(progress.completionStatus === 'complete' ? 'normal' : 'suspend');
+    adapter.setExit(
+      progress.completionStatus === 'complete' ? 'normal' : 'suspend',
+    );
     adapter.commit();
     // Stop accepting author-issued statements on independent destinations
     // before terminate() so a late `useXAPI().sendStatement(...)` from a
@@ -410,7 +473,10 @@
       restoreState(saved);
       prevCompletionStatus = progress.completionStatus;
       prevSuccessStatus = progress.successStatus;
-      adapter.seedLifecycle?.(progress.completionStatus, progress.successStatus);
+      adapter.seedLifecycle?.(
+        progress.completionStatus,
+        progress.successStatus,
+      );
     }
     persistenceReady = true;
 
@@ -453,7 +519,7 @@
             '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
               'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
               '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
-              'in course.config.js to fail the build instead of waiting at runtime.'
+              'in course.config.js to fail the build instead of waiting at runtime.',
           );
         }
       }, 60_000);

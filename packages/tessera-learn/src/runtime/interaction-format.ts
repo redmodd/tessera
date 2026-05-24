@@ -61,13 +61,20 @@ function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
-function indexLookup(options: string[] | undefined, value: string): string | null {
+function indexLookup(
+  options: string[] | undefined,
+  value: string,
+): string | null {
   if (!options) return null;
   const idx = options.indexOf(value);
   return idx >= 0 ? String(idx) : null;
 }
 
-function encodeListItem(value: string, options: string[] | undefined, fmt: InteractionFormat): string {
+function encodeListItem(
+  value: string,
+  options: string[] | undefined,
+  fmt: InteractionFormat,
+): string {
   if (fmt === SCORM12_INTERACTION_FORMAT) {
     const idx = indexLookup(options, value);
     if (idx !== null) return idx;
@@ -77,12 +84,14 @@ function encodeListItem(value: string, options: string[] | undefined, fmt: Inter
 
 export function formatResponse(
   i: Interaction,
-  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT
+  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response.map((v) => encodeListItem(v, i.options, fmt)).join(fmt.itemDelim);
+      return i.response
+        .map((v) => encodeListItem(v, i.options, fmt))
+        .join(fmt.itemDelim);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -94,14 +103,17 @@ export function formatResponse(
       return i.response
         .map(
           ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`
+            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
         )
         .join(fmt.itemDelim);
     case 'numeric':
       return String(i.response);
     case 'performance':
       return i.response
-        .map(([s, v]) => `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`)
+        .map(
+          ([s, v]) =>
+            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
+        )
         .join(fmt.itemDelim);
   }
 }
@@ -109,7 +121,7 @@ export function formatResponse(
 /** Returns null when no correct pattern was provided. */
 export function formatCorrectPattern(
   i: Interaction,
-  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT
+  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string | null {
   if (i.correct === undefined) return null;
   switch (i.type) {
@@ -127,7 +139,7 @@ export function formatCorrectPattern(
       return (i.correct as Array<[string, string]>)
         .map(
           ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`
+            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
         )
         .join(fmt.itemDelim);
     case 'numeric': {
@@ -146,7 +158,10 @@ export function formatCorrectPattern(
       return i.correct as string;
     case 'performance':
       return (i.correct as Array<[string, string | number]>)
-        .map(([s, v]) => `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`)
+        .map(
+          ([s, v]) =>
+            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
+        )
         .join(fmt.itemDelim);
   }
 }
@@ -177,7 +192,7 @@ export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
   correct: boolean | null,
-  spec: ScormInteractionSpec
+  spec: ScormInteractionSpec,
 ): Array<[string, string]> {
   const fields: Array<[string, string]> = [
     [`${prefix}.id`, spec.format.identifier(questionId)],
@@ -187,7 +202,10 @@ export function buildScormInteractionFields(
   if (pattern !== null) {
     fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);
   }
-  fields.push([`${prefix}.${spec.responseField}`, formatResponse(interaction, spec.format)]);
+  fields.push([
+    `${prefix}.${spec.responseField}`,
+    formatResponse(interaction, spec.format),
+  ]);
   if (correct !== null) {
     fields.push([
       `${prefix}.result`,

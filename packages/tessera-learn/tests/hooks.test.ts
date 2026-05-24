@@ -46,7 +46,9 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     currentPageIndex: currentIndex,
     canGoNext: true,
     canGoPrev: false,
-    goToPage: vi.fn((i: number) => { nav.currentPageIndex = i; }),
+    goToPage: vi.fn((i: number) => {
+      nav.currentPageIndex = i;
+    }),
     goNext: vi.fn(),
     goPrev: vi.fn(),
     isPageLocked: vi.fn(() => false),
@@ -75,7 +77,11 @@ describe('useQuestion — standalone mode', () => {
     const q = useQuestion({ id: 'q1', response: () => interaction });
     q.submit();
 
-    expect(adapter.reportInteraction).toHaveBeenCalledWith('q1', interaction, true);
+    expect(adapter.reportInteraction).toHaveBeenCalledWith(
+      'q1',
+      interaction,
+      true,
+    );
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
   });
@@ -95,7 +101,7 @@ describe('useQuestion — standalone mode', () => {
     expect(adapter.reportInteraction).toHaveBeenCalledWith(
       'q1',
       expect.objectContaining({ type: 'true-false' }),
-      false
+      false,
     );
     expect(q.correct).toBe(false);
   });
@@ -221,7 +227,7 @@ describe('useQuestion — standalone mode', () => {
     expect(adapter.reportInteraction).toHaveBeenCalledWith(
       'q1',
       expect.any(Object),
-      null
+      null,
     );
     expect(q.correct).toBe(null);
   });
@@ -324,7 +330,9 @@ function makeQuizCtx(overrides: Record<string, unknown> = {}) {
   const state = { submitted: false };
   const handles: any[] = [];
   const quiz: any = {
-    get submitted() { return state.submitted; },
+    get submitted() {
+      return state.submitted;
+    },
     set submitted(v: boolean) {
       state.submitted = v;
       for (const h of handles) h._setSubmitted(v);
@@ -337,11 +345,17 @@ function makeQuizCtx(overrides: Record<string, unknown> = {}) {
     let correct: boolean | null = null;
     const h = {
       id: api.id,
-      get submitted() { return submitted; },
-      get correct() { return correct; },
+      get submitted() {
+        return submitted;
+      },
+      get correct() {
+        return correct;
+      },
       answer: undefined,
       feedbackVisible: false,
-      get locked() { return submitted; },
+      get locked() {
+        return submitted;
+      },
       isLockedCorrect: false,
       render: undefined,
       setAnswer() {},
@@ -385,8 +399,14 @@ describe('useQuestion — inside a <Quiz>', () => {
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
-    const a = useQuestion({ id: 'a', response: () => ({ type: 'true-false', response: true }) });
-    const b = useQuestion({ id: 'b', response: () => ({ type: 'true-false', response: false }) });
+    const a = useQuestion({
+      id: 'a',
+      response: () => ({ type: 'true-false', response: true }),
+    });
+    const b = useQuestion({
+      id: 'b',
+      response: () => ({ type: 'true-false', response: false }),
+    });
     expect(quiz.registerQuestion).toHaveBeenCalledTimes(2);
     expect(a.id).toBe('a');
     expect(b.id).toBe('b');
@@ -399,13 +419,25 @@ describe('useQuestion — inside a <Quiz>', () => {
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
-    let current: Interaction = { type: 'true-false', response: false, correct: true };
+    let current: Interaction = {
+      type: 'true-false',
+      response: false,
+      correct: true,
+    };
     useQuestion({ id: 'q1', response: () => current });
 
     const arg = quiz.registerQuestion.mock.calls[0][0];
-    expect(arg.interaction()).toEqual({ type: 'true-false', response: false, correct: true });
+    expect(arg.interaction()).toEqual({
+      type: 'true-false',
+      response: false,
+      correct: true,
+    });
     current = { type: 'true-false', response: true, correct: true };
-    expect(arg.interaction()).toEqual({ type: 'true-false', response: true, correct: true });
+    expect(arg.interaction()).toEqual({
+      type: 'true-false',
+      response: true,
+      correct: true,
+    });
   });
 
   it('checkAnswer() returns the boolean from isCorrect(response())', () => {
@@ -415,7 +447,11 @@ describe('useQuestion — inside a <Quiz>', () => {
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
-    let current: Interaction = { type: 'true-false', response: true, correct: true };
+    let current: Interaction = {
+      type: 'true-false',
+      response: true,
+      correct: true,
+    };
     useQuestion({ id: 'q1', response: () => current });
 
     const arg = quiz.registerQuestion.mock.calls[0][0];
@@ -536,7 +572,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(q.retryCount).toBe(0);
     expect(userReset).not.toHaveBeenCalled();
   });
-
 });
 
 // ============ useNavigation ============
@@ -663,7 +698,9 @@ describe('usePersistence', () => {
     return {
       data,
       get: (k: string) => (k in data ? data[k] : null),
-      set: (k: string, v: unknown) => { data[k] = v; },
+      set: (k: string, v: unknown) => {
+        data[k] = v;
+      },
     };
   }
 

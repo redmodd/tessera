@@ -74,7 +74,11 @@ export const ALL_INTERACTION_FIXTURES: ComplianceFixtureQuestion[] = [
   {
     id: 'q-numeric',
     expectedCorrect: true,
-    interaction: { type: 'numeric', response: 42, correct: { min: 40, max: 45 } },
+    interaction: {
+      type: 'numeric',
+      response: 42,
+      correct: { min: 40, max: 45 },
+    },
   },
   {
     id: 'q-likert',

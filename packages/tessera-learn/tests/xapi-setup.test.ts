@@ -11,7 +11,10 @@ const baseLaunchParams = {
   endpoint: 'https://lms.example.com/xapi/',
   registration: 'reg-xapi-setup',
   activityId: 'https://example.com/course/xapi',
-  actor: JSON.stringify({ mbox: 'mailto:learner@example.com', name: 'Learner' }),
+  actor: JSON.stringify({
+    mbox: 'mailto:learner@example.com',
+    name: 'Learner',
+  }),
 };
 
 function setSearchParams(params: Record<string, string>) {
@@ -24,7 +27,7 @@ function setSearchParams(params: Record<string, string>) {
 }
 
 function setupLMSMocks() {
-  mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+  mockFetch.mockImplementation(async (url: string, _options?: RequestInit) => {
     if (url === baseLaunchParams.fetch) {
       return { ok: true, text: async () => 'lms-auth-token' };
     }
@@ -93,7 +96,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 
     // POST went to the LMS-launch endpoint with the launch auth token.
     const statementCalls = mockFetch.mock.calls.filter(([url]) =>
-      String(url).includes('statements')
+      String(url).includes('statements'),
     );
     expect(statementCalls.length).toBeGreaterThan(0);
     const [, init] = statementCalls[0];
@@ -103,7 +106,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     expect(body.actor.mbox).toBe('mailto:learner@example.com');
   });
 
-  it("explicit cmi5 destination inherits the launch actor when xapi.actor is omitted", async () => {
+  it('explicit cmi5 destination inherits the launch actor when xapi.actor is omitted', async () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
@@ -172,8 +175,8 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     await expect(
       client!.sendStatement(
         { verb: { id: 'http://verb/exp' } },
-        { retry: false }
-      )
+        { retry: false },
+      ),
     ).rejects.toThrow(/no cmi5 launch parameters/);
   });
 });

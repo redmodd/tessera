@@ -11,7 +11,9 @@
   let openId = $state(null);
 
   setContext('tessera-accordion', {
-    get openId() { return openId; },
+    get openId() {
+      return openId;
+    },
     toggle(id) {
       openId = openId === id ? null : id;
     },

@@ -15,7 +15,10 @@ let counter = 0;
 
 function createTestDir(): string {
   counter++;
-  const dir = resolve(tmpdir(), `tessera-upgrade-test-${Date.now()}-${counter}`);
+  const dir = resolve(
+    tmpdir(),
+    `tessera-upgrade-test-${Date.now()}-${counter}`,
+  );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -24,12 +27,12 @@ const PKG_ROOT = resolve(__dirname, '..');
 const CLI_PATH = resolve(PKG_ROOT, 'dist', 'index.js');
 
 const TESSERA_VERSION: string = JSON.parse(
-  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')
+  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8'),
 ).version;
 
 function runCLI(
   args: string,
-  cwd: string
+  cwd: string,
 ): { stdout: string; stderr: string; output: string; exitCode: number } {
   try {
     const stdout = execSync(`node ${CLI_PATH} ${args}`, {
@@ -41,7 +44,12 @@ function runCLI(
   } catch (err: any) {
     const stdout = err.stdout?.toString() || '';
     const stderr = err.stderr?.toString() || '';
-    return { stdout, stderr, output: stdout + stderr, exitCode: err.status ?? 1 };
+    return {
+      stdout,
+      stderr,
+      output: stdout + stderr,
+      exitCode: err.status ?? 1,
+    };
   }
 }
 
@@ -65,7 +73,7 @@ function seedProject(dir: string, opts: SeedOptions = {}) {
   }
   writeFileSync(
     resolve(dir, 'package.json'),
-    JSON.stringify(pkg, null, 2) + '\n'
+    JSON.stringify(pkg, null, 2) + '\n',
   );
   if (opts.agentsMd !== undefined) {
     writeFileSync(resolve(dir, 'AGENTS.md'), opts.agentsMd);
@@ -94,7 +102,9 @@ execSync('pnpm build', { cwd: PKG_ROOT, stdio: 'ignore' });
 
 describe('create-tessera upgrade', () => {
   it('adds a missing framework script', () => {
-    seedProject(testDir, { scripts: { dev: 'vite dev', export: 'vite build' } });
+    seedProject(testDir, {
+      scripts: { dev: 'vite dev', export: 'vite build' },
+    });
     const { exitCode, stdout } = runCLI('upgrade', testDir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('added "validate" script');
@@ -121,7 +131,12 @@ describe('create-tessera upgrade', () => {
 
   it('leaves user-added scripts untouched', () => {
     seedProject(testDir, {
-      scripts: { dev: 'vite dev', export: 'vite build', validate: 'tessera-validate', lint: 'eslint .' },
+      scripts: {
+        dev: 'vite dev',
+        export: 'vite build',
+        validate: 'tessera-validate',
+        lint: 'eslint .',
+      },
     });
     runCLI('upgrade', testDir);
     expect(readPkg(testDir).scripts.lint).toBe('eslint .');
@@ -129,7 +144,11 @@ describe('create-tessera upgrade', () => {
 
   it('keeps an authored override of a framework script and warns', () => {
     seedProject(testDir, {
-      scripts: { dev: 'vite dev --host', export: 'vite build', validate: 'tessera-validate' },
+      scripts: {
+        dev: 'vite dev --host',
+        export: 'vite build',
+        validate: 'tessera-validate',
+      },
     });
     const { stdout } = runCLI('upgrade', testDir);
     expect(readPkg(testDir).scripts.dev).toBe('vite dev --host');
@@ -138,17 +157,27 @@ describe('create-tessera upgrade', () => {
 
   it('pins tessera-learn to the version the CLI ships', () => {
     seedProject(testDir, {
-      scripts: { dev: 'vite dev', export: 'vite build', validate: 'tessera-validate' },
+      scripts: {
+        dev: 'vite dev',
+        export: 'vite build',
+        validate: 'tessera-validate',
+      },
       tesseraDep: '^0.0.1',
     });
     const { stdout } = runCLI('upgrade', testDir);
     expect(stdout).toContain('set tessera-learn');
-    expect(readPkg(testDir).dependencies['tessera-learn']).toBe(TESSERA_VERSION);
+    expect(readPkg(testDir).dependencies['tessera-learn']).toBe(
+      TESSERA_VERSION,
+    );
   });
 
   it('overwrites framework-owned AGENTS.md and vite.config.js', () => {
     seedProject(testDir, {
-      scripts: { dev: 'vite dev', export: 'vite build', validate: 'tessera-validate' },
+      scripts: {
+        dev: 'vite dev',
+        export: 'vite build',
+        validate: 'tessera-validate',
+      },
       tesseraDep: TESSERA_VERSION,
       agentsMd: '# stale agents file\n',
       viteConfig: '// stale vite config\n',
@@ -178,7 +207,9 @@ describe('create-tessera upgrade', () => {
     const before = readFileSync(resolve(testDir, 'package.json'), 'utf-8');
     const { stdout } = runCLI('upgrade --dry-run', testDir);
     expect(stdout).toContain('No files written');
-    expect(readFileSync(resolve(testDir, 'package.json'), 'utf-8')).toBe(before);
+    expect(readFileSync(resolve(testDir, 'package.json'), 'utf-8')).toBe(
+      before,
+    );
     expect(existsSync(resolve(testDir, 'AGENTS.md'))).toBe(false);
   });
 

@@ -1,5 +1,5 @@
 ---
-"tessera-learn": patch
+'tessera-learn': patch
 ---
 
 Extract `QuizEngine` from the `useQuiz` closure into a directly-instantiable,

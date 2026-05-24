@@ -1,4 +1,10 @@
-import { existsSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
+import {
+  existsSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+  unlinkSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -106,7 +112,7 @@ const SCORM_DIALECTS: Record<'1.2' | '2004', ScormManifestDialect> = {
 export function generateScormManifest(
   version: '1.2' | '2004',
   config: ExportConfig,
-  distDir: string
+  distDir: string,
 ): string {
   const dialect = SCORM_DIALECTS[version];
   const title = escapeXml(config.title || 'Tessera Course');
@@ -143,14 +149,14 @@ ${fileElements}
 
 export function generateSCORM12Manifest(
   config: ExportConfig,
-  distDir: string
+  distDir: string,
 ): string {
   return generateScormManifest('1.2', config, distDir);
 }
 
 export function generateSCORM2004Manifest(
   config: ExportConfig,
-  distDir: string
+  distDir: string,
 ): string {
   return generateScormManifest('2004', config, distDir);
 }
@@ -164,7 +170,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
   const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
-    ((config.scoring?.passingScore ?? 70) / 100).toFixed(4)
+    ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
   );
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
@@ -193,7 +199,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
 
 export async function createZip(
   distDir: string,
-  outputPath: string
+  outputPath: string,
 ): Promise<number> {
   return new Promise((res, reject) => {
     const output = createWriteStream(outputPath);
@@ -207,7 +213,7 @@ export async function createZip(
 
     archive.pipe(output);
     archive.directory(distDir, false);
-    archive.finalize();
+    void archive.finalize();
   });
 }
 
@@ -222,7 +228,9 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   try {
     for (const f of readdirSync(projectRoot)) {
       if (f.startsWith(`${slug}-`) && f.endsWith('.zip')) {
-        try { unlinkSync(resolve(projectRoot, f)); } catch {}
+        try {
+          unlinkSync(resolve(projectRoot, f));
+        } catch {}
       }
     }
   } catch {}
@@ -231,16 +239,32 @@ function cleanOldZips(projectRoot: string, slug: string): void {
 /** Packaged (zipped) export targets: which manifest file to write and how. */
 const PACKAGED_EXPORTS: Record<
   'scorm12' | 'scorm2004' | 'cmi5',
-  { manifestFile: string; label: string; generate: (config: ExportConfig, distDir: string) => string }
+  {
+    manifestFile: string;
+    label: string;
+    generate: (config: ExportConfig, distDir: string) => string;
+  }
 > = {
-  scorm12: { manifestFile: 'imsmanifest.xml', label: 'SCORM 1.2', generate: generateSCORM12Manifest },
-  scorm2004: { manifestFile: 'imsmanifest.xml', label: 'SCORM 2004', generate: generateSCORM2004Manifest },
-  cmi5: { manifestFile: 'cmi5.xml', label: 'CMI5', generate: (config) => generateCMI5Xml(config) },
+  scorm12: {
+    manifestFile: 'imsmanifest.xml',
+    label: 'SCORM 1.2',
+    generate: generateSCORM12Manifest,
+  },
+  scorm2004: {
+    manifestFile: 'imsmanifest.xml',
+    label: 'SCORM 2004',
+    generate: generateSCORM2004Manifest,
+  },
+  cmi5: {
+    manifestFile: 'cmi5.xml',
+    label: 'CMI5',
+    generate: (config) => generateCMI5Xml(config),
+  },
 };
 
 export async function runExport(
   projectRoot: string,
-  config: ExportConfig
+  config: ExportConfig,
 ): Promise<void> {
   const distDir = resolve(projectRoot, 'dist');
   const standard = config.export?.standard || 'web';
@@ -260,7 +284,11 @@ export async function runExport(
   const spec = PACKAGED_EXPORTS[standard as keyof typeof PACKAGED_EXPORTS];
   if (!spec) return; // unknown standard — the validator rejects these upstream
 
-  writeFileSync(resolve(distDir, spec.manifestFile), spec.generate(config, distDir), 'utf-8');
+  writeFileSync(
+    resolve(distDir, spec.manifestFile),
+    spec.generate(config, distDir),
+    'utf-8',
+  );
   cleanOldZips(projectRoot, slug);
   const zipSize = await createZip(distDir, zipPath);
   console.log(`✓ ${spec.label} export: ${zipName} (${formatSize(zipSize)})`);

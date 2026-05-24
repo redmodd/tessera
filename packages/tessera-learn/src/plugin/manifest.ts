@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
-import type { QuizConfig } from '../runtime/types.js';
+import type { CourseConfig, QuizConfig } from '../runtime/types.js';
 
 // ---------- Types ----------
 
@@ -48,7 +48,10 @@ export function ensureSvelteSuffix(name: string): string {
  * sharing the read avoids the second disk hit (and matters most on cold-cache
  * CI runs and large courses).
  */
-const fileContentCache = new Map<string, { mtimeMs: number; content: string }>();
+const fileContentCache = new Map<
+  string,
+  { mtimeMs: number; content: string }
+>();
 
 export function readSourceFileCached(filePath: string): string {
   const stat = statSync(filePath);
@@ -70,7 +73,7 @@ export function stripPrefix(name: string): string {
 export function titleCase(slug: string): string {
   return slug
     .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -97,7 +100,9 @@ const DEFAULT_EXPORT_RE = /export\s+default\s*/;
  * or null if no balanced object literal follows the `export default` keyword.
  * Used by both manifest extraction and project validation.
  */
-export function extractDefaultExportObjectLiteral(source: string): string | null {
+export function extractDefaultExportObjectLiteral(
+  source: string,
+): string | null {
   const match = source.match(DEFAULT_EXPORT_RE);
   if (!match || match.index === undefined) return null;
   const startIndex = source.indexOf('{', match.index);
@@ -106,8 +111,12 @@ export function extractDefaultExportObjectLiteral(source: string): string | null
 }
 
 export type CourseConfigRead =
-  | { ok: true; config: Record<string, any> }
-  | { ok: false; reason: 'missing' | 'no-export' | 'parse-error'; error?: unknown };
+  | { ok: true; config: Partial<CourseConfig> }
+  | {
+      ok: false;
+      reason: 'missing' | 'no-export' | 'parse-error';
+      error?: unknown;
+    };
 
 /**
  * Read and JSON5-parse the `export default { ... }` literal from a project's
@@ -119,7 +128,9 @@ export type CourseConfigRead =
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const configPath = resolve(projectRoot, 'course.config.js');
   if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
-  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(configPath));
+  const objectStr = extractDefaultExportObjectLiteral(
+    readSourceFileCached(configPath),
+  );
   if (!objectStr) return { ok: false, reason: 'no-export' };
   try {
     return { ok: true, config: JSON5.parse(objectStr) };
@@ -133,10 +144,15 @@ export function readCourseConfig(projectRoot: string): CourseConfigRead {
  * Uses the same JSON5 approach as pageConfig extraction — find the object literal
  * after `export default` and parse it.
  */
-export function readMetaFile(metaPath: string): { title?: string; pages?: string[] } {
+export function readMetaFile(metaPath: string): {
+  title?: string;
+  pages?: string[];
+} {
   if (!existsSync(metaPath)) return {};
 
-  const objectStr = extractDefaultExportObjectLiteral(readSourceFileCached(metaPath));
+  const objectStr = extractDefaultExportObjectLiteral(
+    readSourceFileCached(metaPath),
+  );
   if (!objectStr) return {};
 
   try {
@@ -151,12 +167,17 @@ export type PageConfigParseResult =
   /** No module script, or no `pageConfig =` export. Treat as "no config". */
   | { kind: 'none' }
   /** Found and successfully parsed. */
-  | { kind: 'ok'; value: { title?: string; quiz?: QuizConfig; completesOn?: 'view' } }
+  | {
+      kind: 'ok';
+      value: { title?: string; quiz?: QuizConfig; completesOn?: 'view' };
+    }
   /** Found but couldn't parse as a static object literal — non-literal RHS or JSON5 failure. */
   | { kind: 'invalid' };
 
 /** Source-level pageConfig extraction shared by manifest generation and build-time validation. */
-export function parsePageConfigFromSource(content: string): PageConfigParseResult {
+export function parsePageConfigFromSource(
+  content: string,
+): PageConfigParseResult {
   const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
   if (!moduleScriptMatch) return { kind: 'none' };
 
@@ -171,7 +192,10 @@ export function parsePageConfigFromSource(content: string): PageConfigParseResul
   // pageConfig assigned to something other than an object literal — flag as invalid.
   if (!afterExport.startsWith('{')) return { kind: 'invalid' };
 
-  const startIndex = scriptContent.indexOf('{', configMatch.index + configMatch[0].length);
+  const startIndex = scriptContent.indexOf(
+    '{',
+    configMatch.index + configMatch[0].length,
+  );
   if (startIndex < 0) return { kind: 'invalid' };
   const objectStr = extractObjectLiteral(scriptContent, startIndex);
   if (!objectStr) return { kind: 'invalid' };
@@ -184,12 +208,16 @@ export function parsePageConfigFromSource(content: string): PageConfigParseResul
 }
 
 /** Extract pageConfig from a .svelte file. Throws on parse failure. */
-export function extractPageConfig(filePath: string): { title?: string; quiz?: QuizConfig; completesOn?: 'view' } {
+export function extractPageConfig(filePath: string): {
+  title?: string;
+  quiz?: QuizConfig;
+  completesOn?: 'view';
+} {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
     throw new Error(
-      `${filePath}: pageConfig must be a static object literal (no variables, function calls, or computed values)`
+      `${filePath}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
     );
   }
   return {};
@@ -201,7 +229,10 @@ export function extractPageConfig(filePath: string): { title?: string; quiz?: Qu
  * the open char is wrong or no matching close is found. Shared by manifest
  * extraction, _meta/pageConfig parsing, and the validator's tag-prop parser.
  */
-export function extractObjectLiteral(source: string, startIndex: number): string | null {
+export function extractObjectLiteral(
+  source: string,
+  startIndex: number,
+): string | null {
   const open = source[startIndex];
   if (open !== '{' && open !== '[') return null;
 
@@ -266,7 +297,7 @@ export function extractObjectLiteral(source: string, startIndex: number): string
 function getSortedDirs(dirPath: string): string[] {
   if (!existsSync(dirPath)) return [];
   return readdirSync(dirPath)
-    .filter(name => {
+    .filter((name) => {
       const full = resolve(dirPath, name);
       return statSync(full).isDirectory() && !name.startsWith('.');
     })
@@ -279,7 +310,7 @@ function getSortedDirs(dirPath: string): string[] {
 function getSvelteFiles(dirPath: string): string[] {
   if (!existsSync(dirPath)) return [];
   return readdirSync(dirPath)
-    .filter(name => name.endsWith('.svelte'))
+    .filter((name) => name.endsWith('.svelte'))
     .sort();
 }
 
@@ -327,7 +358,11 @@ export function generateManifest(pagesDir: string): Manifest {
         const filePath = resolve(lessonPath, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
-        let pageConfig: { title?: string; quiz?: QuizConfig; completesOn?: 'view' } = {};
+        let pageConfig: {
+          title?: string;
+          quiz?: QuizConfig;
+          completesOn?: 'view';
+        } = {};
         try {
           pageConfig = extractPageConfig(filePath);
         } catch (e) {
@@ -344,7 +379,9 @@ export function generateManifest(pagesDir: string): Manifest {
           slug: pageSlug,
           importPath: relativePath,
           quiz: pageConfig.quiz || null,
-          ...(pageConfig.completesOn === 'view' ? { completesOn: 'view' as const } : {}),
+          ...(pageConfig.completesOn === 'view'
+            ? { completesOn: 'view' as const }
+            : {}),
         };
 
         lesson.pages.push(page);
@@ -368,17 +405,20 @@ export function generateManifest(pagesDir: string): Manifest {
 /**
  * Order .svelte files: listed in `pages` array first (in order), then unlisted appended alphabetically.
  */
-export function orderPageFiles(allFiles: string[], pagesArray?: string[]): string[] {
+export function orderPageFiles(
+  allFiles: string[],
+  pagesArray?: string[],
+): string[] {
   if (!pagesArray || pagesArray.length === 0) {
     return allFiles;
   }
 
   const listed = pagesArray.map(ensureSvelteSuffix);
   const listedSet = new Set(listed);
-  const unlisted = allFiles.filter(f => !listedSet.has(f)).sort();
+  const unlisted = allFiles.filter((f) => !listedSet.has(f)).sort();
 
   // Only include listed files that actually exist
-  const validListed = listed.filter(f => allFiles.includes(f));
+  const validListed = listed.filter((f) => allFiles.includes(f));
 
   return [...validListed, ...unlisted];
 }

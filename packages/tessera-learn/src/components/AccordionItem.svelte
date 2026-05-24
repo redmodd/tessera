@@ -1,7 +1,3 @@
-<script module>
-  let _accordionItemCounter = 0;
-</script>
-
 <script>
   /**
    * @component AccordionItem
@@ -13,7 +9,7 @@
   import { getContext } from 'svelte';
 
   let { title, children } = $props();
-  const id = _accordionItemCounter++;
+  const id = $props.id();
   const headerId = `tessera-accordion-header-${id}`;
   const panelId = `tessera-accordion-panel-${id}`;
 

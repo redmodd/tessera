@@ -8,7 +8,11 @@ import { describe, it, expect } from 'vitest';
  */
 
 // Mirror of Sorting.svelte checkAnswer
-function checkAnswer(answer: Map<number, number> | null, items: string[], correct: number[]): boolean {
+function checkAnswer(
+  answer: Map<number, number> | null,
+  items: string[],
+  correct: number[],
+): boolean {
   if (!answer || !(answer instanceof Map)) return false;
   if (answer.size !== items.length) return false;
   for (let i = 0; i < items.length; i++) {
@@ -18,7 +22,10 @@ function checkAnswer(answer: Map<number, number> | null, items: string[], correc
 }
 
 // Mirror of Sorting.svelte getItemsForTarget
-function getItemsForTarget(placements: Map<number, number>, targetIdx: number): number[] {
+function getItemsForTarget(
+  placements: Map<number, number>,
+  targetIdx: number,
+): number[] {
   const result: number[] = [];
   for (const [itemIdx, tIdx] of placements) {
     if (tIdx === targetIdx) result.push(itemIdx);
@@ -92,7 +99,11 @@ describe('Sorting checkAnswer', () => {
   it('handles all items going to the same target', () => {
     const allSame = ['A', 'B', 'C'];
     const allCorrect = [0, 0, 0];
-    const answer = new Map<number, number>([[0, 0], [1, 0], [2, 0]]);
+    const answer = new Map<number, number>([
+      [0, 0],
+      [1, 0],
+      [2, 0],
+    ]);
     expect(checkAnswer(answer, allSame, allCorrect)).toBe(true);
   });
 });

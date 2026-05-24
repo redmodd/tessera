@@ -1,13 +1,20 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
-import { XAPIConfigError, XAPIStatementError, validateAgent, validateAuthCredential } from '../src/runtime/xapi/validation.js';
+import {
+  XAPIConfigError,
+  XAPIStatementError,
+  validateAgent,
+  validateAuthCredential,
+} from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
 
 const mockFetch = vi.fn();
 
-function basicOpts(overrides: Partial<ConstructorParameters<typeof XAPIPublisher>[0]> = {}) {
+function basicOpts(
+  overrides: Partial<ConstructorParameters<typeof XAPIPublisher>[0]> = {},
+) {
   return {
     endpoint: 'https://lrs.example.com/xapi/',
     auth: 'tok',
@@ -38,7 +45,7 @@ describe('validateAgent', () => {
   });
   it('rejects two IFIs', () => {
     expect(
-      validateAgent({ mbox: 'mailto:a@b.c', openid: 'https://e.com/u' })
+      validateAgent({ mbox: 'mailto:a@b.c', openid: 'https://e.com/u' }),
     ).toMatch(/exactly one IFI/);
   });
   it('rejects malformed mbox', () => {
@@ -51,13 +58,13 @@ describe('validateAgent', () => {
     expect(
       validateAgent({
         account: { homePage: 'https://lms.example.com', name: 'user1' },
-      })
+      }),
     ).toBeNull();
   });
   it('rejects a Group (with `member`)', () => {
-    expect(
-      validateAgent({ member: [{ mbox: 'mailto:a@b.c' }] })
-    ).toMatch(/Group/);
+    expect(validateAgent({ member: [{ mbox: 'mailto:a@b.c' }] })).toMatch(
+      /Group/,
+    );
   });
 });
 
@@ -78,23 +85,25 @@ describe('validateAuthCredential', () => {
 
 describe('XAPIPublisher — construction', () => {
   it('throws when endpoint is not http(s)', () => {
-    expect(() => new XAPIPublisher(basicOpts({ endpoint: 'ftp://x' as any }))).toThrow(
-      /http\(s\)/
-    );
+    expect(
+      () => new XAPIPublisher(basicOpts({ endpoint: 'ftp://x' as any })),
+    ).toThrow(/http\(s\)/);
   });
   it('throws when endpoint is missing', () => {
     expect(() => new XAPIPublisher(basicOpts({ endpoint: '' as any }))).toThrow(
-      /endpoint/
+      /endpoint/,
     );
   });
   it('normalizes endpoint trailing slash', async () => {
     mockFetch.mockResolvedValue({ ok: true });
     const pub = new XAPIPublisher(
-      basicOpts({ endpoint: 'https://lrs.example.com/xapi' as any })
+      basicOpts({ endpoint: 'https://lrs.example.com/xapi' as any }),
     );
     await pub.init();
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
-    expect(mockFetch.mock.calls[0][0]).toBe('https://lrs.example.com/xapi/statements');
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      'https://lrs.example.com/xapi/statements',
+    );
   });
 });
 
@@ -112,7 +121,7 @@ describe('XAPIPublisher — buildStatement', () => {
     await pub.init();
     const s = pub.buildStatement(
       { verb: { id: 'http://verb/a' } },
-      { id: 'fixed-id-123' }
+      { id: 'fixed-id-123' },
     );
     expect(s.id).toBe('fixed-id-123');
   });
@@ -134,12 +143,16 @@ describe('XAPIPublisher — buildStatement', () => {
     ]);
   });
   it('attaches cmi5 sessionid extension under cmi5Mode', async () => {
-    const pub = new XAPIPublisher(basicOpts({ cmi5Mode: true, sessionId: 'sess-42' }));
+    const pub = new XAPIPublisher(
+      basicOpts({ cmi5Mode: true, sessionId: 'sess-42' }),
+    );
     await pub.init();
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
-    expect(s.context?.extensions?.[
-      'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
-    ]).toBe('sess-42');
+    expect(
+      s.context?.extensions?.[
+        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
+      ],
+    ).toBe('sess-42');
   });
   it('omits cmi5 sessionid extension when not in cmi5 mode', async () => {
     const pub = new XAPIPublisher(basicOpts());
@@ -156,15 +169,17 @@ describe('XAPIPublisher — buildStatement', () => {
     });
     expect(s.context?.extensions?.['http://my/ext']).toBe('value');
     expect(
-      s.context?.extensions?.['https://w3id.org/xapi/cmi5/context/extensions/sessionid']
+      s.context?.extensions?.[
+        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
+      ],
     ).toBeDefined();
   });
   it('throws when called before init resolves a function-form actor', () => {
     const pub = new XAPIPublisher(
-      basicOpts({ actor: async () => ({ mbox: 'mailto:a@b.c' }) })
+      basicOpts({ actor: async () => ({ mbox: 'mailto:a@b.c' }) }),
     );
     expect(() => pub.buildStatement({ verb: { id: 'http://verb/a' } })).toThrow(
-      /init/
+      /init/,
     );
   });
 });
@@ -173,9 +188,9 @@ describe('XAPIPublisher — sendStatement validation', () => {
   it('rejects missing verb.id', async () => {
     const pub = new XAPIPublisher(basicOpts());
     await pub.init();
-    await expect(
-      pub.sendStatement({ verb: { id: '' } })
-    ).rejects.toThrow(XAPIStatementError);
+    await expect(pub.sendStatement({ verb: { id: '' } })).rejects.toThrow(
+      XAPIStatementError,
+    );
   });
   it('rejects missing object.id when object supplied', async () => {
     const pub = new XAPIPublisher(basicOpts());
@@ -184,7 +199,7 @@ describe('XAPIPublisher — sendStatement validation', () => {
       pub.sendStatement({
         verb: { id: 'http://verb/a' },
         object: { id: '' },
-      })
+      }),
     ).rejects.toThrow(XAPIStatementError);
   });
   it('rejects score.scaled out of range', async () => {
@@ -194,7 +209,7 @@ describe('XAPIPublisher — sendStatement validation', () => {
       pub.sendStatement({
         verb: { id: 'http://verb/a' },
         result: { score: { scaled: 1.5 } },
-      })
+      }),
     ).rejects.toThrow(XAPIStatementError);
   });
   it('accepts score.scaled in [-1, 1]', async () => {
@@ -282,7 +297,7 @@ describe('XAPIPublisher — send + retry', () => {
     await pub.init();
     const r = await pub.sendStatement(
       { verb: { id: 'http://verb/a' } },
-      { retry: false }
+      { retry: false },
     );
     expect(n).toBe(1);
     expect(r.destinations[0]).toMatchObject({ ok: false, status: 503 });
@@ -332,7 +347,7 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(resolver).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0][1].headers.get('Authorization')).toBe(
-      'Basic resolved-tok'
+      'Basic resolved-tok',
     );
   });
 
@@ -440,13 +455,15 @@ describe('XAPIPublisher — function-form actor', () => {
   });
 
   it('throws if the resolved actor fails the Identified Agent rule', async () => {
-    const pub = new XAPIPublisher(basicOpts({ actor: () => ({ name: 'no-ifi' } as any) }));
+    const pub = new XAPIPublisher(
+      basicOpts({ actor: () => ({ name: 'no-ifi' }) as any }),
+    );
     await expect(pub.init()).rejects.toThrow(XAPIConfigError);
   });
 
   it('throws if the resolver throws', async () => {
     const pub = new XAPIPublisher(
-      basicOpts({ actor: () => Promise.reject(new Error('noauth')) })
+      basicOpts({ actor: () => Promise.reject(new Error('noauth')) }),
     );
     await expect(pub.init()).rejects.toThrow(/actor resolver/);
   });
@@ -500,7 +517,10 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
 });
 
 describe('XAPIClient — fan-out', () => {
-  function makePub(endpoint: string, actor: XAPIAgent = { mbox: 'mailto:a@b.c' }) {
+  function makePub(
+    endpoint: string,
+    actor: XAPIAgent = { mbox: 'mailto:a@b.c' },
+  ) {
     return new XAPIPublisher({
       endpoint,
       auth: 'tok',
@@ -530,7 +550,8 @@ describe('XAPIClient — fan-out', () => {
 
   it('isolates failures — one destination 5xx does not affect another', async () => {
     mockFetch.mockImplementation(async (url) => {
-      if (String(url).startsWith('https://lrs1.')) return { ok: false, status: 503 };
+      if (String(url).startsWith('https://lrs1.'))
+        return { ok: false, status: 503 };
       return { ok: true, status: 204 };
     });
     const p1 = makePub('https://lrs1.example.com/xapi/');
@@ -540,7 +561,7 @@ describe('XAPIClient — fan-out', () => {
     const client = new XAPIClient([p1, p2]);
     const r = await client.sendStatement(
       { verb: { id: 'http://verb/a' } },
-      { retry: false }
+      { retry: false },
     );
     const o1 = r.destinations.find((d) => d.endpoint.includes('lrs1'));
     const o2 = r.destinations.find((d) => d.endpoint.includes('lrs2'));
@@ -548,7 +569,7 @@ describe('XAPIClient — fan-out', () => {
     expect(o2?.ok).toBe(true);
   });
 
-  it('returns the first publisher\'s actor / activityId / sessionId', async () => {
+  it("returns the first publisher's actor / activityId / sessionId", async () => {
     const p1 = new XAPIPublisher({
       endpoint: 'https://lrs1.example.com/xapi/',
       auth: 't',
@@ -575,9 +596,9 @@ describe('XAPIClient — fan-out', () => {
     const p1 = makePub('https://lrs1.example.com/xapi/');
     await p1.init();
     const client = new XAPIClient([p1]);
-    await expect(
-      client.sendStatement({ verb: { id: '' } })
-    ).rejects.toThrow(XAPIStatementError);
+    await expect(client.sendStatement({ verb: { id: '' } })).rejects.toThrow(
+      XAPIStatementError,
+    );
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -604,7 +625,7 @@ describe('XAPIClient — fan-out', () => {
     expect(p1.isUnloading()).toBe(true);
     expect(p2.isUnloading()).toBe(true);
     await expect(
-      client.sendStatement({ verb: { id: 'http://verb/late' } })
+      client.sendStatement({ verb: { id: 'http://verb/late' } }),
     ).rejects.toThrow(/unloading/);
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -625,7 +646,9 @@ describe('XAPIClient — fan-out', () => {
     client.markUnloading();
     const r = await client.sendStatement({ verb: { id: 'http://verb/late' } });
     const cmi5Outcome = r.destinations.find((d) => d.endpoint.includes('cmi5'));
-    const indepOutcome = r.destinations.find((d) => d.endpoint.includes('analytics'));
+    const indepOutcome = r.destinations.find((d) =>
+      d.endpoint.includes('analytics'),
+    );
     expect(cmi5Outcome?.ok).toBe(false);
     expect(cmi5Outcome?.error?.message).toMatch(/unloading|cmi5/i);
     expect(indepOutcome?.ok).toBe(true);
@@ -634,17 +657,15 @@ describe('XAPIClient — fan-out', () => {
 
 describe('useXAPI registry', () => {
   it('returns null when no publisher is registered', async () => {
-    const { useXAPI, registerXAPIClient } = await import(
-      '../src/runtime/xapi/registry.js'
-    );
+    const { useXAPI, registerXAPIClient } =
+      await import('../src/runtime/xapi/registry.js');
     registerXAPIClient(null);
     expect(useXAPI()).toBeNull();
   });
 
   it('returns the registered client', async () => {
-    const { useXAPI, registerXAPIClient } = await import(
-      '../src/runtime/xapi/registry.js'
-    );
+    const { useXAPI, registerXAPIClient } =
+      await import('../src/runtime/xapi/registry.js');
     const p = new XAPIPublisher(basicOpts());
     await p.init();
     const client = new XAPIClient([p]);
@@ -656,13 +677,15 @@ describe('useXAPI registry', () => {
 
 describe('derive-actor helpers', () => {
   it('synthesizeSCORM12Actor returns a well-formed Identified Agent', async () => {
-    const { synthesizeSCORM12Actor } = await import(
-      '../src/runtime/xapi/derive-actor.js'
-    );
+    const { synthesizeSCORM12Actor } =
+      await import('../src/runtime/xapi/derive-actor.js');
     const api: any = {
       LMSGetValue: (k: string) =>
-        k === 'cmi.core.student_id' ? 'student-42' :
-        k === 'cmi.core.student_name' ? 'Ada Lovelace' : '',
+        k === 'cmi.core.student_id'
+          ? 'student-42'
+          : k === 'cmi.core.student_name'
+            ? 'Ada Lovelace'
+            : '',
     };
     const a = synthesizeSCORM12Actor(api, 'https://example.com/courses/1');
     expect(a).toEqual({
@@ -674,38 +697,38 @@ describe('derive-actor helpers', () => {
   });
 
   it('synthesizeSCORM12Actor honors actorAccountHomePage override', async () => {
-    const { synthesizeSCORM12Actor } = await import(
-      '../src/runtime/xapi/derive-actor.js'
-    );
+    const { synthesizeSCORM12Actor } =
+      await import('../src/runtime/xapi/derive-actor.js');
     const api: any = {
       LMSGetValue: (k: string) => (k === 'cmi.core.student_id' ? 'sid' : ''),
     };
     const a = synthesizeSCORM12Actor(
       api,
       'https://example.com/courses/1',
-      'https://lms.example.com'
+      'https://lms.example.com',
     );
     expect(a?.account?.homePage).toBe('https://lms.example.com');
   });
 
   it('synthesizeSCORM12Actor returns null when student_id is missing', async () => {
-    const { synthesizeSCORM12Actor } = await import(
-      '../src/runtime/xapi/derive-actor.js'
-    );
+    const { synthesizeSCORM12Actor } =
+      await import('../src/runtime/xapi/derive-actor.js');
     const api: any = { LMSGetValue: () => '' };
     expect(
-      synthesizeSCORM12Actor(api, 'https://example.com/courses/1')
+      synthesizeSCORM12Actor(api, 'https://example.com/courses/1'),
     ).toBeNull();
   });
 
   it('synthesizeSCORM2004Actor reads cmi.learner_id / cmi.learner_name', async () => {
-    const { synthesizeSCORM2004Actor } = await import(
-      '../src/runtime/xapi/derive-actor.js'
-    );
+    const { synthesizeSCORM2004Actor } =
+      await import('../src/runtime/xapi/derive-actor.js');
     const api: any = {
       GetValue: (k: string) =>
-        k === 'cmi.learner_id' ? 'learner-7' :
-        k === 'cmi.learner_name' ? 'Grace Hopper' : '',
+        k === 'cmi.learner_id'
+          ? 'learner-7'
+          : k === 'cmi.learner_name'
+            ? 'Grace Hopper'
+            : '',
     };
     const a = synthesizeSCORM2004Actor(api, 'https://example.com/courses/1');
     expect(a).toEqual({

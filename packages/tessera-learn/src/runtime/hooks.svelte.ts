@@ -123,23 +123,47 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       interaction: () => opts.response(),
     });
     return {
-      get id() { return q.id; },
-      get submitted() { return q.submitted; },
-      get correct() { return q.correct; },
-      get answer() { return q.answer; },
-      get feedbackVisible() { return q.feedbackVisible; },
-      get locked() { return q.locked; },
-      get isLockedCorrect() { return q.isLockedCorrect; },
-      get render() { return q.render; },
-      setAnswer(a: unknown) { q.setAnswer(a); },
-      commit() { q.commit(); },
+      get id() {
+        return q.id;
+      },
+      get submitted() {
+        return q.submitted;
+      },
+      get correct() {
+        return q.correct;
+      },
+      get answer() {
+        return q.answer;
+      },
+      get feedbackVisible() {
+        return q.feedbackVisible;
+      },
+      get locked() {
+        return q.locked;
+      },
+      get isLockedCorrect() {
+        return q.isLockedCorrect;
+      },
+      get render() {
+        return q.render;
+      },
+      setAnswer(a: unknown) {
+        q.setAnswer(a);
+      },
+      commit() {
+        q.commit();
+      },
       submit() {},
-      reset() { opts.reset?.(); },
+      reset() {
+        opts.reset?.();
+      },
       retry() {},
       canRetry: false,
       retryCount: 0,
       mode: 'quiz' as const,
-      setRender(render: unknown) { q.setRender(render); },
+      setRender(render: unknown) {
+        q.setRender(render);
+      },
     };
   }
 
@@ -158,7 +182,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     adapterCtx?.adapter.reportInteraction(
       opts.id,
       response,
-      isCorrectInteraction(response)
+      isCorrectInteraction(response),
     );
   }
 
@@ -167,11 +191,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     const response = opts.response();
     currentAnswer = response.response;
     correct = isCorrectInteraction(response);
-    const score = opts.score
-      ? opts.score()
-      : correct === true
-        ? 100
-        : 0;
+    const score = opts.score ? opts.score() : correct === true ? 100 : 0;
 
     if (!committed) {
       adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
@@ -180,7 +200,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     if (opts.graded && navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
-      navCtx.progress.recalculateCompletion(navCtx.manifest.totalPages, navCtx.config);
+      navCtx.progress.recalculateCompletion(
+        navCtx.manifest.totalPages,
+        navCtx.config,
+      );
       navCtx.progress.recalculateSuccess(navCtx.config);
     } else if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
@@ -205,21 +228,41 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   return {
-    get id() { return opts.id; },
-    get submitted() { return submitted; },
-    get correct() { return correct; },
-    get answer() { return currentAnswer; },
-    get feedbackVisible() { return submitted; },
-    get locked() { return submitted; },
-    get isLockedCorrect() { return submitted && correct === true && retryCount >= maxRetries; },
+    get id() {
+      return opts.id;
+    },
+    get submitted() {
+      return submitted;
+    },
+    get correct() {
+      return correct;
+    },
+    get answer() {
+      return currentAnswer;
+    },
+    get feedbackVisible() {
+      return submitted;
+    },
+    get locked() {
+      return submitted;
+    },
+    get isLockedCorrect() {
+      return submitted && correct === true && retryCount >= maxRetries;
+    },
     render: undefined,
-    setAnswer(a: unknown) { currentAnswer = a; },
+    setAnswer(a: unknown) {
+      currentAnswer = a;
+    },
     commit,
     submit,
     reset,
     retry,
-    get canRetry() { return retryCount < maxRetries; },
-    get retryCount() { return retryCount; },
+    get canRetry() {
+      return retryCount < maxRetries;
+    },
+    get retryCount() {
+      return retryCount;
+    },
     mode: 'standalone' as const,
     setRender() {},
   };
@@ -228,18 +271,34 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
 export function useNavigation() {
   const { nav, manifest } = requireNavContext('useNavigation()');
   return {
-    get currentPage() { return manifest.pages[nav.currentPageIndex]; },
-    get currentPageIndex() { return nav.currentPageIndex; },
-    get pages() { return manifest.pages; },
+    get currentPage() {
+      return manifest.pages[nav.currentPageIndex];
+    },
+    get currentPageIndex() {
+      return nav.currentPageIndex;
+    },
+    get pages() {
+      return manifest.pages;
+    },
     goTo(slug: string) {
       const index = manifest.pages.findIndex((p) => p.slug === slug);
       if (index >= 0) nav.goToPage(index);
     },
-    goToIndex(index: number) { nav.goToPage(index); },
-    next() { nav.goNext(); },
-    prev() { nav.goPrev(); },
-    get canGoNext() { return nav.canGoNext; },
-    get canGoPrev() { return nav.canGoPrev; },
+    goToIndex(index: number) {
+      nav.goToPage(index);
+    },
+    next() {
+      nav.goNext();
+    },
+    prev() {
+      nav.goPrev();
+    },
+    get canGoNext() {
+      return nav.canGoNext;
+    },
+    get canGoPrev() {
+      return nav.canGoPrev;
+    },
     canAccess(slug: string) {
       const index = manifest.pages.findIndex((p) => p.slug === slug);
       return index >= 0 && !nav.isPageLocked(index);
@@ -250,12 +309,24 @@ export function useNavigation() {
 export function useProgress() {
   const { progress } = requireNavContext('useProgress()');
   return {
-    get visitedPages() { return progress.visitedPages; },
-    get quizScores() { return progress.quizScores; },
-    get chunkProgress() { return progress.chunkProgress; },
-    get completionStatus() { return progress.completionStatus; },
-    get successStatus() { return progress.successStatus; },
-    markVisited(pageIndex: number) { progress.markVisited(pageIndex); },
+    get visitedPages() {
+      return progress.visitedPages;
+    },
+    get quizScores() {
+      return progress.quizScores;
+    },
+    get chunkProgress() {
+      return progress.chunkProgress;
+    },
+    get completionStatus() {
+      return progress.completionStatus;
+    },
+    get successStatus() {
+      return progress.successStatus;
+    },
+    markVisited(pageIndex: number) {
+      progress.markVisited(pageIndex);
+    },
     markChunk(pageIndex: number, chunkIndex: number) {
       progress.markChunk(pageIndex, chunkIndex);
     },
@@ -272,7 +343,7 @@ export function useCompletion(): {
   markComplete(): void;
   readonly completionStatus: 'incomplete' | 'complete';
 } {
-  const { progress, manifest, config } = requireNavContext('useCompletion()');
+  const { progress, config } = requireNavContext('useCompletion()');
   return {
     markComplete() {
       if (config.completion.mode !== 'manual') {
@@ -280,7 +351,7 @@ export function useCompletion(): {
           warnedNonManualCompletion = true;
           console.warn(
             "Tessera: useCompletion().markComplete() ignored — completion.mode is not 'manual'. " +
-              '(This warning is shown once per session.)'
+              '(This warning is shown once per session.)',
           );
         }
         return;
@@ -294,14 +365,20 @@ export function useCompletion(): {
   };
 }
 
-export function usePersistence<T = unknown>(key: string): {
+export function usePersistence<T = unknown>(
+  key: string,
+): {
   get(): T | null;
   set(value: T): void;
 } {
   const store = requireUserStateStore('usePersistence()');
   return {
-    get(): T | null { return (store.get(key) as T | null) ?? null; },
-    set(value: T) { store.set(key, value); },
+    get(): T | null {
+      return (store.get(key) as T | null) ?? null;
+    },
+    set(value: T) {
+      store.set(key, value);
+    },
   };
 }
 
@@ -363,7 +440,7 @@ export function __warnUnsubmittedQuiz(stats: {
   console.warn(
     '[tessera] useQuiz: submit() was never called before unmount, but the learner answered ' +
       `${stats.answersCount} of ${stats.questionsCount} questions. ` +
-      'Did your custom quiz shell forget to call handle.submit()?'
+      'Did your custom quiz shell forget to call handle.submit()?',
   );
 }
 
@@ -371,16 +448,18 @@ export function __warnEmptyQuiz(questionsCount: number): void {
   if (questionsCount > 0) return;
   console.warn(
     '[tessera] useQuiz: quiz mounted with no registered questions. Question widgets ' +
-      'must call useQuestion() to be scored and reported to the LMS.'
+      'must call useQuestion() to be scored and reported to the LMS.',
   );
 }
 
-export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHandle {
+export function useQuiz(opts: {
+  element: () => HTMLElement | null;
+}): UseQuizHandle {
   const pageCtx = getPageContext();
   const adapterCtx = getAdapterContext();
   if (!pageCtx?.quiz) {
     throw new Error(
-      'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).'
+      'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).',
     );
   }
 
@@ -390,7 +469,7 @@ export function useQuiz(opts: { element: () => HTMLElement | null }): UseQuizHan
   if (existing) {
     console.warn(
       '[tessera] useQuiz: a second quiz registered on this page; ' +
-        'quiz scores are keyed by pageIndex and the later submit will overwrite the earlier one.'
+        'quiz scores are keyed by pageIndex and the later submit will overwrite the earlier one.',
     );
   }
 

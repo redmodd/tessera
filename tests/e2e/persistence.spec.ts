@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
-  await page.waitForFunction(() => !document.querySelector('.tessera-loading-skeleton'), { timeout: 5000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => !document.querySelector('.tessera-loading-skeleton'),
+      { timeout: 5000 },
+    )
+    .catch(() => {});
 }
 
 async function navigateToPage(page, pageTitle: string) {
@@ -18,20 +23,28 @@ test.describe('Persistence — localStorage', () => {
     await waitForContent(page);
   });
 
-  test('navigate to a page, reload → resumes on same page', async ({ page }) => {
+  test('navigate to a page, reload → resumes on same page', async ({
+    page,
+  }) => {
     // Navigate to "Callouts & Images" (should be page index ~2)
     await navigateToPage(page, 'Callouts & Images');
-    await expect(page.locator('.tessera-content h1')).toContainText('Callouts & Images');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Callouts & Images',
+    );
 
     // Reload
     await page.reload();
     await waitForContent(page);
 
     // Should resume on the same page
-    await expect(page.locator('.tessera-content h1')).toContainText('Callouts & Images');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Callouts & Images',
+    );
   });
 
-  test('visited pages survive reload — progress bar preserved', async ({ page }) => {
+  test('visited pages survive reload — progress bar preserved', async ({
+    page,
+  }) => {
     // Visit several pages
     await navigateToPage(page, 'Objectives');
     await navigateToPage(page, 'Callouts & Images');
@@ -55,13 +68,17 @@ test.describe('Persistence — localStorage', () => {
     expect(visitedAfter).toBeGreaterThanOrEqual(visitedBefore);
   });
 
-  test('clear localStorage → course starts fresh on new page load', async ({ browser }) => {
+  test('clear localStorage → course starts fresh on new page load', async ({
+    browser,
+  }) => {
     // First context: visit some pages to build up state
     const ctx1 = await browser.newContext();
     const page1 = await ctx1.newPage();
     await page1.goto('/');
     await waitForContent(page1);
-    await page1.locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' }).click();
+    await page1
+      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
+      .click();
     await waitForContent(page1);
     await page1.close();
     await ctx1.close();
@@ -75,7 +92,10 @@ test.describe('Persistence — localStorage', () => {
     await waitForContent(page2);
 
     // Should be on first page (Welcome) since no saved state
-    await expect(page2.locator('.tessera-content h1')).toContainText('Welcome', { timeout: 10000 });
+    await expect(page2.locator('.tessera-content h1')).toContainText(
+      'Welcome',
+      { timeout: 10000 },
+    );
 
     // Progress should be 1 (only current page)
     const progressLabel = page2.locator('.tessera-progress-label');
@@ -91,7 +111,7 @@ test.describe('Persistence — localStorage', () => {
     // Check localStorage
     const storageData = await page.evaluate(() => {
       const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find(k => k.startsWith('tessera-'));
+      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
       if (!tesseraKey) return null;
       return JSON.parse(localStorage.getItem(tesseraKey)!);
     });
@@ -115,7 +135,10 @@ test.describe('Persistence — localStorage', () => {
 
     // Q1: "2 + 2" → option index 1 ("4")
     await expect(progress).toContainText('Question 1 of 3');
-    await page.locator('.tessera-quiz-question-wrapper.active .tessera-mc-option').nth(1).click();
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
     await expect(primaryBtn).toHaveText('Next');
     await primaryBtn.click(); // show feedback
     await expect(primaryBtn).toHaveText('Continue');
@@ -123,7 +146,9 @@ test.describe('Persistence — localStorage', () => {
 
     // Q2: fill-in "blue"
     await expect(progress).toContainText('Question 2 of 3');
-    await page.locator('.tessera-quiz-question-wrapper.active input[type="text"]').fill('blue');
+    await page
+      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
+      .fill('blue');
     await expect(primaryBtn).toHaveText('Next');
     await primaryBtn.click();
     await expect(primaryBtn).toHaveText('Continue');
@@ -142,7 +167,10 @@ test.describe('Persistence — localStorage', () => {
       const target = matchMap[leftText || ''];
       if (!target) continue;
       await leftItems.nth(i).click();
-      await activeQ.locator('.tessera-matching-item.right', { hasText: target }).first().click();
+      await activeQ
+        .locator('.tessera-matching-item.right', { hasText: target })
+        .first()
+        .click();
       expectedMatches++;
       await expect(matched).toHaveCount(expectedMatches);
     }
@@ -158,7 +186,7 @@ test.describe('Persistence — localStorage', () => {
     // Verify quiz score is in localStorage
     const storageData = await page.evaluate(() => {
       const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find(k => k.startsWith('tessera-'));
+      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
       if (!tesseraKey) return null;
       return JSON.parse(localStorage.getItem(tesseraKey)!);
     });
@@ -171,7 +199,7 @@ test.describe('Persistence — localStorage', () => {
 
     const restoredData = await page.evaluate(() => {
       const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find(k => k.startsWith('tessera-'));
+      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
       if (!tesseraKey) return null;
       return JSON.parse(localStorage.getItem(tesseraKey)!);
     });
@@ -189,7 +217,9 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Callouts & Images');
 
     const storageData = await page.evaluate(() => {
-      const tesseraKey = Object.keys(localStorage).find((k) => k.startsWith('tessera-'));
+      const tesseraKey = Object.keys(localStorage).find((k) =>
+        k.startsWith('tessera-'),
+      );
       return JSON.parse(localStorage.getItem(tesseraKey!)!);
     });
     expect(storageData).toHaveProperty('d');

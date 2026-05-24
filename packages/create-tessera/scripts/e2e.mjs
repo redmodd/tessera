@@ -52,14 +52,20 @@ function setStandard(projectDir, standard) {
 function assertExport(projectDir, template, standard) {
   const dist = join(projectDir, 'dist');
   if (!existsSync(dist) || readdirSync(dist).length === 0) {
-    throw new Error(`[${template}/${standard}] expected non-empty dist/ after export`);
+    throw new Error(
+      `[${template}/${standard}] expected non-empty dist/ after export`,
+    );
   }
   if (standard === 'web') return;
   if (!existsSync(join(dist, MANIFEST[standard]))) {
-    throw new Error(`[${template}/${standard}] expected ${MANIFEST[standard]} in dist/`);
+    throw new Error(
+      `[${template}/${standard}] expected ${MANIFEST[standard]} in dist/`,
+    );
   }
   if (!readdirSync(projectDir).some((f) => f.endsWith('.zip'))) {
-    throw new Error(`[${template}/${standard}] expected a packaged .zip in the project root`);
+    throw new Error(
+      `[${template}/${standard}] expected a packaged .zip in the project root`,
+    );
   }
 }
 
@@ -68,7 +74,10 @@ run('pnpm --filter create-tessera build', REPO_ROOT);
 run('pnpm --filter tessera-learn build', REPO_ROOT);
 
 const packDir = mkdtempSync(join(tmpdir(), 'tessera-pack-'));
-run(`pnpm --filter tessera-learn pack --pack-destination "${packDir}"`, REPO_ROOT);
+run(
+  `pnpm --filter tessera-learn pack --pack-destination "${packDir}"`,
+  REPO_ROOT,
+);
 const tgz = readdirSync(packDir).find((f) => /^tessera-learn-.*\.tgz$/.test(f));
 if (!tgz) {
   throw new Error(`no tessera-learn tarball produced in ${packDir}`);
@@ -95,4 +104,6 @@ for (const template of TEMPLATES) {
   }
 }
 
-console.log('\nAll templates validated and built across every export standard.');
+console.log(
+  '\nAll templates validated and built across every export standard.',
+);

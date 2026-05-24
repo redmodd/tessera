@@ -5,10 +5,9 @@ import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 function startPreview(standard: Standard, port: number): ChildProcess {
   const dir = variantDir('free', standard);
-  return exec(
-    `${viteBin('free')} preview ${dir} --port ${port} --strictPort`,
-    { cwd: dir },
-  );
+  return exec(`${viteBin('free')} preview ${dir} --port ${port} --strictPort`, {
+    cwd: dir,
+  });
 }
 
 async function waitForServer(page: Page, url: string): Promise<void> {
@@ -29,7 +28,7 @@ async function waitForTesseraContent(page: Page): Promise<void> {
   await page
     .waitForFunction(
       () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 }
+      { timeout: 5000 },
     )
     .catch(() => {});
 }
@@ -42,18 +41,15 @@ async function waitForTesseraContent(page: Page): Promise<void> {
 async function waitForScormCall(
   page: Page,
   predicate: (entry: string[]) => boolean,
-  timeoutMs = 5000
+  timeoutMs = 5000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const matched = await page.evaluate(
-      (pred: string) => {
-        const log = (window as any).__scormLog || [];
-        const fn = new Function('entry', `return (${pred})(entry)`);
-        return log.some((entry: string[]) => fn(entry));
-      },
-      predicate.toString()
-    );
+    const matched = await page.evaluate((pred: string) => {
+      const log = (window as any).__scormLog || [];
+      const fn = new Function('entry', `return (${pred})(entry)`);
+      return log.some((entry: string[]) => fn(entry));
+    }, predicate.toString());
     if (matched) return;
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -88,24 +84,32 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.addInitScript(SCORM12_MOCK);
   });
 
-  test('Initialize fires and course boots against mock API', async ({ page }) => {
+  test('Initialize fires and course boots against mock API', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     const verbs = log.map((entry) => entry[0]);
     expect(verbs).toContain('LMSInitialize');
     // First read after init should be suspend_data
     expect(verbs).toContain('LMSGetValue');
   });
 
-  test('Navigation writes suspend_data containing bookmark and visited pages', async ({ page }) => {
+  test('Navigation writes suspend_data containing bookmark and visited pages', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
     await waitForTesseraContent(page);
-    await page.locator('.tessera-nav-page', { hasText: 'Callouts & Images' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
+      .click();
     await waitForTesseraContent(page);
 
     // Poll suspend_data until all three visits are reflected — the writeQueue is
@@ -113,7 +117,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await expect
       .poll(
         async () => {
-          const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+          const data = await page.evaluate(() =>
+            (window as any).__scormDataSnapshot(),
+          );
           const raw = data['cmi.suspend_data'];
           if (!raw) return 0;
           try {
@@ -123,25 +129,36 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
             return 0;
           }
         },
-        { timeout: 5000 }
+        { timeout: 5000 },
       )
       .toBeGreaterThanOrEqual(3);
 
-    const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
     const state = JSON.parse(data['cmi.suspend_data']);
     expect(state).toHaveProperty('b');
     expect(state.b).toBeGreaterThan(0); // not on first page
   });
 
-  test('Re-launch: reload uses suspend_data to restore bookmark', async ({ page }) => {
+  test('Re-launch: reload uses suspend_data to restore bookmark', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Callouts & Images' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
+      .click();
     await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Callouts & Images');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Callouts & Images',
+    );
 
-    await waitForScormCall(page, (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.suspend_data');
+    await waitForScormCall(
+      page,
+      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.suspend_data',
+    );
 
     // Simulate re-launch by reloading the page. sessionStorage preserves mock
     // data across the reload, which is what the LMS would do.
@@ -149,14 +166,20 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await waitForTesseraContent(page);
 
     // After re-launch we should land on the same page the learner left on.
-    await expect(page.locator('.tessera-content h1')).toContainText('Callouts & Images');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Callouts & Images',
+    );
   });
 
-  test('Completing a graded quiz writes score and lesson_status=passed', async ({ page }) => {
+  test('Completing a graded quiz writes score and lesson_status=passed', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Graded Assessment' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+      .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
     // Q1: "What is 2 + 2?" → option index 1 ("4")
@@ -184,7 +207,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     const left = active.locator('.tessera-matching-item.left');
     const right = active.locator('.tessera-matching-item.right');
     const n = await left.count();
-    const targets: Record<string, string> = { '1': 'One', '2': 'Two', '3': 'Three' };
+    const targets: Record<string, string> = {
+      '1': 'One',
+      '2': 'Two',
+      '3': 'Three',
+    };
     for (let i = 0; i < n; i++) {
       const key = (await left.nth(i).textContent())?.trim() ?? '';
       const target = targets[key];
@@ -202,9 +229,14 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
     // Wait for the SCORM score to be committed
-    await waitForScormCall(page, (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.core.score.raw');
+    await waitForScormCall(
+      page,
+      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.core.score.raw',
+    );
 
-    const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
     expect(data['cmi.core.score.raw']).toBe('100');
     expect(data['cmi.core.score.min']).toBe('0');
     expect(data['cmi.core.score.max']).toBe('100');
@@ -213,20 +245,30 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     // Per-question Interaction writes land before the final score, so by now
     // each built-in must have emitted cmi.interactions.<n>.id / .type.
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     const typeWrites = log
-      .filter((e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]))
+      .filter(
+        (e) =>
+          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
+      )
       .map((e) => e[2]);
     expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
 
     const idWrites = log
-      .filter((e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]))
+      .filter(
+        (e) =>
+          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
+      )
       .map((e) => e[2]);
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
 
-  test('Exit flushes session_time in HHHH:MM:SS.SS format and calls LMSFinish', async ({ page }) => {
+  test('Exit flushes session_time in HHHH:MM:SS.SS format and calls LMSFinish', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
@@ -238,13 +280,19 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     // synchronously via drainSync(), so by the time this returns the mock
     // has the final session_time and LMSFinish call.
     await page.evaluate(() => {
-      window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+      window.dispatchEvent(
+        new PageTransitionEvent('pagehide', { persisted: false }),
+      );
     });
 
-    const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
     expect(data['cmi.core.session_time']).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
 
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
   });
 });
@@ -277,38 +325,59 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.addInitScript(SCORM2004_MOCK);
   });
 
-  test('Initialize + GetValue(cmi.suspend_data) fires on boot', async ({ page }) => {
+  test('Initialize + GetValue(cmi.suspend_data) fires on boot', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     const verbs = log.map((entry) => entry[0]);
     expect(verbs).toContain('Initialize');
 
-    const gets = log.filter((entry) => entry[0] === 'GetValue').map((entry) => entry[1]);
+    const gets = log
+      .filter((entry) => entry[0] === 'GetValue')
+      .map((entry) => entry[1]);
     expect(gets).toContain('cmi.suspend_data');
   });
 
-  test('Re-launch via reload restores bookmark from suspend_data', async ({ page }) => {
+  test('Re-launch via reload restores bookmark from suspend_data', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
+      .click();
     await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Accordion & Carousel');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Accordion & Carousel',
+    );
 
-    await waitForScormCall(page, (e) => e[0] === 'SetValue' && e[1] === 'cmi.suspend_data');
+    await waitForScormCall(
+      page,
+      (e) => e[0] === 'SetValue' && e[1] === 'cmi.suspend_data',
+    );
 
     await page.reload();
     await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText('Accordion & Carousel');
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Accordion & Carousel',
+    );
   });
 
-  test('Graded quiz writes split completion_status and success_status', async ({ page }) => {
+  test('Graded quiz writes split completion_status and success_status', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Graded Assessment' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+      .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
     // Answer Q1 correctly
@@ -336,7 +405,11 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     const left = active.locator('.tessera-matching-item.left');
     const right = active.locator('.tessera-matching-item.right');
     const n = await left.count();
-    const targets: Record<string, string> = { '1': 'One', '2': 'Two', '3': 'Three' };
+    const targets: Record<string, string> = {
+      '1': 'One',
+      '2': 'Two',
+      '3': 'Three',
+    };
     for (let i = 0; i < n; i++) {
       const key = (await left.nth(i).textContent())?.trim() ?? '';
       const target = targets[key];
@@ -353,29 +426,43 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
-    await waitForScormCall(page, (e) => e[0] === 'SetValue' && e[1] === 'cmi.score.raw');
+    await waitForScormCall(
+      page,
+      (e) => e[0] === 'SetValue' && e[1] === 'cmi.score.raw',
+    );
 
-    const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
     expect(data['cmi.score.raw']).toBe('100');
     expect(data['cmi.score.scaled']).toBe('1');
     // SCORM 2004 keeps completion and success as separate fields
     expect(data['cmi.success_status']).toBe('passed');
 
     // Per-question Interaction writes: 2004 emits the SCORM vocab verbatim.
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     const typeWrites = log
-      .filter((e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]))
+      .filter(
+        (e) =>
+          e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
+      )
       .map((e) => e[2]);
     expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
 
     const idWrites = log
-      .filter((e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]))
+      .filter(
+        (e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
+      )
       .map((e) => e[2]);
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
 
-  test('Exit flushes session_time in ISO 8601 format and calls Terminate', async ({ page }) => {
+  test('Exit flushes session_time in ISO 8601 format and calls Terminate', async ({
+    page,
+  }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
@@ -384,13 +471,19 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.waitForTimeout(1100);
 
     await page.evaluate(() => {
-      window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+      window.dispatchEvent(
+        new PageTransitionEvent('pagehide', { persisted: false }),
+      );
     });
 
-    const data = await page.evaluate(() => (window as any).__scormDataSnapshot());
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
 
-    const log = (await page.evaluate(() => (window as any).__scormLog)) as string[][];
+    const log = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
   });
 });
@@ -419,7 +512,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     preview?.kill('SIGTERM');
   });
 
-  test('launch with CMI5 params sends Initialized statement', async ({ page }) => {
+  test('launch with CMI5 params sends Initialized statement', async ({
+    page,
+  }) => {
     // Track xAPI statements sent by the course
     const statements: any[] = [];
     let tokenRequests = 0;
@@ -472,7 +567,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     // Find an Initialized statement
     const initStmt = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized'
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
     );
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
@@ -496,7 +591,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       if (url.includes('/xapi/statements')) {
         const req = route.request();
         if (req.method() === 'POST' || req.method() === 'PUT') {
-          try { statements.push(JSON.parse(req.postData() ?? '{}')); } catch {}
+          try {
+            statements.push(JSON.parse(req.postData() ?? '{}'));
+          } catch {}
         }
         await route.fulfill({
           status: 200,
@@ -515,7 +612,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Graded Assessment' }).click();
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+      .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
     // Answer all 3 questions correctly (same flow as the SCORM tests)
@@ -541,7 +640,11 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     const left = active.locator('.tessera-matching-item.left');
     const right = active.locator('.tessera-matching-item.right');
     const n = await left.count();
-    const targets: Record<string, string> = { '1': 'One', '2': 'Two', '3': 'Three' };
+    const targets: Record<string, string> = {
+      '1': 'One',
+      '2': 'Two',
+      '3': 'Three',
+    };
     for (let i = 0; i < n; i++) {
       const key = (await left.nth(i).textContent())?.trim() ?? '';
       const target = targets[key];
@@ -563,14 +666,14 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       .poll(
         () =>
           statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed'
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
           ) != null,
-        { timeout: 5000 }
+        { timeout: 5000 },
       )
       .toBe(true);
 
     const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed'
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
     );
     expect(passed.result?.success).toBe(true);
     expect(passed.result?.score?.scaled).toBe(1);
@@ -578,15 +681,17 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
     const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered'
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
     );
     expect(answered).toHaveLength(3);
-    expect(
-      answered.map((s) => s.object?.definition?.interactionType)
-    ).toEqual(['choice', 'fill-in', 'matching']);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
     for (const s of answered) {
       expect(String(s.object?.id)).toMatch(
-        /^http:\/\/tessera\.test\/activity\/course-1#/
+        /^http:\/\/tessera\.test\/activity\/course-1#/,
       );
       expect(s.result?.response).toBeTruthy();
     }

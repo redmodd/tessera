@@ -12,16 +12,17 @@
   let quizConfig = $derived(pageCtx?.quiz ?? {});
   let feedbackDisabled = $derived(quizConfig.feedbackMode === 'never');
   let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
-  let isImmediateMode = $derived(!feedbackDisabled && quizConfig.feedbackMode === 'immediate');
+  let isImmediateMode = $derived(
+    !feedbackDisabled && quizConfig.feedbackMode === 'immediate',
+  );
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
-  let reviewQuestion = $derived(handle.questions[reviewIndex]);
   let correctCount = $derived(
-    handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0)
+    handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
   let passed = $derived(handle.score >= handle.passingScore);
 
@@ -32,7 +33,12 @@
 
   function needsReveal(q) {
     if (!q) return false;
-    return isImmediateMode && isAnswered(q) && !q.isLockedCorrect && !q.feedbackVisible;
+    return (
+      isImmediateMode &&
+      isAnswered(q) &&
+      !q.isLockedCorrect &&
+      !q.feedbackVisible
+    );
   }
 
   function goNextQuestion() {
@@ -75,25 +81,40 @@
   }
 </script>
 
-<div class="tessera-quiz" bind:this={quizElement} role="region" aria-label="Quiz">
+<div
+  class="tessera-quiz"
+  bind:this={quizElement}
+  role="region"
+  aria-label="Quiz"
+>
   {#if handle.state === 'answering'}
     <!-- Question phase -->
     <div class="tessera-quiz-progress" aria-live="polite">
       <span class="tessera-quiz-progress-text">
-        <span class="tessera-quiz-progress-desktop">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
-        <span class="tessera-quiz-progress-mobile">{currentQuestionIndex + 1}/{totalQuestions}</span>
+        <span class="tessera-quiz-progress-desktop"
+          >Question {currentQuestionIndex + 1} of {totalQuestions}</span
+        >
+        <span class="tessera-quiz-progress-mobile"
+          >{currentQuestionIndex + 1}/{totalQuestions}</span
+        >
       </span>
       <div class="tessera-progress-track">
         <div
           class="tessera-progress-fill"
-          style="width: {totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0}%"
+          style="width: {totalQuestions > 0
+            ? ((currentQuestionIndex + 1) / totalQuestions) * 100
+            : 0}%"
         ></div>
       </div>
     </div>
 
     <div class="tessera-quiz-questions">
       {#each handle.questions as q, i (q.id)}
-        <div class="tessera-quiz-question-wrapper" class:active={i === currentQuestionIndex} aria-hidden={i !== currentQuestionIndex}>
+        <div
+          class="tessera-quiz-question-wrapper"
+          class:active={i === currentQuestionIndex}
+          aria-hidden={i !== currentQuestionIndex}
+        >
           {#if q.render}
             {@render q.render()}
           {/if}
@@ -115,7 +136,9 @@
           disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
         >
-          {currentQuestion?.feedbackVisible && isImmediateMode ? 'Continue' : 'Next'}
+          {currentQuestion?.feedbackVisible && isImmediateMode
+            ? 'Continue'
+            : 'Next'}
         </button>
       {:else if needsReveal(currentQuestion)}
         <button
@@ -134,19 +157,26 @@
         </button>
       {/if}
     </div>
-
   {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
     <div class="tessera-quiz-progress" aria-live="polite">
       <span class="tessera-quiz-progress-text">
-        <span class="tessera-quiz-progress-desktop">Review: Question {reviewIndex + 1} of {totalQuestions}</span>
-        <span class="tessera-quiz-progress-mobile">Review: {reviewIndex + 1}/{totalQuestions}</span>
+        <span class="tessera-quiz-progress-desktop"
+          >Review: Question {reviewIndex + 1} of {totalQuestions}</span
+        >
+        <span class="tessera-quiz-progress-mobile"
+          >Review: {reviewIndex + 1}/{totalQuestions}</span
+        >
       </span>
     </div>
 
     <div class="tessera-quiz-questions">
       {#each handle.questions as q, i (q.id)}
-        <div class="tessera-quiz-question-wrapper" class:active={i === reviewIndex} aria-hidden={i !== reviewIndex}>
+        <div
+          class="tessera-quiz-question-wrapper"
+          class:active={i === reviewIndex}
+          aria-hidden={i !== reviewIndex}
+        >
           {#if q.render}
             {@render q.render()}
           {/if}
@@ -178,14 +208,17 @@
         </button>
       {/if}
     </div>
-
   {:else}
     <!-- Results phase -->
     <div class="tessera-quiz-results" role="status" aria-live="polite">
       <h2 class="tessera-quiz-results-title">Quiz Results</h2>
       <div class="tessera-quiz-score">
         <span class="tessera-quiz-score-value">{handle.score}%</span>
-        <span class="tessera-quiz-score-label" class:passed class:failed={!passed}>
+        <span
+          class="tessera-quiz-score-label"
+          class:passed
+          class:failed={!passed}
+        >
           {passed ? 'Passed' : 'Not Passed'}
         </span>
       </div>
@@ -211,7 +244,9 @@
           </button>
         {/if}
         {#if maxAttempts !== Infinity && handle.attemptCount >= maxAttempts}
-          <p class="tessera-quiz-attempts-exhausted">All attempts used ({handle.attemptCount}/{maxAttempts})</p>
+          <p class="tessera-quiz-attempts-exhausted">
+            All attempts used ({handle.attemptCount}/{maxAttempts})
+          </p>
         {/if}
       </div>
     </div>
@@ -272,7 +307,9 @@
     font-size: 0.9375rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.2s, opacity 0.2s;
+    transition:
+      background 0.2s,
+      opacity 0.2s;
     min-height: 44px;
     min-width: 44px;
   }
@@ -353,8 +390,12 @@
 
   /* Mobile */
   @media (max-width: 640px) {
-    .tessera-quiz-progress-desktop { display: none; }
-    .tessera-quiz-progress-mobile { display: inline; }
+    .tessera-quiz-progress-desktop {
+      display: none;
+    }
+    .tessera-quiz-progress-mobile {
+      display: inline;
+    }
 
     .tessera-quiz-nav {
       position: sticky;

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount, unmount, createRawSnippet } from 'svelte';
+import { mount, unmount } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
@@ -41,7 +41,11 @@ function makeQuizCtx() {
   return { quiz, registrations };
 }
 
-function mountWithContext(Component: any, props: Record<string, unknown>, ctx: unknown) {
+function mountWithContext(
+  Component: any,
+  props: Record<string, unknown>,
+  ctx: unknown,
+) {
   const target = document.createElement('div');
   document.body.appendChild(target);
   const context = new Map<string, unknown>([['tessera-quiz', ctx]]);
@@ -67,14 +71,18 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     const { component } = mountWithContext(
       MultipleChoice,
       { question: 'Pick one', options: ['a', 'b', 'c'], correct: 1 },
-      quiz
+      quiz,
     );
     toUnmount.push(component);
 
     expect(registrations).toHaveLength(1);
     const reg = registrations[0];
     const unanswered = reg.interaction();
-    expect(unanswered).toEqual({ type: 'choice', response: [], correct: ['1'] });
+    expect(unanswered).toEqual({
+      type: 'choice',
+      response: [],
+      correct: ['1'],
+    });
     expect(reg.id).toMatch(/^mc-/);
   });
 
@@ -82,8 +90,12 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     const { quiz, registrations } = makeQuizCtx();
     const { component } = mountWithContext(
       FillInTheBlank,
-      { question: 'Capital of France', answers: ['Paris'], caseSensitive: false },
-      quiz
+      {
+        question: 'Capital of France',
+        answers: ['Paris'],
+        caseSensitive: false,
+      },
+      quiz,
     );
     toUnmount.push(component);
 
@@ -109,7 +121,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
           { left: 'Cat', right: 'Meow' },
         ],
       },
-      quiz
+      quiz,
     );
     toUnmount.push(component);
 
@@ -120,7 +132,10 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(ix).toMatchObject({
       type: 'matching',
       response: [],
-      correct: [['0', '0'], ['1', '1']],
+      correct: [
+        ['0', '0'],
+        ['1', '1'],
+      ],
     });
     expect(reg.id).toMatch(/^matching-/);
   });
@@ -135,7 +150,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         targets: ['Fruit', 'Vegetable'],
         correct: [0, 1],
       },
-      quiz
+      quiz,
     );
     toUnmount.push(component);
 
@@ -146,7 +161,10 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(ix).toMatchObject({
       type: 'matching',
       response: [],
-      correct: [['0', '0'], ['1', '1']],
+      correct: [
+        ['0', '0'],
+        ['1', '1'],
+      ],
     });
     expect(reg.id).toMatch(/^sorting-/);
   });
@@ -154,12 +172,20 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
   it('A Quiz-like round-trip: four built-ins all register with useful interaction payloads', () => {
     const { quiz, registrations } = makeQuizCtx();
     const mountings = [
-      mountWithContext(MultipleChoice, { question: 'Pick', options: ['a'], correct: 0 }, quiz),
-      mountWithContext(FillInTheBlank, { question: 'Fill', answers: ['x'] }, quiz),
+      mountWithContext(
+        MultipleChoice,
+        { question: 'Pick', options: ['a'], correct: 0 },
+        quiz,
+      ),
+      mountWithContext(
+        FillInTheBlank,
+        { question: 'Fill', answers: ['x'] },
+        quiz,
+      ),
       mountWithContext(
         Matching,
         { question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
-        quiz
+        quiz,
       ),
       mountWithContext(
         Sorting,
@@ -169,7 +195,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
           targets: ['T'],
           correct: [0],
         },
-        quiz
+        quiz,
       ),
     ];
     toUnmount.push(...mountings.map((m) => m.component));

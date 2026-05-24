@@ -61,7 +61,7 @@ describe('State serialization helpers', () => {
     currentPageIndex: number,
     visitedPages: Set<number>,
     quizScores: Map<number, number>,
-    durationSeconds: number
+    durationSeconds: number,
   ): SavedState {
     const q: Record<string, number> = {};
     for (const [pageIndex, score] of quizScores) {
@@ -85,7 +85,7 @@ describe('State serialization helpers', () => {
       currentPageIndex: state.b,
       visitedPages: new Set(state.v),
       quizScores: new Map(
-        Object.entries(state.q).map(([k, v]) => [Number(k), v])
+        Object.entries(state.q).map(([k, v]) => [Number(k), v]),
       ),
       durationSeconds: state.d,
     };
@@ -93,7 +93,10 @@ describe('State serialization helpers', () => {
 
   it('round-trips through serialize → deserialize', () => {
     const visited = new Set([0, 1, 2, 5, 8]);
-    const scores = new Map([[3, 85], [7, 90]]);
+    const scores = new Map([
+      [3, 85],
+      [7, 90],
+    ]);
 
     const saved = serializeState(5, visited, scores, 1234);
     const json = JSON.stringify(saved);
@@ -102,7 +105,12 @@ describe('State serialization helpers', () => {
 
     expect(restored.currentPageIndex).toBe(5);
     expect(restored.visitedPages).toEqual(new Set([0, 1, 2, 5, 8]));
-    expect(restored.quizScores).toEqual(new Map([[3, 85], [7, 90]]));
+    expect(restored.quizScores).toEqual(
+      new Map([
+        [3, 85],
+        [7, 90],
+      ]),
+    );
     expect(restored.durationSeconds).toBe(1234);
   });
 
@@ -142,7 +150,8 @@ describe('WebAdapter contract', () => {
   // (The real WebAdapter uses private fields which don't work in vitest without DOM)
   function createTestAdapter(courseTitle: string) {
     const courseId = courseTitle
-      .toLowerCase().trim()
+      .toLowerCase()
+      .trim()
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_]+/g, '-')
       .replace(/-+/g, '-')
@@ -155,7 +164,9 @@ describe('WebAdapter contract', () => {
         try {
           const raw = localStorage.getItem(storageKey);
           if (raw) state = JSON.parse(raw);
-        } catch { state = null; }
+        } catch {
+          state = null;
+        }
       },
       getState: () => state,
       saveState(s: SavedState) {
@@ -228,7 +239,12 @@ describe('WebAdapter contract', () => {
 
   it('full lifecycle: save, reload, restore', async () => {
     const adapter1 = createTestAdapter('Test');
-    adapter1.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], q: { '3': 85 }, d: 600 });
+    adapter1.saveState({
+      b: 7,
+      v: [0, 1, 2, 3, 4, 5, 6, 7],
+      q: { '3': 85 },
+      d: 600,
+    });
 
     // Simulate page reload — new adapter instance, same localStorage
     const adapter2 = createTestAdapter('Test');

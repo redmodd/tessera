@@ -7,6 +7,27 @@ on:
     branches: [main]
 
 jobs:
+  static:
+    name: Lint, types & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm check
+
+      - run: pnpm format:check
+
   test:
     name: Build & test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest

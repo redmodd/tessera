@@ -39,7 +39,7 @@ export function defaultAccountHomePage(activityId: string): string | null {
 export function synthesizeSCORM12Actor(
   api: SCORM12API,
   activityId: string,
-  actorAccountHomePage?: string
+  actorAccountHomePage?: string,
 ): XAPIAgent | null {
   let id = '';
   let name = '';
@@ -68,7 +68,7 @@ export function synthesizeSCORM12Actor(
 export function synthesizeSCORM2004Actor(
   api: SCORM2004API,
   activityId: string,
-  actorAccountHomePage?: string
+  actorAccountHomePage?: string,
 ): XAPIAgent | null {
   let id = '';
   let name = '';

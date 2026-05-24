@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const ownPkg = JSON.parse(
-  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8')
+  readFileSync(resolve(PKG_ROOT, 'package.json'), 'utf-8'),
 ) as { version: string };
 // create-tessera and tessera-learn release in lockstep via the changesets
 // `fixed` group (not `linked`, which would not co-publish tessera-learn), so the
@@ -67,7 +67,9 @@ export function parseArgs(argv: string[]): ParseResult {
     if (a.startsWith('--template=')) {
       const v = a.slice('--template='.length);
       if (v !== 'default' && v !== 'bare') {
-        return { error: `Unknown template "${v}". Valid templates: default, bare` };
+        return {
+          error: `Unknown template "${v}". Valid templates: default, bare`,
+        };
       }
       args.template = v;
     } else if (a.startsWith('-')) {
@@ -151,8 +153,9 @@ const RENAME: Record<string, string> = {
 const TEXT = /\.(svelte|js|ts|json|css|md|html)$/;
 
 function applyTokens(s: string, t: Tokens): string {
-  return s.replace(/__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/g, (m) =>
-    t[m as keyof Tokens]
+  return s.replace(
+    /__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/g,
+    (m) => t[m as keyof Tokens],
   );
 }
 
@@ -241,7 +244,7 @@ function upgrade(dryRun: boolean) {
 
   if (!pkg.dependencies?.['tessera-learn']) {
     failPlain(
-      'this does not look like a Tessera project (no "tessera-learn" dependency in package.json)'
+      'this does not look like a Tessera project (no "tessera-learn" dependency in package.json)',
     );
   }
 
@@ -258,11 +261,11 @@ function upgrade(dryRun: boolean) {
       delete scripts[m.stale];
       pkgChanged = true;
       changes.push(
-        `package.json: removed stale "${m.stale}" script (renamed to "${m.replacedBy}")`
+        `package.json: removed stale "${m.stale}" script (renamed to "${m.replacedBy}")`,
       );
     } else {
       warnings.push(
-        `package.json: kept your "${m.stale}" script — its value differs from the framework default, so it is treated as yours`
+        `package.json: kept your "${m.stale}" script — its value differs from the framework default, so it is treated as yours`,
       );
     }
   }
@@ -276,7 +279,7 @@ function upgrade(dryRun: boolean) {
       changes.push(`package.json: added "${name}" script`);
     } else if (current !== value) {
       warnings.push(
-        `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`
+        `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`,
       );
     }
   }
@@ -287,7 +290,7 @@ function upgrade(dryRun: boolean) {
     pkg.dependencies!['tessera-learn'] = TESSERA_VERSION;
     pkgChanged = true;
     changes.push(
-      `package.json: set tessera-learn to "${TESSERA_VERSION}" (was "${currentDep}")`
+      `package.json: set tessera-learn to "${TESSERA_VERSION}" (was "${currentDep}")`,
     );
   }
 
@@ -308,7 +311,7 @@ function upgrade(dryRun: boolean) {
       dest: resolve(cwd, 'vite.config.js'),
       content: readFileSync(
         resolve(PKG_ROOT, 'templates/base/vite.config.js'),
-        'utf-8'
+        'utf-8',
       ),
     },
   ];
@@ -322,7 +325,7 @@ function upgrade(dryRun: boolean) {
       changes.push(`${f.name}: updated to the current framework version`);
       if (f.name === 'vite.config.js') {
         warnings.push(
-          'vite.config.js: replaced with the framework version — if you had customizations, re-apply them'
+          'vite.config.js: replaced with the framework version — if you had customizations, re-apply them',
         );
       }
     }
@@ -335,7 +338,7 @@ function upgrade(dryRun: boolean) {
   }
 
   process.stdout.write(
-    `\n${dryRun ? 'Would apply' : 'Applied'} ${changes.length} change(s):\n`
+    `\n${dryRun ? 'Would apply' : 'Applied'} ${changes.length} change(s):\n`,
   );
   for (const c of changes) process.stdout.write(`  ${c}\n`);
   if (warnings.length) {
@@ -345,7 +348,7 @@ function upgrade(dryRun: boolean) {
   process.stdout.write(
     dryRun
       ? '\nNo files written (--dry-run). Re-run without --dry-run to apply.\n'
-      : '\nDone. Run "npm install" to pick up dependency changes.\n'
+      : '\nDone. Run "npm install" to pick up dependency changes.\n',
   );
 }
 
@@ -392,7 +395,7 @@ function main() {
 
   const pm = detectPackageManager();
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  ${INSTALL[pm]}\n  ${RUN[pm]} dev\n`
+    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  ${INSTALL[pm]}\n  ${RUN[pm]} dev\n`,
   );
 }
 

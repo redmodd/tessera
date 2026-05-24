@@ -65,11 +65,11 @@ npx create-tessera@latest upgrade --dry-run  # preview without writing
 
 ## Flags
 
-| Flag | Description |
-|------|-------------|
+| Flag                | Description                                                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `--template=<name>` | `default` (full starter, components included) or `bare` (hooks-only, layout.svelte, no built-in components). Defaults to `default`. |
-| `--dry-run` | (`upgrade` only) Preview changes without writing any files. |
-| `--help`, `-h` | Print usage and exit. |
+| `--dry-run`         | (`upgrade` only) Preview changes without writing any files.                                                                         |
+| `--help`, `-h`      | Print usage and exit.                                                                                                               |
 
 ## License
 

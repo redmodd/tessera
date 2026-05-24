@@ -22,10 +22,7 @@ let counter = 0;
 
 function createTestDir(): string {
   counter++;
-  const dir = resolve(
-    tmpdir(),
-    `tessera-export-test-${Date.now()}-${counter}`
-  );
+  const dir = resolve(tmpdir(), `tessera-export-test-${Date.now()}-${counter}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -38,13 +35,9 @@ function createDistDir(root: string): string {
   writeFileSync(
     resolve(distDir, 'assets', 'main.js'),
     'console.log("hi")',
-    'utf-8'
+    'utf-8',
   );
-  writeFileSync(
-    resolve(distDir, 'assets', 'style.css'),
-    'body {}',
-    'utf-8'
-  );
+  writeFileSync(resolve(distDir, 'assets', 'style.css'), 'body {}', 'utf-8');
   return distDir;
 }
 
@@ -67,10 +60,10 @@ describe('generateSCORM12Manifest', () => {
 
     expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain(
-      'xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"'
+      'xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"',
     );
     expect(xml).toContain(
-      'xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"'
+      'xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"',
     );
     expect(xml).toContain('<schemaversion>1.2</schemaversion>');
     expect(xml).toContain('adlcp:scormtype="sco"');
@@ -84,13 +77,8 @@ describe('generateSCORM12Manifest', () => {
 
   it('escapes XML special characters in title', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateSCORM12Manifest(
-      { title: 'A & B <Course>' },
-      distDir
-    );
-    expect(xml).toContain(
-      '<title>A &amp; B &lt;Course&gt;</title>'
-    );
+    const xml = generateSCORM12Manifest({ title: 'A & B <Course>' }, distDir);
+    expect(xml).toContain('<title>A &amp; B &lt;Course&gt;</title>');
   });
 
   it('lists all files in dist/', () => {
@@ -112,13 +100,13 @@ describe('generateSCORM12Manifest', () => {
     const distDir = createDistDir(testRoot);
     const xml = generateSCORM12Manifest({ title: 'Test' }, distDir);
     expect(xml).toContain(
-      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
     expect(xml).toContain(
-      'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd'
+      'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd',
     );
     expect(xml).toContain(
-      'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd'
+      'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
     );
   });
 });
@@ -130,15 +118,9 @@ describe('generateSCORM2004Manifest', () => {
     const distDir = createDistDir(testRoot);
     const xml = generateSCORM2004Manifest({ title: 'My Course' }, distDir);
 
-    expect(xml).toContain(
-      'xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"'
-    );
-    expect(xml).toContain(
-      'xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"'
-    );
-    expect(xml).toContain(
-      '<schemaversion>2004 4th Edition</schemaversion>'
-    );
+    expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"');
+    expect(xml).toContain('xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"');
+    expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>');
   });
 
   it('uses capital T in scormType', () => {
@@ -158,13 +140,13 @@ describe('generateSCORM2004Manifest', () => {
     const distDir = createDistDir(testRoot);
     const xml = generateSCORM2004Manifest({ title: 'Test' }, distDir);
     expect(xml).toContain(
-      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
     expect(xml).toContain(
-      'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd'
+      'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd',
     );
     expect(xml).toContain(
-      'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd'
+      'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
     );
   });
 });
@@ -181,13 +163,11 @@ describe('generateCMI5Xml', () => {
 
     expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain(
-      'xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"'
+      'xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"',
     );
+    expect(xml).toContain('<langstring lang="en-US">My Course</langstring>');
     expect(xml).toContain(
-      '<langstring lang="en-US">My Course</langstring>'
-    );
-    expect(xml).toContain(
-      '<langstring lang="en-US">A great course</langstring>'
+      '<langstring lang="en-US">A great course</langstring>',
     );
   });
 
@@ -311,9 +291,7 @@ describe('runExport', () => {
     });
 
     // Check manifest was written to dist
-    expect(
-      existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))
-    ).toBe(true);
+    expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
 
     // Check zip was created
     const zipPath = resolve(testRoot, 'test-course-2.0.0.zip');
@@ -322,7 +300,7 @@ describe('runExport', () => {
     // Manifest content is valid
     const manifest = readFileSync(
       resolve(testRoot, 'dist', 'imsmanifest.xml'),
-      'utf-8'
+      'utf-8',
     );
     expect(manifest).toContain('<schemaversion>1.2</schemaversion>');
   });
@@ -335,19 +313,15 @@ describe('runExport', () => {
       export: { standard: 'scorm2004' },
     });
 
-    expect(
-      existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))
-    ).toBe(true);
-    expect(
-      existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))
-    ).toBe(true);
+    expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
+    expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
 
     const manifest = readFileSync(
       resolve(testRoot, 'dist', 'imsmanifest.xml'),
-      'utf-8'
+      'utf-8',
     );
     expect(manifest).toContain(
-      '<schemaversion>2004 4th Edition</schemaversion>'
+      '<schemaversion>2004 4th Edition</schemaversion>',
     );
   });
 
@@ -360,17 +334,10 @@ describe('runExport', () => {
       export: { standard: 'cmi5' },
     });
 
-    expect(existsSync(resolve(testRoot, 'dist', 'cmi5.xml'))).toBe(
-      true
-    );
-    expect(
-      existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))
-    ).toBe(true);
+    expect(existsSync(resolve(testRoot, 'dist', 'cmi5.xml'))).toBe(true);
+    expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
 
-    const xml = readFileSync(
-      resolve(testRoot, 'dist', 'cmi5.xml'),
-      'utf-8'
-    );
+    const xml = readFileSync(resolve(testRoot, 'dist', 'cmi5.xml'), 'utf-8');
     expect(xml).toContain('masteryScore="0.8"');
   });
 
@@ -382,8 +349,8 @@ describe('runExport', () => {
       export: { standard: 'scorm12' },
     });
 
-    expect(
-      existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))
-    ).toBe(true);
+    expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
+      true,
+    );
   });
 });

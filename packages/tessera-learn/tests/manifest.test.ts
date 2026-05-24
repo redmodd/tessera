@@ -23,15 +23,33 @@ function createFile(relativePath: string, content: string) {
 }
 
 function setupStandardCourse() {
-  createFile('01-introduction/_meta.js', 'export default { title: "Introduction" };');
-  createFile('01-introduction/01-welcome/_meta.js', 'export default { title: "Welcome", pages: ["welcome", "objectives"] };');
-  createFile('01-introduction/01-welcome/welcome.svelte', `<script context="module">
+  createFile(
+    '01-introduction/_meta.js',
+    'export default { title: "Introduction" };',
+  );
+  createFile(
+    '01-introduction/01-welcome/_meta.js',
+    'export default { title: "Welcome", pages: ["welcome", "objectives"] };',
+  );
+  createFile(
+    '01-introduction/01-welcome/welcome.svelte',
+    `<script context="module">
 export const pageConfig = { title: "Welcome to the Course" }
 </script>
-<h1>Welcome</h1>`);
-  createFile('01-introduction/01-welcome/objectives.svelte', '<h1>Objectives</h1>');
-  createFile('02-core-content/_meta.js', 'export default { title: "Core Content" };');
-  createFile('02-core-content/01-basics/_meta.js', 'export default { title: "The Basics", pages: ["overview"] };');
+<h1>Welcome</h1>`,
+  );
+  createFile(
+    '01-introduction/01-welcome/objectives.svelte',
+    '<h1>Objectives</h1>',
+  );
+  createFile(
+    '02-core-content/_meta.js',
+    'export default { title: "Core Content" };',
+  );
+  createFile(
+    '02-core-content/01-basics/_meta.js',
+    'export default { title: "The Basics", pages: ["overview"] };',
+  );
   createFile('02-core-content/01-basics/overview.svelte', '<h1>Overview</h1>');
 }
 
@@ -94,7 +112,11 @@ describe('orderPageFiles', () => {
   it('returns all files alphabetically when no pages array', () => {
     const all = ['c.svelte', 'a.svelte', 'b.svelte'];
     expect(orderPageFiles(all)).toEqual(['c.svelte', 'a.svelte', 'b.svelte']);
-    expect(orderPageFiles(all, [])).toEqual(['c.svelte', 'a.svelte', 'b.svelte']);
+    expect(orderPageFiles(all, [])).toEqual([
+      'c.svelte',
+      'a.svelte',
+      'b.svelte',
+    ]);
   });
 
   it('skips listed files that do not exist', () => {
@@ -162,13 +184,19 @@ describe('extractObjectLiteral', () => {
 
 describe('readMetaFile', () => {
   it('reads title from _meta.js', () => {
-    const path = createFile('meta-test/_meta.js', 'export default { title: "My Section" };');
+    const path = createFile(
+      'meta-test/_meta.js',
+      'export default { title: "My Section" };',
+    );
     const meta = readMetaFile(path);
     expect(meta.title).toBe('My Section');
   });
 
   it('reads title and pages array', () => {
-    const path = createFile('meta-test2/_meta.js', 'export default { title: "Lesson", pages: ["a", "b"] };');
+    const path = createFile(
+      'meta-test2/_meta.js',
+      'export default { title: "Lesson", pages: ["a", "b"] };',
+    );
     const meta = readMetaFile(path);
     expect(meta.title).toBe('Lesson');
     expect(meta.pages).toEqual(['a', 'b']);
@@ -184,7 +212,10 @@ describe('readMetaFile', () => {
   });
 
   it('handles trailing commas', () => {
-    const path = createFile('meta-trailing/_meta.js', 'export default { title: "T", pages: ["a",], };');
+    const path = createFile(
+      'meta-trailing/_meta.js',
+      'export default { title: "T", pages: ["a",], };',
+    );
     const meta = readMetaFile(path);
     expect(meta.title).toBe('T');
     expect(meta.pages).toEqual(['a']);
@@ -195,16 +226,21 @@ describe('readMetaFile', () => {
 
 describe('extractPageConfig', () => {
   it('extracts title from pageConfig', () => {
-    const path = createFile('page-test/page.svelte', `<script context="module">
+    const path = createFile(
+      'page-test/page.svelte',
+      `<script context="module">
 export const pageConfig = { title: "My Page" }
 </script>
-<h1>Hi</h1>`);
+<h1>Hi</h1>`,
+    );
     const config = extractPageConfig(path);
     expect(config.title).toBe('My Page');
   });
 
   it('extracts quiz config', () => {
-    const path = createFile('page-quiz/quiz.svelte', `<script context="module">
+    const path = createFile(
+      'page-quiz/quiz.svelte',
+      `<script context="module">
 export const pageConfig = {
   title: "Quiz",
   quiz: {
@@ -214,7 +250,8 @@ export const pageConfig = {
   }
 }
 </script>
-<h1>Quiz</h1>`);
+<h1>Quiz</h1>`,
+    );
     const config = extractPageConfig(path);
     expect(config.title).toBe('Quiz');
     expect(config.quiz).toEqual({
@@ -230,27 +267,36 @@ export const pageConfig = {
   });
 
   it('returns empty object when no pageConfig export', () => {
-    const path = createFile('page-no-config/page.svelte', `<script context="module">
+    const path = createFile(
+      'page-no-config/page.svelte',
+      `<script context="module">
 export const something = "else";
-</script>`);
+</script>`,
+    );
     expect(extractPageConfig(path)).toEqual({});
   });
 
   it('handles Infinity in maxAttempts', () => {
-    const path = createFile('page-inf/page.svelte', `<script context="module">
+    const path = createFile(
+      'page-inf/page.svelte',
+      `<script context="module">
 export const pageConfig = {
   title: "Unlimited",
   quiz: { graded: true, maxAttempts: Infinity }
 }
-</script>`);
+</script>`,
+    );
     const config = extractPageConfig(path);
     expect(config.quiz!.maxAttempts).toBe(Infinity);
   });
 
   it('handles single-quoted strings', () => {
-    const path = createFile('page-single/page.svelte', `<script context="module">
+    const path = createFile(
+      'page-single/page.svelte',
+      `<script context="module">
 export const pageConfig = { title: 'Single Quotes' }
-</script>`);
+</script>`,
+    );
     const config = extractPageConfig(path);
     expect(config.title).toBe('Single Quotes');
   });
@@ -301,7 +347,10 @@ describe('generateManifest', () => {
   });
 
   it('uses title-case fallback for page without pageConfig', () => {
-    createFile('01-s/01-l/_meta.js', 'export default { title: "L", pages: ["my-page"] };');
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["my-page"] };',
+    );
     createFile('01-s/01-l/my-page.svelte', '<h1>Hello</h1>');
     const manifest = generateManifest(TMP);
 
@@ -309,13 +358,20 @@ describe('generateManifest', () => {
   });
 
   it('appends unlisted svelte files alphabetically after listed ones', () => {
-    createFile('01-s/01-l/_meta.js', 'export default { title: "L", pages: ["second"] };');
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["second"] };',
+    );
     createFile('01-s/01-l/second.svelte', '<h1>Second</h1>');
     createFile('01-s/01-l/alpha.svelte', '<h1>Alpha</h1>');
     createFile('01-s/01-l/beta.svelte', '<h1>Beta</h1>');
     const manifest = generateManifest(TMP);
 
-    expect(manifest.pages.map(p => p.slug)).toEqual(['second', 'alpha', 'beta']);
+    expect(manifest.pages.map((p) => p.slug)).toEqual([
+      'second',
+      'alpha',
+      'beta',
+    ]);
   });
 
   it('handles empty pages directory', () => {
@@ -331,10 +387,16 @@ describe('generateManifest', () => {
   });
 
   it('assigns sequential indices across sections', () => {
-    createFile('01-a/01-l/_meta.js', 'export default { title: "L1", pages: ["p1", "p2"] };');
+    createFile(
+      '01-a/01-l/_meta.js',
+      'export default { title: "L1", pages: ["p1", "p2"] };',
+    );
     createFile('01-a/01-l/p1.svelte', '<h1>P1</h1>');
     createFile('01-a/01-l/p2.svelte', '<h1>P2</h1>');
-    createFile('02-b/01-l/_meta.js', 'export default { title: "L2", pages: ["p3"] };');
+    createFile(
+      '02-b/01-l/_meta.js',
+      'export default { title: "L2", pages: ["p3"] };',
+    );
     createFile('02-b/01-l/p3.svelte', '<h1>P3</h1>');
     const manifest = generateManifest(TMP);
 
@@ -347,20 +409,26 @@ describe('generateManifest', () => {
     setupStandardCourse();
     const manifest = generateManifest(TMP);
 
-    const nestedPages = manifest.sections.flatMap(s =>
-      s.lessons.flatMap(l => l.pages)
+    const nestedPages = manifest.sections.flatMap((s) =>
+      s.lessons.flatMap((l) => l.pages),
     );
     expect(manifest.pages).toEqual(nestedPages);
   });
 
   it('extracts quiz config into manifest', () => {
-    createFile('01-s/01-l/_meta.js', 'export default { title: "L", pages: ["quiz"] };');
-    createFile('01-s/01-l/quiz.svelte', `<script context="module">
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["quiz"] };',
+    );
+    createFile(
+      '01-s/01-l/quiz.svelte',
+      `<script context="module">
 export const pageConfig = {
   title: "Assessment",
   quiz: { graded: true, gatesProgress: true, maxAttempts: 3 }
 }
-</script>`);
+</script>`,
+    );
     const manifest = generateManifest(TMP);
 
     expect(manifest.pages[0].quiz).toEqual({
@@ -371,7 +439,10 @@ export const pageConfig = {
   });
 
   it('sets quiz to null for non-quiz pages', () => {
-    createFile('01-s/01-l/_meta.js', 'export default { title: "L", pages: ["page"] };');
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["page"] };',
+    );
     createFile('01-s/01-l/page.svelte', '<h1>Hello</h1>');
     const manifest = generateManifest(TMP);
 
@@ -379,10 +450,15 @@ export const pageConfig = {
   });
 
   it('generates correct importPath', () => {
-    createFile('01-intro/01-welcome/_meta.js', 'export default { title: "W", pages: ["hello"] };');
+    createFile(
+      '01-intro/01-welcome/_meta.js',
+      'export default { title: "W", pages: ["hello"] };',
+    );
     createFile('01-intro/01-welcome/hello.svelte', '<h1>Hello</h1>');
     const manifest = generateManifest(TMP);
 
-    expect(manifest.pages[0].importPath).toBe('/pages/01-intro/01-welcome/hello.svelte');
+    expect(manifest.pages[0].importPath).toBe(
+      '/pages/01-intro/01-welcome/hello.svelte',
+    );
   });
 });

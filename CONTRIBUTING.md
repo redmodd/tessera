@@ -66,7 +66,7 @@ Releases are managed by [changesets](https://github.com/changesets/changesets). 
 pnpm changeset
 ```
 
-Pick the affected packages, choose `patch` / `minor` / `major`, and write a one-line summary aimed at end users. Commit the generated file in `.changeset/`. For a change with no user-facing impact (an internal refactor, a test-only change), still add a `patch` — an *empty* changeset (`changeset add --empty`) does **not** satisfy the gate once package files have changed.
+Pick the affected packages, choose `patch` / `minor` / `major`, and write a one-line summary aimed at end users. Commit the generated file in `.changeset/`. For a change with no user-facing impact (an internal refactor, a test-only change), still add a `patch` — an _empty_ changeset (`changeset add --empty`) does **not** satisfy the gate once package files have changed.
 
 `create-tessera` and `tessera-learn` are version-locked (changesets `fixed`): a changeset for either one releases **both** at the same new version, so they always share a version number. This is what lets `create-tessera` pin `tessera-learn` to its own version.
 

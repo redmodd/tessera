@@ -12,7 +12,9 @@ const tfInteraction = (response: boolean): Interaction => ({
   correct: true,
 });
 
-function results(values: Array<{ correct: boolean; weight?: number }>): QuizQuestionResult[] {
+function results(
+  values: Array<{ correct: boolean; weight?: number }>,
+): QuizQuestionResult[] {
   return values.map((v) => ({
     interaction: tfInteraction(v.correct),
     correct: v.correct,
@@ -45,14 +47,18 @@ describe('resolveFeedbackMode', () => {
     const dflt = resolveFeedbackMode({});
     expect(dflt({ ...baseState, revealed: true })).toBe(false);
     expect(dflt({ ...baseState, reviewing: true })).toBe(true);
-    expect(resolveFeedbackMode(null)({ ...baseState, reviewing: true })).toBe(true);
+    expect(resolveFeedbackMode(null)({ ...baseState, reviewing: true })).toBe(
+      true,
+    );
   });
 });
 
 describe('resolveRetryStrategy', () => {
   it("'incorrect-only' enum returns the set of correct indices to lock", () => {
     const fn = resolveRetryStrategy({ retryMode: 'incorrect-only' });
-    const locked = fn(results([{ correct: true }, { correct: false }, { correct: true }]));
+    const locked = fn(
+      results([{ correct: true }, { correct: false }, { correct: true }]),
+    );
     expect([...locked].sort()).toEqual([0, 2]);
   });
 
@@ -63,6 +69,8 @@ describe('resolveRetryStrategy', () => {
 
   it('default config falls through to full reset', () => {
     expect(resolveRetryStrategy({})(results([{ correct: true }])).size).toBe(0);
-    expect(resolveRetryStrategy(null)(results([{ correct: true }])).size).toBe(0);
+    expect(resolveRetryStrategy(null)(results([{ correct: true }])).size).toBe(
+      0,
+    );
   });
 });
