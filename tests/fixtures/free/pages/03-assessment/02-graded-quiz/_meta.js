@@ -1,1 +1,1 @@
-export default { title: "Graded Quiz", pages: ["quiz"] };
+export default { title: 'Graded Quiz', pages: ['quiz'] };

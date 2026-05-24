@@ -1,5 +1,5 @@
 <script module>
-  export const pageConfig = { title: "Check" };
+  export const pageConfig = { title: 'Check' };
 </script>
 
 <script>
@@ -15,7 +15,9 @@
       correct: ['contract'],
       options: ['contract', 'presentation'],
     }),
-    reset: () => { selected = null; },
+    reset: () => {
+      selected = null;
+    },
   });
 </script>
 

@@ -73,9 +73,22 @@
 </div>
 
 <style>
-  .custom-quiz { padding: 1rem; }
-  .custom-quiz-status { font-family: monospace; margin-bottom: 1rem; }
-  .custom-quiz-list { padding-left: 1.5rem; }
-  .custom-quiz-item { margin-bottom: 1rem; }
-  .custom-quiz-actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
+  .custom-quiz {
+    padding: 1rem;
+  }
+  .custom-quiz-status {
+    font-family: monospace;
+    margin-bottom: 1rem;
+  }
+  .custom-quiz-list {
+    padding-left: 1.5rem;
+  }
+  .custom-quiz-item {
+    margin-bottom: 1rem;
+  }
+  .custom-quiz-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
 </style>

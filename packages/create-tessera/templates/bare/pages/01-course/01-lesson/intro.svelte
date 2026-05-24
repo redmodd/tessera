@@ -1,5 +1,5 @@
 <script module>
-  export const pageConfig = { title: "Intro" };
+  export const pageConfig = { title: 'Intro' };
 </script>
 
 <h1>__PROJECT_TITLE__</h1>

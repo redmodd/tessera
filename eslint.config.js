@@ -13,8 +13,6 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/.vite/**',
       'tests/.e2e-variants/**',
-      'tests/fixtures/**',
-      'packages/create-tessera/templates/**',
     ],
   },
 

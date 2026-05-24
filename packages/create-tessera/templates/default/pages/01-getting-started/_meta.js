@@ -1,1 +1,1 @@
-export default { title: "Getting Started" };
+export default { title: 'Getting Started' };

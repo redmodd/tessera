@@ -1,1 +1,1 @@
-export default { title: "Basics" };
+export default { title: 'Basics' };

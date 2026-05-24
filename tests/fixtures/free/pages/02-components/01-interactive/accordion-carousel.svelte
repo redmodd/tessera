@@ -1,9 +1,14 @@
 <script context="module">
-  export const pageConfig = { title: "Accordion & Carousel" };
+  export const pageConfig = { title: 'Accordion & Carousel' };
 </script>
 
 <script>
-  import { Accordion, AccordionItem, Carousel, CarouselSlide } from 'tessera-learn';
+  import {
+    Accordion,
+    AccordionItem,
+    Carousel,
+    CarouselSlide,
+  } from 'tessera-learn';
 </script>
 
 <h1>Accordion & Carousel</h1>

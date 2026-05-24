@@ -156,7 +156,7 @@ describe('create-tessera CLI', () => {
       resolve(testDir, 'my-awesome-course', 'course.config.js'),
       'utf-8',
     );
-    expect(content).toContain('title: "My Awesome Course"');
+    expect(content).toContain("title: 'My Awesome Course'");
   });
 
   it('welcome.svelte includes project title', () => {
@@ -280,8 +280,8 @@ describe('create-tessera CLI', () => {
         resolve(testDir, 'bare-course', 'course.config.js'),
         'utf-8',
       );
-      expect(config).toContain('title: "Bare Course"');
-      expect(config).toContain('export: { standard: "web" }');
+      expect(config).toContain("title: 'Bare Course'");
+      expect(config).toContain("export: { standard: 'web' }");
       expect(config).not.toContain('branding');
     });
 
