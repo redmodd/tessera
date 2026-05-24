@@ -221,6 +221,194 @@ describe('config validation', () => {
     );
   });
 
+  it('warns when title is missing', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"title" is missing or empty'),
+    );
+  });
+
+  it('warns when title is an empty string', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"title" is missing or empty'),
+    );
+  });
+
+  it('warns that a whitespace-only title ships verbatim, not as the default', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "   ",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"title" is only whitespace'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('"title" is missing or empty'),
+    );
+  });
+
+  it('errors when title is not a string', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: 123,
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"title" must be a string, got number'),
+    );
+  });
+
+  it('warns when branding.logo uses the $assets alias', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { logo: "$assets/logo.png" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"branding.logo" starts with "$assets/"'),
+    );
+  });
+
+  it('warns on an unparseable branding.primaryColor', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { primaryColor: "not a color" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"branding.primaryColor" "not a color" does not look like a valid CSS color',
+      ),
+    );
+  });
+
+  it('accepts a valid branding.primaryColor', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { primaryColor: "#3366ff", fontFamily: "Inter, sans-serif" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
+  });
+
+  it('accepts a modern CSS color function for branding.primaryColor', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { primaryColor: "oklch(0.7 0.15 200)" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
+  });
+
+  it('warns when branding is an array', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: ["#fff"],
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"branding" must be an object, got array'),
+    );
+  });
+
+  it('warns when branding.fontFamily is not a string', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { fontFamily: 42 },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"branding.fontFamily" must be a string, got number',
+      ),
+    );
+  });
+
   it('errors on unparseable config', () => {
     writeFile(testRoot, 'course.config.js', 'this is not valid JS;');
     mkdirp(testRoot, 'pages', '01-s', '01-l');
@@ -417,6 +605,60 @@ export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
       ),
     );
   });
+
+  it('errors on invalid quiz.feedbackMode', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { feedbackMode: "imediate" } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'quiz.feedbackMode must be "review", "immediate", or "never", got "imediate"',
+      ),
+    );
+  });
+
+  it('errors on invalid quiz.retryMode', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { retryMode: "partial" } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'quiz.retryMode must be "full" or "incorrect-only", got "partial"',
+      ),
+    );
+  });
+
+  it('accepts valid quiz.feedbackMode and retryMode', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { feedbackMode: "immediate", retryMode: "incorrect-only" } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(
+      errors.filter(
+        (e) => e.includes('feedbackMode') || e.includes('retryMode'),
+      ),
+    ).toHaveLength(0);
+  });
 });
 
 // ---- Structure Validation ----
@@ -476,6 +718,21 @@ describe('structure validation', () => {
     expect(warnings).not.toContainEqual(
       expect.stringContaining(
         'flat-page.svelte: this file is outside the section/lesson structure',
+      ),
+    );
+  });
+
+  it('warns when a section contributes no pages', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/02-empty/_meta.js',
+      'export default { title: "Empty" };',
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '02-empty: section contributed no pages and will be empty',
       ),
     );
   });
@@ -689,6 +946,169 @@ describe('question component validation', () => {
       expect.stringContaining('<FillInTheBlank> answers must not be empty'),
     );
   });
+
+  it('warns when a question weight is a string', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} weight="2" />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'weight="2" is a string and is ignored (treated as 1)',
+      ),
+    );
+  });
+
+  it('errors when a question weight is non-finite', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} weight={Infinity} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('weight must be finite'),
+    );
+  });
+
+  it('warns when a question weight is not positive', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} weight={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weight 0 is not positive and is ignored'),
+    );
+  });
+
+  it('accepts a positive numeric weight', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} weight={2} />`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(
+      [...errors, ...warnings].filter((m) => m.includes('weight')),
+    ).toHaveLength(0);
+  });
+
+  it('warns when MultipleChoice optionFeedback has more entries than options', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} optionFeedback={["x", "y", "z"]} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'optionFeedback has 3 entries but only 2 options',
+      ),
+    );
+  });
+
+  it('does not warn when optionFeedback is shorter than options', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b", "c"]} correct={0} optionFeedback={["x"]} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('optionFeedback'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('warns when a question id will be rewritten under SCORM 1.2', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'question id "my question" will be rewritten to "my_question" for SCORM 1.2',
+      ),
+    );
+  });
+
+  it('errors on a SCORM 1.2 sanitized id collision', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="q-1" question="A" options={["a", "b"]} correct={0} />
+<MultipleChoice id="q_1" question="B" options={["a", "b"]} correct={1} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'collides with a prior id after SCORM 1.2 sanitization ("q_1")',
+      ),
+    );
+  });
+
+  it('does not flag id rewrites under non-scorm12 export', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('will be rewritten')),
+    ).toHaveLength(0);
+  });
+
+  it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="q1" question="A" options={["a", "b"]} correct={0} />
+<MultipleChoice id="q1" question="B" options={["a", "b"]} correct={1} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(
+      errors.filter((e) => e.includes('duplicate question id')),
+    ).toHaveLength(1);
+    expect(
+      errors.filter((e) => e.includes('after SCORM 1.2 sanitization')),
+    ).toHaveLength(0);
+  });
 });
 
 // ---- Contract Bypass Detection ----
@@ -858,6 +1278,59 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { errors } = validateProject(testRoot);
     expect(
       errors.filter((e) => e.includes('completion.mode is "quiz"')),
+    ).toHaveLength(0);
+  });
+
+  it('warns when completion.mode is "quiz" but passingScore is unset', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'scoring.passingScore is not set — defaulting to 70%',
+      ),
+    );
+  });
+
+  it('does not nudge when passingScore is set explicitly under quiz mode', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  scoring: { passingScore: 80 },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('passingScore is not set')),
     ).toHaveLength(0);
   });
 
