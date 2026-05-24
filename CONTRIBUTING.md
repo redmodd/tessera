@@ -60,17 +60,17 @@ Tessera supports four delivery modes: SCORM 1.2, SCORM 2004 4th Edition, cmi5, a
 
 ## Releases
 
-Releases are managed by [changesets](https://github.com/changesets/changesets). When your PR contains a user-facing change to either published package:
+Releases are managed by [changesets](https://github.com/changesets/changesets). CI gates every PR on `pnpm changeset status --since=origin/main`, so any PR that changes a file under a published package — `packages/tessera-learn/` or `packages/create-tessera/`, including tests and in-package docs — needs a changeset:
 
 ```bash
 pnpm changeset
 ```
 
-Pick the affected packages, choose `patch` / `minor` / `major`, and write a one-line summary aimed at end users. Commit the generated file in `.changeset/`.
+Pick the affected packages, choose `patch` / `minor` / `major`, and write a one-line summary aimed at end users. Commit the generated file in `.changeset/`. For a change with no user-facing impact (an internal refactor, a test-only change), still add a `patch` — an *empty* changeset (`changeset add --empty`) does **not** satisfy the gate once package files have changed.
 
 `create-tessera` and `tessera-learn` are version-locked (changesets `fixed`): a changeset for either one releases **both** at the same new version, so they always share a version number. This is what lets `create-tessera` pin `tessera-learn` to its own version.
 
-Internal changes (docs, CI, refactors with no API impact) don't need a changeset.
+Only PRs confined to root-level files (root docs, CI config, the top-level `tests/` suite) can skip the changeset.
 
 A "Version Packages" PR is opened automatically once changesets land on `main`. Merging it triggers the publish workflow.
 
