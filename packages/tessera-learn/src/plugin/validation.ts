@@ -157,16 +157,22 @@ function parseConfig(
     }
   }
 
-  // Validate title. The merge falls back to "Untitled Course" for a missing or
-  // empty string (warn), but a non-string is passed through truthy and ships
-  // verbatim (error).
+  // Validate title against the runtime merge `userConfig.title || "Untitled
+  // Course"`: a missing or empty string falls back to the default (warn), a
+  // whitespace-only string is truthy and ships verbatim (warn), and a
+  // non-string is a misconfiguration — a truthy one ships as-is, a falsy one
+  // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
     errors.push(
       `course.config.js: "title" must be a string, got ${typeof config.title}`,
     );
-  } else if (config.title === undefined || config.title.trim() === '') {
+  } else if (config.title === undefined || config.title === '') {
     warnings.push(
       'course.config.js: "title" is missing or empty — the course will ship as "Untitled Course"',
+    );
+  } else if (config.title.trim() === '') {
+    warnings.push(
+      'course.config.js: "title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
     );
   }
 
@@ -266,12 +272,14 @@ function parseConfig(
 // ---------- Branding Validation ----------
 
 // Permissive approximation of the browser's accepted color set: hex 3/4/6/8,
-// rgb()/rgba()/hsl()/hsla(), or a bare keyword (named colors, transparent,
-// currentColor). parseColor's real check (App.svelte) is browser-only and the
-// runtime degrades gracefully, so an unrecognized value is advisory, never an
-// error — lean permissive to avoid rejecting values the browser would accept.
+// any CSS functional notation (rgb/hsl/hwb/lab/lch/oklab/oklch/color), or a
+// bare keyword (named colors, transparent, currentColor). parseColor's real
+// check (App.svelte) is browser-only and the runtime degrades gracefully, so
+// an unrecognized value is advisory, never an error — lean permissive to avoid
+// rejecting values the browser would accept.
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-const FUNC_COLOR_RE = /^(?:rgb|rgba|hsl|hsla)\(.*\)$/i;
+const FUNC_COLOR_RE =
+  /^(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\(.*\)$/i;
 const NAMED_COLOR_RE = /^[a-zA-Z]+$/;
 
 function isPlausibleColor(value: string): boolean {
@@ -288,9 +296,9 @@ function isPlausibleColor(value: string): boolean {
  * extends this same function with a contrast check on primaryColor.
  */
 function validateBranding(raw: unknown, warnings: string[]): void {
-  if (raw === null || typeof raw !== 'object') {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     warnings.push(
-      `course.config.js: "branding" must be an object, got ${raw === null ? 'null' : typeof raw} — will be ignored`,
+      `course.config.js: "branding" must be an object, got ${raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw} — will be ignored`,
     );
     return;
   }

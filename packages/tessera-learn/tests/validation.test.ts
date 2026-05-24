@@ -256,6 +256,27 @@ describe('config validation', () => {
     );
   });
 
+  it('warns that a whitespace-only title ships verbatim, not as the default', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "   ",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"title" is only whitespace'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('"title" is missing or empty'),
+    );
+  });
+
   it('errors when title is not a string', () => {
     createValidProject(testRoot);
     writeConfig(
@@ -329,6 +350,42 @@ describe('config validation', () => {
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
+  });
+
+  it('accepts a modern CSS color function for branding.primaryColor', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: { primaryColor: "oklch(0.7 0.15 200)" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
+  });
+
+  it('warns when branding is an array', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  branding: ["#fff"],
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"branding" must be an object, got array'),
+    );
   });
 
   it('warns when branding.fontFamily is not a string', () => {
