@@ -15,6 +15,7 @@ import {
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
+import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
 
 // ---------- Types ----------
 
@@ -56,8 +57,10 @@ const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
-const VALID_FEEDBACK_MODES = ['review', 'immediate', 'never'];
-const VALID_RETRY_MODES = ['full', 'incorrect-only'];
+// Derived from the runtime types (single source of truth) — widened to
+// string[] so .includes() accepts an arbitrary author-supplied value.
+const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
+const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
 
 // ---------- Main ----------
 

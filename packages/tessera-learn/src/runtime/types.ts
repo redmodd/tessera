@@ -2,6 +2,14 @@ import type { AccessFn } from './access.js';
 import type { XAPIAgent } from './xapi/types.js';
 
 /**
+ * Quiz enum domains as runtime tuples. The unions below derive from these, and
+ * the build-time validator imports them too — so the accepted value set has a
+ * single source and can't drift between the types and the validator.
+ */
+export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
+export const RETRY_MODES = ['full', 'incorrect-only'] as const;
+
+/**
  * Per-page quiz configuration. Single source of truth — the build plugin
  * extracts this from `pageConfig.quiz` and embeds it in the manifest;
  * the runtime reads it from there. Keep field shapes in sync.
@@ -10,8 +18,8 @@ export interface QuizConfig {
   graded?: boolean;
   gatesProgress?: boolean;
   maxAttempts?: number;
-  feedbackMode?: 'review' | 'immediate' | 'never';
-  retryMode?: 'full' | 'incorrect-only';
+  feedbackMode?: (typeof FEEDBACK_MODES)[number];
+  retryMode?: (typeof RETRY_MODES)[number];
 }
 
 export interface CourseConfig {
