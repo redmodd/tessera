@@ -86,7 +86,7 @@ export class NavigationState {
     if (index < 0 || index >= this.manifest.totalPages) return;
     if (this.isPageLocked(index)) return;
     const page = this.manifest.pages[index];
-    this.#pageModules[page.importPath]?.();
+    void this.#pageModules[page.importPath]?.();
   }
 
   goToPage(index: number) {

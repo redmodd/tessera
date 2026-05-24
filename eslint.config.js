@@ -63,11 +63,13 @@ export default tseslint.config(
   },
 
   // Type-aware linting is scoped to the shipped source the package tsconfigs
-  // cover. The payoff is no-floating-promises: a dropped await on a SCORM/cmi5
-  // commit is a silent tracking-corruption bug.
+  // cover, including the `.svelte.ts` reactive runtime modules. The payoff is
+  // no-floating-promises: a dropped await on a SCORM/cmi5 commit is a silent
+  // tracking-corruption bug. Type info inside `.svelte` component markup needs
+  // a svelte.config.js the build doesn't otherwise require, so async LMS work
+  // is kept in these `.ts`/`.svelte.ts` modules where the rule reaches it.
   {
-    files: ['packages/*/src/**/*.ts'],
-    ignores: ['**/*.svelte.ts'],
+    files: ['packages/*/src/**/*.ts', 'packages/*/src/**/*.svelte.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,
