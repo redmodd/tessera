@@ -91,16 +91,16 @@ async function buildVariant(
 
   const configPath = resolve(dir, 'course.config.js');
   const original = readFileSync(configPath, 'utf-8');
-  const pattern = /export:\s*\{\s*standard:\s*"[^"]*"\s*\}/;
+  const pattern = /export:\s*\{\s*standard:\s*["'][^"']*["']\s*\}/;
   if (!pattern.test(original)) {
     throw new Error(
       `[e2e globalSetup] ${fixtureName}/course.config.js: failed to substitute export.standard for "${standard}". ` +
-        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*"[^"]*"\\s*\\}/.`,
+        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*["'][^"']*["']\\s*\\}/.`,
     );
   }
   const patched = original.replace(
     pattern,
-    `export: { standard: "${standard}" }`,
+    `export: { standard: '${standard}' }`,
   );
   writeFileSync(configPath, patched);
 

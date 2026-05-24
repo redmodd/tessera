@@ -42,11 +42,11 @@ function run(cmd, cwd) {
 function setStandard(projectDir, standard) {
   const cfg = join(projectDir, 'course.config.js');
   const src = readFileSync(cfg, 'utf-8');
-  const re = /standard:\s*"[^"]*"/;
+  const re = /standard:\s*["'][^"']*["']/;
   if (!re.test(src)) {
     throw new Error(`could not find export.standard in ${cfg}`);
   }
-  writeFileSync(cfg, src.replace(re, `standard: "${standard}"`));
+  writeFileSync(cfg, src.replace(re, `standard: '${standard}'`));
 }
 
 function assertExport(projectDir, template, standard) {
