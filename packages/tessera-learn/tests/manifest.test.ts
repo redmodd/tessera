@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import {
   generateManifest,
   extractPageConfig,
-  extractObjectLiteral,
+  extractDefaultExportObjectLiteral,
   readMetaFile,
   orderPageFiles,
   stripPrefix,
@@ -126,57 +126,77 @@ describe('orderPageFiles', () => {
   });
 });
 
-// ---------- extractObjectLiteral ----------
+// ---------- extractDefaultExportObjectLiteral ----------
 
-describe('extractObjectLiteral', () => {
+describe('extractDefaultExportObjectLiteral', () => {
   it('extracts simple object', () => {
-    const src = 'export default { title: "Hello" };';
-    const idx = src.indexOf('{');
-    expect(extractObjectLiteral(src, idx)).toBe('{ title: "Hello" }');
+    expect(
+      extractDefaultExportObjectLiteral('export default { title: "Hello" };'),
+    ).toBe('{ title: "Hello" }');
   });
 
   it('handles nested objects', () => {
-    const src = '{ quiz: { graded: true }, title: "T" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ quiz: { graded: true }, title: "T" }';
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
   it('handles strings with braces', () => {
-    const src = '{ title: "a { b } c" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ title: "a { b } c" }';
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
   it('handles single-quoted strings', () => {
-    const src = "{ title: 'a { b }' }";
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = "{ title: 'a { b }' }";
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
   it('handles escaped quotes in strings', () => {
-    const src = '{ title: "a \\" b" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ title: "a \\" b" }';
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
   it('handles comments', () => {
-    const src = `{
+    const literal = `{
   // this is a comment
   title: "Hello"
 }`;
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
   it('handles multi-line comments', () => {
-    const src = `{
+    const literal = `{
   /* { nested } */
   title: "Hello"
 }`;
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
+      literal,
+    );
   });
 
-  it('returns null for non-brace start', () => {
-    expect(extractObjectLiteral('hello', 0)).toBeNull();
+  it('returns null when there is no default export', () => {
+    expect(extractDefaultExportObjectLiteral('const x = 1;')).toBeNull();
   });
 
-  it('returns null for unmatched braces', () => {
-    expect(extractObjectLiteral('{ title: "hi"', 0)).toBeNull();
+  it('returns null when the default export is not an object literal', () => {
+    expect(
+      extractDefaultExportObjectLiteral('export default "hi";'),
+    ).toBeNull();
+  });
+
+  it('returns null for unparseable source', () => {
+    expect(
+      extractDefaultExportObjectLiteral('export default { title: "hi"'),
+    ).toBeNull();
   });
 });
 

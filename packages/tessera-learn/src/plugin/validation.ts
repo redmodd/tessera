@@ -3,12 +3,12 @@ import { resolve, relative } from 'node:path';
 import JSON5 from 'json5';
 import {
   extractDefaultExportObjectLiteral,
-  extractObjectLiteral,
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
   readCourseConfig,
 } from './manifest.js';
+import { findComponents, getParseError, type PropValue } from './ast.js';
 import {
   validateAgent,
   validateAuthCredential,
@@ -832,6 +832,22 @@ function validatePageFile(
   const fileRel = relative(projectRoot, filePath);
   const content = readSourceFileCached(filePath);
 
+  const parseError = getParseError(content);
+  if (parseError) {
+    errors.push(`${fileRel}: could not parse — ${parseError}`);
+    return {
+      page: {
+        fileRel,
+        navIndex,
+        hasGradedQuiz: false,
+        hasQuiz: false,
+        completesOnView: false,
+      },
+      isQuiz: false,
+      isGradedQuiz: false,
+    };
+  }
+
   const pageConfig = validatePageConfig(content, fileRel, errors);
 
   const isQuiz = !!pageConfig?.quiz;
@@ -1213,68 +1229,6 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   Sorting: ['question', 'items', 'targets', 'correct'],
 };
 
-type PropValue =
-  | { kind: 'string'; value: string }
-  | { kind: 'expr'; raw: string }
-  | { kind: 'bool' };
-
-/**
- * Parse the props of an opening tag starting just after the component name.
- * Returns null if the tag can't be parsed cleanly — callers then skip it
- * rather than risk a false positive.
- */
-function parseTagProps(
-  content: string,
-  start: number,
-): { props: Map<string, PropValue>; hasSpread: boolean } | null {
-  const props = new Map<string, PropValue>();
-  let hasSpread = false;
-  let i = start;
-  while (i < content.length) {
-    while (i < content.length && /\s/.test(content[i])) i++;
-    if (i >= content.length) return null;
-    const c = content[i];
-    if (c === '>') return { props, hasSpread };
-    if (c === '/' && content[i + 1] === '>') return { props, hasSpread };
-    // Spread / shorthand expression — skip the whole {...} block, but record
-    // that unseen props may be supplied here so callers can suppress
-    // false-positive "missing required prop / alt / title" diagnostics.
-    if (c === '{') {
-      const block = extractObjectLiteral(content, i);
-      if (!block) return null;
-      hasSpread = true;
-      i += block.length;
-      continue;
-    }
-    const nameMatch = /^[A-Za-z_][\w-]*/.exec(content.slice(i));
-    if (!nameMatch) return null;
-    const propName = nameMatch[0];
-    i += propName.length;
-    while (i < content.length && /\s/.test(content[i])) i++;
-    if (content[i] !== '=') {
-      props.set(propName, { kind: 'bool' });
-      continue;
-    }
-    i++;
-    while (i < content.length && /\s/.test(content[i])) i++;
-    const v = content[i];
-    if (v === '"' || v === "'") {
-      const end = content.indexOf(v, i + 1);
-      if (end === -1) return null;
-      props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
-      i = end + 1;
-    } else if (v === '{') {
-      const block = extractObjectLiteral(content, i);
-      if (!block) return null;
-      props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
-      i += block.length;
-    } else {
-      return null;
-    }
-  }
-  return null;
-}
-
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   try {
@@ -1302,17 +1256,14 @@ function validateQuestionComponents(
   warnings: string[],
   exportStandard?: string,
 ): void {
-  const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
-  const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
+  const components = findComponents(
+    content,
+    new Set(Object.keys(QUESTION_COMPONENT_REQUIRED)),
+  );
+  if (!components) return;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = tagStartRe.exec(content)) !== null) {
-    const name = m[1];
-    const parsed = parseTagProps(content, m.index + m[0].length);
-    if (!parsed) continue;
-    const { props, hasSpread } = parsed;
-
+  for (const { name, props, hasSpread } of components) {
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
       if (!hasSpread && !props.has(req)) {
         errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
@@ -1469,15 +1420,12 @@ function validateMediaComponents(
   errors: string[],
   warnings: string[],
 ): void {
-  const scan = content.replace(HTML_COMMENT_RE, '');
-  const tagStartRe = /<(Image|Video|Audio)(?=[\s/>])/g;
-  let m: RegExpExecArray | null;
-  while ((m = tagStartRe.exec(scan)) !== null) {
-    const name = m[1];
-    const parsed = parseTagProps(scan, m.index + m[0].length);
-    if (!parsed) continue;
-    const { props, hasSpread } = parsed;
-
+  const components = findComponents(
+    content,
+    new Set(['Image', 'Video', 'Audio']),
+  );
+  if (!components) return;
+  for (const { name, props, hasSpread } of components) {
     if (name === 'Image') {
       const alt = props.get('alt');
       const decorative = props.get('decorative');

@@ -1550,6 +1550,61 @@ describe('a11y — spread props suppress false positives', () => {
   });
 });
 
+describe('AST reach — constructs the regex scanner used to skip', () => {
+  it('validates a component carrying a directive (regex bailed on the colon)', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice class:highlight question="Q" options={['a', 'b']} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(true);
+  });
+
+  it('validates expression props on a multiline tag', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice\n  question="Q"\n  options={['a', 'b', 'c']}\n  correct={5}\n/>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'out of range for 3 options')).toBe(true);
+  });
+
+  it('finds a component nested inside a block', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `{#if show}<MultipleChoice question="Q" options={['a', 'b']} />{/if}`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(true);
+  });
+
+  it('does not validate a commented-out component', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <MultipleChoice question="Q" /> -->`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop')).toBe(false);
+  });
+});
+
+describe('parse failures', () => {
+  it('surfaces an unparseable page as a validator error', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'could not parse')).toBe(true);
+  });
+
+  it('does not cascade content errors on an unparseable page', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop')).toBe(false);
+  });
+});
+
 describe('a11y rule 1.5 — question option/answer labels', () => {
   it('warns on an empty option label', () => {
     createValidProject(testRoot);

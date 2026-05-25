@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
+import { defaultExportObjectLiteral, namedExportObjectLiteral } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
 
 // ---------- Types ----------
@@ -89,25 +90,15 @@ export function deriveSlug(name: string, isFile = false): string {
 export const MODULE_SCRIPT_RE =
   /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>([\s\S]*?)<\/script>/;
 
-/** Matches `export const pageConfig =` (RHS is read separately). */
-export const PAGE_CONFIG_EXPORT_RE = /export\s+const\s+pageConfig\s*=\s*/;
-
-/** Matches `export default ` (RHS is read separately). */
-const DEFAULT_EXPORT_RE = /export\s+default\s*/;
-
 /**
  * Locate `export default { ... }` and return the object literal substring,
- * or null if no balanced object literal follows the `export default` keyword.
- * Used by both manifest extraction and project validation.
+ * or null if there is no default export object literal. Used by both manifest
+ * extraction and project validation.
  */
 export function extractDefaultExportObjectLiteral(
   source: string,
 ): string | null {
-  const match = source.match(DEFAULT_EXPORT_RE);
-  if (!match || match.index === undefined) return null;
-  const startIndex = source.indexOf('{', match.index);
-  if (startIndex < 0) return null;
-  return extractObjectLiteral(source, startIndex);
+  return defaultExportObjectLiteral(source);
 }
 
 export type CourseConfigRead =
@@ -181,27 +172,12 @@ export function parsePageConfigFromSource(
   const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
   if (!moduleScriptMatch) return { kind: 'none' };
 
-  const scriptContent = moduleScriptMatch[1];
-
-  const configMatch = scriptContent.match(PAGE_CONFIG_EXPORT_RE);
-  if (!configMatch || configMatch.index === undefined) return { kind: 'none' };
-
-  const afterExport = scriptContent
-    .slice(configMatch.index + configMatch[0].length)
-    .trimStart();
-  // pageConfig assigned to something other than an object literal — flag as invalid.
-  if (!afterExport.startsWith('{')) return { kind: 'invalid' };
-
-  const startIndex = scriptContent.indexOf(
-    '{',
-    configMatch.index + configMatch[0].length,
-  );
-  if (startIndex < 0) return { kind: 'invalid' };
-  const objectStr = extractObjectLiteral(scriptContent, startIndex);
-  if (!objectStr) return { kind: 'invalid' };
+  const literal = namedExportObjectLiteral(moduleScriptMatch[1], 'pageConfig');
+  if (literal.kind === 'none') return { kind: 'none' };
+  if (literal.kind === 'invalid') return { kind: 'invalid' };
 
   try {
-    return { kind: 'ok', value: JSON5.parse(objectStr) };
+    return { kind: 'ok', value: JSON5.parse(literal.text) };
   } catch {
     return { kind: 'invalid' };
   }
@@ -221,74 +197,6 @@ export function extractPageConfig(filePath: string): {
     );
   }
   return {};
-}
-
-/**
- * Extract a balanced `{...}` or `[...]` span starting at the opening bracket,
- * skipping strings and comments. Returns the substring (inclusive) or null if
- * the open char is wrong or no matching close is found. Shared by manifest
- * extraction, _meta/pageConfig parsing, and the validator's tag-prop parser.
- */
-export function extractObjectLiteral(
-  source: string,
-  startIndex: number,
-): string | null {
-  const open = source[startIndex];
-  if (open !== '{' && open !== '[') return null;
-
-  let depth = 0;
-  let inString: string | null = null;
-  let escaped = false;
-
-  for (let i = startIndex; i < source.length; i++) {
-    const char = source[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\' && inString) {
-      escaped = true;
-      continue;
-    }
-
-    if (inString) {
-      if (char === inString) {
-        inString = null;
-      }
-      continue;
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      inString = char;
-      continue;
-    }
-
-    // Skip single-line comments
-    if (char === '/' && i + 1 < source.length && source[i + 1] === '/') {
-      const newline = source.indexOf('\n', i);
-      i = newline === -1 ? source.length : newline;
-      continue;
-    }
-
-    // Skip multi-line comments
-    if (char === '/' && i + 1 < source.length && source[i + 1] === '*') {
-      const end = source.indexOf('*/', i + 2);
-      i = end === -1 ? source.length : end + 1;
-      continue;
-    }
-
-    if (char === '{' || char === '[') depth++;
-    if (char === '}' || char === ']') {
-      depth--;
-      if (depth === 0) {
-        return source.slice(startIndex, i + 1);
-      }
-    }
-  }
-
-  return null;
 }
 
 /**

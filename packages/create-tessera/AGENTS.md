@@ -20,7 +20,7 @@ npm run accessibility-check  # opt-in runtime accessibility audit (axe) over the
 
 The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
 
-`npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
+`npm run validate` runs the same checks as `dev` and `export` (page syntax, manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
 `npm run accessibility-check` is the deeper, opt-in pass: it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). It needs two optional dependencies — install them once with `npm i -D playwright @axe-core/playwright && npx playwright install chromium`; the command prints this same hint if they're missing. See [Accessibility](#accessibility).
 
