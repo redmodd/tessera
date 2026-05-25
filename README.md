@@ -9,7 +9,7 @@
 
 Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
 
-Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Cursor](https://cursor.com), [Aider](https://aider.chat), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
+Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
 **There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
 
