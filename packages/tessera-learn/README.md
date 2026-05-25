@@ -20,6 +20,7 @@ That creates a project with Tessera wired up, a starter page structure, and the 
 - **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` — wires page/layout discovery, the LMS adapter, and the export pipeline. Used in your project's `vite.config.js`.
 - **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `DefaultLayout`.
 - **LMS adapters**: SCORM 1.2, SCORM 2004 4th Edition, cmi5, static Web — selected via `course.config.js` `export.standard`.
+- **Accessibility checks**: static rules (alt text, media titles/captions, heading order, contrast, `<html lang>`) run inside validation and the build with zero extra dependencies; an opt-in runtime audit (`tessera-a11y`, with `playwright` + `@axe-core/playwright` as optional peers) renders every page and gates on axe-core violations.
 
 See `AGENTS.md` for usage, signatures, and authoring conventions.
 

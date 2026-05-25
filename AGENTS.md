@@ -54,7 +54,7 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 
 ## Package internals (quick map)
 
-- **`tessera-learn`** — `src/runtime/` (state, completion/success rollup, navigation gating, the SCORM/cmi5/web adapters) and `src/plugin/` (the Vite plugin and the `tessera-validate` CLI). Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
+- **`tessera-learn`** — `src/runtime/` (state, completion/success rollup, navigation gating, the SCORM/cmi5/web adapters) and `src/plugin/` (the Vite plugin, the `tessera-validate` CLI, and `a11y/` — the `tessera-a11y` runtime accessibility audit driving Playwright + axe-core over a built course). Playwright and `@axe-core/playwright` are **optional peers** — Tier 2 is opt-in, so the static gate stays dependency-free. Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
 - **`create-tessera`** — `src/index.ts` drives both scaffold and `upgrade`. Built with tsdown to `dist/index.js` (the `create-tessera` bin).
 
 ## CI

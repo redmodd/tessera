@@ -118,6 +118,7 @@ export const FRAMEWORK_SCRIPTS: Record<string, string> = {
   dev: 'vite dev',
   export: 'vite build',
   validate: 'tessera-validate',
+  'accessibility-check': 'tessera-a11y',
 };
 
 // Framework scripts that were renamed across versions. On upgrade a stale key

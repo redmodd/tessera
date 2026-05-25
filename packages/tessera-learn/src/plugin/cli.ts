@@ -22,4 +22,7 @@ if (warnings.length > 0) {
 } else {
   console.log('\x1b[32m[tessera]\x1b[0m Validation passed — no issues found.');
 }
+console.log(
+  '\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: npm run accessibility-check\x1b[0m',
+);
 process.exit(0);

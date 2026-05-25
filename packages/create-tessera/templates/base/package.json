@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite dev",
     "export": "vite build",
-    "validate": "tessera-validate"
+    "validate": "tessera-validate",
+    "accessibility-check": "tessera-a11y"
   },
   "dependencies": {
     "tessera-learn": "__TESSERA_VERSION__"

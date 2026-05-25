@@ -37,4 +37,6 @@ rules and 1a), `standard` (axe ruleset tags), and `ignore` (a flat per-rule
 escape hatch matched literally against each diagnostic's ID across all tiers).
 
 The scaffolded `course.config.js` now ships `language: 'en'` so fresh courses
-start clean.
+start clean, and the scaffold adds a reserved `accessibility-check` npm script
+(→ `tessera-a11y`) alongside `dev` / `export` / `validate`; `upgrade` reconciles
+it into existing projects.

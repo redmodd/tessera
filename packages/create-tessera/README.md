@@ -45,9 +45,10 @@ Then (commands below use `npm`; substitute your package manager — `pnpm`, `yar
 ```bash
 cd my-course
 npm install
-npm run dev       # local dev server at http://localhost:5173
-npm run export    # build + package for the configured LMS standard
-npm run validate  # check the project for structural errors, no server or build
+npm run dev                  # local dev server at http://localhost:5173
+npm run export               # build + package for the configured LMS standard
+npm run validate             # check the project for structural errors, no server or build
+npm run accessibility-check  # opt-in runtime accessibility audit (needs optional playwright + axe deps)
 ```
 
 Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
@@ -61,7 +62,7 @@ npx create-tessera@latest upgrade            # apply changes
 npx create-tessera@latest upgrade --dry-run  # preview without writing
 ```
 
-`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
+`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`, `accessibility-check`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
 
 ## Flags
 
