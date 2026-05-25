@@ -29,7 +29,7 @@ export interface ValidationResult {
 // ---------- A11y rule IDs ----------
 
 /** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
-export const A11Y_IDS = {
+const A11Y_IDS = {
   imageAlt: 'tessera/image-alt',
   mediaTitle: 'tessera/media-title',
   mediaTranscript: 'tessera/media-transcript',
@@ -60,6 +60,15 @@ function diagnosticId(message: string): string | null {
   return m ? m[1] : null;
 }
 
+/** True when a tagged diagnostic's rule ID is in the ignore set. */
+export function isIgnored(
+  message: string,
+  ignore: ReadonlySet<string>,
+): boolean {
+  const id = diagnosticId(message);
+  return id !== null && ignore.has(id);
+}
+
 export interface A11ySettings {
   level: 'warn' | 'error';
   standard: 'wcag2a' | 'wcag2aa' | 'wcag21aa';
@@ -88,16 +97,13 @@ export function normalizeA11y(raw: unknown): A11ySettings {
  * promotable a11y warnings to errors) to a result in place. `ignore` suppresses
  * at any severity, including hard contract errors; `level` only re-rates.
  */
-export function applyA11ySettings(
+function applyA11ySettings(
   result: ValidationResult,
   settings: A11ySettings,
 ): void {
   if (settings.ignore.length > 0) {
     const ignored = new Set(settings.ignore);
-    const keep = (msg: string) => {
-      const id = diagnosticId(msg);
-      return !(id !== null && ignored.has(id));
-    };
+    const keep = (msg: string) => !isIgnored(msg, ignored);
     result.errors = result.errors.filter(keep);
     result.warnings = result.warnings.filter(keep);
   }

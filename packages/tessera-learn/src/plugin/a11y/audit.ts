@@ -66,6 +66,12 @@ export function axeIgnoreRules(ignore: string[]): string[] {
   );
 }
 
+// A violation with no impact is treated as failing rather than slipping the
+// gate at every threshold.
+function isFailing(v: AxeViolation, thresholdRank: number): boolean {
+  return !v.impact || IMPACT_RANK[v.impact] >= thresholdRank;
+}
+
 // Optional deps loaded by variable specifier so tsc doesn't require them to be
 // installed — Tier 2 is opt-in and the absence is handled with a clear message.
 async function tryImport(specifier: string): Promise<unknown> {
@@ -233,10 +239,7 @@ export async function runAudit(
     for (const p of pages) {
       for (const v of p.violations) {
         totalViolations++;
-        // axe may report a violation with no impact; treat unknown severity as
-        // failing rather than letting it slip the gate at every threshold.
-        if (!v.impact || IMPACT_RANK[v.impact] >= thresholdRank)
-          failingViolations++;
+        if (isFailing(v, thresholdRank)) failingViolations++;
       }
     }
 
@@ -274,9 +277,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
       console.log(`\x1b[32m  ✓\x1b[0m ${p.title}`);
       continue;
     }
-    const failing = p.violations.some(
-      (v) => !v.impact || IMPACT_RANK[v.impact] >= thresholdRank,
-    );
+    const failing = p.violations.some((v) => isFailing(v, thresholdRank));
     const mark = failing ? '\x1b[31m  ✗\x1b[0m' : '\x1b[33m  ⚠\x1b[0m';
     console.log(`${mark} ${p.title}`);
     for (const v of p.violations) {

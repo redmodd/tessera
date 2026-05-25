@@ -19,6 +19,7 @@ import {
   reportValidationIssues,
   normalizeA11y,
   isPlausibleLanguageTag,
+  isIgnored,
   type A11ySettings,
 } from './validation.js';
 import { runExport } from './export.js';
@@ -457,10 +458,7 @@ function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
     buildEnd() {
       if (!a11y.isBuild || a11y.warnings.length === 0) return;
       const ignored = new Set(a11y.settings.ignore);
-      const warnings = a11y.warnings.filter((msg) => {
-        const id = /^\[([^\]]+)\] /.exec(msg)?.[1];
-        return !(id !== undefined && ignored.has(id));
-      });
+      const warnings = a11y.warnings.filter((msg) => !isIgnored(msg, ignored));
       a11y.warnings = [];
       if (warnings.length === 0) return;
       if (a11y.settings.level === 'error') {
