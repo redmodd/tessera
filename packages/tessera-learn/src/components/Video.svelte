@@ -5,12 +5,17 @@
    * Lazy-loads via IntersectionObserver.
    *
    * @prop {string} src - Video URL (YouTube, Vimeo, direct video file, or $assets/ path)
-   * @prop {string} [title] - Accessible label for the video
+   * @prop {string} title - Accessible label for the video (required; rule 1.4)
+   * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
+   *   Caption/subtitle tracks for native (non-embed) video, rendered as <track>.
+   *   Ignored for YouTube/Vimeo embeds — the platform owns their captions.
+   * @prop {string} [transcript] - Transcript text (or $assets/ path) shown in a
+   *   <details> disclosure below the player.
    */
   import { onMount } from 'svelte';
   import { resolveAsset } from './util.js';
 
-  let { src, title = '' } = $props();
+  let { src, title, tracks = [], transcript = '' } = $props();
   let resolvedSrc = $derived(resolveAsset(src));
   let containerRef = $state(null);
   let visible = $state(false);
@@ -68,6 +73,14 @@
     {:else}
       <video controls class="tessera-video-native" aria-label={title}>
         <source src={resolvedSrc} />
+        {#each tracks as track (track.src)}
+          <track
+            src={resolveAsset(track.src)}
+            kind={track.kind ?? 'captions'}
+            srclang={track.srclang}
+            label={track.label}
+          />
+        {/each}
         Your browser does not support the video element.
       </video>
     {/if}
@@ -77,6 +90,13 @@
     </div>
   {/if}
 </div>
+
+{#if transcript}
+  <details class="tessera-video-transcript">
+    <summary>Transcript</summary>
+    <div class="tessera-video-transcript-body">{transcript}</div>
+  </details>
+{/if}
 
 <style>
   .tessera-video {
@@ -120,5 +140,23 @@
   .tessera-video-placeholder-icon {
     font-size: 2rem;
     color: var(--tessera-text-light);
+  }
+
+  .tessera-video-transcript {
+    margin-top: var(--tessera-spacing-sm);
+    margin-bottom: var(--tessera-spacing-lg);
+    font-size: 0.875rem;
+  }
+
+  .tessera-video-transcript summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--tessera-text);
+  }
+
+  .tessera-video-transcript-body {
+    margin-top: var(--tessera-spacing-sm);
+    color: var(--tessera-text-light);
+    white-space: pre-line;
   }
 </style>

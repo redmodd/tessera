@@ -38,6 +38,7 @@ function createValidProject(root: string): void {
     root,
     `export default {
   title: "Test Course",
+  language: "en",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
@@ -1388,5 +1389,295 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings.filter((w) => w.includes('SCORM 1.2'))).toHaveLength(0);
+  });
+});
+
+// ---- Accessibility (a11y) Validation ----
+
+/** Overwrite the single page created by createValidProject. */
+function writePage(root: string, content: string): void {
+  writeFile(root, 'pages/01-section/01-lesson/page.svelte', content);
+}
+
+const has = (arr: string[], substr: string): boolean =>
+  arr.some((s) => s.includes(substr));
+
+describe('a11y rule 1.3 — Image alt-or-decorative', () => {
+  it('errors when <Image> has no alt and is not decorative', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(true);
+  });
+
+  it('passes when alt is present', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" alt="A diagram" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('passes when marked decorative', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" decorative={true} />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('errors on empty alt with no decorative', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" alt="" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(true);
+  });
+
+  it('warns when decorative but alt text is also supplied', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" decorative alt="X" />`);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+    expect(has(warnings, 'tessera/image-alt')).toBe(true);
+  });
+
+  it('skips a non-static alt expression (no false positive)', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" alt={someVar} />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+});
+
+describe('a11y rule 1.4 — media title / captions / transcript', () => {
+  it('errors when <Video> has no title', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Video src="https://youtu.be/abcdefghijk" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(true);
+  });
+
+  it('errors when <Audio> has no title', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Audio src="$assets/a.mp3" transcript="…" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(true);
+  });
+
+  it('warns when a YouTube embed has no transcript', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<Video src="https://www.youtube.com/watch?v=abcdefghijk" title="T" />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/media-transcript')).toBe(true);
+  });
+
+  it('warns when a native video has neither tracks nor transcript', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Video src="$assets/clip.mp4" title="T" />`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/media-captions')).toBe(true);
+  });
+
+  it('does not warn on a native video that has tracks', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<Video src="$assets/clip.mp4" title="T" tracks={[{ src: '$assets/c.vtt', kind: 'captions' }]} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/media-captions')).toBe(false);
+  });
+
+  it('warns when <Audio> has no transcript', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Audio src="$assets/a.mp3" title="T" />`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/media-transcript')).toBe(true);
+  });
+});
+
+describe('a11y rule 1.5 — question option/answer labels', () => {
+  it('warns on an empty option label', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice question="Q" options={['A', '']} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/question-label')).toBe(true);
+  });
+
+  it('does not warn when all options are non-empty', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice question="Q" options={['A', 'B']} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/question-label')).toBe(false);
+  });
+});
+
+describe('a11y rule 1.6 — heading order', () => {
+  it('warns on a skipped heading level', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h1>Title</h1>\n<h3>Sub</h3>`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(true);
+  });
+
+  it('does not warn on a well-ordered hierarchy', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h1>Title</h1>\n<h2>Sub</h2>\n<h3>Sub-sub</h3>`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
+  });
+});
+
+describe('a11y rule 1.7 — primaryColor contrast', () => {
+  it('warns on a low-contrast primaryColor against white', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "en",
+  branding: { primaryColor: "#93c5fd" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/primary-contrast')).toBe(true);
+  });
+
+  it('does not warn on a passing primaryColor', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "en",
+  branding: { primaryColor: "#2563eb" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/primary-contrast')).toBe(false);
+  });
+});
+
+describe('a11y rule 1.8 — language tag', () => {
+  it('warns when language is missing', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/lang')).toBe(true);
+  });
+
+  it('warns on an implausible BCP-47 tag', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "english",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/lang')).toBe(true);
+  });
+
+  it('accepts a well-formed tag', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "fr-CA",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/lang')).toBe(false);
+  });
+});
+
+describe('a11y config block — level and ignore', () => {
+  it('errors on an invalid a11y.level', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "en",
+  a11y: { level: "loud" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'a11y.level')).toBe(true);
+  });
+
+  it('ignore suppresses a hard contract error by rule ID', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" />`);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  language: "en",
+  a11y: { ignore: ["tessera/image-alt"] },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it("level: 'error' promotes a promotable warning to an error", () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "T",
+  a11y: { level: "error" },
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'tessera/lang')).toBe(true);
+    expect(has(warnings, 'tessera/lang')).toBe(false);
   });
 });

@@ -27,6 +27,10 @@ export interface CourseConfig {
   description?: string;
   author?: string;
   version?: string;
+  /** BCP-47 language tag for <html lang>. Defaults to 'en'. WCAG 3.1.1. */
+  language?: string;
+  /** Accessibility checker configuration. */
+  a11y?: A11yConfig;
   branding?: {
     logo?: string;
     primaryColor?: string;
@@ -51,6 +55,16 @@ export interface CourseConfig {
    * credentials and shares the cmi5 adapter's queue.
    */
   xapi?: XAPIConfig | XAPIConfig[];
+}
+
+/** Accessibility checker configuration. */
+export interface A11yConfig {
+  /** Build-gate severity for promotable Tier-1 rules + Tier-1a warnings. */
+  level?: 'warn' | 'error';
+  /** axe ruleset tags for the Tier-2 runtime auditor. */
+  standard?: 'wcag2a' | 'wcag2aa' | 'wcag21aa';
+  /** Per-rule escape hatch matched literally against each diagnostic's ID. */
+  ignore?: string[];
 }
 
 export interface ManualCompletion {

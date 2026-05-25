@@ -28,4 +28,5 @@
 <Audio
   src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
   title="Sample Audio"
+  transcript="An instrumental sample track used to demonstrate the audio player."
 />
