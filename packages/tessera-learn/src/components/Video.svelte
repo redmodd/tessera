@@ -14,26 +14,14 @@
    */
   import { onMount } from 'svelte';
   import { resolveAsset } from './util.js';
+  import { resolveVideoEmbedUrl } from './video-embed.js';
 
   let { src, title, tracks = [], transcript = '' } = $props();
   let resolvedSrc = $derived(resolveAsset(src));
   let containerRef = $state(null);
   let visible = $state(false);
 
-  const youtubeRegex =
-    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const vimeoRegex = /vimeo\.com\/(?:video\/)?(\d+)/;
-
-  let embedUrl = $derived.by(() => {
-    const ytMatch = src.match(youtubeRegex);
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-
-    const vimeoMatch = src.match(vimeoRegex);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-
-    return null;
-  });
-
+  let embedUrl = $derived(resolveVideoEmbedUrl(src));
   let isEmbed = $derived(embedUrl !== null);
 
   onMount(() => {

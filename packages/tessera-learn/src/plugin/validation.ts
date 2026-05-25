@@ -17,6 +17,7 @@ import {
 import { shortIdentifier } from '../runtime/interaction-format.js';
 import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
+import { isVideoEmbed } from '../components/video-embed.js';
 
 // ---------- Types ----------
 
@@ -141,7 +142,14 @@ const KNOWN_CONFIG_FIELDS = new Set([
   'a11y',
 ]);
 
-const BCP47_RE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
+// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
+const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+
+/** Plausible BCP-47 tag? Shared by the linter and the <html lang> emitter. */
+export function isPlausibleLanguageTag(value: unknown): value is string {
+  return typeof value === 'string' && BCP47_RE.test(value);
+}
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
@@ -285,10 +293,7 @@ function parseConfig(
         `course.config.js: "language" is not set — defaulting <html lang> to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
       ),
     );
-  } else if (
-    typeof config.language !== 'string' ||
-    !BCP47_RE.test(config.language)
-  ) {
+  } else if (!isPlausibleLanguageTag(config.language)) {
     warnings.push(
       tag(
         A11Y_IDS.lang,
@@ -1439,7 +1444,8 @@ function validateQuestionComponents(
 
 // ---------- Media Component Validation (rules 1.3 / 1.4) ----------
 
-const MEDIA_EMBED_RE = /(?:youtu\.be|youtube\.com|vimeo\.com)/;
+/** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 
 /**
  * Sibling to validateQuestionComponents kept out of QUESTION_COMPONENT_REQUIRED
@@ -1452,16 +1458,28 @@ function validateMediaComponents(
   errors: string[],
   warnings: string[],
 ): void {
+  const scan = content.replace(HTML_COMMENT_RE, '');
   const tagStartRe = /<(Image|Video|Audio)(?=[\s/>])/g;
   let m: RegExpExecArray | null;
-  while ((m = tagStartRe.exec(content)) !== null) {
+  while ((m = tagStartRe.exec(scan)) !== null) {
     const name = m[1];
-    const props = parseTagProps(content, m.index + m[0].length);
+    const props = parseTagProps(scan, m.index + m[0].length);
     if (!props) continue;
 
     if (name === 'Image') {
       const alt = props.get('alt');
       const decorative = props.get('decorative');
+      // A string value is truthy at runtime (so decorative="false" hides the
+      // image), but the parser sees a string, not a boolean — flag the misuse.
+      if (decorative?.kind === 'string') {
+        errors.push(
+          tag(
+            A11Y_IDS.imageAlt,
+            `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${JSON.stringify(decorative.value)}`,
+          ),
+        );
+        continue;
+      }
       const hasDecorative =
         decorative?.kind === 'bool' ||
         (decorative?.kind === 'expr' && decorative.raw.trim() !== 'false');
@@ -1486,7 +1504,9 @@ function validateMediaComponents(
     }
 
     // Video / Audio
-    if (props.get('title') === undefined) {
+    const title = props.get('title');
+    const titleIsEmpty = title?.kind === 'string' && title.value.trim() === '';
+    if (title === undefined || titleIsEmpty) {
       errors.push(
         tag(
           A11Y_IDS.mediaTitle,
@@ -1495,7 +1515,7 @@ function validateMediaComponents(
       );
     }
     const src = props.get('src');
-    const isEmbed = src?.kind === 'string' && MEDIA_EMBED_RE.test(src.value);
+    const isEmbed = src?.kind === 'string' && isVideoEmbed(src.value);
     if (name === 'Video' && isEmbed && props.get('transcript') === undefined) {
       warnings.push(
         tag(
@@ -1532,17 +1552,20 @@ function validateMediaComponents(
 // ---------- Heading Order Validation (rule 1.6) ----------
 
 /**
- * Warn on a skipped heading level (e.g. h2 → h4). Scripts/styles are stripped
- * first so string literals and CSS can't be miscounted. No "one h1 per page"
- * check — the layout owns the page h1 and child components emit headings a
- * static scan can't see; that belongs to the Tier-2 audit.
+ * Warn on a skipped heading level (e.g. h2 → h4). Scripts, styles, and comments
+ * are stripped first so string literals, CSS, and commented-out markup can't be
+ * miscounted. No "one h1 per page" check — the layout owns the page h1 and child
+ * components emit headings a static scan can't see; that belongs to the Tier-2
+ * audit.
  */
 function validateHeadingOrder(
   content: string,
   fileRel: string,
   warnings: string[],
 ): void {
-  const html = content.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
+  const html = content
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(HTML_COMMENT_RE, '');
   const levels = [...html.matchAll(/<h([1-6])\b/gi)].map((h) => Number(h[1]));
   let prevSeen: number | null = null;
   for (const level of levels) {

@@ -222,7 +222,9 @@ export async function runAudit(
   for (const p of pages) {
     for (const v of p.violations) {
       totalViolations++;
-      if (v.impact && IMPACT_RANK[v.impact] >= thresholdRank)
+      // axe may report a violation with no impact; treat unknown severity as
+      // failing rather than letting it slip the gate at every threshold.
+      if (!v.impact || IMPACT_RANK[v.impact] >= thresholdRank)
         failingViolations++;
     }
   }

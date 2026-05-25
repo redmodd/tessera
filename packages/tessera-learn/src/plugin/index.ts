@@ -18,6 +18,7 @@ import {
   validateProject,
   reportValidationIssues,
   normalizeA11y,
+  isPlausibleLanguageTag,
   type A11ySettings,
 } from './validation.js';
 import { runExport } from './export.js';
@@ -206,10 +207,12 @@ function tesseraEntryPlugin(): Plugin {
 }
 
 // 'en' fallback applied here: the config default-merge runs later than buildStart.
+// Only a validated BCP-47 tag is interpolated into <html lang>, so a malformed
+// value (caught separately as a warning) can't ship a broken attribute.
 function readLanguage(projectRoot: string): string {
   const read = readCourseConfig(projectRoot);
   const lang = read.ok ? read.config.language : undefined;
-  return typeof lang === 'string' && lang.trim() !== '' ? lang : 'en';
+  return isPlausibleLanguageTag(lang) ? lang : 'en';
 }
 
 function generateIndexHtml(lang: string): string {
