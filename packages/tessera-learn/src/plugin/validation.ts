@@ -1220,19 +1220,23 @@ type PropValue =
 function parseTagProps(
   content: string,
   start: number,
-): Map<string, PropValue> | null {
+): { props: Map<string, PropValue>; hasSpread: boolean } | null {
   const props = new Map<string, PropValue>();
+  let hasSpread = false;
   let i = start;
   while (i < content.length) {
     while (i < content.length && /\s/.test(content[i])) i++;
     if (i >= content.length) return null;
     const c = content[i];
-    if (c === '>') return props;
-    if (c === '/' && content[i + 1] === '>') return props;
-    // Spread / shorthand expression — skip the whole {...} block.
+    if (c === '>') return { props, hasSpread };
+    if (c === '/' && content[i + 1] === '>') return { props, hasSpread };
+    // Spread / shorthand expression — skip the whole {...} block, but record
+    // that unseen props may be supplied here so callers can suppress
+    // false-positive "missing required prop / alt / title" diagnostics.
     if (c === '{') {
       const block = extractObjectLiteral(content, i);
       if (!block) return null;
+      hasSpread = true;
       i += block.length;
       continue;
     }
@@ -1299,11 +1303,12 @@ function validateQuestionComponents(
   let m: RegExpExecArray | null;
   while ((m = tagStartRe.exec(content)) !== null) {
     const name = m[1];
-    const props = parseTagProps(content, m.index + m[0].length);
-    if (!props) continue;
+    const parsed = parseTagProps(content, m.index + m[0].length);
+    if (!parsed) continue;
+    const { props, hasSpread } = parsed;
 
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
-      if (!props.has(req)) {
+      if (!hasSpread && !props.has(req)) {
         errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
       }
     }
@@ -1463,8 +1468,9 @@ function validateMediaComponents(
   let m: RegExpExecArray | null;
   while ((m = tagStartRe.exec(scan)) !== null) {
     const name = m[1];
-    const props = parseTagProps(scan, m.index + m[0].length);
-    if (!props) continue;
+    const parsed = parseTagProps(scan, m.index + m[0].length);
+    if (!parsed) continue;
+    const { props, hasSpread } = parsed;
 
     if (name === 'Image') {
       const alt = props.get('alt');
@@ -1484,7 +1490,7 @@ function validateMediaComponents(
         decorative?.kind === 'bool' ||
         (decorative?.kind === 'expr' && decorative.raw.trim() === 'true');
       const altIsEmpty = alt?.kind === 'string' && alt.value.trim() === '';
-      if (!hasDecorative && (alt === undefined || altIsEmpty)) {
+      if (!hasDecorative && !hasSpread && (alt === undefined || altIsEmpty)) {
         errors.push(
           tag(
             A11Y_IDS.imageAlt,
@@ -1506,7 +1512,7 @@ function validateMediaComponents(
     // Video / Audio
     const title = props.get('title');
     const titleIsEmpty = title?.kind === 'string' && title.value.trim() === '';
-    if (title === undefined || titleIsEmpty) {
+    if (!hasSpread && (title === undefined || titleIsEmpty)) {
       errors.push(
         tag(
           A11Y_IDS.mediaTitle,
@@ -1516,7 +1522,12 @@ function validateMediaComponents(
     }
     const src = props.get('src');
     const isEmbed = src?.kind === 'string' && isVideoEmbed(src.value);
-    if (name === 'Video' && isEmbed && props.get('transcript') === undefined) {
+    if (
+      name === 'Video' &&
+      !hasSpread &&
+      isEmbed &&
+      props.get('transcript') === undefined
+    ) {
       warnings.push(
         tag(
           A11Y_IDS.mediaTranscript,
@@ -1526,6 +1537,7 @@ function validateMediaComponents(
     }
     if (
       name === 'Video' &&
+      !hasSpread &&
       src?.kind === 'string' &&
       !isEmbed &&
       props.get('tracks') === undefined &&
@@ -1538,7 +1550,11 @@ function validateMediaComponents(
         ),
       );
     }
-    if (name === 'Audio' && props.get('transcript') === undefined) {
+    if (
+      name === 'Audio' &&
+      !hasSpread &&
+      props.get('transcript') === undefined
+    ) {
       warnings.push(
         tag(
           A11Y_IDS.mediaTranscript,

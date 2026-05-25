@@ -19,6 +19,10 @@ const IMPACT_RANK: Record<ImpactLevel, number> = {
   critical: 4,
 };
 
+// Set by runAudit during its build/preview; the plugin forces the WebAdapter,
+// skips export packaging, and stubs xAPI while it's set. See plugin/index.ts.
+export const AUDIT_ENV_FLAG = 'TESSERA_A11Y_AUDIT';
+
 interface AxeViolation {
   id: string;
   impact: ImpactLevel | null;
@@ -137,106 +141,130 @@ export async function runAudit(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vite = (await import('vite')) as any;
 
-  const distHtml = resolve(projectRoot, 'dist', 'index.html');
-  if (options.rebuild || !existsSync(distHtml)) {
-    console.log('[tessera a11y] Building course…');
-    await vite.build({ root: projectRoot, logLevel: 'warn' });
-  }
+  // A throwaway web build, kept out of dist/ so a real LMS export is untouched.
+  const auditDist = resolve(projectRoot, 'node_modules', '.tessera-a11y');
+  const distHtml = resolve(auditDist, 'index.html');
 
-  const server = await vite.preview({
-    root: projectRoot,
-    preview: { port: 0, host: '127.0.0.1' },
-    logLevel: 'warn',
-  });
-  const baseUrl: string | undefined = server.resolvedUrls?.local?.[0];
-  if (!baseUrl) {
-    server.httpServer?.close?.();
-    console.error('[tessera a11y] Could not determine preview server URL.');
-    return 1;
-  }
+  const prevEnv = process.env[AUDIT_ENV_FLAG];
+  process.env[AUDIT_ENV_FLAG] = '1';
 
-  const browser = await chromium.launch();
-  const pages: PageAuditResult[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let server: any;
   try {
-    // axe-core/playwright requires a page from an explicit context.
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    // ?__tessera_audit unlocks navigation so quiz-gated pages can be scanned.
-    const auditUrl = new URL(baseUrl);
-    auditUrl.searchParams.set('__tessera_audit', '1');
-    await page.goto(auditUrl.href, { waitUntil: 'networkidle' });
-    await page.waitForSelector('#tessera-app', { timeout: 20_000 });
-
-    const scan = async (): Promise<AxeViolation[]> => {
-      const builder = new AxeBuilder({ page }).withTags(tags);
-      if (disableRules.length > 0) builder.disableRules(disableRules);
-      const out = await builder.analyze();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return out.violations.map((v: any) => ({
-        id: v.id,
-        impact: v.impact ?? null,
-        help: v.help,
-        helpUrl: v.helpUrl,
-        nodes: v.nodes.length,
-      }));
-    };
-
-    const navCount = await page.locator('button.tessera-nav-page').count();
-    if (navCount === 0) {
-      // No sidebar (custom chrome) — audit whatever is rendered at the entry.
-      pages.push({
-        index: 0,
-        title: manifest.pages[0]?.title ?? '(entry)',
-        violations: await scan(),
+    if (options.rebuild || !existsSync(distHtml)) {
+      console.log('[tessera a11y] Building course…');
+      await vite.build({
+        root: projectRoot,
+        build: { outDir: auditDist, emptyOutDir: true },
+        logLevel: 'warn',
       });
-    } else {
-      for (let i = 0; i < navCount; i++) {
-        const btn = page.locator('button.tessera-nav-page').nth(i);
-        const title = (await btn.textContent())?.trim() || `Page ${i + 1}`;
-        await btn.click();
-        await page.waitForFunction(
-          (idx: number) =>
-            document
-              .querySelectorAll('button.tessera-nav-page')
-              [idx]?.getAttribute('aria-current') === 'page',
-          i,
-          { timeout: 20_000 },
-        );
-        await page.waitForLoadState('networkidle');
-        pages.push({ index: i, title, violations: await scan() });
+    }
+
+    server = await vite.preview({
+      root: projectRoot,
+      build: { outDir: auditDist },
+      preview: { port: 0, host: '127.0.0.1' },
+      logLevel: 'warn',
+    });
+    const baseUrl: string | undefined = server.resolvedUrls?.local?.[0];
+    if (!baseUrl) {
+      console.error('[tessera a11y] Could not determine preview server URL.');
+      return 1;
+    }
+
+    const browser = await chromium.launch();
+    const pages: PageAuditResult[] = [];
+    try {
+      // axe-core/playwright requires a page from an explicit context.
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      // ?__tessera_audit unlocks navigation so quiz-gated pages can be scanned.
+      const auditUrl = new URL(baseUrl);
+      auditUrl.searchParams.set('__tessera_audit', '1');
+      await page.goto(auditUrl.href, { waitUntil: 'networkidle' });
+      await page.waitForSelector('#tessera-app', { timeout: 20_000 });
+
+      const scan = async (): Promise<AxeViolation[]> => {
+        const builder = new AxeBuilder({ page }).withTags(tags);
+        if (disableRules.length > 0) builder.disableRules(disableRules);
+        const out = await builder.analyze();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return out.violations.map((v: any) => ({
+          id: v.id,
+          impact: v.impact ?? null,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          nodes: v.nodes.length,
+        }));
+      };
+
+      const navCount = await page.locator('button.tessera-nav-page').count();
+      if (navCount === 0) {
+        // No sidebar (custom chrome) — audit whatever is rendered at the entry.
+        pages.push({
+          index: 0,
+          title: manifest.pages[0]?.title ?? '(entry)',
+          violations: await scan(),
+        });
+      } else {
+        for (let i = 0; i < navCount; i++) {
+          const btn = page.locator('button.tessera-nav-page').nth(i);
+          const title = (await btn.textContent())?.trim() || `Page ${i + 1}`;
+          await btn.click();
+          await page.waitForFunction(
+            (idx: number) =>
+              document
+                .querySelectorAll('button.tessera-nav-page')
+                [idx]?.getAttribute('aria-current') === 'page',
+            i,
+            { timeout: 20_000 },
+          );
+          await page.waitForLoadState('networkidle');
+          pages.push({ index: i, title, violations: await scan() });
+        }
+      }
+    } finally {
+      await browser.close();
+    }
+
+    const thresholdRank = IMPACT_RANK[threshold];
+    let totalViolations = 0;
+    let failingViolations = 0;
+    for (const p of pages) {
+      for (const v of p.violations) {
+        totalViolations++;
+        // axe may report a violation with no impact; treat unknown severity as
+        // failing rather than letting it slip the gate at every threshold.
+        if (!v.impact || IMPACT_RANK[v.impact] >= thresholdRank)
+          failingViolations++;
       }
     }
+
+    const report: AuditReport = {
+      standard: settings.standard,
+      threshold,
+      pages,
+      totalViolations,
+      failingViolations,
+      passed: failingViolations === 0,
+    };
+    const reportPath = resolve(projectRoot, 'a11y-report.json');
+    writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
+
+    printSummary(report, reportPath);
+    return report.passed ? 0 : 1;
+  } catch (err) {
+    console.error(
+      `\x1b[31m[tessera a11y]\x1b[0m Audit could not complete: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return 1;
   } finally {
-    await browser.close();
-    server.httpServer?.close?.();
+    server?.httpServer?.close?.();
+    if (prevEnv === undefined) delete process.env[AUDIT_ENV_FLAG];
+    else process.env[AUDIT_ENV_FLAG] = prevEnv;
   }
-
-  const thresholdRank = IMPACT_RANK[threshold];
-  let totalViolations = 0;
-  let failingViolations = 0;
-  for (const p of pages) {
-    for (const v of p.violations) {
-      totalViolations++;
-      // axe may report a violation with no impact; treat unknown severity as
-      // failing rather than letting it slip the gate at every threshold.
-      if (!v.impact || IMPACT_RANK[v.impact] >= thresholdRank)
-        failingViolations++;
-    }
-  }
-
-  const report: AuditReport = {
-    standard: settings.standard,
-    threshold,
-    pages,
-    totalViolations,
-    failingViolations,
-    passed: failingViolations === 0,
-  };
-  const reportPath = resolve(projectRoot, 'a11y-report.json');
-  writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
-
-  printSummary(report, reportPath);
-  return report.passed ? 0 : 1;
 }
 
 function printSummary(report: AuditReport, reportPath: string): void {

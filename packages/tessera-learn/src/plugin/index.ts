@@ -25,8 +25,14 @@ import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 
+import { AUDIT_ENV_FLAG } from './a11y/audit.js';
+
 export { runAudit } from './a11y/audit.js';
 export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
+
+function isAuditBuild(): boolean {
+  return process.env[AUDIT_ENV_FLAG] === '1';
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -134,6 +140,7 @@ function tesseraEntryPlugin(): Plugin {
   const stylesDir = resolveStylesDir();
   const appSveltePath = resolve(runtimeDir, 'App.svelte');
   let projectRoot: string;
+  let outDir: string;
   let isBuild = false;
 
   return {
@@ -142,6 +149,7 @@ function tesseraEntryPlugin(): Plugin {
 
     configResolved(config: ResolvedConfig) {
       projectRoot = config.root;
+      outDir = resolve(config.root, config.build.outDir);
       isBuild = config.command === 'build';
     },
 
@@ -166,9 +174,9 @@ function tesseraEntryPlugin(): Plugin {
           } catch {}
         }
 
-        // Copy assets/ directory to dist/assets/ so $assets/ references resolve
+        // Copy assets/ into the build's assets/ so $assets/ references resolve
         const assetsDir = resolve(projectRoot, 'assets');
-        const distAssetsDir = resolve(projectRoot, 'dist', 'assets');
+        const distAssetsDir = resolve(outDir, 'assets');
         if (existsSync(assetsDir)) {
           mkdirSync(distAssetsDir, { recursive: true });
           cpSync(assetsDir, distAssetsDir, { recursive: true });
@@ -493,6 +501,7 @@ function tesseraExportPlugin(): Plugin {
 
     async closeBundle() {
       if (!isBuild) return;
+      if (isAuditBuild()) return;
 
       const read = readCourseConfig(projectRoot);
       if (!read.ok) {
@@ -648,6 +657,10 @@ function tesseraAdapterPlugin(): Plugin {
         standard = read.config.export.standard;
       }
 
+      // The audit renders headless with no LMS in the frame chain; the SCORM/
+      // cmi5 adapters throw when their API is absent, so render with WebAdapter.
+      if (isAuditBuild()) standard = 'web';
+
       switch (standard) {
         case 'scorm12':
           return `
@@ -719,6 +732,11 @@ function tesseraXAPISetupPlugin(): Plugin {
 
       if (!isBuild) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
+      }
+
+      // The audit runs offline — don't wire real LRS destinations into it.
+      if (isAuditBuild()) {
+        return `export async function buildXAPIClient() { return null; }`;
       }
 
       let standard = 'web';

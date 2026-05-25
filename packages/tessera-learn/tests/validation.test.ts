@@ -1518,6 +1518,38 @@ describe('a11y rule 1.4 — media title / captions / transcript', () => {
   });
 });
 
+describe('a11y — spread props suppress false positives', () => {
+  it('does not error on <Image> whose props come via spread', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image {...img} />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('does not error on <Video>/<Audio> title supplied via spread', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Video {...vid} />\n<Audio {...aud} />`);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(false);
+    expect(has(warnings, 'tessera/media-captions')).toBe(false);
+    expect(has(warnings, 'tessera/media-transcript')).toBe(false);
+  });
+
+  it('does not flag a question component missing required props via spread', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<MultipleChoice {...q} />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop')).toBe(false);
+  });
+
+  it('still errors on an explicit missing alt alongside other props', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(true);
+  });
+});
+
 describe('a11y rule 1.5 — question option/answer labels', () => {
   it('warns on an empty option label', () => {
     createValidProject(testRoot);
