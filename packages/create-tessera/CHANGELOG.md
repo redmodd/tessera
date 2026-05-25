@@ -1,11 +1,70 @@
 # create-tessera
 
+## 0.0.13
+
+### Patch Changes
+
+- 1edf88f: Add an accessibility checker spanning three non-overlapping tiers, plus the
+  component and config changes that make an accessible result expressible.
+
+  **Tier 0 — components correct by construction.**
+  - `Image` — `alt` is no longer silently optional; add a `decorative` boolean so
+    "forgot alt" is distinguishable from "intentionally ornamental" (renders empty
+    `alt` + `aria-hidden`).
+  - `Video` / `Audio` — `title` (the accessible name) is required; add `tracks`
+    (rendered as `<track>` on native players) and `transcript` (a `<details>`
+    disclosure).
+  - `<html lang>` — new top-level `language` config field (BCP-47, default `'en'`)
+    interpolated into the generated HTML instead of a hardcoded `lang="en"`.
+
+  **Tier 1 — static analyzer (build + dev, zero new runtime deps).**
+  - _1a_ routes the Svelte compiler's `a11y_*` warnings (filtered to author files)
+    through the validation reporter and gates them at `buildEnd`.
+  - _1b_ adds tessera-specific rules: `<Image>` alt-or-decorative, `<Video>`/
+    `<Audio>` title + captions/transcript, empty question option/answer labels,
+    skipped heading levels, `branding.primaryColor` contrast against white, and a
+    well-formed `language` tag.
+
+  **Tier 2 — runtime auditor.** New `tessera-a11y` bin drives Playwright + axe-core
+  over every page of a built course, writes `a11y-report.json`, and exits non-zero
+  on violations at/above an impact threshold (default `serious`). Playwright and
+  `@axe-core/playwright` are optional — the command exits with an actionable
+  message when they're absent, so the static gate carries no new dependency.
+
+  **Config.** New `a11y` block: `level` (`warn` | `error`, promotes the heuristic
+  rules and 1a), `standard` (axe ruleset tags), and `ignore` (a flat per-rule
+  escape hatch matched literally against each diagnostic's ID across all tiers).
+
+  The scaffolded `course.config.js` now ships `language: 'en'` so fresh courses
+  start clean, and the scaffold adds a reserved `accessibility-check` npm script
+  (→ `tessera-a11y`) alongside `dev` / `export` / `validate`; `upgrade` reconciles
+  it into existing projects.
+
+  **Fix.** `$assets/` references carrying a Vite query/hash suffix (e.g. `?raw`,
+  `?url`) are no longer mis-reported as "not found" by the asset-reference
+  validator — the suffix is stripped before the on-disk existence check.
+
+- 28cdba8: Pin scaffolded and upgraded `tessera-learn` to the exact version create-tessera
+  ships at, derived from the package's own version, instead of a hand-maintained
+  `tesseraVersion` field. create-tessera and tessera-learn now release in lockstep
+  (changesets `fixed`), so the pinned runtime version always matches what was
+  published and cannot drift.
+- d4e0351: Move scaffolder templates from inline string literals to real on-disk template
+  directories (`templates/base`, `templates/default`, `templates/bare`) copied by a
+  token-substituting walker, and make the post-scaffold "Next steps" hint
+  package-manager-aware (npm/pnpm/yarn/bun via `npm_config_user_agent`).
+
+  Mostly an internal refactor, but scaffolded projects also change in two small
+  ways: the bare template's demo check question now follows the documented choice
+  pattern (readable ids + `options`, so SCORM 1.2 export emits the position indexes
+  SCORM Cloud's strict validator requires), and the scaffolded README/AGENTS.md now
+  note that the `npm` run commands can be swapped for your package manager.
+
 ## 0.0.12
 
 ### Patch Changes
 
 - 909863b: - Bump the scaffolded `tessera-learn` pin to `^0.0.11` so newly-created projects pick up the standalone-question LMS score fix, consistent `$assets/` resolution across the media components, and the relocated framework bundle (`dist/tessera/`).
-
   - Pin `"types": ["node"]` in the package tsconfig so a standalone `tsc -p packages/create-tessera/tsconfig.json` type-checks clean (it was reporting phantom missing-`process` / `node:*` errors). No change to the scaffolded output or CLI behavior.
 
 ## 0.0.11
