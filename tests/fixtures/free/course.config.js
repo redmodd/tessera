@@ -3,6 +3,7 @@ export default {
   description: 'A comprehensive course for end-to-end testing',
   author: 'Tessera E2E',
   version: '1.0.0',
+  language: 'en',
   branding: {
     logo: '',
     primaryColor: '#2563eb',

@@ -1,7 +1,7 @@
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, relative, isAbsolute } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -14,10 +14,26 @@ import {
 import { generateManifest, readCourseConfig } from './manifest.js';
 import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
-import { validateProject, reportValidationIssues } from './validation.js';
+import {
+  validateProject,
+  reportValidationIssues,
+  normalizeA11y,
+  isPlausibleLanguageTag,
+  isIgnored,
+  type A11ySettings,
+} from './validation.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
+
+import { AUDIT_ENV_FLAG } from './a11y/audit.js';
+
+export { runAudit } from './a11y/audit.js';
+export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
+
+function isAuditBuild(): boolean {
+  return process.env[AUDIT_ENV_FLAG] === '1';
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,15 +50,71 @@ function resolveStylesDir(): string {
   return resolve(packageRoot, 'styles');
 }
 
+// Tier-1a state shared between the svelte() onwarn handler and the sibling
+// gate plugin. onwarn fires during transform (after the Tier-1b buildStart
+// gate), so a11y warnings are collected here and flushed/gated at buildEnd.
+interface A11yCompilerState {
+  warnings: string[];
+  projectRoot: string;
+  isBuild: boolean;
+  settings: A11ySettings;
+}
+
+// Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
+// in build and may be absolute or a virtual id elsewhere. Return the
+// project-relative path for a real author file, or null to skip framework /
+// node_modules / virtual modules — Tier 0 owns the framework's own warnings.
+function projectFileRel(
+  filename: string | undefined,
+  projectRoot: string,
+): string | null {
+  if (!filename || !projectRoot) return null;
+  if (
+    filename.startsWith('\0') ||
+    filename.includes('virtual:') ||
+    filename.includes('node_modules')
+  ) {
+    return null;
+  }
+  const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
+  const rel = relative(projectRoot, abs);
+  if (rel.startsWith('..') || isAbsolute(rel) || rel.includes('node_modules')) {
+    return null;
+  }
+  return rel;
+}
+
 export function tesseraPlugin() {
   const manifestRef: { current: Manifest | null; root: string } = {
     current: null,
     root: '',
   };
+  const a11y: A11yCompilerState = {
+    warnings: [],
+    projectRoot: '',
+    isBuild: false,
+    settings: normalizeA11y(undefined),
+  };
   return [
     svelte({
       compilerOptions: { css: 'external' },
+      onwarn(warning, defaultHandler) {
+        if (warning.code?.startsWith('a11y')) {
+          const rel = projectFileRel(warning.filename, a11y.projectRoot);
+          if (rel !== null) {
+            const msg = `[${warning.code}] ${rel}: ${warning.message}`;
+            if (a11y.isBuild) {
+              a11y.warnings.push(msg);
+            } else if (!a11y.settings.ignore.includes(warning.code)) {
+              reportValidationIssues({ errors: [], warnings: [msg] });
+            }
+          }
+          return; // suppress the raw Vite print; we re-emit via the reporter
+        }
+        defaultHandler?.(warning);
+      },
     }),
+    tesseraA11yCompilerPlugin(a11y),
     tesseraValidationPlugin(),
     tesseraEntryPlugin(),
     tesseraConfigPlugin(),
@@ -69,6 +141,7 @@ function tesseraEntryPlugin(): Plugin {
   const stylesDir = resolveStylesDir();
   const appSveltePath = resolve(runtimeDir, 'App.svelte');
   let projectRoot: string;
+  let outDir: string;
   let isBuild = false;
 
   return {
@@ -77,6 +150,7 @@ function tesseraEntryPlugin(): Plugin {
 
     configResolved(config: ResolvedConfig) {
       projectRoot = config.root;
+      outDir = resolve(config.root, config.build.outDir);
       isBuild = config.command === 'build';
     },
 
@@ -85,7 +159,7 @@ function tesseraEntryPlugin(): Plugin {
       if (isBuild) {
         writeFileSync(
           resolve(projectRoot, 'index.html'),
-          generateIndexHtml(),
+          generateIndexHtml(readLanguage(projectRoot)),
           'utf-8',
         );
       }
@@ -101,9 +175,9 @@ function tesseraEntryPlugin(): Plugin {
           } catch {}
         }
 
-        // Copy assets/ directory to dist/assets/ so $assets/ references resolve
+        // Copy assets/ into the build's assets/ so $assets/ references resolve
         const assetsDir = resolve(projectRoot, 'assets');
-        const distAssetsDir = resolve(projectRoot, 'dist', 'assets');
+        const distAssetsDir = resolve(outDir, 'assets');
         if (existsSync(assetsDir)) {
           mkdirSync(distAssetsDir, { recursive: true });
           cpSync(assetsDir, distAssetsDir, { recursive: true });
@@ -116,7 +190,7 @@ function tesseraEntryPlugin(): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml();
+            const html = generateIndexHtml(readLanguage(projectRoot));
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -144,9 +218,18 @@ function tesseraEntryPlugin(): Plugin {
   };
 }
 
-function generateIndexHtml(): string {
+// 'en' fallback applied here: the config default-merge runs later than buildStart.
+// Only a validated BCP-47 tag is interpolated into <html lang>, so a malformed
+// value (caught separately as a warning) can't ship a broken attribute.
+function readLanguage(projectRoot: string): string {
+  const read = readCourseConfig(projectRoot);
+  const lang = read.ok ? read.config.language : undefined;
+  return isPlausibleLanguageTag(lang) ? lang : 'en';
+}
+
+function generateIndexHtml(lang: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -357,6 +440,38 @@ function tesseraValidationPlugin(): Plugin {
   };
 }
 
+// Tier 1a: flush + gate the Svelte compiler's a11y warnings at buildEnd, after
+// every module is transformed. svelte() accepts `onwarn` but not arbitrary
+// Rollup hooks, so the gate lives here and shares the onwarn closure.
+function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
+  return {
+    name: 'tessera:a11y-compiler',
+    enforce: 'pre',
+
+    configResolved(config: ResolvedConfig) {
+      a11y.projectRoot = config.root;
+      a11y.isBuild = config.command === 'build';
+      const read = readCourseConfig(config.root);
+      a11y.settings = normalizeA11y(read.ok ? read.config.a11y : undefined);
+    },
+
+    buildEnd() {
+      if (!a11y.isBuild || a11y.warnings.length === 0) return;
+      const ignored = new Set(a11y.settings.ignore);
+      const warnings = a11y.warnings.filter((msg) => !isIgnored(msg, ignored));
+      a11y.warnings = [];
+      if (warnings.length === 0) return;
+      if (a11y.settings.level === 'error') {
+        reportValidationIssues({ errors: warnings, warnings: [] });
+        throw new Error(
+          `Tessera: ${warnings.length} a11y issue(s) with a11y.level: 'error'. Fix the errors above to continue.`,
+        );
+      }
+      reportValidationIssues({ errors: [], warnings });
+    },
+  };
+}
+
 function runValidation(projectRoot: string): void {
   const result = validateProject(projectRoot);
   reportValidationIssues(result);
@@ -384,6 +499,7 @@ function tesseraExportPlugin(): Plugin {
 
     async closeBundle() {
       if (!isBuild) return;
+      if (isAuditBuild()) return;
 
       const read = readCourseConfig(projectRoot);
       if (!read.ok) {
@@ -539,6 +655,10 @@ function tesseraAdapterPlugin(): Plugin {
         standard = read.config.export.standard;
       }
 
+      // The audit renders headless with no LMS in the frame chain; the SCORM/
+      // cmi5 adapters throw when their API is absent, so render with WebAdapter.
+      if (isAuditBuild()) standard = 'web';
+
       switch (standard) {
         case 'scorm12':
           return `
@@ -610,6 +730,11 @@ function tesseraXAPISetupPlugin(): Plugin {
 
       if (!isBuild) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
+      }
+
+      // The audit runs offline — don't wire real LRS destinations into it.
+      if (isAuditBuild()) {
+        return `export async function buildXAPIClient() { return null; }`;
       }
 
       let standard = 'web';

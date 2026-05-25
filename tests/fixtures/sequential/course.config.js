@@ -3,6 +3,7 @@ export default {
   description: 'A course for testing sequential navigation mode',
   author: 'Tessera E2E',
   version: '1.0.0',
+  language: 'en',
   branding: {
     logo: '',
     primaryColor: '#2563eb',

@@ -71,6 +71,9 @@ importers:
 
   packages/tessera-learn:
     dependencies:
+      '@axe-core/playwright':
+        specifier: '>=4'
+        version: 4.11.3(playwright-core@1.60.0)
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.1.2
         version: 7.1.2(svelte@5.55.7(@typescript-eslint/types@8.59.4))(vite@8.0.13(@types/node@25.8.0)(esbuild@0.27.4))
@@ -80,6 +83,9 @@ importers:
       json5:
         specifier: ^2.0.0
         version: 2.2.3
+      playwright:
+        specifier: '>=1.40'
+        version: 1.60.0
       svelte:
         specifier: ^5.55.7
         version: 5.55.7(@typescript-eslint/types@8.59.4)

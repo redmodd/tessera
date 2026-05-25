@@ -30,6 +30,10 @@ export class NavigationState {
   #progress: ProgressState;
   #config: CourseConfig;
   #pageModules: PageModuleMap | null = null;
+  // Audit mode unlocks every page so the Tier-2 auditor can render and scan
+  // each one's DOM. Safe because gating is a runtime-only UX affordance — the
+  // whole course already ships client-side (see access.ts).
+  #auditMode: boolean;
   currentPageIndex = $state(0);
 
   canGoPrev = $derived(this.currentPageIndex > 0);
@@ -66,10 +70,12 @@ export class NavigationState {
     manifest: Manifest,
     progress: ProgressState,
     config: CourseConfig,
+    auditMode = false,
   ) {
     this.manifest = manifest;
     this.#progress = progress;
     this.#config = config;
+    this.#auditMode = auditMode;
   }
 
   setPageModules(modules: PageModuleMap) {
@@ -104,6 +110,7 @@ export class NavigationState {
   }
 
   isPageLocked(index: number): boolean {
+    if (this.#auditMode) return false;
     return this.#lockedSet.has(index);
   }
 

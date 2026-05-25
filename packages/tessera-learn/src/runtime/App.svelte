@@ -34,8 +34,13 @@
   );
 
   // ---- State classes ----
+  // The Tier-2 auditor appends ?__tessera_audit to unlock navigation so it can
+  // scan every page, including ones gated behind a quiz.
+  const auditMode =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('__tessera_audit');
   const progress = new ProgressState(gradedQuizIndices);
-  const nav = new NavigationState(manifest, progress, config);
+  const nav = new NavigationState(manifest, progress, config, auditMode);
   nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
 

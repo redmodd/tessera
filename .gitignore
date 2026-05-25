@@ -5,6 +5,7 @@ node_modules
 dist
 coverage
 *.tsbuildinfo
+a11y-report.json
 
 # Caches
 .vite

@@ -16,12 +16,106 @@ import {
 } from '../runtime/xapi/agent-rules.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
 import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
+import { contrastRatio } from './a11y/contrast.js';
+import { isVideoEmbed } from '../components/video-embed.js';
 
 // ---------- Types ----------
 
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
+}
+
+// ---------- A11y rule IDs ----------
+
+/** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
+const A11Y_IDS = {
+  imageAlt: 'tessera/image-alt',
+  mediaTitle: 'tessera/media-title',
+  mediaTranscript: 'tessera/media-transcript',
+  mediaCaptions: 'tessera/media-captions',
+  questionLabel: 'tessera/question-label',
+  headingOrder: 'tessera/heading-order',
+  primaryContrast: 'tessera/primary-contrast',
+  lang: 'tessera/lang',
+} as const;
+
+/** Promotable by `a11y.level: 'error'`; the rest are hard contract errors. */
+const PROMOTABLE_A11Y_IDS = new Set<string>([
+  A11Y_IDS.mediaTranscript,
+  A11Y_IDS.mediaCaptions,
+  A11Y_IDS.questionLabel,
+  A11Y_IDS.headingOrder,
+  A11Y_IDS.primaryContrast,
+  A11Y_IDS.lang,
+]);
+
+/** Prefix a diagnostic with its rule ID so `a11y.ignore` / `level` can match it. */
+function tag(id: string, message: string): string {
+  return `[${id}] ${message}`;
+}
+
+function diagnosticId(message: string): string | null {
+  const m = /^\[([^\]]+)\] /.exec(message);
+  return m ? m[1] : null;
+}
+
+/** True when a tagged diagnostic's rule ID is in the ignore set. */
+export function isIgnored(
+  message: string,
+  ignore: ReadonlySet<string>,
+): boolean {
+  const id = diagnosticId(message);
+  return id !== null && ignore.has(id);
+}
+
+export interface A11ySettings {
+  level: 'warn' | 'error';
+  standard: 'wcag2a' | 'wcag2aa' | 'wcag21aa';
+  ignore: string[];
+}
+
+const VALID_A11Y_LEVELS = ['warn', 'error'];
+const VALID_A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'];
+
+/** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
+export function normalizeA11y(raw: unknown): A11ySettings {
+  const a11y =
+    raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const level = a11y.level === 'error' ? 'error' : 'warn';
+  const standard = VALID_A11Y_STANDARDS.includes(a11y.standard as string)
+    ? (a11y.standard as A11ySettings['standard'])
+    : 'wcag2aa';
+  const ignore = Array.isArray(a11y.ignore)
+    ? a11y.ignore.filter((x): x is string => typeof x === 'string')
+    : [];
+  return { level, standard, ignore };
+}
+
+/**
+ * Apply `a11y.ignore` (drop tagged diagnostics) and `a11y.level` (promote the
+ * promotable a11y warnings to errors) to a result in place. `ignore` suppresses
+ * at any severity, including hard contract errors; `level` only re-rates.
+ */
+function applyA11ySettings(
+  result: ValidationResult,
+  settings: A11ySettings,
+): void {
+  if (settings.ignore.length > 0) {
+    const ignored = new Set(settings.ignore);
+    const keep = (msg: string) => !isIgnored(msg, ignored);
+    result.errors = result.errors.filter(keep);
+    result.warnings = result.warnings.filter(keep);
+  }
+  if (settings.level === 'error') {
+    const remaining: string[] = [];
+    for (const msg of result.warnings) {
+      const id = diagnosticId(msg);
+      if (id !== null && PROMOTABLE_A11Y_IDS.has(id)) result.errors.push(msg);
+      else remaining.push(msg);
+    }
+    result.warnings = remaining;
+  }
 }
 
 /** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
@@ -43,6 +137,7 @@ const KNOWN_CONFIG_FIELDS = new Set([
   'description',
   'author',
   'version',
+  'language',
   'branding',
   'navigation',
   'completion',
@@ -50,7 +145,17 @@ const KNOWN_CONFIG_FIELDS = new Set([
   'export',
   'chrome',
   'xapi',
+  'a11y',
 ]);
+
+// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
+// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
+const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+
+/** Plausible BCP-47 tag? Shared by the linter and the <html lang> emitter. */
+export function isPlausibleLanguageTag(value: unknown): value is string {
+  return typeof value === 'string' && BCP47_RE.test(value);
+}
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
@@ -111,7 +216,9 @@ export function validateProject(projectRoot: string): ValidationResult {
     crossValidate(config, pageResults, errors, warnings);
   }
 
-  return { errors, warnings };
+  const result: ValidationResult = { errors, warnings };
+  applyA11ySettings(result, normalizeA11y(config?.a11y));
+  return result;
 }
 
 // ---------- Config Validation ----------
@@ -182,6 +289,28 @@ function parseConfig(
   // Validate branding
   if (config.branding !== undefined) {
     validateBranding(config.branding, warnings);
+  }
+
+  // Rule 1.8: language present and well-formed (BCP-47)
+  if (config.language === undefined) {
+    warnings.push(
+      tag(
+        A11Y_IDS.lang,
+        `course.config.js: "language" is not set — defaulting <html lang> to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
+      ),
+    );
+  } else if (!isPlausibleLanguageTag(config.language)) {
+    warnings.push(
+      tag(
+        A11Y_IDS.lang,
+        `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
+      ),
+    );
+  }
+
+  // Validate a11y config block
+  if (config.a11y !== undefined) {
+    validateA11yConfig(config.a11y, errors);
   }
 
   // Validate navigation.mode
@@ -293,10 +422,9 @@ function isPlausibleColor(value: string): boolean {
 }
 
 /**
- * Format-only checks on the branding block — all advisory (warnings). The
- * runtime failures are mild: an unresolved logo ships a broken <img src>, an
- * unparseable color falls back to theme defaults. A11Y_CHECKER.md rule 1.7
- * extends this same function with a contrast check on primaryColor.
+ * Format checks on the branding block (advisory) plus rule 1.7's contrast check
+ * on primaryColor. Runtime failures are mild: an unresolved logo ships a broken
+ * <img src>, an unparseable color falls back to theme defaults.
  */
 function validateBranding(raw: unknown, warnings: string[]): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -330,6 +458,19 @@ function validateBranding(raw: unknown, warnings: string[]): void {
       warnings.push(
         `course.config.js: "branding.primaryColor" "${primaryColor}" does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
       );
+    } else {
+      // Rule 1.7: primaryColor is used both as links on the default white page
+      // background and as a button fill behind white text — symmetric, so one
+      // ratio covers both. Non-#hex valid colors return null and defer to Tier 2.
+      const ratio = contrastRatio(primaryColor, '#ffffff');
+      if (ratio !== null && ratio < 4.5) {
+        warnings.push(
+          tag(
+            A11Y_IDS.primaryContrast,
+            `course.config.js: branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white — it's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
+          ),
+        );
+      }
     }
   }
 
@@ -338,6 +479,46 @@ function validateBranding(raw: unknown, warnings: string[]): void {
     warnings.push(
       `course.config.js: "branding.fontFamily" must be a string, got ${typeof fontFamily}`,
     );
+  }
+}
+
+// ---------- a11y Config Validation ----------
+
+/** Shape-check the `a11y` block. Malformed values can't be silenced by `ignore`. */
+function validateA11yConfig(raw: unknown, errors: string[]): void {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push(
+      `course.config.js: "a11y" must be an object, got ${raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw}`,
+    );
+    return;
+  }
+  const a11y = raw as Record<string, unknown>;
+
+  if (
+    a11y.level !== undefined &&
+    !VALID_A11Y_LEVELS.includes(a11y.level as string)
+  ) {
+    errors.push(
+      `course.config.js: "a11y.level" must be "warn" or "error", got ${JSON.stringify(a11y.level)}`,
+    );
+  }
+  if (
+    a11y.standard !== undefined &&
+    !VALID_A11Y_STANDARDS.includes(a11y.standard as string)
+  ) {
+    errors.push(
+      `course.config.js: "a11y.standard" must be "wcag2a", "wcag2aa", or "wcag21aa", got ${JSON.stringify(a11y.standard)}`,
+    );
+  }
+  if (a11y.ignore !== undefined) {
+    if (
+      !Array.isArray(a11y.ignore) ||
+      a11y.ignore.some((x) => typeof x !== 'string')
+    ) {
+      errors.push(
+        `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,
+      );
+    }
   }
 }
 
@@ -672,6 +853,8 @@ function validatePageFile(
     warnings,
     exportStandard,
   );
+  validateMediaComponents(content, fileRel, errors, warnings);
+  validateHeadingOrder(content, fileRel, warnings);
   validateContractBypass(content, fileRel, errors);
   if (
     pageConfig?.quiz &&
@@ -1043,19 +1226,23 @@ type PropValue =
 function parseTagProps(
   content: string,
   start: number,
-): Map<string, PropValue> | null {
+): { props: Map<string, PropValue>; hasSpread: boolean } | null {
   const props = new Map<string, PropValue>();
+  let hasSpread = false;
   let i = start;
   while (i < content.length) {
     while (i < content.length && /\s/.test(content[i])) i++;
     if (i >= content.length) return null;
     const c = content[i];
-    if (c === '>') return props;
-    if (c === '/' && content[i + 1] === '>') return props;
-    // Spread / shorthand expression — skip the whole {...} block.
+    if (c === '>') return { props, hasSpread };
+    if (c === '/' && content[i + 1] === '>') return { props, hasSpread };
+    // Spread / shorthand expression — skip the whole {...} block, but record
+    // that unseen props may be supplied here so callers can suppress
+    // false-positive "missing required prop / alt / title" diagnostics.
     if (c === '{') {
       const block = extractObjectLiteral(content, i);
       if (!block) return null;
+      hasSpread = true;
       i += block.length;
       continue;
     }
@@ -1122,12 +1309,26 @@ function validateQuestionComponents(
   let m: RegExpExecArray | null;
   while ((m = tagStartRe.exec(content)) !== null) {
     const name = m[1];
-    const props = parseTagProps(content, m.index + m[0].length);
-    if (!props) continue;
+    const parsed = parseTagProps(content, m.index + m[0].length);
+    if (!parsed) continue;
+    const { props, hasSpread } = parsed;
 
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
-      if (!props.has(req)) {
+      if (!hasSpread && !props.has(req)) {
         errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
+      }
+    }
+
+    // Rule 1.5: empty option/answer labels are both an a11y and a scoring bug.
+    for (const labelProp of ['options', 'answers']) {
+      const entries = staticArray(props.get(labelProp));
+      if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
+        warnings.push(
+          tag(
+            A11Y_IDS.questionLabel,
+            `${fileRel}: <${name}> has an empty ${labelProp === 'options' ? 'option' : 'answer'} label`,
+          ),
+        );
       }
     }
 
@@ -1252,6 +1453,156 @@ function validateQuestionComponents(
   }
 }
 
+// ---------- Media Component Validation (rules 1.3 / 1.4) ----------
+
+/** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+
+/**
+ * Sibling to validateQuestionComponents kept out of QUESTION_COMPONENT_REQUIRED
+ * so media isn't treated as gradable questions. Declares `warnings` directly.
+ * Non-static (kind 'expr') values are skipped, matching the rest of the linter.
+ */
+function validateMediaComponents(
+  content: string,
+  fileRel: string,
+  errors: string[],
+  warnings: string[],
+): void {
+  const scan = content.replace(HTML_COMMENT_RE, '');
+  const tagStartRe = /<(Image|Video|Audio)(?=[\s/>])/g;
+  let m: RegExpExecArray | null;
+  while ((m = tagStartRe.exec(scan)) !== null) {
+    const name = m[1];
+    const parsed = parseTagProps(scan, m.index + m[0].length);
+    if (!parsed) continue;
+    const { props, hasSpread } = parsed;
+
+    if (name === 'Image') {
+      const alt = props.get('alt');
+      const decorative = props.get('decorative');
+      // A string value is truthy at runtime (so decorative="false" hides the
+      // image), but the parser sees a string, not a boolean — flag the misuse.
+      if (decorative?.kind === 'string') {
+        errors.push(
+          tag(
+            A11Y_IDS.imageAlt,
+            `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${JSON.stringify(decorative.value)}`,
+          ),
+        );
+        continue;
+      }
+      const hasDecorative =
+        decorative?.kind === 'bool' ||
+        (decorative?.kind === 'expr' && decorative.raw.trim() === 'true');
+      const altIsEmpty = alt?.kind === 'string' && alt.value.trim() === '';
+      if (!hasDecorative && !hasSpread && (alt === undefined || altIsEmpty)) {
+        errors.push(
+          tag(
+            A11Y_IDS.imageAlt,
+            `${fileRel}: <Image> needs alt text, or mark it decorative={true} if purely ornamental`,
+          ),
+        );
+      }
+      if (hasDecorative && alt?.kind === 'string' && alt.value.trim() !== '') {
+        warnings.push(
+          tag(
+            A11Y_IDS.imageAlt,
+            `${fileRel}: <Image> is decorative but also has alt text — the alt will be dropped`,
+          ),
+        );
+      }
+      continue;
+    }
+
+    // Video / Audio
+    const title = props.get('title');
+    const titleIsEmpty = title?.kind === 'string' && title.value.trim() === '';
+    if (!hasSpread && (title === undefined || titleIsEmpty)) {
+      errors.push(
+        tag(
+          A11Y_IDS.mediaTitle,
+          `${fileRel}: <${name}> needs a title — it's the accessible name for the player`,
+        ),
+      );
+    }
+    const src = props.get('src');
+    const isEmbed = src?.kind === 'string' && isVideoEmbed(src.value);
+    if (
+      name === 'Video' &&
+      !hasSpread &&
+      isEmbed &&
+      props.get('transcript') === undefined
+    ) {
+      warnings.push(
+        tag(
+          A11Y_IDS.mediaTranscript,
+          `${fileRel}: <Video> embeds can't carry caption tracks — provide a transcript for WCAG 1.2`,
+        ),
+      );
+    }
+    if (
+      name === 'Video' &&
+      !hasSpread &&
+      src?.kind === 'string' &&
+      !isEmbed &&
+      props.get('tracks') === undefined &&
+      props.get('transcript') === undefined
+    ) {
+      warnings.push(
+        tag(
+          A11Y_IDS.mediaCaptions,
+          `${fileRel}: native <Video> has no caption tracks or transcript — add tracks={[…]} or a transcript for WCAG 1.2.2`,
+        ),
+      );
+    }
+    if (
+      name === 'Audio' &&
+      !hasSpread &&
+      props.get('transcript') === undefined
+    ) {
+      warnings.push(
+        tag(
+          A11Y_IDS.mediaTranscript,
+          `${fileRel}: <Audio> has no transcript — required for WCAG 1.2.1`,
+        ),
+      );
+    }
+  }
+}
+
+// ---------- Heading Order Validation (rule 1.6) ----------
+
+/**
+ * Warn on a skipped heading level (e.g. h2 → h4). Scripts, styles, and comments
+ * are stripped first so string literals, CSS, and commented-out markup can't be
+ * miscounted. No "one h1 per page" check — the layout owns the page h1 and child
+ * components emit headings a static scan can't see; that belongs to the Tier-2
+ * audit.
+ */
+function validateHeadingOrder(
+  content: string,
+  fileRel: string,
+  warnings: string[],
+): void {
+  const html = content
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(HTML_COMMENT_RE, '');
+  const levels = [...html.matchAll(/<h([1-6])\b/gi)].map((h) => Number(h[1]));
+  let prevSeen: number | null = null;
+  for (const level of levels) {
+    if (prevSeen !== null && level - prevSeen > 1) {
+      warnings.push(
+        tag(
+          A11Y_IDS.headingOrder,
+          `${fileRel}: heading level jumps from h${prevSeen} to h${level} — don't skip levels (WCAG 1.3.1)`,
+        ),
+      );
+    }
+    prevSeen = level;
+  }
+}
+
 // ---------- Contract Bypass Detection ----------
 
 const QUIZ_COMPLETE_DISPATCH_RE =
@@ -1300,7 +1651,7 @@ function collectAssetRefs(content: string): string[] {
   let match: RegExpExecArray | null;
   ASSET_REF_RE.lastIndex = 0;
   while ((match = ASSET_REF_RE.exec(content)) !== null) {
-    seen.add(match[1]);
+    seen.add(match[1].replace(/[?#].*$/, ''));
   }
   return [...seen];
 }

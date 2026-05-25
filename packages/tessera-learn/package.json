@@ -55,7 +55,8 @@
     "**/*.css"
   ],
   "bin": {
-    "tessera-validate": "./dist/plugin/cli.js"
+    "tessera-validate": "./dist/plugin/cli.js",
+    "tessera-a11y": "./dist/plugin/a11y-cli.js"
   },
   "engines": {
     "node": ">=24"
@@ -72,6 +73,18 @@
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
     "svelte": "^5.55.7"
+  },
+  "peerDependencies": {
+    "@axe-core/playwright": ">=4",
+    "playwright": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "@axe-core/playwright": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

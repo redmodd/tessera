@@ -5,30 +5,26 @@
    * Lazy-loads via IntersectionObserver.
    *
    * @prop {string} src - Video URL (YouTube, Vimeo, direct video file, or $assets/ path)
-   * @prop {string} [title] - Accessible label for the video
+   * @prop {string} title - Accessible label for the video (required; rule 1.4)
+   * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
+   *   Caption/subtitle tracks for native (non-embed) video, rendered as <track>.
+   *   Ignored for YouTube/Vimeo embeds — the platform owns their captions.
+   * @prop {string} [transcript] - Transcript text shown in a <details> disclosure
+   *   below the player. To load it from a file, import the file with Vite's ?raw
+   *   suffix: `import t from '$assets/x.txt?raw'` then `transcript={t}`.
    */
   import { onMount } from 'svelte';
   import { resolveAsset } from './util.js';
+  import { resolveVideoEmbedUrl } from './video-embed.js';
+  import MediaTracks from './MediaTracks.svelte';
+  import Transcript from './Transcript.svelte';
 
-  let { src, title = '' } = $props();
+  let { src, title, tracks = [], transcript = '' } = $props();
   let resolvedSrc = $derived(resolveAsset(src));
   let containerRef = $state(null);
   let visible = $state(false);
 
-  const youtubeRegex =
-    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const vimeoRegex = /vimeo\.com\/(?:video\/)?(\d+)/;
-
-  let embedUrl = $derived.by(() => {
-    const ytMatch = src.match(youtubeRegex);
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-
-    const vimeoMatch = src.match(vimeoRegex);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-
-    return null;
-  });
-
+  let embedUrl = $derived(resolveVideoEmbedUrl(src));
   let isEmbed = $derived(embedUrl !== null);
 
   onMount(() => {
@@ -68,6 +64,7 @@
     {:else}
       <video controls class="tessera-video-native" aria-label={title}>
         <source src={resolvedSrc} />
+        <MediaTracks {tracks} />
         Your browser does not support the video element.
       </video>
     {/if}
@@ -77,6 +74,8 @@
     </div>
   {/if}
 </div>
+
+<Transcript text={transcript} />
 
 <style>
   .tessera-video {

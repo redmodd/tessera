@@ -11,15 +11,18 @@ Build a course with built-in components, your own (via the hooks), or any mix. T
 From the project root (commands below use `npm`; substitute your package manager — `pnpm`, `yarn`, or `bun` — if you used one):
 
 ```bash
-npm install            # first time only
-npm run dev            # dev server at http://localhost:5173 (Ctrl+C to stop)
-npm run export         # build + package for the LMS standard configured in course.config.js
-npm run validate       # run project validation only — no server, no bundle
+npm install               # first time only
+npm run dev               # dev server at http://localhost:5173 (Ctrl+C to stop)
+npm run export            # build + package for the LMS standard configured in course.config.js
+npm run validate          # run project validation only — no server, no bundle
+npm run accessibility-check  # opt-in runtime accessibility audit (axe) over the built course
 ```
 
 The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
 
-`npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
+`npm run validate` runs the same checks as `dev` and `export` (manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
+
+`npm run accessibility-check` is the deeper, opt-in pass: it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). It needs two optional dependencies — install them once with `npm i -D playwright @axe-core/playwright && npx playwright install chromium`; the command prints this same hint if they're missing. See [Accessibility](#accessibility).
 
 ### Upgrading the project
 
@@ -28,9 +31,9 @@ npx create-tessera@latest upgrade        # apply the latest framework files to t
 npx create-tessera@latest upgrade --dry-run   # preview the changes first
 ```
 
-`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
+`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`, `accessibility-check`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
 
-`dev`, `export`, and `validate` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
+`dev`, `export`, `validate`, and `accessibility-check` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
 
 ---
 
@@ -189,11 +192,14 @@ Children become the body. A11y: `role="note"` with type-appropriate `aria-label`
 
 Lazy-loaded image with optional caption. Renders as `<figure>`/`<figcaption>`.
 
-| Prop      | Type     | Description                            |
-| --------- | -------- | -------------------------------------- |
-| `src`     | `string` | Image URL. `$assets/` prefix supported |
-| `alt`     | `string` | **Required.** Alt text                 |
-| `caption` | `string` | Optional caption                       |
+| Prop         | Type      | Description                                                                                                                                                              |
+| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src`        | `string`  | Image URL. `$assets/` prefix supported                                                                                                                                   |
+| `alt`        | `string`  | **Required unless `decorative`.** Alt text describing the image                                                                                                          |
+| `decorative` | `boolean` | Set `decorative={true}` for a purely ornamental image — renders an empty `alt` + `aria-hidden` so assistive tech skips it. Use this _instead of_ `alt`, not alongside it |
+| `caption`    | `string`  | Optional caption                                                                                                                                                         |
+
+Every `<Image>` must resolve to exactly one of: meaningful `alt` text, or `decorative={true}`. The validator errors if neither is present (a missing/empty `alt` is the most common accessibility miss). `decorative` is a **boolean** — write `decorative` or `decorative={true}`, never `decorative="true"` (a string is always truthy, so the validator rejects it).
 
 ```svelte
 <Image
@@ -201,6 +207,9 @@ Lazy-loaded image with optional caption. Renders as `<figure>`/`<figcaption>`.
   alt="System architecture diagram"
   caption="Figure 1"
 />
+
+<!-- Ornamental divider that adds nothing for a screen reader: -->
+<Image src="$assets/flourish.svg" decorative={true} />
 ```
 
 ### Accordion / AccordionItem
@@ -263,22 +272,59 @@ Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `c
 
 YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
 
-| Prop    | Type     | Description                  |
-| ------- | -------- | ---------------------------- |
-| `src`   | `string` | Video URL or `$assets/` path |
-| `title` | `string` | Accessible label             |
+| Prop         | Type     | Description                                                                                                                                                   |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Video URL or `$assets/` path                                                                                                                                  |
+| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
+| `tracks`     | `array`  | Caption/subtitle tracks for **native** video, rendered as `<track>` (see shape below). Ignored for YouTube/Vimeo embeds — the platform owns their captions    |
+| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
+
+`title` is the accessible name and is required (empty/whitespace is rejected). For **WCAG 1.2** the validator also warns when a video has no captions: native video with no `tracks` and no `transcript`, or an embed with no `transcript` (embeds can't carry your `<track>` files, so supply a transcript). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
 
 ```svelte
-<Video src="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Intro" />
-<Video src="$assets/demo.mp4" title="Demo" />
+<script>
+  // ?raw inlines the file's text at build time — works under file://, SCORM, and subpaths
+  import intro from '$assets/intro.txt?raw';
+</script>
+
+<Video
+  src="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  title="Intro"
+  transcript={intro}
+/>
+<Video
+  src="$assets/demo.mp4"
+  title="Demo"
+  tracks={[
+    {
+      src: '$assets/demo.en.vtt',
+      kind: 'captions',
+      srclang: 'en',
+      label: 'English',
+    },
+  ]}
+/>
 ```
 
 ### Audio
 
 Native player. A11y: `aria-label` from title.
 
+| Prop         | Type     | Description                                                                                                                                                   |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Audio URL or `$assets/` path                                                                                                                                  |
+| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
+| `tracks`     | `array`  | Caption tracks rendered as `<track>` (same shape as `Video`)                                                                                                  |
+| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
+
+`title` is required. For **WCAG 1.2.1** the validator warns when an `<Audio>` has no `transcript` — audio-only content needs a text alternative.
+
 ```svelte
-<Audio src="$assets/lecture-01.mp3" title="Lecture 1" />
+<script>
+  import lecture from '$assets/lecture-01.txt?raw';
+</script>
+
+<Audio src="$assets/lecture-01.mp3" title="Lecture 1" transcript={lecture} />
 ```
 
 ---
@@ -677,6 +723,7 @@ export default {
   description: '',
   author: '',
   version: '1.0.0',
+  language: 'en', // BCP-47 tag for <html lang> (e.g. "en", "fr-CA"); defaults to "en"
 
   branding: {
     logo: '', // e.g., "$assets/logo.png"
@@ -702,8 +749,19 @@ export default {
   export: {
     standard: 'web', // "web" | "scorm12" | "scorm2004" | "cmi5"
   },
+
+  // Accessibility checker (all optional — sensible defaults apply)
+  a11y: {
+    level: 'warn', // "warn" (default) or "error" — "error" makes the promotable a11y rules block the build
+    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset for accessibility-check
+    ignore: [], // rule IDs to suppress, e.g. ["tessera/heading-order", "color-contrast"]
+  },
 };
 ```
+
+- `language` sets `<html lang>` for screen readers (WCAG 3.1.1). Set it to your course's language as a [BCP-47](https://www.w3.org/International/articles/language-tags/) tag. A missing or implausible value warns and falls back to `"en"`.
+- `a11y.level: "error"` promotes the "promotable" accessibility warnings (captions/transcript, heading order, contrast, language, and the Svelte compiler's a11y warnings) to build-blocking errors. Hard contract errors (missing `alt`, missing media `title`) always block regardless of `level`.
+- `a11y.ignore` is a flat list matched literally against each diagnostic's rule ID across **all tiers** — the `tessera/…` IDs printed by `validate`, the `a11y_…` IDs from the Svelte compiler, and the bare axe rule IDs (e.g. `color-contrast`) from `accessibility-check`.
 
 - `navigation.mode: "free"` → all pages accessible except those blocked by gating quizzes.
 - `navigation.mode: "sequential"` → pages unlock one at a time as each is completed.
@@ -719,6 +777,7 @@ Every field except `title` has a default. The build merges yours over:
 // effective defaults
 {
   title: "Untitled Course",
+  language: "en",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
@@ -726,7 +785,7 @@ Every field except `title` has a default. The build merges yours over:
 }
 ```
 
-So `export default { title: "My Course" }` is a complete config: free navigation, full-percentage completion, web export.
+So `export default { title: "My Course" }` is a complete config: free navigation, full-percentage completion, web export, `<html lang="en">`. (The scaffold seeds `language: 'en'` so a fresh course starts without the language warning; set it to your actual language.)
 
 ### Custom access rules
 
@@ -774,6 +833,32 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 ### Validation
 
 The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `npm run validate` to check without building.
+
+---
+
+## Accessibility
+
+Tessera checks accessibility in two passes, plus components that are accessible by construction.
+
+**Static checks** run inside `validate`, `dev`, and `export` — no extra setup. They cover what's visible in your source: `<Image>` alt-or-`decorative`, `<Video>`/`<Audio>` `title` + captions/transcript, empty question option/answer labels, skipped heading levels (e.g. `h2` → `h4`), `branding.primaryColor` contrast against white, and a well-formed `language` tag. They also route the Svelte compiler's own `a11y_*` warnings through the reporter. Each diagnostic carries a rule ID in brackets (e.g. `[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
+
+**Runtime audit** is the opt-in deep pass: `npm run accessibility-check` builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
+
+```bash
+# one-time setup for the runtime audit (optional dependencies):
+npm i -D playwright @axe-core/playwright
+npx playwright install chromium
+
+npm run accessibility-check                 # audit (threshold: serious)
+npm run accessibility-check -- --threshold minor   # stricter
+npm run accessibility-check -- --build      # force a fresh build first
+```
+
+The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.
+
+The audit's ruleset and severity come from the `a11y` block in `course.config.js` (`standard`, `ignore`); see [`course.config.js`](#courseconfigjs). `a11y-report.json` is build output — it's git-ignored by default.
+
+Hard contract errors (missing `alt`, missing media `title`) always block the build. Everything else is a warning unless you set `a11y.level: "error"`. To silence a specific rule everywhere, add its ID to `a11y.ignore`.
 
 ---
 
