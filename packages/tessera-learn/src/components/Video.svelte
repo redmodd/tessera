@@ -9,8 +9,9 @@
    * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
    *   Caption/subtitle tracks for native (non-embed) video, rendered as <track>.
    *   Ignored for YouTube/Vimeo embeds — the platform owns their captions.
-   * @prop {string} [transcript] - Transcript text (or $assets/ path) shown in a
-   *   <details> disclosure below the player.
+   * @prop {string} [transcript] - Transcript text shown in a <details> disclosure
+   *   below the player. To load it from a file, import the file with Vite's ?raw
+   *   suffix: `import t from '$assets/x.txt?raw'` then `transcript={t}`.
    */
   import { onMount } from 'svelte';
   import { resolveAsset } from './util.js';
@@ -61,7 +62,7 @@
     {:else}
       <video controls class="tessera-video-native" aria-label={title}>
         <source src={resolvedSrc} />
-        {#each tracks as track (track.src)}
+        {#each tracks as track, i (i)}
           <track
             src={resolveAsset(track.src)}
             kind={track.kind ?? 'captions'}

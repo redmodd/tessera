@@ -7,8 +7,9 @@
    * @prop {string} title - Accessible label for the player (required; rule 1.4)
    * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
    *   Caption/subtitle tracks rendered as <track> on the native player.
-   * @prop {string} [transcript] - Transcript text (or $assets/ path) shown in a
-   *   <details> disclosure below the player (WCAG 1.2.1).
+   * @prop {string} [transcript] - Transcript text shown in a <details> disclosure
+   *   below the player (WCAG 1.2.1). To load it from a file, import the file with
+   *   Vite's ?raw suffix: `import t from '$assets/x.txt?raw'` then `transcript={t}`.
    */
   import { resolveAsset } from './util.js';
 
@@ -27,7 +28,7 @@
     class="tessera-audio-player"
   >
     <source src={resolvedSrc} />
-    {#each tracks as track (track.src)}
+    {#each tracks as track, i (i)}
       <track
         src={resolveAsset(track.src)}
         kind={track.kind ?? 'captions'}

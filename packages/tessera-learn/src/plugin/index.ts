@@ -70,8 +70,11 @@ function projectFileRel(
     return null;
   }
   const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
-  if (!abs.startsWith(projectRoot) || abs.includes('node_modules')) return null;
-  return relative(projectRoot, abs);
+  const rel = relative(projectRoot, abs);
+  if (rel.startsWith('..') || isAbsolute(rel) || rel.includes('node_modules')) {
+    return null;
+  }
+  return rel;
 }
 
 export function tesseraPlugin() {

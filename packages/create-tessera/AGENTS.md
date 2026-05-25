@@ -272,20 +272,25 @@ Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `c
 
 YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
 
-| Prop         | Type     | Description                                                                                                                                                |
-| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src`        | `string` | Video URL or `$assets/` path                                                                                                                               |
-| `title`      | `string` | **Required.** Accessible label for the player                                                                                                              |
-| `tracks`     | `array`  | Caption/subtitle tracks for **native** video, rendered as `<track>` (see shape below). Ignored for YouTube/Vimeo embeds — the platform owns their captions |
-| `transcript` | `string` | Transcript text (or `$assets/` path) shown in a `<details>` disclosure below the player                                                                    |
+| Prop         | Type     | Description                                                                                                                                                   |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Video URL or `$assets/` path                                                                                                                                  |
+| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
+| `tracks`     | `array`  | Caption/subtitle tracks for **native** video, rendered as `<track>` (see shape below). Ignored for YouTube/Vimeo embeds — the platform owns their captions    |
+| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
 
 `title` is the accessible name and is required (empty/whitespace is rejected). For **WCAG 1.2** the validator also warns when a video has no captions: native video with no `tracks` and no `transcript`, or an embed with no `transcript` (embeds can't carry your `<track>` files, so supply a transcript). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
 
 ```svelte
+<script>
+  // ?raw inlines the file's text at build time — works under file://, SCORM, and subpaths
+  import intro from '$assets/intro.txt?raw';
+</script>
+
 <Video
   src="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
   title="Intro"
-  transcript="$assets/intro.txt"
+  transcript={intro}
 />
 <Video
   src="$assets/demo.mp4"
@@ -305,21 +310,21 @@ YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for di
 
 Native player. A11y: `aria-label` from title.
 
-| Prop         | Type     | Description                                                                             |
-| ------------ | -------- | --------------------------------------------------------------------------------------- |
-| `src`        | `string` | Audio URL or `$assets/` path                                                            |
-| `title`      | `string` | **Required.** Accessible label for the player                                           |
-| `tracks`     | `array`  | Caption tracks rendered as `<track>` (same shape as `Video`)                            |
-| `transcript` | `string` | Transcript text (or `$assets/` path) shown in a `<details>` disclosure below the player |
+| Prop         | Type     | Description                                                                                                                                                   |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Audio URL or `$assets/` path                                                                                                                                  |
+| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
+| `tracks`     | `array`  | Caption tracks rendered as `<track>` (same shape as `Video`)                                                                                                  |
+| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
 
 `title` is required. For **WCAG 1.2.1** the validator warns when an `<Audio>` has no `transcript` — audio-only content needs a text alternative.
 
 ```svelte
-<Audio
-  src="$assets/lecture-01.mp3"
-  title="Lecture 1"
-  transcript="$assets/lecture-01.txt"
-/>
+<script>
+  import lecture from '$assets/lecture-01.txt?raw';
+</script>
+
+<Audio src="$assets/lecture-01.mp3" title="Lecture 1" transcript={lecture} />
 ```
 
 ---

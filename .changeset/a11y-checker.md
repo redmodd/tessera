@@ -40,3 +40,7 @@ The scaffolded `course.config.js` now ships `language: 'en'` so fresh courses
 start clean, and the scaffold adds a reserved `accessibility-check` npm script
 (→ `tessera-a11y`) alongside `dev` / `export` / `validate`; `upgrade` reconciles
 it into existing projects.
+
+**Fix.** `$assets/` references carrying a Vite query/hash suffix (e.g. `?raw`,
+`?url`) are no longer mis-reported as "not found" by the asset-reference
+validator — the suffix is stripped before the on-disk existence check.

@@ -30,7 +30,6 @@ interface AxeViolation {
 interface PageAuditResult {
   index: number;
   title: string;
-  skipped?: 'locked';
   violations: AxeViolation[];
 }
 
@@ -194,10 +193,6 @@ export async function runAudit(
       for (let i = 0; i < navCount; i++) {
         const btn = page.locator('button.tessera-nav-page').nth(i);
         const title = (await btn.textContent())?.trim() || `Page ${i + 1}`;
-        if ((await btn.getAttribute('aria-disabled')) === 'true') {
-          pages.push({ index: i, title, skipped: 'locked', violations: [] });
-          continue;
-        }
         await btn.click();
         await page.waitForFunction(
           (idx: number) =>
@@ -245,16 +240,17 @@ export async function runAudit(
 }
 
 function printSummary(report: AuditReport, reportPath: string): void {
+  const thresholdRank = IMPACT_RANK[report.threshold];
   for (const p of report.pages) {
-    if (p.skipped) {
-      console.log(`\x1b[2m  - ${p.title} — skipped (${p.skipped})\x1b[0m`);
-      continue;
-    }
     if (p.violations.length === 0) {
       console.log(`\x1b[32m  ✓\x1b[0m ${p.title}`);
       continue;
     }
-    console.log(`\x1b[31m  ✗\x1b[0m ${p.title}`);
+    const failing = p.violations.some(
+      (v) => !v.impact || IMPACT_RANK[v.impact] >= thresholdRank,
+    );
+    const mark = failing ? '\x1b[31m  ✗\x1b[0m' : '\x1b[33m  ⚠\x1b[0m';
+    console.log(`${mark} ${p.title}`);
     for (const v of p.violations) {
       console.log(
         `      [${v.impact ?? 'n/a'}] ${v.id} — ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,

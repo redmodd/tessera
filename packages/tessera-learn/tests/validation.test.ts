@@ -790,6 +790,20 @@ describe('asset reference validation', () => {
       0,
     );
   });
+
+  it('strips Vite query suffixes (?raw) before checking existence', () => {
+    createValidProject(testRoot);
+    writeFile(testRoot, 'assets/intro.txt', 'A transcript.');
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script>import intro from '$assets/intro.txt?raw';</script>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('$assets/intro.txt')),
+    ).toHaveLength(0);
+  });
 });
 
 // ---- Question Component Validation ----
@@ -1444,6 +1458,13 @@ describe('a11y rule 1.3 — Image alt-or-decorative', () => {
     writePage(testRoot, `<Image src="$assets/x.png" alt={someVar} />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('requires alt for a non-static decorative expression', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image src="$assets/x.png" decorative={maybe} />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(true);
   });
 });
 

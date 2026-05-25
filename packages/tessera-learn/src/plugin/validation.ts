@@ -1482,7 +1482,7 @@ function validateMediaComponents(
       }
       const hasDecorative =
         decorative?.kind === 'bool' ||
-        (decorative?.kind === 'expr' && decorative.raw.trim() !== 'false');
+        (decorative?.kind === 'expr' && decorative.raw.trim() === 'true');
       const altIsEmpty = alt?.kind === 'string' && alt.value.trim() === '';
       if (!hasDecorative && (alt === undefined || altIsEmpty)) {
         errors.push(
@@ -1629,7 +1629,7 @@ function collectAssetRefs(content: string): string[] {
   let match: RegExpExecArray | null;
   ASSET_REF_RE.lastIndex = 0;
   while ((match = ASSET_REF_RE.exec(content)) !== null) {
-    seen.add(match[1]);
+    seen.add(match[1].replace(/[?#].*$/, ''));
   }
   return [...seen];
 }
