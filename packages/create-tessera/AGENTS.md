@@ -854,6 +854,8 @@ npm run accessibility-check -- --threshold minor   # stricter
 npm run accessibility-check -- --build      # force a fresh build first
 ```
 
+The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.
+
 The audit's ruleset and severity come from the `a11y` block in `course.config.js` (`standard`, `ignore`); see [`course.config.js`](#courseconfigjs). `a11y-report.json` is build output — it's git-ignored by default.
 
 Hard contract errors (missing `alt`, missing media `title`) always block the build. Everything else is a warning unless you set `a11y.level: "error"`. To silence a specific rule everywhere, add its ID to `a11y.ignore`.
