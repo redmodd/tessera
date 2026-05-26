@@ -201,9 +201,9 @@ describe('extractDefaultExportObjectLiteral', () => {
 
   it('handles strings containing </script>', () => {
     const literal = `{ template: '</script><b>hi</b>' }`;
-    expect(extractDefaultExportObjectLiteral(`export default ${literal};`)).toBe(
-      literal,
-    );
+    expect(
+      extractDefaultExportObjectLiteral(`export default ${literal};`),
+    ).toBe(literal);
   });
 
   it('handles `as const` on the default export', () => {

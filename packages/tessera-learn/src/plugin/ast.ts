@@ -232,7 +232,10 @@ export function defaultExportObjectLiteral(jsSource: string): string | null {
   return extractBalancedBraces(jsSource, braceIndex);
 }
 
-function findPageConfigInModule(root: Node, source: string): NamedObjectLiteral {
+function findPageConfigInModule(
+  root: Node,
+  source: string,
+): NamedObjectLiteral {
   const program = (root.module as { content?: Node } | null)?.content;
   if (!program) return { kind: 'none' };
   const body = (program.body as Node[]) ?? [];
