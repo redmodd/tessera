@@ -5,6 +5,7 @@ import {
   generateManifest,
   extractPageConfig,
   extractDefaultExportObjectLiteral,
+  parsePageConfigFromSource,
   readMetaFile,
   orderPageFiles,
   stripPrefix,
@@ -218,6 +219,40 @@ describe('extractDefaultExportObjectLiteral', () => {
     expect(
       extractDefaultExportObjectLiteral(`export default ({ title: 'X' });`),
     ).toBe(`{ title: 'X' }`);
+  });
+
+  it('handles a block comment between `export default` and the literal', () => {
+    expect(
+      extractDefaultExportObjectLiteral(
+        `export default /* note */ { title: 'X' };`,
+      ),
+    ).toBe(`{ title: 'X' }`);
+  });
+
+  it('handles a line comment between `export default` and the literal', () => {
+    expect(
+      extractDefaultExportObjectLiteral(
+        `export default\n// SPDX-License-Identifier: MIT\n{ title: 'X' };`,
+      ),
+    ).toBe(`{ title: 'X' }`);
+  });
+});
+
+// ---------- parsePageConfigFromSource ----------
+
+describe('parsePageConfigFromSource', () => {
+  it('reads pageConfig from a module script when the template fails to parse', () => {
+    const source = `<script context="module">
+export const pageConfig = { title: 'X', quiz: { graded: true } };
+</script>
+<h1>page</h1>
+{#if `;
+    const result = parsePageConfigFromSource(source);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.title).toBe('X');
+      expect(result.value.quiz).toEqual({ graded: true });
+    }
   });
 });
 

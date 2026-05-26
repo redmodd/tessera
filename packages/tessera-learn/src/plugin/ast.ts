@@ -1,17 +1,15 @@
+import { Parser } from 'acorn';
+import { tsPlugin } from '@sveltejs/acorn-typescript';
 import { parse } from 'svelte/compiler';
 
 /**
  * Shared parsing layer for the build-time validator and manifest generator.
  *
- * Structure is read from Svelte's own AST (`svelte/compiler`'s `parse`, which
- * bundles acorn) so the validator no longer hand-rolls a template scanner.
- * Static *values* are still recovered with JSON5 by the callers — only the
- * parsing of structure (tags, attributes, pageConfig location) moves here.
- *
- * Plain JS files (`course.config.js`, `_meta.js`) are not Svelte, so a
- * string-aware balanced-brace matcher is used to locate the default-export
- * object literal — wrapping them as `<script module>` would mis-tokenise any
- * embedded `</script>` and would not survive trailing TS like `as const`.
+ * `.svelte` files go through `svelte/compiler`'s `parse`; plain JS files
+ * (`course.config.js`, `_meta.js`) and the module-script fallback go through
+ * acorn (with `acorn-typescript` for `as const` / `satisfies T`). Static
+ * *values* are still recovered with JSON5 by the callers — only structure
+ * parsing lives here.
  */
 
 export type PropValue =
@@ -164,86 +162,19 @@ export function findComponents(
   return collectComponents(root, names).map((node) => readProps(source, node));
 }
 
-/**
- * Balanced `{...}` / `[...]` span starting at the opening bracket. String-
- * and comment-aware so embedded braces (including `</script>` in a string)
- * don't end the span. Used for plain JS only.
- */
-function extractBalancedBraces(
-  source: string,
-  startIndex: number,
-): string | null {
-  const open = source[startIndex];
-  if (open !== '{' && open !== '[') return null;
+const TsParser = Parser.extend(tsPlugin() as unknown as Parameters<typeof Parser.extend>[0]);
 
-  let depth = 0;
-  let inString: string | null = null;
-  let escaped = false;
-
-  for (let i = startIndex; i < source.length; i++) {
-    const char = source[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\' && inString) {
-      escaped = true;
-      continue;
-    }
-
-    if (inString) {
-      if (char === inString) inString = null;
-      continue;
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      inString = char;
-      continue;
-    }
-
-    if (char === '/' && i + 1 < source.length && source[i + 1] === '/') {
-      const newline = source.indexOf('\n', i);
-      i = newline === -1 ? source.length : newline;
-      continue;
-    }
-
-    if (char === '/' && i + 1 < source.length && source[i + 1] === '*') {
-      const end = source.indexOf('*/', i + 2);
-      i = end === -1 ? source.length : end + 1;
-      continue;
-    }
-
-    if (char === '{' || char === '[') depth++;
-    if (char === '}' || char === ']') {
-      depth--;
-      if (depth === 0) {
-        return source.slice(startIndex, i + 1);
-      }
-    }
+function parseJsModule(source: string): Node | null {
+  try {
+    return TsParser.parse(source, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+    }) as unknown as Node;
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
-/**
- * Return the source text of the object literal in `export default { ... }`,
- * or null if there is no default export or it isn't an object literal.
- * Plain JS only — does not wrap as `<script module>`.
- */
-export function defaultExportObjectLiteral(jsSource: string): string | null {
-  const match = jsSource.match(/export\s+default\s*/);
-  if (!match || match.index === undefined) return null;
-  const afterKeyword = match.index + match[0].length;
-  const braceIndex = jsSource.indexOf('{', afterKeyword);
-  if (braceIndex < 0) return null;
-  const between = jsSource.slice(afterKeyword, braceIndex);
-  if (!/^[\s(]*$/.test(between)) return null;
-  return extractBalancedBraces(jsSource, braceIndex);
-}
-
-/** Strip TS casts (`x as T`, `x satisfies T`, `<T>x`) so the wrapped literal is recoverable. */
 function unwrapTsCast(node: Node | null): Node | null {
   let current = node;
   while (
@@ -257,12 +188,10 @@ function unwrapTsCast(node: Node | null): Node | null {
   return current;
 }
 
-function findPageConfigInModule(
-  root: Node,
+function findPageConfigInProgram(
+  program: Node,
   source: string,
 ): NamedObjectLiteral {
-  const program = (root.module as { content?: Node } | null)?.content;
-  if (!program) return { kind: 'none' };
   const body = (program.body as Node[]) ?? [];
   for (const node of body) {
     if (node.type !== 'ExportNamedDeclaration') continue;
@@ -282,12 +211,50 @@ function findPageConfigInModule(
 }
 
 /**
+ * Return the source text of the object literal in `export default { ... }`,
+ * or null if there is no default export or it isn't an object literal.
+ * Plain JS only.
+ */
+export function defaultExportObjectLiteral(jsSource: string): string | null {
+  const program = parseJsModule(jsSource);
+  if (!program) return null;
+  for (const node of (program.body as Node[]) ?? []) {
+    if (node.type !== 'ExportDefaultDeclaration') continue;
+    const decl = unwrapTsCast(
+      (node as { declaration?: Node }).declaration ?? null,
+    );
+    if (decl && decl.type === 'ObjectExpression') {
+      return jsSource.slice(decl.start, decl.end);
+    }
+    return null;
+  }
+  return null;
+}
+
+const MODULE_SCRIPT_RE =
+  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>([\s\S]*?)<\/script>/;
+
+function pageConfigFromModuleScriptFallback(
+  svelteSource: string,
+): NamedObjectLiteral {
+  const moduleScript = svelteSource.match(MODULE_SCRIPT_RE);
+  if (!moduleScript) return { kind: 'none' };
+  const program = parseJsModule(moduleScript[1]);
+  if (!program) return { kind: 'none' };
+  return findPageConfigInProgram(program, moduleScript[1]);
+}
+
+/**
  * Locate `export const pageConfig = { ... }` in a Svelte page's module script
  * and return the object-literal text. Walks the page-level AST so TypeScript
  * (`lang="ts"`) module scripts are handled by Svelte's own parser.
  */
 export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   const { root } = parseRoot(svelteSource);
-  if (!root) return { kind: 'none' };
-  return findPageConfigInModule(root, svelteSource);
+  if (root) {
+    const program = (root.module as { content?: Node } | null)?.content;
+    if (!program) return { kind: 'none' };
+    return findPageConfigInProgram(program, svelteSource);
+  }
+  return pageConfigFromModuleScriptFallback(svelteSource);
 }

@@ -69,7 +69,9 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
+    "@sveltejs/acorn-typescript": "^1.0.10",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "acorn": "^8.16.0",
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
     "svelte": "^5.55.7"

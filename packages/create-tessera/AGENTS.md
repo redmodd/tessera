@@ -832,7 +832,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `npm run validate` to check without building.
+The Vite plugin runs project validation on every dev start and build (page syntax, manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `npm run validate` to check without building.
 
 ---
 
