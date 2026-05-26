@@ -1,11 +1,25 @@
 # create-tessera
 
+## 0.0.13
+
+### Patch Changes
+
+- 1edf88f: **Accessibility checker** — a three-tier system for catching a11y issues, plus the component and config changes to support it.
+  - **Components.** `Image` now requires either `alt` or the new `decorative` flag (was silently optional). `Video`/`Audio` require a `title` and accept `tracks` (rendered as `<track>`) and a `transcript` disclosure. A new top-level `language` config field (BCP-47, default `'en'`) sets `<html lang>`.
+  - **Static analyzer** (build + dev, no new deps). Routes Svelte's `a11y_*` compiler warnings through the validation reporter, plus tessera-specific rules for missing alt/title/captions, empty question labels, skipped heading levels, low `primaryColor` contrast, and malformed `language` tags.
+  - **Runtime auditor.** New `tessera-a11y` bin runs Playwright + axe-core over a built course, writes `a11y-report.json`, and exits non-zero above an impact threshold (default `serious`). Playwright and `@axe-core/playwright` are optional.
+  - **Config.** New `a11y` block: `level` (`warn`/`error`), `standard` (axe ruleset tags), and `ignore` (per-rule escape hatch).
+  - **Scaffold.** New courses ship `language: 'en'` and a reserved `accessibility-check` script (→ `tessera-a11y`); `upgrade` adds it to existing projects.
+  - **Fix.** `$assets/` references with a Vite query suffix (`?raw`, `?url`) are no longer mis-reported as missing.
+
+- 28cdba8: Pin scaffolded and upgraded `tessera-learn` to the exact version create-tessera ships, derived from its own version rather than a hand-maintained `tesseraVersion` field. The two packages now release in lockstep, so the pinned runtime can't drift from what was published.
+- d4e0351: Move scaffolder templates from inline strings to real on-disk template directories copied by a token-substituting walker, and make the post-scaffold "Next steps" hint package-manager-aware (npm/pnpm/yarn/bun). Mostly internal, but scaffolded output changes slightly: the bare template's demo question now uses the documented choice pattern (readable ids + `options`, so SCORM 1.2 export emits the position indexes SCORM Cloud requires), and the README/AGENTS.md note that `npm` commands can be swapped for your package manager.
+
 ## 0.0.12
 
 ### Patch Changes
 
 - 909863b: - Bump the scaffolded `tessera-learn` pin to `^0.0.11` so newly-created projects pick up the standalone-question LMS score fix, consistent `$assets/` resolution across the media components, and the relocated framework bundle (`dist/tessera/`).
-
   - Pin `"types": ["node"]` in the package tsconfig so a standalone `tsc -p packages/create-tessera/tsconfig.json` type-checks clean (it was reporting phantom missing-`process` / `node:*` errors). No change to the scaffolded output or CLI behavior.
 
 ## 0.0.11

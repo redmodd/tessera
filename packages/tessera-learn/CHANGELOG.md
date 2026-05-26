@@ -1,11 +1,35 @@
 # tessera-learn
 
+## 0.0.13
+
+### Patch Changes
+
+- 1edf88f: **Accessibility checker** — a three-tier system for catching a11y issues, plus the component and config changes to support it.
+  - **Components.** `Image` now requires either `alt` or the new `decorative` flag (was silently optional). `Video`/`Audio` require a `title` and accept `tracks` (rendered as `<track>`) and a `transcript` disclosure. A new top-level `language` config field (BCP-47, default `'en'`) sets `<html lang>`.
+  - **Static analyzer** (build + dev, no new deps). Routes Svelte's `a11y_*` compiler warnings through the validation reporter, plus tessera-specific rules for missing alt/title/captions, empty question labels, skipped heading levels, low `primaryColor` contrast, and malformed `language` tags.
+  - **Runtime auditor.** New `tessera-a11y` bin runs Playwright + axe-core over a built course, writes `a11y-report.json`, and exits non-zero above an impact threshold (default `serious`). Playwright and `@axe-core/playwright` are optional.
+  - **Config.** New `a11y` block: `level` (`warn`/`error`), `standard` (axe ruleset tags), and `ignore` (per-rule escape hatch).
+  - **Scaffold.** New courses ship `language: 'en'` and a reserved `accessibility-check` script (→ `tessera-a11y`); `upgrade` adds it to existing projects.
+  - **Fix.** `$assets/` references with a Vite query suffix (`?raw`, `?url`) are no longer mis-reported as missing.
+
+- 64bc37c: Fix correctness issues surfaced by new static analysis: four unhandled promises in async LMS/runtime work (cmi5 State PUT, the write-queue flush, ZIP finalize, page prefetch) are now explicitly fire-and-forget (behavior unchanged); cmi5 launch-parameter errors attach the underlying error via `cause`; and `<AccordionItem>` derives its element ids from `$props.id()` instead of a module-level counter. Also adds monorepo type-checking, ESLint, and Prettier (internal tooling). No public API change.
+
+- 4e69ce8: Internal: extract `QuizEngine` from the `useQuiz` closure into a standalone, DOM-free class. No public API or behavior change.
+- cc638d6: Close build-time validation gaps so authors get a diagnostic instead of silent misbehavior:
+  - **`quiz.feedbackMode` / `quiz.retryMode`** — enum-checked; catches typos that previously fell through to the default.
+  - **`title`** — warns when missing or empty, errors when non-string.
+  - **Question `weight`** — warns when ignored or coerced; errors on a non-finite value that would make the score `NaN`.
+  - **Question `id` (SCORM 1.2)** — warns when sanitization would rewrite it, errors on a post-sanitization collision.
+  - **`MultipleChoice.optionFeedback`** — warns when it has more entries than `options`.
+  - **`scoring.passingScore`** — warns when `completion.mode: "quiz"` leaves it at the implicit default (70%).
+  - **`branding`** — warns on a malformed `logo`, `primaryColor`, or `fontFamily`.
+  - **Empty sections** — warns when a section contributes no pages.
+
 ## 0.0.11
 
 ### Patch Changes
 
 - 909863b: - **Standalone graded questions now count toward the LMS score.** A course graded entirely through standalone `useQuestion({ graded: true })` previously reported `success_status` but never called `adapter.setScore`, leaving `cmi.score.raw` unset; the score and success status could also disagree when both quizzes and standalone questions existed. Both are now derived from one source (`ProgressState.gradedScore()`), and the score-reporting effect commits only when the rounded score actually changes — so page turns no longer re-issue redundant `setScore` / `setDuration` / `commit()` round-trips.
-
   - **Consistent `$assets/` resolution in media components.** `Image`, `Audio`, and `Video` now resolve `src` through the shared `resolveAsset()` helper using one document-relative `./assets/` form that works at the domain root, under an LMS subpath, and over `file://`. Previously `Image` used a root-relative `/assets/` prefix and `Audio` / `Video` emitted the literal `$assets/` URL unresolved. A missing/empty `src` renders an empty `<source>` instead of throwing.
 
   - **Framework bundle emitted to `dist/tessera/`.** Vite's hashed JS/CSS chunks now live in `dist/tessera/`, leaving `dist/assets/` for user media only, so a host can apply an immutable long-cache rule to the bundle without risking stale media. No author-facing change — courses keep referencing media via `$assets/...`.
@@ -83,14 +107,12 @@
 ### Patch Changes
 
 - **cmi5 spec conformance against strict LRSes.** End-to-end validated against SCORM Cloud. The adapter now consumes the documents cmi5 actually requires and emits the statement shapes strict validators accept, replacing several heuristics that produced silent rejections in earlier versions.
-
   - **`LMS.LaunchData` (§10)** — fetched at init; `contextTemplate` is now the base context on every Defined Statement (§9.6.2). The Publisher Activity (`contextActivities.grouping`, §9.6.2.3) and session id extension (§9.6.3.1) come from there, not from heuristic URL parsing. `launchMode`, `returnURL`, `launchParameters`, `masteryScore`, and `moveOn` are also read from LaunchData and exposed via new getters: `getLaunchMode()`, `getReturnURL()`, `getLaunchParameters()`. LaunchData wins over the URL `masteryScore` parameter.
   - **Learner Preferences (§11)** — `cmi5LearnerPreferences` Agent Profile is fetched at startup _before_ Initialized, satisfying the §11 obligation strict LRSes enforce. Exposed via `getLearnerPreferences()`.
   - **`launchMode` (§10.2.2)** — Browse and Review launches now suppress every Defined Statement except Initialized and Terminated.
   - **`exit()` method (§10.2.6)** — new explicit-exit path. Calls `terminate()`, awaits the publisher queue so Terminated lands first, then `window.location.assign`s to the LMS-supplied `returnURL`.
 
   Spec-conformance fixes to lifecycle statement shapes:
-
   - **§9.6 Context Categories** — every Defined Statement now carries the `cmi5` Category Activity in `contextActivities.category`; Completed / Passed / Failed additionally carry the `moveOn` Category. Without these, conformant LRSes silently fail to roll up cmi5 lifecycle state.
   - **§9.5.1 score scope** — `result.score` is dropped from Completed (forbidden) and kept on Passed / Failed only.
   - **§9.6.3.2 masteryScore extension** — scoped to Passed / Failed only; previously emitted on every Defined Statement.
@@ -100,17 +122,14 @@
   - **§9.6.2 contextTemplate merge** — template-supplied categories are concatenated with the AU's required ones (never overwritten, per §10.2.1).
 
   cmi5 fetch / token plumbing:
-
   - **§11.2 auth-token parsing** — accepts the spec-conformant JSON body (`{"auth-token": "..."}`) in addition to the legacy plain-text form. Without this the Authorization header carried the entire JSON string, producing 400 "Malformed authorization header" on every authenticated call.
 
   Manifest (`cmi5.xml`) fixes:
-
   - `<au>` emits `<url>` as a child element (was an attribute) so the manifest passes the cmi5 CourseStructure XSD.
   - `<au>` emits a `launchMethod="AnyWindow"` attribute (required by the XSD).
   - `masteryScore` is rounded to 4 decimal places (§10.2.4) to avoid `0.7000000000000001` float drift.
 
   Operational visibility:
-
   - LRS non-2xx responses now surface the response body in the outcome's error message (capped at 500 chars) — debugging cmi5 rejections no longer requires snapshotting the network panel.
   - Every lifecycle statement (Initialized / Completed / Passed / Failed / Terminated / Answered) now logs a console warning on LRS rejection with the verb name and status. The previous `.catch(() => {})` path swallowed 4xx/5xx outcomes that the publisher resolves successfully.
   - State API GET / PUT and Agent Profile GET log meaningful non-2xx statuses (404 is silent on resume + prefs, since "no document" is normal).
@@ -136,12 +155,10 @@
 - **Custom widgets** — `useQuestion` gains a standalone-mode retry surface so authors of custom question widgets can build their own Try-Again UI on top of the hook (matching what the built-in widgets already do): `maxRetries` option, `retry()` method, and `canRetry`/`retryCount` getters on the returned handle. No-ops inside a `<Quiz>` (the parent quiz still drives retries there).
 
   **Sorting / Matching reactivity (Svelte 5)** — fix two bugs that survived the Svelte 4 → 5 migration:
-
   - Sorting placements were stored in a plain `Map` under `$state`; `.set` / `.delete` didn't trigger reactivity, so the UI only updated when adjacent reassignments happened to invalidate. Switched to `SvelteMap`.
   - Matching's auto-submit-on-final-pair was driven from a `$effect` reading derived state — moved into the match handler so it fires once when the final pair lands.
 
   **Sorting accessibility**
-
   - Drop targets are now keyboard-activatable: tab reaches each target, Enter/Space places the selected card. Previously keyboard users could select the deck card but had no way to drop it.
   - The deck card actually shows a focus ring now — the previous rule used `outline:` with a `box-shadow`-shaped value (`0 0 0 3px rgba(...)`), which is invalid syntax and was silently ignored.
 
