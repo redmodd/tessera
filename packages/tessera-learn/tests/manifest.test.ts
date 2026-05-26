@@ -198,6 +198,21 @@ describe('extractDefaultExportObjectLiteral', () => {
       extractDefaultExportObjectLiteral('export default { title: "hi"'),
     ).toBeNull();
   });
+
+  it('handles strings containing </script>', () => {
+    const literal = `{ template: '</script><b>hi</b>' }`;
+    expect(extractDefaultExportObjectLiteral(`export default ${literal};`)).toBe(
+      literal,
+    );
+  });
+
+  it('handles `as const` on the default export', () => {
+    expect(
+      extractDefaultExportObjectLiteral(
+        `export default { title: 'X' } as const;`,
+      ),
+    ).toBe(`{ title: 'X' }`);
+  });
 });
 
 // ---------- readMetaFile ----------

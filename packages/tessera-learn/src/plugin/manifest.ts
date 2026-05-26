@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
-import { defaultExportObjectLiteral, namedExportObjectLiteral } from './ast.js';
+import { defaultExportObjectLiteral, pageConfigLiteral } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
 
 // ---------- Types ----------
@@ -169,10 +169,7 @@ export type PageConfigParseResult =
 export function parsePageConfigFromSource(
   content: string,
 ): PageConfigParseResult {
-  const moduleScriptMatch = content.match(MODULE_SCRIPT_RE);
-  if (!moduleScriptMatch) return { kind: 'none' };
-
-  const literal = namedExportObjectLiteral(moduleScriptMatch[1], 'pageConfig');
+  const literal = pageConfigLiteral(content);
   if (literal.kind === 'none') return { kind: 'none' };
   if (literal.kind === 'invalid') return { kind: 'invalid' };
 

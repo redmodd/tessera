@@ -1605,6 +1605,24 @@ describe('parse failures', () => {
   });
 });
 
+describe('pageConfig in a TypeScript module script', () => {
+  it('reads a valid pageConfig even when surrounding module body has TS syntax', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+import type { PageConfig } from './types';
+export const pageConfig: PageConfig = { title: 'T' };
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+});
+
 describe('a11y rule 1.5 — question option/answer labels', () => {
   it('warns on an empty option label', () => {
     createValidProject(testRoot);

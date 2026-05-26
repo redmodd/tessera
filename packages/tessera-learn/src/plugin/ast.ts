@@ -4,10 +4,14 @@ import { parse } from 'svelte/compiler';
  * Shared parsing layer for the build-time validator and manifest generator.
  *
  * Structure is read from Svelte's own AST (`svelte/compiler`'s `parse`, which
- * bundles acorn) so the validator no longer hand-rolls a template scanner or a
- * balanced-brace matcher. Static *values* are still recovered with JSON5 by the
- * callers — only the parsing of structure (tags, attributes, object-literal
- * spans) moves here, since that is where the regex path's false negatives lived.
+ * bundles acorn) so the validator no longer hand-rolls a template scanner.
+ * Static *values* are still recovered with JSON5 by the callers — only the
+ * parsing of structure (tags, attributes, pageConfig location) moves here.
+ *
+ * Plain JS files (`course.config.js`, `_meta.js`) are not Svelte, so a
+ * string-aware balanced-brace matcher is used to locate the default-export
+ * object literal — wrapping them as `<script module>` would mis-tokenise any
+ * embedded `</script>` and would not survive trailing TS like `as const`.
  */
 
 export type PropValue =
@@ -21,6 +25,11 @@ export interface ComponentMatch {
   hasSpread: boolean;
 }
 
+export type NamedObjectLiteral =
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'literal'; text: string };
+
 interface Node {
   type: string;
   start: number;
@@ -28,23 +37,35 @@ interface Node {
   [key: string]: unknown;
 }
 
-const rootCache = new Map<string, Node | null>();
-
-/** Parse a source string, returning the AST root or null on a syntax error. */
-function parseRoot(source: string): Node | null {
-  const cached = rootCache.get(source);
-  if (cached !== undefined) return cached;
-  let root: Node | null;
-  try {
-    root = parse(source, { modern: true }) as unknown as Node;
-  } catch {
-    root = null;
-  }
-  rootCache.set(source, root);
-  return root;
+interface CacheEntry {
+  root: Node | null;
+  error: string | null;
 }
 
-/** Depth-first collect of component nodes whose name is in `names`, in source order. */
+const rootCache = new Map<string, CacheEntry>();
+const ROOT_CACHE_LIMIT = 8;
+
+function parseRoot(source: string): CacheEntry {
+  const cached = rootCache.get(source);
+  if (cached !== undefined) return cached;
+  let entry: CacheEntry;
+  try {
+    entry = {
+      root: parse(source, { modern: true }) as unknown as Node,
+      error: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    entry = { root: null, error: message.split('\n')[0].trim() };
+  }
+  rootCache.set(source, entry);
+  if (rootCache.size > ROOT_CACHE_LIMIT) {
+    const oldest = rootCache.keys().next().value;
+    if (oldest !== undefined) rootCache.delete(oldest);
+  }
+  return entry;
+}
+
 function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
   const found: Node[] = [];
   const seen = new Set<object>();
@@ -69,7 +90,6 @@ function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
   return found.sort((a, b) => a.start - b.start);
 }
 
-/** Build the prop map for one element, mirroring the old PropValue shape. */
 function readProps(source: string, node: Node): ComponentMatch {
   const props = new Map<string, PropValue>();
   let hasSpread = false;
@@ -111,19 +131,12 @@ function readProps(source: string, node: Node): ComponentMatch {
 }
 
 /**
- * Return a one-line message if `source` is not valid Svelte, else null. Lets the
- * validator surface a real syntax error itself rather than only failing later in
- * the compiler (and the compile-less CLI would otherwise miss it entirely).
+ * Return a one-line message if `source` is not valid Svelte, else null. Lets
+ * the validator surface a real syntax error itself rather than only failing
+ * later in the compiler (and the compile-less CLI would otherwise miss it).
  */
 export function getParseError(source: string): string | null {
-  if (parseRoot(source) !== null) return null;
-  try {
-    parse(source, { modern: true });
-    return null;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return message.split('\n')[0].trim();
-  }
+  return parseRoot(source).error;
 }
 
 /**
@@ -135,75 +148,118 @@ export function findComponents(
   source: string,
   names: ReadonlySet<string>,
 ): ComponentMatch[] | null {
-  const root = parseRoot(source);
+  const { root } = parseRoot(source);
   if (!root) return null;
   return collectComponents(root, names).map((node) => readProps(source, node));
 }
 
-/** Parse a JS source by wrapping it as a module script, returning its Program body. */
-function parseModuleBody(
-  jsSource: string,
-): { body: Node[]; wrapped: string } | null {
-  const wrapped = `<script module>\n${jsSource}\n</script>`;
-  const root = parseRoot(wrapped);
-  const program = root && (root.module as { content?: Node } | null)?.content;
-  if (!program) return null;
-  return { body: (program.body as Node[]) ?? [], wrapped };
+/**
+ * Balanced `{...}` / `[...]` span starting at the opening bracket. String-
+ * and comment-aware so embedded braces (including `</script>` in a string)
+ * don't end the span. Used for plain JS only.
+ */
+function extractBalancedBraces(
+  source: string,
+  startIndex: number,
+): string | null {
+  const open = source[startIndex];
+  if (open !== '{' && open !== '[') return null;
+
+  let depth = 0;
+  let inString: string | null = null;
+  let escaped = false;
+
+  for (let i = startIndex; i < source.length; i++) {
+    const char = source[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+
+    if (inString) {
+      if (char === inString) inString = null;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      inString = char;
+      continue;
+    }
+
+    if (char === '/' && i + 1 < source.length && source[i + 1] === '/') {
+      const newline = source.indexOf('\n', i);
+      i = newline === -1 ? source.length : newline;
+      continue;
+    }
+
+    if (char === '/' && i + 1 < source.length && source[i + 1] === '*') {
+      const end = source.indexOf('*/', i + 2);
+      i = end === -1 ? source.length : end + 1;
+      continue;
+    }
+
+    if (char === '{' || char === '[') depth++;
+    if (char === '}' || char === ']') {
+      depth--;
+      if (depth === 0) {
+        return source.slice(startIndex, i + 1);
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
  * Return the source text of the object literal in `export default { ... }`,
- * or null if there is no default export, it isn't an object literal, or the
- * source can't be parsed. Replaces the hand-rolled balanced-brace matcher.
+ * or null if there is no default export or it isn't an object literal.
+ * Plain JS only — does not wrap as `<script module>`.
  */
 export function defaultExportObjectLiteral(jsSource: string): string | null {
-  const parsed = parseModuleBody(jsSource);
-  if (!parsed) return null;
-  for (const node of parsed.body) {
-    if (node.type !== 'ExportDefaultDeclaration') continue;
-    const decl = node.declaration as Node;
-    if (decl.type !== 'ObjectExpression') return null;
-    return parsed.wrapped.slice(decl.start, decl.end);
-  }
-  return null;
+  const match = jsSource.match(/export\s+default\s*/);
+  if (!match || match.index === undefined) return null;
+  const afterKeyword = match.index + match[0].length;
+  const braceIndex = jsSource.indexOf('{', afterKeyword);
+  if (braceIndex < 0) return null;
+  const between = jsSource.slice(afterKeyword, braceIndex);
+  if (between.trim() !== '') return null;
+  return extractBalancedBraces(jsSource, braceIndex);
 }
 
-export type NamedObjectLiteral =
-  | { kind: 'none' }
-  | { kind: 'invalid' }
-  | { kind: 'literal'; text: string };
-
-/**
- * Locate `export const <name> = { ... }` and return the object-literal text.
- * `none` when the export is absent, `invalid` when present but not a static
- * object literal (or unparseable), `literal` with the text otherwise.
- */
-export function namedExportObjectLiteral(
-  jsSource: string,
-  name: string,
-): NamedObjectLiteral {
-  const parsed = parseModuleBody(jsSource);
-  if (!parsed) {
-    return new RegExp(`export\\s+const\\s+${name}\\b`).test(jsSource)
-      ? { kind: 'invalid' }
-      : { kind: 'none' };
-  }
-  for (const node of parsed.body) {
+function findPageConfigInModule(root: Node, source: string): NamedObjectLiteral {
+  const program = (root.module as { content?: Node } | null)?.content;
+  if (!program) return { kind: 'none' };
+  const body = (program.body as Node[]) ?? [];
+  for (const node of body) {
     if (node.type !== 'ExportNamedDeclaration') continue;
     const declaration = node.declaration as Node | null;
     if (!declaration || declaration.type !== 'VariableDeclaration') continue;
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
-      if (id.type !== 'Identifier' || id.name !== name) continue;
+      if (id.type !== 'Identifier' || id.name !== 'pageConfig') continue;
       const init = decl.init as Node | null;
       if (init && init.type === 'ObjectExpression') {
-        return {
-          kind: 'literal',
-          text: parsed.wrapped.slice(init.start, init.end),
-        };
+        return { kind: 'literal', text: source.slice(init.start, init.end) };
       }
       return { kind: 'invalid' };
     }
   }
   return { kind: 'none' };
+}
+
+/**
+ * Locate `export const pageConfig = { ... }` in a Svelte page's module script
+ * and return the object-literal text. Walks the page-level AST so TypeScript
+ * (`lang="ts"`) module scripts are handled by Svelte's own parser.
+ */
+export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
+  const { root } = parseRoot(svelteSource);
+  if (!root) return { kind: 'none' };
+  return findPageConfigInModule(root, svelteSource);
 }
