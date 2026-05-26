@@ -87,9 +87,6 @@ export function deriveSlug(name: string, isFile = false): string {
 }
 
 /** Matches both Svelte 5 `<script module>` and legacy `<script context="module">`. */
-export const MODULE_SCRIPT_RE =
-  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>([\s\S]*?)<\/script>/;
-
 /**
  * Locate `export default { ... }` and return the object literal substring,
  * or null if there is no default export object literal. Used by both manifest

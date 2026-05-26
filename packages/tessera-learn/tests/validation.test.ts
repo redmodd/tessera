@@ -1621,6 +1621,50 @@ export const pageConfig: PageConfig = { title: 'T' };
       false,
     );
   });
+
+  it('reads pageConfig wrapped in `as const`', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+export const pageConfig = { title: 'T' } as const;
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+
+  it('reads pageConfig wrapped in `satisfies T`', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+type PageConfig = { title: string };
+export const pageConfig = { title: 'T' } satisfies PageConfig;
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+});
+
+describe('bind: on a question component is treated as the prop being set', () => {
+  it('does not report missing prop when the prop is bound', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script>let c = 0;</script>
+<MultipleChoice question="Q" options={['a', 'b']} bind:correct={c} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(false);
+  });
 });
 
 describe('a11y rule 1.5 — question option/answer labels', () => {

@@ -56,7 +56,8 @@ function parseRoot(source: string): CacheEntry {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    entry = { root: null, error: message.split('\n')[0].trim() };
+    const firstLine = message.split('\n')[0].trim();
+    entry = { root: null, error: firstLine || 'parse error' };
   }
   rootCache.set(source, entry);
   if (rootCache.size > ROOT_CACHE_LIMIT) {
@@ -97,6 +98,16 @@ function readProps(source: string, node: Node): ComponentMatch {
   for (const attr of attributes) {
     if (attr.type === 'SpreadAttribute') {
       hasSpread = true;
+      continue;
+    }
+    if (attr.type === 'BindDirective') {
+      const expr = (attr as { expression?: Node }).expression;
+      if (expr) {
+        props.set(attr.name as string, {
+          kind: 'expr',
+          raw: source.slice(expr.start, expr.end).trim(),
+        });
+      }
       continue;
     }
     if (attr.type !== 'Attribute') continue;
@@ -228,8 +239,22 @@ export function defaultExportObjectLiteral(jsSource: string): string | null {
   const braceIndex = jsSource.indexOf('{', afterKeyword);
   if (braceIndex < 0) return null;
   const between = jsSource.slice(afterKeyword, braceIndex);
-  if (between.trim() !== '') return null;
+  if (!/^[\s(]*$/.test(between)) return null;
   return extractBalancedBraces(jsSource, braceIndex);
+}
+
+/** Strip TS casts (`x as T`, `x satisfies T`, `<T>x`) so the wrapped literal is recoverable. */
+function unwrapTsCast(node: Node | null): Node | null {
+  let current = node;
+  while (
+    current &&
+    (current.type === 'TSAsExpression' ||
+      current.type === 'TSSatisfiesExpression' ||
+      current.type === 'TSTypeAssertion')
+  ) {
+    current = (current as { expression?: Node }).expression ?? null;
+  }
+  return current;
 }
 
 function findPageConfigInModule(
@@ -246,7 +271,7 @@ function findPageConfigInModule(
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
       if (id.type !== 'Identifier' || id.name !== 'pageConfig') continue;
-      const init = decl.init as Node | null;
+      const init = unwrapTsCast(decl.init as Node | null);
       if (init && init.type === 'ObjectExpression') {
         return { kind: 'literal', text: source.slice(init.start, init.end) };
       }

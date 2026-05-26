@@ -213,6 +213,12 @@ describe('extractDefaultExportObjectLiteral', () => {
       ),
     ).toBe(`{ title: 'X' }`);
   });
+
+  it('handles a parenthesized default export', () => {
+    expect(
+      extractDefaultExportObjectLiteral(`export default ({ title: 'X' });`),
+    ).toBe(`{ title: 'X' }`);
+  });
 });
 
 // ---------- readMetaFile ----------
