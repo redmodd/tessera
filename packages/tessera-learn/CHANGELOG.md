@@ -4,96 +4,26 @@
 
 ### Patch Changes
 
-- 1edf88f: Add an accessibility checker spanning three non-overlapping tiers, plus the
-  component and config changes that make an accessible result expressible.
+- 1edf88f: **Accessibility checker** — a three-tier system for catching a11y issues, plus the component and config changes to support it.
+  - **Components.** `Image` now requires either `alt` or the new `decorative` flag (was silently optional). `Video`/`Audio` require a `title` and accept `tracks` (rendered as `<track>`) and a `transcript` disclosure. A new top-level `language` config field (BCP-47, default `'en'`) sets `<html lang>`.
+  - **Static analyzer** (build + dev, no new deps). Routes Svelte's `a11y_*` compiler warnings through the validation reporter, plus tessera-specific rules for missing alt/title/captions, empty question labels, skipped heading levels, low `primaryColor` contrast, and malformed `language` tags.
+  - **Runtime auditor.** New `tessera-a11y` bin runs Playwright + axe-core over a built course, writes `a11y-report.json`, and exits non-zero above an impact threshold (default `serious`). Playwright and `@axe-core/playwright` are optional.
+  - **Config.** New `a11y` block: `level` (`warn`/`error`), `standard` (axe ruleset tags), and `ignore` (per-rule escape hatch).
+  - **Scaffold.** New courses ship `language: 'en'` and a reserved `accessibility-check` script (→ `tessera-a11y`); `upgrade` adds it to existing projects.
+  - **Fix.** `$assets/` references with a Vite query suffix (`?raw`, `?url`) are no longer mis-reported as missing.
 
-  **Tier 0 — components correct by construction.**
-  - `Image` — `alt` is no longer silently optional; add a `decorative` boolean so
-    "forgot alt" is distinguishable from "intentionally ornamental" (renders empty
-    `alt` + `aria-hidden`).
-  - `Video` / `Audio` — `title` (the accessible name) is required; add `tracks`
-    (rendered as `<track>` on native players) and `transcript` (a `<details>`
-    disclosure).
-  - `<html lang>` — new top-level `language` config field (BCP-47, default `'en'`)
-    interpolated into the generated HTML instead of a hardcoded `lang="en"`.
+- 64bc37c: Fix correctness issues surfaced by new static analysis: four unhandled promises in async LMS/runtime work (cmi5 State PUT, the write-queue flush, ZIP finalize, page prefetch) are now explicitly fire-and-forget (behavior unchanged); cmi5 launch-parameter errors attach the underlying error via `cause`; and `<AccordionItem>` derives its element ids from `$props.id()` instead of a module-level counter. Also adds monorepo type-checking, ESLint, and Prettier (internal tooling). No public API change.
 
-  **Tier 1 — static analyzer (build + dev, zero new runtime deps).**
-  - _1a_ routes the Svelte compiler's `a11y_*` warnings (filtered to author files)
-    through the validation reporter and gates them at `buildEnd`.
-  - _1b_ adds tessera-specific rules: `<Image>` alt-or-decorative, `<Video>`/
-    `<Audio>` title + captions/transcript, empty question option/answer labels,
-    skipped heading levels, `branding.primaryColor` contrast against white, and a
-    well-formed `language` tag.
-
-  **Tier 2 — runtime auditor.** New `tessera-a11y` bin drives Playwright + axe-core
-  over every page of a built course, writes `a11y-report.json`, and exits non-zero
-  on violations at/above an impact threshold (default `serious`). Playwright and
-  `@axe-core/playwright` are optional — the command exits with an actionable
-  message when they're absent, so the static gate carries no new dependency.
-
-  **Config.** New `a11y` block: `level` (`warn` | `error`, promotes the heuristic
-  rules and 1a), `standard` (axe ruleset tags), and `ignore` (a flat per-rule
-  escape hatch matched literally against each diagnostic's ID across all tiers).
-
-  The scaffolded `course.config.js` now ships `language: 'en'` so fresh courses
-  start clean, and the scaffold adds a reserved `accessibility-check` npm script
-  (→ `tessera-a11y`) alongside `dev` / `export` / `validate`; `upgrade` reconciles
-  it into existing projects.
-
-  **Fix.** `$assets/` references carrying a Vite query/hash suffix (e.g. `?raw`,
-  `?url`) are no longer mis-reported as "not found" by the asset-reference
-  validator — the suffix is stripped before the on-disk existence check.
-
-- 64bc37c: Add static checking to the monorepo: per-package type checking (`svelte-check`
-  for `tessera-learn`, `tsc --noEmit` for `create-tessera`), an ESLint flat config
-  (typed `no-floating-promises`, `no-console` as a warning, `no-unused-vars`) and
-  Prettier, wired into CI as a `static` job. Scripts: `lint`, `check`, `format`,
-  `format:check`.
-
-  Fixes the correctness issues this surfaced in the shipped runtime: four
-  unhandled `Promise`s on async LMS/runtime work — the cmi5 State PUT
-  (`saveState`), the SCORM/cmi5 write-queue flush, the ZIP `finalize`, and the
-  page-module `prefetch` — are now explicitly marked fire-and-forget with `void`
-  (each already self-sequences through its task/write queue, routes errors via
-  events, or is a deliberate cache warm, so the fix documents intent rather than
-  changing behavior); cmi5 launch-parameter errors attach the underlying error via
-  `cause`; and a handful of dead bindings, an unused `<video>` `svelte-ignore`,
-  and an unused keyboard handler were removed. `<AccordionItem>` now derives its
-  element ids from `$props.id()` instead of a module-level counter. No public API
-  change.
-  </content>
-
-- 4e69ce8: Extract `QuizEngine` from the `useQuiz` closure into a directly-instantiable,
-  framework/DOM-free class (`src/runtime/quiz-engine.svelte.ts`). `useQuiz` is now
-  a thin Svelte wrapper over it. Internal refactor only — no public API or behavior
-  change; `useQuiz` still returns `UseQuizHandle`. (`create-tessera` bumps in
-  lockstep via the fixed-version group.)
-- cc638d6: Close build-time validation gaps for config fields and component props that were
-  modeled but never checked, so authors get a diagnostic instead of silent
-  misbehavior:
-  - **`quiz.feedbackMode` / `quiz.retryMode`** — enum-checked (errors on a typo
-    like `feedbackMode: "imediate"` that previously fell through to the default).
-  - **`title`** — warns when missing or empty (ships as `"Untitled Course"`),
-    errors when set to a non-string (the merge passes it through truthy).
-  - **Question `weight`** — warns when ignored (a string like `weight="2"`, or a
-    non-positive value coerced to `1`); errors on a non-finite literal
-    (`weight={Infinity}`) that would make the weighted score `NaN`.
-  - **Question `id` under SCORM 1.2** — warns when `shortIdentifier` would rewrite
-    it (spaces/punctuation/border underscores) and errors on a post-sanitization
-    collision (`q-1` vs `q_1`). scorm12-only; deduped against the existing
-    raw-duplicate check.
-  - **`MultipleChoice.optionFeedback`** — warns when it has more entries than
-    `options` (the overflow can never be shown).
-  - **`scoring.passingScore`** — nudges (warning) when `completion.mode: "quiz"`
-    leaves it implicit at the default 70%.
-  - **`branding`** — format-only warnings for a non-string/`$assets`-prefixed
-    `logo`, an unparseable `primaryColor`, and a non-string `fontFamily`.
+- 4e69ce8: Internal: extract `QuizEngine` from the `useQuiz` closure into a standalone, DOM-free class. No public API or behavior change.
+- cc638d6: Close build-time validation gaps so authors get a diagnostic instead of silent misbehavior:
+  - **`quiz.feedbackMode` / `quiz.retryMode`** — enum-checked; catches typos that previously fell through to the default.
+  - **`title`** — warns when missing or empty, errors when non-string.
+  - **Question `weight`** — warns when ignored or coerced; errors on a non-finite value that would make the score `NaN`.
+  - **Question `id` (SCORM 1.2)** — warns when sanitization would rewrite it, errors on a post-sanitization collision.
+  - **`MultipleChoice.optionFeedback`** — warns when it has more entries than `options`.
+  - **`scoring.passingScore`** — warns when `completion.mode: "quiz"` leaves it at the implicit default (70%).
+  - **`branding`** — warns on a malformed `logo`, `primaryColor`, or `fontFamily`.
   - **Empty sections** — warns when a section contributes no pages.
-
-  `shortIdentifier` is now exported from `runtime/interaction-format.ts` and used
-  as the single source of truth for the SCORM 1.2 id check (no duplicated regex).
-  `validateQuestionComponents` gained `warnings`/`exportStandard` channels, threaded
-  through `validatePages` → `validatePageFile`. No public API change.
 
 ## 0.0.11
 
