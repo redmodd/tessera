@@ -1,7 +1,11 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
-import { defaultExportObjectLiteral, pageConfigLiteral } from './ast.js';
+import {
+  clearParseCache,
+  defaultExportObjectLiteral,
+  pageConfigLiteral,
+} from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
 
 // ---------- Types ----------
@@ -86,15 +90,21 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-/** Matches both Svelte 5 `<script module>` and legacy `<script context="module">`. */
+export type DefaultExportLiteralResult =
+  | { kind: 'literal'; text: string }
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'parse-error' };
+
 /**
- * Locate `export default { ... }` and return the object literal substring,
- * or null if there is no default export object literal. Used by both manifest
- * extraction and project validation.
+ * Locate `export default { ... }` and return its object-literal text. Returns
+ * a discriminated result so callers can tell parse failure from a missing or
+ * non-literal default export. Used by both manifest extraction and project
+ * validation.
  */
 export function extractDefaultExportObjectLiteral(
   source: string,
-): string | null {
+): DefaultExportLiteralResult {
   return defaultExportObjectLiteral(source);
 }
 
@@ -116,12 +126,14 @@ export type CourseConfigRead =
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const configPath = resolve(projectRoot, 'course.config.js');
   if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
-  const objectStr = extractDefaultExportObjectLiteral(
+  const result = extractDefaultExportObjectLiteral(
     readSourceFileCached(configPath),
   );
-  if (!objectStr) return { ok: false, reason: 'no-export' };
+  if (result.kind === 'parse-error')
+    return { ok: false, reason: 'parse-error' };
+  if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
   try {
-    return { ok: true, config: JSON5.parse(objectStr) };
+    return { ok: true, config: JSON5.parse(result.text) };
   } catch (error) {
     return { ok: false, reason: 'parse-error', error };
   }
@@ -138,13 +150,13 @@ export function readMetaFile(metaPath: string): {
 } {
   if (!existsSync(metaPath)) return {};
 
-  const objectStr = extractDefaultExportObjectLiteral(
+  const result = extractDefaultExportObjectLiteral(
     readSourceFileCached(metaPath),
   );
-  if (!objectStr) return {};
+  if (result.kind !== 'literal') return {};
 
   try {
-    return JSON5.parse(objectStr);
+    return JSON5.parse(result.text);
   } catch {
     return {};
   }
@@ -222,6 +234,7 @@ function getSvelteFiles(dirPath: string): string[] {
  * Generate a course manifest by scanning the pages/ directory.
  */
 export function generateManifest(pagesDir: string): Manifest {
+  clearParseCache();
   const sections: ManifestSection[] = [];
   const flatPages: ManifestPage[] = [];
   let pageIndex = 0;

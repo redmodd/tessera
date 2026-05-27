@@ -438,7 +438,20 @@ describe('_meta.js validation', () => {
     writeFile(testRoot, 'pages/01-section/_meta.js', 'this is broken {');
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('_meta.js: syntax error'),
+      expect.stringContaining('_meta.js: could not parse'),
+    );
+  });
+
+  it('errors on _meta.js with valid export followed by junk', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      `export default { title: "S" };\nconst broken =`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('_meta.js: could not parse'),
     );
   });
 
@@ -1587,6 +1600,31 @@ describe('AST reach — constructs the regex scanner used to skip', () => {
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'missing required prop')).toBe(false);
   });
+
+  it('does not validate a commented-out <Image>', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <Image src="$assets/x.png" /> -->`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('does not validate a commented-out <Video>', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<!-- <Video src="https://youtu.be/abcdefghijk" /> -->`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(false);
+  });
+
+  it('does not validate a commented-out <Audio>', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <Audio src="$assets/a.mp3" /> -->`);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(false);
+    expect(has(warnings, 'tessera/media-transcript')).toBe(false);
+  });
 });
 
 describe('parse failures', () => {
@@ -1602,6 +1640,26 @@ describe('parse failures', () => {
     writePage(testRoot, `<MultipleChoice question={ />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'missing required prop')).toBe(false);
+  });
+
+  it('does not cascade "no graded quiz" when the only candidate page failed to parse', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'could not parse')).toBe(true);
+    expect(has(errors, 'no pages have quiz config with graded: true')).toBe(
+      false,
+    );
   });
 });
 

@@ -41,7 +41,11 @@ interface CacheEntry {
 }
 
 const rootCache = new Map<string, CacheEntry>();
-const ROOT_CACHE_LIMIT = 8;
+
+/** Drop every cached root. Call at the start of a run to scope the cache. */
+export function clearParseCache(): void {
+  rootCache.clear();
+}
 
 function parseRoot(source: string): CacheEntry {
   const cached = rootCache.get(source);
@@ -58,10 +62,6 @@ function parseRoot(source: string): CacheEntry {
     entry = { root: null, error: firstLine || 'parse error' };
   }
   rootCache.set(source, entry);
-  if (rootCache.size > ROOT_CACHE_LIMIT) {
-    const oldest = rootCache.keys().next().value;
-    if (oldest !== undefined) rootCache.delete(oldest);
-  }
   return entry;
 }
 
@@ -134,6 +134,7 @@ function readProps(source: string, node: Node): ComponentMatch {
         kind: 'expr',
         raw: source.slice(expr.start, expr.end).trim(),
       });
+      if (source[attr.start] === '{') hasSpread = true;
     }
   }
   return { name: node.name as string, props, hasSpread };
@@ -162,7 +163,9 @@ export function findComponents(
   return collectComponents(root, names).map((node) => readProps(source, node));
 }
 
-const TsParser = Parser.extend(tsPlugin() as unknown as Parameters<typeof Parser.extend>[0]);
+const TsParser = Parser.extend(
+  tsPlugin() as unknown as Parameters<typeof Parser.extend>[0],
+);
 
 function parseJsModule(source: string): Node | null {
   try {
@@ -181,7 +184,8 @@ function unwrapTsCast(node: Node | null): Node | null {
     current &&
     (current.type === 'TSAsExpression' ||
       current.type === 'TSSatisfiesExpression' ||
-      current.type === 'TSTypeAssertion')
+      current.type === 'TSTypeAssertion' ||
+      current.type === 'TSNonNullExpression')
   ) {
     current = (current as { expression?: Node }).expression ?? null;
   }
@@ -211,37 +215,49 @@ function findPageConfigInProgram(
 }
 
 /**
- * Return the source text of the object literal in `export default { ... }`,
- * or null if there is no default export or it isn't an object literal.
- * Plain JS only.
+ * Locate the `export default { ... }` object literal in a plain JS source.
+ * Returns a discriminated result so callers can tell parse failure from a
+ * missing or non-literal default export.
  */
-export function defaultExportObjectLiteral(jsSource: string): string | null {
+export function defaultExportObjectLiteral(
+  jsSource: string,
+): NamedObjectLiteral | { kind: 'parse-error' } {
   const program = parseJsModule(jsSource);
-  if (!program) return null;
+  if (!program) return { kind: 'parse-error' };
   for (const node of (program.body as Node[]) ?? []) {
     if (node.type !== 'ExportDefaultDeclaration') continue;
     const decl = unwrapTsCast(
       (node as { declaration?: Node }).declaration ?? null,
     );
     if (decl && decl.type === 'ObjectExpression') {
-      return jsSource.slice(decl.start, decl.end);
+      return { kind: 'literal', text: jsSource.slice(decl.start, decl.end) };
     }
-    return null;
+    return { kind: 'invalid' };
   }
-  return null;
+  return { kind: 'none' };
 }
 
-const MODULE_SCRIPT_RE =
-  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>([\s\S]*?)<\/script>/;
+const MODULE_SCRIPT_OPEN_RE =
+  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>/;
+const SCRIPT_CLOSE = '</script>';
 
 function pageConfigFromModuleScriptFallback(
   svelteSource: string,
 ): NamedObjectLiteral {
-  const moduleScript = svelteSource.match(MODULE_SCRIPT_RE);
-  if (!moduleScript) return { kind: 'none' };
-  const program = parseJsModule(moduleScript[1]);
-  if (!program) return { kind: 'none' };
-  return findPageConfigInProgram(program, moduleScript[1]);
+  const open = svelteSource.match(MODULE_SCRIPT_OPEN_RE);
+  if (!open || open.index === undefined) return { kind: 'none' };
+  const bodyStart = open.index + open[0].length;
+  // Try every `</script>` candidate from earliest; the first one whose body
+  // parses as JS is the real close (an earlier hit is inside a string literal).
+  let from = bodyStart;
+  while (true) {
+    const closeIdx = svelteSource.indexOf(SCRIPT_CLOSE, from);
+    if (closeIdx < 0) return { kind: 'none' };
+    const body = svelteSource.slice(bodyStart, closeIdx);
+    const program = parseJsModule(body);
+    if (program) return findPageConfigInProgram(program, body);
+    from = closeIdx + SCRIPT_CLOSE.length;
+  }
 }
 
 /**

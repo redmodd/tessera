@@ -8,7 +8,12 @@ import {
   ensureSvelteSuffix,
   readCourseConfig,
 } from './manifest.js';
-import { findComponents, getParseError, type PropValue } from './ast.js';
+import {
+  clearParseCache,
+  findComponents,
+  getParseError,
+  type PropValue,
+} from './ast.js';
 import {
   validateAgent,
   validateAuthCredential,
@@ -174,6 +179,7 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  * Returns errors (block build) and warnings (informational).
  */
 export function validateProject(projectRoot: string): ValidationResult {
+  clearParseCache();
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -246,12 +252,10 @@ function parseConfig(
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
-      errors.push(
-        'course.config.js: could not parse — must use `export default { ... }` syntax',
-      );
+      errors.push('course.config.js: must use `export default { ... }` syntax');
     } else if (read.reason === 'parse-error') {
       errors.push(
-        'course.config.js: syntax error — must export a static object literal',
+        'course.config.js: could not parse — JavaScript syntax error',
       );
     }
     return null;
@@ -811,6 +815,7 @@ interface PagesValidationResult extends ValidationResult {
   totalPages: number;
   totalQuizzes: number;
   hasGradedQuiz: boolean;
+  hasParseErrors: boolean;
   pages: PageInfo[];
 }
 
@@ -828,7 +833,12 @@ function validatePageFile(
   warnings: string[],
   assetExistsCache: Map<string, boolean>,
   exportStandard?: string,
-): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
+): {
+  page: PageInfo;
+  isQuiz: boolean;
+  isGradedQuiz: boolean;
+  parseError: boolean;
+} {
   const fileRel = relative(projectRoot, filePath);
   const content = readSourceFileCached(filePath);
 
@@ -845,6 +855,7 @@ function validatePageFile(
       },
       isQuiz: false,
       isGradedQuiz: false,
+      parseError: true,
     };
   }
 
@@ -894,6 +905,7 @@ function validatePageFile(
     },
     isQuiz,
     isGradedQuiz,
+    parseError: false,
   };
 }
 
@@ -909,6 +921,7 @@ function validatePages(
   let totalPages = 0;
   let totalQuizzes = 0;
   let hasGradedQuiz = false;
+  let hasParseErrors = false;
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
 
@@ -922,6 +935,7 @@ function validatePages(
       totalPages: 0,
       totalQuizzes: 0,
       hasGradedQuiz: false,
+      hasParseErrors: false,
       pages,
     };
   }
@@ -957,6 +971,7 @@ function validatePages(
       totalPages: 0,
       totalQuizzes: 0,
       hasGradedQuiz: false,
+      hasParseErrors: false,
       pages,
     };
   }
@@ -1012,6 +1027,7 @@ function validatePages(
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
       if (result.isGradedQuiz) hasGradedQuiz = true;
+      if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
 
@@ -1083,6 +1099,7 @@ function validatePages(
         totalPages++;
         if (result.isQuiz) totalQuizzes++;
         if (result.isGradedQuiz) hasGradedQuiz = true;
+        if (result.parseError) hasParseErrors = true;
         pages.push(result.page);
       }
     }
@@ -1101,7 +1118,15 @@ function validatePages(
     );
   }
 
-  return { errors, warnings, totalPages, totalQuizzes, hasGradedQuiz, pages };
+  return {
+    errors,
+    warnings,
+    totalPages,
+    totalQuizzes,
+    hasGradedQuiz,
+    hasParseErrors,
+    pages,
+  };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1114,11 +1139,15 @@ function validateMetaFile(
   if (!existsSync(metaPath)) return null;
 
   const metaRel = `${parentRel}/_meta.js`;
-  const objectStr = extractDefaultExportObjectLiteral(
+  const result = extractDefaultExportObjectLiteral(
     readSourceFileCached(metaPath),
   );
 
-  if (!objectStr) {
+  if (result.kind === 'parse-error') {
+    errors.push(`${metaRel}: could not parse — JavaScript syntax error`);
+    return null;
+  }
+  if (result.kind !== 'literal') {
     errors.push(
       `${metaRel}: syntax error — must export default { title: "..." }`,
     );
@@ -1127,7 +1156,7 @@ function validateMetaFile(
 
   let meta: { title?: string; pages?: string[] };
   try {
-    meta = JSON5.parse(objectStr);
+    meta = JSON5.parse(result.text);
   } catch {
     errors.push(
       `${metaRel}: syntax error — must export default { title: "..." }`,
@@ -1635,7 +1664,11 @@ function crossValidate(
   warnings: string[],
 ): void {
   // completion.mode "quiz" but no graded quizzes
-  if (config.completion?.mode === 'quiz' && !pageResults.hasGradedQuiz) {
+  if (
+    config.completion?.mode === 'quiz' &&
+    !pageResults.hasGradedQuiz &&
+    !pageResults.hasParseErrors
+  ) {
     errors.push(
       'completion.mode is "quiz" but no pages have quiz config with graded: true',
     );
@@ -1658,7 +1691,8 @@ function crossValidate(
   if (
     isManual &&
     config.completion?.trigger === 'page' &&
-    completesOnPages.length === 0
+    completesOnPages.length === 0 &&
+    !pageResults.hasParseErrors
   ) {
     errors.push(
       'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view". ' +

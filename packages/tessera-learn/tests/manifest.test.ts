@@ -130,38 +130,35 @@ describe('orderPageFiles', () => {
 // ---------- extractDefaultExportObjectLiteral ----------
 
 describe('extractDefaultExportObjectLiteral', () => {
+  const literalOf = (src: string): string | null => {
+    const r = extractDefaultExportObjectLiteral(src);
+    return r.kind === 'literal' ? r.text : null;
+  };
+
   it('extracts simple object', () => {
-    expect(
-      extractDefaultExportObjectLiteral('export default { title: "Hello" };'),
-    ).toBe('{ title: "Hello" }');
+    expect(literalOf('export default { title: "Hello" };')).toBe(
+      '{ title: "Hello" }',
+    );
   });
 
   it('handles nested objects', () => {
     const literal = '{ quiz: { graded: true }, title: "T" }';
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
-    );
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles strings with braces', () => {
     const literal = '{ title: "a { b } c" }';
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
-    );
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles single-quoted strings', () => {
     const literal = "{ title: 'a { b }' }";
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
-    );
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles escaped quotes in strings', () => {
     const literal = '{ title: "a \\" b" }';
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
-    );
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles comments', () => {
@@ -169,9 +166,7 @@ describe('extractDefaultExportObjectLiteral', () => {
   // this is a comment
   title: "Hello"
 }`;
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
-    );
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles multi-line comments', () => {
@@ -179,59 +174,59 @@ describe('extractDefaultExportObjectLiteral', () => {
   /* { nested } */
   title: "Hello"
 }`;
-    expect(extractDefaultExportObjectLiteral(`export default ${literal}`)).toBe(
-      literal,
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
+  });
+
+  it('reports "none" when there is no default export', () => {
+    expect(extractDefaultExportObjectLiteral('const x = 1;').kind).toBe('none');
+  });
+
+  it('reports "invalid" when the default export is not an object literal', () => {
+    expect(extractDefaultExportObjectLiteral('export default "hi";').kind).toBe(
+      'invalid',
     );
   });
 
-  it('returns null when there is no default export', () => {
-    expect(extractDefaultExportObjectLiteral('const x = 1;')).toBeNull();
+  it('reports "parse-error" for unparseable source', () => {
+    expect(
+      extractDefaultExportObjectLiteral('export default { title: "hi"').kind,
+    ).toBe('parse-error');
   });
 
-  it('returns null when the default export is not an object literal', () => {
+  it('reports "parse-error" when a valid export is followed by junk', () => {
     expect(
-      extractDefaultExportObjectLiteral('export default "hi";'),
-    ).toBeNull();
-  });
-
-  it('returns null for unparseable source', () => {
-    expect(
-      extractDefaultExportObjectLiteral('export default { title: "hi"'),
-    ).toBeNull();
+      extractDefaultExportObjectLiteral(
+        `export default { title: 'OK' };\nconst broken =`,
+      ).kind,
+    ).toBe('parse-error');
   });
 
   it('handles strings containing </script>', () => {
     const literal = `{ template: '</script><b>hi</b>' }`;
-    expect(
-      extractDefaultExportObjectLiteral(`export default ${literal};`),
-    ).toBe(literal);
+    expect(literalOf(`export default ${literal};`)).toBe(literal);
   });
 
   it('handles `as const` on the default export', () => {
-    expect(
-      extractDefaultExportObjectLiteral(
-        `export default { title: 'X' } as const;`,
-      ),
-    ).toBe(`{ title: 'X' }`);
+    expect(literalOf(`export default { title: 'X' } as const;`)).toBe(
+      `{ title: 'X' }`,
+    );
   });
 
   it('handles a parenthesized default export', () => {
-    expect(
-      extractDefaultExportObjectLiteral(`export default ({ title: 'X' });`),
-    ).toBe(`{ title: 'X' }`);
+    expect(literalOf(`export default ({ title: 'X' });`)).toBe(
+      `{ title: 'X' }`,
+    );
   });
 
   it('handles a block comment between `export default` and the literal', () => {
-    expect(
-      extractDefaultExportObjectLiteral(
-        `export default /* note */ { title: 'X' };`,
-      ),
-    ).toBe(`{ title: 'X' }`);
+    expect(literalOf(`export default /* note */ { title: 'X' };`)).toBe(
+      `{ title: 'X' }`,
+    );
   });
 
   it('handles a line comment between `export default` and the literal', () => {
     expect(
-      extractDefaultExportObjectLiteral(
+      literalOf(
         `export default\n// SPDX-License-Identifier: MIT\n{ title: 'X' };`,
       ),
     ).toBe(`{ title: 'X' }`);
