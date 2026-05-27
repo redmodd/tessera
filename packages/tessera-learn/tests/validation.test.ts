@@ -438,7 +438,20 @@ describe('_meta.js validation', () => {
     writeFile(testRoot, 'pages/01-section/_meta.js', 'this is broken {');
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('_meta.js: syntax error'),
+      expect.stringContaining('_meta.js: could not parse'),
+    );
+  });
+
+  it('errors on _meta.js with valid export followed by junk', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      `export default { title: "S" };\nconst broken =`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('_meta.js: could not parse'),
     );
   });
 
@@ -1547,6 +1560,168 @@ describe('a11y — spread props suppress false positives', () => {
     writePage(testRoot, `<Image src="$assets/x.png" />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'tessera/image-alt')).toBe(true);
+  });
+});
+
+describe('AST reach — constructs the regex scanner used to skip', () => {
+  it('validates a component carrying a directive (regex bailed on the colon)', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice class:highlight question="Q" options={['a', 'b']} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(true);
+  });
+
+  it('validates expression props on a multiline tag', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<MultipleChoice\n  question="Q"\n  options={['a', 'b', 'c']}\n  correct={5}\n/>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'out of range for 3 options')).toBe(true);
+  });
+
+  it('finds a component nested inside a block', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `{#if show}<MultipleChoice question="Q" options={['a', 'b']} />{/if}`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(true);
+  });
+
+  it('does not validate a commented-out component', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <MultipleChoice question="Q" /> -->`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop')).toBe(false);
+  });
+
+  it('does not validate a commented-out <Image>', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <Image src="$assets/x.png" /> -->`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('does not validate a commented-out <Video>', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<!-- <Video src="https://youtu.be/abcdefghijk" /> -->`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(false);
+  });
+
+  it('does not validate a commented-out <Audio>', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<!-- <Audio src="$assets/a.mp3" /> -->`);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'tessera/media-title')).toBe(false);
+    expect(has(warnings, 'tessera/media-transcript')).toBe(false);
+  });
+});
+
+describe('parse failures', () => {
+  it('surfaces an unparseable page as a validator error', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'could not parse')).toBe(true);
+  });
+
+  it('does not cascade content errors on an unparseable page', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop')).toBe(false);
+  });
+
+  it('does not cascade "no graded quiz" when the only candidate page failed to parse', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    writePage(testRoot, `<MultipleChoice question={ />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'could not parse')).toBe(true);
+    expect(has(errors, 'no pages have quiz config with graded: true')).toBe(
+      false,
+    );
+  });
+});
+
+describe('pageConfig in a TypeScript module script', () => {
+  it('reads a valid pageConfig even when surrounding module body has TS syntax', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+import type { PageConfig } from './types';
+export const pageConfig: PageConfig = { title: 'T' };
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+
+  it('reads pageConfig wrapped in `as const`', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+export const pageConfig = { title: 'T' } as const;
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+
+  it('reads pageConfig wrapped in `satisfies T`', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script context="module" lang="ts">
+type PageConfig = { title: string };
+export const pageConfig = { title: 'T' } satisfies PageConfig;
+</script>
+<h1>page</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'pageConfig must be a static object literal')).toBe(
+      false,
+    );
+  });
+});
+
+describe('bind: on a question component is treated as the prop being set', () => {
+  it('does not report missing prop when the prop is bound', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script>let c = 0;</script>
+<MultipleChoice question="Q" options={['a', 'b']} bind:correct={c} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'missing required prop "correct"')).toBe(false);
   });
 });
 

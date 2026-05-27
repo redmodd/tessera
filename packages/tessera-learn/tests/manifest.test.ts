@@ -4,7 +4,8 @@ import { resolve } from 'node:path';
 import {
   generateManifest,
   extractPageConfig,
-  extractObjectLiteral,
+  extractDefaultExportObjectLiteral,
+  parsePageConfigFromSource,
   readMetaFile,
   orderPageFiles,
   stripPrefix,
@@ -126,57 +127,127 @@ describe('orderPageFiles', () => {
   });
 });
 
-// ---------- extractObjectLiteral ----------
+// ---------- extractDefaultExportObjectLiteral ----------
 
-describe('extractObjectLiteral', () => {
+describe('extractDefaultExportObjectLiteral', () => {
+  const literalOf = (src: string): string | null => {
+    const r = extractDefaultExportObjectLiteral(src);
+    return r.kind === 'literal' ? r.text : null;
+  };
+
   it('extracts simple object', () => {
-    const src = 'export default { title: "Hello" };';
-    const idx = src.indexOf('{');
-    expect(extractObjectLiteral(src, idx)).toBe('{ title: "Hello" }');
+    expect(literalOf('export default { title: "Hello" };')).toBe(
+      '{ title: "Hello" }',
+    );
   });
 
   it('handles nested objects', () => {
-    const src = '{ quiz: { graded: true }, title: "T" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ quiz: { graded: true }, title: "T" }';
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles strings with braces', () => {
-    const src = '{ title: "a { b } c" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ title: "a { b } c" }';
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles single-quoted strings', () => {
-    const src = "{ title: 'a { b }' }";
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = "{ title: 'a { b }' }";
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles escaped quotes in strings', () => {
-    const src = '{ title: "a \\" b" }';
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    const literal = '{ title: "a \\" b" }';
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles comments', () => {
-    const src = `{
+    const literal = `{
   // this is a comment
   title: "Hello"
 }`;
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
   it('handles multi-line comments', () => {
-    const src = `{
+    const literal = `{
   /* { nested } */
   title: "Hello"
 }`;
-    expect(extractObjectLiteral(src, 0)).toBe(src);
+    expect(literalOf(`export default ${literal}`)).toBe(literal);
   });
 
-  it('returns null for non-brace start', () => {
-    expect(extractObjectLiteral('hello', 0)).toBeNull();
+  it('reports "none" when there is no default export', () => {
+    expect(extractDefaultExportObjectLiteral('const x = 1;').kind).toBe('none');
   });
 
-  it('returns null for unmatched braces', () => {
-    expect(extractObjectLiteral('{ title: "hi"', 0)).toBeNull();
+  it('reports "invalid" when the default export is not an object literal', () => {
+    expect(extractDefaultExportObjectLiteral('export default "hi";').kind).toBe(
+      'invalid',
+    );
+  });
+
+  it('reports "parse-error" for unparseable source', () => {
+    expect(
+      extractDefaultExportObjectLiteral('export default { title: "hi"').kind,
+    ).toBe('parse-error');
+  });
+
+  it('reports "parse-error" when a valid export is followed by junk', () => {
+    expect(
+      extractDefaultExportObjectLiteral(
+        `export default { title: 'OK' };\nconst broken =`,
+      ).kind,
+    ).toBe('parse-error');
+  });
+
+  it('handles strings containing </script>', () => {
+    const literal = `{ template: '</script><b>hi</b>' }`;
+    expect(literalOf(`export default ${literal};`)).toBe(literal);
+  });
+
+  it('handles `as const` on the default export', () => {
+    expect(literalOf(`export default { title: 'X' } as const;`)).toBe(
+      `{ title: 'X' }`,
+    );
+  });
+
+  it('handles a parenthesized default export', () => {
+    expect(literalOf(`export default ({ title: 'X' });`)).toBe(
+      `{ title: 'X' }`,
+    );
+  });
+
+  it('handles a block comment between `export default` and the literal', () => {
+    expect(literalOf(`export default /* note */ { title: 'X' };`)).toBe(
+      `{ title: 'X' }`,
+    );
+  });
+
+  it('handles a line comment between `export default` and the literal', () => {
+    expect(
+      literalOf(
+        `export default\n// SPDX-License-Identifier: MIT\n{ title: 'X' };`,
+      ),
+    ).toBe(`{ title: 'X' }`);
+  });
+});
+
+// ---------- parsePageConfigFromSource ----------
+
+describe('parsePageConfigFromSource', () => {
+  it('reads pageConfig from a module script when the template fails to parse', () => {
+    const source = `<script context="module">
+export const pageConfig = { title: 'X', quiz: { graded: true } };
+</script>
+<h1>page</h1>
+{#if `;
+    const result = parsePageConfigFromSource(source);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.title).toBe('X');
+      expect(result.value.quiz).toEqual({ graded: true });
+    }
   });
 });
 

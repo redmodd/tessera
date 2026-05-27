@@ -3,12 +3,17 @@ import { resolve, relative } from 'node:path';
 import JSON5 from 'json5';
 import {
   extractDefaultExportObjectLiteral,
-  extractObjectLiteral,
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
   readCourseConfig,
 } from './manifest.js';
+import {
+  clearParseCache,
+  findComponents,
+  getParseError,
+  type PropValue,
+} from './ast.js';
 import {
   validateAgent,
   validateAuthCredential,
@@ -174,6 +179,7 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  * Returns errors (block build) and warnings (informational).
  */
 export function validateProject(projectRoot: string): ValidationResult {
+  clearParseCache();
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -246,12 +252,10 @@ function parseConfig(
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
-      errors.push(
-        'course.config.js: could not parse — must use `export default { ... }` syntax',
-      );
+      errors.push('course.config.js: must use `export default { ... }` syntax');
     } else if (read.reason === 'parse-error') {
       errors.push(
-        'course.config.js: syntax error — must export a static object literal',
+        'course.config.js: could not parse — JavaScript syntax error',
       );
     }
     return null;
@@ -811,6 +815,7 @@ interface PagesValidationResult extends ValidationResult {
   totalPages: number;
   totalQuizzes: number;
   hasGradedQuiz: boolean;
+  hasParseErrors: boolean;
   pages: PageInfo[];
 }
 
@@ -828,9 +833,31 @@ function validatePageFile(
   warnings: string[],
   assetExistsCache: Map<string, boolean>,
   exportStandard?: string,
-): { page: PageInfo; isQuiz: boolean; isGradedQuiz: boolean } {
+): {
+  page: PageInfo;
+  isQuiz: boolean;
+  isGradedQuiz: boolean;
+  parseError: boolean;
+} {
   const fileRel = relative(projectRoot, filePath);
   const content = readSourceFileCached(filePath);
+
+  const parseError = getParseError(content);
+  if (parseError) {
+    errors.push(`${fileRel}: could not parse — ${parseError}`);
+    return {
+      page: {
+        fileRel,
+        navIndex,
+        hasGradedQuiz: false,
+        hasQuiz: false,
+        completesOnView: false,
+      },
+      isQuiz: false,
+      isGradedQuiz: false,
+      parseError: true,
+    };
+  }
 
   const pageConfig = validatePageConfig(content, fileRel, errors);
 
@@ -878,6 +905,7 @@ function validatePageFile(
     },
     isQuiz,
     isGradedQuiz,
+    parseError: false,
   };
 }
 
@@ -893,6 +921,7 @@ function validatePages(
   let totalPages = 0;
   let totalQuizzes = 0;
   let hasGradedQuiz = false;
+  let hasParseErrors = false;
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
 
@@ -906,6 +935,7 @@ function validatePages(
       totalPages: 0,
       totalQuizzes: 0,
       hasGradedQuiz: false,
+      hasParseErrors: false,
       pages,
     };
   }
@@ -941,6 +971,7 @@ function validatePages(
       totalPages: 0,
       totalQuizzes: 0,
       hasGradedQuiz: false,
+      hasParseErrors: false,
       pages,
     };
   }
@@ -996,6 +1027,7 @@ function validatePages(
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
       if (result.isGradedQuiz) hasGradedQuiz = true;
+      if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
 
@@ -1067,6 +1099,7 @@ function validatePages(
         totalPages++;
         if (result.isQuiz) totalQuizzes++;
         if (result.isGradedQuiz) hasGradedQuiz = true;
+        if (result.parseError) hasParseErrors = true;
         pages.push(result.page);
       }
     }
@@ -1085,7 +1118,15 @@ function validatePages(
     );
   }
 
-  return { errors, warnings, totalPages, totalQuizzes, hasGradedQuiz, pages };
+  return {
+    errors,
+    warnings,
+    totalPages,
+    totalQuizzes,
+    hasGradedQuiz,
+    hasParseErrors,
+    pages,
+  };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1098,11 +1139,15 @@ function validateMetaFile(
   if (!existsSync(metaPath)) return null;
 
   const metaRel = `${parentRel}/_meta.js`;
-  const objectStr = extractDefaultExportObjectLiteral(
+  const result = extractDefaultExportObjectLiteral(
     readSourceFileCached(metaPath),
   );
 
-  if (!objectStr) {
+  if (result.kind === 'parse-error') {
+    errors.push(`${metaRel}: could not parse — JavaScript syntax error`);
+    return null;
+  }
+  if (result.kind !== 'literal') {
     errors.push(
       `${metaRel}: syntax error — must export default { title: "..." }`,
     );
@@ -1111,7 +1156,7 @@ function validateMetaFile(
 
   let meta: { title?: string; pages?: string[] };
   try {
-    meta = JSON5.parse(objectStr);
+    meta = JSON5.parse(result.text);
   } catch {
     errors.push(
       `${metaRel}: syntax error — must export default { title: "..." }`,
@@ -1213,68 +1258,6 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   Sorting: ['question', 'items', 'targets', 'correct'],
 };
 
-type PropValue =
-  | { kind: 'string'; value: string }
-  | { kind: 'expr'; raw: string }
-  | { kind: 'bool' };
-
-/**
- * Parse the props of an opening tag starting just after the component name.
- * Returns null if the tag can't be parsed cleanly — callers then skip it
- * rather than risk a false positive.
- */
-function parseTagProps(
-  content: string,
-  start: number,
-): { props: Map<string, PropValue>; hasSpread: boolean } | null {
-  const props = new Map<string, PropValue>();
-  let hasSpread = false;
-  let i = start;
-  while (i < content.length) {
-    while (i < content.length && /\s/.test(content[i])) i++;
-    if (i >= content.length) return null;
-    const c = content[i];
-    if (c === '>') return { props, hasSpread };
-    if (c === '/' && content[i + 1] === '>') return { props, hasSpread };
-    // Spread / shorthand expression — skip the whole {...} block, but record
-    // that unseen props may be supplied here so callers can suppress
-    // false-positive "missing required prop / alt / title" diagnostics.
-    if (c === '{') {
-      const block = extractObjectLiteral(content, i);
-      if (!block) return null;
-      hasSpread = true;
-      i += block.length;
-      continue;
-    }
-    const nameMatch = /^[A-Za-z_][\w-]*/.exec(content.slice(i));
-    if (!nameMatch) return null;
-    const propName = nameMatch[0];
-    i += propName.length;
-    while (i < content.length && /\s/.test(content[i])) i++;
-    if (content[i] !== '=') {
-      props.set(propName, { kind: 'bool' });
-      continue;
-    }
-    i++;
-    while (i < content.length && /\s/.test(content[i])) i++;
-    const v = content[i];
-    if (v === '"' || v === "'") {
-      const end = content.indexOf(v, i + 1);
-      if (end === -1) return null;
-      props.set(propName, { kind: 'string', value: content.slice(i + 1, end) });
-      i = end + 1;
-    } else if (v === '{') {
-      const block = extractObjectLiteral(content, i);
-      if (!block) return null;
-      props.set(propName, { kind: 'expr', raw: block.slice(1, -1).trim() });
-      i += block.length;
-    } else {
-      return null;
-    }
-  }
-  return null;
-}
-
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   try {
@@ -1302,17 +1285,14 @@ function validateQuestionComponents(
   warnings: string[],
   exportStandard?: string,
 ): void {
-  const names = Object.keys(QUESTION_COMPONENT_REQUIRED).join('|');
-  const tagStartRe = new RegExp(`<(${names})(?=[\\s/>])`, 'g');
+  const components = findComponents(
+    content,
+    new Set(Object.keys(QUESTION_COMPONENT_REQUIRED)),
+  );
+  if (!components) return;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = tagStartRe.exec(content)) !== null) {
-    const name = m[1];
-    const parsed = parseTagProps(content, m.index + m[0].length);
-    if (!parsed) continue;
-    const { props, hasSpread } = parsed;
-
+  for (const { name, props, hasSpread } of components) {
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
       if (!hasSpread && !props.has(req)) {
         errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
@@ -1469,15 +1449,12 @@ function validateMediaComponents(
   errors: string[],
   warnings: string[],
 ): void {
-  const scan = content.replace(HTML_COMMENT_RE, '');
-  const tagStartRe = /<(Image|Video|Audio)(?=[\s/>])/g;
-  let m: RegExpExecArray | null;
-  while ((m = tagStartRe.exec(scan)) !== null) {
-    const name = m[1];
-    const parsed = parseTagProps(scan, m.index + m[0].length);
-    if (!parsed) continue;
-    const { props, hasSpread } = parsed;
-
+  const components = findComponents(
+    content,
+    new Set(['Image', 'Video', 'Audio']),
+  );
+  if (!components) return;
+  for (const { name, props, hasSpread } of components) {
     if (name === 'Image') {
       const alt = props.get('alt');
       const decorative = props.get('decorative');
@@ -1687,7 +1664,11 @@ function crossValidate(
   warnings: string[],
 ): void {
   // completion.mode "quiz" but no graded quizzes
-  if (config.completion?.mode === 'quiz' && !pageResults.hasGradedQuiz) {
+  if (
+    config.completion?.mode === 'quiz' &&
+    !pageResults.hasGradedQuiz &&
+    !pageResults.hasParseErrors
+  ) {
     errors.push(
       'completion.mode is "quiz" but no pages have quiz config with graded: true',
     );
@@ -1710,7 +1691,8 @@ function crossValidate(
   if (
     isManual &&
     config.completion?.trigger === 'page' &&
-    completesOnPages.length === 0
+    completesOnPages.length === 0 &&
+    !pageResults.hasParseErrors
   ) {
     errors.push(
       'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view". ' +
