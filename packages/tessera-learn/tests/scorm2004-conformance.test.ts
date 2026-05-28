@@ -105,7 +105,10 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ['likert', { type: 'likert', response: 'agree' }],
       // numeric with min == max writes a single-value pattern (no [:] range
       // delimiter), which the data model accepts.
-      ['numeric', { type: 'numeric', response: 7, correct: { min: 7, max: 7 } }],
+      [
+        'numeric',
+        { type: 'numeric', response: 7, correct: { min: 7, max: 7 } },
+      ],
     ] as const)(
       'a %s interaction is accepted by the data model',
       async (label, interaction) => {
