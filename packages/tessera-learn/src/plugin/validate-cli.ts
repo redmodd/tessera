@@ -1,6 +1,5 @@
 import { validateProject, reportValidationIssues } from './validation.js';
 
-/** Run static structure validation against a project. Returns a process exit code. */
 export function runValidate(projectRoot: string): number {
   const { errors, warnings } = validateProject(projectRoot);
 

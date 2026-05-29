@@ -14,7 +14,6 @@ a11y/check options:
   --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)
   --build                                          Force a fresh build first`;
 
-/** Route a `tessera` subcommand. Returns a process exit code. */
 export async function main(argv: string[]): Promise<number> {
   const [sub, ...rest] = argv;
   switch (sub) {
@@ -23,8 +22,6 @@ export async function main(argv: string[]): Promise<number> {
     case 'a11y':
       return runA11y(rest);
     case 'check': {
-      // Validate is fast and static; if it fails the build/audit would too,
-      // so stop before the slow runtime pass.
       const validateCode = runValidate(process.cwd());
       if (validateCode !== 0) return validateCode;
       return runA11y(rest);
@@ -42,7 +39,6 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-// Run only when invoked directly as the `tessera` bin, not when imported by tests.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   void main(process.argv.slice(2)).then((code) => process.exit(code));
 }

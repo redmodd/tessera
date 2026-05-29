@@ -66,7 +66,6 @@ export function axeIgnoreRules(ignore: string[]): string[] {
   );
 }
 
-/** True when a launch error means the chromium binary isn't downloaded yet. */
 export function isMissingBrowserError(message: string): boolean {
   return /Executable doesn't exist|playwright install/i.test(message);
 }

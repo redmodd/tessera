@@ -11,7 +11,6 @@ export type ParsedA11yArgs =
   | { ok: true; args: AuditOptions }
   | { ok: false; error: string };
 
-/** Parse `tessera a11y` flags. Pure — no I/O. */
 export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
   let threshold: ImpactLevel | undefined;
   let rebuild = false;
@@ -39,7 +38,6 @@ export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
   return { ok: true, args };
 }
 
-/** Parse args and run the runtime accessibility audit. Returns an exit code. */
 export async function runA11y(argv: string[]): Promise<number> {
   const parsed = parseA11yArgs(argv);
   if (!parsed.ok) {
