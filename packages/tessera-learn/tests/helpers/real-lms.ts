@@ -1,31 +1,18 @@
-// Faithful LMS test doubles backed by scorm-again, which validates each write
-// against the real CMI data model. The wrapper conforms to the adapter's
-// SCORM12API / SCORM2004API shape and adds:
-//  - errors: failures captured synchronously at each write/lifecycle call site.
-//    GetLastError is latched and reset by the next successful call, so polling
-//    it later is racy; reading it the instant a call returns captures the right
-//    code. The retry queue re-runs a failing write, so assert on emptiness.
-//  - log: every delegated call (1.2 interaction fields are write-only, so they
-//    can only be verified via the log + empty errors, not read-back).
-//  - dispose: terminates the instance so its unload handlers don't leak.
+// LMS doubles backed by scorm-again that validate writes against the spec.
 import { Scorm12API } from 'scorm-again/scorm12';
 import { Scorm2004API } from 'scorm-again/scorm2004';
 import type { SCORM12API } from '../../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../../src/runtime/adapters/scorm2004.js';
-
-export interface CapturedError {
-  key: string;
-  code: string;
-}
+import {
+  type CapturedError,
+  createScorm12ErrorCapture,
+  createScorm2004ErrorCapture,
+} from './scorm-error-capture.js';
 
 interface RealLms<TApi, TRaw> {
-  /** Wrapped instance conforming to the adapter's expected API shape. */
   api: TApi;
-  /** The underlying scorm-again instance, for read-back of readable elements. */
   raw: TRaw;
-  /** Writes/lifecycle calls scorm-again rejected, captured at the call site. */
   errors: CapturedError[];
-  /** Every delegated call: [method, ...args/value]. */
   log: string[][];
   dispose(): void;
 }
@@ -33,9 +20,6 @@ interface RealLms<TApi, TRaw> {
 export type RealLms12 = RealLms<SCORM12API, Scorm12API>;
 export type RealLms2004 = RealLms<SCORM2004API, Scorm2004API>;
 
-// autocommit/lmsCommitUrl off so nothing fires async or hits the network;
-// logLevel NONE so scorm-again's own console logging can't trip the suites
-// that assert on console.warn call counts.
 const SETTINGS = {
   autocommit: false,
   lmsCommitUrl: undefined,
@@ -47,10 +31,7 @@ export function createReal12Lms(): RealLms12 {
   const errors: CapturedError[] = [];
   const log: string[][] = [];
 
-  const capture = (key: string, ret: string) => {
-    const code = raw.LMSGetLastError();
-    if (ret !== 'true' || code !== '0') errors.push({ key, code });
-  };
+  const capture = createScorm12ErrorCapture(raw, errors);
 
   const api: SCORM12API = {
     LMSInitialize: (s) => {
@@ -107,10 +88,7 @@ export function createReal2004Lms(): RealLms2004 {
   const errors: CapturedError[] = [];
   const log: string[][] = [];
 
-  const capture = (key: string, ret: string) => {
-    const code = raw.GetLastError();
-    if (ret !== 'true' || code !== '0') errors.push({ key, code });
-  };
+  const capture = createScorm2004ErrorCapture(raw, errors);
 
   const api: SCORM2004API = {
     Initialize: (s) => {

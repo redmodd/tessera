@@ -1,7 +1,4 @@
 // @vitest-environment jsdom
-// SCORM 2004 adapter conformance against scorm-again. Seam: assert the
-// instrumented `errors` array is empty. 2004 interaction sub-elements are
-// readable, so interactions are verified by reading state back.
 import { describe, it, expect, afterEach } from 'vitest';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';

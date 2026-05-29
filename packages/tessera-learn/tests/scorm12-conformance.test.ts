@@ -1,9 +1,4 @@
 // @vitest-environment jsdom
-// SCORM 1.2 adapter conformance against scorm-again, which validates every
-// write against the real data model. Seam: assert the instrumented `errors`
-// array is empty. 1.2 interaction sub-elements are write-only (404 on read),
-// so they are verified via the write log + empty errors; readable elements
-// are verified by reading state back.
 import { describe, it, expect, afterEach } from 'vitest';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
@@ -14,7 +9,6 @@ import {
   type RealLms12,
 } from './helpers/real-lms.js';
 
-/** Wait for the adapter's async write queue to flush. */
 const flush = () => new Promise((r) => setTimeout(r, 50));
 
 describe('SCORM12Adapter against scorm-again', () => {

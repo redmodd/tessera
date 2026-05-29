@@ -1,18 +1,8 @@
-// In-browser LMS doubles for the e2e round-trips, backed by scorm-again, which
-// validates every write — a spec-illegal write surfaces in window.__scormErrors
-// and fails the round-trip. Injection is two init scripts: the browser bundle
-// (defines window.Scorm12API / Scorm2004API), then a seam that builds the
-// instance, installs window.API / API_1484_11, and exposes the seams the specs
-// read: __scormDataSnapshot() (scorm-again's getFlattenedCMI(), already in the
-// dotted-key shape), __scormLog, and __scormErrors. State is mirrored to
-// sessionStorage and reloaded via loadFromFlattenedJSON so page.reload()
-// restores the learner record (the LMS re-launch the resume specs exercise).
+// E2E LMS doubles backed by scorm-again; spec-illegal writes surface in window.__scormErrors.
 import { createRequire } from 'node:module';
 import type { Page } from '@playwright/test';
 
 const require = createRequire(import.meta.url);
-// The require/default condition resolves to the UMD browser bundle
-// (dist/scorm12.js — `this.Scorm12API = (...)`), injectable as a plain script.
 const SCORM12_BUNDLE = require.resolve('scorm-again/scorm12');
 const SCORM2004_BUNDLE = require.resolve('scorm-again/scorm2004');
 
@@ -90,14 +80,6 @@ export async function installScorm2004Mock(page: Page): Promise<void> {
   await page.addInitScript(SCORM2004_SEAM);
 }
 
-/**
- * CMI5 mock. The adapter reads launch params from the URL
- * (?fetch=...&endpoint=...&registration=...&activityId=...&actor=...),
- * POSTs to the fetch URL to get an auth-token, then sends xAPI statements
- * to the endpoint. We expose the launch URL as a helper and intercept
- * network requests via page.route() in the spec. scorm-again does not
- * implement cmi5, so this path keeps its bespoke network mock.
- */
 export function cmi5LaunchURL(base: string): string {
   const params = new URLSearchParams({
     fetch: 'http://cmi5-mock.test/fetch',
