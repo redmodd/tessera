@@ -135,6 +135,7 @@ describe('create-tessera CLI', () => {
     expect(pkg.type).toBe('module');
     expect(pkg.scripts.dev).toBe('vite dev');
     expect(pkg.scripts.export).toBe('vite build');
+    expect(pkg.packageManager).toMatch(/^pnpm@/);
     expect(pkg.scripts.validate).toBe('tessera validate');
     expect(pkg.scripts.check).toBe('tessera check');
     expect(pkg.scripts['accessibility-check']).toBeUndefined();
@@ -218,7 +219,7 @@ describe('create-tessera CLI', () => {
     expect(existsSync(resolve(projectDir, 'assets/_gitkeep'))).toBe(false);
   });
 
-  it('tailors the "Next steps" hint to npm_config_user_agent', () => {
+  it('leads the "Next steps" hint with pnpm', () => {
     const stdout = execSync(`node ${CLI_PATH} pnpm-course`, {
       cwd: testDir,
       encoding: 'utf-8',
@@ -226,7 +227,7 @@ describe('create-tessera CLI', () => {
       env: {
         ...process.env,
         npm_config_yes: 'true',
-        npm_config_user_agent: 'pnpm/9.0.0 npm/? node/v24.0.0',
+        npm_config_user_agent: 'npm/10.5.0 node/v24.0.0',
       },
     });
     expect(stdout).toContain('pnpm install');

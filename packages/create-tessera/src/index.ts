@@ -31,9 +31,9 @@ Options:
   --help, -h          Show this help
 
 Examples:
-  npm create tessera@latest my-course
-  npm create tessera@latest my-course -- --template=bare
-  npx create-tessera@latest upgrade
+  pnpm create tessera@latest my-course
+  pnpm create tessera@latest my-course --template=bare
+  pnpm dlx create-tessera@latest upgrade
 `;
 
 type Template = 'default' | 'bare';
@@ -196,32 +196,6 @@ function scaffold(dir: string, template: Template, tokens: Tokens) {
   copyAgentsMd(join(dir, 'AGENTS.md'));
 }
 
-// Package-manager-aware post-scaffold hints. Detection keys off the
-// npm_config_user_agent every PM sets when running `create`; a miss falls back
-// to npm with no functional impact (the hint is cosmetic).
-type PM = 'npm' | 'pnpm' | 'yarn' | 'bun';
-
-export function detectPackageManager(): PM {
-  const ua = process.env.npm_config_user_agent ?? '';
-  if (ua.startsWith('pnpm')) return 'pnpm';
-  if (ua.startsWith('yarn')) return 'yarn';
-  if (ua.startsWith('bun')) return 'bun';
-  return 'npm';
-}
-
-const INSTALL: Record<PM, string> = {
-  npm: 'npm install',
-  pnpm: 'pnpm install',
-  yarn: 'yarn',
-  bun: 'bun install',
-};
-const RUN: Record<PM, string> = {
-  npm: 'npm run',
-  pnpm: 'pnpm',
-  yarn: 'yarn',
-  bun: 'bun run',
-};
-
 function fail(message: string): never {
   process.stderr.write(`Error: ${message}\n\n`);
   process.stderr.write(USAGE);
@@ -367,7 +341,7 @@ function upgrade(dryRun: boolean) {
   process.stdout.write(
     dryRun
       ? '\nNo files written (--dry-run). Re-run without --dry-run to apply.\n'
-      : '\nDone. Run "npm install" to pick up dependency changes.\n',
+      : '\nDone. Run "pnpm install" to pick up dependency changes.\n',
   );
 }
 
@@ -412,9 +386,8 @@ function main() {
     __TESSERA_VERSION__: TESSERA_VERSION,
   });
 
-  const pm = detectPackageManager();
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  ${INSTALL[pm]}\n  ${RUN[pm]} dev\n`,
+    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n`,
   );
 }
 
