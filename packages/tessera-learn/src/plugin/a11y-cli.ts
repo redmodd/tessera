@@ -1,5 +1,4 @@
-#!/usr/bin/env node
-import { runAudit, type ImpactLevel } from './a11y/audit.js';
+import { runAudit, type AuditOptions, type ImpactLevel } from './a11y/audit.js';
 
 const VALID_THRESHOLDS: ImpactLevel[] = [
   'minor',
@@ -8,28 +7,44 @@ const VALID_THRESHOLDS: ImpactLevel[] = [
   'critical',
 ];
 
-const args = process.argv.slice(2);
-let threshold: ImpactLevel | undefined;
-let rebuild = false;
+export type ParsedA11yArgs =
+  | { ok: true; args: AuditOptions }
+  | { ok: false; error: string };
 
-for (let i = 0; i < args.length; i++) {
-  const arg = args[i];
-  if (arg === '--threshold') {
-    const value = args[++i] as ImpactLevel;
-    if (!VALID_THRESHOLDS.includes(value)) {
-      console.error(
-        `[tessera a11y] --threshold must be one of: ${VALID_THRESHOLDS.join(', ')}`,
-      );
-      process.exit(1);
+/** Parse `tessera a11y` flags. Pure — no I/O. */
+export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
+  let threshold: ImpactLevel | undefined;
+  let rebuild = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--threshold') {
+      const value = argv[++i] as ImpactLevel;
+      if (!VALID_THRESHOLDS.includes(value)) {
+        return {
+          ok: false,
+          error: `--threshold must be one of: ${VALID_THRESHOLDS.join(', ')}`,
+        };
+      }
+      threshold = value;
+    } else if (arg === '--build') {
+      rebuild = true;
+    } else {
+      return { ok: false, error: `Unknown argument: ${arg}` };
     }
-    threshold = value;
-  } else if (arg === '--build') {
-    rebuild = true;
-  } else {
-    console.error(`[tessera a11y] Unknown argument: ${arg}`);
-    process.exit(1);
   }
+
+  const args: AuditOptions = { rebuild };
+  if (threshold !== undefined) args.threshold = threshold;
+  return { ok: true, args };
 }
 
-const code = await runAudit(process.cwd(), { threshold, rebuild });
-process.exit(code);
+/** Parse args and run the runtime accessibility audit. Returns an exit code. */
+export async function runA11y(argv: string[]): Promise<number> {
+  const parsed = parseA11yArgs(argv);
+  if (!parsed.ok) {
+    console.error(`[tessera a11y] ${parsed.error}`);
+    return 1;
+  }
+  return runAudit(process.cwd(), parsed.args);
+}
