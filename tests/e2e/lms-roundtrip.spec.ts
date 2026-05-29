@@ -314,11 +314,8 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 // SCORM 2004
 // ---------------------------------------------------------------------------
 
-// UNSKIP (→ describe.serial) when scorm-again ships the validatePattern fix and
-// the dep is bumped. The graded quiz has a <Matching> question, whose
-// correct_responses scorm-again 3.0.4 wrongly rejects (406), halting the write
-// queue and breaking downstream writes. 1.2 is unaffected.
-test.describe.skip('LMS round-trip — SCORM 2004', () => {
+// Unskipped: scorm-again 3.0.5 ships the validatePattern fix.
+test.describe.serial('LMS round-trip — SCORM 2004', () => {
   const PORT = 5193;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;

@@ -161,10 +161,8 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 // SCORM 2004
 // ---------------------------------------------------------------------------
 
-// UNSKIP (→ describe.serial) when scorm-again ships the validatePattern fix and
-// the dep is bumped — see lms-roundtrip.spec.ts. The custom quiz's <Matching>
-// correct_responses is wrongly rejected by scorm-again 3.0.4, halting the queue.
-test.describe.skip('Custom-quiz LMS roundtrip — SCORM 2004', () => {
+// Unskipped: scorm-again 3.0.5 ships the validatePattern fix.
+test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
   const PORT = 5296;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;

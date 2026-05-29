@@ -125,7 +125,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
     // bumped. 3.0.4 wrongly rejects the SCORM-spec bracketed correct_responses
     // delimiters ([.]/[,]/[:]) the adapter (and SCORM Cloud) emit for matching
     // and numeric ranges — its own positive matching test is skipped upstream.
-    describe.skip('matching + numeric range (pending scorm-again fix)', () => {
+    describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
         [
           'matching',

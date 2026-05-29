@@ -17,10 +17,3 @@ always-`true` hand-rolled doubles. No public API or runtime behavior change.
   reading state back where elements are readable. The existing mock suites are
   retained for fault injection (forced `'false'`, thrown calls, error codes)
   and serialization detail.
-- `scorm-again` 3.0.4 has a `validatePattern` bug that rejects the SCORM 2004
-  spec's bracketed `correct_responses` delimiters (`[.]`/`[:]`) for matching and
-  numeric-range interactions — its own positive matching test is skipped
-  upstream. The adapter is spec-correct (and passes SCORM Cloud), so the 2004
-  matching/numeric conformance cases and the 2004 e2e round-trips are
-  **skipped pending the upstream fix**; unskip and bump the `scorm-again` pin
-  once it ships. SCORM 1.2 is unaffected.

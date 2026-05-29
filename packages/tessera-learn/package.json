@@ -92,7 +92,7 @@
     "@types/node": "^25.8.0",
     "@vitest/coverage-v8": "^4.1.6",
     "jsdom": "^29.0.1",
-    "scorm-again": "3.0.4",
+    "scorm-again": "3.0.5",
     "svelte-check": "^4.4.8",
     "tsdown": "^0.22.0",
     "typescript": "^6.0.3",
