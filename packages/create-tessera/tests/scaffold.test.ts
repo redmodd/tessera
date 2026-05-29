@@ -135,7 +135,11 @@ describe('create-tessera CLI', () => {
     expect(pkg.type).toBe('module');
     expect(pkg.scripts.dev).toBe('vite dev');
     expect(pkg.scripts.export).toBe('vite build');
-    expect(pkg.scripts.validate).toBe('tessera-validate');
+    expect(pkg.scripts.validate).toBe('tessera validate');
+    expect(pkg.scripts.check).toBe('tessera check');
+    expect(pkg.scripts['accessibility-check']).toBeUndefined();
+    expect(pkg.devDependencies['@axe-core/playwright']).toBeDefined();
+    expect(pkg.devDependencies.playwright).toBeDefined();
     expect(pkg.dependencies['tessera-learn']).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
   });
