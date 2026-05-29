@@ -161,7 +161,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 // SCORM 2004
 // ---------------------------------------------------------------------------
 
-// Unskipped: scorm-again 3.0.5 ships the validatePattern fix.
 test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
   const PORT = 5296;
   const BASE = `http://localhost:${PORT}`;

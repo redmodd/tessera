@@ -314,7 +314,6 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 // SCORM 2004
 // ---------------------------------------------------------------------------
 
-// Unskipped: scorm-again 3.0.5 ships the validatePattern fix.
 test.describe.serial('LMS round-trip — SCORM 2004', () => {
   const PORT = 5193;
   const BASE = `http://localhost:${PORT}`;

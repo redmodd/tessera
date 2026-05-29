@@ -121,10 +121,6 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
-    // UNSKIP when scorm-again ships the validatePattern fix and the dep is
-    // bumped. 3.0.4 wrongly rejects the SCORM-spec bracketed correct_responses
-    // delimiters ([.]/[,]/[:]) the adapter (and SCORM Cloud) emit for matching
-    // and numeric ranges — its own positive matching test is skipped upstream.
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
         [
