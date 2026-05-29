@@ -1,87 +1,85 @@
-/**
- * In-browser mocks for LMS APIs. Injected via page.addInitScript() so they run
- * before the course bundle boots. Data is mirrored into sessionStorage so it
- * survives a page.reload() — this simulates an LMS re-launching the same SCO
- * and restoring saved state.
- */
+// E2E LMS doubles backed by scorm-again; spec-illegal writes surface in window.__scormErrors.
+import { createRequire } from 'node:module';
+import type { Page } from '@playwright/test';
 
-export const SCORM12_MOCK = `
+const require = createRequire(import.meta.url);
+const SCORM12_BUNDLE = require.resolve('scorm-again/scorm12');
+const SCORM2004_BUNDLE = require.resolve('scorm-again/scorm2004');
+
+const SCORM12_SEAM = `
 (() => {
-  const STORAGE_KEY = '__scorm12_mock_data';
-  let data = {};
+  const KEY = '__scorm12_data';
+  const api = new window.Scorm12API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (raw) data = JSON.parse(raw);
+    const raw = sessionStorage.getItem(KEY);
+    if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
   } catch {}
   const persist = () => {
-    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+    try { sessionStorage.setItem(KEY, JSON.stringify(api.getFlattenedCMI())); } catch {}
   };
   window.__scormLog = [];
+  window.__scormErrors = [];
+  const capture = (key, ret) => {
+    const code = api.LMSGetLastError();
+    if (ret !== 'true' || code !== '0') window.__scormErrors.push({ key, code });
+  };
   window.API = {
-    LMSInitialize(s) { window.__scormLog.push(['LMSInitialize', s]); return 'true'; },
-    LMSFinish(s) { window.__scormLog.push(['LMSFinish', s]); persist(); return 'true'; },
-    LMSGetValue(k) {
-      const v = data[k] != null ? String(data[k]) : '';
-      window.__scormLog.push(['LMSGetValue', k, v]);
-      return v;
-    },
-    LMSSetValue(k, v) {
-      data[k] = String(v);
-      persist();
-      window.__scormLog.push(['LMSSetValue', k, String(v)]);
-      return 'true';
-    },
-    LMSCommit(s) { persist(); window.__scormLog.push(['LMSCommit', s]); return 'true'; },
-    LMSGetLastError() { return '0'; },
-    LMSGetErrorString() { return ''; },
-    LMSGetDiagnostic() { return ''; },
+    LMSInitialize(s) { const r = api.LMSInitialize(s); window.__scormLog.push(['LMSInitialize', s]); capture('Initialize', r); return r; },
+    LMSFinish(s) { const r = api.LMSFinish(s); window.__scormLog.push(['LMSFinish', s]); capture('Finish', r); persist(); return r; },
+    LMSGetValue(k) { const v = api.LMSGetValue(k); window.__scormLog.push(['LMSGetValue', k, v]); return v; },
+    LMSSetValue(k, v) { const r = api.LMSSetValue(k, String(v)); window.__scormLog.push(['LMSSetValue', k, String(v)]); capture(k, r); persist(); return r; },
+    LMSCommit(s) { const r = api.LMSCommit(s); window.__scormLog.push(['LMSCommit', s]); capture('Commit', r); persist(); return r; },
+    LMSGetLastError() { return api.LMSGetLastError(); },
+    LMSGetErrorString(c) { return api.LMSGetErrorString(c); },
+    LMSGetDiagnostic(c) { return api.LMSGetDiagnostic(c); },
   };
-  window.__scormDataSnapshot = () => JSON.parse(JSON.stringify(data));
+  window.__scormDataSnapshot = () => api.getFlattenedCMI();
 })();
 `;
 
-export const SCORM2004_MOCK = `
+const SCORM2004_SEAM = `
 (() => {
-  const STORAGE_KEY = '__scorm2004_mock_data';
-  let data = {};
+  const KEY = '__scorm2004_data';
+  const api = new window.Scorm2004API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (raw) data = JSON.parse(raw);
+    const raw = sessionStorage.getItem(KEY);
+    if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
   } catch {}
   const persist = () => {
-    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+    try { sessionStorage.setItem(KEY, JSON.stringify(api.getFlattenedCMI())); } catch {}
   };
   window.__scormLog = [];
-  window.API_1484_11 = {
-    Initialize(s) { window.__scormLog.push(['Initialize', s]); return 'true'; },
-    Terminate(s) { window.__scormLog.push(['Terminate', s]); persist(); return 'true'; },
-    GetValue(k) {
-      const v = data[k] != null ? String(data[k]) : '';
-      window.__scormLog.push(['GetValue', k, v]);
-      return v;
-    },
-    SetValue(k, v) {
-      data[k] = String(v);
-      persist();
-      window.__scormLog.push(['SetValue', k, String(v)]);
-      return 'true';
-    },
-    Commit(s) { persist(); window.__scormLog.push(['Commit', s]); return 'true'; },
-    GetLastError() { return '0'; },
-    GetErrorString() { return ''; },
-    GetDiagnostic() { return ''; },
+  window.__scormErrors = [];
+  const capture = (key, ret) => {
+    const code = api.GetLastError();
+    if (ret !== 'true' || code !== '0') window.__scormErrors.push({ key, code });
   };
-  window.__scormDataSnapshot = () => JSON.parse(JSON.stringify(data));
+  window.API_1484_11 = {
+    Initialize(s) { const r = api.Initialize(s); window.__scormLog.push(['Initialize', s]); capture('Initialize', r); return r; },
+    Terminate(s) { const r = api.Terminate(s); window.__scormLog.push(['Terminate', s]); capture('Terminate', r); persist(); return r; },
+    GetValue(k) { const v = api.GetValue(k); window.__scormLog.push(['GetValue', k, v]); return v; },
+    SetValue(k, v) { const r = api.SetValue(k, String(v)); window.__scormLog.push(['SetValue', k, String(v)]); capture(k, r); persist(); return r; },
+    Commit(s) { const r = api.Commit(s); window.__scormLog.push(['Commit', s]); capture('Commit', r); persist(); return r; },
+    GetLastError() { return api.GetLastError(); },
+    GetErrorString(c) { return api.GetErrorString(c); },
+    GetDiagnostic(c) { return api.GetDiagnostic(c); },
+  };
+  window.__scormDataSnapshot = () => api.getFlattenedCMI();
 })();
 `;
 
-/**
- * CMI5 mock. The adapter reads launch params from the URL
- * (?fetch=...&endpoint=...&registration=...&activityId=...&actor=...),
- * POSTs to the fetch URL to get an auth-token, then sends xAPI statements
- * to the endpoint. We expose the launch URL as a helper and intercept
- * network requests via page.route() in the spec.
- */
+/** Install a `scorm-again`-backed SCORM 1.2 LMS (`window.API`). */
+export async function installScorm12Mock(page: Page): Promise<void> {
+  await page.addInitScript({ path: SCORM12_BUNDLE });
+  await page.addInitScript(SCORM12_SEAM);
+}
+
+/** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`). */
+export async function installScorm2004Mock(page: Page): Promise<void> {
+  await page.addInitScript({ path: SCORM2004_BUNDLE });
+  await page.addInitScript(SCORM2004_SEAM);
+}
+
 export function cmi5LaunchURL(base: string): string {
   const params = new URLSearchParams({
     fetch: 'http://cmi5-mock.test/fetch',

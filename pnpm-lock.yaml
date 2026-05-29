@@ -38,6 +38,9 @@ importers:
       prettier-plugin-svelte:
         specifier: ^4.0.1
         version: 4.0.1(prettier@3.8.3)(svelte@5.55.7(@typescript-eslint/types@8.59.4))
+      scorm-again:
+        specifier: 3.0.5
+        version: 3.0.5
       svelte-eslint-parser:
         specifier: ^1.6.1
         version: 1.6.1(svelte@5.55.7(@typescript-eslint/types@8.59.4))
@@ -105,6 +108,9 @@ importers:
       jsdom:
         specifier: ^29.0.1
         version: 29.1.1
+      scorm-again:
+        specifier: 3.0.5
+        version: 3.0.5
       svelte-check:
         specifier: ^4.4.8
         version: 4.4.8(picomatch@4.0.4)(svelte@5.55.7(@typescript-eslint/types@8.59.4))(typescript@6.0.3)
@@ -1967,6 +1973,10 @@ packages:
   saxes@6.0.0:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
+
+  scorm-again@3.0.5:
+    resolution: {integrity: sha512-UW4VvfGrB7+izNtABATQrp6ztPUV43Poyah3CbMdMkeF0gTrKu8RsnYXy2LRGmnIN2rPvQ6fnVk3HPYmAMiyVg==}
+    engines: {node: '>=20.19.0'}
 
   semver@7.8.0:
     resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
@@ -4016,6 +4026,8 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
+
+  scorm-again@3.0.5: {}
 
   semver@7.8.0: {}
 

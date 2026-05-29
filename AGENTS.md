@@ -37,6 +37,8 @@ pnpm test:coverage    # + v8 coverage under packages/*/coverage/
 pnpm test:e2e         # Playwright suite (build first)
 pnpm lint
 pnpm changeset        # record a release note for a user-facing change
+pnpm format           # Format all files with prettier
+pnpm format:check     # Check if files are formatted (without modifying)
 ```
 
 Node >= 24, pnpm via corepack. First-time full setup (install + build + Playwright browsers): `./scripts/setup-e2e.sh`.

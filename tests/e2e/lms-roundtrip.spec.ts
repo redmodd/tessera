@@ -1,6 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import { exec, type ChildProcess } from 'node:child_process';
-import { SCORM12_MOCK, SCORM2004_MOCK, cmi5LaunchURL } from './lms-mocks.js';
+import {
+  installScorm12Mock,
+  installScorm2004Mock,
+  cmi5LaunchURL,
+} from './lms-mocks.js';
 import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 function startPreview(standard: Standard, port: number): ChildProcess {
@@ -81,7 +85,14 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(SCORM12_MOCK);
+    await installScorm12Mock(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    const errors = await page.evaluate(
+      () => (window as { __scormErrors?: unknown[] }).__scormErrors ?? [],
+    );
+    expect(errors).toEqual([]);
   });
 
   test('Initialize fires and course boots against mock API', async ({
@@ -285,14 +296,16 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       );
     });
 
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.core.session_time']).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
-
+    // Assert the adapter's written format from the call log: scorm-again
+    // normalizes session_time on storage, so the snapshot is not verbatim.
     const log = (await page.evaluate(
       () => (window as any).__scormLog,
     )) as string[][];
+    const sessionTimeWrite = log.find(
+      (entry) =>
+        entry[0] === 'LMSSetValue' && entry[1] === 'cmi.core.session_time',
+    );
+    expect(sessionTimeWrite?.[2]).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
   });
 });
@@ -322,7 +335,14 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(SCORM2004_MOCK);
+    await installScorm2004Mock(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    const errors = await page.evaluate(
+      () => (window as { __scormErrors?: unknown[] }).__scormErrors ?? [],
+    );
+    expect(errors).toEqual([]);
   });
 
   test('Initialize + GetValue(cmi.suspend_data) fires on boot', async ({
