@@ -23,7 +23,8 @@ describe('parseA11yArgs', () => {
   it('rejects an invalid threshold', () => {
     const result = parseA11yArgs(['--threshold', 'nope']);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('--threshold must be one of');
+    if (!result.ok)
+      expect(result.error).toContain('--threshold must be one of');
   });
 
   it('rejects unknown arguments', () => {

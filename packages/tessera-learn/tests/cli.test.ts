@@ -15,6 +15,8 @@ describe('tessera CLI dispatcher', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = await main(['frobnicate']);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('Unknown command: frobnicate');
+    expect(err.mock.calls.flat().join(' ')).toContain(
+      'Unknown command: frobnicate',
+    );
   });
 });
