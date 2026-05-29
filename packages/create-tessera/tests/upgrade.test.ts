@@ -108,7 +108,25 @@ describe('create-tessera upgrade', () => {
     const { exitCode, stdout } = runCLI('upgrade', testDir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('added "validate" script');
-    expect(readPkg(testDir).scripts.validate).toBe('tessera-validate');
+    expect(readPkg(testDir).scripts.validate).toBe('tessera validate');
+  });
+
+  it('migrates legacy validate value and replaces accessibility-check with check', () => {
+    seedProject(testDir, {
+      scripts: {
+        dev: 'vite dev',
+        export: 'vite build',
+        validate: 'tessera-validate',
+        'accessibility-check': 'tessera-a11y',
+      },
+    });
+    const { exitCode, stdout } = runCLI('upgrade', testDir);
+    expect(exitCode).toBe(0);
+    const scripts = readPkg(testDir).scripts;
+    expect(scripts.validate).toBe('tessera validate');
+    expect(scripts['accessibility-check']).toBeUndefined();
+    expect(scripts.check).toBe('tessera check');
+    expect(stdout).toContain('removed stale "accessibility-check" script');
   });
 
   it('renames a stale framework script when its value is unchanged', () => {
@@ -134,7 +152,7 @@ describe('create-tessera upgrade', () => {
       scripts: {
         dev: 'vite dev',
         export: 'vite build',
-        validate: 'tessera-validate',
+        validate: 'tessera validate',
         lint: 'eslint .',
       },
     });
@@ -147,7 +165,7 @@ describe('create-tessera upgrade', () => {
       scripts: {
         dev: 'vite dev --host',
         export: 'vite build',
-        validate: 'tessera-validate',
+        validate: 'tessera validate',
       },
     });
     const { stdout } = runCLI('upgrade', testDir);
@@ -160,7 +178,7 @@ describe('create-tessera upgrade', () => {
       scripts: {
         dev: 'vite dev',
         export: 'vite build',
-        validate: 'tessera-validate',
+        validate: 'tessera validate',
       },
       tesseraDep: '^0.0.1',
     });
@@ -176,7 +194,7 @@ describe('create-tessera upgrade', () => {
       scripts: {
         dev: 'vite dev',
         export: 'vite build',
-        validate: 'tessera-validate',
+        validate: 'tessera validate',
       },
       tesseraDep: TESSERA_VERSION,
       agentsMd: '# stale agents file\n',

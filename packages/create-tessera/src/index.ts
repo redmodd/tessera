@@ -117,8 +117,8 @@ function copyAgentsMd(dest: string) {
 export const FRAMEWORK_SCRIPTS: Record<string, string> = {
   dev: 'vite dev',
   export: 'vite build',
-  validate: 'tessera-validate',
-  'accessibility-check': 'tessera-a11y',
+  validate: 'tessera validate',
+  check: 'tessera check',
 };
 
 // Framework scripts that were renamed across versions. On upgrade a stale key
@@ -131,7 +131,19 @@ interface ScriptMigration {
 }
 const SCRIPT_MIGRATIONS: ScriptMigration[] = [
   { stale: 'preview', oldValue: 'vite dev', replacedBy: 'dev' },
+  {
+    stale: 'accessibility-check',
+    oldValue: 'tessera-a11y',
+    replacedBy: 'check',
+  },
 ];
+
+// Prior framework-owned values for a kept script name. On upgrade, a current
+// value matching a legacy default is migrated to the new value; a value that
+// matches neither the new nor a legacy default is treated as an author override.
+const LEGACY_FRAMEWORK_VALUES: Record<string, string[]> = {
+  validate: ['tessera-validate'],
+};
 
 // Tokens substituted into text template files as they are copied. Delimiters use
 // __UPPER__ so they cannot collide with Svelte `{...}` or JS `${...}`.
@@ -279,9 +291,15 @@ function upgrade(dryRun: boolean) {
       pkgChanged = true;
       changes.push(`package.json: added "${name}" script`);
     } else if (current !== value) {
-      warnings.push(
-        `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`,
-      );
+      if ((LEGACY_FRAMEWORK_VALUES[name] ?? []).includes(current)) {
+        scripts[name] = value;
+        pkgChanged = true;
+        changes.push(`package.json: updated "${name}" script to "${value}"`);
+      } else {
+        warnings.push(
+          `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`,
+        );
+      }
     }
   }
 
