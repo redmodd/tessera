@@ -18,10 +18,16 @@ export function createErrorCapture(
   };
 }
 
-export function createScorm12ErrorCapture(raw: Scorm12API, errors: CapturedError[]) {
+export function createScorm12ErrorCapture(
+  raw: Scorm12API,
+  errors: CapturedError[],
+) {
   return createErrorCapture(() => raw.LMSGetLastError(), errors);
 }
 
-export function createScorm2004ErrorCapture(raw: Scorm2004API, errors: CapturedError[]) {
+export function createScorm2004ErrorCapture(
+  raw: Scorm2004API,
+  errors: CapturedError[],
+) {
   return createErrorCapture(() => raw.GetLastError(), errors);
 }
