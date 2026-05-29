@@ -25,7 +25,7 @@ The dev server hot-reloads as you edit pages, layouts, components, and `course.c
 `npm run check` runs `validate` and then the deeper, opt-in pass (`tessera a11y`): it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). The runtime audit drives Playwright, which needs a browser binary once per machine:
 
 ```bash
-pnpm exec playwright install chromium
+npx playwright install chromium
 ```
 
 See [Accessibility](#accessibility).
@@ -853,7 +853,7 @@ Tessera checks accessibility in two passes, plus components that are accessible 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 
 ```bash
-pnpm exec playwright install chromium
+npx playwright install chromium
 ```
 
 ```bash

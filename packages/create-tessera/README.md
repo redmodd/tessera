@@ -54,7 +54,7 @@ npm run check                # validate, then the runtime accessibility audit (a
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 
 ```bash
-pnpm exec playwright install chromium
+npx playwright install chromium
 ```
 
 Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
