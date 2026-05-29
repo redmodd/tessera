@@ -55,8 +55,7 @@
     "**/*.css"
   ],
   "bin": {
-    "tessera-validate": "./dist/plugin/cli.js",
-    "tessera-a11y": "./dist/plugin/a11y-cli.js"
+    "tessera": "./dist/plugin/cli.js"
   },
   "engines": {
     "node": ">=24"

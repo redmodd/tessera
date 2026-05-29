@@ -1,28 +1,48 @@
 #!/usr/bin/env node
-import { validateProject, reportValidationIssues } from './validation.js';
+import { pathToFileURL } from 'node:url';
+import { runValidate } from './validate-cli.js';
+import { runA11y } from './a11y-cli.js';
 
-const projectRoot = process.cwd();
-const { errors, warnings } = validateProject(projectRoot);
+const USAGE = `Usage: tessera <command> [options]
 
-reportValidationIssues({ errors, warnings });
+Commands:
+  validate            Fast static structure checks
+  a11y [options]      Runtime accessibility audit (builds + drives Playwright)
+  check [options]     Run validate, then a11y
 
-if (errors.length > 0) {
-  const summary =
-    `Validation failed with ${errors.length} error(s)` +
-    (warnings.length > 0 ? ` and ${warnings.length} warning(s)` : '') +
-    '.';
-  console.error(`\n\x1b[31m${summary}\x1b[0m`);
-  process.exit(1);
+a11y/check options:
+  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)
+  --build                                          Force a fresh build first`;
+
+/** Route a `tessera` subcommand. Returns a process exit code. */
+export async function main(argv: string[]): Promise<number> {
+  const [sub, ...rest] = argv;
+  switch (sub) {
+    case 'validate':
+      return runValidate(process.cwd());
+    case 'a11y':
+      return runA11y(rest);
+    case 'check': {
+      // Validate is fast and static; if it fails the build/audit would too,
+      // so stop before the slow runtime pass.
+      const validateCode = runValidate(process.cwd());
+      if (validateCode !== 0) return validateCode;
+      return runA11y(rest);
+    }
+    case '--help':
+    case '-h':
+      console.log(USAGE);
+      return 0;
+    case undefined:
+      console.error(`No command given.\n\n${USAGE}`);
+      return 1;
+    default:
+      console.error(`Unknown command: ${sub}\n\n${USAGE}`);
+      return 1;
+  }
 }
 
-if (warnings.length > 0) {
-  console.log(
-    `\n\x1b[33mValidation passed with ${warnings.length} warning(s).\x1b[0m`,
-  );
-} else {
-  console.log('\x1b[32m[tessera]\x1b[0m Validation passed — no issues found.');
+// Run only when invoked directly as the `tessera` bin, not when imported by tests.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  void main(process.argv.slice(2)).then((code) => process.exit(code));
 }
-console.log(
-  '\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: npm run accessibility-check\x1b[0m',
-);
-process.exit(0);
