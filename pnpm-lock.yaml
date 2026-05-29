@@ -38,6 +38,9 @@ importers:
       prettier-plugin-svelte:
         specifier: ^4.0.1
         version: 4.0.1(prettier@3.8.3)(svelte@5.55.7(@typescript-eslint/types@8.59.4))
+      scorm-again:
+        specifier: 3.0.5
+        version: 3.0.5
       svelte-eslint-parser:
         specifier: ^1.6.1
         version: 1.6.1(svelte@5.55.7(@typescript-eslint/types@8.59.4))
