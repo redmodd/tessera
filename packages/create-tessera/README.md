@@ -20,13 +20,13 @@ node --version    # should print v24.x.x or higher
 ## Usage
 
 ```bash
-npm create tessera@latest my-course
+pnpm create tessera@latest my-course
 ```
 
 Or equivalently:
 
 ```bash
-pnpm create tessera my-course
+npm create tessera@latest my-course
 yarn create tessera my-course
 ```
 
@@ -40,15 +40,21 @@ The scaffolder creates a new directory with:
 
 Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise.
 
-Then (commands below use `npm`; substitute your package manager — `pnpm`, `yarn`, or `bun` — if you used one):
+Then (the project is set up for `pnpm` — Node's corepack provisions it automatically):
 
 ```bash
 cd my-course
-npm install
-npm run dev                  # local dev server at http://localhost:5173
-npm run export               # build + package for the configured LMS standard
-npm run validate             # check the project for structural errors, no server or build
-npm run accessibility-check  # opt-in runtime accessibility audit (needs optional playwright + axe deps)
+pnpm install
+pnpm dev                     # local dev server at http://localhost:5173
+pnpm export                  # build + package for the configured LMS standard
+pnpm validate                # check the project for structural errors, no server or build
+pnpm check                   # validate, then the runtime accessibility audit (axe) over the built course
+```
+
+The runtime audit drives Playwright, which needs a browser binary once per machine:
+
+```bash
+pnpm exec playwright install chromium
 ```
 
 Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
@@ -58,11 +64,11 @@ Open the printed URL in your browser. The page hot-reloads as you edit course fi
 Run from a project root to re-apply the latest framework files:
 
 ```bash
-npx create-tessera@latest upgrade            # apply changes
-npx create-tessera@latest upgrade --dry-run  # preview without writing
+pnpm dlx create-tessera@latest upgrade            # apply changes
+pnpm dlx create-tessera@latest upgrade --dry-run  # preview without writing
 ```
 
-`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`, `accessibility-check`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
+`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`, `check`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
 
 ## Flags
 

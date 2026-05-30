@@ -8,32 +8,38 @@ Build a course with built-in components, your own (via the hooks), or any mix. T
 
 ## Running the project
 
-From the project root (commands below use `npm`; substitute your package manager — `pnpm`, `yarn`, or `bun` — if you used one):
+From the project root (the project is set up for `pnpm` — Node's corepack provisions it automatically):
 
 ```bash
-npm install               # first time only
-npm run dev               # dev server at http://localhost:5173 (Ctrl+C to stop)
-npm run export            # build + package for the LMS standard configured in course.config.js
-npm run validate          # run project validation only — no server, no bundle
-npm run accessibility-check  # opt-in runtime accessibility audit (axe) over the built course
+pnpm install              # first time only
+pnpm dev                  # dev server at http://localhost:5173 (Ctrl+C to stop)
+pnpm export               # build + package for the LMS standard configured in course.config.js
+pnpm validate             # run project validation only — no server, no bundle
+pnpm check                # validate, then the runtime accessibility audit (axe) over the built course
 ```
 
 The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
 
-`npm run validate` runs the same checks as `dev` and `export` (page syntax, manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
+`pnpm validate` runs the same checks as `dev` and `export` (page syntax, manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
-`npm run accessibility-check` is the deeper, opt-in pass: it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). It needs two optional dependencies — install them once with `npm i -D playwright @axe-core/playwright && npx playwright install chromium`; the command prints this same hint if they're missing. See [Accessibility](#accessibility).
+`pnpm check` runs `validate` and then the deeper, opt-in pass (`tessera a11y`): it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). The runtime audit drives Playwright, which needs a browser binary once per machine:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+See [Accessibility](#accessibility).
 
 ### Upgrading the project
 
 ```bash
-npx create-tessera@latest upgrade        # apply the latest framework files to this project
-npx create-tessera@latest upgrade --dry-run   # preview the changes first
+pnpm dlx create-tessera@latest upgrade        # apply the latest framework files to this project
+pnpm dlx create-tessera@latest upgrade --dry-run   # preview the changes first
 ```
 
-`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`, `accessibility-check`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
+`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`, `check`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
 
-`dev`, `export`, `validate`, and `accessibility-check` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
+`dev`, `export`, `validate`, and `check` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
 
 ---
 
@@ -77,7 +83,7 @@ my-course/
 
 You own everything in the project directory: `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, and `styles/`. Edit those freely.
 
-**Never edit `node_modules/` or `vite.config.js`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `npm install`, and are silently wiped when the course's tessera-learn version is updated. If you think you need to change framework behaviour, you're looking for an extension point instead:
+**Never edit `node_modules/` or `vite.config.js`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `pnpm install`, and are silently wiped when the course's tessera-learn version is updated. If you think you need to change framework behaviour, you're looking for an extension point instead:
 
 - **New question type or interactive widget** → a custom component using the `useQuestion` hook.
 - **Different course chrome** (header, nav, layout) → `layout.svelte`.
@@ -753,7 +759,7 @@ export default {
   // Accessibility checker (all optional — sensible defaults apply)
   a11y: {
     level: 'warn', // "warn" (default) or "error" — "error" makes the promotable a11y rules block the build
-    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset for accessibility-check
+    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset for tessera a11y
     ignore: [], // rule IDs to suppress, e.g. ["tessera/heading-order", "color-contrast"]
   },
 };
@@ -761,7 +767,7 @@ export default {
 
 - `language` sets `<html lang>` for screen readers (WCAG 3.1.1). Set it to your course's language as a [BCP-47](https://www.w3.org/International/articles/language-tags/) tag. A missing or implausible value warns and falls back to `"en"`.
 - `a11y.level: "error"` promotes the "promotable" accessibility warnings (captions/transcript, heading order, contrast, language, and the Svelte compiler's a11y warnings) to build-blocking errors. Hard contract errors (missing `alt`, missing media `title`) always block regardless of `level`.
-- `a11y.ignore` is a flat list matched literally against each diagnostic's rule ID across **all tiers** — the `tessera/…` IDs printed by `validate`, the `a11y_…` IDs from the Svelte compiler, and the bare axe rule IDs (e.g. `color-contrast`) from `accessibility-check`.
+- `a11y.ignore` is a flat list matched literally against each diagnostic's rule ID across **all tiers** — the `tessera/…` IDs printed by `validate`, the `a11y_…` IDs from the Svelte compiler, and the bare axe rule IDs (e.g. `color-contrast`) from `tessera a11y`.
 
 - `navigation.mode: "free"` → all pages accessible except those blocked by gating quizzes.
 - `navigation.mode: "sequential"` → pages unlock one at a time as each is completed.
@@ -819,7 +825,7 @@ export default {
 
 ### Build output
 
-`npm run export` (which wraps `vite build`) writes:
+`pnpm export` (which wraps `vite build`) writes:
 
 | `export.standard` | What ships                            | Where                                    |
 | ----------------- | ------------------------------------- | ---------------------------------------- |
@@ -832,7 +838,7 @@ For LMS exports, upload the zip via your LMS's import flow. For web export, the 
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (page syntax, manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `npm run validate` to check without building.
+The Vite plugin runs project validation on every dev start and build (page syntax, manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `pnpm validate` to check without building.
 
 ---
 
@@ -842,16 +848,18 @@ Tessera checks accessibility in two passes, plus components that are accessible 
 
 **Static checks** run inside `validate`, `dev`, and `export` — no extra setup. They cover what's visible in your source: `<Image>` alt-or-`decorative`, `<Video>`/`<Audio>` `title` + captions/transcript, empty question option/answer labels, skipped heading levels (e.g. `h2` → `h4`), `branding.primaryColor` contrast against white, and a well-formed `language` tag. They also route the Svelte compiler's own `a11y_*` warnings through the reporter. Each diagnostic carries a rule ID in brackets (e.g. `[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
 
-**Runtime audit** is the opt-in deep pass: `npm run accessibility-check` builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
+**Runtime audit** is the opt-in deep pass: `tessera a11y` (run it directly, or via `pnpm check`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
+
+The runtime audit drives Playwright, which needs a browser binary once per machine:
 
 ```bash
-# one-time setup for the runtime audit (optional dependencies):
-npm i -D playwright @axe-core/playwright
-npx playwright install chromium
+pnpm exec playwright install chromium
+```
 
-npm run accessibility-check                 # audit (threshold: serious)
-npm run accessibility-check -- --threshold minor   # stricter
-npm run accessibility-check -- --build      # force a fresh build first
+```bash
+tessera a11y                      # audit (threshold: serious)
+tessera a11y --threshold minor    # stricter
+tessera a11y --build              # force a fresh build first
 ```
 
 The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.

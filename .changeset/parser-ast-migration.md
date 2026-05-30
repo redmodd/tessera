@@ -12,6 +12,6 @@ semantics, message strings, and severities are unchanged.
 - **Comments and string-embedded tags no longer match.** A commented-out or
   string-embedded `<MultipleChoice …>` is no longer scanned as live markup.
 - **Syntax errors surface.** A page Svelte can't parse is reported as
-  `… could not parse — <message>`, so `tessera-validate` (which never
+  `… could not parse — <message>`, so `tessera validate` (which never
   compiles) catches them too; other content checks on that page are skipped
   to avoid cascading noise.

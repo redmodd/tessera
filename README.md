@@ -19,7 +19,7 @@ _Under the hood:_ Tessera is a runtime built on Svelte and Vite. Pages are `.sve
 
 ## Prerequisites
 
-Tessera requires **Node.js 24 or later** (which includes `npm`). If you already have it, jump to [Quick start](#quick-start). Otherwise:
+Tessera requires **Node.js 24 or later**. If you already have it, jump to [Quick start](#quick-start). Otherwise:
 
 - **macOS:** Download the macOS Installer (`.pkg`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
 - **Windows:** Download the Windows Installer (`.msi`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
@@ -34,16 +34,16 @@ node --version    # should print v24.x.x or higher
 
 ## Quick start
 
-Commands below use `npm`; substitute your package manager (`pnpm`, `yarn`, or `bun`) if you used one.
-
 ```bash
-npm create tessera@latest my-course
+pnpm create tessera@latest my-course
 cd my-course
-npm install
-npm run dev       # local dev server at http://localhost:5173
-npm run export    # build + package for the configured standard
-npm run validate  # check the project for structural errors, no server or build
+pnpm install
+pnpm dev       # local dev server at http://localhost:5173
+pnpm export    # build + package for the configured standard
+pnpm validate  # check the project for structural errors, no server or build
 ```
+
+(If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)
 
 Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
@@ -62,11 +62,11 @@ Every scaffolded project ships with `AGENTS.md` at its root. Your agent will rea
 <Callout type="tip"><p>Drop in components for richer content.</p></Callout>
 ```
 
-_Want a minimal starting point with no reference components?_ `npm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
+_Want a minimal starting point with no reference components?_ `pnpm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
 
 ## Updating an existing project
 
-From a project root, `npx create-tessera@latest upgrade` pulls in the latest framework files without touching your authored content. Add `--dry-run` to preview. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#upgrading-an-existing-project) for details.
+From a project root, `pnpm dlx create-tessera@latest upgrade` pulls in the latest framework files without touching your authored content. Add `--dry-run` to preview. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#upgrading-an-existing-project) for details.
 
 ## Authoring with AI
 
@@ -80,17 +80,17 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 ## Troubleshooting
 
-**`command not found: npm`**: Node isn't installed, or your terminal hasn't picked it up yet. Close and reopen the terminal window after installing Node. If it's still missing, re-run the installer from [nodejs.org/en/download](https://nodejs.org/en/download).
+**`command not found: pnpm`**: pnpm isn't installed. Install it via `npm install -g pnpm` or `corepack enable pnpm` (Node 24+ includes corepack). Then close and reopen your terminal.
 
 **`engine "node" is incompatible` or similar version errors**: your Node version is older than 24. Run `node --version` to check, then install the current version from [nodejs.org/en/download](https://nodejs.org/en/download).
 
 **`Port 5173 is already in use`**: another dev server is running. Either close it, or let Tessera pick the next port (it'll print the new URL; open that one).
 
-**`npm install` fails with network errors**: check your internet connection and retry. If you're behind a corporate proxy or firewall, npm needs proxy configuration (search "npm proxy settings" or ask your IT team).
+**`pnpm install` fails with network errors**: check your internet connection and retry. If you're behind a corporate proxy or firewall, pnpm needs proxy configuration (search "pnpm proxy settings" or ask your IT team).
 
-**Permission errors during `npm install`**: don't use `sudo`. See [npm's guide to resolving EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
+**Permission errors during `pnpm install`**: don't use `sudo`. See [pnpm's guide to resolving permission errors](https://pnpm.io/cli/install#--no-optional).
 
-**The browser shows a blank page after `npm run dev`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
+**The browser shows a blank page after `pnpm dev`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
 
 ## Documentation
 

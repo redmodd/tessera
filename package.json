@@ -7,10 +7,8 @@
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "test:e2e": "playwright test",
-    "lint": "eslint .",
-    "check": "pnpm -r check",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "check": "prettier --check . && eslint . && pnpm -r check",
+    "fix": "prettier --write . && eslint . --fix",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"

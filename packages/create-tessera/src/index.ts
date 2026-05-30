@@ -31,9 +31,9 @@ Options:
   --help, -h          Show this help
 
 Examples:
-  npm create tessera@latest my-course
-  npm create tessera@latest my-course -- --template=bare
-  npx create-tessera@latest upgrade
+  pnpm create tessera@latest my-course
+  pnpm create tessera@latest my-course --template=bare
+  pnpm dlx create-tessera@latest upgrade
 `;
 
 type Template = 'default' | 'bare';
@@ -117,8 +117,8 @@ function copyAgentsMd(dest: string) {
 export const FRAMEWORK_SCRIPTS: Record<string, string> = {
   dev: 'vite dev',
   export: 'vite build',
-  validate: 'tessera-validate',
-  'accessibility-check': 'tessera-a11y',
+  validate: 'tessera validate',
+  check: 'tessera check',
 };
 
 // Framework scripts that were renamed across versions. On upgrade a stale key
@@ -131,7 +131,19 @@ interface ScriptMigration {
 }
 const SCRIPT_MIGRATIONS: ScriptMigration[] = [
   { stale: 'preview', oldValue: 'vite dev', replacedBy: 'dev' },
+  {
+    stale: 'accessibility-check',
+    oldValue: 'tessera-a11y',
+    replacedBy: 'check',
+  },
 ];
+
+// Prior framework-owned values for a kept script name. On upgrade, a current
+// value matching a legacy default is migrated to the new value; a value that
+// matches neither the new nor a legacy default is treated as an author override.
+const LEGACY_FRAMEWORK_VALUES: Record<string, string[]> = {
+  validate: ['tessera-validate'],
+};
 
 // Tokens substituted into text template files as they are copied. Delimiters use
 // __UPPER__ so they cannot collide with Svelte `{...}` or JS `${...}`.
@@ -183,32 +195,6 @@ function scaffold(dir: string, template: Template, tokens: Tokens) {
   copyTemplate(resolve(PKG_ROOT, 'templates', template), dir, tokens);
   copyAgentsMd(join(dir, 'AGENTS.md'));
 }
-
-// Package-manager-aware post-scaffold hints. Detection keys off the
-// npm_config_user_agent every PM sets when running `create`; a miss falls back
-// to npm with no functional impact (the hint is cosmetic).
-type PM = 'npm' | 'pnpm' | 'yarn' | 'bun';
-
-export function detectPackageManager(): PM {
-  const ua = process.env.npm_config_user_agent ?? '';
-  if (ua.startsWith('pnpm')) return 'pnpm';
-  if (ua.startsWith('yarn')) return 'yarn';
-  if (ua.startsWith('bun')) return 'bun';
-  return 'npm';
-}
-
-const INSTALL: Record<PM, string> = {
-  npm: 'npm install',
-  pnpm: 'pnpm install',
-  yarn: 'yarn',
-  bun: 'bun install',
-};
-const RUN: Record<PM, string> = {
-  npm: 'npm run',
-  pnpm: 'pnpm',
-  yarn: 'yarn',
-  bun: 'bun run',
-};
 
 function fail(message: string): never {
   process.stderr.write(`Error: ${message}\n\n`);
@@ -279,9 +265,15 @@ function upgrade(dryRun: boolean) {
       pkgChanged = true;
       changes.push(`package.json: added "${name}" script`);
     } else if (current !== value) {
-      warnings.push(
-        `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`,
-      );
+      if ((LEGACY_FRAMEWORK_VALUES[name] ?? []).includes(current)) {
+        scripts[name] = value;
+        pkgChanged = true;
+        changes.push(`package.json: updated "${name}" script to "${value}"`);
+      } else {
+        warnings.push(
+          `package.json: kept your "${name}" script — its value differs from the framework default ("${value}"), so it is treated as yours`,
+        );
+      }
     }
   }
 
@@ -349,7 +341,7 @@ function upgrade(dryRun: boolean) {
   process.stdout.write(
     dryRun
       ? '\nNo files written (--dry-run). Re-run without --dry-run to apply.\n'
-      : '\nDone. Run "npm install" to pick up dependency changes.\n',
+      : '\nDone. Run "pnpm install" to pick up dependency changes.\n',
   );
 }
 
@@ -394,9 +386,8 @@ function main() {
     __TESSERA_VERSION__: TESSERA_VERSION,
   });
 
-  const pm = detectPackageManager();
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  ${INSTALL[pm]}\n  ${RUN[pm]} dev\n`,
+    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n`,
   );
 }
 
