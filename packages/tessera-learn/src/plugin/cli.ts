@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runValidate } from './validate-cli.js';
 import { runA11y } from './a11y-cli.js';
@@ -39,6 +40,20 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+// argv[1] is realpath'd to match Node's already-resolved import.meta.url, so the
+// guard still fires when invoked through a symlink (pnpm/npm bin shims).
+export function isMainEntry(
+  metaUrl: string,
+  entry: string | undefined,
+): boolean {
+  if (!entry) return false;
+  try {
+    return metaUrl === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (isMainEntry(import.meta.url, process.argv[1])) {
   void main(process.argv.slice(2)).then((code) => process.exit(code));
 }

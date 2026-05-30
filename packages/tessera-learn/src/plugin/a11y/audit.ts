@@ -134,8 +134,8 @@ export async function runAudit(
     console.error(
       `\x1b[31m[tessera a11y]\x1b[0m Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
         `  Install them to run the runtime audit:\n` +
-        `    npm i -D playwright @axe-core/playwright\n` +
-        `    npx playwright install chromium`,
+        `    pnpm add -D playwright @axe-core/playwright\n` +
+        `    pnpm exec playwright install chromium`,
     );
     return 1;
   }
