@@ -31,7 +31,10 @@ describe('tessera CLI dispatcher', () => {
   });
 
   it('prints usage and exits 0 for --help on a subcommand', async () => {
-    for (const argv of [['a11y', '--help'], ['check', '-h']]) {
+    for (const argv of [
+      ['a11y', '--help'],
+      ['check', '-h'],
+    ]) {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       const code = await main(argv);
       expect(code).toBe(0);
