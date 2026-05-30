@@ -3,17 +3,18 @@
 'create-tessera': minor
 ---
 
-Collapse the reconciled project surface and retire `create-tessera upgrade`.
-The `tessera` CLI now owns `dev` and `export` (Vite run programmatically via a
-shared `buildInlineConfig`, with an optional `tessera.config.js` escape hatch),
-so scaffolded projects no longer carry a `vite.config.js` or a `vite`
-devDependency — `vite` is now a `tessera-learn` dependency. Scaffolded npm
-scripts are pure `tessera <x>` aliases. The canonical authoring guide moves into
-`tessera-learn` (shipped in its `files`, so it installs at
-`node_modules/tessera-learn/AGENTS.md`); scaffolded projects no longer carry a
-copy — they get small `CLAUDE.md` (imports the guide for Claude Code) and
-`AGENTS.md` (pointer for other agents) stubs, so the guide updates with the
-dependency. Updating a course is now a plain `pnpm add tessera-learn@latest`.
-Projects scaffolded before this change need a one-time manual edit (swap scripts
-to `tessera <x>`, drop `vite` / `@sveltejs/vite-plugin-svelte`, delete
-`vite.config.js`).
+The `tessera` CLI now owns the build: `tessera dev` / `tessera export` run Vite
+programmatically, so scaffolded projects no longer carry `vite.config.js` or a
+`vite` devDependency (`vite` moved into `tessera-learn`). Need to customise the
+build? Add an optional `tessera.config.js`. Updating a course is now just
+`pnpm add tessera-learn@latest` — the `create-tessera upgrade` command is gone.
+
+The authoring guide now ships with `tessera-learn` (at
+`node_modules/tessera-learn/AGENTS.md`); scaffolded projects get small
+`CLAUDE.md` / `AGENTS.md` pointer stubs instead of a copy, so it updates with the
+dependency.
+
+**Migrating a project scaffolded before this release:** swap the npm scripts to
+`tessera dev` / `tessera export` / `tessera validate` / `tessera check`, drop
+`vite` and `@sveltejs/vite-plugin-svelte` from `devDependencies`, and delete
+`vite.config.js`.
