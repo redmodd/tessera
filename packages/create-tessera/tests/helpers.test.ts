@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import {
-  parseArgs,
-  validateProjectName,
-  toTitleCase,
-  FRAMEWORK_SCRIPTS,
-} from '../src/index.ts';
-
-const PKG_ROOT = resolve(__dirname, '..');
+import { parseArgs, validateProjectName, toTitleCase } from '../src/index.ts';
 
 describe('parseArgs', () => {
   it('returns help when --help is passed', () => {
@@ -103,24 +94,6 @@ describe('toTitleCase', () => {
     for (const n of names) {
       expect(validateProjectName(n)).toBeNull();
       expect(toTitleCase(n)).toMatch(/^[A-Za-z0-9 ]*$/);
-    }
-  });
-});
-
-describe('template ⇄ code invariants', () => {
-  it('base/package.json scripts match FRAMEWORK_SCRIPTS', () => {
-    const pkg = JSON.parse(
-      readFileSync(resolve(PKG_ROOT, 'templates/base/package.json'), 'utf-8'),
-    );
-    expect(pkg.scripts).toEqual(FRAMEWORK_SCRIPTS);
-  });
-
-  it('files upgrade reads verbatim are token-free', () => {
-    const TOKEN = /__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/;
-    for (const f of ['templates/base/vite.config.js', 'AGENTS.md']) {
-      expect(TOKEN.test(readFileSync(resolve(PKG_ROOT, f), 'utf-8'))).toBe(
-        false,
-      );
     }
   });
 });

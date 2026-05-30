@@ -150,6 +150,13 @@ export async function runAudit(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vite = (await import('vite')) as any;
+  const { resolveTesseraConfig } = await import('../inline-config.js');
+  // Carries tesseraPlugin() + the Svelte compiler; without it the plugin-less
+  // build would silently produce a broken bundle (there is no vite.config.js).
+  const auditBaseConfig = await resolveTesseraConfig(projectRoot, {
+    command: 'build',
+    mode: 'production',
+  });
 
   // A throwaway web build, kept out of dist/ so a real LMS export is untouched.
   const auditDist = resolve(projectRoot, 'node_modules', '.tessera-a11y');
@@ -163,15 +170,17 @@ export async function runAudit(
   try {
     if (options.rebuild || !existsSync(distHtml)) {
       console.log('[tessera a11y] Building course…');
-      await vite.build({
-        root: projectRoot,
-        build: { outDir: auditDist, emptyOutDir: true },
-        logLevel: 'warn',
-      });
+      await vite.build(
+        vite.mergeConfig(auditBaseConfig, {
+          build: { outDir: auditDist, emptyOutDir: true },
+          logLevel: 'warn',
+        }),
+      );
     }
 
     server = await vite.preview({
       root: projectRoot,
+      base: auditBaseConfig.base,
       build: { outDir: auditDist },
       preview: { port: 0, host: '127.0.0.1' },
       logLevel: 'warn',

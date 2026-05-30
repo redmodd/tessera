@@ -5,6 +5,8 @@ import { runA11y } from './a11y-cli.js';
 const USAGE = `Usage: tessera <command> [options]
 
 Commands:
+  dev                 Start the Vite dev server
+  export              Build and package the course for its LMS standard
   validate            Fast static structure checks
   a11y [options]      Runtime accessibility audit (builds + drives Playwright)
   check [options]     Run validate, then a11y
@@ -16,6 +18,14 @@ a11y/check options:
 export async function main(argv: string[]): Promise<number> {
   const [sub, ...rest] = argv;
   switch (sub) {
+    case 'dev': {
+      const { runDev } = await import('./build-commands.js');
+      return runDev(process.cwd());
+    }
+    case 'export': {
+      const { runBuild } = await import('./build-commands.js');
+      return runBuild(process.cwd());
+    }
     case 'validate':
       return runValidate(process.cwd());
     case 'a11y':
