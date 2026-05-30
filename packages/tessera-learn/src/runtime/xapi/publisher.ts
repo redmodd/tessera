@@ -482,18 +482,22 @@ export class XAPIPublisher {
       }));
   }
 
+  #buildHeaders(token: string): Headers {
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Basic ${token}`);
+    headers.set('X-Experience-API-Version', X_API_VERSION);
+    headers.set('Content-Type', 'application/json');
+    return headers;
+  }
+
   #fetchWithToken(
     token: string,
     body: string,
     keepalive: boolean,
   ): Promise<SendOutcome> {
-    const headers = new Headers();
-    if (token) headers.set('Authorization', `Basic ${token}`);
-    headers.set('X-Experience-API-Version', X_API_VERSION);
-    headers.set('Content-Type', 'application/json');
     return fetch(this.#statementsUrl, {
       method: 'POST',
-      headers,
+      headers: this.#buildHeaders(token),
       body,
       keepalive,
     })
@@ -521,18 +525,14 @@ export class XAPIPublisher {
     ) {
       this.#cachedAuth = null;
       return this.#resolveAuth(true)
-        .then((newToken) => {
-          const retryHeaders = new Headers();
-          if (newToken) retryHeaders.set('Authorization', `Basic ${newToken}`);
-          retryHeaders.set('X-Experience-API-Version', X_API_VERSION);
-          retryHeaders.set('Content-Type', 'application/json');
-          return fetch(this.#statementsUrl, {
+        .then((newToken) =>
+          fetch(this.#statementsUrl, {
             method: 'POST',
-            headers: retryHeaders,
+            headers: this.#buildHeaders(newToken),
             body,
             keepalive,
-          });
-        })
+          }),
+        )
         .then((retryResp): SendOutcome => {
           if (retryResp.ok || retryResp.status === 409) {
             return { ok: true, status: retryResp.status };

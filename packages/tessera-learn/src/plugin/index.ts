@@ -1,7 +1,6 @@
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve, relative, isAbsolute } from 'node:path';
+import { resolve, relative, isAbsolute } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -35,18 +34,15 @@ function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 // Resolve the runtime directory where App.svelte lives
 function resolveRuntimeDir(): string {
-  const packageRoot = resolve(__dirname, '..', '..');
+  const packageRoot = resolve(import.meta.dirname, '..', '..');
   return resolve(packageRoot, 'src', 'runtime');
 }
 
 // Resolve the framework styles directory
 function resolveStylesDir(): string {
-  const packageRoot = resolve(__dirname, '..', '..');
+  const packageRoot = resolve(import.meta.dirname, '..', '..');
   return resolve(packageRoot, 'styles');
 }
 

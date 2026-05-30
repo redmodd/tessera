@@ -26,6 +26,15 @@ export function slugFromQuestion(text: unknown): string {
     .slice(0, 40);
 }
 
+/** Author-supplied `id`, or a `prefix-<slug>` fallback derived from the prompt. */
+export function questionId(
+  id: string | undefined,
+  prefix: string,
+  question: unknown,
+): string {
+  return id ?? `${prefix}-${slugFromQuestion(question)}`;
+}
+
 /** Fisher-Yates shuffle returning a fresh array. */
 export function shuffle<T>(arr: readonly T[]): T[] {
   const result = arr.slice();

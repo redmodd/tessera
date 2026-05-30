@@ -520,6 +520,57 @@ export const pageConfig = {
     expect(manifest.pages[0].quiz).toBeNull();
   });
 
+  it('includes section-level .svelte files as flat-shape pages', () => {
+    createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
+    createFile('01-intro/welcome.svelte', '<h1>Welcome</h1>');
+
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.totalPages).toBe(1);
+    expect(manifest.pages[0].slug).toBe('welcome');
+    expect(manifest.pages[0].importPath).toBe('/pages/01-intro/welcome.svelte');
+    expect(manifest.sections[0].lessons).toHaveLength(1);
+    expect(manifest.sections[0].lessons[0].title).toBe('');
+    expect(manifest.sections[0].lessons[0].pages[0].slug).toBe('welcome');
+  });
+
+  it('orders flat pages before nested lessons and indexes sequentially', () => {
+    createFile(
+      '01-intro/_meta.js',
+      'export default { title: "Intro", pages: ["b", "a"] };',
+    );
+    createFile('01-intro/a.svelte', '<h1>A</h1>');
+    createFile('01-intro/b.svelte', '<h1>B</h1>');
+    createFile(
+      '01-intro/01-deep/_meta.js',
+      'export default { title: "Deep", pages: ["c"] };',
+    );
+    createFile('01-intro/01-deep/c.svelte', '<h1>C</h1>');
+
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages.map((p) => p.slug)).toEqual(['b', 'a', 'c']);
+    expect(manifest.pages.map((p) => p.index)).toEqual([0, 1, 2]);
+    expect(manifest.sections[0].lessons).toHaveLength(2);
+    expect(manifest.sections[0].lessons[0].title).toBe('');
+    expect(manifest.sections[0].lessons[1].title).toBe('Deep');
+  });
+
+  it('honors flat pageConfig (quiz, title) from section-level files', () => {
+    createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
+    createFile(
+      '01-intro/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", quiz: { graded: true } }
+</script>`,
+    );
+
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].title).toBe('Exam');
+    expect(manifest.pages[0].quiz).toEqual({ graded: true });
+  });
+
   it('generates correct importPath', () => {
     createFile(
       '01-intro/01-welcome/_meta.js',

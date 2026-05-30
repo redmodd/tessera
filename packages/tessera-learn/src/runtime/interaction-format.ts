@@ -41,14 +41,9 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   identifier: (v) => v,
 };
 
-export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
-  itemDelim: '[,]',
-  pairDelim: '[.]',
-  rangeDelim: '[:]',
-  supportsNumericRange: true,
-  formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: (v) => v,
-};
+// xAPI reuses SCORM 2004's delimiters, numeric-range support, and identity
+// identifier verbatim, so it's the same format object.
+export const XAPI_INTERACTION_FORMAT = SCORM2004_INTERACTION_FORMAT;
 
 /**
  * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +

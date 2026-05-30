@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { slugFromQuestion, shuffle } from './util.js';
+  import { questionId, shuffle } from './util.js';
   import LockedBanner from './LockedBanner.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -51,7 +51,7 @@
   // pairs as stringified ids.
   const q = useQuestion({
     get id() {
-      return id ?? `sorting-${slugFromQuestion(question)}`;
+      return questionId(id, 'sorting', question);
     },
     get weight() {
       return weight;

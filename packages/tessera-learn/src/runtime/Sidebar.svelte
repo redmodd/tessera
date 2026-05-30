@@ -56,7 +56,9 @@
 
       {#if !collapsedSections.has(section.slug)}
         {#each section.lessons as lesson (lesson.slug)}
-          <div class="tessera-nav-lesson-title">{lesson.title}</div>
+          {#if lesson.title}
+            <div class="tessera-nav-lesson-title">{lesson.title}</div>
+          {/if}
           {#each lesson.pages as page (page.index)}
             {@const locked = nav.isPageLocked(page.index)}
             <button

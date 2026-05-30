@@ -42,7 +42,7 @@ function logRetryGiveUp(
   );
 }
 
-export function formatLMSErrorDetail(
+function formatLMSErrorDetail(
   errorReporter: LMSErrorReporter | undefined,
   code: string,
 ): string {

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { slugFromQuestion, shuffle } from './util.js';
+  import { questionId, shuffle } from './util.js';
   import LockedBanner from './LockedBanner.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -62,7 +62,7 @@
 
   const q = useQuestion({
     get id() {
-      return id ?? `matching-${slugFromQuestion(question)}`;
+      return questionId(id, 'matching', question);
     },
     get weight() {
       return weight;
