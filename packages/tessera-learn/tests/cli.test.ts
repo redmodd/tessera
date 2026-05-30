@@ -29,6 +29,16 @@ describe('tessera CLI dispatcher', () => {
       'Unknown command: frobnicate',
     );
   });
+
+  it('prints usage and exits 0 for --help on a subcommand', async () => {
+    for (const argv of [['a11y', '--help'], ['check', '-h']]) {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const code = await main(argv);
+      expect(code).toBe(0);
+      expect(log.mock.calls.flat().join(' ')).toContain('Usage: tessera');
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe('isMainEntry', () => {

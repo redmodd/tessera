@@ -21,10 +21,15 @@ export async function main(argv: string[]): Promise<number> {
     case 'validate':
       return runValidate(process.cwd());
     case 'a11y':
-      return runA11y(rest);
     case 'check': {
-      const validateCode = runValidate(process.cwd());
-      if (validateCode !== 0) return validateCode;
+      if (rest.includes('--help') || rest.includes('-h')) {
+        console.log(USAGE);
+        return 0;
+      }
+      if (sub === 'check') {
+        const validateCode = runValidate(process.cwd());
+        if (validateCode !== 0) return validateCode;
+      }
       return runA11y(rest);
     }
     case '--help':
