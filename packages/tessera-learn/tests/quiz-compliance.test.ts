@@ -325,7 +325,6 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
       q.setAnswer(i, '__answered__');
     q.submit();
-    expect(m.ref.events[0].score).toBe(90);
     expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length);
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
       const f = ALL_INTERACTION_FIXTURES[i];
@@ -338,7 +337,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     }
   });
 
-  it('mixed weights change the score but leave per-question interactions identical', () => {
+  it('mixed weights leave per-question interactions identical (rollup score is covered in use-quiz)', () => {
     // Weights are not part of any LMS standard — a single question is still
     // pass/fail to the LMS regardless of its rollup weight. Only the rolled-up
     // score reflects the weighted formula.
@@ -358,8 +357,6 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
       q.setAnswer(i, '__answered__');
     q.submit();
-    // Σ(w·correct) / Σ(w) × 100 = (9 correct × 1 + 0 × 9) / (9 × 1 + 9) × 100 = 50
-    expect(m.ref.events[0].score).toBe(50);
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
       const f = ALL_INTERACTION_FIXTURES[i];
       expect(adapter.calls[i]).toEqual([
