@@ -70,6 +70,8 @@ Updating is a plain dependency bump — there is no `create-tessera upgrade` ver
 pnpm add tessera-learn@latest
 ```
 
+To pin a specific release instead of the newest — for reproducible builds, or to avoid an unwanted major — name the version: `pnpm add tessera-learn@0.1.0` (or edit the version in `package.json` and run `pnpm install`).
+
 The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your project tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically — your `CLAUDE.md` / `AGENTS.md` pointers don't change.
 
 > **Projects scaffolded before this model** still have `"dev": "vite dev"` scripts, a `vite` devDependency, and a `vite.config.js`. To move them over once: change the four scripts to `tessera dev` / `tessera export` / `tessera validate` / `tessera check`, drop `vite` and `@sveltejs/vite-plugin-svelte` from `devDependencies`, and delete `vite.config.js`.

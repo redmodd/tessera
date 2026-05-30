@@ -40,6 +40,8 @@ Updating is a plain dependency bump from the project root — there is no `creat
 pnpm add tessera-learn@latest
 ```
 
+You don't have to take the newest release — pin a specific version with `pnpm add tessera-learn@0.1.0` (or set the version in `package.json` and run `pnpm install`) for a reproducible build or to skip a major.
+
 The framework owns the build (there is no `vite.config.js`), the reserved scripts, and this authoring guide, so nothing in your tree needs reconciling. This guide ships _inside_ `tessera-learn` (you're reading `node_modules/tessera-learn/AGENTS.md`), so bumping the dependency updates it automatically. Your project's root `CLAUDE.md` and `AGENTS.md` are just small pointers to this file — they never need to change.
 
 ### Customising the build (optional)
