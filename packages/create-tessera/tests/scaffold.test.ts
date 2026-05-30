@@ -166,10 +166,6 @@ describe('create-tessera CLI', () => {
     );
   });
 
-  // The guide itself lives only in tessera-learn (installed into node_modules).
-  // The scaffold drops one small static pointer stub under two names so each
-  // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). The
-  // @-import is what Claude expands; it is inert-but-harmless prose elsewhere.
   it('scaffolds AGENTS.md/CLAUDE.md as identical pointers, not a copy of the guide', () => {
     runCLI('my-course', testDir);
     const agents = readFileSync(
@@ -180,7 +176,6 @@ describe('create-tessera CLI', () => {
       resolve(testDir, 'my-course', 'CLAUDE.md'),
       'utf-8',
     );
-    // Same content under both names, so they can never drift.
     expect(claude).toBe(agents);
     expect(agents).toContain('@./node_modules/tessera-learn/AGENTS.md');
     // A pointer, not the full guide — keep it tiny.
