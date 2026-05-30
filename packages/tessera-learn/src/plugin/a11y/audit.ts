@@ -66,6 +66,10 @@ export function axeIgnoreRules(ignore: string[]): string[] {
   );
 }
 
+export function isMissingBrowserError(message: string): boolean {
+  return /Executable doesn't exist|playwright install/i.test(message);
+}
+
 // A violation with no impact is treated as failing rather than slipping the
 // gate at every threshold.
 function isFailing(v: AxeViolation, thresholdRank: number): boolean {
@@ -130,8 +134,8 @@ export async function runAudit(
     console.error(
       `\x1b[31m[tessera a11y]\x1b[0m Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
         `  Install them to run the runtime audit:\n` +
-        `    npm i -D playwright @axe-core/playwright\n` +
-        `    npx playwright install chromium`,
+        `    pnpm add -D playwright @axe-core/playwright\n` +
+        `    pnpm exec playwright install chromium`,
     );
     return 1;
   }
@@ -178,7 +182,21 @@ export async function runAudit(
       return 1;
     }
 
-    const browser = await chromium.launch();
+    let browser;
+    try {
+      browser = await chromium.launch();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (isMissingBrowserError(message)) {
+        console.error(
+          `\x1b[31m[tessera a11y]\x1b[0m Chromium isn't installed for Playwright.\n` +
+            `  Install it once:\n` +
+            `    pnpm exec playwright install chromium`,
+        );
+        return 1;
+      }
+      throw err;
+    }
     const pages: PageAuditResult[] = [];
     try {
       // axe-core/playwright requires a page from an explicit context.

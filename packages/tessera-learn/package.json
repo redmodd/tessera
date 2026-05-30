@@ -55,8 +55,7 @@
     "**/*.css"
   ],
   "bin": {
-    "tessera-validate": "./dist/plugin/cli.js",
-    "tessera-a11y": "./dist/plugin/a11y-cli.js"
+    "tessera": "./dist/plugin/cli.js"
   },
   "engines": {
     "node": ">=24"
@@ -89,14 +88,14 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^25.8.0",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "jsdom": "^29.0.1",
     "scorm-again": "3.0.5",
     "svelte-check": "^4.4.8",
-    "tsdown": "^0.22.0",
+    "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.13",
-    "vitest": "^4.1.6"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   }
 }

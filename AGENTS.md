@@ -35,10 +35,9 @@ pnpm build            # build both packages (tsdown); required before e2e
 pnpm test             # unit tests (Vitest) in both packages
 pnpm test:coverage    # + v8 coverage under packages/*/coverage/
 pnpm test:e2e         # Playwright suite (build first)
-pnpm lint
+pnpm check            # verify: prettier --check + eslint + svelte-check
+pnpm fix              # autofix: prettier --write + eslint --fix
 pnpm changeset        # record a release note for a user-facing change
-pnpm format           # Format all files with prettier
-pnpm format:check     # Check if files are formatted (without modifying)
 ```
 
 Node >= 24, pnpm via corepack. First-time full setup (install + build + Playwright browsers): `./scripts/setup-e2e.sh`.
@@ -56,7 +55,7 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 
 ## Package internals (quick map)
 
-- **`tessera-learn`** — `src/runtime/` (state, completion/success rollup, navigation gating, the SCORM/cmi5/web adapters) and `src/plugin/` (the Vite plugin, the `tessera-validate` CLI, and `a11y/` — the `tessera-a11y` runtime accessibility audit driving Playwright + axe-core over a built course). Playwright and `@axe-core/playwright` are **optional peers** — Tier 2 is opt-in, so the static gate stays dependency-free. Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
+- **`tessera-learn`** — `src/runtime/` (state, completion/success rollup, navigation gating, the SCORM/cmi5/web adapters) and `src/plugin/` (the Vite plugin, the `tessera` CLI — `validate` / `a11y` / `check` subcommands — and `a11y/` — the `tessera a11y` runtime accessibility audit driving Playwright + axe-core over a built course). Playwright and `@axe-core/playwright` are **optional peers** — Tier 2 is opt-in, so the static gate stays dependency-free. Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
 - **`create-tessera`** — `src/index.ts` drives both scaffold and `upgrade`. Built with tsdown to `dist/index.js` (the `create-tessera` bin).
 
 ## CI
