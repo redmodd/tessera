@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { slugFromQuestion } from './util.js';
+  import { questionId } from './util.js';
   import LockedBanner from './LockedBanner.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -24,7 +24,7 @@
 
   const q = useQuestion({
     get id() {
-      return id ?? `mc-${slugFromQuestion(question)}`;
+      return questionId(id, 'mc', question);
     },
     get weight() {
       return weight;

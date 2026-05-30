@@ -228,6 +228,59 @@ function getSvelteFiles(dirPath: string): string[] {
     .sort();
 }
 
+// ---------- Course structure walker ----------
+
+export interface WalkedLesson {
+  /** Lesson directory name, or null for a section's implicit flat lesson. */
+  name: string | null;
+  /** Directory holding the `.svelte` files (the section dir for a flat lesson). */
+  dir: string;
+  /** `_meta.js` path governing this lesson's title and page order. */
+  metaPath: string;
+  /** Sorted raw `.svelte` filenames in `dir` (pre-ordering). */
+  files: string[];
+}
+
+export interface WalkedSection {
+  name: string;
+  dir: string;
+  metaPath: string;
+  lessons: WalkedLesson[];
+}
+
+/**
+ * Enumerate the course's section → lesson → file structure. Section-level
+ * `.svelte` files become an implicit flat lesson (`name: null`) ordered before
+ * the section's explicit lesson directories. Shared by manifest generation and
+ * build-time validation so the two never disagree on which files are pages.
+ */
+export function walkPages(pagesDir: string): WalkedSection[] {
+  const sections: WalkedSection[] = [];
+  for (const sectionName of getSortedDirs(pagesDir)) {
+    const dir = resolve(pagesDir, sectionName);
+    const metaPath = resolve(dir, '_meta.js');
+    const lessons: WalkedLesson[] = [];
+
+    const flatFiles = getSvelteFiles(dir);
+    if (flatFiles.length > 0) {
+      lessons.push({ name: null, dir, metaPath, files: flatFiles });
+    }
+
+    for (const lessonName of getSortedDirs(dir)) {
+      const lessonDir = resolve(dir, lessonName);
+      lessons.push({
+        name: lessonName,
+        dir: lessonDir,
+        metaPath: resolve(lessonDir, '_meta.js'),
+        files: getSvelteFiles(lessonDir),
+      });
+    }
+
+    sections.push({ name: sectionName, dir, metaPath, lessons });
+  }
+  return sections;
+}
+
 // ---------- Main ----------
 
 /**
@@ -239,12 +292,9 @@ export function generateManifest(pagesDir: string): Manifest {
   const flatPages: ManifestPage[] = [];
   let pageIndex = 0;
 
-  const sectionDirs = getSortedDirs(pagesDir);
-
-  for (const sectionName of sectionDirs) {
-    const sectionPath = resolve(pagesDir, sectionName);
-    const sectionMeta = readMetaFile(resolve(sectionPath, '_meta.js'));
-    const sectionSlug = deriveSlug(sectionName);
+  for (const walkedSection of walkPages(pagesDir)) {
+    const sectionMeta = readMetaFile(walkedSection.metaPath);
+    const sectionSlug = deriveSlug(walkedSection.name);
 
     const section: ManifestSection = {
       title: sectionMeta.title || titleCase(sectionSlug),
@@ -252,25 +302,29 @@ export function generateManifest(pagesDir: string): Manifest {
       lessons: [],
     };
 
-    const lessonDirs = getSortedDirs(sectionPath);
-
-    for (const lessonName of lessonDirs) {
-      const lessonPath = resolve(sectionPath, lessonName);
-      const lessonMeta = readMetaFile(resolve(lessonPath, '_meta.js'));
-      const lessonSlug = deriveSlug(lessonName);
+    for (const walkedLesson of walkedSection.lessons) {
+      // The flat lesson uses the section _meta for ordering and has no title —
+      // the sidebar renders its pages without a lesson header.
+      const isFlat = walkedLesson.name === null;
+      const lessonMeta = isFlat
+        ? sectionMeta
+        : readMetaFile(walkedLesson.metaPath);
+      const lessonSlug = isFlat ? sectionSlug : deriveSlug(walkedLesson.name!);
+      const relDir = isFlat
+        ? `/pages/${walkedSection.name}`
+        : `/pages/${walkedSection.name}/${walkedLesson.name}`;
 
       const lesson: ManifestLesson = {
-        title: lessonMeta.title || titleCase(lessonSlug),
+        title: isFlat ? '' : lessonMeta.title || titleCase(lessonSlug),
         slug: lessonSlug,
         pages: [],
       };
 
-      // Determine page order
-      const allSvelteFiles = getSvelteFiles(lessonPath);
-      const orderedFiles = orderPageFiles(allSvelteFiles, lessonMeta.pages);
-
-      for (const fileName of orderedFiles) {
-        const filePath = resolve(lessonPath, fileName);
+      for (const fileName of orderPageFiles(
+        walkedLesson.files,
+        lessonMeta.pages,
+      )) {
+        const filePath = resolve(walkedLesson.dir, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
         let pageConfig: {
@@ -286,13 +340,11 @@ export function generateManifest(pagesDir: string): Manifest {
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
 
-        const relativePath = `/pages/${sectionName}/${lessonName}/${fileName}`;
-
         const page: ManifestPage = {
           index: pageIndex,
           title: pageConfig.title || titleCase(pageSlug),
           slug: pageSlug,
-          importPath: relativePath,
+          importPath: `${relDir}/${fileName}`,
           quiz: pageConfig.quiz || null,
           ...(pageConfig.completesOn === 'view'
             ? { completesOn: 'view' as const }

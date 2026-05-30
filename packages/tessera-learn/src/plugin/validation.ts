@@ -7,6 +7,9 @@ import {
   readSourceFileCached,
   ensureSvelteSuffix,
   readCourseConfig,
+  orderPageFiles,
+  walkPages,
+  type WalkedLesson,
 } from './manifest.js';
 import {
   clearParseCache,
@@ -19,6 +22,7 @@ import {
   validateAuthCredential,
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
+import { httpOrigin } from '../runtime/xapi/derive-actor.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
 import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
@@ -768,21 +772,14 @@ function validateSingleXAPIEntry(
   if (
     actor === undefined &&
     (standard === 'scorm12' || standard === 'scorm2004') &&
-    typeof activityId === 'string'
+    typeof activityId === 'string' &&
+    httpOrigin(activityId) === null &&
+    aahp === undefined
   ) {
-    let isHttp: boolean;
-    try {
-      const u = new URL(activityId);
-      isHttp = u.protocol === 'http:' || u.protocol === 'https:';
-    } catch {
-      isHttp = false;
-    }
-    if (!isHttp && aahp === undefined) {
-      errors.push(
-        `course.config.js: ${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
-          `Provide ${label}.actorAccountHomePage explicitly.`,
-      );
-    }
+    errors.push(
+      `course.config.js: ${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
+        `Provide ${label}.actorAccountHomePage explicitly.`,
+    );
   }
 
   // registration — optional UUID v4.
@@ -925,97 +922,65 @@ function validatePages(
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
 
-  if (!existsSync(pagesDir)) {
+  const noPages = (): PagesValidationResult => {
     errors.push(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
     return {
       errors,
       warnings,
-      totalPages: 0,
-      totalQuizzes: 0,
-      hasGradedQuiz: false,
-      hasParseErrors: false,
+      totalPages,
+      totalQuizzes,
+      hasGradedQuiz,
+      hasParseErrors,
       pages,
     };
-  }
+  };
 
-  const topLevelEntries = readdirSync(pagesDir);
+  if (!existsSync(pagesDir)) return noPages();
 
-  // Check for stray .svelte files at pages/ root
-  for (const entry of topLevelEntries) {
+  // walkPages only descends into section dirs, so scan pages/ root separately.
+  for (const entry of readdirSync(pagesDir)) {
     const fullPath = resolve(pagesDir, entry);
     if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
-      const relPath = relative(projectRoot, fullPath);
       warnings.push(
-        `${relPath}: this file is outside the section/lesson structure and will be ignored`,
+        `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
       );
     }
   }
 
-  // Get section directories
-  const sectionDirs = topLevelEntries
-    .filter((name) => {
-      const full = resolve(pagesDir, name);
-      return statSync(full).isDirectory() && !name.startsWith('.');
-    })
-    .sort();
+  const sections = walkPages(pagesDir);
+  if (sections.length === 0) return noPages();
 
-  if (sectionDirs.length === 0) {
-    errors.push(
-      'No pages found. Create at least one section with a lesson and page in pages/',
-    );
-    return {
-      errors,
-      warnings,
-      totalPages: 0,
-      totalQuizzes: 0,
-      hasGradedQuiz: false,
-      hasParseErrors: false,
-      pages,
-    };
-  }
-
-  for (const sectionName of sectionDirs) {
-    const sectionPath = resolve(pagesDir, sectionName);
-    const sectionRel = relative(projectRoot, sectionPath);
-    const pagesBeforeSection = totalPages;
-
-    // Validate section _meta.js
-    const sectionMeta = validateMetaFile(
-      resolve(sectionPath, '_meta.js'),
-      sectionRel,
-      errors,
-    );
-
-    // Flat mode: .svelte files directly at section level are pages of an
-    // implicit single lesson. Validate them just like lesson-level pages.
-    const sectionEntries = readdirSync(sectionPath);
-    const sectionSvelteFiles = sectionEntries
-      .filter((name) => {
-        const full = resolve(sectionPath, name);
-        return name.endsWith('.svelte') && statSync(full).isFile();
-      })
-      .sort();
-
-    if (sectionMeta?.pages) {
-      for (const pageName of sectionMeta.pages) {
+  // For a flat lesson `meta` is the section's _meta. Same ordering as generateManifest.
+  const validateLesson = (
+    lesson: WalkedLesson,
+    meta: { pages?: string[] } | null,
+  ): void => {
+    if (meta?.pages) {
+      for (const pageName of meta.pages) {
         const fileName = ensureSvelteSuffix(pageName);
-        if (!sectionSvelteFiles.includes(fileName)) {
-          const metaRel = relative(
-            projectRoot,
-            resolve(sectionPath, '_meta.js'),
-          );
+        if (!lesson.files.includes(fileName)) {
           errors.push(
-            `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
+            `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
+          );
+        }
+      }
+    }
+    if (meta?.pages && meta.pages.length > 0) {
+      const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
+      for (const file of lesson.files) {
+        if (!listedSet.has(file)) {
+          warnings.push(
+            `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
           );
         }
       }
     }
 
-    for (const fileName of sectionSvelteFiles) {
+    for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
       const result = validatePageFile(
-        resolve(sectionPath, fileName),
+        resolve(lesson.dir, fileName),
         projectRoot,
         assetsDir,
         totalPages,
@@ -1030,77 +995,25 @@ function validatePages(
       if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
+  };
 
-    // Get lesson directories
-    const lessonDirs = sectionEntries
-      .filter((name) => {
-        const full = resolve(sectionPath, name);
-        return statSync(full).isDirectory() && !name.startsWith('.');
-      })
-      .sort();
+  for (const section of sections) {
+    const sectionRel = relative(projectRoot, section.dir);
+    const pagesBeforeSection = totalPages;
 
-    for (const lessonName of lessonDirs) {
-      const lessonPath = resolve(sectionPath, lessonName);
-      const lessonRel = relative(projectRoot, lessonPath);
+    const sectionMeta = validateMetaFile(section.metaPath, sectionRel, errors);
 
-      // Validate lesson _meta.js
-      const meta = validateMetaFile(
-        resolve(lessonPath, '_meta.js'),
-        lessonRel,
-        errors,
-      );
-
-      // Get .svelte files
-      const svelteFiles = readdirSync(lessonPath)
-        .filter((name) => name.endsWith('.svelte'))
-        .sort();
-
-      // Check pages array references
-      if (meta?.pages) {
-        for (const pageName of meta.pages) {
-          const fileName = ensureSvelteSuffix(pageName);
-          if (!svelteFiles.includes(fileName)) {
-            const metaRel = relative(
-              projectRoot,
-              resolve(lessonPath, '_meta.js'),
-            );
-            errors.push(
-              `${metaRel}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
-            );
-          }
-        }
-      }
-
-      // Check for unlisted .svelte files
-      if (meta?.pages && meta.pages.length > 0) {
-        const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
-        for (const file of svelteFiles) {
-          if (!listedSet.has(file)) {
-            const relPath = relative(projectRoot, resolve(lessonPath, file));
-            warnings.push(
-              `${relPath}: not listed in _meta.js pages array — will be appended at end`,
-            );
-          }
-        }
-      }
-
-      // Validate each .svelte file
-      for (const fileName of svelteFiles) {
-        const result = validatePageFile(
-          resolve(lessonPath, fileName),
-          projectRoot,
-          assetsDir,
-          totalPages,
+    for (const lesson of section.lessons) {
+      if (lesson.name === null) {
+        // Flat lesson uses the section _meta, already validated above.
+        validateLesson(lesson, sectionMeta);
+      } else {
+        const meta = validateMetaFile(
+          lesson.metaPath,
+          relative(projectRoot, lesson.dir),
           errors,
-          warnings,
-          assetExistsCache,
-          exportStandard,
         );
-        totalPages++;
-        if (result.isQuiz) totalQuizzes++;
-        if (result.isGradedQuiz) hasGradedQuiz = true;
-        if (result.parseError) hasParseErrors = true;
-        pages.push(result.page);
+        validateLesson(lesson, meta);
       }
     }
 
@@ -1112,11 +1025,7 @@ function validatePages(
     }
   }
 
-  if (totalPages === 0) {
-    errors.push(
-      'No pages found. Create at least one section with a lesson and page in pages/',
-    );
-  }
+  if (totalPages === 0) return noPages();
 
   return {
     errors,
