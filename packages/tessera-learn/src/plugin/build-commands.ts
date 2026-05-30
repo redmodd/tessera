@@ -1,16 +1,12 @@
-import { buildInlineConfig, loadUserConfig } from './inline-config.js';
-
-// vite is imported lazily so the `tessera validate` path never loads it.
-async function resolveConfig(projectRoot: string) {
-  const vite = await import('vite');
-  const base = buildInlineConfig(projectRoot);
-  const user = await loadUserConfig(projectRoot);
-  return user ? vite.mergeConfig(base, user) : base;
-}
+import { resolveTesseraConfig } from './inline-config.js';
 
 export async function runDev(projectRoot: string): Promise<number> {
   const vite = await import('vite');
-  const server = await vite.createServer(await resolveConfig(projectRoot));
+  const config = await resolveTesseraConfig(projectRoot, {
+    command: 'serve',
+    mode: 'development',
+  });
+  const server = await vite.createServer(config);
   await server.listen();
   server.printUrls();
   server.bindCLIShortcuts({ print: true });
@@ -20,6 +16,10 @@ export async function runDev(projectRoot: string): Promise<number> {
 
 export async function runBuild(projectRoot: string): Promise<number> {
   const vite = await import('vite');
-  await vite.build(await resolveConfig(projectRoot));
+  const config = await resolveTesseraConfig(projectRoot, {
+    command: 'build',
+    mode: 'production',
+  });
+  await vite.build(config);
   return 0;
 }
