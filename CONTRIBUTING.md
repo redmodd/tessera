@@ -35,7 +35,7 @@ AGENTS.md            # Monorepo dev guide (working on Tessera itself)
 
 ## Editing the authoring guide
 
-The course authoring guide lives at `packages/create-tessera/AGENTS.md`. Edit it there — it's published with the scaffolder (via the package `files` field) and copied into every scaffolded project by `packages/create-tessera/src/index.ts` (and overwritten by `create-tessera upgrade`). The repo-root `AGENTS.md` is a separate document: the monorepo dev guide for working on Tessera itself.
+The course authoring guide lives at `packages/tessera-learn/AGENTS.md`. Edit it there — it ships in `tessera-learn`'s `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy of it elsewhere: `create-tessera` scaffolds only small pointer stubs (`packages/create-tessera/templates/base/CLAUDE.md` imports the guide for Claude Code; `…/AGENTS.md` points other agents at it). The repo-root `AGENTS.md` is a separate document: the monorepo dev guide for working on Tessera itself.
 
 ## Branch + commit style
 

@@ -33,10 +33,13 @@ yarn create tessera my-course
 The scaffolder creates a new directory with:
 
 - `course.config.js`: course metadata, navigation, completion, and export settings
-- `vite.config.js`: Vite config wired up with the Tessera plugin (do not modify)
 - `pages/`: starter section, lesson, and page
-- `AGENTS.md`: the full authoring guide, right in the project root (read by humans and any LLM agent working in the project)
+- `AGENTS.md` and `CLAUDE.md`: small pointers to the authoring guide (see below)
 - `.gitignore`
+
+The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version — there's no copy to maintain in the project. The scaffolded `CLAUDE.md` imports it (Claude Code reads `CLAUDE.md` and loads the guide automatically); the scaffolded `AGENTS.md` points other agents (Codex, Cursor, …) at the same file.
+
+The Vite build is owned by the `tessera` CLI — there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js`; see the authoring guide.
 
 Both templates also create `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves both folders empty and additionally creates a `layout.svelte` at the project root for you to customise.
 
@@ -57,25 +60,25 @@ The runtime audit drives Playwright, which needs a browser binary once per machi
 pnpm exec playwright install chromium
 ```
 
-Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The scaffolded project's `AGENTS.md` is the full authoring guide.
+Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The full authoring guide is at `node_modules/tessera-learn/AGENTS.md` (your `CLAUDE.md` / `AGENTS.md` point to it).
 
-## Upgrading an existing project
+## Updating an existing project
 
-Run from a project root to re-apply the latest framework files:
+Updating is a plain dependency bump — there is no `create-tessera upgrade` verb. From the project root:
 
 ```bash
-pnpm dlx create-tessera@latest upgrade            # apply changes
-pnpm dlx create-tessera@latest upgrade --dry-run  # preview without writing
+pnpm add tessera-learn@latest
 ```
 
-`upgrade` touches only **framework-owned** files: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts (`dev`, `export`, `validate`, `check`) in `package.json`, and pins `tessera-learn` to the version this CLI ships. Authored files — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, `README.md` — are never touched. If you've changed a reserved script, `upgrade` leaves your version in place and warns.
+The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your project tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically — your `CLAUDE.md` / `AGENTS.md` pointers don't change.
+
+> **Projects scaffolded before this model** still have `"dev": "vite dev"` scripts, a `vite` devDependency, and a `vite.config.js`. To move them over once: change the four scripts to `tessera dev` / `tessera export` / `tessera validate` / `tessera check`, drop `vite` and `@sveltejs/vite-plugin-svelte` from `devDependencies`, and delete `vite.config.js`.
 
 ## Flags
 
 | Flag                | Description                                                                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `--template=<name>` | `default` (full starter, components included) or `bare` (hooks-only, layout.svelte, no built-in components). Defaults to `default`. |
-| `--dry-run`         | (`upgrade` only) Preview changes without writing any files.                                                                         |
 | `--help`, `-h`      | Print usage and exit.                                                                                                               |
 
 ## License

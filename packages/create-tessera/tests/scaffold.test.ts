@@ -97,10 +97,10 @@ describe('create-tessera CLI', () => {
 
     // Core files
     expect(existsSync(resolve(projectDir, 'package.json'))).toBe(true);
-    expect(existsSync(resolve(projectDir, 'vite.config.js'))).toBe(true);
     expect(existsSync(resolve(projectDir, 'course.config.js'))).toBe(true);
     expect(existsSync(resolve(projectDir, '.gitignore'))).toBe(true);
     expect(existsSync(resolve(projectDir, 'AGENTS.md'))).toBe(true);
+    expect(existsSync(resolve(projectDir, 'CLAUDE.md'))).toBe(true);
 
     // Pages structure
     expect(
@@ -125,7 +125,7 @@ describe('create-tessera CLI', () => {
     expect(existsSync(resolve(projectDir, 'assets/.gitkeep'))).toBe(true);
   });
 
-  it('package.json has correct name and scripts', () => {
+  it('package.json scripts are pure tessera aliases', () => {
     runCLI('my-course', testDir);
     const pkgPath = resolve(testDir, 'my-course', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
@@ -133,26 +133,58 @@ describe('create-tessera CLI', () => {
     expect(pkg.name).toBe('my-course');
     expect(pkg.private).toBe(true);
     expect(pkg.type).toBe('module');
-    expect(pkg.scripts.dev).toBe('vite dev');
-    expect(pkg.scripts.export).toBe('vite build');
-    expect(pkg.packageManager).toMatch(/^pnpm@/);
+    expect(pkg.scripts.dev).toBe('tessera dev');
+    expect(pkg.scripts.export).toBe('tessera export');
     expect(pkg.scripts.validate).toBe('tessera validate');
     expect(pkg.scripts.check).toBe('tessera check');
+    expect(pkg.packageManager).toMatch(/^pnpm@/);
     expect(pkg.scripts['accessibility-check']).toBeUndefined();
+    expect(pkg.dependencies['tessera-learn']).toBeDefined();
+    // Vite and vite-plugin-svelte are owned by tessera-learn now, not scaffolded.
+    expect(pkg.devDependencies.vite).toBeUndefined();
+    expect(pkg.devDependencies['@sveltejs/vite-plugin-svelte']).toBeUndefined();
+    // Optional a11y peers the author must hold directly to run `tessera check`.
     expect(pkg.devDependencies['@axe-core/playwright']).toBeDefined();
     expect(pkg.devDependencies.playwright).toBeDefined();
-    expect(pkg.dependencies['tessera-learn']).toBeDefined();
-    expect(pkg.devDependencies.vite).toBeDefined();
   });
 
-  it('vite.config.js imports tesseraPlugin', () => {
+  // A project running components against a different Svelte than tessera-learn
+  // compiled them with breaks subtly, so the floors must allow a single version.
+  it('scaffolds a svelte floor that matches tessera-learn', () => {
     runCLI('my-course', testDir);
-    const content = readFileSync(
-      resolve(testDir, 'my-course', 'vite.config.js'),
+    const scaffolded = JSON.parse(
+      readFileSync(resolve(testDir, 'my-course', 'package.json'), 'utf-8'),
+    );
+    const framework = JSON.parse(
+      readFileSync(
+        resolve(__dirname, '..', '..', 'tessera-learn', 'package.json'),
+        'utf-8',
+      ),
+    );
+    expect(scaffolded.devDependencies.svelte).toBe(
+      framework.dependencies.svelte,
+    );
+  });
+
+  // The guide itself lives only in tessera-learn (installed into node_modules).
+  // The scaffold drops one small static pointer stub under two names so each
+  // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). The
+  // @-import is what Claude expands; it is inert-but-harmless prose elsewhere.
+  it('scaffolds AGENTS.md/CLAUDE.md as identical pointers, not a copy of the guide', () => {
+    runCLI('my-course', testDir);
+    const agents = readFileSync(
+      resolve(testDir, 'my-course', 'AGENTS.md'),
       'utf-8',
     );
-    expect(content).toContain("from 'tessera-learn/plugin'");
-    expect(content).toContain('tesseraPlugin()');
+    const claude = readFileSync(
+      resolve(testDir, 'my-course', 'CLAUDE.md'),
+      'utf-8',
+    );
+    // Same content under both names, so they can never drift.
+    expect(claude).toBe(agents);
+    expect(agents).toContain('@./node_modules/tessera-learn/AGENTS.md');
+    // A pointer, not the full guide — keep it tiny.
+    expect(agents.length).toBeLessThan(2000);
   });
 
   it('course.config.js has title derived from project name', () => {
@@ -297,12 +329,12 @@ describe('create-tessera CLI', () => {
       );
     });
 
-    it('still writes AGENTS.md, package.json, vite.config.js', () => {
+    it('still writes AGENTS.md, CLAUDE.md, and package.json', () => {
       runCLI('bare-course --template=bare', testDir);
       const projectDir = resolve(testDir, 'bare-course');
       expect(existsSync(resolve(projectDir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(resolve(projectDir, 'CLAUDE.md'))).toBe(true);
       expect(existsSync(resolve(projectDir, 'package.json'))).toBe(true);
-      expect(existsSync(resolve(projectDir, 'vite.config.js'))).toBe(true);
     });
 
     it('scaffolds empty styles/ and assets/ folders', () => {

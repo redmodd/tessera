@@ -24,6 +24,7 @@ import {
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
+import { resolvePackageRoot } from './package-root.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -36,14 +37,12 @@ function isAuditBuild(): boolean {
 
 // Resolve the runtime directory where App.svelte lives
 function resolveRuntimeDir(): string {
-  const packageRoot = resolve(import.meta.dirname, '..', '..');
-  return resolve(packageRoot, 'src', 'runtime');
+  return resolve(resolvePackageRoot(), 'src', 'runtime');
 }
 
 // Resolve the framework styles directory
 function resolveStylesDir(): string {
-  const packageRoot = resolve(import.meta.dirname, '..', '..');
-  return resolve(packageRoot, 'styles');
+  return resolve(resolvePackageRoot(), 'styles');
 }
 
 // Tier-1a state shared between the svelte() onwarn handler and the sibling

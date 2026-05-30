@@ -30,16 +30,31 @@ pnpm exec playwright install chromium
 
 See [Accessibility](#accessibility).
 
-### Upgrading the project
+`dev`, `export`, `validate`, and `check` are **reserved script names** — each is a thin alias for the matching `tessera` subcommand. Don't repurpose them.
+
+### Updating the framework
+
+Updating is a plain dependency bump from the project root — there is no `create-tessera upgrade`:
 
 ```bash
-pnpm dlx create-tessera@latest upgrade        # apply the latest framework files to this project
-pnpm dlx create-tessera@latest upgrade --dry-run   # preview the changes first
+pnpm add tessera-learn@latest
 ```
 
-`upgrade` re-applies **framework-owned** files to an existing project: it overwrites `AGENTS.md` and `vite.config.js`, reconciles the reserved npm scripts in `package.json` (`dev`, `export`, `validate`, `check`), and pins `tessera-learn` to the version the CLI ships. **Authored files are never touched** — `course.config.js`, `pages/`, `styles/`, `layout.svelte`, and `README.md`.
+The framework owns the build (there is no `vite.config.js`), the reserved scripts, and this authoring guide, so nothing in your tree needs reconciling. This guide ships _inside_ `tessera-learn` (you're reading `node_modules/tessera-learn/AGENTS.md`), so bumping the dependency updates it automatically. Your project's root `CLAUDE.md` and `AGENTS.md` are just small pointers to this file — they never need to change.
 
-`dev`, `export`, `validate`, and `check` are **reserved script names** owned by the framework — don't repurpose them. `upgrade` adds any that are missing; if you've changed one, it leaves your version alone and warns. `AGENTS.md` and `vite.config.js` are framework-owned: don't hand-edit them, since `upgrade` overwrites them.
+### Customising the build (optional)
+
+Tessera runs Vite for you with the right plugins; you never write a `vite.config.js`. If you genuinely need to extend the build, add a `tessera.config.js` at the project root. It is a **partial** Vite config that Tessera merges on top of its own — you only specify the delta, and `tesseraPlugin()` (with the Svelte compiler) stays wired in automatically:
+
+```js
+// tessera.config.js — merged on top of Tessera's Vite config
+export default {
+  server: { port: 4000 },
+  resolve: { alias: { $lib: '/src/lib' } },
+};
+```
+
+`tessera.config.js` is never scaffolded and never touched by updates — once you add it, it's yours.
 
 ---
 
@@ -52,7 +67,6 @@ The framework imposes the **minimum** structure it needs to discover content. Ev
 ```
 my-course/
 ├── course.config.js          # Course configuration
-├── vite.config.js             # Vite config (do not modify)
 ├── package.json
 └── pages/                     # Course content (at least one section dir with .svelte files)
     └── intro/
@@ -69,7 +83,8 @@ my-course/
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
 ├── assets/                    # Images, audio, video files (referenced via $assets/)
 ├── styles/                    # Custom CSS overrides
-├── AGENTS.md                  # This file (written by the scaffolder)
+├── CLAUDE.md                  # Pointer that imports this guide for Claude Code
+├── AGENTS.md                  # Pointer to this guide for other agents
 └── pages/
     └── 01-intro/              # Numeric prefix → controls order
         ├── _meta.js           # Override section title; control page order
@@ -83,7 +98,7 @@ my-course/
 
 You own everything in the project directory: `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, and `styles/`. Edit those freely.
 
-**Never edit `node_modules/` or `vite.config.js`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `pnpm install`, and are silently wiped when the course's tessera-learn version is updated. If you think you need to change framework behaviour, you're looking for an extension point instead:
+**Never edit `node_modules/`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `pnpm install`, and are silently wiped when the course's tessera-learn version is updated. (There is no `vite.config.js` to edit either; the build is the framework's. For a genuine build tweak, add a `tessera.config.js` — see [Customising the build](#customising-the-build-optional).) If you think you need to change framework behaviour, you're looking for an extension point instead:
 
 - **New question type or interactive widget** → a custom component using the `useQuestion` hook.
 - **Different course chrome** (header, nav, layout) → `layout.svelte`.

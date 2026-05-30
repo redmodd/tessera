@@ -66,7 +66,7 @@ _Want a minimal starting point with no reference components?_ `pnpm create tesse
 
 ## Updating an existing project
 
-From a project root, `pnpm dlx create-tessera@latest upgrade` pulls in the latest framework files without touching your authored content. Add `--dry-run` to preview. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#upgrading-an-existing-project) for details.
+Updating is a plain dependency bump — from a project root, `pnpm add tessera-learn@latest`. The framework owns the build and the reserved scripts, so there's nothing else to reconcile. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-project) for details (including the one-time manual edit for projects scaffolded before this model).
 
 ## Authoring with AI
 
