@@ -1347,6 +1347,21 @@ function validateQuestionComponents(
 /** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 
+const SCRIPT_STYLE_RE = /<(script|style)\b[\s\S]*?<\/\1>/gi;
+
+// Loop until stable: one pass can leave a reconstructed tag behind (e.g. `<scr<script></script>ipt>`).
+function stripRepeated(input: string, patterns: RegExp[]): string {
+  let out = input;
+  for (const pattern of patterns) {
+    let prev: string;
+    do {
+      prev = out;
+      out = out.replace(pattern, '');
+    } while (out !== prev);
+  }
+  return out;
+}
+
 /**
  * Sibling to validateQuestionComponents kept out of QUESTION_COMPONENT_REQUIRED
  * so media isn't treated as gradable questions. Declares `warnings` directly.
@@ -1471,9 +1486,7 @@ function validateHeadingOrder(
   fileRel: string,
   warnings: string[],
 ): void {
-  const html = content
-    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
-    .replace(HTML_COMMENT_RE, '');
+  const html = stripRepeated(content, [SCRIPT_STYLE_RE, HTML_COMMENT_RE]);
   const levels = [...html.matchAll(/<h([1-6])\b/gi)].map((h) => Number(h[1]));
   let prevSeen: number | null = null;
   for (const level of levels) {

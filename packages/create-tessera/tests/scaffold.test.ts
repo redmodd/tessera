@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 
 let testDir: string;
 let counter = 0;
@@ -25,12 +25,16 @@ function runCLI(
   cwd: string,
 ): { stdout: string; stderr: string; output: string; exitCode: number } {
   try {
-    const stdout = execSync(`node ${CLI_PATH} ${args}`, {
-      cwd,
-      encoding: 'utf-8',
-      timeout: 30000,
-      env: { ...process.env, npm_config_yes: 'true' },
-    });
+    const stdout = execFileSync(
+      'node',
+      [CLI_PATH, ...args.split(/\s+/).filter(Boolean)],
+      {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 30000,
+        env: { ...process.env, npm_config_yes: 'true' },
+      },
+    );
     return { stdout, stderr: '', output: stdout, exitCode: 0 };
   } catch (err: any) {
     const stdout = err.stdout?.toString() || '';
@@ -247,7 +251,7 @@ describe('create-tessera CLI', () => {
   });
 
   it('leads the "Next steps" hint with pnpm', () => {
-    const stdout = execSync(`node ${CLI_PATH} pnpm-course`, {
+    const stdout = execFileSync('node', [CLI_PATH, 'pnpm-course'], {
       cwd: testDir,
       encoding: 'utf-8',
       timeout: 30000,

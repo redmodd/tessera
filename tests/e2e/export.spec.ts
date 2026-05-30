@@ -1,11 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
-import { existsSync, readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { variantDir, viteBin } from './global-setup.js';
-
-const execAsync = promisify(exec);
 
 test.describe('Export — Web', () => {
   test('vite build produces dist/ folder with index.html', async () => {
@@ -45,8 +42,9 @@ test.describe('Export — Serve Built Output', () => {
     const webDir = variantDir('free', 'web');
 
     // Start vite preview, capture the child process
-    const previewProcess = exec(
-      `${viteBin('free')} preview ${webDir} --port 5190 --strictPort`,
+    const previewProcess = execFile(
+      viteBin('free'),
+      ['preview', webDir, '--port', '5190', '--strictPort'],
       { cwd: webDir },
     );
 
@@ -107,9 +105,7 @@ test.describe('Export — SCORM 1.2', () => {
     expect(xml).toContain('E2E Test Course');
 
     // ZIP should exist at the variant root (runExport writes it next to dist/)
-    const zipFiles = (
-      await execAsync(`ls ${scormDir}/*.zip 2>/dev/null || true`)
-    ).stdout.trim();
+    const zipFiles = readdirSync(scormDir).filter((f) => f.endsWith('.zip'));
     expect(zipFiles.length).toBeGreaterThan(0);
   });
 });
