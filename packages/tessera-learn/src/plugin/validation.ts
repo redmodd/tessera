@@ -434,10 +434,14 @@ function isPlausibleColor(value: string): boolean {
  * on primaryColor. Runtime failures are mild: an unresolved logo ships a broken
  * <img src>, an unparseable color falls back to theme defaults.
  */
+function describeType(raw: unknown): string {
+  return raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw;
+}
+
 function validateBranding(raw: unknown, warnings: string[]): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     warnings.push(
-      `course.config.js: "branding" must be an object, got ${raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw} — will be ignored`,
+      `course.config.js: "branding" must be an object, got ${describeType(raw)} — will be ignored`,
     );
     return;
   }
@@ -496,7 +500,7 @@ function validateBranding(raw: unknown, warnings: string[]): void {
 function validateA11yConfig(raw: unknown, errors: string[]): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     errors.push(
-      `course.config.js: "a11y" must be an object, got ${raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw}`,
+      `course.config.js: "a11y" must be an object, got ${describeType(raw)}`,
     );
     return;
   }
