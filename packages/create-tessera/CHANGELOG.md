@@ -1,5 +1,19 @@
 # create-tessera
 
+## 0.1.0
+
+### Minor Changes
+
+- 8ff7039: The `tessera-validate` and `tessera-a11y` binaries are now one `tessera` CLI with `validate`, `a11y`, and `check` subcommands; new projects are set up for pnpm (run `pnpm exec playwright install chromium` once to enable the browser-backed `check`/`a11y` audit).
+- 09314ec: The `tessera` CLI now owns the build — `tessera dev` / `tessera export` run Vite programmatically, so scaffolded projects no longer carry `vite.config.js` or a `vite` devDependency (add an optional `tessera.config.js` to customise), and the `create-tessera upgrade` command is gone (update a course with `pnpm add tessera-learn@latest`). The authoring guide now ships inside `tessera-learn` at `node_modules/tessera-learn/AGENTS.md`, with `CLAUDE.md` / `AGENTS.md` pointer stubs in scaffolded projects.
+
+  **Migrating a project scaffolded before this release:** swap the npm scripts to `tessera dev` / `tessera export` / `tessera validate` / `tessera check`, drop `vite` and `@sveltejs/vite-plugin-svelte` from `devDependencies`, and delete `vite.config.js`.
+
+### Patch Changes
+
+- df7b48b: Fix flat-shape courses (`.svelte` pages directly inside a section directory) rendering no pages: manifest generation and validation now share one page walker.
+- Internal: dependency bumps (including Svelte 5.56), a doc-anchor fix, and CodeQL/CI cleanup — no API or behavior changes.
+
 ## 0.0.13
 
 ### Patch Changes
