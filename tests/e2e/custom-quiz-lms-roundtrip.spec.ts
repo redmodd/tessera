@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { exec, type ChildProcess } from 'node:child_process';
+import { execFile, type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
@@ -20,8 +20,9 @@ import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 function startPreview(standard: Standard, port: number): ChildProcess {
   const dir = variantDir('custom-quiz', standard);
-  return exec(
-    `${viteBin('custom-quiz')} preview ${dir} --port ${port} --strictPort`,
+  return execFile(
+    viteBin('custom-quiz'),
+    ['preview', dir, '--port', String(port), '--strictPort'],
     { cwd: dir },
   );
 }

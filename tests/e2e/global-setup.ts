@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   cpSync,
@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const REPO_ROOT = process.cwd();
 const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
@@ -52,11 +52,12 @@ export function viteBin(fixture: FixtureName): string {
  * "Command failed: ..." — useless for debugging a parallel build that died.
  */
 async function run(
-  cmd: string,
+  file: string,
+  args: string[],
   opts: { cwd: string; timeout: number },
 ): Promise<void> {
   try {
-    await execAsync(cmd, opts);
+    await execFileAsync(file, args, opts);
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message: string };
     throw new Error(
@@ -105,7 +106,7 @@ async function buildVariant(
   writeFileSync(configPath, patched);
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
-  await run(`${viteBin(fixtureName)} build ${dir}`, {
+  await run(viteBin(fixtureName), ['build', dir], {
     cwd: dir,
     timeout: 60_000,
   });
