@@ -12,7 +12,9 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     const dir = variantDir('free', 'web');
     expect(existsSync(resolve(dir, 'dist', 'index.html'))).toBe(true);
 
-    const code = await runAudit(dir, { threshold: 'serious' });
+    // Standalone fixture has no shared/ dir, so workspaceRoot is just the course
+    // dir — runAudit's second arg only feeds the (here unused) $shared alias.
+    const code = await runAudit(dir, dir, { threshold: 'serious' });
 
     expect(existsSync(resolve(dir, 'a11y-report.json'))).toBe(true);
     expect(code).toBe(0);

@@ -7,11 +7,21 @@ import { tesseraPlugin } from './index.js';
 // Base Vite config for every Tessera command (dev, export, a11y build).
 // configFile:false disables Vite's own discovery — there is no vite.config.js —
 // and tesseraPlugin() supplies the Svelte compiler, so this is the full plugin set.
-export function buildInlineConfig(projectRoot: string): InlineConfig {
+//
+// $shared points at the workspace-level design system, which lives outside the
+// per-course Vite root, so it is wired here (where workspaceRoot is known) rather
+// than next to $assets in the plugin. server.fs.allow must list workspaceRoot or
+// the dev server's fs.strict gate refuses to serve $shared files.
+export function buildInlineConfig(
+  projectRoot: string,
+  workspaceRoot: string,
+): InlineConfig {
   return {
     root: projectRoot,
     configFile: false,
     plugins: [tesseraPlugin()],
+    resolve: { alias: { $shared: resolve(workspaceRoot, 'shared') } },
+    server: { fs: { allow: [workspaceRoot] } },
   };
 }
 
@@ -34,10 +44,11 @@ export async function loadUserConfig(
 
 export async function resolveTesseraConfig(
   projectRoot: string,
+  workspaceRoot: string,
   env: ConfigEnv,
 ): Promise<InlineConfig> {
   const vite = await import('vite');
-  const base = buildInlineConfig(projectRoot);
+  const base = buildInlineConfig(projectRoot, workspaceRoot);
   const user = await loadUserConfig(projectRoot, env);
   return user ? vite.mergeConfig(base, user) : base;
 }

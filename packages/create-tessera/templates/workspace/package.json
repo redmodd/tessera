@@ -4,11 +4,12 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "tessera dev",
-    "export": "tessera export",
-    "validate": "tessera validate",
-    "a11y": "tessera a11y",
-    "check": "tessera check"
+    "new": "tessera new",
+    "dev": "tessera dev getting-started",
+    "export": "tessera export getting-started",
+    "validate": "tessera validate getting-started",
+    "a11y": "tessera a11y getting-started",
+    "check": "tessera check getting-started"
   },
   "dependencies": {
     "tessera-learn": "__TESSERA_VERSION__"

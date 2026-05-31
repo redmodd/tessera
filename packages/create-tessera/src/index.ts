@@ -1,13 +1,8 @@
-import {
-  existsSync,
-  mkdirSync,
-  writeFileSync,
-  copyFileSync,
-  readFileSync,
-  readdirSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
+import { copyTemplate } from 'tessera-learn/template-copy';
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -17,22 +12,28 @@ const ownPkg = JSON.parse(
 // create-tessera and tessera-learn release in lockstep via the changesets
 // `fixed` group (not `linked`, which would not co-publish tessera-learn), so the
 // version this CLI ships at always has a matching published tessera-learn to pin
-// into scaffolded projects.
+// into scaffolded workspaces.
 const TESSERA_VERSION = ownPkg.version;
 
-const USAGE = `Usage: create-tessera <project-name> [--template=<default|bare>]
+// The first course every workspace ships with. `tessera new <name>` adds more.
+const SEED_COURSE = 'getting-started';
 
-Scaffold a new Tessera course.
+const USAGE = `Usage: create-tessera <workspace-name> [--template=<default|bare>]
+
+Scaffold a new Tessera workspace (a home for many courses).
 
 Options:
-  --template=<name>   Template to use ("default" or "bare", default: "default")
+  --template=<name>   First course's template ("default" or "bare", default: "default")
   --help, -h          Show this help
 
 Examples:
-  pnpm create tessera@latest my-course
-  pnpm create tessera@latest my-course --template=bare
+  pnpm create tessera@latest my-courses
+  pnpm create tessera@latest my-courses --template=bare
 
-To update an existing course, bump the framework dependency from its root:
+Add more courses to an existing workspace from its root:
+  pnpm tessera new <name>
+
+To update the framework, bump the dependency from the workspace root:
   pnpm add tessera-learn@latest
 `;
 
@@ -72,80 +73,26 @@ export function parseArgs(argv: string[]): ParseResult {
   return { args };
 }
 
-// npm package name rules: 1-214 chars, lowercase, must start with [a-z0-9],
-// allowed chars [a-z0-9._-], no leading dot or underscore.
-export function validateProjectName(name: string): string | null {
-  if (!name) return 'Project name is required';
-  if (name.length > 214) return 'Project name must be 214 characters or fewer';
-  if (name !== name.toLowerCase()) return 'Project name must be lowercase';
-  if (!/^[a-z0-9]/.test(name)) {
-    return 'Project name must start with a letter or digit';
-  }
-  if (!/^[a-z0-9._-]+$/.test(name)) {
-    return 'Project name may only contain lowercase letters, digits, "-", "_", and "."';
-  }
-  return null;
-}
-
-export function toTitleCase(slug: string): string {
-  return slug
-    .split(/[-_.\s]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
 // Tokens substituted into text template files as they are copied. Delimiters use
-// __UPPER__ so they cannot collide with Svelte `{...}` or JS `${...}`.
-interface Tokens {
-  __PROJECT_NAME__: string; // validated slug
-  __PROJECT_TITLE__: string; // toTitleCase(slug)
-  __TESSERA_VERSION__: string; // TESSERA_VERSION
-}
+// __UPPER__ in the templates so they cannot collide with Svelte `{...}` or JS
+// `${...}`; copyTemplate (shared with `tessera new`) matches them by bare name.
+type Tokens = Record<string, string>;
 
-// npm's tarball packing strips/renames leading-dot files, so templates store
-// them prefixed and we restore the dot on copy. (create-vite convention.)
-const RENAME: Record<string, string> = {
-  _gitignore: '.gitignore',
-  _gitkeep: '.gitkeep',
-};
-
-// Text files get token substitution; everything else (renamed dotfiles, future
-// binary assets like a logo) is copied byte-for-byte so it is never mangled by
-// applyTokens.
-const TEXT = /\.(svelte|js|ts|json|css|md|html)$/;
-
-function applyTokens(s: string, t: Tokens): string {
-  return s.replace(
-    /__(PROJECT_NAME|PROJECT_TITLE|TESSERA_VERSION)__/g,
-    (m) => t[m as keyof Tokens],
-  );
-}
-
-function copyTemplate(srcDir: string, destDir: string, tokens: Tokens) {
-  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
-    const src = join(srcDir, entry.name);
-    const dest = join(destDir, RENAME[entry.name] ?? entry.name);
-    if (entry.isDirectory()) {
-      mkdirSync(dest, { recursive: true });
-      copyTemplate(src, dest, tokens);
-    } else if (TEXT.test(entry.name)) {
-      writeFileSync(dest, applyTokens(readFileSync(src, 'utf-8'), tokens));
-    } else {
-      copyFileSync(src, dest);
-    }
-  }
-}
-
-// Layer base/ then the chosen variant; the variant wins on path collisions, but
-// in practice the dirs are disjoint, so this is purely additive.
+// Scaffold the workspace shell, then stamp the first course under courses/.
 function scaffold(dir: string, template: Template, tokens: Tokens) {
-  copyTemplate(resolve(PKG_ROOT, 'templates/base'), dir, tokens);
-  copyTemplate(resolve(PKG_ROOT, 'templates', template), dir, tokens);
+  copyTemplate(resolve(PKG_ROOT, 'templates/workspace'), dir, tokens);
   // CLAUDE.md and AGENTS.md are the same pointer stub under two names so each
-  // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). Mirror
-  // one template instead of maintaining two identical files.
+  // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). They
+  // live only at the workspace root — `tessera new` never stamps per-course
+  // pointers, and the @-import path resolves to node_modules only from here.
   copyFileSync(join(dir, 'AGENTS.md'), join(dir, 'CLAUDE.md'));
+
+  const courseTemplate = template === 'bare' ? 'course-bare' : 'course';
+  copyTemplate(
+    resolve(PKG_ROOT, 'templates', courseTemplate),
+    join(dir, 'courses', SEED_COURSE),
+    tokens,
+  );
 }
 
 function fail(message: string): never {
@@ -174,7 +121,6 @@ function main() {
   if (nameError) fail(nameError);
 
   const name = args.projectName;
-  const title = toTitleCase(name);
   const projectDir = resolve(process.cwd(), name);
 
   if (existsSync(projectDir)) {
@@ -185,13 +131,15 @@ function main() {
   mkdirSync(projectDir, { recursive: true });
 
   scaffold(projectDir, args.template, {
-    __PROJECT_NAME__: name,
-    __PROJECT_TITLE__: title,
-    __TESSERA_VERSION__: TESSERA_VERSION,
+    PROJECT_NAME: name,
+    PROJECT_TITLE: toTitleCase(SEED_COURSE),
+    TESSERA_VERSION,
   });
 
   process.stdout.write(
-    `\nCreated ${name} (${args.template} template).\n\nNext steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n`,
+    `\nCreated workspace ${name} (${args.template} template).\n\n` +
+      `Next steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n\n` +
+      `Add another course:\n  pnpm tessera new <name>\n`,
   );
 }
 

@@ -6,6 +6,54 @@ Build a course with built-in components, your own (via the hooks), or any mix. T
 
 ---
 
+## Workspaces
+
+A Tessera project is a **workspace**: one `package.json` and one `node_modules` shared by **many courses**, plus a `shared/` design system. Each course is a self-contained folder under `courses/`.
+
+```
+my-courses/
+├── package.json            # the one package — owns tessera-learn, svelte, scripts
+├── shared/                 # design system shared across courses (imported as $shared)
+│   ├── Button.svelte
+│   └── tokens.css
+├── courses/
+│   ├── getting-started/    # a course = a content folder (course.config.js, pages/, …)
+│   └── <next course>/
+└── AGENTS.md / CLAUDE.md   # pointers to this guide (workspace root only)
+```
+
+**Everything else in this guide describes a single course** — i.e. the contents of one `courses/<name>/` folder (`course.config.js`, `layout.svelte`, `pages/`, `styles/`).
+
+**Open the workspace folder** (not an individual course) so this guide stays in scope and `$shared` resolves.
+
+### Working with courses
+
+```bash
+pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps already here)
+tessera dev <name>          # run a command against a named course…
+cd courses/<name> && tessera dev   # …or cd into the course and run it bare
+tessera export <name>       # each course exports independently to its own LMS package
+```
+
+A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `getting-started`.)
+
+### Sharing across courses with `$shared`
+
+`$shared` resolves to the workspace `shared/` directory, so any course can import the shared design system:
+
+```svelte
+<script>
+  import Button from '$shared/Button.svelte';
+  import '$shared/tokens.css';
+</script>
+
+<Button>Continue</Button>
+```
+
+`$shared` is bundled into each course's export at build time, so it ships in every SCORM/cmi5/web package with no extra wiring.
+
+---
+
 ## Running the project
 
 From the project root (the project is set up for `pnpm` — Node's corepack provisions it automatically):

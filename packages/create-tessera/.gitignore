@@ -1,0 +1,4 @@
+# Synced from tessera-learn at build time (see scripts/sync-templates.mjs).
+# tessera-learn owns the source of record; do not edit or commit these copies.
+templates/course/
+templates/course-bare/
