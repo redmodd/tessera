@@ -13,6 +13,12 @@ A pnpm workspace with two published packages plus an end-to-end harness:
 - **`tessera-learn`** — the framework: an LMS-tracking runtime + Vite plugin + the `tessera` CLI. Svelte 5. One adapter layer over SCORM 1.2 / SCORM 2004 4th Edition / cmi5 / static web. Owns and ships the course authoring guide (`AGENTS.md`).
 - **`create-tessera`** — the `npm create tessera` scaffolder. Scaffolds small `CLAUDE.md` / `AGENTS.md` pointers to `tessera-learn`'s authoring guide (no copy).
 
+The adapter layer is the spine: `createAdapter()` picks one implementation from the course's export standard, and everything downstream stays mode-agnostic.
+
+```ts
+const adapter = createAdapter(config); // → SCORM12 | SCORM2004 | CMI5 | WebAdapter
+```
+
 ## Layout
 
 ```
@@ -53,10 +59,17 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 - **The authoring guide is owned by `tessera-learn`.** Edit `packages/tessera-learn/AGENTS.md` directly — it ships in that package's `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy anywhere else: `create-tessera` scaffolds only small `CLAUDE.md` / `AGENTS.md` pointers to it (templates under `packages/create-tessera/templates/base/`). The repo-root `AGENTS.md` (this file) is a separate dev guide, unrelated to the authoring guide.
 - **Releases run on changesets; the two packages version-lock.** CI gates every PR on `pnpm changeset status --since=origin/main`, so **any PR that changes a file under a published package (`packages/tessera-learn/` or `packages/create-tessera/`) needs a `pnpm changeset`** — including no-API-impact refactors, their tests, and in-package docs. An _empty_ changeset does **not** satisfy the gate; use a real `patch` when there's no user-facing change. Only PRs confined to root-level files (root docs, CI, the top-level `tests/` suite) can skip it. `create-tessera` and `tessera-learn` release in lockstep (changesets `fixed`) — a changeset for either bumps both to the same version, which is what lets `create-tessera` pin `tessera-learn` to its own version. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Package internals (quick map)
+## Package internals
 
-- **`tessera-learn`** — `src/runtime/` (state, completion/success rollup, navigation gating, the SCORM/cmi5/web adapters) and `src/plugin/` (the Vite plugin, the `tessera` CLI — `dev` / `export` / `validate` / `a11y` / `check` subcommands — and `a11y/` — the `tessera a11y` runtime accessibility audit driving Playwright + axe-core over a built course). `dev`/`export` run Vite programmatically via the shared `buildInlineConfig()` (no scaffolded `vite.config.js`); `vite` is a runtime dependency. Playwright and `@axe-core/playwright` are **optional peers** — Tier 2 is opt-in, so the static gate stays dependency-free. Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
-- **`create-tessera`** — `src/index.ts` is a one-shot scaffolder (no `upgrade` verb). Built with tsdown to `dist/index.js` (the `create-tessera` bin).
+The directory tree is discoverable with `ls`; these are the facts that aren't.
+
+**`tessera-learn`** — runtime (`src/runtime/`) + the Vite plugin and `tessera` CLI (`src/plugin/`, subcommands `dev` / `export` / `validate` / `a11y` / `check`).
+
+- `dev`/`export` run Vite programmatically through the shared `buildInlineConfig()` — there is no scaffolded `vite.config.js`, and `vite` is a runtime dependency.
+- Playwright and `@axe-core/playwright` are **optional peers**: the `tessera a11y` audit (Tier 2) is opt-in, so the static gate stays dependency-free.
+- Exports: `.` (Svelte source), `./plugin`, `./runtime/*`. Built with tsdown.
+
+**`create-tessera`** — one-shot scaffolder (`src/index.ts`), no `upgrade` verb. Built with tsdown to the `create-tessera` bin.
 
 ## CI
 
