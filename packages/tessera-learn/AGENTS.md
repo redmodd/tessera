@@ -1554,7 +1554,7 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 </div>
 ```
 
-Always submit through `useQuiz().submit()`. See [Data contract](#data-contract--what-the-lms-sees).
+Always submit through `useQuiz().submit()`. See [Data contract](#data-contract-what-the-lms-sees).
 
 ### Recipe 4b: Custom question widget for a custom quiz shell
 
