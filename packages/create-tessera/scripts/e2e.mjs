@@ -23,6 +23,10 @@ const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PKG_ROOT, '..', '..');
 const CLI = join(PKG_ROOT, 'dist', 'index.js');
 const TEMPLATES = ['default', 'bare'];
+// The seed course every scaffolded workspace ships with (create-tessera's
+// SEED_COURSE). Its content — course.config.js, dist/, the packaged zip — lives
+// under courses/<seed>/, while npm scripts run from the workspace root.
+const SEED_COURSE = 'getting-started';
 // Every export target. Packaged standards (all but web) write a manifest into
 // dist/ and a zip into the project root; web just emits the static dist/.
 const STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
@@ -87,19 +91,22 @@ console.log(`\nLocal tessera-learn tarball: ${tarball}`);
 
 for (const template of TEMPLATES) {
   const work = mkdtempSync(join(tmpdir(), `tessera-e2e-${template}-`));
-  const name = `${template}-course`;
+  const name = `${template}-workspace`;
   const projectDir = join(work, name);
+  const courseDir = join(projectDir, 'courses', SEED_COURSE);
 
   run(`node "${CLI}" ${name} --template=${template}`, work);
   // Installs the tarball as tessera-learn (overriding the registry pin) plus the
-  // registry devDeps in one shot.
+  // registry devDeps in one shot, into the workspace's single node_modules.
   run(`npm install "${tarball}"`, projectDir);
 
   for (const standard of STANDARDS) {
-    setStandard(projectDir, standard);
+    // The standard lives in the course config; the build runs from the
+    // workspace root via the seed-course-named npm scripts.
+    setStandard(courseDir, standard);
     run('npm run validate', projectDir);
     run('npm run export', projectDir);
-    assertExport(projectDir, template, standard);
+    assertExport(courseDir, template, standard);
     console.log(`\n✓ ${template}/${standard}: validated and built`);
   }
 }
