@@ -83,6 +83,37 @@ function projectFileRel(
   return rel;
 }
 
+type VirtualLoadCtx = { projectRoot: string; isBuild: boolean };
+
+function virtualModule(
+  name: string,
+  virtualId: string,
+  load: (
+    this: import('vite').Rollup.PluginContext,
+    ctx: VirtualLoadCtx,
+  ) => string | null,
+): Plugin {
+  const resolvedId = '\0' + virtualId;
+  let projectRoot = '';
+  let isBuild = false;
+  return {
+    name,
+    enforce: 'pre',
+    configResolved(config: ResolvedConfig) {
+      projectRoot = config.root;
+      isBuild = config.command === 'build';
+    },
+    resolveId(id) {
+      return id === virtualId ? resolvedId : null;
+    },
+    load(id) {
+      return id === resolvedId
+        ? load.call(this, { projectRoot, isBuild })
+        : null;
+    },
+  };
+}
+
 export function tesseraPlugin() {
   const manifestRef: { current: Manifest | null; root: string } = {
     current: null,
@@ -116,6 +147,7 @@ export function tesseraPlugin() {
     tesseraA11yCompilerPlugin(a11y),
     tesseraValidationPlugin(),
     tesseraEntryPlugin(),
+    tesseraConfigDefaultsPlugin(),
     tesseraConfigPlugin(),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(manifestRef),
@@ -286,7 +318,6 @@ mount(App, {
 // ---------- Config Plugin ----------
 
 const VIRTUAL_CONFIG_ID = 'virtual:tessera-config';
-const RESOLVED_CONFIG_ID = '\0' + VIRTUAL_CONFIG_ID;
 
 function completionDefaults(mode: string | undefined): {
   completion: Record<string, unknown>;
@@ -304,67 +335,47 @@ function completionDefaults(mode: string | undefined): {
   };
 }
 
-function tesseraConfigPlugin(): Plugin {
-  let projectRoot: string;
-
+function tesseraConfigDefaultsPlugin(): Plugin {
   return {
-    name: 'tessera:config',
+    name: 'tessera:config-defaults',
     enforce: 'pre',
-
     config(config) {
       const root = config.root || process.cwd();
-
       return {
         base: './',
-        build: {
-          assetsDir: 'tessera',
-        },
-        resolve: {
-          alias: {
-            $assets: resolve(root, 'assets'),
-          },
-        },
+        build: { assetsDir: 'tessera' },
+        resolve: { alias: { $assets: resolve(root, 'assets') } },
         // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer
         // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.
-        optimizeDeps: {
-          exclude: ['tessera-learn'],
-        },
+        optimizeDeps: { exclude: ['tessera-learn'] },
       };
     },
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_CONFIG_ID) return RESOLVED_CONFIG_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id === RESOLVED_CONFIG_ID) {
-        const configPath = resolve(projectRoot, 'course.config.js');
-        if (existsSync(configPath)) this.addWatchFile(configPath);
-        const read = readCourseConfig(projectRoot);
-        const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
-
-        const { completion, passingScore } = completionDefaults(
-          userConfig.completion?.mode,
-        );
-        const merged = {
-          title: userConfig.title || 'Untitled Course',
-          ...userConfig,
-          navigation: { mode: 'free', ...userConfig.navigation },
-          completion: { ...completion, ...userConfig.completion },
-          scoring: { passingScore, ...userConfig.scoring },
-          export: { standard: 'web', ...userConfig.export },
-        };
-
-        return `export default ${JSON.stringify(merged)};`;
-      }
-      return null;
-    },
   };
+}
+
+function tesseraConfigPlugin(): Plugin {
+  return virtualModule(
+    'tessera:config',
+    VIRTUAL_CONFIG_ID,
+    function ({ projectRoot }) {
+      const configPath = resolve(projectRoot, 'course.config.js');
+      if (existsSync(configPath)) this.addWatchFile(configPath);
+      const read = readCourseConfig(projectRoot);
+      const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
+      const { completion, passingScore } = completionDefaults(
+        userConfig.completion?.mode,
+      );
+      const merged = {
+        title: userConfig.title || 'Untitled Course',
+        ...userConfig,
+        navigation: { mode: 'free', ...userConfig.navigation },
+        completion: { ...completion, ...userConfig.completion },
+        scoring: { passingScore, ...userConfig.scoring },
+        export: { standard: 'web', ...userConfig.export },
+      };
+      return `export default ${JSON.stringify(merged)};`;
+    },
+  );
 }
 
 // ---------- Manifest Watch Helpers ----------
@@ -388,7 +399,6 @@ function addWatchFiles(
 // ---------- Pages Plugin ----------
 
 const VIRTUAL_PAGES_ID = 'virtual:tessera-pages';
-const RESOLVED_PAGES_ID = '\0' + VIRTUAL_PAGES_ID;
 
 /**
  * Provides a virtual module that exports an import.meta.glob map for all .svelte
@@ -396,22 +406,9 @@ const RESOLVED_PAGES_ID = '\0' + VIRTUAL_PAGES_ID;
  * pages/ directory, and Vite can statically analyze it for code splitting.
  */
 function tesseraPagesPlugin(): Plugin {
-  return {
-    name: 'tessera:pages',
-    enforce: 'pre',
-
-    resolveId(id) {
-      if (id === VIRTUAL_PAGES_ID) return RESOLVED_PAGES_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id === RESOLVED_PAGES_ID) {
-        return `export default import.meta.glob('/pages/**/*.svelte');`;
-      }
-      return null;
-    },
-  };
+  return virtualModule('tessera:pages', VIRTUAL_PAGES_ID, () => {
+    return `export default import.meta.glob('/pages/**/*.svelte');`;
+  });
 }
 
 // ---------- Validation Plugin ----------
@@ -622,29 +619,12 @@ function tesseraManifestPlugin(manifestRef: {
 }
 
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
-const RESOLVED_ADAPTER_ID = '\0' + VIRTUAL_ADAPTER_ID;
 
 function tesseraAdapterPlugin(): Plugin {
-  let projectRoot: string;
-  let isBuild = false;
-
-  return {
-    name: 'tessera:adapter',
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_ADAPTER_ID) return RESOLVED_ADAPTER_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id !== RESOLVED_ADAPTER_ID) return null;
-
+  return virtualModule(
+    'tessera:adapter',
+    VIRTUAL_ADAPTER_ID,
+    ({ projectRoot, isBuild }) => {
       // In dev, defer to the runtime selector so its WebAdapter fallback
       // for unreachable LMS APIs keeps working.
       if (!isBuild) {
@@ -703,33 +683,16 @@ export function createAdapter(config) {
 `;
       }
     },
-  };
+  );
 }
 
 const VIRTUAL_XAPI_SETUP_ID = 'virtual:tessera-xapi-setup';
-const RESOLVED_XAPI_SETUP_ID = '\0' + VIRTUAL_XAPI_SETUP_ID;
 
 function tesseraXAPISetupPlugin(): Plugin {
-  let projectRoot: string;
-  let isBuild = false;
-
-  return {
-    name: 'tessera:xapi-setup',
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_XAPI_SETUP_ID) return RESOLVED_XAPI_SETUP_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id !== RESOLVED_XAPI_SETUP_ID) return null;
-
+  return virtualModule(
+    'tessera:xapi-setup',
+    VIRTUAL_XAPI_SETUP_ID,
+    ({ projectRoot, isBuild }) => {
       if (!isBuild) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
@@ -756,7 +719,7 @@ function tesseraXAPISetupPlugin(): Plugin {
 
       return `export async function buildXAPIClient() { return null; }`;
     },
-  };
+  );
 }
 
 function tesseraFirstPagePreloadPlugin(manifestRef: {
