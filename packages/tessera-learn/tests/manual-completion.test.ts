@@ -851,7 +851,6 @@ describe('manual completion — page trigger', () => {
     progress: ProgressState,
     config: CourseConfig,
   ) {
-    const manifest = { sections: [], pages, totalPages: pages.length };
     progress.markVisited(index);
     if (
       pages[index].completesOn === 'view' &&
