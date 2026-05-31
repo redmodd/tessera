@@ -125,45 +125,40 @@ test.describe('Component — RevealModal', () => {
 
   test('clicking trigger opens modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('Escape closes modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await page.waitForSelector('[role="dialog"]');
+    await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
   test('focus is trapped inside modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
 
     // Tab several times — focus should stay inside modal
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab');
     }
 
-    const isInModal = await page.evaluate(() => {
-      const active = document.activeElement;
-      return (
-        !!active?.closest('[role="dialog"]') ||
-        !!active?.closest('.tessera-modal-overlay')
-      );
-    });
+    const isInModal = await page.evaluate(
+      () => !!document.activeElement?.closest('dialog.tessera-modal'),
+    );
     expect(isInModal).toBe(true);
   });
 
-  test('clicking outside modal closes it', async ({ page }) => {
+  test('clicking the backdrop closes it', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Click on overlay (outside modal content)
-    await page
-      .locator('.tessera-modal-overlay')
-      .click({ position: { x: 10, y: 10 } });
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+    // The centered <dialog> box doesn't reach the viewport corner; a click
+    // there lands on the ::backdrop, whose target is the dialog element.
+    await page.mouse.click(5, 5);
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 });
 
@@ -214,7 +209,7 @@ test.describe('Component Accessibility', () => {
     await page.waitForSelector('.tessera-reveal-trigger');
 
     await page.locator('.tessera-reveal-trigger').click();
-    const dialog = page.locator('[role="dialog"]');
+    const dialog = page.getByRole('dialog');
     const content = page.locator('.tessera-modal-content');
     await expect(dialog).toBeVisible();
     // The fade-in animation interpolates opacity from 0→1 over 200ms; wait for
