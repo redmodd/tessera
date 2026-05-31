@@ -9,10 +9,10 @@ Tessera is a toolkit for building interactive online courses, designed for AI-as
 You probably don't want to install this package directly. Use the scaffolder:
 
 ```bash
-npm create tessera@latest my-course
+pnpm create tessera@latest my-course
 ```
 
-That creates a project with Tessera wired up, a starter page structure, and the authoring guide (`AGENTS.md`) at the project root. Prefer hooks-only? `npm create tessera@latest -- --template=bare my-course` scaffolds without the built-in components.
+That creates a project with Tessera wired up, a starter page structure, and the authoring guide (`AGENTS.md`) at the project root. Prefer hooks-only? `pnpm create tessera@latest my-course --template=bare` scaffolds without the built-in components.
 
 ## What's included
 

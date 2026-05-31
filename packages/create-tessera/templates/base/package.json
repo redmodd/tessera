@@ -7,6 +7,7 @@
     "dev": "tessera dev",
     "export": "tessera export",
     "validate": "tessera validate",
+    "a11y": "tessera a11y",
     "check": "tessera check"
   },
   "dependencies": {

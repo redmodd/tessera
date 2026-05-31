@@ -24,7 +24,7 @@ export function runValidate(projectRoot: string): number {
     );
   }
   console.log(
-    '\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: tessera a11y\x1b[0m',
+    '\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: pnpm exec tessera a11y\x1b[0m',
   );
   return 0;
 }

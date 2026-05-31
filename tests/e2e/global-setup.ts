@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
 const execFileAsync = promisify(execFile);
 
 const REPO_ROOT = process.cwd();
-const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
+export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5';
 export type FixtureName = 'free' | 'custom-quiz';
@@ -44,6 +44,14 @@ export function variantDir(fixture: FixtureName, standard: Standard): string {
 // directly rather than relying on PATH or root-level resolution.
 export function viteBin(fixture: FixtureName): string {
   return resolve(FIXTURES[fixture].source, 'node_modules/.bin/vite');
+}
+
+export function tesseraBin(fixture: FixtureName): string {
+  return resolve(FIXTURES[fixture].source, 'node_modules/.bin/tessera');
+}
+
+export function fixtureSource(fixture: FixtureName): string {
+  return FIXTURES[fixture].source;
 }
 
 /**
