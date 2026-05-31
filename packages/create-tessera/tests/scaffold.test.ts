@@ -140,6 +140,7 @@ describe('create-tessera CLI', () => {
     expect(pkg.scripts.dev).toBe('tessera dev');
     expect(pkg.scripts.export).toBe('tessera export');
     expect(pkg.scripts.validate).toBe('tessera validate');
+    expect(pkg.scripts.a11y).toBe('tessera a11y');
     expect(pkg.scripts.check).toBe('tessera check');
     expect(pkg.packageManager).toMatch(/^pnpm@/);
     expect(pkg.scripts['accessibility-check']).toBeUndefined();
