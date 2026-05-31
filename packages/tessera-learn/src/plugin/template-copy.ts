@@ -23,8 +23,6 @@ function applyTokens(s: string, tokens: Record<string, string>): string {
   );
 }
 
-// Recursively copy a template tree, substituting __TOKEN__ placeholders in text
-// files and restoring dotfile names.
 export function copyTemplate(
   srcDir: string,
   destDir: string,

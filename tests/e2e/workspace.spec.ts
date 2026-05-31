@@ -154,9 +154,7 @@ test.describe('Workspace — many courses, shared design system', () => {
   });
 
   test('validate stays clean on a $shared-importing course', async () => {
-    // execFileAsync rejects on a non-zero exit; resolving means validate passed.
-    // Locks in that an import from $shared never trips a false structural error
-    // (the validator is import-agnostic — this is the regression guard for it).
+    // Validate is import-agnostic; resolving (exit 0) proves a $shared import stays clean.
     await expect(
       execFileAsync(
         process.execPath,

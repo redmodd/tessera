@@ -57,7 +57,6 @@ function listHint(workspaceRoot: string): string {
   );
 }
 
-// Resolve which course a command targets, plus the workspace root for $shared.
 // A name argument always wins; otherwise the cwd must itself be a course. There
 // is deliberately no "single course → use it implicitly" rule, so a bare command
 // never changes meaning when a second course is added.

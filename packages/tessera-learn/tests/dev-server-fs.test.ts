@@ -5,13 +5,10 @@ import { tmpdir } from 'node:os';
 import { createServer, type ViteDevServer } from 'vite';
 import { buildInlineConfig } from '../src/plugin/inline-config.js';
 
-// Guards the $shared dev-serve gotcha: shared/ lives outside the per-course Vite
-// root, and with server.fs.strict (Vite's default) the dev server refuses files
-// outside its allow-list. buildInlineConfig must add workspaceRoot to fs.allow.
-//
-// The workspace is built in os.tmpdir(), OUTSIDE the repo, on purpose: an
-// ancestor pnpm-lock.yaml/.git would let Vite widen fs.allow by itself and mask
-// a regression. Here the gate is governed solely by what buildInlineConfig sets.
+// $shared lives outside the per-course Vite root, so fs.strict (Vite's default)
+// blocks it unless buildInlineConfig adds workspaceRoot to fs.allow. The
+// workspace is built in os.tmpdir(), outside the repo, on purpose: an ancestor
+// pnpm-lock.yaml/.git would let Vite widen fs.allow on its own and mask a regression.
 
 interface FsOptions {
   strict?: boolean;

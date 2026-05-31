@@ -23,9 +23,8 @@ const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PKG_ROOT, '..', '..');
 const CLI = join(PKG_ROOT, 'dist', 'index.js');
 const TEMPLATES = ['default', 'bare'];
-// The seed course every scaffolded workspace ships with (create-tessera's
-// SEED_COURSE). Its content — course.config.js, dist/, the packaged zip — lives
-// under courses/<seed>/, while npm scripts run from the workspace root.
+// The scaffolded seed course. Its content (course.config.js, dist/, the zip)
+// lives under courses/<seed>/; the npm scripts run from the workspace root.
 const SEED_COURSE = 'getting-started';
 // Every export target. Packaged standards (all but web) write a manifest into
 // dist/ and a zip into the project root; web just emits the static dist/.
@@ -101,8 +100,7 @@ for (const template of TEMPLATES) {
   run(`npm install "${tarball}"`, projectDir);
 
   for (const standard of STANDARDS) {
-    // The standard lives in the course config; the build runs from the
-    // workspace root via the seed-course-named npm scripts.
+    // Standard lives in the course config; scripts build from the workspace root.
     setStandard(courseDir, standard);
     run('npm run validate', projectDir);
     run('npm run export', projectDir);

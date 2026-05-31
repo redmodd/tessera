@@ -73,9 +73,8 @@ export function parseArgs(argv: string[]): ParseResult {
   return { args };
 }
 
-// Tokens substituted into text template files as they are copied. Delimiters use
-// __UPPER__ in the templates so they cannot collide with Svelte `{...}` or JS
-// `${...}`; copyTemplate (shared with `tessera new`) matches them by bare name.
+// __UPPER__ delimiters can't collide with Svelte `{...}` or JS `${...}`;
+// copyTemplate (shared with `tessera new`) matches them by bare name.
 type Tokens = Record<string, string>;
 
 // Scaffold the workspace shell, then stamp the first course under courses/.
