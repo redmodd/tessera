@@ -5,6 +5,7 @@ import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
+  parseScaled01,
 } from './format.js';
 
 export interface SCORM2004API {
@@ -92,10 +93,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     } catch {
       return null;
     }
-    if (!raw) return null;
-    const n = Number(raw);
-    if (Number.isFinite(n) && n >= 0 && n <= 1) return n;
-    return null;
+    return parseScaled01(raw);
   }
 
   saveState(state: SavedState): void {
