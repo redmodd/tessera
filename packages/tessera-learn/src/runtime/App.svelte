@@ -10,6 +10,7 @@
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
+  import { DEFAULT_PASSING_SCORE } from './defaults.js';
   import { DurationTracker } from './duration.js';
   import { createAdapter } from 'virtual:tessera-adapter';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
@@ -62,7 +63,7 @@
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({
     quiz: null,
-    passingScore: config.scoring?.passingScore ?? 70,
+    passingScore: config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE,
   });
   setContext(TESSERA_PAGE, pageContext);
 

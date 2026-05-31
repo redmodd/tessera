@@ -14,6 +14,10 @@ import { generateManifest, readCourseConfig } from './manifest.js';
 import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
 import {
+  DEFAULT_PASSING_SCORE,
+  DEFAULT_PERCENTAGE_THRESHOLD,
+} from '../runtime/defaults.js';
+import {
   validateProject,
   reportValidationIssues,
   normalizeA11y,
@@ -292,8 +296,11 @@ function completionDefaults(mode: string | undefined): {
     return { completion: { mode: 'manual' }, passingScore: 0 };
   }
   return {
-    completion: { mode: 'percentage', percentageThreshold: 100 },
-    passingScore: 70,
+    completion: {
+      mode: 'percentage',
+      percentageThreshold: DEFAULT_PERCENTAGE_THRESHOLD,
+    },
+    passingScore: DEFAULT_PASSING_SCORE,
   };
 }
 
