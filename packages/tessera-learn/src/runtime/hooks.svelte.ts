@@ -122,49 +122,16 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       reset: opts.reset,
       interaction: () => opts.response(),
     });
-    return {
-      get id() {
-        return q.id;
-      },
-      get submitted() {
-        return q.submitted;
-      },
-      get correct() {
-        return q.correct;
-      },
-      get answer() {
-        return q.answer;
-      },
-      get feedbackVisible() {
-        return q.feedbackVisible;
-      },
-      get locked() {
-        return q.locked;
-      },
-      get isLockedCorrect() {
-        return q.isLockedCorrect;
-      },
-      get render() {
-        return q.render;
-      },
-      setAnswer(a: unknown) {
-        q.setAnswer(a);
-      },
-      commit() {
-        q.commit();
-      },
-      submit() {},
-      reset() {
-        opts.reset?.();
-      },
-      retry() {},
-      canRetry: false,
-      retryCount: 0,
-      mode: 'quiz' as const,
-      setRender(render: unknown) {
-        q.setRender(render);
-      },
-    };
+    const handle = q as UseQuestionHandle;
+    handle.submit = () => {};
+    handle.reset = () => opts.reset?.();
+    handle.retry = () => {};
+    Object.defineProperties(handle, {
+      canRetry: { value: false },
+      retryCount: { value: 0 },
+      mode: { value: 'quiz' },
+    });
+    return handle;
   }
 
   const maxRetries = opts.maxRetries ?? Infinity;
@@ -197,17 +164,14 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
       committed = true;
     }
-    if (opts.graded && navCtx) {
+    if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
-      navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
-      navCtx.progress.recalculateCompletion(
-        navCtx.manifest.totalPages,
-        navCtx.config,
+      navCtx.progress.markStandaloneQuestion(
+        pageIndex,
+        opts.id,
+        score,
+        !!opts.graded,
       );
-      navCtx.progress.recalculateSuccess(navCtx.config);
-    } else if (navCtx) {
-      const pageIndex = navCtx.nav.currentPageIndex;
-      navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, false);
     }
 
     submitted = true;
@@ -357,7 +321,6 @@ export function useCompletion(): {
         return;
       }
       progress.markCompleteManually();
-      progress.recalculateSuccess(config);
     },
     get completionStatus() {
       return progress.completionStatus;

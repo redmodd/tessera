@@ -96,3 +96,24 @@ describe('formatISO8601Duration', () => {
     expect(formatISO8601Duration(300)).toBe('PT5M');
   });
 });
+
+import { parseScaled01 } from '../src/runtime/adapters/format.js';
+
+describe('parseScaled01', () => {
+  it('accepts in-range numbers and numeric strings', () => {
+    expect(parseScaled01(0)).toBe(0);
+    expect(parseScaled01(1)).toBe(1);
+    expect(parseScaled01(0.7)).toBe(0.7);
+    expect(parseScaled01('0.5')).toBe(0.5);
+  });
+  it('rejects out-of-range, non-finite, empty, and null', () => {
+    expect(parseScaled01(-0.1)).toBeNull();
+    expect(parseScaled01(1.1)).toBeNull();
+    expect(parseScaled01(NaN)).toBeNull();
+    expect(parseScaled01(Infinity)).toBeNull();
+    expect(parseScaled01('')).toBeNull();
+    expect(parseScaled01(null)).toBeNull();
+    expect(parseScaled01(undefined)).toBeNull();
+    expect(parseScaled01('abc')).toBeNull();
+  });
+});

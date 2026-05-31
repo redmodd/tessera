@@ -8,75 +8,26 @@
    * @prop {import('svelte').Snippet} content - Modal body snippet
    */
   let { trigger, content, title = '' } = $props();
-  let open = $state(false);
-  let modalRef = $state(null);
-  let previousFocus = null;
+  let dialogRef = $state(null);
 
   function openModal() {
-    previousFocus = document.activeElement;
-    open = true;
+    dialogRef?.showModal();
+    document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
-    open = false;
-    if (previousFocus && typeof previousFocus.focus === 'function') {
-      previousFocus.focus();
-    }
+    dialogRef?.close();
   }
 
-  function handleOverlayClick(e) {
-    if (e.target === e.currentTarget) {
-      closeModal();
-    }
+  function handleClose() {
+    document.body.style.overflow = '';
   }
 
-  function handleKeydown(e) {
-    if (e.key === 'Escape') {
-      closeModal();
-      return;
-    }
-
-    // Focus trap
-    if (e.key === 'Tab' && modalRef) {
-      const focusable = modalRef.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
+  // A click whose target is the dialog element itself (not its content) is a
+  // backdrop click.
+  function handleClick(e) {
+    if (e.target === dialogRef) closeModal();
   }
-
-  $effect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      // Focus the modal after render
-      queueMicrotask(() => {
-        if (modalRef) {
-          const firstFocusable = modalRef.querySelector(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-          );
-          if (firstFocusable) firstFocusable.focus();
-          else modalRef.focus();
-        }
-      });
-    } else {
-      document.body.style.overflow = '';
-    }
-  });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -85,37 +36,29 @@
   {@render trigger()}
 </div>
 
-{#if open}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="tessera-modal-overlay"
-    onclick={handleOverlayClick}
-    onkeydown={handleKeydown}
-  >
-    <div
-      class="tessera-modal-content"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title || 'Modal'}
-      bind:this={modalRef}
-      tabindex="-1"
-    >
-      {#if title}
-        <h2 class="tessera-modal-title">{title}</h2>
-      {/if}
-      <div class="tessera-modal-body">
-        {@render content()}
-      </div>
-      <button
-        class="tessera-modal-close"
-        onclick={closeModal}
-        aria-label="Close modal"
-      >
-        ✕
-      </button>
+<dialog
+  class="tessera-modal"
+  bind:this={dialogRef}
+  aria-label={title || 'Modal'}
+  onclick={handleClick}
+  onclose={handleClose}
+>
+  <div class="tessera-modal-content">
+    {#if title}
+      <h2 class="tessera-modal-title">{title}</h2>
+    {/if}
+    <div class="tessera-modal-body">
+      {@render content()}
     </div>
+    <button
+      class="tessera-modal-close"
+      onclick={closeModal}
+      aria-label="Close modal"
+    >
+      ✕
+    </button>
   </div>
-{/if}
+</dialog>
 
 <style>
   .tessera-reveal-trigger {
@@ -129,15 +72,18 @@
     border-radius: 4px;
   }
 
-  .tessera-modal-overlay {
-    position: fixed;
-    inset: 0;
+  .tessera-modal {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    margin: auto;
+  }
+
+  .tessera-modal::backdrop {
     background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    padding: var(--tessera-spacing-lg);
     animation: tessera-modal-fade-in 200ms ease;
   }
 
@@ -146,16 +92,10 @@
     background: var(--tessera-bg);
     border-radius: 12px;
     padding: var(--tessera-spacing-xl);
-    max-width: 600px;
-    width: 100%;
     max-height: 80vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
     animation: tessera-modal-slide-in 200ms ease;
-  }
-
-  .tessera-modal-content:focus {
-    outline: none;
   }
 
   .tessera-modal-title {
@@ -222,10 +162,15 @@
   }
 
   @media (max-width: 640px) {
+    .tessera-modal {
+      max-height: 90vh;
+      margin-top: auto;
+      margin-bottom: 0;
+    }
+
     .tessera-modal-content {
       max-height: 90vh;
       border-radius: 12px 12px 0 0;
-      align-self: flex-end;
     }
   }
 </style>

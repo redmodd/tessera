@@ -1,0 +1,3 @@
+export const DEFAULT_PASSING_SCORE = 70;
+
+export const DEFAULT_PERCENTAGE_THRESHOLD = 100;

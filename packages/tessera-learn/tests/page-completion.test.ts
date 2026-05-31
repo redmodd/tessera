@@ -35,8 +35,12 @@ describe('isPageComplete', () => {
   it('informational page is complete when visited', () => {
     const page = createPage(0);
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig();
+    const progress = new ProgressState(
+      gradedQuizIndices(manifest),
+      config,
+      manifest.totalPages,
+    );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -51,8 +55,12 @@ describe('isPageComplete', () => {
       maxAttempts: 3,
     });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig();
+    const progress = new ProgressState(
+      gradedQuizIndices(manifest),
+      config,
+      manifest.totalPages,
+    );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -67,8 +75,12 @@ describe('isPageComplete', () => {
       maxAttempts: 3,
     });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 70 } });
+    const progress = new ProgressState(
+      gradedQuizIndices(manifest),
+      config,
+      manifest.totalPages,
+    );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -86,8 +98,12 @@ describe('isPageComplete', () => {
       maxAttempts: 3,
     });
     const manifest = createManifestFromPages([page]);
-    const progress = new ProgressState(gradedQuizIndices(manifest));
     const config = createConfig({ scoring: { passingScore: 90 } });
+    const progress = new ProgressState(
+      gradedQuizIndices(manifest),
+      config,
+      manifest.totalPages,
+    );
 
     progress.quizCompleted(0, 85);
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);

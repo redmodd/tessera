@@ -90,6 +90,10 @@ function makeSCORMDevFallbackPublisher(
  * adapter present in non-cmi5 export modes — the validator should have
  * caught this at build time).
  */
+type ActorResolution =
+  | { kind: 'actor'; value: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>) }
+  | { kind: 'scorm-fallback'; standard: 'scorm12' | 'scorm2004' };
+
 function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
@@ -114,24 +118,18 @@ function resolveDestination(
 
   // Explicit endpoint.
   const explicit = entry as XAPIExplicitConfig;
-  const actorOrResolver = resolveExplicitActor(explicit, config, adapter);
-  if (actorOrResolver === null) return null;
-  if (
-    typeof actorOrResolver === 'object' &&
-    (actorOrResolver as { __scormDevFallback?: 'scorm12' | 'scorm2004' })
-      .__scormDevFallback
-  ) {
-    const std = (
-      actorOrResolver as { __scormDevFallback: 'scorm12' | 'scorm2004' }
-    ).__scormDevFallback;
-    return { kind: 'explicit', publisher: makeSCORMDevFallbackPublisher(std) };
+  const resolution = resolveExplicitActor(explicit, config, adapter);
+  if (resolution === null) return null;
+  if (resolution.kind === 'scorm-fallback') {
+    return {
+      kind: 'explicit',
+      publisher: makeSCORMDevFallbackPublisher(resolution.standard),
+    };
   }
   const publisher = new XAPIPublisher({
     endpoint: explicit.endpoint,
     auth: explicit.auth,
-    actor: actorOrResolver as
-      | XAPIAgent
-      | (() => XAPIAgent | Promise<XAPIAgent>),
+    actor: resolution.value,
     activityId: explicit.activityId,
     registration: explicit.registration,
   });
@@ -149,50 +147,45 @@ function resolveExplicitActor(
   explicit: XAPIExplicitConfig,
   config: CourseConfig,
   adapter: PersistenceAdapter | null,
-):
-  | XAPIAgent
-  | (() => XAPIAgent | Promise<XAPIAgent>)
-  | { __scormDevFallback: 'scorm12' | 'scorm2004' }
-  | null {
-  if (explicit.actor !== undefined) return explicit.actor;
-  // No author-supplied actor — try mode-specific derivation.
+): ActorResolution | null {
+  if (explicit.actor !== undefined) {
+    return { kind: 'actor', value: explicit.actor };
+  }
   if (config.export?.standard === 'cmi5' && adapter instanceof CMI5Adapter) {
     const inner = adapter.getPublisher();
-    if (inner) {
-      // The cmi5 adapter's publisher has the launch actor cached.
-      try {
-        return inner.getActor();
-      } catch {
-        return null;
-      }
+    if (!inner) return null;
+    try {
+      return { kind: 'actor', value: inner.getActor() };
+    } catch {
+      return null;
     }
-    return null;
   }
   if (config.export?.standard === 'scorm12') {
     if (adapter instanceof SCORM12Adapter) {
-      return synthesizeSCORM12Actor(
-        adapter.getAPI(),
-        explicit.activityId,
-        explicit.actorAccountHomePage,
-      );
+      return {
+        kind: 'actor',
+        value: synthesizeSCORM12Actor(
+          adapter.getAPI(),
+          explicit.activityId,
+          explicit.actorAccountHomePage,
+        ) as XAPIAgent,
+      };
     }
-    // Adapter is the WebAdapter dev fallback. Mirror the cmi5 'lms'
-    // dev-fallback path: install a stub publisher that surfaces an
-    // explicit error rather than silently no-oping. Authors get the
-    // same dev/prod parity in SCORM that they get in cmi5.
-    return { __scormDevFallback: 'scorm12' };
+    return { kind: 'scorm-fallback', standard: 'scorm12' };
   }
   if (config.export?.standard === 'scorm2004') {
     if (adapter instanceof SCORM2004Adapter) {
-      return synthesizeSCORM2004Actor(
-        adapter.getAPI(),
-        explicit.activityId,
-        explicit.actorAccountHomePage,
-      );
+      return {
+        kind: 'actor',
+        value: synthesizeSCORM2004Actor(
+          adapter.getAPI(),
+          explicit.activityId,
+          explicit.actorAccountHomePage,
+        ) as XAPIAgent,
+      };
     }
-    return { __scormDevFallback: 'scorm2004' };
+    return { kind: 'scorm-fallback', standard: 'scorm2004' };
   }
-  // Web export with no actor — build-time validator should have errored.
   console.warn(
     'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
   );

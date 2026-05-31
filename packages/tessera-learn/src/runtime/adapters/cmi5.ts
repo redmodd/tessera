@@ -5,7 +5,7 @@ import {
   formatCorrectPattern,
   XAPI_INTERACTION_FORMAT,
 } from '../interaction-format.js';
-import { formatISO8601Duration } from './format.js';
+import { formatISO8601Duration, parseScaled01 } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import type { XAPIAgent } from '../xapi/types.js';
@@ -151,8 +151,8 @@ export class CMI5Adapter implements PersistenceAdapter {
 
     const rawMastery = params.get('masteryScore');
     if (rawMastery !== null && rawMastery !== '') {
-      const m = Number(rawMastery);
-      if (Number.isFinite(m) && m >= 0 && m <= 1) {
+      const m = parseScaled01(rawMastery);
+      if (m !== null) {
         this.#masteryScore = m;
       } else {
         console.warn(
@@ -272,13 +272,9 @@ export class CMI5Adapter implements PersistenceAdapter {
       ) {
         this.#returnURL = this.#launchData.returnURL;
       }
-      if (
-        typeof this.#launchData.masteryScore === 'number' &&
-        Number.isFinite(this.#launchData.masteryScore) &&
-        this.#launchData.masteryScore >= 0 &&
-        this.#launchData.masteryScore <= 1
-      ) {
-        this.#masteryScore = this.#launchData.masteryScore;
+      const launchMastery = parseScaled01(this.#launchData.masteryScore);
+      if (launchMastery !== null) {
+        this.#masteryScore = launchMastery;
       }
     }
 
