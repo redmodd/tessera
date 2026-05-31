@@ -1,11 +1,20 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { CourseConfig } from './types.js';
+import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
 export class ProgressState {
   #quizGradedIndices: ReadonlySet<number>;
+  #config: CourseConfig;
+  #totalPages: number;
 
-  constructor(quizGradedIndices: ReadonlySet<number>) {
+  constructor(
+    quizGradedIndices: ReadonlySet<number>,
+    config: CourseConfig,
+    totalPages: number,
+  ) {
     this.#quizGradedIndices = quizGradedIndices;
+    this.#config = config;
+    this.#totalPages = totalPages;
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -28,11 +37,15 @@ export class ProgressState {
    * Pages in this set contribute to course success status via their standalone average.
    */
   gradedStandalonePages = $state(new SvelteSet<number>());
-  completionStatus = $state<'incomplete' | 'complete'>('incomplete');
-  successStatus = $state<'unknown' | 'passed' | 'failed'>('unknown');
 
-  // Latch for manual completion. Monotonic; recalc methods bail when set.
+  // Latch for manual completion. Monotonic; only flips forward.
   #manuallyCompleted = $state(false);
+
+  /**
+   * Monotonic counter incremented on every persistable state mutation. App.svelte
+   * subscribes to this single signal to schedule a coalesced save.
+   */
+  version = $state(0);
 
   get manuallyCompleted(): boolean {
     return this.#manuallyCompleted;
@@ -42,41 +55,21 @@ export class ProgressState {
   markCompleteManually(): void {
     if (this.#manuallyCompleted) return;
     this.#manuallyCompleted = true;
-    this.completionStatus = 'complete';
     this.version++;
   }
 
-  /**
-   * Monotonic counter incremented on every persistable state mutation
-   * (visited/scores/chunks/standalone). Callers that need to react to *any*
-   * progress change can subscribe to this single signal instead of iterating
-   * each Map/Set themselves.
-   */
-  version = $state(0);
-
-  /**
-   * Mark a page as visited. Callers must call recalculateCompletion()
-   * afterward to update completionStatus.
-   */
   markVisited(pageIndex: number) {
     if (this.visitedPages.has(pageIndex)) return;
     this.visitedPages.add(pageIndex);
     this.version++;
   }
 
-  /**
-   * Record a quiz score. Callers must call recalculateCompletion()
-   * and recalculateSuccess() afterward to update status fields.
-   */
   quizCompleted(pageIndex: number, score: number) {
     this.quizScores.set(pageIndex, score);
     this.version++;
   }
 
-  /**
-   * Record the highest chunk index revealed on a page. Idempotent — only
-   * advances forward, never backward.
-   */
+  /** Record the highest chunk index revealed on a page. Only advances forward. */
   markChunk(pageIndex: number, chunkIndex: number) {
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
@@ -89,11 +82,6 @@ export class ProgressState {
     return this.chunkProgress.get(pageIndex) ?? -1;
   }
 
-  /**
-   * Record the score for a single standalone question (one created via
-   * `useQuestion` outside a `<Quiz>`). When `graded`, the page is added to
-   * `gradedStandalonePages` so it contributes to course success.
-   */
   markStandaloneQuestion(
     pageIndex: number,
     questionId: string,
@@ -121,66 +109,48 @@ export class ProgressState {
     return sum / pageMap.size;
   }
 
-  recalculateCompletion(totalPages: number, config: CourseConfig) {
-    if (this.#manuallyCompleted) return;
-    if (config.completion.mode === 'manual') return;
-    if (config.completion.mode === 'percentage') {
-      const threshold = config.completion.percentageThreshold ?? 100;
+  completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
+    if (this.#manuallyCompleted) return 'complete';
+    const mode = this.#config.completion.mode;
+    if (mode === 'manual') return 'incomplete';
+    if (mode === 'percentage') {
+      const threshold =
+        this.#config.completion.percentageThreshold ??
+        DEFAULT_PERCENTAGE_THRESHOLD;
       const percent =
-        totalPages > 0 ? (this.visitedPages.size / totalPages) * 100 : 0;
-      this.completionStatus = percent >= threshold ? 'complete' : 'incomplete';
-    } else if (config.completion.mode === 'quiz') {
-      const { indices } = this.#gradedPages();
-      if (indices.length === 0) {
-        this.completionStatus = 'incomplete';
-        return;
-      }
-      const average = this.#gradedAverage(indices);
-      this.completionStatus =
-        average >= config.scoring.passingScore ? 'complete' : 'incomplete';
+        this.#totalPages > 0
+          ? (this.visitedPages.size / this.#totalPages) * 100
+          : 0;
+      return percent >= threshold ? 'complete' : 'incomplete';
     }
-  }
+    const { indices } = this.#gradedPages();
+    if (indices.length === 0) return 'incomplete';
+    return this.#gradedAverage(indices) >= this.#config.scoring.passingScore
+      ? 'complete'
+      : 'incomplete';
+  });
 
-  recalculateSuccess(config: CourseConfig) {
-    if (config.completion.mode === 'manual') {
-      const want = config.completion.requireSuccessStatus;
-      // Stay 'unknown' until manual mark fires, so a learner who never
-      // finishes isn't reported as passed.
-      this.successStatus =
-        this.#manuallyCompleted && want !== undefined ? want : 'unknown';
-      return;
+  successStatus = $derived.by<'unknown' | 'passed' | 'failed'>(() => {
+    if (this.#config.completion.mode === 'manual') {
+      const want = this.#config.completion.requireSuccessStatus;
+      return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
-
     const { indices, attempted } = this.#gradedPages();
-
-    if (indices.length === 0) {
-      this.successStatus = 'unknown';
-      return;
-    }
-    // Stay unknown until at least one graded score has been recorded
-    if (!attempted) {
-      this.successStatus = 'unknown';
-      return;
-    }
-    const average = this.#gradedAverage(indices);
-    this.successStatus =
-      average >= config.scoring.passingScore ? 'passed' : 'failed';
-  }
+    if (indices.length === 0 || !attempted) return 'unknown';
+    return this.#gradedAverage(indices) >= this.#config.scoring.passingScore
+      ? 'passed'
+      : 'failed';
+  });
 
   /**
    * Effective graded score for LMS reporting — same union and averaging as
-   * recalculateSuccess, so score and success status can't disagree.
+   * successStatus, so score and success status can't disagree.
    */
   gradedScore(): { average: number; attempted: boolean } {
     const { indices, attempted } = this.#gradedPages();
     return { average: this.#gradedAverage(indices), attempted };
   }
 
-  /**
-   * Union of pages that contribute to graded scoring: pageConfig graded quizzes
-   * plus pages with at least one graded standalone question (deduped).
-   * `attempted` is true if any of those pages has a recorded score.
-   */
   #gradedPages(): { indices: number[]; attempted: boolean } {
     const merged = new Set(this.#quizGradedIndices);
     for (const i of this.gradedStandalonePages) merged.add(i);
@@ -189,18 +159,12 @@ export class ProgressState {
     return { indices, attempted };
   }
 
-  /** Whether a page has any recorded graded score (quiz or standalone). */
   #hasScore(pageIndex: number): boolean {
     if (this.quizScores.has(pageIndex)) return true;
     const pageMap = this.standaloneQuestionScores.get(pageIndex);
     return !!pageMap && pageMap.size > 0;
   }
 
-  /**
-   * Average across the given page indices. Each page contributes its quiz score
-   * if present, otherwise its standalone average. Pages with no recorded score
-   * contribute 0 (matching the existing "unattempted graded quiz = 0" rule).
-   */
   #gradedAverage(indices: number[]): number {
     if (indices.length === 0) return 0;
     let sum = 0;

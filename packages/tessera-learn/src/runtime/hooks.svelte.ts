@@ -164,17 +164,14 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
       committed = true;
     }
-    if (opts.graded && navCtx) {
+    if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
-      navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, true);
-      navCtx.progress.recalculateCompletion(
-        navCtx.manifest.totalPages,
-        navCtx.config,
+      navCtx.progress.markStandaloneQuestion(
+        pageIndex,
+        opts.id,
+        score,
+        !!opts.graded,
       );
-      navCtx.progress.recalculateSuccess(navCtx.config);
-    } else if (navCtx) {
-      const pageIndex = navCtx.nav.currentPageIndex;
-      navCtx.progress.markStandaloneQuestion(pageIndex, opts.id, score, false);
     }
 
     submitted = true;
@@ -324,7 +321,6 @@ export function useCompletion(): {
         return;
       }
       progress.markCompleteManually();
-      progress.recalculateSuccess(config);
     },
     get completionStatus() {
       return progress.completionStatus;

@@ -40,7 +40,11 @@
   const auditMode =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('__tessera_audit');
-  const progress = new ProgressState(gradedQuizIndices);
+  const progress = new ProgressState(
+    gradedQuizIndices,
+    config,
+    manifest.totalPages,
+  );
   const nav = new NavigationState(manifest, progress, config, auditMode);
   nav.setPageModules(pageModules);
   let duration = $state(new DurationTracker(0));
@@ -142,8 +146,6 @@
         ) {
           progress.markCompleteManually();
         }
-        progress.recalculateCompletion(manifest.totalPages, config);
-        progress.recalculateSuccess(config);
         onIdle(() => nav.prefetch(index + 1));
       })
       .catch((err) => {
@@ -254,8 +256,6 @@
     const { score } = e.detail;
     const pageIndex = nav.currentPageIndex;
     progress.quizCompleted(pageIndex, score);
-    progress.recalculateCompletion(manifest.totalPages, config);
-    progress.recalculateSuccess(config);
   }
 
   // ---- Persistence: serialize / restore ----
@@ -324,13 +324,9 @@
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
-    // Must come before recalc so manual-mode branches see the latch.
     if (saved.m === 1) {
       progress.markCompleteManually();
     }
-    // Recalculate derived state
-    progress.recalculateCompletion(manifest.totalPages, config);
-    progress.recalculateSuccess(config);
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
       nav.goToPage(saved.b);
@@ -466,8 +462,8 @@
     // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
     // threshold for this launch and overrides the manifest. Mutate the
     // imported config object once before any UI reads it so every
-    // downstream consumer (recalculateSuccess, navigation gating, Quiz
-    // page context) sees the same effective value.
+    // downstream consumer (the derived completion/success status, navigation
+    // gating, Quiz page context) sees the same effective value.
     const lmsMastery = adapter.getMasteryScore?.();
     if (typeof lmsMastery === 'number') {
       config.scoring.passingScore = lmsMastery * 100;
