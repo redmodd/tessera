@@ -3,15 +3,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { cpSync, existsSync, rmSync, symlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { VARIANTS_ROOT, fixtureSource, tesseraBin } from './global-setup.js';
+import { VARIANTS_ROOT, fixtureSource, tesseraCli } from './global-setup.js';
 
 const execFileAsync = promisify(execFile);
 
-// The `tessera export` path scaffolded courses use, which the fixtures' raw
-// `vite build` scripts never exercise.
+// Covers the `tessera export` path; the fixtures' raw `vite build` never does.
 test.describe('CLI — tessera export', () => {
-  // Under VARIANTS_ROOT (gitignored, inside the repo) so workspace dep
-  // resolution matches a scaffolded course; a /tmp dir can't resolve svelte.
+  // Inside the repo so workspace dep resolution matches a real course (a /tmp dir can't resolve svelte).
   const projectDir = resolve(VARIANTS_ROOT, 'cli-smoke');
 
   test.beforeAll(() => {
@@ -35,10 +33,10 @@ test.describe('CLI — tessera export', () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  test('builds dist/ via the project-local bin', async () => {
+  test('builds dist/ via the CLI', async () => {
     const { stdout, stderr } = await execFileAsync(
-      tesseraBin('free'),
-      ['export'],
+      process.execPath,
+      [tesseraCli('free'), 'export'],
       { cwd: projectDir, timeout: 60_000 },
     );
 

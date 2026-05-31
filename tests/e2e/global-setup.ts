@@ -46,8 +46,12 @@ export function viteBin(fixture: FixtureName): string {
   return resolve(FIXTURES[fixture].source, 'node_modules/.bin/vite');
 }
 
-export function tesseraBin(fixture: FixtureName): string {
-  return resolve(FIXTURES[fixture].source, 'node_modules/.bin/tessera');
+// Run with `node` directly; pnpm skips the .bin/tessera shim when dist isn't built at install time (CI builds after).
+export function tesseraCli(fixture: FixtureName): string {
+  return resolve(
+    FIXTURES[fixture].source,
+    'node_modules/tessera-learn/dist/plugin/cli.js',
+  );
 }
 
 export function fixtureSource(fixture: FixtureName): string {
