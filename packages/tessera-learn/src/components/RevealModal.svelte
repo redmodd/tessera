@@ -12,10 +12,15 @@
 
   function openModal() {
     dialogRef?.showModal();
+    document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
     dialogRef?.close();
+  }
+
+  function handleClose() {
+    document.body.style.overflow = '';
   }
 
   // A click whose target is the dialog element itself (not its content) is a
@@ -36,6 +41,7 @@
   bind:this={dialogRef}
   aria-label={title || 'Modal'}
   onclick={handleClick}
+  onclose={handleClose}
 >
   <div class="tessera-modal-content">
     {#if title}
@@ -158,8 +164,13 @@
   @media (max-width: 640px) {
     .tessera-modal {
       max-height: 90vh;
+      margin-top: auto;
+      margin-bottom: 0;
+    }
+
+    .tessera-modal-content {
+      max-height: 90vh;
       border-radius: 12px 12px 0 0;
-      align-self: flex-end;
     }
   }
 </style>
