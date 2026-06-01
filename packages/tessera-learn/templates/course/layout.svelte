@@ -1,4 +1,5 @@
 <script>
+  import '$shared/tokens.css';
   import { useNavigation, useProgress } from 'tessera-learn';
 
   let { page } = $props();

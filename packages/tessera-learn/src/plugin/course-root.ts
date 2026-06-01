@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { validateProjectName } from './project-name.js';
 
 export interface ResolvedCourse {
   ok: true;
@@ -64,6 +65,12 @@ export function resolveCourse(cwd: string, name?: string): ResolveResult {
   const here = resolve(cwd);
 
   if (name) {
+    if (validateProjectName(name)) {
+      return {
+        ok: false,
+        error: `Invalid course name "${name}" — names are lowercase and may contain only letters, digits, "-", "_", and ".".`,
+      };
+    }
     const workspaceRoot = findWorkspaceRoot(here);
     if (!workspaceRoot) return { ok: false, error: NOT_A_WORKSPACE };
     const courseRoot = join(workspaceRoot, 'courses', name);

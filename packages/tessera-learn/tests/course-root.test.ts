@@ -121,6 +121,16 @@ describe('resolveCourse', () => {
     rmSync(one, { recursive: true, force: true });
   });
 
+  it('rejects a path-traversing or otherwise invalid course name before resolving', () => {
+    const traverse = resolveCourse(ws, '../advanced');
+    expect(traverse.ok).toBe(false);
+    if (!traverse.ok) expect(traverse.error).toContain('Invalid course name');
+
+    const bad = resolveCourse(ws, 'Bad/Name');
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error).toContain('Invalid course name');
+  });
+
   it('errors when a name is given but cwd is not inside a workspace', () => {
     const result = resolveCourse(tmpdir(), 'getting-started');
     expect(result.ok).toBe(false);
