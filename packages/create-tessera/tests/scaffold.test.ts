@@ -143,6 +143,16 @@ describe('create-tessera workspace scaffold', () => {
     expect(pkg.devDependencies.vite).toBeUndefined();
   });
 
+  it('points the package.json scripts at the course it actually stamped', () => {
+    runCLI('my-courses', testDir);
+    const ws = resolve(testDir, 'my-courses');
+    const pkg = JSON.parse(readFileSync(resolve(ws, 'package.json'), 'utf-8'));
+    const course = pkg.scripts.dev.replace('tessera dev ', '');
+    expect(existsSync(resolve(ws, 'courses', course, 'course.config.js'))).toBe(
+      true,
+    );
+  });
+
   it('pins a svelte floor that matches tessera-learn', () => {
     runCLI('my-courses', testDir);
     const scaffolded = JSON.parse(

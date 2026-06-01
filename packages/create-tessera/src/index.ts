@@ -133,6 +133,7 @@ function main() {
     PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(SEED_COURSE),
     TESSERA_VERSION,
+    SEED_COURSE,
   });
 
   process.stdout.write(

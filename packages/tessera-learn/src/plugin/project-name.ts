@@ -4,15 +4,18 @@
 
 // npm package name rules: 1-214 chars, lowercase, must start with [a-z0-9],
 // allowed chars [a-z0-9._-], no leading dot or underscore.
-export function validateProjectName(name: string): string | null {
-  if (!name) return 'Project name is required';
-  if (name.length > 214) return 'Project name must be 214 characters or fewer';
-  if (name !== name.toLowerCase()) return 'Project name must be lowercase';
+export function validateProjectName(
+  name: string,
+  label = 'Project name',
+): string | null {
+  if (!name) return `${label} is required`;
+  if (name.length > 214) return `${label} must be 214 characters or fewer`;
+  if (name !== name.toLowerCase()) return `${label} must be lowercase`;
   if (!/^[a-z0-9]/.test(name)) {
-    return 'Project name must start with a letter or digit';
+    return `${label} must start with a letter or digit`;
   }
   if (!/^[a-z0-9._-]+$/.test(name)) {
-    return 'Project name may only contain lowercase letters, digits, "-", "_", and "."';
+    return `${label} may only contain lowercase letters, digits, "-", "_", and "."`;
   }
   return null;
 }

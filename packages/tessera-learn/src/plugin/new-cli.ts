@@ -20,7 +20,7 @@ export function runNew(name: string | undefined, cwd: string): number {
     return 1;
   }
 
-  const nameError = validateProjectName(name);
+  const nameError = validateProjectName(name, 'Course name');
   if (nameError) {
     console.error(`[tessera new] ${nameError}`);
     return 1;
