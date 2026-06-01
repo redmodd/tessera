@@ -11,28 +11,17 @@ describe('parseArgs', () => {
     expect(parseArgs(['-h'])).toEqual({ help: true });
   });
 
-  it('defaults the template to "default"', () => {
+  it('parses the workspace name', () => {
     expect(parseArgs(['my-course']).args).toEqual({
       projectName: 'my-course',
-      template: 'default',
     });
-  });
-
-  it('accepts --template=bare', () => {
-    expect(parseArgs(['my-course', '--template=bare']).args).toEqual({
-      projectName: 'my-course',
-      template: 'bare',
-    });
-  });
-
-  it('rejects unknown templates', () => {
-    expect(parseArgs(['x', '--template=fancy']).error).toMatch(
-      /Unknown template/,
-    );
   });
 
   it('rejects unknown flags', () => {
     expect(parseArgs(['--version']).error).toMatch(/Unknown option/);
+    expect(parseArgs(['my-course', '--template=bare']).error).toMatch(
+      /Unknown option/,
+    );
   });
 
   it('rejects multiple positional arguments', () => {

@@ -65,8 +65,6 @@ Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will r
 <Callout type="tip"><p>Drop in components for richer content.</p></Callout>
 ```
 
-_Want a minimal starting point with no reference components?_ `pnpm create tessera@latest -- --template=bare my-courses` seeds the workspace's first course hooks-only, useful when you'd rather have the agent build everything from scratch.
-
 ## Updating an existing workspace
 
 Updating is a plain dependency bump — from the workspace root, `pnpm add tessera-learn@latest`. The whole workspace shares the one dependency, so every course moves together, and the framework owns the build and the reserved scripts, so there's nothing else to reconcile. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) for details.

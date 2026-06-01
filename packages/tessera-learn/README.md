@@ -12,7 +12,7 @@ You probably don't want to install this package directly. Use the scaffolder:
 pnpm create tessera@latest my-course
 ```
 
-That creates a workspace with Tessera wired up, a seed course, and the authoring guide (`AGENTS.md`) at the workspace root. Add more courses with `pnpm tessera new <name>`. Prefer hooks-only? `pnpm create tessera@latest my-courses --template=bare` seeds the first course without the built-in components.
+That creates a workspace with Tessera wired up, a seed course, and the authoring guide (`AGENTS.md`) at the workspace root. Add more courses with `pnpm tessera new <name>`.
 
 ## What's included
 

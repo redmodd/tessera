@@ -44,7 +44,7 @@ The full authoring guide ships with the framework at `node_modules/tessera-learn
 
 The Vite build is owned by the `tessera` CLI — there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js`; see the authoring guide.
 
-The `--template` flag picks the **seed course's** template. Every course gets `assets/` (drop images, audio, video here) and `styles/`. The `default` template seeds `styles/custom.css` with optional CSS overrides; the `bare` template leaves them empty and additionally creates a `layout.svelte` at the course root for you to customise.
+Every course gets `assets/` (drop images, audio, video here), a root `layout.svelte` to customise the course shell, and `styles/custom.css` for optional CSS overrides.
 
 Then (the workspace is set up for `pnpm` — Node's corepack provisions it automatically):
 
@@ -82,10 +82,9 @@ The framework owns the build (`tessera dev`/`export`), the reserved scripts, and
 
 ## Flags
 
-| Flag                | Description                                                                                                                                                     |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--template=<name>` | The seed course's template: `default` (full starter, components included) or `bare` (hooks-only, layout.svelte, no built-in components). Defaults to `default`. |
-| `--help`, `-h`      | Print usage and exit.                                                                                                                                           |
+| Flag           | Description           |
+| -------------- | --------------------- |
+| `--help`, `-h` | Print usage and exit. |
 
 ## License
 

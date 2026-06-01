@@ -214,46 +214,10 @@ describe('create-tessera workspace scaffold', () => {
     expect(stdout).not.toContain('npm run dev');
   });
 
-  it('errors on unknown --template value', () => {
-    const { stderr, exitCode } = runCLI('my-courses --template=fancy', testDir);
+  it('rejects an unknown flag', () => {
+    const { stderr, exitCode } = runCLI('my-courses --template=bare', testDir);
     expect(exitCode).toBe(1);
-    expect(stderr).toContain('Unknown template');
-  });
-
-  describe('--template=bare', () => {
-    it('seeds a bare course with a useQuestion check page', () => {
-      runCLI('bare-courses --template=bare', testDir);
-      const ws = resolve(testDir, 'bare-courses');
-      const checkPage = readFileSync(
-        resolve(ws, SEED, 'pages/01-course/01-lesson/check.svelte'),
-        'utf-8',
-      );
-      expect(checkPage).toContain('useQuestion');
-      expect(checkPage).toContain("type: 'choice'");
-    });
-
-    it('differs from the default seed (no branding, different pages)', () => {
-      runCLI('bare-courses --template=bare', testDir);
-      const ws = resolve(testDir, 'bare-courses');
-      const config = readFileSync(
-        resolve(ws, SEED, 'course.config.js'),
-        'utf-8',
-      );
-      expect(config).not.toContain('branding');
-      // default seed ships a getting-started section; bare ships a course/lesson.
-      expect(existsSync(resolve(ws, SEED, 'pages/01-getting-started'))).toBe(
-        false,
-      );
-      expect(existsSync(resolve(ws, SEED, 'pages/01-course'))).toBe(true);
-    });
-
-    it('still writes the workspace shell', () => {
-      runCLI('bare-courses --template=bare', testDir);
-      const ws = resolve(testDir, 'bare-courses');
-      expect(existsSync(resolve(ws, 'AGENTS.md'))).toBe(true);
-      expect(existsSync(resolve(ws, 'shared/Button.svelte'))).toBe(true);
-      expect(existsSync(resolve(ws, 'package.json'))).toBe(true);
-    });
+    expect(stderr).toContain('Unknown option');
   });
 });
 
@@ -276,7 +240,7 @@ describe('course template build-sync', () => {
     });
   }
 
-  it.each(['course', 'course-bare'])(
+  it.each(['course'])(
     'the synced %s copy byte-matches tessera-learn (no drift)',
     (name) => {
       const src = join(sourceRoot, name);

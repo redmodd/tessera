@@ -18,17 +18,15 @@ const TESSERA_VERSION = ownPkg.version;
 // The first course every workspace ships with. `tessera new <name>` adds more.
 const SEED_COURSE = 'getting-started';
 
-const USAGE = `Usage: create-tessera <workspace-name> [--template=<default|bare>]
+const USAGE = `Usage: create-tessera <workspace-name>
 
 Scaffold a new Tessera workspace (a home for many courses).
 
 Options:
-  --template=<name>   First course's template ("default" or "bare", default: "default")
   --help, -h          Show this help
 
 Examples:
   pnpm create tessera@latest my-courses
-  pnpm create tessera@latest my-courses --template=bare
 
 Add more courses to an existing workspace from its root:
   pnpm tessera new <name>
@@ -37,11 +35,8 @@ To update the framework, bump the dependency from the workspace root:
   pnpm add tessera-learn@latest
 `;
 
-type Template = 'default' | 'bare';
-
 interface ParsedArgs {
   projectName?: string;
-  template: Template;
 }
 
 interface ParseResult {
@@ -51,18 +46,10 @@ interface ParseResult {
 }
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: ParsedArgs = { template: 'default' };
+  const args: ParsedArgs = {};
   for (const a of argv) {
     if (a === '--help' || a === '-h') return { help: true };
-    if (a.startsWith('--template=')) {
-      const v = a.slice('--template='.length);
-      if (v !== 'default' && v !== 'bare') {
-        return {
-          error: `Unknown template "${v}". Valid templates: default, bare`,
-        };
-      }
-      args.template = v;
-    } else if (a.startsWith('-')) {
+    if (a.startsWith('-')) {
       return { error: `Unknown option "${a}"` };
     } else if (!args.projectName) {
       args.projectName = a;
@@ -78,7 +65,7 @@ export function parseArgs(argv: string[]): ParseResult {
 type Tokens = Record<string, string>;
 
 // Scaffold the workspace shell, then stamp the first course under courses/.
-function scaffold(dir: string, template: Template, tokens: Tokens) {
+function scaffold(dir: string, tokens: Tokens) {
   copyTemplate(resolve(PKG_ROOT, 'templates/workspace'), dir, tokens);
   // CLAUDE.md and AGENTS.md are the same pointer stub under two names so each
   // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). They
@@ -86,9 +73,8 @@ function scaffold(dir: string, template: Template, tokens: Tokens) {
   // pointers, and the @-import path resolves to node_modules only from here.
   copyFileSync(join(dir, 'AGENTS.md'), join(dir, 'CLAUDE.md'));
 
-  const courseTemplate = template === 'bare' ? 'course-bare' : 'course';
   copyTemplate(
-    resolve(PKG_ROOT, 'templates', courseTemplate),
+    resolve(PKG_ROOT, 'templates', 'course'),
     join(dir, 'courses', SEED_COURSE),
     tokens,
   );
@@ -129,7 +115,7 @@ function main() {
 
   mkdirSync(projectDir, { recursive: true });
 
-  scaffold(projectDir, args.template, {
+  scaffold(projectDir, {
     PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(SEED_COURSE),
     TESSERA_VERSION,
@@ -137,7 +123,7 @@ function main() {
   });
 
   process.stdout.write(
-    `\nCreated workspace ${name} (${args.template} template).\n\n` +
+    `\nCreated workspace ${name}.\n\n` +
       `Next steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n\n` +
       `Add another course:\n  pnpm tessera new <name>\n`,
   );

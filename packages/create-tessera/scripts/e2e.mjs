@@ -1,7 +1,7 @@
-// End-to-end check: scaffold each template, install the *local* tessera-learn,
+// End-to-end check: scaffold a workspace, install the *local* tessera-learn,
 // then validate and build it under every export standard, asserting each one
-// produces output. This is what proves the on-disk templates are real,
-// installable, validatable, buildable projects — not just text.
+// produces output. This is what proves the on-disk template is a real,
+// installable, validatable, buildable project — not just text.
 //
 // tessera-learn is packed from this repo and installed over the scaffolded
 // `^0.0.x` pin, so the e2e validates the in-repo framework regardless of what is
@@ -22,7 +22,6 @@ import { fileURLToPath } from 'node:url';
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PKG_ROOT, '..', '..');
 const CLI = join(PKG_ROOT, 'dist', 'index.js');
-const TEMPLATES = ['default', 'bare'];
 // The scaffolded seed course. Its content (course.config.js, dist/, the zip)
 // lives under courses/<seed>/; the npm scripts run from the workspace root.
 const SEED_COURSE = 'getting-started';
@@ -52,22 +51,18 @@ function setStandard(projectDir, standard) {
   writeFileSync(cfg, src.replace(re, `standard: '${standard}'`));
 }
 
-function assertExport(projectDir, template, standard) {
+function assertExport(projectDir, standard) {
   const dist = join(projectDir, 'dist');
   if (!existsSync(dist) || readdirSync(dist).length === 0) {
-    throw new Error(
-      `[${template}/${standard}] expected non-empty dist/ after export`,
-    );
+    throw new Error(`[${standard}] expected non-empty dist/ after export`);
   }
   if (standard === 'web') return;
   if (!existsSync(join(dist, MANIFEST[standard]))) {
-    throw new Error(
-      `[${template}/${standard}] expected ${MANIFEST[standard]} in dist/`,
-    );
+    throw new Error(`[${standard}] expected ${MANIFEST[standard]} in dist/`);
   }
   if (!readdirSync(projectDir).some((f) => f.endsWith('.zip'))) {
     throw new Error(
-      `[${template}/${standard}] expected a packaged .zip in the project root`,
+      `[${standard}] expected a packaged .zip in the project root`,
     );
   }
 }
@@ -88,27 +83,25 @@ if (!tgz) {
 const tarball = join(packDir, tgz);
 console.log(`\nLocal tessera-learn tarball: ${tarball}`);
 
-for (const template of TEMPLATES) {
-  const work = mkdtempSync(join(tmpdir(), `tessera-e2e-${template}-`));
-  const name = `${template}-workspace`;
-  const projectDir = join(work, name);
-  const courseDir = join(projectDir, 'courses', SEED_COURSE);
+const work = mkdtempSync(join(tmpdir(), 'tessera-e2e-'));
+const name = 'e2e-workspace';
+const projectDir = join(work, name);
+const courseDir = join(projectDir, 'courses', SEED_COURSE);
 
-  run(`node "${CLI}" ${name} --template=${template}`, work);
-  // Installs the tarball as tessera-learn (overriding the registry pin) plus the
-  // registry devDeps in one shot, into the workspace's single node_modules.
-  run(`npm install "${tarball}"`, projectDir);
+run(`node "${CLI}" ${name}`, work);
+// Installs the tarball as tessera-learn (overriding the registry pin) plus the
+// registry devDeps in one shot, into the workspace's single node_modules.
+run(`npm install "${tarball}"`, projectDir);
 
-  for (const standard of STANDARDS) {
-    // Standard lives in the course config; scripts build from the workspace root.
-    setStandard(courseDir, standard);
-    run('npm run validate', projectDir);
-    run('npm run export', projectDir);
-    assertExport(courseDir, template, standard);
-    console.log(`\n✓ ${template}/${standard}: validated and built`);
-  }
+for (const standard of STANDARDS) {
+  // Standard lives in the course config; scripts build from the workspace root.
+  setStandard(courseDir, standard);
+  run('npm run validate', projectDir);
+  run('npm run export', projectDir);
+  assertExport(courseDir, standard);
+  console.log(`\n✓ ${standard}: validated and built`);
 }
 
 console.log(
-  '\nAll templates validated and built across every export standard.',
+  '\nThe scaffolded course validated and built across every export standard.',
 );

@@ -10,7 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const createTesseraRoot = resolve(here, '..');
 const tesseraLearnRoot = resolve(createTesseraRoot, '..', 'tessera-learn');
 
-const TEMPLATES = ['course', 'course-bare'];
+const TEMPLATES = ['course'];
 
 for (const name of TEMPLATES) {
   const src = resolve(tesseraLearnRoot, 'templates', name);
