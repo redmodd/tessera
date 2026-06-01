@@ -33,6 +33,7 @@ pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps alre
 tessera dev <name>          # run a command against a named course…
 cd courses/<name> && tessera dev   # …or cd into the course and run it bare
 tessera export <name>       # each course exports independently to its own LMS package
+cd courses/<name> && tessera export   # …the bare form works for every command, not just dev
 ```
 
 A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `starter-course`.)
