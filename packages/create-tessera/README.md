@@ -33,12 +33,12 @@ yarn create tessera my-courses
 The scaffolder creates a workspace directory with:
 
 - `package.json`: the one package — owns `tessera-learn`, Svelte, and the reserved scripts
-- `courses/getting-started/`: a seed course (`course.config.js`, `pages/`, `styles/`, …)
+- `courses/starter-course/`: a seed course (`course.config.js`, `pages/`, `styles/`, …)
 - `shared/`: a design system shared across courses, imported as `$shared` (`Button.svelte`, `tokens.css`)
 - `AGENTS.md` and `CLAUDE.md`: small pointers to the authoring guide (see below)
 - `.gitignore`
 
-A **course** is a self-contained folder under `courses/`. The workspace seeds one (`getting-started`); add more with `pnpm tessera new <name>`, which stamps `courses/<name>/` without re-installing (the workspace already owns the dependencies). Each course exports independently to its own LMS package.
+A **course** is a self-contained folder under `courses/`. The workspace seeds one (`starter-course`); add more with `pnpm tessera new <name>`, which stamps `courses/<name>/` without re-installing (the workspace already owns the dependencies). Each course exports independently to its own LMS package.
 
 The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version — there's no copy to maintain in the workspace. The scaffolded `CLAUDE.md` imports it (Claude Code reads `CLAUDE.md` and loads the guide automatically); the scaffolded `AGENTS.md` points other agents (Codex, Cursor, …) at the same file. Both live at the workspace root only — open the workspace folder (not an individual course) so the guide stays in scope and `$shared` resolves.
 
@@ -51,14 +51,14 @@ Then (the workspace is set up for `pnpm` — Node's corepack provisions it autom
 ```bash
 cd my-courses
 pnpm install
-pnpm dev                     # local dev server at http://localhost:5173 (runs the getting-started course)
-pnpm export                  # build + package the getting-started course for its configured LMS standard
-pnpm validate                # check the getting-started course for structural errors, no server or build
+pnpm dev                     # local dev server at http://localhost:5173 (runs the starter-course course)
+pnpm export                  # build + package the starter-course course for its configured LMS standard
+pnpm validate                # check the starter-course course for structural errors, no server or build
 pnpm check                   # validate, then the runtime accessibility audit (axe) over the built course
 pnpm tessera new <name>      # add another course at courses/<name>/
 ```
 
-The root scripts target the seed course `getting-started`. To run a command against a different course, name it (`tessera dev <name>`) or `cd` into its folder and run the command bare. A bare command at the workspace root lists the available courses rather than guessing.
+The root scripts target the seed course `starter-course`. To run a command against a different course, name it (`tessera dev <name>`) or `cd` into its folder and run the command bare. A bare command at the workspace root lists the available courses rather than guessing.
 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 

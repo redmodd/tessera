@@ -17,7 +17,7 @@ my-courses/
 │   ├── Button.svelte
 │   └── tokens.css
 ├── courses/
-│   ├── getting-started/    # a course = a content folder (course.config.js, pages/, …)
+│   ├── starter-course/     # a course = a content folder (course.config.js, pages/, …)
 │   └── <next course>/
 └── AGENTS.md / CLAUDE.md   # pointers to this guide (workspace root only)
 ```
@@ -35,7 +35,7 @@ cd courses/<name> && tessera dev   # …or cd into the course and run it bare
 tessera export <name>       # each course exports independently to its own LMS package
 ```
 
-A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `getting-started`.)
+A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `starter-course`.)
 
 ### Sharing across courses with `$shared`
 

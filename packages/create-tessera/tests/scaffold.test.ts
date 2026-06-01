@@ -70,7 +70,7 @@ execSync('pnpm build', {
   stdio: 'ignore',
 });
 
-const SEED = 'courses/getting-started';
+const SEED = 'courses/starter-course';
 
 describe('create-tessera workspace scaffold', () => {
   it('prints usage when no arguments provided', () => {
@@ -112,7 +112,7 @@ describe('create-tessera workspace scaffold', () => {
     expect(existsSync(resolve(ws, 'pages'))).toBe(false);
   });
 
-  it('lands the first course under courses/getting-started', () => {
+  it('lands the first course under courses/starter-course', () => {
     runCLI('my-courses', testDir);
     const ws = resolve(testDir, 'my-courses');
     expect(existsSync(resolve(ws, SEED, 'course.config.js'))).toBe(true);
@@ -132,9 +132,9 @@ describe('create-tessera workspace scaffold', () => {
     expect(pkg.private).toBe(true);
     // A bare `tessera dev` from the workspace root errors by design, so the
     // scaffolded scripts must name the seed course.
-    expect(pkg.scripts.dev).toBe('tessera dev getting-started');
-    expect(pkg.scripts.export).toBe('tessera export getting-started');
-    expect(pkg.scripts.validate).toBe('tessera validate getting-started');
+    expect(pkg.scripts.dev).toBe('tessera dev starter-course');
+    expect(pkg.scripts.export).toBe('tessera export starter-course');
+    expect(pkg.scripts.validate).toBe('tessera validate starter-course');
     expect(pkg.scripts.dev).not.toBe('tessera dev');
     expect(pkg.scripts.new).toBe('tessera new');
     expect(pkg.dependencies['tessera-learn']).toBeDefined();
@@ -187,7 +187,7 @@ describe('create-tessera workspace scaffold', () => {
       resolve(testDir, 'my-courses', SEED, 'course.config.js'),
       'utf-8',
     );
-    expect(config).toContain("title: 'Getting Started'");
+    expect(config).toContain("title: 'Starter Course'");
   });
 
   it('renames dotfiles on copy', () => {

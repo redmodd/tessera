@@ -16,7 +16,7 @@ const ownPkg = JSON.parse(
 const TESSERA_VERSION = ownPkg.version;
 
 // The first course every workspace ships with. `tessera new <name>` adds more.
-const SEED_COURSE = 'getting-started';
+const SEED_COURSE = 'starter-course';
 
 const USAGE = `Usage: create-tessera <workspace-name>
 

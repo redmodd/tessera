@@ -24,7 +24,7 @@ const REPO_ROOT = resolve(PKG_ROOT, '..', '..');
 const CLI = join(PKG_ROOT, 'dist', 'index.js');
 // The scaffolded seed course. Its content (course.config.js, dist/, the zip)
 // lives under courses/<seed>/; the npm scripts run from the workspace root.
-const SEED_COURSE = 'getting-started';
+const SEED_COURSE = 'starter-course';
 // Every export target. Packaged standards (all but web) write a manifest into
 // dist/ and a zip into the project root; web just emits the static dist/.
 const STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
