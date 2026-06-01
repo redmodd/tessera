@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  mkdirSync,
+  rmSync,
+} from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, execSync } from 'node:child_process';
 
@@ -239,4 +245,37 @@ describe('create-tessera workspace scaffold', () => {
       expect(existsSync(resolve(ws, 'package.json'))).toBe(true);
     });
   });
+});
+
+// The build syncs tessera-learn's course templates into create-tessera; drift
+// would ship a stale course. (The `pnpm build` above runs the sync first.)
+describe('course template build-sync', () => {
+  const copyRoot = resolve(__dirname, '..', 'templates');
+  const sourceRoot = resolve(
+    __dirname,
+    '..',
+    '..',
+    'tessera-learn',
+    'templates',
+  );
+
+  function relFiles(dir: string, base: string = dir): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = join(dir, e.name);
+      return e.isDirectory() ? relFiles(p, base) : [relative(base, p)];
+    });
+  }
+
+  it.each(['course', 'course-bare'])(
+    'the synced %s copy byte-matches tessera-learn (no drift)',
+    (name) => {
+      const src = join(sourceRoot, name);
+      const copy = join(copyRoot, name);
+      const srcFiles = relFiles(src).sort();
+      expect(relFiles(copy).sort()).toEqual(srcFiles);
+      for (const f of srcFiles) {
+        expect(readFileSync(join(copy, f))).toEqual(readFileSync(join(src, f)));
+      }
+    },
+  );
 });
