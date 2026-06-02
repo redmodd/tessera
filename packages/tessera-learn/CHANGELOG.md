@@ -1,5 +1,19 @@
 # tessera-learn
 
+## 0.2.0
+
+### Minor Changes
+
+- a60b5bb: **Workspaces: one project, many courses.** `npm create tessera` now scaffolds a _workspace_ — a single package that holds many courses under `courses/<name>/`, sharing one `node_modules` and a `shared/` design system imported as `$shared` (resolved in dev, bundled into each export). Every course still exports independently to its own SCORM 1.2 / SCORM 2004 4e / cmi5 / web package.
+  - `tessera new <name>` stamps a new course; `tessera duplicate <source> <new>` copies an existing one verbatim (config and title included).
+  - `dev` / `export` / `validate` / `a11y` / `check` take an optional course name (`tessera dev <name>`), or run bare from inside a course folder; a bare command at the workspace root lists the available courses instead of guessing.
+
+  **Breaking:** the standalone single-course layout is no longer scaffolded or supported — the workspace is the only shape going forward. Pre-1.0, so this ships as a `minor` (0.x).
+
+### Patch Changes
+
+- 5f18964: Correct the `tessera` CLI's invocation hints and docs for a project-local bin, and add an `a11y` script to scaffolded projects (`pnpm a11y`).
+
 ## 0.1.0
 
 ### Minor Changes
