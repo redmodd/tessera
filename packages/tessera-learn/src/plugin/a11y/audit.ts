@@ -35,6 +35,7 @@ interface PageAuditResult {
   index: number;
   title: string;
   violations: AxeViolation[];
+  loadFailed?: boolean;
 }
 
 interface AuditReport {
@@ -43,6 +44,7 @@ interface AuditReport {
   pages: PageAuditResult[];
   pagesAudited: number;
   totalPages: number;
+  pagesFailedToLoad: number;
   totalViolations: number;
   failingViolations: number;
   passed: boolean;
@@ -238,6 +240,19 @@ export async function runAudit(
         }));
       };
 
+      const recordPage = async (
+        index: number,
+        title: string,
+      ): Promise<PageAuditResult> => {
+        const loadFailed = await page.evaluate(
+          () =>
+            document.getElementById('tessera-app')?.dataset.tesseraPageError ===
+            'true',
+        );
+        if (loadFailed) return { index, title, violations: [], loadFailed };
+        return { index, title, violations: await scan() };
+      };
+
       const totalPages = manifest.pages.length;
       const hasAuditHook = await page.evaluate(
         () => typeof window.__tesseraAudit?.goToIndex === 'function',
@@ -252,11 +267,7 @@ export async function runAudit(
               `(1 of ${totalPages}). The report records the reduced scope.`,
           );
         }
-        pages.push({
-          index: 0,
-          title: manifest.pages[0]?.title ?? '(entry)',
-          violations: await scan(),
-        });
+        pages.push(await recordPage(0, manifest.pages[0]?.title ?? '(entry)'));
       } else {
         for (let i = 0; i < totalPages; i++) {
           await page.evaluate(
@@ -271,11 +282,9 @@ export async function runAudit(
             { timeout: 20_000 },
           );
           await page.waitForLoadState('networkidle');
-          pages.push({
-            index: i,
-            title: manifest.pages[i]?.title ?? `Page ${i + 1}`,
-            violations: await scan(),
-          });
+          pages.push(
+            await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
+          );
         }
       }
     } finally {
@@ -285,7 +294,9 @@ export async function runAudit(
     const thresholdRank = IMPACT_RANK[threshold];
     let totalViolations = 0;
     let failingViolations = 0;
+    let pagesFailedToLoad = 0;
     for (const p of pages) {
+      if (p.loadFailed) pagesFailedToLoad++;
       for (const v of p.violations) {
         totalViolations++;
         if (isFailing(v, thresholdRank)) failingViolations++;
@@ -298,9 +309,10 @@ export async function runAudit(
       pages,
       pagesAudited: pages.length,
       totalPages: manifest.pages.length,
+      pagesFailedToLoad,
       totalViolations,
       failingViolations,
-      passed: failingViolations === 0,
+      passed: failingViolations === 0 && pagesFailedToLoad === 0,
     };
     const reportPath = resolve(projectRoot, 'a11y-report.json');
     writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
@@ -324,6 +336,10 @@ export async function runAudit(
 function printSummary(report: AuditReport, reportPath: string): void {
   const thresholdRank = IMPACT_RANK[report.threshold];
   for (const p of report.pages) {
+    if (p.loadFailed) {
+      console.log(`\x1b[31m  ✗\x1b[0m ${p.title} — failed to load`);
+      continue;
+    }
     if (p.violations.length === 0) {
       console.log(`\x1b[32m  ✓\x1b[0m ${p.title}`);
       continue;
@@ -350,8 +366,17 @@ function printSummary(report: AuditReport, reportPath: string): void {
       `\x1b[32m[tessera a11y] Passed\x1b[0m — ${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
     );
   } else {
+    const reasons: string[] = [];
+    if (report.failingViolations > 0) {
+      reasons.push(
+        `${report.failingViolations} finding(s) at/above "${report.threshold}" (of ${report.totalViolations} total)`,
+      );
+    }
+    if (report.pagesFailedToLoad > 0) {
+      reasons.push(`${report.pagesFailedToLoad} page(s) failed to load`);
+    }
     console.log(
-      `\x1b[31m[tessera a11y] Failed\x1b[0m — ${report.failingViolations} finding(s) at/above "${report.threshold}" (of ${report.totalViolations} total).`,
+      `\x1b[31m[tessera a11y] Failed\x1b[0m — ${reasons.join('; ')}.`,
     );
   }
 }

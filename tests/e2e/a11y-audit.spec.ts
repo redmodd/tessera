@@ -51,15 +51,17 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     ]);
   });
 
-  // A page whose module throws on import renders an ErrorPage rather than
-  // settling its navigation through the success path. The auditor must still
-  // reach and scan every page instead of hanging on the broken one and aborting
-  // the run with no report written.
-  test('still audits every page when one page fails to load', async () => {
+  // The broken fixture's middle page throws on import: the audit must reach
+  // every page, flag the failure, and fail the run rather than pass on the
+  // accessible ErrorPage it renders.
+  test('flags and fails on a page that fails to load', async () => {
     test.setTimeout(120_000);
     const dir = variantDir('broken-page', 'web');
 
-    await runAudit(dir, dir, { threshold: 'serious', rebuild: true });
+    const code = await runAudit(dir, dir, {
+      threshold: 'serious',
+      rebuild: true,
+    });
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -72,5 +74,10 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
       'Broken',
       'Summary',
     ]);
+    expect(report.pages[1].loadFailed).toBe(true);
+    expect(report.pages[1].violations).toEqual([]);
+    expect(report.pagesFailedToLoad).toBe(1);
+    expect(report.passed).toBe(false);
+    expect(code).toBe(1);
   });
 });

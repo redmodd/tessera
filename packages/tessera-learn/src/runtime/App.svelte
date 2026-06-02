@@ -492,6 +492,7 @@
   id="tessera-app"
   data-chrome={chromeMode}
   data-tessera-page-index={auditMode ? renderedPageIndex : undefined}
+  data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
 >
   <LoadingBar active={pageLoading} />
   {#if UserLayout}
