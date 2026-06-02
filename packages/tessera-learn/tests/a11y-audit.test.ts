@@ -3,6 +3,8 @@ import {
   axeTags,
   axeIgnoreRules,
   isMissingBrowserError,
+  mapNodeDetail,
+  mapViolation,
 } from '../src/plugin/a11y/audit.js';
 
 describe('axeTags', () => {
@@ -27,6 +29,69 @@ describe('axeIgnoreRules', () => {
       'color-contrast',
     ];
     expect(axeIgnoreRules(ignore)).toEqual(['image-alt', 'color-contrast']);
+  });
+});
+
+describe('mapNodeDetail', () => {
+  it('joins the target selector, keeps the html, and collapses the summary', () => {
+    expect(
+      mapNodeDetail({
+        target: ['.how-to-play', '.hint'],
+        html: '<p class="hint">Tap a sign</p>',
+        failureSummary:
+          'Fix any of the following:\n  Element has insufficient color contrast of 3.1',
+      }),
+    ).toEqual({
+      target: '.how-to-play .hint',
+      html: '<p class="hint">Tap a sign</p>',
+      summary:
+        'Fix any of the following: Element has insufficient color contrast of 3.1',
+    });
+  });
+
+  it('truncates over-long html and tolerates missing fields', () => {
+    const result = mapNodeDetail({ html: 'x'.repeat(500) });
+    expect(result.target).toBe('');
+    expect(result.summary).toBe('');
+    expect(result.html).toHaveLength(200);
+    expect(result.html.endsWith('…')).toBe(true);
+  });
+});
+
+describe('mapViolation', () => {
+  it('keeps the count and expands per-node detail', () => {
+    const result = mapViolation({
+      id: 'color-contrast',
+      impact: 'serious',
+      help: 'Elements must meet minimum color contrast ratio thresholds',
+      helpUrl: 'https://example.test/color-contrast',
+      nodes: [
+        {
+          target: ['.hint'],
+          html: '<p class="hint">x</p>',
+          failureSummary: 'Expected contrast ratio of 4.5:1',
+        },
+      ],
+    });
+    expect(result.nodes).toBe(1);
+    expect(result.elements).toEqual([
+      {
+        target: '.hint',
+        html: '<p class="hint">x</p>',
+        summary: 'Expected contrast ratio of 4.5:1',
+      },
+    ]);
+  });
+
+  it('normalizes a missing impact to null', () => {
+    const result = mapViolation({
+      id: 'region',
+      help: 'h',
+      helpUrl: 'u',
+      nodes: [],
+    });
+    expect(result.impact).toBeNull();
+    expect(result.elements).toEqual([]);
   });
 });
 
