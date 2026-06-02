@@ -48,6 +48,13 @@
   );
   const nav = new NavigationState(manifest, progress, config, auditMode);
   nav.setPageModules(pageModules);
+
+  // Layout-independent navigation seam the Tier-2 auditor walks pages through.
+  if (auditMode) {
+    window.__tesseraAudit = {
+      goToIndex: (i) => nav.goToPage(i),
+    };
+  }
   let duration = $state(new DurationTracker(0));
 
   const onIdle =
@@ -64,6 +71,9 @@
   let pageLoading = $state(true);
   let pageError = $state(null);
   let retryKey = $state(0);
+  // Rendered page index, surfaced on #tessera-app so the auditor can wait for a
+  // requested navigation to settle before scanning.
+  let renderedPageIndex = $state(-1);
 
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({
@@ -130,6 +140,7 @@
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
       pageLoading = false;
+      renderedPageIndex = index;
       return;
     }
 
@@ -140,6 +151,7 @@
         pageContext.quiz = page.quiz;
         PageComponent = mod.default;
         pageLoading = false;
+        renderedPageIndex = index;
         progress.markVisited(index);
         if (
           manifest.pages[index].completesOn === 'view' &&
@@ -154,6 +166,7 @@
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
         pageLoading = false;
+        renderedPageIndex = index;
       });
   }
 
@@ -446,6 +459,7 @@
   });
 
   onDestroy(() => {
+    if (auditMode) delete window.__tesseraAudit;
     window.removeEventListener('pagehide', handleExit);
     window.removeEventListener('beforeunload', handleExit);
     const appEl = document.getElementById('tessera-app');
@@ -474,7 +488,12 @@
   {/if}
 {/snippet}
 
-<div id="tessera-app" data-chrome={chromeMode}>
+<div
+  id="tessera-app"
+  data-chrome={chromeMode}
+  data-tessera-page-index={auditMode ? renderedPageIndex : undefined}
+  data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
+>
   <LoadingBar active={pageLoading} />
   {#if UserLayout}
     <UserLayout {page} />

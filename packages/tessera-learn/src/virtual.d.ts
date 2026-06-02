@@ -30,3 +30,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  __tesseraAudit?: {
+    goToIndex(index: number): void;
+  };
+}

@@ -130,6 +130,16 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@25.9.1)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.27.4))
 
+  tests/fixtures/broken-page:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      vite:
+        specifier: ^8.0.14
+        version: 8.0.14(@types/node@25.9.1)(esbuild@0.27.4)
+
   tests/fixtures/custom-layout:
     dependencies:
       tessera-learn:
