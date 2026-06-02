@@ -33,7 +33,6 @@ interface ImportMeta {
 
 interface Window {
   __tesseraAudit?: {
-    totalPages: number;
     goToIndex(index: number): void;
   };
 }

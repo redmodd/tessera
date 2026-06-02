@@ -52,7 +52,6 @@
   // Layout-independent navigation seam the Tier-2 auditor walks pages through.
   if (auditMode) {
     window.__tesseraAudit = {
-      totalPages: manifest.totalPages,
       goToIndex: (i) => nav.goToPage(i),
     };
   }

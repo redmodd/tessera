@@ -338,6 +338,13 @@ function printSummary(report: AuditReport, reportPath: string): void {
     }
   }
   console.log(`\n[tessera a11y] Report written to ${reportPath}`);
+  if (report.pagesAudited < report.totalPages) {
+    console.log(
+      `\x1b[33m[tessera a11y] Covered ${report.pagesAudited} of ${report.totalPages} page(s)\x1b[0m — reduced scope, the rest were not audited.`,
+    );
+  } else {
+    console.log(`[tessera a11y] Covered all ${report.totalPages} page(s).`);
+  }
   if (report.passed) {
     console.log(
       `\x1b[32m[tessera a11y] Passed\x1b[0m — ${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
