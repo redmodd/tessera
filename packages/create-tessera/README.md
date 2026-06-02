@@ -56,6 +56,7 @@ pnpm export                  # build + package the starter-course course for its
 pnpm validate                # check the starter-course course for structural errors, no server or build
 pnpm check                   # validate, then the runtime accessibility audit (axe) over the built course
 pnpm tessera new <name>      # add another course at courses/<name>/
+pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
 ```
 
 The root scripts target the seed course `starter-course`. To run a command against a different course, name it (`pnpm tessera dev <name>`) or `cd` into its folder and run `pnpm exec tessera dev`. A bare command at the workspace root lists the available courses rather than guessing.

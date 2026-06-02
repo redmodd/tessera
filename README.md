@@ -44,6 +44,7 @@ pnpm dev               # local dev server at http://localhost:5173 (runs the see
 pnpm export            # build + package the seed course for the configured standard
 pnpm validate          # check the seed course for structural errors, no server or build
 pnpm tessera new intro # add another course at courses/intro/
+pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
 (If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)

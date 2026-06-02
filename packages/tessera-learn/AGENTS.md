@@ -30,6 +30,7 @@ my-courses/
 
 ```bash
 pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps already here)
+pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
 pnpm tessera dev <name>     # run a command against a named course…
 cd courses/<name> && pnpm exec tessera dev   # …or cd into the course and run it without a name
 pnpm tessera export <name>  # each course exports independently to its own LMS package

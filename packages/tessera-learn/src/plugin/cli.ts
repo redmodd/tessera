@@ -2,17 +2,19 @@
 import { runValidate } from './validate-cli.js';
 import { runA11y } from './a11y-cli.js';
 import { runNew } from './new-cli.js';
+import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
 
 const USAGE = `Usage: tessera <command> [course] [options]
 
 Commands:
-  new <name>          Scaffold a new course into courses/<name>
-  dev    [course]     Start the Vite dev server
-  export [course]     Build and package the course for its LMS standard
-  validate [course]   Fast static structure checks
-  a11y   [course]     Runtime accessibility audit (builds + drives Playwright)
-  check  [course]     Run validate, then a11y
+  new <name>                  Scaffold a new course into courses/<name>
+  duplicate <source> <new>    Copy courses/<source> to courses/<new>
+  dev       [course]          Start the Vite dev server
+  export    [course]          Build and package the course for its LMS standard
+  validate  [course]          Fast static structure checks
+  a11y      [course]          Runtime accessibility audit (builds + drives Playwright)
+  check     [course]          Run validate, then a11y
 
 Run a command from inside a course folder, or name the course explicitly.
 
@@ -40,6 +42,7 @@ export async function main(
   const [sub, ...rest] = argv;
 
   if (sub === 'new') return runNew(rest[0], cwd);
+  if (sub === 'duplicate') return runDuplicate(rest[0], rest[1], cwd);
 
   switch (sub) {
     case 'dev':
