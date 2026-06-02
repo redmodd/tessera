@@ -42,7 +42,6 @@ export function runNew(name: string | undefined, cwd: string): number {
 
   const templateDir = join(resolvePackageRoot(), 'templates', 'course');
   copyTemplate(templateDir, courseDir, {
-    PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(name),
   });
 

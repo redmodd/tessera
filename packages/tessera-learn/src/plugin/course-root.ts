@@ -65,10 +65,11 @@ export function resolveCourse(cwd: string, name?: string): ResolveResult {
   const here = resolve(cwd);
 
   if (name) {
-    if (validateProjectName(name)) {
+    const nameError = validateProjectName(name, 'the name');
+    if (nameError) {
       return {
         ok: false,
-        error: `Invalid course name "${name}" — names are lowercase and may contain only letters, digits, "-", "_", and ".".`,
+        error: `Invalid course name "${name}" — ${nameError}.`,
       };
     }
     const workspaceRoot = findWorkspaceRoot(here);
