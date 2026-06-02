@@ -40,16 +40,16 @@ node --version    # should print v24.x.x or higher
 pnpm create tessera@latest my-courses
 cd my-courses
 pnpm install
-pnpm dev               # local dev server at http://localhost:5173 (runs the seed course)
-pnpm export            # build + package the seed course for the configured standard
-pnpm validate          # check the seed course for structural errors, no server or build
+pnpm dev starter-course      # local dev server at http://localhost:5173
+pnpm export starter-course   # build + package the course for the configured standard
+pnpm validate starter-course # check the course for structural errors, no server or build
 pnpm tessera new intro # add another course at courses/intro/
 pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
 (If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)
 
-This scaffolds a workspace with one seed course (`starter-course`). The root scripts above target that course; to drive another, name it (`pnpm tessera dev intro`) or `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). The root scripts forward to whichever course you name — `pnpm dev <course>` runs it, while a bare `pnpm dev` lists the available courses rather than guessing. You can also `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
 Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
@@ -92,7 +92,7 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 **Permission errors during `pnpm install`**: don't use `sudo`. See [pnpm's guide to resolving permission errors](https://pnpm.io/cli/install#--no-optional).
 
-**The browser shows a blank page after `pnpm dev`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
+**The browser shows a blank page after `pnpm dev <course>`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
 
 ## Documentation
 

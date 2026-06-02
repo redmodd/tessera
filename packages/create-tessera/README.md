@@ -51,15 +51,15 @@ Then (the workspace is set up for `pnpm` — Node's corepack provisions it autom
 ```bash
 cd my-courses
 pnpm install
-pnpm dev                     # local dev server at http://localhost:5173 (runs the starter-course course)
-pnpm export                  # build + package the starter-course course for its configured LMS standard
-pnpm validate                # check the starter-course course for structural errors, no server or build
-pnpm check                   # validate, then the runtime accessibility audit (axe) over the built course
+pnpm dev starter-course      # local dev server at http://localhost:5173
+pnpm export starter-course   # build + package the course for its configured LMS standard
+pnpm validate starter-course # check the course for structural errors, no server or build
+pnpm check starter-course    # validate, then the runtime accessibility audit (axe) over the built course
 pnpm tessera new <name>      # add another course at courses/<name>/
 pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
 ```
 
-The root scripts target the seed course `starter-course`. To run a command against a different course, name it (`pnpm tessera dev <name>`) or `cd` into its folder and run `pnpm exec tessera dev`. A bare command at the workspace root lists the available courses rather than guessing.
+The root scripts forward to whichever course you name: `pnpm dev <course>` runs that course, while a bare command at the workspace root lists the available courses rather than guessing. You can also `cd` into a course folder and run `pnpm exec tessera dev`.
 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 
