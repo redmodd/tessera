@@ -5,11 +5,11 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "new": "tessera new",
-    "dev": "tessera dev __SEED_COURSE__",
-    "export": "tessera export __SEED_COURSE__",
-    "validate": "tessera validate __SEED_COURSE__",
-    "a11y": "tessera a11y __SEED_COURSE__",
-    "check": "tessera check __SEED_COURSE__"
+    "dev": "tessera dev",
+    "export": "tessera export",
+    "validate": "tessera validate",
+    "a11y": "tessera a11y",
+    "check": "tessera check"
   },
   "dependencies": {
     "tessera-learn": "__TESSERA_VERSION__"

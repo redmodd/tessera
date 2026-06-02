@@ -123,34 +123,23 @@ describe('create-tessera workspace scaffold', () => {
     expect(existsSync(resolve(ws, SEED, 'styles/custom.css'))).toBe(true);
   });
 
-  it('roots package.json scripts at the seed course, never bare', () => {
+  it('uses pass-through root scripts so an explicit course is forwarded', () => {
     runCLI('my-courses', testDir);
     const pkg = JSON.parse(
       readFileSync(resolve(testDir, 'my-courses', 'package.json'), 'utf-8'),
     );
     expect(pkg.name).toBe('my-courses');
     expect(pkg.private).toBe(true);
-    // A bare `tessera dev` from the workspace root errors by design, so the
-    // scaffolded scripts must name the seed course.
-    expect(pkg.scripts.dev).toBe('tessera dev starter-course');
-    expect(pkg.scripts.export).toBe('tessera export starter-course');
-    expect(pkg.scripts.validate).toBe('tessera validate starter-course');
-    expect(pkg.scripts.dev).not.toBe('tessera dev');
+    expect(pkg.scripts.dev).toBe('tessera dev');
+    expect(pkg.scripts.export).toBe('tessera export');
+    expect(pkg.scripts.validate).toBe('tessera validate');
+    expect(pkg.scripts.a11y).toBe('tessera a11y');
+    expect(pkg.scripts.check).toBe('tessera check');
     expect(pkg.scripts.new).toBe('tessera new');
     expect(pkg.dependencies['tessera-learn']).toBeDefined();
     expect(pkg.devDependencies['@axe-core/playwright']).toBeDefined();
     expect(pkg.devDependencies.playwright).toBeDefined();
     expect(pkg.devDependencies.vite).toBeUndefined();
-  });
-
-  it('points the package.json scripts at the course it actually stamped', () => {
-    runCLI('my-courses', testDir);
-    const ws = resolve(testDir, 'my-courses');
-    const pkg = JSON.parse(readFileSync(resolve(ws, 'package.json'), 'utf-8'));
-    const course = pkg.scripts.dev.replace('tessera dev ', '');
-    expect(existsSync(resolve(ws, 'courses', course, 'course.config.js'))).toBe(
-      true,
-    );
   });
 
   it('pins a svelte floor that matches tessera-learn', () => {
@@ -209,7 +198,7 @@ describe('create-tessera workspace scaffold', () => {
       },
     });
     expect(stdout).toContain('pnpm install');
-    expect(stdout).toContain('pnpm dev');
+    expect(stdout).toContain('pnpm dev starter-course');
     expect(stdout).toContain('tessera new');
     expect(stdout).not.toContain('npm run dev');
   });

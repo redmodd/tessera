@@ -119,12 +119,11 @@ function main() {
     PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(SEED_COURSE),
     TESSERA_VERSION,
-    SEED_COURSE,
   });
 
   process.stdout.write(
     `\nCreated workspace ${name}.\n\n` +
-      `Next steps:\n  cd ${name}\n  pnpm install\n  pnpm dev\n\n` +
+      `Next steps:\n  cd ${name}\n  pnpm install\n  pnpm dev ${SEED_COURSE}\n\n` +
       `Add another course:\n  pnpm tessera new <name>\n`,
   );
 }
