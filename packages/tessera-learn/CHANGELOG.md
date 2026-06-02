@@ -1,5 +1,12 @@
 # tessera-learn
 
+## 0.2.1
+
+### Patch Changes
+
+- 1ddd286: `tessera a11y` now audits every page of a course that uses a custom `layout.svelte`, instead of silently scanning only the entry page and reporting a pass. A page that fails to load at runtime is flagged in the report and fails the audit, rather than being scanned as an accessible error screen.
+- eac739d: Scaffolded root scripts now pass through to the CLI (`tessera dev`) instead of hardcoding the seed course. `pnpm dev <course>` runs the course you name, and a bare `pnpm dev` lists the available courses rather than silently running the seed.
+
 ## 0.2.0
 
 ### Minor Changes
