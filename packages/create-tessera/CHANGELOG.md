@@ -4,13 +4,11 @@
 
 ### Minor Changes
 
-- a60b5bb: **New `tessera duplicate <source> <new>` subcommand.** Copies `courses/<source>/` to `courses/<new>/` within the workspace, skipping build artifacts (`dist/`, `a11y-report.json`, `node_modules/`, Vite/a11y caches). The copy is verbatim — the course config (including its `title`) is carried over untouched, and the command prints a reminder to update the title. Refuses to overwrite an existing course; reuses the same workspace, name-validation, and not-found messages as the rest of the CLI.
-- a60b5bb: **Workspaces: one project, many courses.** `npm create tessera` now scaffolds a _workspace_ — a single package (`package.json` + `node_modules`) that holds many courses under `courses/<name>/` and a `shared/` design system imported as `$shared`. Each course still exports independently to its own SCORM 1.2 / SCORM 2004 4e / cmi5 / web package.
-  - New `tessera new <name>` subcommand stamps a course into `courses/<name>/` (no install — the workspace owns the dependencies).
-  - `dev` / `export` / `validate` / `a11y` / `check` take an optional course name (`tessera dev <name>`), or run bare from inside a course folder. A bare command at the workspace root lists the available courses rather than guessing.
-  - New `$shared` alias resolves to the workspace `shared/` directory in dev and is bundled into every export.
+- a60b5bb: **Workspaces: one project, many courses.** `npm create tessera` now scaffolds a _workspace_ — a single package that holds many courses under `courses/<name>/`, sharing one `node_modules` and a `shared/` design system imported as `$shared` (resolved in dev, bundled into each export). Every course still exports independently to its own SCORM 1.2 / SCORM 2004 4e / cmi5 / web package.
+  - `tessera new <name>` stamps a new course; `tessera duplicate <source> <new>` copies an existing one verbatim (config and title included).
+  - `dev` / `export` / `validate` / `a11y` / `check` take an optional course name (`tessera dev <name>`), or run bare from inside a course folder; a bare command at the workspace root lists the available courses instead of guessing.
 
-  **Breaking:** the standalone single-course project layout is no longer scaffolded or supported as a runtime shape; the workspace is the only shape going forward. Pre-1.0, so this ships as a `minor` (0.x).
+  **Breaking:** the standalone single-course layout is no longer scaffolded or supported — the workspace is the only shape going forward. Pre-1.0, so this ships as a `minor` (0.x).
 
 ### Patch Changes
 
