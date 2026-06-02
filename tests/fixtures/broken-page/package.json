@@ -1,0 +1,15 @@
+{
+  "name": "test-project-broken-page",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "tessera-learn": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.14"
+  }
+}
