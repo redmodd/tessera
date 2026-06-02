@@ -140,6 +140,7 @@
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
       pageLoading = false;
+      renderedPageIndex = index;
       return;
     }
 
@@ -165,6 +166,7 @@
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
         pageLoading = false;
+        renderedPageIndex = index;
       });
   }
 
