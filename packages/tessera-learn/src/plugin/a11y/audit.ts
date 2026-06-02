@@ -78,6 +78,7 @@ export function axeIgnoreRules(ignore: string[]): string[] {
 }
 
 const MAX_HTML_LENGTH = 200;
+const MAX_ELEMENTS_SHOWN = 5;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapNodeDetail(node: any): AxeNodeDetail {
@@ -383,11 +384,17 @@ function printSummary(report: AuditReport, reportPath: string): void {
       console.log(
         `      [${v.impact ?? 'n/a'}] ${v.id} — ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
       );
-      for (const el of v.elements) {
+      for (const el of v.elements.slice(0, MAX_ELEMENTS_SHOWN)) {
         console.log(
           `\x1b[90m        → ${el.target || '(unknown element)'}\x1b[0m`,
         );
         if (el.summary) console.log(`\x1b[90m          ${el.summary}\x1b[0m`);
+      }
+      const hidden = v.elements.length - MAX_ELEMENTS_SHOWN;
+      if (hidden > 0) {
+        console.log(
+          `\x1b[90m        … and ${hidden} more — see a11y-report.json\x1b[0m`,
+        );
       }
     }
   }
