@@ -47,6 +47,6 @@ export function runNew(name: string | undefined, cwd: string): number {
   });
 
   const rel = relative(workspaceRoot, courseDir);
-  console.log(`\nCreated ${rel}.\n\nNext steps:\n  tessera dev ${name}\n`);
+  console.log(`\nCreated ${rel}.\n\nNext steps:\n  pnpm tessera dev ${name}\n`);
   return 0;
 }
