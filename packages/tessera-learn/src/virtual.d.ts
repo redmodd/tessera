@@ -30,3 +30,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  __tesseraAudit?: {
+    totalPages: number;
+    goToIndex(index: number): void;
+  };
+}

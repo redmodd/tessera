@@ -17,7 +17,7 @@ const REPO_ROOT = process.cwd();
 export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5';
-export type FixtureName = 'free' | 'custom-quiz';
+export type FixtureName = 'free' | 'custom-quiz' | 'custom-layout';
 
 interface FixtureSpec {
   source: string;
@@ -32,6 +32,10 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   'custom-quiz': {
     source: resolve(REPO_ROOT, 'tests/fixtures/custom-quiz'),
     standards: ['scorm12', 'scorm2004', 'cmi5'],
+  },
+  'custom-layout': {
+    source: resolve(REPO_ROOT, 'tests/fixtures/custom-layout'),
+    standards: ['web'],
   },
 };
 

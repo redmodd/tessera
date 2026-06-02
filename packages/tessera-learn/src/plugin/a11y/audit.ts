@@ -41,6 +41,8 @@ interface AuditReport {
   standard: A11ySettings['standard'];
   threshold: ImpactLevel;
   pages: PageAuditResult[];
+  pagesAudited: number;
+  totalPages: number;
   totalViolations: number;
   failingViolations: number;
   passed: boolean;
@@ -236,29 +238,44 @@ export async function runAudit(
         }));
       };
 
-      const navCount = await page.locator('button.tessera-nav-page').count();
-      if (navCount === 0) {
-        // No sidebar (custom chrome) — audit whatever is rendered at the entry.
+      const totalPages = manifest.pages.length;
+      const hasAuditHook = await page.evaluate(
+        () => typeof window.__tesseraAudit?.goToIndex === 'function',
+      );
+
+      if (!hasAuditHook) {
+        // No navigation hook — audit the entry only, but flag the reduced scope
+        // rather than passing it off as full coverage.
+        if (totalPages > 1) {
+          console.warn(
+            `\x1b[33m[tessera a11y]\x1b[0m Could not enumerate pages; auditing the entry page only ` +
+              `(1 of ${totalPages}). The report records the reduced scope.`,
+          );
+        }
         pages.push({
           index: 0,
           title: manifest.pages[0]?.title ?? '(entry)',
           violations: await scan(),
         });
       } else {
-        for (let i = 0; i < navCount; i++) {
-          const btn = page.locator('button.tessera-nav-page').nth(i);
-          const title = (await btn.textContent())?.trim() || `Page ${i + 1}`;
-          await btn.click();
+        for (let i = 0; i < totalPages; i++) {
+          await page.evaluate(
+            (idx: number) => window.__tesseraAudit!.goToIndex(idx),
+            i,
+          );
           await page.waitForFunction(
             (idx: number) =>
-              document
-                .querySelectorAll('button.tessera-nav-page')
-                [idx]?.getAttribute('aria-current') === 'page',
+              document.getElementById('tessera-app')?.dataset
+                .tesseraPageIndex === String(idx),
             i,
             { timeout: 20_000 },
           );
           await page.waitForLoadState('networkidle');
-          pages.push({ index: i, title, violations: await scan() });
+          pages.push({
+            index: i,
+            title: manifest.pages[i]?.title ?? `Page ${i + 1}`,
+            violations: await scan(),
+          });
         }
       }
     } finally {
@@ -279,6 +296,8 @@ export async function runAudit(
       standard: settings.standard,
       threshold,
       pages,
+      pagesAudited: pages.length,
+      totalPages: manifest.pages.length,
       totalViolations,
       failingViolations,
       passed: failingViolations === 0,
