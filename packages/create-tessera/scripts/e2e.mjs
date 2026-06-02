@@ -96,8 +96,8 @@ run(`npm install "${tarball}"`, projectDir);
 for (const standard of STANDARDS) {
   // Standard lives in the course config; scripts build from the workspace root.
   setStandard(courseDir, standard);
-  run('npm run validate', projectDir);
-  run('npm run export', projectDir);
+  run(`npm run validate -- ${SEED_COURSE}`, projectDir);
+  run(`npm run export -- ${SEED_COURSE}`, projectDir);
   assertExport(courseDir, standard);
   console.log(`\n✓ ${standard}: validated and built`);
 }
