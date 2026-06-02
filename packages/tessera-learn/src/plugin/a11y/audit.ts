@@ -125,6 +125,7 @@ async function loadDeps(): Promise<
  */
 export async function runAudit(
   projectRoot: string,
+  workspaceRoot: string,
   options: AuditOptions = {},
 ): Promise<number> {
   const threshold: ImpactLevel = options.threshold ?? 'serious';
@@ -153,10 +154,14 @@ export async function runAudit(
   const { resolveTesseraConfig } = await import('../inline-config.js');
   // Carries tesseraPlugin() + the Svelte compiler; without it the plugin-less
   // build would silently produce a broken bundle (there is no vite.config.js).
-  const auditBaseConfig = await resolveTesseraConfig(projectRoot, {
-    command: 'build',
-    mode: 'production',
-  });
+  const auditBaseConfig = await resolveTesseraConfig(
+    projectRoot,
+    workspaceRoot,
+    {
+      command: 'build',
+      mode: 'production',
+    },
+  );
 
   // A throwaway web build, kept out of dist/ so a real LMS export is untouched.
   const auditDist = resolve(projectRoot, 'node_modules', '.tessera-a11y');

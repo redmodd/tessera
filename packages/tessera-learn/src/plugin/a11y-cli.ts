@@ -38,11 +38,15 @@ export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
   return { ok: true, args };
 }
 
-export async function runA11y(argv: string[]): Promise<number> {
+export async function runA11y(
+  projectRoot: string,
+  workspaceRoot: string,
+  argv: string[],
+): Promise<number> {
   const parsed = parseA11yArgs(argv);
   if (!parsed.ok) {
     console.error(`[tessera a11y] ${parsed.error}`);
     return 1;
   }
-  return runAudit(process.cwd(), parsed.args);
+  return runAudit(projectRoot, workspaceRoot, parsed.args);
 }

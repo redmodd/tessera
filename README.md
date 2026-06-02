@@ -13,7 +13,9 @@ Open your course in an AI coding assistant like [Claude Code](https://claude.com
 
 **There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
 
-When you're done, one command packages your course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
+When you're done, one command packages a course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
+
+**One project, many courses.** A Tessera project is a _workspace_: a single package (one `package.json`, one `node_modules`) that holds as many courses as you like under `courses/<name>/`, plus a `shared/` design system any course can import as `$shared`. Each course still exports independently to its own LMS package. New workspaces seed one course to start; `pnpm tessera new <name>` adds more.
 
 _Under the hood:_ Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
 
@@ -35,19 +37,21 @@ node --version    # should print v24.x.x or higher
 ## Quick start
 
 ```bash
-pnpm create tessera@latest my-course
-cd my-course
+pnpm create tessera@latest my-courses
+cd my-courses
 pnpm install
-pnpm dev       # local dev server at http://localhost:5173
-pnpm export    # build + package for the configured standard
-pnpm validate  # check the project for structural errors, no server or build
+pnpm dev               # local dev server at http://localhost:5173 (runs the seed course)
+pnpm export            # build + package the seed course for the configured standard
+pnpm validate          # check the seed course for structural errors, no server or build
+pnpm tessera new intro # add another course at courses/intro/
+pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
 (If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)
 
-Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). The root scripts above target that course; to drive another, name it (`pnpm tessera dev intro`) or `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
-Every scaffolded project ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
+Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
 ```svelte
 <script module>
@@ -62,11 +66,9 @@ Every scaffolded project ships with `AGENTS.md` at its root. Your agent will rea
 <Callout type="tip"><p>Drop in components for richer content.</p></Callout>
 ```
 
-_Want a minimal starting point with no reference components?_ `pnpm create tessera@latest -- --template=bare my-course` scaffolds a hooks-only project, useful when you'd rather have the agent build everything from scratch.
+## Updating an existing workspace
 
-## Updating an existing project
-
-Updating is a plain dependency bump — from a project root, `pnpm add tessera-learn@latest`. The framework owns the build and the reserved scripts, so there's nothing else to reconcile. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-project) for details (including the one-time manual edit for projects scaffolded before this model).
+Updating is a plain dependency bump — from the workspace root, `pnpm add tessera-learn@latest`. The whole workspace shares the one dependency, so every course moves together, and the framework owns the build and the reserved scripts, so there's nothing else to reconcile. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) for details.
 
 ## Authoring with AI
 
@@ -74,7 +76,7 @@ Once your project is running, ask the agent for what you want:
 
 > _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
-`AGENTS.md` (at the root of your project) teaches the agent the conventions: how pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
+`AGENTS.md` (at the root of your workspace) teaches the agent the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 
 You review the output, ask for changes, and iterate. The dev server hot-reloads as the agent writes, so you see each change immediately.
 
@@ -94,7 +96,7 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 ## Documentation
 
-The authoring guide (components, hooks, quizzes, layouts, custom xAPI, the full `course.config.js` shape) lives in [`AGENTS.md`](./AGENTS.md), shipped at the root of every scaffolded project for both human authors and AI agents.
+The authoring guide (workspaces, components, hooks, quizzes, layouts, custom xAPI, the full `course.config.js` shape) lives in [`AGENTS.md`](./AGENTS.md), shipped at the root of every scaffolded workspace for both human authors and AI agents.
 
 ## Contributing
 

@@ -1,0 +1,8 @@
+/* Design tokens shared across every course in this workspace.
+ * Import from any course via `$shared/tokens.css`.
+ */
+:root {
+  --shared-color-primary: #0066cc;
+  --shared-color-text: #1a1a1a;
+  --shared-radius: 0.375rem;
+}

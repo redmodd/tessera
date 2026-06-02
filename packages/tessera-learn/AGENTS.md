@@ -6,6 +6,56 @@ Build a course with built-in components, your own (via the hooks), or any mix. T
 
 ---
 
+## Workspaces
+
+A Tessera project is a **workspace**: one `package.json` and one `node_modules` shared by **many courses**, plus a `shared/` design system. Each course is a self-contained folder under `courses/`.
+
+```
+my-courses/
+├── package.json            # the one package — owns tessera-learn, svelte, scripts
+├── shared/                 # design system shared across courses (imported as $shared)
+│   ├── Button.svelte
+│   └── tokens.css
+├── courses/
+│   ├── starter-course/     # a course = a content folder (course.config.js, pages/, …)
+│   └── <next course>/
+└── AGENTS.md / CLAUDE.md   # pointers to this guide (workspace root only)
+```
+
+**Everything else in this guide describes a single course** — i.e. the contents of one `courses/<name>/` folder (`course.config.js`, `layout.svelte`, `pages/`, `styles/`).
+
+**Open the workspace folder** (not an individual course) so this guide stays in scope and `$shared` resolves.
+
+### Working with courses
+
+```bash
+pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps already here)
+pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
+pnpm tessera dev <name>     # run a command against a named course…
+cd courses/<name> && pnpm exec tessera dev   # …or cd into the course and run it without a name
+pnpm tessera export <name>  # each course exports independently to its own LMS package
+cd courses/<name> && pnpm exec tessera export   # …this works for every command, not just dev
+```
+
+A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `starter-course`.)
+
+### Sharing across courses with `$shared`
+
+`$shared` resolves to the workspace `shared/` directory, so any course can import the shared design system:
+
+```svelte
+<script>
+  import Button from '$shared/Button.svelte';
+  import '$shared/tokens.css';
+</script>
+
+<Button>Continue</Button>
+```
+
+`$shared` is bundled into each course's export at build time, so it ships in every SCORM/cmi5/web package with no extra wiring.
+
+---
+
 ## Running the project
 
 From the project root (the project is set up for `pnpm` — Node's corepack provisions it automatically):
@@ -865,7 +915,7 @@ Tessera checks accessibility in two passes, plus components that are accessible 
 
 **Static checks** run inside `validate`, `dev`, and `export` — no extra setup. They cover what's visible in your source: `<Image>` alt-or-`decorative`, `<Video>`/`<Audio>` `title` + captions/transcript, empty question option/answer labels, skipped heading levels (e.g. `h2` → `h4`), `branding.primaryColor` contrast against white, and a well-formed `language` tag. They also route the Svelte compiler's own `a11y_*` warnings through the reporter. Each diagnostic carries a rule ID in brackets (e.g. `[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
 
-**Runtime audit** is the opt-in deep pass: `tessera a11y` (run it directly, or via `pnpm check`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
+**Runtime audit** is the opt-in deep pass: `pnpm a11y` (run it directly, or via `pnpm check`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 
@@ -874,9 +924,9 @@ pnpm exec playwright install chromium
 ```
 
 ```bash
-tessera a11y                      # audit (threshold: serious)
-tessera a11y --threshold minor    # stricter
-tessera a11y --build              # force a fresh build first
+pnpm exec tessera a11y                   # audit (threshold: serious)
+pnpm exec tessera a11y --threshold minor # stricter
+pnpm exec tessera a11y --build           # force a fresh build first
 ```
 
 The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.

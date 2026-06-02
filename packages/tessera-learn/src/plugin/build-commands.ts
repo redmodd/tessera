@@ -1,8 +1,11 @@
 import { resolveTesseraConfig } from './inline-config.js';
 
-export async function runDev(projectRoot: string): Promise<number> {
+export async function runDev(
+  projectRoot: string,
+  workspaceRoot: string,
+): Promise<number> {
   const vite = await import('vite');
-  const config = await resolveTesseraConfig(projectRoot, {
+  const config = await resolveTesseraConfig(projectRoot, workspaceRoot, {
     command: 'serve',
     mode: 'development',
   });
@@ -14,9 +17,12 @@ export async function runDev(projectRoot: string): Promise<number> {
   return new Promise<number>(() => {});
 }
 
-export async function runBuild(projectRoot: string): Promise<number> {
+export async function runBuild(
+  projectRoot: string,
+  workspaceRoot: string,
+): Promise<number> {
   const vite = await import('vite');
-  const config = await resolveTesseraConfig(projectRoot, {
+  const config = await resolveTesseraConfig(projectRoot, workspaceRoot, {
     command: 'build',
     mode: 'production',
   });

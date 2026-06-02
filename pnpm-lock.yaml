@@ -62,6 +62,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.7
         version: 4.1.7(vitest@4.1.7)
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../tessera-learn
       tsdown:
         specifier: ^0.22.1
         version: 0.22.1(typescript@6.0.3)

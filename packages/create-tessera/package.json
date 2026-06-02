@@ -37,7 +37,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsdown",
+    "sync-templates": "node scripts/sync-templates.mjs",
+    "build": "pnpm sync-templates && tsdown",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.7",
+    "tessera-learn": "workspace:*",
     "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
