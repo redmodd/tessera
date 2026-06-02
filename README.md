@@ -47,8 +47,6 @@ pnpm tessera new intro # add another course at courses/intro/
 pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
-(If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)
-
 This scaffolds a workspace with one seed course (`starter-course`). The root scripts forward to whichever course you name — `pnpm dev <course>` runs it, while a bare `pnpm dev` lists the available courses rather than guessing. You can also `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
 Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
