@@ -58,7 +58,7 @@ pnpm check                   # validate, then the runtime accessibility audit (a
 pnpm tessera new <name>      # add another course at courses/<name>/
 ```
 
-The root scripts target the seed course `starter-course`. To run a command against a different course, name it (`tessera dev <name>`) or `cd` into its folder and run the command bare. A bare command at the workspace root lists the available courses rather than guessing.
+The root scripts target the seed course `starter-course`. To run a command against a different course, name it (`pnpm tessera dev <name>`) or `cd` into its folder and run `pnpm exec tessera dev`. A bare command at the workspace root lists the available courses rather than guessing.
 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 

@@ -15,7 +15,7 @@ Open your course in an AI coding assistant like [Claude Code](https://claude.com
 
 When you're done, one command packages a course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), or a static web bundle. Completion, scores, and bookmarking report back to the LMS automatically. The same source builds for every standard, so you don't maintain four versions.
 
-**One project, many courses.** A Tessera project is a _workspace_: a single package (one `package.json`, one `node_modules`) that holds as many courses as you like under `courses/<name>/`, plus a `shared/` design system any course can import as `$shared`. Each course still exports independently to its own LMS package. New workspaces seed one course to start; `tessera new <name>` adds more.
+**One project, many courses.** A Tessera project is a _workspace_: a single package (one `package.json`, one `node_modules`) that holds as many courses as you like under `courses/<name>/`, plus a `shared/` design system any course can import as `$shared`. Each course still exports independently to its own LMS package. New workspaces seed one course to start; `pnpm tessera new <name>` adds more.
 
 _Under the hood:_ Tessera is a runtime built on Svelte and Vite. Pages are `.svelte` files. You can edit them directly in code; the AI assistance is there to do the heavy lifting.
 
@@ -48,7 +48,7 @@ pnpm tessera new intro # add another course at courses/intro/
 
 (If you prefer `npm`, `yarn`, or `bun`, substitute those commands.)
 
-This scaffolds a workspace with one seed course (`starter-course`). The root scripts above target that course; to drive another, name it (`tessera dev intro`) or `cd courses/intro` and run the command bare. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). The root scripts above target that course; to drive another, name it (`pnpm tessera dev intro`) or `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
 Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 

@@ -30,10 +30,10 @@ my-courses/
 
 ```bash
 pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps already here)
-tessera dev <name>          # run a command against a named course…
-cd courses/<name> && tessera dev   # …or cd into the course and run it bare
-tessera export <name>       # each course exports independently to its own LMS package
-cd courses/<name> && tessera export   # …the bare form works for every command, not just dev
+pnpm tessera dev <name>     # run a command against a named course…
+cd courses/<name> && pnpm exec tessera dev   # …or cd into the course and run it without a name
+pnpm tessera export <name>  # each course exports independently to its own LMS package
+cd courses/<name> && pnpm exec tessera export   # …this works for every command, not just dev
 ```
 
 A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — target the seed course `starter-course`.)
@@ -914,7 +914,7 @@ Tessera checks accessibility in two passes, plus components that are accessible 
 
 **Static checks** run inside `validate`, `dev`, and `export` — no extra setup. They cover what's visible in your source: `<Image>` alt-or-`decorative`, `<Video>`/`<Audio>` `title` + captions/transcript, empty question option/answer labels, skipped heading levels (e.g. `h2` → `h4`), `branding.primaryColor` contrast against white, and a well-formed `language` tag. They also route the Svelte compiler's own `a11y_*` warnings through the reporter. Each diagnostic carries a rule ID in brackets (e.g. `[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
 
-**Runtime audit** is the opt-in deep pass: `tessera a11y` (run it directly, or via `pnpm check`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
+**Runtime audit** is the opt-in deep pass: `pnpm a11y` (run it directly, or via `pnpm check`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
 
 The runtime audit drives Playwright, which needs a browser binary once per machine:
 
@@ -923,9 +923,9 @@ pnpm exec playwright install chromium
 ```
 
 ```bash
-tessera a11y                      # audit (threshold: serious)
-tessera a11y --threshold minor    # stricter
-tessera a11y --build              # force a fresh build first
+pnpm exec tessera a11y                   # audit (threshold: serious)
+pnpm exec tessera a11y --threshold minor # stricter
+pnpm exec tessera a11y --build           # force a fresh build first
 ```
 
 The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.
