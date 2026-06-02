@@ -358,6 +358,11 @@ function printSummary(report: AuditReport, reportPath: string): void {
     console.log(
       `\x1b[33m[tessera a11y] Covered ${report.pagesAudited} of ${report.totalPages} page(s)\x1b[0m — reduced scope, the rest were not audited.`,
     );
+  } else if (report.pagesFailedToLoad > 0) {
+    const scanned = report.pagesAudited - report.pagesFailedToLoad;
+    console.log(
+      `[tessera a11y] Reached all ${report.totalPages} page(s); scanned ${scanned}, ${report.pagesFailedToLoad} failed to load.`,
+    );
   } else {
     console.log(`[tessera a11y] Covered all ${report.totalPages} page(s).`);
   }
