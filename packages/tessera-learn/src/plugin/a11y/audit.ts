@@ -23,12 +23,19 @@ const IMPACT_RANK: Record<ImpactLevel, number> = {
 // skips export packaging, and stubs xAPI while it's set. See plugin/index.ts.
 export const AUDIT_ENV_FLAG = 'TESSERA_A11Y_AUDIT';
 
+export interface AxeNodeDetail {
+  target: string;
+  html: string;
+  summary: string;
+}
+
 interface AxeViolation {
   id: string;
   impact: ImpactLevel | null;
   help: string;
   helpUrl: string;
   nodes: number;
+  elements: AxeNodeDetail[];
 }
 
 interface PageAuditResult {
@@ -68,6 +75,39 @@ export function axeIgnoreRules(ignore: string[]): string[] {
   return ignore.filter(
     (id) => !id.startsWith('tessera/') && !id.startsWith('a11y_'),
   );
+}
+
+const MAX_HTML_LENGTH = 200;
+const MAX_ELEMENTS_SHOWN = 5;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapNodeDetail(node: any): AxeNodeDetail {
+  const target = Array.isArray(node?.target)
+    ? node.target.flat(Infinity).join(' ')
+    : String(node?.target ?? '');
+  const html = String(node?.html ?? '');
+  return {
+    target,
+    html:
+      html.length > MAX_HTML_LENGTH
+        ? `${html.slice(0, MAX_HTML_LENGTH - 1)}…`
+        : html,
+    summary: String(node?.failureSummary ?? '')
+      .replace(/\s*\n\s*/g, ' ')
+      .trim(),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapViolation(v: any): AxeViolation {
+  return {
+    id: v.id,
+    impact: v.impact ?? null,
+    help: v.help,
+    helpUrl: v.helpUrl,
+    nodes: v.nodes.length,
+    elements: v.nodes.map(mapNodeDetail),
+  };
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -230,14 +270,7 @@ export async function runAudit(
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         const out = await builder.analyze();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return out.violations.map((v: any) => ({
-          id: v.id,
-          impact: v.impact ?? null,
-          help: v.help,
-          helpUrl: v.helpUrl,
-          nodes: v.nodes.length,
-        }));
+        return out.violations.map(mapViolation);
       };
 
       const recordPage = async (
@@ -351,6 +384,18 @@ function printSummary(report: AuditReport, reportPath: string): void {
       console.log(
         `      [${v.impact ?? 'n/a'}] ${v.id} — ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
       );
+      for (const el of v.elements.slice(0, MAX_ELEMENTS_SHOWN)) {
+        console.log(
+          `\x1b[90m        → ${el.target || '(unknown element)'}\x1b[0m`,
+        );
+        if (el.summary) console.log(`\x1b[90m          ${el.summary}\x1b[0m`);
+      }
+      const hidden = v.elements.length - MAX_ELEMENTS_SHOWN;
+      if (hidden > 0) {
+        console.log(
+          `\x1b[90m        … and ${hidden} more — see a11y-report.json\x1b[0m`,
+        );
+      }
     }
   }
   console.log(`\n[tessera a11y] Report written to ${reportPath}`);
