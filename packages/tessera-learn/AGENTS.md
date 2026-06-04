@@ -137,13 +137,13 @@ my-course/
 - **Never edit `node_modules/`.** Edits there are git-ignored and wiped on the next install/update. There is no `vite.config.js` to edit.
 - To change framework behaviour, use an extension point instead of patching `node_modules/`:
 
-| Need | Use |
-| ---- | --- |
-| New question type / interactive widget | custom component with the `useQuestion` hook |
-| Different course chrome (header, nav) | `layout.svelte` |
-| Different quiz UI | `quiz.svelte` with the `useQuiz` hook |
-| Styling | `styles/` |
-| Navigation, completion, scoring, export target | `course.config.js` |
+| Need                                           | Use                                          |
+| ---------------------------------------------- | -------------------------------------------- |
+| New question type / interactive widget         | custom component with the `useQuestion` hook |
+| Different course chrome (header, nav)          | `layout.svelte`                              |
+| Different quiz UI                              | `quiz.svelte` with the `useQuiz` hook        |
+| Styling                                        | `styles/`                                    |
+| Navigation, completion, scoring, export target | `course.config.js`                           |
 
 If none fit, surface the limitation — don't patch around it in `node_modules/`.
 
@@ -236,12 +236,12 @@ Styled box. A11y: `role="note"` with type-appropriate `aria-label`. Children bec
 
 Lazy-loaded image, renders as `<figure>`/`<figcaption>`.
 
-| Prop         | Type      | Description                                                             |
-| ------------ | --------- | ----------------------------------------------------------------------- |
-| `src`        | `string`  | Image URL. `$assets/` prefix supported                                  |
-| `alt`        | `string`  | **Required unless `decorative`.** Alt text                              |
-| `decorative` | `boolean` | Ornamental image — empty `alt` + `aria-hidden`. Use _instead of_ `alt`  |
-| `caption`    | `string`  | Optional caption                                                        |
+| Prop         | Type      | Description                                                            |
+| ------------ | --------- | ---------------------------------------------------------------------- |
+| `src`        | `string`  | Image URL. `$assets/` prefix supported                                 |
+| `alt`        | `string`  | **Required unless `decorative`.** Alt text                             |
+| `decorative` | `boolean` | Ornamental image — empty `alt` + `aria-hidden`. Use _instead of_ `alt` |
+| `caption`    | `string`  | Optional caption                                                       |
 
 Rules:
 
@@ -249,7 +249,11 @@ Rules:
 - `decorative` is a boolean — write `decorative` or `decorative={true}`, never `decorative="true"` (a string is truthy and rejected).
 
 ```svelte
-<Image src="$assets/diagram.png" alt="System architecture diagram" caption="Figure 1" />
+<Image
+  src="$assets/diagram.png"
+  alt="System architecture diagram"
+  caption="Figure 1"
+/>
 <Image src="$assets/flourish.svg" decorative={true} />
 ```
 
@@ -309,12 +313,12 @@ Modal triggered by interaction. Uses Svelte 5 snippets. A11y: `role="dialog"`, `
 
 YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
 
-| Prop         | Type     | Description                                                                                   |
-| ------------ | -------- | --------------------------------------------------------------------------------------------- |
-| `src`        | `string` | Video URL or `$assets/` path                                                                  |
-| `title`      | `string` | **Required.** Accessible label (empty/whitespace rejected)                                    |
-| `tracks`     | `array`  | Caption tracks for **native** video → `<track>`. Ignored for YouTube/Vimeo                     |
-| `transcript` | `string` | Transcript in a `<details>` below the player. Load from file via `?raw` import (see example)   |
+| Prop         | Type     | Description                                                                                  |
+| ------------ | -------- | -------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Video URL or `$assets/` path                                                                 |
+| `title`      | `string` | **Required.** Accessible label (empty/whitespace rejected)                                   |
+| `tracks`     | `array`  | Caption tracks for **native** video → `<track>`. Ignored for YouTube/Vimeo                   |
+| `transcript` | `string` | Transcript in a `<details>` below the player. Load from file via `?raw` import (see example) |
 
 Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed needs `transcript` (embeds can't carry `<track>` files). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
 
@@ -323,11 +327,22 @@ Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed 
   import intro from '$assets/intro.txt?raw';
 </script>
 
-<Video src="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Intro" transcript={intro} />
+<Video
+  src="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  title="Intro"
+  transcript={intro}
+/>
 <Video
   src="$assets/demo.mp4"
   title="Demo"
-  tracks={[{ src: '$assets/demo.en.vtt', kind: 'captions', srclang: 'en', label: 'English' }]}
+  tracks={[
+    {
+      src: '$assets/demo.en.vtt',
+      kind: 'captions',
+      srclang: 'en',
+      label: 'English',
+    },
+  ]}
 />
 ```
 
@@ -335,12 +350,12 @@ Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed 
 
 Native player. A11y: `aria-label` from title.
 
-| Prop         | Type     | Description                                              |
-| ------------ | -------- | -------------------------------------------------------- |
-| `src`        | `string` | Audio URL or `$assets/` path                             |
-| `title`      | `string` | **Required.** Accessible label                           |
-| `tracks`     | `array`  | Caption tracks → `<track>` (same shape as `Video`)       |
-| `transcript` | `string` | Transcript in a `<details>` (load from file via `?raw`)  |
+| Prop         | Type     | Description                                             |
+| ------------ | -------- | ------------------------------------------------------- |
+| `src`        | `string` | Audio URL or `$assets/` path                            |
+| `title`      | `string` | **Required.** Accessible label                          |
+| `tracks`     | `array`  | Caption tracks → `<track>` (same shape as `Video`)      |
+| `transcript` | `string` | Transcript in a `<details>` (load from file via `?raw`) |
 
 Transcript rule (WCAG 1.2.1): the validator warns when `<Audio>` has no `transcript`.
 
@@ -379,7 +394,11 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
   correct={1}
 />
 
-<FillInTheBlank id="q-symbol" question="What element has the symbol 'O'?" answers={['Oxygen']} />
+<FillInTheBlank
+  id="q-symbol"
+  question="What element has the symbol 'O'?"
+  answers={['Oxygen']}
+/>
 ```
 
 ### Rules
@@ -397,13 +416,13 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` as the buil
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                  |
-| --------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                              |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                  |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                 |
+| Field           | Type                                 | Default    | Description                                                                                        |
+| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                     |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                        |
+| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                       |
 | `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: after `revealFeedback(q)`, locks the answer. `review`: post-submit only. `never`: off |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked       |
 
 ### Per-question weighting
 
@@ -450,7 +469,10 @@ Page score = weighted-correct percentage: `Σ(weight × correct) / Σ(weight) ×
 `answers` only needs distinct spellings; `caseSensitive: false` handles case variants.
 
 ```svelte
-<FillInTheBlank question="What element has the symbol 'O'?" answers={['Oxygen']} />
+<FillInTheBlank
+  question="What element has the symbol 'O'?"
+  answers={['Oxygen']}
+/>
 ```
 
 #### Matching
@@ -499,10 +521,10 @@ Drag-and-drop (or click-to-place) into labelled categories.
 
 All four types work outside `<Quiz>` for inline practice and render their own Check/Retry.
 
-| Prop         | Type     | Default    | Description                       |
-| ------------ | -------- | ---------- | --------------------------------- |
-| `maxRetries` | `number` | `Infinity` | Max retries for standalone        |
-| `weight`     | `number` | `1`        | Per-question page-level weight    |
+| Prop         | Type     | Default    | Description                    |
+| ------------ | -------- | ---------- | ------------------------------ |
+| `maxRetries` | `number` | `Infinity` | Max retries for standalone     |
+| `weight`     | `number` | `1`        | Per-question page-level weight |
 
 ```svelte
 <MultipleChoice
@@ -543,7 +565,10 @@ Declare `completesOn: "view"` (the only v1 value) on any page. Completion fires 
   const { markComplete, completionStatus } = useCompletion();
 </script>
 
-<button onclick={() => markComplete()} disabled={completionStatus === 'complete'}>
+<button
+  onclick={() => markComplete()}
+  disabled={completionStatus === 'complete'}
+>
   I acknowledge
 </button>
 
@@ -572,7 +597,7 @@ By default `successStatus` stays `"unknown"` under manual. For completion **and*
 completion: { mode: "manual", requireSuccessStatus: "passed" }  // or "failed"
 ```
 
-| Adapter        | `markComplete()` with no `requireSuccessStatus`                          |
+| Adapter        | `markComplete()` with no `requireSuccessStatus`                         |
 | -------------- | ----------------------------------------------------------------------- |
 | SCORM 1.2      | `cmi.core.lesson_status = "completed"`                                  |
 | SCORM 2004 4th | `cmi.completion_status = "completed"`, `cmi.success_status = "unknown"` |
@@ -729,16 +754,16 @@ export default {
 
 ### Field behaviour
 
-| Field                       | Behaviour                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `language`                  | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`          |
-| `navigation.mode: "free"`   | All pages accessible except those blocked by gating quizzes                                         |
-| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes                                                    |
-| `completion.mode: "percentage"` | Completes when `visitedPages / totalPages * 100 >= percentageThreshold`                          |
-| `completion.mode: "quiz"`   | Completes when graded quiz average >= `scoring.passingScore`                                        |
-| `completion.mode: "manual"` | Completes when an author trigger fires. See [Manual completion](#manual-completion)                 |
-| `a11y.level: "error"`       | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless |
-| `a11y.ignore`               | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs) |
+| Field                           | Behaviour                                                                                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                   |
+| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                 |
+| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes                                                                                                                                |
+| `completion.mode: "percentage"` | Completes when `visitedPages / totalPages * 100 >= percentageThreshold`                                                                                                     |
+| `completion.mode: "quiz"`       | Completes when graded quiz average >= `scoring.passingScore`                                                                                                                |
+| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                         |
+| `a11y.level: "error"`           | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless |
+| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs)                                                         |
 
 ### Minimum config
 
@@ -768,8 +793,13 @@ export default {
     canAccess: (ctx) => {
       if (!sequentialAccess(ctx)) return false;
       if (ctx.page.slug === 'lesson-5') {
-        const i = ctx.manifest.pages.findIndex((p) => p.slug === 'lesson-2-quiz');
-        return (ctx.progress.quizScores.get(i) ?? 0) >= ctx.config.scoring.passingScore;
+        const i = ctx.manifest.pages.findIndex(
+          (p) => p.slug === 'lesson-2-quiz',
+        );
+        return (
+          (ctx.progress.quizScores.get(i) ?? 0) >=
+          ctx.config.scoring.passingScore
+        );
       }
       return true;
     },
@@ -783,12 +813,12 @@ export default {
 
 `pnpm export <course>` writes:
 
-| `export.standard` | What ships                            | Where                                    |
-| ----------------- | ------------------------------------- | ---------------------------------------- |
-| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (any static host)                |
-| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`              |
-| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip`            |
-| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`                 |
+| `export.standard` | What ships                            | Where                         |
+| ----------------- | ------------------------------------- | ----------------------------- |
+| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (any static host)     |
+| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`   |
+| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip` |
+| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`      |
 
 Upload the LMS zips via your LMS's import flow. Drop `dist/` (web) on Netlify, GitHub Pages, S3, or any static host.
 
@@ -1059,12 +1089,12 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 
 ### Per-mode behaviour
 
-| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'`        | `xapi: {endpoint, ...}` (explicit)                |
-| ------------- | ------------------ | ----------------------------- | ------------------------------------------------- |
-| **cmi5**      | `useXAPI()` → null | Inherits launch LRS           | Independent publisher; `actor` defaults to launch actor |
-| **scorm12**   | `useXAPI()` → null | **Config error**              | Independent; `actor` derived from `cmi.core.student_id` |
-| **scorm2004** | `useXAPI()` → null | **Config error**              | Independent; `actor` derived from `cmi.learner_id` |
-| **web**       | `useXAPI()` → null | **Config error**              | Independent; `actor` **required** in config        |
+| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'` | `xapi: {endpoint, ...}` (explicit)                      |
+| ------------- | ------------------ | ---------------------- | ------------------------------------------------------- |
+| **cmi5**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
+| **scorm12**   | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.core.student_id` |
+| **scorm2004** | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.learner_id`      |
+| **web**       | `useXAPI()` → null | **Config error**       | Independent; `actor` **required** in config             |
 
 ### Gotchas
 
@@ -1094,12 +1124,12 @@ OAuth at the publisher level, statement signing/attachment helpers, offline/Inde
 
 The runtime translates author intent into adapter calls automatically; you don't write any of it. The author-relevant differences:
 
-| Concern                | SCORM 1.2                                  | SCORM 2004 4th                          | cmi5                                  |
-| ---------------------- | ------------------------------------------ | --------------------------------------- | ------------------------------------- |
-| Completion + success   | One field (`lesson_status`); no "unknown" — success wins when known, else completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
-| Score scale to LMS     | `score.raw` (0–100)                        | `score.raw` (0–100) **and** `score.scaled` (0–1) | `result.score.scaled` (0–1)    |
-| `usePersistence` cap   | ~4 KB (plan for 4096 chars)                | 64000 chars                             | LRS-defined (typically unbounded)     |
-| Resume after reload    | From `cmi.suspend_data`                    | From `cmi.suspend_data`                 | From `tessera-state` (State API)      |
+| Concern              | SCORM 1.2                                                                            | SCORM 2004 4th                                                 | cmi5                                 |
+| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------ |
+| Completion + success | One field (`lesson_status`); no "unknown" — success wins when known, else completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
+| Score scale to LMS   | `score.raw` (0–100)                                                                  | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
+| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                          | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Resume after reload  | From `cmi.suspend_data`                                                              | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
 
@@ -1110,12 +1140,12 @@ Author-facing consequences:
 
 ### Local testing
 
-| Standard   | How to test                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| scorm12    | Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player |
-| scorm2004  | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                        |
-| cmi5       | Upload `dist/*-cmi5.zip` to SCORM Cloud and use its generated cmi5 dispatch URL                |
-| web        | Serve `dist/` from any static host                                                            |
+| Standard  | How to test                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------- |
+| scorm12   | Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player |
+| scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                       |
+| cmi5      | Upload `dist/*-cmi5.zip` to SCORM Cloud and use its generated cmi5 dispatch URL               |
+| web       | Serve `dist/` from any static host                                                            |
 
 Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / interactions look right.
 
@@ -1194,14 +1224,20 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
   }
 </script>
 
-<svg width="400" height="200" role="img" aria-label="Drag to match elements to their symbols">
+<svg
+  width="400"
+  height="200"
+  role="img"
+  aria-label="Drag to match elements to their symbols"
+>
   <!-- canvas + line-drawing UI calls connect(l, r) on drop -->
 </svg>
 
 {#if q.mode === 'standalone'}
   <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button>{/if}
+  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button
+    >{/if}
 {/if}
 ```
 
@@ -1218,7 +1254,9 @@ Horizontal topbar with breadcrumb + progress %.
   const nav = useNavigation();
   const progress = useProgress();
 
-  const percent = $derived(Math.round((progress.visitedPages.size / nav.pages.length) * 100));
+  const percent = $derived(
+    Math.round((progress.visitedPages.size / nav.pages.length) * 100),
+  );
 </script>
 
 <header class="topbar">
@@ -1231,7 +1269,10 @@ Horizontal topbar with breadcrumb + progress %.
 
 <nav class="footer">
   <button disabled={!nav.canGoPrev} onclick={() => nav.prev()}>← Back</button>
-  <select onchange={(e) => nav.goTo(e.currentTarget.value)} value={nav.currentPage.slug}>
+  <select
+    onchange={(e) => nav.goTo(e.currentTarget.value)}
+    value={nav.currentPage.slug}
+  >
     {#each nav.pages as p}<option value={p.slug}>{p.title}</option>{/each}
   </select>
   <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next →</button>
@@ -1304,7 +1345,8 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
 
 <div bind:this={host} class="my-quiz">
   <p>
-    Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz.questions.length}
+    Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz
+      .questions.length}
   </p>
 
   {#each quiz.questions as q (q.id)}
@@ -1314,7 +1356,9 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
   {/each}
 
   {#if quiz.state === 'answering'}
-    <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}>Submit</button>
+    <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
+      >Submit</button
+    >
   {:else if quiz.state === 'submitted'}
     <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
@@ -1376,14 +1420,20 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
   </fieldset>
 
   {#if q.feedbackVisible}
-    <p>{q.answer === correct ? 'Correct.' : 'The right answer was ' + options[correct] + '.'}</p>
+    <p>
+      {q.answer === correct
+        ? 'Correct.'
+        : 'The right answer was ' + options[correct] + '.'}
+    </p>
   {/if}
 {/snippet}
 
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
-    <button disabled={selected === null} onclick={() => q.submit()}>Check</button>
+    <button disabled={selected === null} onclick={() => q.submit()}
+      >Check</button
+    >
   {/if}
 {/if}
 ```
@@ -1424,7 +1474,10 @@ A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts t
 <p>At least 50 characters required to pass.</p>
 
 <textarea bind:value={answer} rows="6" disabled={q.submitted}></textarea>
-<button onclick={() => q.submit()} disabled={q.submitted || answer.trim().length < 50}>
+<button
+  onclick={() => q.submit()}
+  disabled={q.submitted || answer.trim().length < 50}
+>
   Submit
 </button>
 
