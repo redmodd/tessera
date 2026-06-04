@@ -6,6 +6,7 @@ import {
   resolveCourse,
   findWorkspaceRoot,
   listCourses,
+  listMalformedCourses,
 } from '../src/plugin/course-root.js';
 
 let ws: string;
@@ -59,6 +60,23 @@ describe('listCourses', () => {
   it('ignores directories without a course.config.js', () => {
     mkdirSync(join(ws, 'courses', 'not-a-course'), { recursive: true });
     expect(listCourses(ws)).toEqual(['advanced', 'getting-started']);
+  });
+});
+
+describe('listMalformedCourses', () => {
+  it('flags a directory that has pages/ but no course.config.js', () => {
+    mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
+    expect(listMalformedCourses(ws)).toEqual(['half-built']);
+  });
+
+  it('does not flag legitimate non-course directories', () => {
+    mkdirSync(join(ws, 'courses', 'shared-assets'), { recursive: true });
+    writeFileSync(join(ws, 'courses', 'README.md'), '# courses');
+    expect(listMalformedCourses(ws)).toEqual([]);
+  });
+
+  it('does not flag valid courses', () => {
+    expect(listMalformedCourses(ws)).toEqual([]);
   });
 });
 
@@ -134,5 +152,15 @@ describe('resolveCourse', () => {
   it('errors when a name is given but cwd is not inside a workspace', () => {
     const result = resolveCourse(tmpdir(), 'getting-started');
     expect(result.ok).toBe(false);
+  });
+
+  it('surfaces a malformed course in the hint instead of silently dropping it', () => {
+    mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
+    const result = resolveCourse(ws, 'half-built');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('half-built');
+      expect(result.error).toContain('course.config.js');
+    }
   });
 });

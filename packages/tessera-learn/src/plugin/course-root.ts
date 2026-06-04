@@ -44,17 +44,47 @@ export function listCourses(workspaceRoot: string): string[] {
   }
 }
 
+export function listMalformedCourses(workspaceRoot: string): string[] {
+  const coursesDir = join(workspaceRoot, 'courses');
+  try {
+    return readdirSync(coursesDir, { withFileTypes: true })
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          !isCourse(join(coursesDir, e.name)) &&
+          isDir(join(coursesDir, e.name, 'pages')),
+      )
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 const NOT_A_WORKSPACE =
   'Not inside a Tessera workspace — no `courses/` directory was found at or above the current directory.';
+
+function malformedHint(workspaceRoot: string): string {
+  const malformed = listMalformedCourses(workspaceRoot);
+  if (malformed.length === 0) return '';
+  return (
+    `\nSkipped (missing course.config.js):\n` +
+    malformed.map((c) => `  courses/${c}`).join('\n')
+  );
+}
 
 function listHint(workspaceRoot: string): string {
   const courses = listCourses(workspaceRoot);
   if (courses.length === 0) {
-    return '\nNo courses found. Create one with `tessera new <name>`.';
+    return (
+      '\nNo courses found. Create one with `tessera new <name>`.' +
+      malformedHint(workspaceRoot)
+    );
   }
   return (
     `\nAvailable courses:\n${courses.map((c) => `  ${c}`).join('\n')}` +
-    '\nName one (`tessera <command> <course>`) or cd into its folder.'
+    '\nName one (`tessera <command> <course>`) or cd into its folder.' +
+    malformedHint(workspaceRoot)
   );
 }
 
