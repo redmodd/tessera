@@ -125,6 +125,15 @@ export function isMissingDepsError(message: string): boolean {
 }
 
 const INSTALL_CHROMIUM = 'pnpm exec playwright install chromium';
+const PLAYWRIGHT_SPECS = ['playwright', '@playwright/test'] as const;
+
+function reportManualInstall(lead: string): void {
+  console.error(
+    `\x1b[31m[tessera a11y]\x1b[0m ${lead}\n` +
+      `  Install it once:\n` +
+      `    ${INSTALL_CHROMIUM}`,
+  );
+}
 
 type SpawnFn = (
   command: string,
@@ -140,7 +149,7 @@ function resolvePlaywrightBin():
   | { command: string; args: string[] }
   | undefined {
   const require = createRequire(import.meta.url);
-  for (const spec of ['playwright', '@playwright/test']) {
+  for (const spec of PLAYWRIGHT_SPECS) {
     try {
       const pkgPath = require.resolve(`${spec}/package.json`);
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
@@ -250,11 +259,7 @@ export async function launchWithInstall({
     );
     const installed = await install();
     if (!installed) {
-      console.error(
-        `\x1b[31m[tessera a11y]\x1b[0m Chromium isn't installed for Playwright.\n` +
-          `  Install it once:\n` +
-          `    ${INSTALL_CHROMIUM}`,
-      );
+      reportManualInstall("Chromium isn't installed for Playwright.");
       return { ok: false, code: 1 };
     }
 
@@ -267,10 +272,8 @@ export async function launchWithInstall({
         isMissingBrowserError(retryMessage) &&
         !isMissingDepsError(retryMessage)
       ) {
-        console.error(
-          `\x1b[31m[tessera a11y]\x1b[0m Chromium still isn't installed after the install step.\n` +
-            `  Install it once:\n` +
-            `    ${INSTALL_CHROMIUM}`,
+        reportManualInstall(
+          "Chromium still isn't installed after the install step.",
         );
       } else {
         reportLaunchFailure(retryMessage, isLinux);
@@ -304,7 +307,7 @@ async function loadDeps(): Promise<
 > {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let chromium: any;
-  for (const spec of ['playwright', '@playwright/test']) {
+  for (const spec of PLAYWRIGHT_SPECS) {
     try {
       const mod = (await tryImport(spec)) as { chromium?: unknown };
       if (mod.chromium) {
