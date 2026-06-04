@@ -32,29 +32,57 @@ export function findWorkspaceRoot(cwd: string): string | null {
   }
 }
 
-export function listCourses(workspaceRoot: string): string[] {
+function scanCourses(workspaceRoot: string): {
+  courses: string[];
+  malformed: string[];
+} {
   const coursesDir = join(workspaceRoot, 'courses');
+  const courses: string[] = [];
+  const malformed: string[] = [];
   try {
-    return readdirSync(coursesDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && isCourse(join(coursesDir, e.name)))
-      .map((e) => e.name)
-      .sort();
+    for (const e of readdirSync(coursesDir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const dir = join(coursesDir, e.name);
+      if (isCourse(dir)) courses.push(e.name);
+      else if (isDir(join(dir, 'pages'))) malformed.push(e.name);
+    }
   } catch {
-    return [];
+    return { courses, malformed };
   }
+  return { courses: courses.sort(), malformed: malformed.sort() };
+}
+
+export function listCourses(workspaceRoot: string): string[] {
+  return scanCourses(workspaceRoot).courses;
+}
+
+export function listMalformedCourses(workspaceRoot: string): string[] {
+  return scanCourses(workspaceRoot).malformed;
 }
 
 const NOT_A_WORKSPACE =
   'Not inside a Tessera workspace — no `courses/` directory was found at or above the current directory.';
 
+function malformedHint(malformed: string[]): string {
+  if (malformed.length === 0) return '';
+  return (
+    `\nSkipped (missing course.config.js):\n` +
+    malformed.map((c) => `  courses/${c}`).join('\n')
+  );
+}
+
 function listHint(workspaceRoot: string): string {
-  const courses = listCourses(workspaceRoot);
+  const { courses, malformed } = scanCourses(workspaceRoot);
   if (courses.length === 0) {
-    return '\nNo courses found. Create one with `tessera new <name>`.';
+    return (
+      '\nNo courses found. Create one with `tessera new <name>`.' +
+      malformedHint(malformed)
+    );
   }
   return (
     `\nAvailable courses:\n${courses.map((c) => `  ${c}`).join('\n')}` +
-    '\nName one (`tessera <command> <course>`) or cd into its folder.'
+    '\nName one (`tessera <command> <course>`) or cd into its folder.' +
+    malformedHint(malformed)
   );
 }
 
