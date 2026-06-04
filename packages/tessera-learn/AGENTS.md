@@ -80,7 +80,7 @@ Plain dependency bump — there is no `create-tessera upgrade`:
 pnpm add tessera-learn@latest      # or @0.1.0 to pin
 ```
 
-The framework owns the build, the reserved scripts, and this guide. Nothing in your tree needs reconciling; your root `CLAUDE.md`/`AGENTS.md` are pointers and never change.
+The framework owns the build, the reserved scripts, and this guide, so a bump needs no reconciling. Your root `CLAUDE.md`/`AGENTS.md` point to this guide and aren't overwritten by updates — add your own workspace standards to their Project notes section freely.
 
 ### Customising the build (optional)
 
