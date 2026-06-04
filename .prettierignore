@@ -7,3 +7,4 @@ tests/.e2e-variants/**
 pnpm-lock.yaml
 CHANGELOG.md
 *.tsbuildinfo
+packages/create-tessera/templates/workspace/README.md
