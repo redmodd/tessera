@@ -64,13 +64,14 @@ pnpm install              # first time only
 pnpm dev <course>         # dev server at http://localhost:5173 (Ctrl+C to stop)
 pnpm export <course>      # build + package for the LMS standard in course.config.js
 pnpm validate <course>    # run validation only — no server, no bundle
+pnpm a11y <course>        # runtime a11y audit on its own (the audit half of check)
 pnpm check <course>       # validate, then the runtime a11y audit (axe) over the built course
 ```
 
 - `dev` hot-reloads pages, layouts, components, and `course.config.js`.
 - `validate` runs the same static checks as `dev`/`export` and exits non-zero on failure. Use it as the fast feedback loop after editing.
 - `check` runs `validate` then `tessera a11y` (builds, renders every page headless, runs axe-core). First run auto-installs Chromium. See [Accessibility](#accessibility).
-- `dev` / `export` / `validate` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
+- `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
 
 ### Updating the framework
 
@@ -837,9 +838,9 @@ Two passes plus components that are accessible by construction.
 **Runtime audit** (`tessera a11y`) is the opt-in deep pass. Run it directly or via `pnpm check <course>`:
 
 ```bash
-pnpm exec tessera a11y                   # audit (threshold: serious)
-pnpm exec tessera a11y --threshold minor # stricter
-pnpm exec tessera a11y --build           # force a fresh build first
+pnpm a11y <course>                   # audit (threshold: serious)
+pnpm a11y <course> --threshold minor # stricter
+pnpm a11y <course> --build           # force a fresh build first
 ```
 
 It builds the course, renders **every** page headless (including quiz-gated pages), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), and exits non-zero on any violation at/above the impact threshold (default `serious`). It catches what a static scan can't: computed ARIA, focus order, rendered contrast. First run auto-installs Chromium. It uses the web adapter, so it works regardless of `export.standard`.
