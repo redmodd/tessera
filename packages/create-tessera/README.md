@@ -61,11 +61,7 @@ pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<ne
 
 The root scripts forward to whichever course you name: `pnpm dev <course>` runs that course, while a bare command at the workspace root lists the available courses rather than guessing. You can also `cd` into a course folder and run `pnpm exec tessera dev`.
 
-The runtime audit drives Playwright, which needs a browser binary once per machine:
-
-```bash
-pnpm exec playwright install chromium
-```
+The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing.
 
 Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The full authoring guide is at `node_modules/tessera-learn/AGENTS.md` (your `CLAUDE.md` / `AGENTS.md` point to it).
 

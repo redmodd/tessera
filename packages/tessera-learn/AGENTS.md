@@ -72,13 +72,7 @@ The dev server hot-reloads as you edit pages, layouts, components, and `course.c
 
 `pnpm validate <course>` runs the same checks as `dev` and `export` (page syntax, manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
 
-`pnpm check <course>` runs `validate` and then the deeper, opt-in pass (`tessera a11y`): it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). The runtime audit drives Playwright, which needs a browser binary once per machine:
-
-```bash
-pnpm exec playwright install chromium
-```
-
-See [Accessibility](#accessibility).
+`pnpm check <course>` runs `validate` and then the deeper, opt-in pass (`tessera a11y`): it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing. See [Accessibility](#accessibility).
 
 `dev`, `export`, `validate`, and `check` are **reserved script names** — each is a thin alias for the matching `tessera` subcommand. Don't repurpose them.
 
@@ -917,11 +911,7 @@ Tessera checks accessibility in two passes, plus components that are accessible 
 
 **Runtime audit** is the opt-in deep pass: `pnpm a11y <course>` (run it directly, or via `pnpm check <course>`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
 
-The runtime audit drives Playwright, which needs a browser binary once per machine:
-
-```bash
-pnpm exec playwright install chromium
-```
+The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it isn't already present — no manual step needed.
 
 ```bash
 pnpm exec tessera a11y                   # audit (threshold: serious)
