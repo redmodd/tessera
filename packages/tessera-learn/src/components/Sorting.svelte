@@ -3,7 +3,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId, shuffle } from './util.js';
-  import LockedBanner from './LockedBanner.svelte';
+  import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -77,10 +77,7 @@
   if (!inQuiz) {
     initQueue();
   } else {
-    onMount(() => {
-      initQueue();
-      q.setRender(renderQuestion);
-    });
+    onMount(initQueue);
   }
 
   let currentItemIdx = $derived(queue.length > 0 ? queue[0] : null);
@@ -176,7 +173,7 @@
   }
 </script>
 
-{#snippet sortingContent()}
+<QuestionShell {q} class="tessera-sorting" aria-label={question}>
   <p class="tessera-sorting-question">{question}</p>
 
   <!-- Card deck: shows the current card to be placed -->
@@ -321,28 +318,9 @@
       </button>
     </div>
   {/if}
-{/snippet}
-
-{#if !inQuiz}
-  <div class="tessera-sorting" aria-label={question}>
-    {@render sortingContent()}
-  </div>
-{/if}
-
-{#snippet renderQuestion()}
-  <div class="tessera-sorting" aria-label={question}>
-    {#if q.isLockedCorrect}
-      <LockedBanner />
-    {/if}
-    {@render sortingContent()}
-  </div>
-{/snippet}
+</QuestionShell>
 
 <style>
-  .tessera-sorting {
-    padding: var(--tessera-spacing-md) 0;
-  }
-
   .tessera-sorting-question {
     font-size: 1.125rem;
     font-weight: 600;

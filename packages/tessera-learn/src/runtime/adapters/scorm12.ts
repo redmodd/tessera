@@ -29,7 +29,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
     responseField: 'student_response',
     timestampField: 'time',
     timestamp: () => new Date().toTimeString().slice(0, 8),
-    typeValue: (t) => scorm12Type(t),
+    typeValue: scorm12Type,
     resultLabels: { correct: 'correct', incorrect: 'wrong' },
     format: SCORM12_INTERACTION_FORMAT,
   },

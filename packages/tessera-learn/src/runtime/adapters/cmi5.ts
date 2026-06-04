@@ -579,10 +579,7 @@ export class CMI5Adapter implements PersistenceAdapter {
     opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> {
     const tmpl = this.#launchData?.contextTemplate ?? {};
-    const tmplActivities = (tmpl.contextActivities ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const tmplActivities = tmpl.contextActivities ?? {};
 
     // Concat-dedupe category to preserve any template-supplied entries
     // (§10.2.1 forbids overwriting them).
@@ -594,14 +591,8 @@ export class CMI5Adapter implements PersistenceAdapter {
         category.push({ id, objectType: 'Activity' });
       }
     };
-    const templateCategory = Array.isArray(
-      (tmplActivities as { category?: unknown }).category,
-    )
-      ? (
-          tmplActivities as {
-            category: Array<{ id: string; objectType?: string }>;
-          }
-        ).category
+    const templateCategory = Array.isArray(tmplActivities.category)
+      ? tmplActivities.category
       : [];
     for (const c of templateCategory) {
       if (c && typeof c.id === 'string') push(c.id);
@@ -615,13 +606,13 @@ export class CMI5Adapter implements PersistenceAdapter {
     };
 
     const ctx: Record<string, unknown> = {
-      ...(tmpl as Record<string, unknown>),
+      ...tmpl,
       contextActivities,
     };
     // cmi5 §9.6.3.2 — masteryScore extension is scoped to Passed/Failed.
     if (opts.mastery && this.#masteryScore !== null) {
       ctx.extensions = {
-        ...((tmpl.extensions ?? {}) as Record<string, unknown>),
+        ...(tmpl.extensions ?? {}),
         [CMI5_MASTERYSCORE_EXT]: this.#masteryScore,
       };
     }
