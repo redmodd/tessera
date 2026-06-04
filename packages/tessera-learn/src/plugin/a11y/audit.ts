@@ -116,6 +116,14 @@ export function isMissingBrowserError(message: string): boolean {
   return /Executable doesn't exist|playwright install/i.test(message);
 }
 
+// A missing-deps failure also mentions `playwright install-deps`, so it matches
+// isMissingBrowserError; detect it first to route to the `--with-deps` fix.
+export function isMissingDepsError(message: string): boolean {
+  return /Host system is missing dependencies|missing dependencies to run browser/i.test(
+    message,
+  );
+}
+
 const INSTALL_CHROMIUM = 'pnpm exec playwright install chromium';
 
 type SpawnFn = (
@@ -125,6 +133,7 @@ type SpawnFn = (
 ) => {
   on(event: 'error', listener: (err: Error) => void): unknown;
   on(event: 'exit', listener: (code: number | null) => void): unknown;
+  kill?(signal?: NodeJS.Signals): unknown;
 };
 
 function resolvePlaywrightBin():
@@ -151,11 +160,14 @@ function resolvePlaywrightBin():
   return undefined;
 }
 
+const INSTALL_TIMEOUT_MS = 10 * 60_000;
+
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
 export async function installChromium(
   workspaceRoot: string,
   spawnFn: SpawnFn = spawn,
+  timeoutMs: number = INSTALL_TIMEOUT_MS,
 ): Promise<boolean> {
   const bin = resolvePlaywrightBin();
   if (!bin) {
@@ -170,18 +182,45 @@ export async function installChromium(
       stdio: 'inherit',
       cwd: workspaceRoot,
     });
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolvePromise(ok);
+    };
+    const timer = setTimeout(() => {
+      console.error(
+        `\x1b[31m[tessera a11y]\x1b[0m Chromium install timed out after ${Math.round(
+          timeoutMs / 60_000,
+        )} min; aborting.`,
+      );
+      child.kill?.('SIGKILL');
+      finish(false);
+    }, timeoutMs);
+    timer.unref?.();
     child.on('error', (err) => {
       console.error(
         `\x1b[31m[tessera a11y]\x1b[0m Failed to start the Chromium install: ${err.message}`,
       );
-      resolvePromise(false);
+      finish(false);
     });
-    child.on('exit', (code) => resolvePromise(code === 0));
+    child.on('exit', (code) => finish(code === 0));
   });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LaunchResult = { ok: true; browser: any } | { ok: false; code: number };
+
+function reportLaunchFailure(message: string, isLinux: boolean): void {
+  console.error(
+    `\x1b[31m[tessera a11y]\x1b[0m Chromium is installed but failed to launch.\n` +
+      (isLinux
+        ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
+        : ``) +
+      `  Original error: ${message}`,
+  );
+}
 
 // Owns the catch → install → guarded-retry around chromium.launch(). The retry
 // is guarded because a binary-only install can still fail to launch (on Linux,
@@ -200,6 +239,10 @@ export async function launchWithInstall({
     return { ok: true, browser: await launch() };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (isMissingDepsError(message)) {
+      reportLaunchFailure(message, isLinux);
+      return { ok: false, code: 1 };
+    }
     if (!isMissingBrowserError(message)) throw err;
 
     console.log(
@@ -220,20 +263,17 @@ export async function launchWithInstall({
     } catch (retryErr) {
       const retryMessage =
         retryErr instanceof Error ? retryErr.message : String(retryErr);
-      if (isMissingBrowserError(retryMessage)) {
+      if (
+        isMissingBrowserError(retryMessage) &&
+        !isMissingDepsError(retryMessage)
+      ) {
         console.error(
           `\x1b[31m[tessera a11y]\x1b[0m Chromium still isn't installed after the install step.\n` +
             `  Install it once:\n` +
             `    ${INSTALL_CHROMIUM}`,
         );
       } else {
-        console.error(
-          `\x1b[31m[tessera a11y]\x1b[0m Chromium installed but failed to launch.\n` +
-            (isLinux
-              ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
-              : ``) +
-            `  Original error: ${retryMessage}`,
-        );
+        reportLaunchFailure(retryMessage, isLinux);
       }
       return { ok: false, code: 1 };
     }

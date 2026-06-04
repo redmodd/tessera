@@ -4,6 +4,7 @@ import {
   axeIgnoreRules,
   installChromium,
   isMissingBrowserError,
+  isMissingDepsError,
   launchWithInstall,
   mapNodeDetail,
   mapViolation,
@@ -122,6 +123,18 @@ describe('isMissingBrowserError', () => {
 });
 
 const MISSING_BROWSER = "Executable doesn't exist at /cache/chromium/chrome";
+const MISSING_DEPS =
+  'browserType.launch: Host system is missing dependencies to run browsers.\n' +
+  'Please install them with the following command:\n' +
+  '    sudo pnpm exec playwright install-deps';
+
+describe('isMissingDepsError', () => {
+  it('matches a host-deps failure that also names playwright install-deps', () => {
+    expect(isMissingDepsError(MISSING_DEPS)).toBe(true);
+    expect(isMissingBrowserError(MISSING_DEPS)).toBe(true);
+    expect(isMissingDepsError(MISSING_BROWSER)).toBe(false);
+  });
+});
 
 describe('launchWithInstall', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -224,6 +237,39 @@ describe('launchWithInstall', () => {
     );
     expect(install).not.toHaveBeenCalled();
   });
+
+  it('reports the --with-deps fix without installing when system deps are missing', async () => {
+    const launch = vi.fn().mockRejectedValue(new Error(MISSING_DEPS));
+    const install = vi.fn(async () => true);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install, isLinux: true });
+
+    expect(result).toEqual({ ok: false, code: 1 });
+    expect(install).not.toHaveBeenCalled();
+    expect(launch).toHaveBeenCalledTimes(1);
+    const msg = error.mock.calls[0][0];
+    expect(msg).toContain('--with-deps');
+    expect(msg).not.toContain("still isn't installed");
+  });
+
+  it('shows --with-deps, not a reinstall, when the retry fails on missing deps', async () => {
+    const launch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(MISSING_BROWSER))
+      .mockRejectedValueOnce(new Error(MISSING_DEPS));
+    const install = vi.fn(async () => true);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install, isLinux: true });
+
+    expect(result).toEqual({ ok: false, code: 1 });
+    expect(install).toHaveBeenCalledTimes(1);
+    const msg = error.mock.calls[0][0];
+    expect(msg).toContain('--with-deps');
+    expect(msg).not.toContain("still isn't installed");
+  });
 });
 
 function fakeSpawn(behavior: 'exit0' | 'exit1' | 'error') {
@@ -269,5 +315,24 @@ describe('installChromium', () => {
 
     expect(ok).toBe(false);
     expect(error.mock.calls[0][0]).toContain('spawn ENOENT');
+  });
+
+  it('kills the child and returns false when the install times out', async () => {
+    let killed = false;
+    const hangingSpawn = (() => ({
+      on() {
+        return this;
+      },
+      kill() {
+        killed = true;
+        return true;
+      },
+    })) as unknown as Parameters<typeof installChromium>[1];
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const ok = await installChromium('/workspace', hangingSpawn, 5);
+
+    expect(ok).toBe(false);
+    expect(killed).toBe(true);
   });
 });
