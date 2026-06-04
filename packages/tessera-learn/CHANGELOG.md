@@ -1,5 +1,15 @@
 # tessera-learn
 
+## 0.2.2
+
+### Patch Changes
+
+- 663357a: `tessera a11y` / `tessera check` now auto-install Chromium for Playwright on first use instead of failing with a manual instruction.
+- fc41b00: a11y audit now reports which element triggered each violation: `a11y-report.json` records the selector, HTML, and axe's failure summary per node, and the console output lists the offending selector and failure summary.
+- ba866d1: Rewrite the course authoring guide (`AGENTS.md`) into a procedural, LLM-facing instruction set — converting prose to rules/tables and trimming runtime-internal reference that authors never write.
+- 701a18d: Internal refactor with no author-facing changes: the four question widgets now share a `QuestionShell` component for their standalone-vs-quiz render, and the LMS adapter labels and cmi5 context builder were de-duplicated.
+- 7978096: A course directory under `courses/` that has a `pages/` folder but is missing its `course.config.js` is now reported as skipped when listing the workspace's courses, instead of being silently dropped.
+
 ## 0.2.1
 
 ### Patch Changes

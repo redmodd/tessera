@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.2.2
+
+### Patch Changes
+
+- 455a7d4: Scaffolded workspaces now include a human-facing `README.md` and a "Project notes" section in `AGENTS.md` where users add their own context for the agent.
+
 ## 0.2.1
 
 ### Patch Changes
