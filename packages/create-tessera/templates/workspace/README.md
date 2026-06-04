@@ -14,5 +14,6 @@ pnpm tessera new <name>      # add a course
 pnpm export <name>           # build a SCORM / cmi5 / web package
 ```
 
-Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md), which points to the full
-guide at `node_modules/tessera-learn/AGENTS.md`.
+Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md) — it loads the full guide
+and has a **Project notes** section where you add your own context (audience, tone,
+brand).
