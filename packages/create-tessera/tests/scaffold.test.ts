@@ -166,6 +166,7 @@ describe('create-tessera workspace scaffold', () => {
     const claude = readFileSync(resolve(ws, 'CLAUDE.md'), 'utf-8');
     expect(claude).toBe(agents);
     expect(agents).toContain('@./node_modules/tessera-learn/AGENTS.md');
+    expect(agents).toContain('## Project notes');
     expect(agents.length).toBeLessThan(2000);
     // Pointers live only at the root — never stamped per course.
     expect(existsSync(resolve(ws, SEED, 'AGENTS.md'))).toBe(false);
@@ -180,7 +181,6 @@ describe('create-tessera workspace scaffold', () => {
     expect(readme).toContain('# my-courses');
     expect(readme).toContain('pnpm install');
     expect(readme).toContain('pnpm dev starter-course');
-    // Points at the guide rather than duplicating it.
     expect(readme).toContain('AGENTS.md');
     expect(readme).not.toContain('@./node_modules/tessera-learn/AGENTS.md');
   });
