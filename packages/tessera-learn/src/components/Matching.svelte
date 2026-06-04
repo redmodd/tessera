@@ -3,7 +3,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId, shuffle } from './util.js';
-  import LockedBanner from './LockedBanner.svelte';
+  import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -85,10 +85,7 @@
   if (!inQuiz) {
     initShuffle();
   } else {
-    onMount(() => {
-      initShuffle();
-      q.setRender(renderQuestion);
-    });
+    onMount(initShuffle);
   }
 
   function handleLeftClick(leftIndex) {
@@ -166,7 +163,7 @@
   }
 </script>
 
-{#snippet matchingContent()}
+<QuestionShell {q} class="tessera-matching" aria-label={question}>
   <p class="tessera-matching-question">{question}</p>
 
   <div class="tessera-matching-grid">
@@ -268,28 +265,9 @@
       {/if}
     </div>
   {/if}
-{/snippet}
-
-{#if !inQuiz}
-  <div class="tessera-matching" aria-label={question}>
-    {@render matchingContent()}
-  </div>
-{/if}
-
-{#snippet renderQuestion()}
-  <div class="tessera-matching" aria-label={question}>
-    {#if q.isLockedCorrect}
-      <LockedBanner />
-    {/if}
-    {@render matchingContent()}
-  </div>
-{/snippet}
+</QuestionShell>
 
 <style>
-  .tessera-matching {
-    padding: var(--tessera-spacing-md) 0;
-  }
-
   .tessera-matching-question {
     font-size: 1.125rem;
     font-weight: 600;

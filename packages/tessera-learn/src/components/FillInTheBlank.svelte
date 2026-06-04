@@ -1,8 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId } from './util.js';
-  import LockedBanner from './LockedBanner.svelte';
+  import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -56,10 +55,6 @@
   // `q.mode` is fixed for the lifetime of the widget; capture once.
   const inQuiz = q.mode === 'quiz';
 
-  onMount(() => {
-    if (inQuiz) q.setRender(renderQuestion);
-  });
-
   function handleInput(e) {
     if (q.locked) return;
     inputValue = e.target.value;
@@ -79,7 +74,7 @@
   }
 </script>
 
-{#snippet fitbContent()}
+<QuestionShell {q} class="tessera-fitb">
   <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
   <div class="tessera-fitb-input-wrapper">
@@ -138,28 +133,9 @@
       {/if}
     </div>
   {/if}
-{/snippet}
-
-{#if !inQuiz}
-  <div class="tessera-fitb">
-    {@render fitbContent()}
-  </div>
-{/if}
-
-{#snippet renderQuestion()}
-  <div class="tessera-fitb">
-    {#if q.isLockedCorrect}
-      <LockedBanner />
-    {/if}
-    {@render fitbContent()}
-  </div>
-{/snippet}
+</QuestionShell>
 
 <style>
-  .tessera-fitb {
-    padding: var(--tessera-spacing-md) 0;
-  }
-
   .tessera-fitb-question {
     display: block;
     font-size: 1.125rem;

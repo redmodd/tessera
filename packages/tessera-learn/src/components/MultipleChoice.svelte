@@ -1,8 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId } from './util.js';
-  import LockedBanner from './LockedBanner.svelte';
+  import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
   let {
@@ -45,10 +44,6 @@
   // `q.mode` is fixed for the lifetime of the widget; capture once.
   const inQuiz = q.mode === 'quiz';
 
-  onMount(() => {
-    if (inQuiz) q.setRender(renderQuestion);
-  });
-
   function handleSelect(optIndex) {
     if (q.locked) return;
     selectedOption = optIndex;
@@ -73,7 +68,12 @@
   }
 </script>
 
-{#snippet mcContent()}
+<QuestionShell
+  {q}
+  class="tessera-mc"
+  role="radiogroup"
+  aria-labelledby="{groupId}-label"
+>
   <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
   <div class="tessera-mc-options">
@@ -127,28 +127,9 @@
       <RetryButton onclick={() => q.retry()} />
     {/if}
   {/if}
-{/snippet}
-
-{#if !inQuiz}
-  <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
-    {@render mcContent()}
-  </div>
-{/if}
-
-{#snippet renderQuestion()}
-  <div class="tessera-mc" role="radiogroup" aria-labelledby="{groupId}-label">
-    {#if q.isLockedCorrect}
-      <LockedBanner />
-    {/if}
-    {@render mcContent()}
-  </div>
-{/snippet}
+</QuestionShell>
 
 <style>
-  .tessera-mc {
-    padding: var(--tessera-spacing-md) 0;
-  }
-
   .tessera-mc-question {
     font-size: 1.125rem;
     font-weight: 600;
