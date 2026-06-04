@@ -1,14 +1,14 @@
 # AGENTS.md: Tessera Course Authoring Guide
 
-Tessera is an **LMS tracking runtime** for interactive learning content. It handles SCORM 1.2 / SCORM 2004 / cmi5 / xAPI statements, progress state, completion and success rollup, persistence, and navigation gating, and gets out of the way for the presentation layer.
+Tessera is an LMS-tracking runtime for interactive learning content (SCORM 1.2 / SCORM 2004 4e / cmi5 / static web). It owns tracking, progress, completion/success rollup, persistence, and navigation gating. You own the presentation layer.
 
-Build a course with built-in components, your own (via the hooks), or any mix. This file is the canonical reference for any agent or human author working in a Tessera project. Read it before generating or editing course code.
+This is the canonical reference for authoring a Tessera course. Read it before generating or editing course code. You are reading `node_modules/tessera-learn/AGENTS.md`; it updates when you bump `tessera-learn`.
 
 ---
 
 ## Workspaces
 
-A Tessera project is a **workspace**: one `package.json` and one `node_modules` shared by **many courses**, plus a `shared/` design system. Each course is a self-contained folder under `courses/`.
+A Tessera project is a **workspace**: one `package.json` and one `node_modules` shared by many courses, plus a `shared/` design system. Each course is a self-contained folder under `courses/`.
 
 ```
 my-courses/
@@ -17,31 +17,32 @@ my-courses/
 │   ├── Button.svelte
 │   └── tokens.css
 ├── courses/
-│   ├── starter-course/     # a course = a content folder (course.config.js, pages/, …)
+│   ├── starter-course/     # a course = course.config.js, pages/, …
 │   └── <next course>/
 └── AGENTS.md / CLAUDE.md   # pointers to this guide (workspace root only)
 ```
 
-**Everything else in this guide describes a single course** — i.e. the contents of one `courses/<name>/` folder (`course.config.js`, `layout.svelte`, `pages/`, `styles/`).
+Rules:
 
-**Open the workspace folder** (not an individual course) so this guide stays in scope and `$shared` resolves.
+- **Open the workspace folder**, not an individual course — this keeps the guide in scope and `$shared` resolving.
+- Everything below "Project Structure" describes a single course: the contents of one `courses/<name>/`.
+- Name the course on every command. A bare command at the workspace root errors and lists courses; it never picks one.
 
-### Working with courses
+### Course commands
 
 ```bash
-pnpm tessera new <name>     # scaffold courses/<name>/ (no install — deps already here)
-pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
-pnpm tessera dev <name>     # run a command against a named course…
-cd courses/<name> && pnpm exec tessera dev   # …or cd into the course and run it without a name
-pnpm tessera export <name>  # each course exports independently to its own LMS package
-cd courses/<name> && pnpm exec tessera export   # …this works for every command, not just dev
+pnpm tessera new <name>                 # scaffold courses/<name>/
+pnpm tessera duplicate <source> <new>   # copy a course to courses/<new>/
+pnpm tessera dev <name>                 # run a command against a named course
+cd courses/<name> && pnpm exec tessera dev   # …or cd in and omit the name
+pnpm tessera export <name>              # each course exports independently
 ```
 
-A **bare command at the workspace root errors** and lists the available courses — it never silently picks one, so its meaning can't change as you add courses. Name the course, or `cd` into its folder. (The scaffolded root scripts — `pnpm dev`, `pnpm export`, … — pass straight through, so `pnpm dev <course>` runs that course and a bare `pnpm dev` errors just the same.)
+The scaffolded root scripts (`pnpm dev`, `pnpm export`, …) pass through: `pnpm dev <course>` runs that course; bare `pnpm dev` errors.
 
-### Sharing across courses with `$shared`
+### `$shared`
 
-`$shared` resolves to the workspace `shared/` directory, so any course can import the shared design system:
+`$shared` resolves to the workspace `shared/` directory and is bundled into each course's export. Import from it in any course:
 
 ```svelte
 <script>
@@ -52,61 +53,53 @@ A **bare command at the workspace root errors** and lists the available courses 
 <Button>Continue</Button>
 ```
 
-`$shared` is bundled into each course's export at build time, so it ships in every SCORM/cmi5/web package with no extra wiring.
-
 ---
 
 ## Running the project
 
-From the workspace root (set up for `pnpm` — Node's corepack provisions it automatically). The `dev`/`export`/`validate`/`check` scripts take the course to run; a bare command lists the workspace's courses rather than picking one:
+From the workspace root (`pnpm`; corepack provisions it). Each command takes the course name:
 
 ```bash
 pnpm install              # first time only
 pnpm dev <course>         # dev server at http://localhost:5173 (Ctrl+C to stop)
-pnpm export <course>      # build + package for the LMS standard configured in course.config.js
-pnpm validate <course>    # run project validation only — no server, no bundle
-pnpm check <course>       # validate, then the runtime accessibility audit (axe) over the built course
+pnpm export <course>      # build + package for the LMS standard in course.config.js
+pnpm validate <course>    # run validation only — no server, no bundle
+pnpm a11y <course>        # runtime a11y audit on its own (the audit half of check)
+pnpm check <course>       # validate, then the runtime a11y audit (axe) over the built course
 ```
 
-The dev server hot-reloads as you edit pages, layouts, components, and `course.config.js`. The `export` command produces a SCORM 1.2, SCORM 2004, cmi5, or static-web bundle depending on `course.config.js`.
-
-`pnpm validate <course>` runs the same checks as `dev` and `export` (page syntax, manifest shape, `pageConfig`, question components, asset references, LMS data-contract bypass, and the static accessibility rules) and exits non-zero if any fail. Use it as a fast feedback loop after editing — it's the quickest way to confirm a change is structurally sound.
-
-`pnpm check <course>` runs `validate` and then the deeper, opt-in pass (`tessera a11y`): it builds the course, renders every page in a headless browser, and runs [axe-core](https://github.com/dequelabs/axe-core) to catch issues a static scan can't see (computed ARIA, real rendered contrast). The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing. See [Accessibility](#accessibility).
-
-`dev`, `export`, `validate`, and `check` are **reserved script names** — each is a thin alias for the matching `tessera` subcommand. Don't repurpose them.
+- `dev` hot-reloads pages, layouts, components, and `course.config.js`.
+- `validate` runs the same static checks as `dev`/`export` and exits non-zero on failure. Use it as the fast feedback loop after editing.
+- `check` runs `validate` then `tessera a11y` (builds, renders every page headless, runs axe-core). First run auto-installs Chromium. See [Accessibility](#accessibility).
+- `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
 
 ### Updating the framework
 
-Updating is a plain dependency bump from the project root — there is no `create-tessera upgrade`:
+Plain dependency bump — there is no `create-tessera upgrade`:
 
 ```bash
-pnpm add tessera-learn@latest
+pnpm add tessera-learn@latest      # or @0.1.0 to pin
 ```
 
-You don't have to take the newest release — pin a specific version with `pnpm add tessera-learn@0.1.0` (or set the version in `package.json` and run `pnpm install`) for a reproducible build or to skip a major.
-
-The framework owns the build (there is no `vite.config.js`), the reserved scripts, and this authoring guide, so nothing in your tree needs reconciling. This guide ships _inside_ `tessera-learn` (you're reading `node_modules/tessera-learn/AGENTS.md`), so bumping the dependency updates it automatically. Your project's root `CLAUDE.md` and `AGENTS.md` are just small pointers to this file — they never need to change.
+The framework owns the build, the reserved scripts, and this guide, so a bump needs no reconciling. Your root `CLAUDE.md`/`AGENTS.md` point to this guide and aren't overwritten by updates — add your own workspace standards to their Project notes section freely.
 
 ### Customising the build (optional)
 
-Tessera runs Vite for you with the right plugins; you never write a `vite.config.js`. If you genuinely need to extend the build, add a `tessera.config.js` at the project root. It is a **partial** Vite config that Tessera merges on top of its own — you only specify the delta, and `tesseraPlugin()` (with the Svelte compiler) stays wired in automatically:
+You never write `vite.config.js`. To extend the build, add `tessera.config.js` at the project root — a **partial** Vite config merged on top of Tessera's. `tesseraPlugin()` and the Svelte compiler stay wired in.
 
 ```js
-// tessera.config.js — merged on top of Tessera's Vite config
+// tessera.config.js
 export default {
   server: { port: 4000 },
   resolve: { alias: { $lib: '/src/lib' } },
 };
 ```
 
-`tessera.config.js` is never scaffolded and never touched by updates — once you add it, it's yours.
+It is never scaffolded and never touched by updates.
 
 ---
 
 ## Project Structure
-
-The framework imposes the **minimum** structure it needs to discover content. Everything else is convention you can opt into.
 
 ### Required
 
@@ -114,12 +107,12 @@ The framework imposes the **minimum** structure it needs to discover content. Ev
 my-course/
 ├── course.config.js          # Course configuration
 ├── package.json
-└── pages/                     # Course content (at least one section dir with .svelte files)
+└── pages/                     # at least one section dir with .svelte files
     └── intro/
         └── welcome.svelte
 ```
 
-`pages/` exists, contains one or more **section directories**, each containing one or more `.svelte` files (directly or inside lesson subdirectories). The runtime works with that alone.
+`pages/` must contain one or more **section directories**, each with one or more `.svelte` files (directly or in lesson subdirectories).
 
 ### Optional
 
@@ -127,10 +120,9 @@ my-course/
 my-course/
 ├── layout.svelte              # Custom chrome (replaces default sidebar/topbar)
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
-├── assets/                    # Images, audio, video files (referenced via $assets/)
+├── assets/                    # Images, audio, video (referenced via $assets/)
 ├── styles/                    # Custom CSS overrides
-├── CLAUDE.md                  # Pointer that imports this guide for Claude Code
-├── AGENTS.md                  # Pointer to this guide for other agents
+├── CLAUDE.md / AGENTS.md      # Pointers to this guide
 └── pages/
     └── 01-intro/              # Numeric prefix → controls order
         ├── _meta.js           # Override section title; control page order
@@ -140,76 +132,66 @@ my-course/
             └── overview.svelte
 ```
 
-### What you can edit
+### Editing rules
 
-You own everything in the project directory: `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, and `styles/`. Edit those freely.
+- **Edit freely:** `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, `styles/`.
+- **Never edit `node_modules/`.** Edits there are git-ignored and wiped on the next install/update. There is no `vite.config.js` to edit.
+- To change framework behaviour, use an extension point instead of patching `node_modules/`:
 
-**Never edit `node_modules/`.** `node_modules/tessera-learn/` is the framework itself — edits there are git-ignored, work only until the next `pnpm install`, and are silently wiped when the course's tessera-learn version is updated. (There is no `vite.config.js` to edit either; the build is the framework's. For a genuine build tweak, add a `tessera.config.js` — see [Customising the build](#customising-the-build-optional).) If you think you need to change framework behaviour, you're looking for an extension point instead:
+| Need                                           | Use                                          |
+| ---------------------------------------------- | -------------------------------------------- |
+| New question type / interactive widget         | custom component with the `useQuestion` hook |
+| Different course chrome (header, nav)          | `layout.svelte`                              |
+| Different quiz UI                              | `quiz.svelte` with the `useQuiz` hook        |
+| Styling                                        | `styles/`                                    |
+| Navigation, completion, scoring, export target | `course.config.js`                           |
 
-- **New question type or interactive widget** → a custom component using the `useQuestion` hook.
-- **Different course chrome** (header, nav, layout) → `layout.svelte`.
-- **Different quiz UI** → `quiz.svelte` using the `useQuiz` hook.
-- **Styling** → `styles/`.
-- **Navigation, completion, scoring, or export target** → `course.config.js`.
-
-If none of those fit, the limitation is real — surface it rather than patching around it in `node_modules/`.
+If none fit, surface the limitation — don't patch around it in `node_modules/`.
 
 ### Hierarchy and ordering
 
-The manifest is always **section → lesson → page**. Files directly in a section folder are flattened into one implicit lesson with the section's title; lesson subdirectories nest as expected. Both shapes can coexist.
+- Manifest is always **section → lesson → page**. Files directly in a section folder flatten into one implicit lesson titled after the section. Lesson subdirectories nest. Both shapes can coexist.
+- Sorting is alphabetical by directory/filename.
+- Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs/titles (`01-getting-started/` → slug `getting-started`, title "Getting Started").
+- Control page order **within a lesson** with `_meta.js`, not filename prefixes.
 
-Sorting is alphabetical by directory / filename. Numeric prefixes on directories (`01-`, `02-`, …) give explicit ordering without renaming the files inside, and are stripped from slugs and titles (`01-getting-started/` → slug `getting-started`, title "Getting Started"). Use `_meta.js` to control page order within a lesson rather than prefixing page filenames.
+### `_meta.js`
 
-### `_meta.js` files
+Optional everywhere. Default: titles fall back to the title-cased slug; pages sort alphabetically. **Omit the file when defaults are what you want** (`pages: ["only-page"]` and `title: "Splash"` on `01-splash/` are no-ops).
 
-**Optional everywhere.** When absent, titles fall back to the title-cased slug (`01-getting-started/` → "Getting Started") and pages sort alphabetically by filename. **Omit the file entirely** when those defaults are what you want — `pages: ["only-page"]` on a single-page lesson is a no-op, and `title: "Splash"` on `01-splash/` duplicates the auto-derived title.
-
-Reach for `_meta.js` only when the override is real:
+Use it only for a real override:
 
 ```js
-// section or lesson _meta.js: title override (folder name doesn't auto-derive to what you want)
+// title override (folder name doesn't derive to what you want)
 export default { title: 'How to play' }; // folder is `01-intro`
 ```
 
 ```js
-// lesson _meta.js: explicit page order
-export default {
-  title: 'Welcome',
-  pages: ['welcome', 'objectives'],
-};
+// explicit page order — listed pages first, unlisted .svelte appended alphabetically
+export default { title: 'Welcome', pages: ['welcome', 'objectives'] };
 ```
-
-Pages listed in `pages` come first in listed order; any unlisted `.svelte` files are appended alphabetically.
 
 ---
 
 ## Authoring Surfaces
 
-1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc., from `tessera-learn`. Use, compose, or skip.
-2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`. The stable contract between custom widgets and the runtime. Anything the built-ins do, you can do.
-3. **Custom layout**: drop `layout.svelte` at the project root to replace the default chrome.
-4. **Custom quiz shell**: drop `quiz.svelte` at the project root to replace the built-in quiz UI for every page that has `pageConfig.quiz`. Authors call `useQuiz()` for state and dispatch; question widgets continue to register through `useQuestion`.
-5. **Custom xAPI**: `useXAPI()` returns a publisher for emitting your own xAPI verbs to one or more LRSes. See [Custom xAPI statements](#custom-xapi-statements).
+1. **Built-in components** — `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
+2. **Hooks** — `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`. The stable contract between custom widgets and the runtime.
+3. **Custom layout** — `layout.svelte` at the project root replaces the default chrome.
+4. **Custom quiz shell** — `quiz.svelte` at the project root replaces the quiz UI for every page with `pageConfig.quiz`.
+5. **Custom xAPI** — `useXAPI()` emits your own verbs. See [Custom xAPI](#custom-xapi-statements).
 
-A custom widget that calls `useQuestion` and emits an `Interaction` is treated identically to `<MultipleChoice>`, with the same scoring, LMS reporting, and persistence.
+A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`.
 
 ---
 
 ## Creating Pages
 
-Each page is a `.svelte` file inside a lesson folder.
-
-### Basic page
-
-```svelte
-<h1>Welcome</h1><p>Standard HTML works as-is.</p>
-```
+Each page is a `.svelte` file inside a lesson folder. Standard HTML works as-is.
 
 ### Page configuration
 
-`pageConfig` sets the page title and configures quizzes. It must be a **static object literal** in a module script block. No variables, function calls, or computed values.
-
-Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) are accepted by the manifest parser.
+`pageConfig` sets the title and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse.
 
 ```svelte
 <script module>
@@ -221,7 +203,7 @@ Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) are a
 <h1>Introduction to the Topic</h1>
 ```
 
-If `pageConfig.title` is omitted, the title is derived from the filename: `my-page.svelte` → "My Page".
+If `title` is omitted, it derives from the filename: `my-page.svelte` → "My Page".
 
 ### Importing components
 
@@ -230,26 +212,22 @@ If `pageConfig.title` is omitted, the title is derived from the filename: `my-pa
   import { Callout, Image } from 'tessera-learn';
 </script>
 
-<Callout type="info">
-  <p>Helpful information.</p>
-</Callout>
+<Callout type="info"><p>Helpful information.</p></Callout>
 ```
 
 ---
 
 ## Component Reference
 
-All components import from `tessera-learn`. Nothing is loaded automatically; import only what you use.
+All components import from `tessera-learn`. Nothing loads automatically.
 
 ### Callout
 
-Styled box for highlighting information.
+Styled box. A11y: `role="note"` with type-appropriate `aria-label`. Children become the body.
 
 | Prop   | Type                                          | Default  |
 | ------ | --------------------------------------------- | -------- |
 | `type` | `"info" \| "warning" \| "tip" \| "important"` | `"info"` |
-
-Children become the body. A11y: `role="note"` with type-appropriate `aria-label`.
 
 ```svelte
 <Callout type="warning"><p>Be careful.</p></Callout>
@@ -257,16 +235,19 @@ Children become the body. A11y: `role="note"` with type-appropriate `aria-label`
 
 ### Image
 
-Lazy-loaded image with optional caption. Renders as `<figure>`/`<figcaption>`.
+Lazy-loaded image, renders as `<figure>`/`<figcaption>`.
 
-| Prop         | Type      | Description                                                                                                                                                              |
-| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src`        | `string`  | Image URL. `$assets/` prefix supported                                                                                                                                   |
-| `alt`        | `string`  | **Required unless `decorative`.** Alt text describing the image                                                                                                          |
-| `decorative` | `boolean` | Set `decorative={true}` for a purely ornamental image — renders an empty `alt` + `aria-hidden` so assistive tech skips it. Use this _instead of_ `alt`, not alongside it |
-| `caption`    | `string`  | Optional caption                                                                                                                                                         |
+| Prop         | Type      | Description                                                            |
+| ------------ | --------- | ---------------------------------------------------------------------- |
+| `src`        | `string`  | Image URL. `$assets/` prefix supported                                 |
+| `alt`        | `string`  | **Required unless `decorative`.** Alt text                             |
+| `decorative` | `boolean` | Ornamental image — empty `alt` + `aria-hidden`. Use _instead of_ `alt` |
+| `caption`    | `string`  | Optional caption                                                       |
 
-Every `<Image>` must resolve to exactly one of: meaningful `alt` text, or `decorative={true}`. The validator errors if neither is present (a missing/empty `alt` is the most common accessibility miss). `decorative` is a **boolean** — write `decorative` or `decorative={true}`, never `decorative="true"` (a string is always truthy, so the validator rejects it).
+Rules:
+
+- Every `<Image>` needs exactly one of: meaningful `alt`, or `decorative={true}`. The validator errors if neither is present.
+- `decorative` is a boolean — write `decorative` or `decorative={true}`, never `decorative="true"` (a string is truthy and rejected).
 
 ```svelte
 <Image
@@ -274,14 +255,12 @@ Every `<Image>` must resolve to exactly one of: meaningful `alt` text, or `decor
   alt="System architecture diagram"
   caption="Figure 1"
 />
-
-<!-- Ornamental divider that adds nothing for a screen reader: -->
 <Image src="$assets/flourish.svg" decorative={true} />
 ```
 
 ### Accordion / AccordionItem
 
-Expandable panels. Only one open at a time. A11y: `aria-expanded`, `aria-controls`, `role="region"`, keyboard Enter/Space.
+Expandable panels, one open at a time. A11y: `aria-expanded`, `aria-controls`, `role="region"`, Enter/Space.
 
 ```svelte
 <Accordion>
@@ -296,28 +275,24 @@ Expandable panels. Only one open at a time. A11y: `aria-expanded`, `aria-control
 
 ### Carousel / CarouselSlide
 
-Slide-based viewer. A11y: `role="region"`, `aria-roledescription="carousel"`, arrow keys, mobile swipe.
+Slide viewer. A11y: `role="region"`, `aria-roledescription="carousel"`, arrow keys, swipe.
 
 ```svelte
 <Carousel>
-  <CarouselSlide
-    ><h3>Step 1</h3>
-    <p>Plan.</p></CarouselSlide
-  >
-  <CarouselSlide
-    ><h3>Step 2</h3>
-    <p>Build.</p></CarouselSlide
-  >
-  <CarouselSlide
-    ><h3>Step 3</h3>
-    <p>Deploy.</p></CarouselSlide
-  >
+  <CarouselSlide>
+    <h3>Step 1</h3>
+    <p>Plan.</p>
+  </CarouselSlide>
+  <CarouselSlide>
+    <h3>Step 2</h3>
+    <p>Build.</p>
+  </CarouselSlide>
 </Carousel>
 ```
 
 ### RevealModal
 
-Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `content`. A11y: `role="dialog"`, `aria-modal="true"`, focus trap, Escape to close.
+Modal triggered by interaction. Uses Svelte 5 snippets. A11y: `role="dialog"`, `aria-modal`, focus trap, Escape to close.
 
 | Prop      | Type      | Description                       |
 | --------- | --------- | --------------------------------- |
@@ -339,18 +314,17 @@ Modal triggered by user interaction. Uses Svelte 5 snippets for `trigger` and `c
 
 YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
 
-| Prop         | Type     | Description                                                                                                                                                   |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src`        | `string` | Video URL or `$assets/` path                                                                                                                                  |
-| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
-| `tracks`     | `array`  | Caption/subtitle tracks for **native** video, rendered as `<track>` (see shape below). Ignored for YouTube/Vimeo embeds — the platform owns their captions    |
-| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
+| Prop         | Type     | Description                                                                                  |
+| ------------ | -------- | -------------------------------------------------------------------------------------------- |
+| `src`        | `string` | Video URL or `$assets/` path                                                                 |
+| `title`      | `string` | **Required.** Accessible label (empty/whitespace rejected)                                   |
+| `tracks`     | `array`  | Caption tracks for **native** video → `<track>`. Ignored for YouTube/Vimeo                   |
+| `transcript` | `string` | Transcript in a `<details>` below the player. Load from file via `?raw` import (see example) |
 
-`title` is the accessible name and is required (empty/whitespace is rejected). For **WCAG 1.2** the validator also warns when a video has no captions: native video with no `tracks` and no `transcript`, or an embed with no `transcript` (embeds can't carry your `<track>` files, so supply a transcript). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
+Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed needs `transcript` (embeds can't carry `<track>` files). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
 
 ```svelte
 <script>
-  // ?raw inlines the file's text at build time — works under file://, SCORM, and subpaths
   import intro from '$assets/intro.txt?raw';
 </script>
 
@@ -377,14 +351,14 @@ YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for di
 
 Native player. A11y: `aria-label` from title.
 
-| Prop         | Type     | Description                                                                                                                                                   |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src`        | `string` | Audio URL or `$assets/` path                                                                                                                                  |
-| `title`      | `string` | **Required.** Accessible label for the player                                                                                                                 |
-| `tracks`     | `array`  | Caption tracks rendered as `<track>` (same shape as `Video`)                                                                                                  |
-| `transcript` | `string` | Transcript text shown in a `<details>` disclosure below the player. To load it from a file, import the file with a `?raw` suffix and pass it in (see example) |
+| Prop         | Type     | Description                                             |
+| ------------ | -------- | ------------------------------------------------------- |
+| `src`        | `string` | Audio URL or `$assets/` path                            |
+| `title`      | `string` | **Required.** Accessible label                          |
+| `tracks`     | `array`  | Caption tracks → `<track>` (same shape as `Video`)      |
+| `transcript` | `string` | Transcript in a `<details>` (load from file via `?raw`) |
 
-`title` is required. For **WCAG 1.2.1** the validator warns when an `<Audio>` has no `transcript` — audio-only content needs a text alternative.
+Transcript rule (WCAG 1.2.1): the validator warns when `<Audio>` has no `transcript`.
 
 ```svelte
 <script>
@@ -398,11 +372,9 @@ Native player. A11y: `aria-label` from title.
 
 ## Quizzes
 
-A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps the page in the resolved quiz shell (built-in `<Quiz>` by default; a project-supplied `quiz.svelte` if one exists at the project root). Page authors no longer need their own `<Quiz>` wrapper. Drop question components directly at the page root.
+A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in the resolved quiz shell (built-in `<Quiz>`, or a project `quiz.svelte` if present). Drop question components at the page root — no `<Quiz>` wrapper.
 
 ### Setup
-
-A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imported, questions dropped at the page root:
 
 ```svelte
 <script module>
@@ -430,63 +402,53 @@ A complete, copy-paste-ready quiz page — `pageConfig.quiz` set, components imp
 />
 ```
 
-### Common mistakes
+### Rules
 
-Watch for these:
-
-- **`correct` is a 0-based index, not the answer text.** `correct={1}` means the second option. It must be in range for `options`.
-- **Every required prop must be present.** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
+- **`correct` is a 0-based index, not the answer text.** `correct={1}` is the second option; it must be in range for `options`.
+- **All required props present:** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
-- **Question `id`s must be unique within a page.** Duplicates collide in `cmi.interactions`.
-- **Don't add your own `<Quiz>` wrapper.** A page with `pageConfig.quiz` is wrapped automatically — just drop the question components at the page root.
-- **Custom widgets must register through `useQuestion` and submit through `useQuiz().submit()`.** See [Data contract](#data-contract-what-the-lms-sees) below.
+- **Question `id`s are unique within a page.** Duplicates collide in `cmi.interactions`.
+- **No `<Quiz>` wrapper.** Pages with `pageConfig.quiz` are wrapped automatically.
+- **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing. See [Data contract](#data-contract).
 
-### Data contract: what the LMS sees
+### Data contract
 
-Whatever quiz UI you build, the LMS sees the same `cmi.interactions` it would from the built-in: every question registered through `useQuestion` flows through the persistence adapter. Each interaction is reported the moment the widget calls `q.commit()` — atomic widgets (MCQ, true-false, likert) call it on click, composite widgets (matching, sorting, fill-in) call it on blur or final-state. `useQuiz().submit()` calls commit on any question whose widget hasn't yet, as a safety net. The reporting cost — one xAPI Answered / one `cmi.interactions.n` block per call — happens incrementally throughout the session rather than batching at the end, so a learner closing the tab after the last commit still gets credit. Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.
+Whatever quiz UI you build, the LMS sees the same `cmi.interactions` as the built-in. Every question registered through `useQuestion` reports the moment its widget calls `q.commit()`; `useQuiz().submit()` commits any that haven't, as a safety net. **Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.**
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                                                |
-| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                             |
-| `gatesProgress` | `boolean`                            | `false`    | Whether passing is required to access the next page                                                                        |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                               |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | When feedback renders. See below.                                                                                          |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `"full"` resets every answer on retry; `"incorrect-only"` keeps questions the learner already got right locked as correct. |
-
-`feedbackMode` values: `"immediate"` reveals after the shell calls `revealFeedback(q)` and locks the answer; `"review"` shows feedback only on the post-submit review screen; `"never"` disables feedback entirely (the built-in `<Quiz>` hides the Review button).
-
-`gatesProgress: true` blocks navigation to the next page until the learner passes. Works in both `free` and `sequential` navigation modes.
+| Field           | Type                                 | Default    | Description                                                                                        |
+| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                     |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                        |
+| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                       |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: after `revealFeedback(q)`, locks the answer. `review`: post-submit only. `never`: off |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked       |
 
 ### Per-question weighting
 
-Pass `weight` to `useQuestion` (and through built-in widget props) to change how much a question pulls on the page-level score. Defaults to 1; non-positive values are treated as 1.
+Pass `weight` (default 1; non-positive treated as 1) to change how much a question pulls on the page score. Works identically inside `<Quiz>` and standalone.
 
 ```svelte
 <MultipleChoice id="q-easy" weight={1} ... />
 <MultipleChoice id="q-hard" weight={3} ... />
 ```
 
-Weights apply identically inside a `<Quiz>` and to standalone questions on a plain page — the same widget answered the same way produces the same page score either way.
-
-The page-level score is the weighted-correct percentage: `Σ(weight × correct) / Σ(weight) × 100`, rounded. With every weight at the default 1 this is the plain correct-count percentage.
-
-The LMS still sees each question as a single pass/fail interaction; weights only affect the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*`.
+Page score = weighted-correct percentage: `Σ(weight × correct) / Σ(weight) × 100`, rounded. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction).
 
 ### Question types
 
 #### MultipleChoice
 
-| Prop                | Type       | Description                                                                                    |
-| ------------------- | ---------- | ---------------------------------------------------------------------------------------------- |
-| `question`          | `string`   | Prompt                                                                                         |
-| `options`           | `string[]` | Answer options                                                                                 |
-| `correct`           | `number`   | Index of correct option (0-based)                                                              |
-| `correctFeedback`   | `string`   | Optional                                                                                       |
-| `incorrectFeedback` | `string`   | Optional                                                                                       |
-| `optionFeedback`    | `string[]` | Optional per-option feedback                                                                   |
-| `weight`            | `number`   | Page-level rollup weight (default `1`). See [Per-question weighting](#per-question-weighting). |
+| Prop                | Type       | Description                          |
+| ------------------- | ---------- | ------------------------------------ |
+| `question`          | `string`   | Prompt                               |
+| `options`           | `string[]` | Answer options                       |
+| `correct`           | `number`   | Index of correct option (0-based)    |
+| `correctFeedback`   | `string`   | Optional                             |
+| `incorrectFeedback` | `string`   | Optional                             |
+| `optionFeedback`    | `string[]` | Optional per-option feedback         |
+| `weight`            | `number`   | Page-level rollup weight (default 1) |
 
 ```svelte
 <MultipleChoice
@@ -505,7 +467,7 @@ The LMS still sees each question as a single pass/fail interaction; weights only
 | `caseSensitive` | `boolean`  | `false` | Comparison casing        |
 | `weight`        | `number`   | `1`     | Page-level rollup weight |
 
-`answers` only needs distinct spellings; `caseSensitive: false` already handles case variants.
+`answers` only needs distinct spellings; `caseSensitive: false` handles case variants.
 
 ```svelte
 <FillInTheBlank
@@ -516,13 +478,13 @@ The LMS still sees each question as a single pass/fail interaction; weights only
 
 #### Matching
 
-| Prop       | Type                              | Description                            |
-| ---------- | --------------------------------- | -------------------------------------- |
-| `question` | `string`                          | Prompt                                 |
-| `pairs`    | `{left: string, right: string}[]` | Correct pairs                          |
-| `weight`   | `number`                          | Page-level rollup weight (default `1`) |
+Right column auto-shuffled. Click left then right to match (tap on mobile); click a pair to unmatch. All pairs must be correct.
 
-The right column is auto-shuffled. Click left then right to match (tap on mobile). Click a matched pair to unmatch. All pairs must be correct.
+| Prop       | Type                              | Description                          |
+| ---------- | --------------------------------- | ------------------------------------ |
+| `question` | `string`                          | Prompt                               |
+| `pairs`    | `{left: string, right: string}[]` | Correct pairs                        |
+| `weight`   | `number`                          | Page-level rollup weight (default 1) |
 
 ```svelte
 <Matching
@@ -539,13 +501,13 @@ The right column is auto-shuffled. Click left then right to match (tap on mobile
 
 Drag-and-drop (or click-to-place) into labelled categories.
 
-| Prop       | Type       | Description                                                     |
-| ---------- | ---------- | --------------------------------------------------------------- |
-| `question` | `string`   | Prompt                                                          |
-| `items`    | `string[]` | Items to sort                                                   |
-| `targets`  | `string[]` | Category labels                                                 |
-| `correct`  | `number[]` | For each item, the index of its correct target (parallel array) |
-| `weight`   | `number`   | Page-level rollup weight (default `1`)                          |
+| Prop       | Type       | Description                                          |
+| ---------- | ---------- | ---------------------------------------------------- |
+| `question` | `string`   | Prompt                                               |
+| `items`    | `string[]` | Items to sort                                        |
+| `targets`  | `string[]` | Category labels                                      |
+| `correct`  | `number[]` | Per item, the index of its correct target (parallel) |
+| `weight`   | `number`   | Page-level rollup weight (default 1)                 |
 
 ```svelte
 <Sorting
@@ -558,12 +520,12 @@ Drag-and-drop (or click-to-place) into labelled categories.
 
 ### Standalone questions
 
-All four question components also work outside `<Quiz>` for inline practice. Standalone widgets render their own Check / Retry buttons.
+All four types work outside `<Quiz>` for inline practice and render their own Check/Retry.
 
-| Prop         | Type     | Default    | Description                               |
-| ------------ | -------- | ---------- | ----------------------------------------- |
-| `maxRetries` | `number` | `Infinity` | Max retries for standalone widgets        |
-| `weight`     | `number` | `1`        | Per-question weight for page-level rollup |
+| Prop         | Type     | Default    | Description                    |
+| ------------ | -------- | ---------- | ------------------------------ |
+| `maxRetries` | `number` | `Infinity` | Max retries for standalone     |
+| `weight`     | `number` | `1`        | Per-question page-level weight |
 
 ```svelte
 <MultipleChoice
@@ -574,43 +536,33 @@ All four question components also work outside `<Quiz>` for inline practice. Sta
 />
 ```
 
-Standalone questions are not graded by default. To grade one (e.g., a required reflection that affects course success), build it with the `useQuestion` hook directly. See [Recipe 5](#recipe-5-graded-standalone-question).
+Standalone questions are not graded by default. To grade one, build it with `useQuestion`. See [Recipe 5](#recipe-5-graded-standalone-question).
 
 ---
 
 ## Manual completion
 
-`completion.mode: "manual"` is for courses where the author — not a quiz score or a page-visit ratio — owns the moment of completion. Two examples:
+Use `completion.mode: "manual"` when the author owns the completion moment (e.g. reading the final page, or a "click to acknowledge" button) rather than a quiz score or page-visit ratio.
 
-- A short policy briefing where reading the final page **is** the proof of completion.
-- A compliance "click to acknowledge" button at the end of a module.
-
-Under manual mode, **both** triggers below are always active. First-to-fire wins; subsequent calls are idempotent.
+Both triggers below are always active under manual mode. First-to-fire wins; subsequent calls are idempotent.
 
 ### Trigger A: page frontmatter
 
-Declare `completesOn: "view"` on any page. Completion fires the moment that page renders.
+Declare `completesOn: "view"` (the only v1 value) on any page. Completion fires the moment that page renders.
 
 ```svelte
-<!-- pages/05-summary/finale.svelte -->
 <script module>
-  export const pageConfig = {
-    title: "You're done",
-    completesOn: 'view',
-  };
+  export const pageConfig = { title: "You're done", completesOn: 'view' };
 </script>
 
 <h1>Thanks for completing the briefing.</h1>
 ```
-
-`completesOn` accepts the literal string `"view"` (only value in v1). The page is marked visited and completion fires in the same effect — the LMS sees one `setCompletionStatus("complete")` immediately after the page renders.
 
 ### Trigger B: runtime hook
 
 ```svelte
 <script>
   import { useCompletion } from 'tessera-learn';
-
   const { markComplete, completionStatus } = useCompletion();
 </script>
 
@@ -626,55 +578,54 @@ Declare `completesOn: "view"` on any page. Completion fires the moment that page
 {/if}
 ```
 
-Composes cleanly with custom widgets, modal close handlers, video-ended events, timer expirations, etc. Calling `markComplete()` outside `completion.mode: "manual"` is a no-op with a one-shot dev warning per session — safe to leave in shared components.
+`markComplete()` composes with any event (modal close, video-ended, timer). Outside `mode: "manual"` it is a no-op with a one-shot dev warning — safe to leave in shared components.
 
 ### `completion.trigger` (build-time check)
 
-Optional. Set to `"page"` to fail the build when no page declares `completesOn: "view"`. Useful when the page-view path is load-bearing and a typo should fail the build, not the launch. Both triggers still work either way; the field only adds a static check.
+Optional. Set to `"page"` to fail the build when no page declares `completesOn: "view"`. Both triggers still work regardless.
 
 ```js
 completion: { mode: "manual", trigger: "page" }
 ```
 
-When omitted, the dev runtime warns once after 60 s if completion has not fired.
+When omitted, the dev runtime warns once after 60s if completion hasn't fired.
 
 ### Success status
 
-By default `successStatus` stays `"unknown"` under manual — the LMS sees completion without a pass/fail verdict. If you want completion **and** an automatic pass (typical for "acknowledge" flows):
+By default `successStatus` stays `"unknown"` under manual. For completion **and** an automatic pass:
 
 ```js
 completion: { mode: "manual", requireSuccessStatus: "passed" }  // or "failed"
 ```
 
-| Adapter        | What the LMS sees on `markComplete()` (no `requireSuccessStatus`)       |
+| Adapter        | `markComplete()` with no `requireSuccessStatus`                         |
 | -------------- | ----------------------------------------------------------------------- |
 | SCORM 1.2      | `cmi.core.lesson_status = "completed"`                                  |
 | SCORM 2004 4th | `cmi.completion_status = "completed"`, `cmi.success_status = "unknown"` |
 | cmi5           | **Completed** statement (no Passed / Failed)                            |
 | web            | `localStorage` only                                                     |
 
-With `requireSuccessStatus: "passed"`, SCORM 1.2 writes `lesson_status = "passed"`, SCORM 2004 writes `success_status = "passed"`, and cmi5 emits a **Passed** statement alongside **Completed**.
+With `requireSuccessStatus: "passed"`: SCORM 1.2 → `lesson_status = "passed"`, SCORM 2004 → `success_status = "passed"`, cmi5 → **Passed** alongside **Completed**.
 
 ### Quizzes under manual mode
 
-A graded quiz under `mode: "manual"` reports its score to the LMS gradebook but does **not** drive completion or success — `markComplete()` / `completesOn` does. The build emits a warning to make this explicit. Set `graded: false` (or remove the quiz) if that's not what you want.
+A graded quiz reports its score to the gradebook but does **not** drive completion/success — `markComplete()`/`completesOn` does. The build warns. Set `graded: false` if that's not what you want.
 
 ### Non-goals
 
-- Combining manual + quiz/percentage rules ("complete when X **and** quiz passed"). Use a `useCompletion()` call inside a custom `$effect` if you need conditional logic.
-- Per-learner conditional completion expressed in config — same answer: do it in a component with `useCompletion()`.
-- Marking a course **incomplete** after it has been completed. Completion is monotonic in every spec we target. The runtime ignores re-marks.
+- Combining manual + quiz/percentage rules → use `useCompletion()` in a custom `$effect`.
+- Per-learner conditional completion in config → do it in a component with `useCompletion()`.
+- Marking a course incomplete after completion. Completion is monotonic; re-marks are ignored.
 
 ---
 
 ## Assets
 
-Drop files into `assets/`. Reference them with `$assets/` in built-in component props:
+Drop files into `assets/`. Reference with `$assets/` in built-in component props:
 
 ```svelte
 <Image src="$assets/photo.png" alt="Photo" />
 <Video src="$assets/demo.mp4" title="Demo" />
-<Audio src="$assets/lecture.mp3" title="Lecture" />
 ```
 
 In CSS, use a relative path from `styles/`:
@@ -685,28 +636,15 @@ In CSS, use a relative path from `styles/`:
 }
 ```
 
-External URLs work too: `<Image src="https://example.com/img.jpg" alt="..." />`.
+External URLs work too. At build the plugin copies `assets/` → `dist/assets/`, so `$assets/foo.png` resolves the same in dev and the shipped bundle.
 
-At build time the plugin copies `assets/` into `dist/assets/` so `$assets/foo.png` resolves the same way in the shipped bundle as it does in the dev server.
+### `$assets/` in custom components
 
-### `$assets/` is three things — know which you're using
-
-`$assets/` is presented as a single convention, but it's actually three distinct mechanisms with different scopes. Custom components have to pick one explicitly; the wrong choice gives a silent 404, not a build error.
-
-1. **Vite import alias** — works in ES `import` statements. Vite resolves `$assets/...` to the project's `assets/` directory and bundles the asset:
-   ```js
-   import logoUrl from '$assets/logo.svg?url';
-   ```
-2. **Built-in component prop rewrite** — `Image`, `Audio`, and `Video` rewrite `$assets/foo` → `./assets/foo` internally before rendering. This is why `<Image src="$assets/photo.png">` works.
-3. **Build-time copy** — the plugin copies `assets/` to `dist/assets/`, so the document-relative path `./assets/foo.png` resolves identically in dev and in the shipped bundle.
-
-**Raw HTML attributes are not rewritten.** `<img src="$assets/foo.svg">` in a custom component fetches the literal string `/$assets/foo.svg` and 404s — there's no validator warning for this. Same for `new Audio('$assets/...')`, CSS `url()` strings built in JS, etc.
-
-### Asset references in custom components
+`$assets/` is **only** rewritten in two places: ES `import` statements (Vite alias) and the `src` prop of built-in `Image`/`Audio`/`Video`. **Raw HTML attributes are NOT rewritten** — `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and CSS `url()` strings built in JS all 404 with no warning.
 
 Pick by use case:
 
-**One-off reference — ES import (preferred):**
+**One-off — ES import (preferred).** Build-time bundling, hashing, fails the build if missing:
 
 ```svelte
 <script>
@@ -716,9 +654,7 @@ Pick by use case:
 <img src={url} alt="Diagram" />
 ```
 
-Build-time bundling, asset hashing, fails the build if missing.
-
-**Collection referenced by name — `import.meta.glob`:**
+**Collection chosen at runtime — `import.meta.glob`.** Same build-time guarantees:
 
 ```js
 const signs = import.meta.glob('$assets/signs/*.svg', {
@@ -726,19 +662,14 @@ const signs = import.meta.glob('$assets/signs/*.svg', {
   query: '?url',
   import: 'default',
 });
-// then look up by full key:
-const url = signs[`/assets/signs/${filename}`];
+const url = signs[`/assets/signs/${filename}`]; // look up by full key
 ```
 
-Use this when the asset is chosen at runtime by ID/filename. Same build-time guarantees as a single import.
-
-**Pure runtime string (last resort):**
+**Pure runtime string (last resort).** No build-time guarantees; use only when the filename comes from server data:
 
 ```js
 const src = `./assets/signs/${filename}`;
 ```
-
-No build-time guarantees, but works when neither pattern above fits (e.g., filenames that come from server data). Equivalent to what `Image`/`Audio`/`Video` do internally.
 
 ---
 
@@ -746,9 +677,7 @@ No build-time guarantees, but works when neither pattern above fits (e.g., filen
 
 Add `.css` files to `styles/`. They load after framework styles and override them.
 
-### CSS custom properties
-
-Override these to theme globally:
+Override these custom properties to theme globally:
 
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
@@ -777,7 +706,7 @@ Override these to theme globally:
 }
 ```
 
-`branding.primaryColor` and `branding.fontFamily` in `course.config.js` cover the common overrides without writing CSS.
+For the common case, set `branding.primaryColor` and `branding.fontFamily` in `course.config.js` instead of writing CSS.
 
 ---
 
@@ -785,15 +714,14 @@ Override these to theme globally:
 
 ```js
 export default {
-  // Metadata
-  title: 'My Course', // required
+  title: 'My Course', // required — the only field with no default
   description: '',
   author: '',
   version: '1.0.0',
-  language: 'en', // BCP-47 tag for <html lang> (e.g. "en", "fr-CA"); defaults to "en"
+  language: 'en', // BCP-47 tag for <html lang>; defaults to "en"
 
   branding: {
-    logo: '', // e.g., "$assets/logo.png"
+    logo: '', // e.g. "$assets/logo.png"
     primaryColor: '#2563eb',
     fontFamily: 'Inter, sans-serif',
   },
@@ -817,31 +745,32 @@ export default {
     standard: 'web', // "web" | "scorm12" | "scorm2004" | "cmi5"
   },
 
-  // Accessibility checker (all optional — sensible defaults apply)
   a11y: {
-    level: 'warn', // "warn" (default) or "error" — "error" makes the promotable a11y rules block the build
-    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset for tessera a11y
+    level: 'warn', // "warn" (default) | "error" — "error" makes promotable a11y rules block the build
+    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset
     ignore: [], // rule IDs to suppress, e.g. ["tessera/heading-order", "color-contrast"]
   },
 };
 ```
 
-- `language` sets `<html lang>` for screen readers (WCAG 3.1.1). Set it to your course's language as a [BCP-47](https://www.w3.org/International/articles/language-tags/) tag. A missing or implausible value warns and falls back to `"en"`.
-- `a11y.level: "error"` promotes the "promotable" accessibility warnings (captions/transcript, heading order, contrast, language, and the Svelte compiler's a11y warnings) to build-blocking errors. Hard contract errors (missing `alt`, missing media `title`) always block regardless of `level`.
-- `a11y.ignore` is a flat list matched literally against each diagnostic's rule ID across **all tiers** — the `tessera/…` IDs printed by `validate`, the `a11y_…` IDs from the Svelte compiler, and the bare axe rule IDs (e.g. `color-contrast`) from `tessera a11y`.
+### Field behaviour
 
-- `navigation.mode: "free"` → all pages accessible except those blocked by gating quizzes.
-- `navigation.mode: "sequential"` → pages unlock one at a time as each is completed.
-- `completion.mode: "percentage"` → course completes when `visitedPages / totalPages * 100 >= percentageThreshold`.
-- `completion.mode: "quiz"` → course completes when graded quiz average >= `scoring.passingScore`.
-- `completion.mode: "manual"` → course completes when an author-declared trigger fires. See [Manual completion](#manual-completion).
+| Field                           | Behaviour                                                                                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                   |
+| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                 |
+| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes                                                                                                                                |
+| `completion.mode: "percentage"` | Completes when `visitedPages / totalPages * 100 >= percentageThreshold`                                                                                                     |
+| `completion.mode: "quiz"`       | Completes when graded quiz average >= `scoring.passingScore`                                                                                                                |
+| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                         |
+| `a11y.level: "error"`           | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless |
+| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs)                                                         |
 
 ### Minimum config
 
-Every field except `title` has a default. The build merges yours over:
+Every field except `title` has a default, so `export default { title: "My Course" }` is complete (free nav, full-percentage completion, web export, `<html lang="en">`). Effective defaults:
 
 ```js
-// effective defaults
 {
   title: "Untitled Course",
   language: "en",
@@ -852,17 +781,14 @@ Every field except `title` has a default. The build merges yours over:
 }
 ```
 
-So `export default { title: "My Course" }` is a complete config: free navigation, full-percentage completion, web export, `<html lang="en">`. (The scaffold seeds `language: 'en'` so a fresh course starts without the language warning; set it to your actual language.)
-
 ### Custom access rules
 
-For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess`. It runs synchronously on every navigation evaluation. Keep it cheap.
+For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess`. It runs synchronously on every navigation evaluation — keep it cheap.
 
 ```js
 import { sequentialAccess } from 'tessera-learn';
 
 export default {
-  // ...
   navigation: {
     mode: 'sequential',
     canAccess: (ctx) => {
@@ -882,54 +808,50 @@ export default {
 };
 ```
 
-`AccessContext` exposes `pageIndex`, `page`, `manifest`, `progress`, and `config`. The presets `freeAccess` and `sequentialAccess` are re-exported from `tessera-learn` for composition. `resolveAccess(config)` is also exported. It returns the predicate the runtime would use (custom `canAccess` if set, otherwise the matching preset). Useful when you want to wrap rather than replace.
+`AccessContext` exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. Presets `freeAccess` and `sequentialAccess` are re-exported for composition. `resolveAccess(config)` returns the predicate the runtime would use (custom `canAccess` if set, else the matching preset) — use it to wrap rather than replace.
 
 ### Build output
 
-`pnpm export <course>` (which wraps `vite build`) writes:
+`pnpm export <course>` writes:
 
-| `export.standard` | What ships                            | Where                                    |
-| ----------------- | ------------------------------------- | ---------------------------------------- |
-| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (host on any static file server) |
-| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`              |
-| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip`            |
-| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`                 |
+| `export.standard` | What ships                            | Where                         |
+| ----------------- | ------------------------------------- | ----------------------------- |
+| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (any static host)     |
+| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`   |
+| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip` |
+| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`      |
 
-For LMS exports, upload the zip via your LMS's import flow. For web export, the bundle is a self-contained static site. Drop `dist/` on Netlify, GitHub Pages, S3, or any static host.
+Upload the LMS zips via your LMS's import flow. Drop `dist/` (web) on Netlify, GitHub Pages, S3, or any static host.
 
 ### Validation
 
-The Vite plugin runs project validation on every dev start and build (page syntax, manifest shape, `pageConfig` parseability, question components, asset references, LMS data-contract bypass, etc.). Errors abort the build and print as `[tessera error] ...`; warnings print as `[tessera warning] ...` and don't block. Run `pnpm validate <course>` to check without building.
+The plugin validates on every dev start and build (page syntax, manifest shape, `pageConfig`, question components, asset references, data-contract bypass). Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. Run `pnpm validate <course>` to check without building.
 
 ---
 
 ## Accessibility
 
-Tessera checks accessibility in two passes, plus components that are accessible by construction.
+Two passes plus components that are accessible by construction.
 
-**Static checks** run inside `validate`, `dev`, and `export` — no extra setup. They cover what's visible in your source: `<Image>` alt-or-`decorative`, `<Video>`/`<Audio>` `title` + captions/transcript, empty question option/answer labels, skipped heading levels (e.g. `h2` → `h4`), `branding.primaryColor` contrast against white, and a well-formed `language` tag. They also route the Svelte compiler's own `a11y_*` warnings through the reporter. Each diagnostic carries a rule ID in brackets (e.g. `[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
+**Static checks** run inside `validate` / `dev` / `export` — no setup. They cover: `<Image>` alt-or-`decorative`; `<Video>`/`<Audio>` `title` + captions/transcript; empty question labels; skipped heading levels; `branding.primaryColor` contrast against white; well-formed `language`; and the Svelte compiler's `a11y_*` warnings. Each diagnostic carries a rule ID (`[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
 
-**Runtime audit** is the opt-in deep pass: `pnpm a11y <course>` (run it directly, or via `pnpm check <course>`, which runs `validate` first) builds the course, renders **every** page in a headless browser (including pages gated behind a quiz), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json`, and exits non-zero on any violation at or above an impact threshold (default `serious`). It catches what a static scan can't — computed ARIA, focus order, real rendered contrast.
-
-The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it isn't already present — no manual step needed.
+**Runtime audit** (`tessera a11y`) is the opt-in deep pass. Run it directly or via `pnpm check <course>`:
 
 ```bash
-pnpm exec tessera a11y                   # audit (threshold: serious)
-pnpm exec tessera a11y --threshold minor # stricter
-pnpm exec tessera a11y --build           # force a fresh build first
+pnpm a11y <course>                   # audit (threshold: serious)
+pnpm a11y <course> --threshold minor # stricter
+pnpm a11y <course> --build           # force a fresh build first
 ```
 
-The audit renders the course with the web adapter, so it works regardless of your `export.standard` — you don't need an LMS to run it.
+It builds the course, renders **every** page headless (including quiz-gated pages), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), and exits non-zero on any violation at/above the impact threshold (default `serious`). It catches what a static scan can't: computed ARIA, focus order, rendered contrast. First run auto-installs Chromium. It uses the web adapter, so it works regardless of `export.standard`.
 
-The audit's ruleset and severity come from the `a11y` block in `course.config.js` (`standard`, `ignore`); see [`course.config.js`](#courseconfigjs). `a11y-report.json` is build output — it's git-ignored by default.
-
-Hard contract errors (missing `alt`, missing media `title`) always block the build. Everything else is a warning unless you set `a11y.level: "error"`. To silence a specific rule everywhere, add its ID to `a11y.ignore`.
+Ruleset/severity come from the `a11y` block (`standard`, `ignore`). Hard errors (missing `alt`, missing media `title`) always block; everything else is a warning unless `a11y.level: "error"`.
 
 ---
 
 ## Hooks Reference
 
-Six hooks plus one helper make up the stable contract between widgets and the runtime.
+Six hooks plus one helper. Each is synchronous, must be called during component setup inside a Tessera course, and throws if called outside the runtime.
 
 ```js
 import {
@@ -944,11 +866,9 @@ import {
 import type { Interaction } from 'tessera-learn';
 ```
 
-Each hook is synchronous and must be called during component setup, inside a Tessera course. Calling them outside the runtime throws.
-
 ### The `Question` model
 
-Both `useQuiz()` and `useQuestion()` traffic in the same per-question object. A quiz shell iterates `quiz.questions`; a widget gets its own `Question` directly from `useQuestion()`. No indexes, no `getContext('tessera-quiz')` — both halves use the same handle.
+`useQuiz()` and `useQuestion()` traffic in the same per-question object. A shell iterates `quiz.questions`; a widget gets its `Question` from `useQuestion()`. No indexes, no `getContext`.
 
 ```ts
 interface Question {
@@ -957,19 +877,19 @@ interface Question {
   readonly correct: boolean | null;
   readonly answer: unknown;
   readonly feedbackVisible: boolean;
-  readonly locked: boolean; // input must be read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // narrow case: locked because retry policy preserved this as already-correct
+  readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
+  readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void; // signal the answer is final; triggers the per-question LMS write. Idempotent — a second call with the same answer is a no-op.
+  commit(): void; // mark answer final; triggers the per-question LMS write. Idempotent.
 }
 ```
 
-Widgets should gate input on `q.locked` and only branch on `q.isLockedCorrect` to render the "already correct" banner.
+Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "already correct" banner.
 
-`Interaction` follows SCORM 2004 4th Edition vocabulary verbatim: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` if the runtime should not auto-judge; `useQuestion` reports a `null` correctness flag and your widget renders its own UI.
+`Interaction` uses SCORM 2004 vocabulary: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
 
-For `choice` / `sequencing` / `matching`, name your responses with readable ids (`response: ['speed-limit']`) and pass the full option list alongside via `options` (or `optionPairs` for matching). The encoder is then adaptive per export: cmi5 and SCORM 2004 ship the names through unchanged for self-describing traces; SCORM 1.2 maps each name to its position index in `options` so SCORM Cloud's strict validator accepts the value. Omit `options` and SCORM 1.2 falls back to slugging the literal identifier.
+For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names; SCORM 1.2 maps each to its index in `options`. Omit `options` and SCORM 1.2 slugs the literal identifier.
 
 ```ts
 response: () => ({
@@ -978,37 +898,33 @@ response: () => ({
   correct: ['speed-limit'],
   options: ['stop', 'yield', 'speed-limit', 'merge'],
 });
-// SCORM 1.2 → student_response: "2"
-// SCORM 2004 → learner_response: "speed-limit"
-// cmi5      → result.response:    "speed-limit"
+// SCORM 1.2 → "2"   SCORM 2004 → "speed-limit"   cmi5 → "speed-limit"
 ```
-
-Matching uses `optionPairs: { left, right }` for the same effect, mapping each pair's `[l, r]` to `"<leftIdx>.<rightIdx>"` on SCORM 1.2.
 
 ### `useQuestion`
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside a quiz**: the parent shell drives submission. The widget calls `setAnswer()` on user input, `commit()` when the answer is final, `setRender(snippet)` once at mount, and reads `locked` / `feedbackVisible` / `answer` to render. `submit()`, `retry()`, `setRender()` etc. degrade to no-ops in the irrelevant mode — the same widget works in both.
-- **Standalone**: the widget owns its own Check/Retry. Set `graded: true` to count toward course success.
+- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `commit()` when final, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. `submit()`/`retry()` are no-ops here.
+- **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id
   graded?: boolean; // standalone only
-  response: () => Interaction; // current learner answer; called on each commit() and on submit
+  response: () => Interaction; // current answer; called on each commit() and on submit
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
   reset?: () => void;
 }): Question & {
-  submit(): void; // standalone: triggers own check. quiz: no-op (shell drives).
+  submit(): void; // standalone: own check. quiz: no-op
   reset(): void;
   retry(): void; // standalone only; no-op once maxRetries hit or inside a quiz
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
-  setRender(render: unknown): void; // registers the snippet for the parent shell to render
+  setRender(render: unknown): void;
 };
 ```
 
@@ -1031,7 +947,6 @@ function useQuestion(opts: {
   });
 </script>
 
-<!-- drag-to-reorder UI bound to `order` -->
 {#if q.mode === 'standalone'}
   <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
 {/if}
@@ -1039,7 +954,7 @@ function useQuestion(opts: {
 
 ### `useQuiz`
 
-Quiz orchestration hook for any project-supplied `quiz.svelte` (and the built-in `<Quiz>`). A custom shell calls `useQuiz` to drive submission/retry/review. Question widgets call `q.commit()` when their answer is final; that's what triggers the per-question LMS write. `submit()` calls commit for any uncommitted questions as a safety net, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypassing it means the quiz never marks Completed / Passed / Failed.
+Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Question widgets call `q.commit()` when final; that triggers the per-question LMS write. `submit()` commits any uncommitted questions, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -1050,7 +965,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly score: number;
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  submit(): void; // reports any uncommitted interactions, then dispatches tessera-quiz-complete
+  submit(): void;
   retry(): void;
   startReview(): void;
   exitReview(): void;
@@ -1058,9 +973,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
 };
 ```
 
-Throws when called on a page without `pageConfig.quiz`. Three telemetry-only DOM events also fire (`tessera-quiz-question-answered`, `tessera-quiz-before-submit`, `tessera-quiz-retry`); none of them write to the adapter.
-
-`passingScore` reads the resolved threshold: config's `scoring.passingScore`, overridden when the LMS supplies one (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`). Use this instead of importing `course.config.js` directly — importing the config skips the LMS override.
+Throws on a page without `pageConfig.quiz`. Use `passingScore` from here, not `course.config.js` directly — importing the config skips the LMS mastery override (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`).
 
 ### `useNavigation`
 
@@ -1095,19 +1008,18 @@ function useProgress(): {
 
 ### `useCompletion`
 
-Trigger course completion from any component, and reactively read the current completion status. Active under `completion.mode: "manual"`; in any other mode `markComplete()` is a no-op with a one-shot dev warning. See [Manual completion](#manual-completion).
+Active under `completion.mode: "manual"`; in any other mode `markComplete()` is a no-op with a one-shot dev warning. See [Manual completion](#manual-completion).
 
 ```ts
 function useCompletion(): {
-  /** Idempotent — only the first call per session has an effect. */
-  markComplete(): void;
+  markComplete(): void; // idempotent — only the first call per session has an effect
   readonly completionStatus: 'incomplete' | 'complete';
 };
 ```
 
 ### `usePersistence<T>(key)`
 
-Per-widget persistent state. Survives reload on every adapter: `localStorage` for web, SCORM `cmi.suspend_data` for SCORM 1.2/2004, xAPI State API for cmi5. Reads sync; writes batched by the adapter. JSON-serializable values only.
+Per-widget persistent state, JSON-serializable only. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Mind the SCORM 1.2 ~4 KB suspend-data cap (see [LMS behaviour](#lms-behaviour)).
 
 ```ts
 function usePersistence<T>(key: string): {
@@ -1128,7 +1040,7 @@ function usePersistence<T>(key: string): {
 
 ### `isCorrect(interaction)`
 
-Pure helper. Returns `true`, `false`, or `null` (when the interaction has no `correct` field).
+Pure helper. Returns `true`, `false`, or `null` (when the interaction has no `correct`).
 
 ```ts
 function isCorrect(i: Interaction): boolean | null;
@@ -1138,7 +1050,7 @@ function isCorrect(i: Interaction): boolean | null;
 
 ## Custom xAPI statements
 
-The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated under cmi5; `cmi.*` writes under SCORM) is sent automatically. See [LMS Adapter Reference](#lms-adapter-reference). To emit your own xAPI verbs, use `useXAPI()`:
+The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated; `cmi.*` writes under SCORM) is sent automatically. To emit your own verbs, use `useXAPI()`:
 
 ```ts
 import { useXAPI } from 'tessera-learn';
@@ -1150,13 +1062,11 @@ xapi?.sendStatement({
 });
 ```
 
-`useXAPI()` is a plain function (not a Svelte context hook), callable from anywhere: component setup, event handlers, async callbacks, plain `.ts` modules. Returns `null` when no LRS is configured or before adapter init resolves; null-check and degrade gracefully.
+`useXAPI()` is a plain function callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured or before adapter init resolves — **null-check and degrade gracefully**. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`. You supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
 
-The publisher fills in `actor`, `timestamp`, `id` (UUID), `context.contextActivities.grouping`, `context.registration` (cmi5), and the `sessionid` extension (cmi5). You supply `verb`, `object` (defaults to the activity), and optionally `result`, `context`, `attachments`.
+### Configure the destination
 
-### Configure the destination: `course.config.js`
-
-`config.xapi` is one destination, or an array of them. The destination is always declared explicitly. There is no implicit default.
+`config.xapi` is one destination or an array. Always declared explicitly — no implicit default.
 
 ```js
 xapi: {
@@ -1166,7 +1076,7 @@ xapi: {
   activityId: 'https://example.com/courses/intro-to-x',
 }
 
-// cmi5 only: inherit the LMS launch LRS (endpoint+auth+actor+activityId+registration):
+// cmi5 only: inherit the LMS launch LRS:
 xapi: { endpoint: 'lms' }
 
 // Fan out (at most one 'lms' entry):
@@ -1176,206 +1086,75 @@ xapi: [
 ]
 ```
 
-Each destination has its own queue, auth resolver, and retry loop. One UUID is minted per `sendStatement` and reused across destinations, so all LRSes see the same statement id (idempotent dedupe works).
+Each destination has its own queue, auth resolver, and retry loop. One UUID per `sendStatement` is reused across destinations (idempotent dedupe).
 
 ### Per-mode behaviour
 
-| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'`                                  | `xapi: {endpoint, ...}` (explicit)                                |
-| ------------- | ------------------ | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| **cmi5**      | `useXAPI()` → null | Inherits launch LRS; shares queue with lifecycle stream | Independent publisher; `actor` defaults to launch actor           |
-| **scorm12**   | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` derived from `cmi.core.student_id` |
-| **scorm2004** | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` derived from `cmi.learner_id`      |
-| **web**       | `useXAPI()` → null | **Config error**                                        | Independent publisher; `actor` **required** in config             |
+| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'` | `xapi: {endpoint, ...}` (explicit)                      |
+| ------------- | ------------------ | ---------------------- | ------------------------------------------------------- |
+| **cmi5**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
+| **scorm12**   | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.core.student_id` |
+| **scorm2004** | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.learner_id`      |
+| **web**       | `useXAPI()` → null | **Config error**       | Independent; `actor` **required** in config             |
 
-### Actor resolution
+### Gotchas
 
-Priority order (top wins):
-
-1. **Author-supplied `xapi.actor`**: always wins.
-2. **cmi5 launch actor**: under cmi5, the publisher uses the same Agent the LMS handed us at launch.
-3. **SCORM-derived actor**: under scorm12/scorm2004, the publisher synthesizes:
-   ```ts
-   {
-     account: {
-       homePage: xapi.actorAccountHomePage ?? originOf(xapi.activityId),
-       name:     <cmi.core.student_id | cmi.learner_id>,
-     },
-     name:       <cmi.core.student_name | cmi.learner_name>,
-     objectType: 'Agent',
-   }
-   ```
-   The `account` IFI satisfies xAPI's Identified Agent rule. `homePage` defaults to the activityId origin; override via `actorAccountHomePage` if your authority namespace is elsewhere. Required if `activityId` is a non-URL IRI.
-4. **Fallback: error.** Web export with no `actor` fails at config time.
-
-Mid-session identity change (e.g., learner logs in/out without reloading) is **not supported in v1**. Actor is resolved once per page-load and cached. Reload the runtime on identity change.
-
-### Auth
-
-v1 supports **Basic auth only**. The publisher prepends `Basic ` to whatever your `auth` value resolves to; pass the credential value, not the full header.
-
-For OAuth-protected LRSes, wrap the token exchange in your `auth` function and return a Basic credential the LRS accepts (or run a thin proxy that converts).
-
-The function form is re-invoked once on a 401 to cover short-lived tokens that have just expired. Two consecutive 401s mark the auth resolver dead for the publisher's lifetime. Every subsequent send fails fast without hitting the LRS. Reload the runtime to retry.
-
-**Static-string `auth` ships in your bundle**: fine for demos, never for production. Use a function that fetches a server-brokered short-lived token instead.
-
-### Retry policy
-
-- **Default:** 3 attempts with exponential backoff (100ms, 200ms, 400ms).
-- **5xx / network errors** retry. **4xx** short-circuits; retrying won't help.
-- **HTTP 409 Conflict** is treated as **success** (xAPI rejects POSTs with a duplicate statement id, so a 409 on retry means the LRS already accepted the statement).
-- **Per-statement opt-out:** `sendStatement(stmt, { retry: false })` for fire-and-forget telemetry where the author would rather drop than block.
+- **Actor priority:** author-supplied `xapi.actor` always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
+- **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` function or run a proxy.
+- **Never ship a static `auth` string on web** — the bundle is public. Use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
+- **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).
+- **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
+- **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.
 
 ### `sendStatement` return shape
 
 ```ts
 const result = await xapi.sendStatement({ verb, object });
-// result: {
-//   statementId: string,
-//   statement: Statement,           // fully resolved: actor, context, timestamp filled in
-//   destinations: [{ endpoint, ok, status?, error? }, ...]
-// }
+// { statementId, statement, destinations: [{ endpoint, ok, status?, error? }, ...] }
 ```
 
-`destinations[]` lets you act on partial failures under fan-out: one LRS can be down without affecting the others.
+`destinations[]` lets you handle partial failures under fan-out. The publisher validates only: `verb.id` non-empty, `object.id` non-empty when supplied, `result.score.scaled` in `[-1, 1]` when supplied. Everything else passes through; the LRS reports shape errors via `destinations[].error`.
 
-### Validation
+### Not in v1
 
-The publisher checks three things before sending:
-
-1. `verb.id`: present, non-empty string.
-2. `object.id`: non-empty string when `object` is supplied.
-3. `result.score.scaled`: number in `[-1, 1]` when supplied.
-
-Everything else passes through. The LRS gives clearer errors for IRI / extension / attachment shape issues than we can; failures surface via `destinations[].error`.
-
-### Mode-specific caveats
-
-**SCORM (1.2 / 2004).** Actor is auto-derived from the LMS data model; supply `actor` explicitly to use a different IFI (`mbox`, `openid`). **CORS** is the painful one: the LRS must allow the LMS-served origin, and many don't by default. cmi5's `sessionid` extension does not exist here; attach your own extension if you need to group statements by session. In dev (WebAdapter fallback), an explicit `xapi` destination with no author actor cannot synthesize an Agent, so `sendStatement` rejects with an explicit error.
-
-**Web.** The bundle is public, so static `auth: 'Basic abc123'` leaks. Always use a function that fetches a server-brokered short-lived token. CORS matters for the token endpoint too. Three actor patterns: hardcoded anonymous, author-wired (`actor: () => getCurrentUser()`), or query-string `?actor=...` mirroring cmi5.
-
-**cmi5 with `endpoint: 'lms'`.** Author and adapter share one publisher instance and one queue, so ordering is preserved (no race between an author's `experienced` and the adapter's `Completed`). Running locally without launch params, `sendStatement` rejects with a missing-params error. No silent fallback. Point `endpoint` at a local LRS for dev.
-
-**Page unload.** Once unload begins, every publisher is marked unloading and `useXAPI()?.sendStatement(...)` calls reject; this is required to keep cmi5 Terminated last on the wire (§9.3.6). Record-at-the-end work belongs in a child component's `onDestroy`, not `beforeunload`.
-
-### Non-goals (v1)
-
-- Bearer / OAuth credentials at the publisher level (wrap in your `auth` function).
-- Statement signing / attachments helpers (the publisher accepts attachments but doesn't help build them).
-- Offline queue / IndexedDB durability.
-- LRS State API access for non-cmi5 modes.
-- Voiding statements.
-- Mid-session actor refresh (`refreshActor()`).
-- Group actors (Agent only).
+OAuth at the publisher level, statement signing/attachment helpers, offline/IndexedDB queue, State API for non-cmi5 modes, voiding, mid-session actor refresh, group actors.
 
 ---
 
-## LMS Adapter Reference
+## LMS behaviour
 
-The runtime translates author intent (page visits, quiz scores, completion, persistence) into a fixed set of adapter calls. Each export standard maps those calls onto a different LMS contract. This section is the source-of-truth view of what the LMS sees for any given runtime event.
+The runtime translates author intent into adapter calls automatically; you don't write any of it. The author-relevant differences:
 
-### Cross-mode rollup
+| Concern              | SCORM 1.2                                                                            | SCORM 2004 4th                                                 | cmi5                                 |
+| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------ |
+| Completion + success | One field (`lesson_status`); no "unknown" — success wins when known, else completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
+| Score scale to LMS   | `score.raw` (0–100)                                                                  | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
+| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                          | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Resume after reload  | From `cmi.suspend_data`                                                              | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
-| Runtime event                                                                                | SCORM 1.2                                                                                                             | SCORM 2004 4th                                                                                                                   | cmi5                                                                                                                                                                                                                                                                                                     |
-| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Session start                                                                                | `LMSInitialize("")`; read `cmi.suspend_data` and `cmi.interactions._count`                                            | `Initialize("")`; read `cmi.suspend_data` and `cmi.interactions._count`                                                          | `POST` cmi5 `fetch` URL → token; `GET` `LMS.LaunchData` State (§10, → session id + Publisher Activity + launchMode + returnURL + masteryScore + moveOn); `GET` `cmi5LearnerPreferences` Agent Profile (§11); build publisher; send **Initialized**; `GET` `tessera-state` for resume                     |
-| State persisted (page visited, bookmark moved, chunk revealed, `usePersistence` write, etc.) | `LMSSetValue("cmi.suspend_data", json)` (microtask-coalesced)                                                         | `SetValue("cmi.suspend_data", json)` (microtask-coalesced)                                                                       | State API `PUT` `tessera-state` document, chained on the publisher queue                                                                                                                                                                                                                                 |
-| Graded quiz scored                                                                           | `LMSSetValue("cmi.core.score.raw"\|"min"\|"max", …)` then `LMSSetValue("cmi.core.lesson_status", "passed"\|"failed")` | `SetValue("cmi.score.raw"\|"min"\|"max"\|"scaled", …)` then `SetValue("cmi.success_status", "passed"\|"failed")`                 | **Passed** or **Failed** statement, with `result.score.scaled` and `result.duration` (one-shot per session)                                                                                                                                                                                              |
-| Course completion changes                                                                    | Funneled into `cmi.core.lesson_status` (only one field exists)                                                        | `SetValue("cmi.completion_status", "completed"\|"incomplete")`                                                                   | **Completed** statement with `result.completion = true` and `result.duration` (one-shot per session). cmi5 §9.5.1 forbids `score` on Completed — the score rides on the subsequent **Passed**/**Failed** instead.                                                                                        |
-| Author marks complete (`completion.mode: "manual"`)                                          | `cmi.core.lesson_status = "completed"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set)                       | `cmi.completion_status = "completed"`; `cmi.success_status = "unknown"` (or `"passed"`/`"failed"` if `requireSuccessStatus` set) | **Completed** statement; **Passed**/**Failed** if `requireSuccessStatus` set                                                                                                                                                                                                                             |
-| Question answered (graded or standalone, inside or outside a quiz)                           | `cmi.interactions.{n}.id` / `student_response` / `result` / `time` / `type` (n continues from prior `_count`)         | `cmi.interactions.{n}.id` / `learner_response` / `result` / `timestamp` / `type` (n continues from prior `_count`)               | **Answered** statement; object `${activityId}#${questionId}`, definition `cmi.interaction` + `interactionType`, `result.response`, `result.success`                                                                                                                                                      |
-| Resume after reload                                                                          | Read `cmi.suspend_data` on init; manifest is rebuilt from code, not LMS                                               | Read `cmi.suspend_data` on init                                                                                                  | State API `GET` `tessera-state`; lifecycle replays from where the prior session left off                                                                                                                                                                                                                 |
-| Author exit / unload                                                                         | `LMSSetValue("cmi.core.exit", "suspend"\|"")`, `LMSCommit("")`, `LMSFinish("")` (queue drained synchronously)         | `SetValue("cmi.exit", "suspend"\|"normal"\|...)`, `Commit("")`, `Terminate("")` (queue drained synchronously)                    | **Terminated** (always last on the wire, cmi5 §9.3.6). Explicit-exit path: `adapter.exit()` drains the queue then redirects to `returnURL` (§10.2.6). No Suspended verb — incomplete exit is signalled by Terminated without a preceding Completed; the LMS handles Abandoned and resume on next launch. |
-| Learner identity (xAPI actor synthesis)                                                      | `cmi.core.student_id` + `cmi.core.student_name`                                                                       | `cmi.learner_id` + `cmi.learner_name`                                                                                            | Launch-supplied actor JSON (Identified Agent)                                                                                                                                                                                                                                                            |
-| Persistence cap                                                                              | ~4096 chars per spec; many LMSes allow more, but plan for 4 KB                                                        | 64000 chars per spec                                                                                                             | LRS-defined (typically unbounded for State API documents)                                                                                                                                                                                                                                                |
-| Score scale exposed to LMS                                                                   | `score.raw` only (0–100)                                                                                              | `score.raw` (0–100) **and** `score.scaled` (0–1)                                                                                 | `result.score.scaled` (0–1)                                                                                                                                                                                                                                                                              |
+Author-facing consequences:
 
-The SCORM adapter's internal `commit()` (the `LMSCommit` / `Commit` call) is microtask-coalesced — multiple state mutations within one tick collapse to a single API call. cmi5 statements are individual (no batched commit).
+- **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
+- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown" status). Pass/fail uses `scoring.passingScore`, not the LMS's mastery field.
+- **SCORM 2004 / cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore`. Read it via `useQuiz().passingScore`.
+- A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
-### SCORM 1.2 notes
+### Local testing
 
-API discovery: walks `window.parent` / `window.opener` up to 10 levels looking for `API`.
+| Standard  | How to test                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------- |
+| scorm12   | Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player |
+| scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                       |
+| cmi5      | Upload `dist/*-cmi5.zip` to SCORM Cloud and use its generated cmi5 dispatch URL               |
+| web       | Serve `dist/` from any static host                                                            |
 
-**One status field.** `cmi.core.lesson_status` collapses completion and pass/fail. The runtime resolves them by priority: success (`passed` / `failed`) wins when known; otherwise completion (`completed` / `incomplete`) is written. There is no "unknown"; until a graded quiz produces a result, the LMS sees `incomplete`.
-
-**Mastery is Tessera's, not the LMS's.** Pass/fail is computed from `scoring.passingScore`. `cmi.student_data.mastery_score` is read-only for this runtime.
-
-**Interaction encoding (§3.4.7).** Plain `,` items, `.` pairs, `:` ranges (not the bracketed `[,]` 2004 form). `cmi.interactions.n.id` and response/correct identifiers are slugged to `CMIIdentifier` (alphanumeric + underscore, max 250 chars) — raw option text like `"88 Earth days"` becomes `88_Earth_days`, and an id like `q-1` becomes `q_1`, to dodge `405 Incorrect Data Type`. `true-false` writes `t`/`f`. Numeric `correct_responses.n.pattern` is a single CMIDecimal; ranges are dropped (`result` still carries pass/fail).
-
-**Field write order.** `id` → `type` → `correct_responses.0.pattern` → `student_response` → `result` → `time`, matching the spec's `interactions._children` ordering. SCORM Cloud's strict validator rejects `student_response` with the misleading "must be consistent with interaction type" if `correct_responses.0.pattern` hasn't been declared first — the LMS has no expected pattern to validate against. Other LMSes (Moodle, Reload, scorm-again) accept any order, but the spec ordering is the safest.
-
-**Bookmark.** `cmi.core.lesson_location` is written from `SavedState.b` on every `saveState` to surface "Resume from page N" in LMS UIs.
-
-**Not implemented.** No `cmi.objectives.*` writes. No SCORM 1.2 sequencing; `navigation.canAccess` is the only gating layer, and the LMS sees one SCO. SCORM 1.2 `time-out` / `logout` exit values are not emitted.
-
-**Local testing.** Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free tier) or [Reload SCORM Player](https://github.com/reload/reload). Inspect the LMS API call log to confirm `lesson_status` and `cmi.interactions.*` look right.
-
-### SCORM 2004 4th notes
-
-API discovery: `API_1484_11` via the same parent/opener walk.
-
-**Two status fields, both written.** `cmi.completion_status` and `cmi.success_status` are independent. `unknown` is written _explicitly_ when no graded result exists; leaving it null causes some LMSes (notably SCORM Cloud) to roll a null up to `passed` during status rollup.
-
-**LMS-supplied thresholds.** `cmi.scaled_passing_score` (§4.2.4.3) is read on init and exposed via `adapter.getMasteryScore()`. `App.svelte` picks up `masteryScore` and overrides `scoring.passingScore` for the launch — parity with cmi5's launch-time mastery.
-
-**Launch mode (§4.2.1.5).** `cmi.mode` is read on init. In `browse` and `review` launches every learner-record write is silently suppressed (`setScore` / `setCompletionStatus` / `setSuccessStatus` / `setExit` / `setDuration` / `reportInteraction` / `saveState` — including the `cmi.suspend_data` write). Mirrors cmi5's launchMode handling; exposed via `adapter.getLaunchMode()`.
-
-**Interaction encoding (§4.2.7 / Appendix A).** Bracketed delimiters `[,]` / `[.]` / `[:]` (literal text, not regex). Identifiers are passed through unchanged — §4.2.7 / Appendix A's `short_identifier_type` allows any printable, and 2004's `cmi.interactions.n.id` upgraded to `long_identifier_type` (4000 chars). Slugging would only obscure LMS-side reports without buying anything. `cmi.interactions.n.timestamp` is `time(second,10,0)` per §3.3.10.1 / ISO 8601 §5.3.3 — zone-free, second-resolution (`YYYY-MM-DDThh:mm:ss`); SCORM Cloud rejects fractional seconds and `Z` / `±hh:mm` suffixes with 406.
-
-**Bookmark + progress.** `cmi.location` is written from `SavedState.b` on every `saveState`. `cmi.progress_measure = 1` fires on `setCompletionStatus('complete')` so LMS dashboards show 100%.
-
-**Real precision.** All CMIDecimal-like writes (`score.raw`, `score.scaled`, etc.) round through `formatReal107` — SCORM 2004 4E defines them as `real(10,7)`, and `String(1/3)` would otherwise trip 406.
-
-**Not implemented.** `imsss:sequencing` rules are omitted from `imsmanifest.xml` by design. No `cmi.objectives.*`, no `cmi.adl.nav.*` writes.
-
-**Local testing.** SCORM Cloud is the easiest end-to-end check. Moodle, Cornerstone, SuccessFactors, and Canvas (via Rustici Engine) accept `dist/*-scorm2004.zip` directly.
-
-### cmi5 notes
-
-**Launch contract.** The LMS opens the course URL with `endpoint`, `fetch`, `actor` (JSON-encoded Identified Agent), `activityId`, and optionally `registration`. Discovery succeeds when all four required params are present; otherwise `LMSAdapterError`.
-
-**Token fetch is single-use** (cmi5 §6.2). On failure, reload from the LMS to retry. The token is used as a `Basic` credential, not Bearer. If the fetch URL responds with the spec-defined `{"error-code":...,"error-text":...}` shape (§8.2.3 — typically the single-use violation on a refresh), `adapter.init()` throws with the LMS's error-code/text instead of stuffing the JSON blob into the `Basic` credential and 400-spamming the LRS.
-
-**Lifecycle order.** **Initialized** → **Answered** (one per question, as each widget calls `q.commit()`; uncommitted ones flush at submit) → **Completed** → **Passed** / **Failed** → **Terminated** (always last, cmi5 §9.3.6). Completed is one-shot per registration (never re-emitted on resume); Passed/Failed are re-emitted only on a _status transition_ (e.g., a learner who failed in session 1 and passes in session 2 fires a fresh Passed in session 2, but a learner who passed before and resumes does not re-emit). The runtime seeds the adapter at restore time via `seedLifecycle()` so the LMS isn't spammed with duplicates that 403 as "completion status already determined." **Satisfied** and **Suspended** are not emitted by the AU — Satisfied is LMS-only (§9.3.9), and Suspended isn't a cmi5 verb (§9.3 enumerates nine; the LMS handles Abandoned / resume on relaunch).
-
-**Required result fields.** Completed: `completion: true`, `duration` (no `score` — §9.5.1 forbids it). Passed: `success: true`, `duration`, `result.score.scaled` when known (§9.3.4 requires `scaled >= masteryScore` when present). Failed: `success: false`, `duration`, `result.score.scaled` when known (§9.3.5 requires `scaled < masteryScore` when present). Terminated: `duration` (§9.5.4.1). On contradiction the verb is preserved and the score is dropped with a console warning.
-
-**Context per Defined Statement.** Categories: `cmi5` Category Activity on every Defined Statement (§9.6.2.1); plus `moveOn` Category on Completed / Passed / Failed (§9.6.2.2). Extensions: `sessionid` (§9.6.3.1) on every statement (Defined and Allowed) — value sourced from `LMS.LaunchData.contextTemplate` when supplied, else minted UUID. `masteryScore` extension on Passed / Failed only (§9.6.3.2). The full `contextTemplate` from `LMS.LaunchData` is merged in (§9.6.2 makes it the AU's base context; §10.2.1 says AU MUST NOT overwrite template values, so the AU's categories are concatenated and deduped against the template's, never replacing them).
-
-**`LMS.LaunchData` (§10).** Fetched once at init from the State API under `stateId='LMS.LaunchData'`. The AU reads `contextTemplate`, `launchMode`, `returnURL`, and `masteryScore` from it. LaunchData values override anything parsed from the launch URL (§10.2.4 makes LaunchData authoritative). When the document is absent, statements ship without the LMS-supplied Publisher Activity and may be rejected by strict LRSes — a console warning fires.
-
-**Learner Preferences (§11).** `cmi5LearnerPreferences` from the Agent Profile API, fetched _before_ Initialized — strict LRSes (SCORM Cloud) track that the GET happened and reject Initialized otherwise. A 404 here is normal (no preferences set); only the GET itself is required, and the response body is not consumed.
-
-**Launch mode (§10.2.2).** "Normal" launches emit the full lifecycle. "Browse" and "Review" launches emit only Initialized and Terminated — every other Defined Statement is silently suppressed. Exposed via `adapter.getLaunchMode()`.
-
-**Return URL (§10.2.6).** `adapter.exit()` is the explicit-exit path: calls `terminate()`, awaits the publisher queue so Terminated lands before navigation, then `window.location.assign(returnURL)`. The page-unload `terminate()` path can't redirect (the browser is already navigating).
-
-**State persistence.** `tessera-state` document via the State API, keyed by `activityId` + `agent` + `registration?` + `stateId='tessera-state'` (distinct from the LMS-owned `LMS.LaunchData` and `cmi5LearnerPreferences` documents). Writes chain onto the publisher's queue so the suspend payload lands before Terminated.
-
-**Manifest (`cmi5.xml`).** Generated by the plugin: course id + AU id are stable URNs derived from `config.title` (`urn:tessera:{course,au}:<hex>`). `<au>` carries `launchMethod="AnyWindow"` (CourseStructure XSD requires it), `moveOn` (`Completed` for percentage/manual, `CompletedAndPassed` for quiz mode), and `masteryScore` (rounded to 4 decimal places per §10.2.4). The `<url>` is a child element of `<au>`, not an attribute.
-
-**Not implemented.** No multi-AU courses (one course = one AU in v1). No **Waived** or **Abandoned** verbs (LMS-only). No mid-session actor refresh.
-
-**Local testing.** Upload `dist/*-cmi5.zip` to SCORM Cloud and use the cmi5 dispatch URL it generates, the closest free equivalent to a real LMS launch.
-
-### Common adapter behaviour
-
-**Queue + retry.** SCORM adapters serialize every `LMSSetValue` / `LMSCommit` through a sequential queue with exponential-backoff retry on transient errors. Each enqueue carries the cmi key as `context`; retry warnings include the real LMS error code (`GetLastError`), the message (`GetErrorString`), and — when supplied — the verbose diagnostic (`GetDiagnostic`, which SCORM Cloud uses to name the offending element). The give-up log reads e.g. `[cmi.interactions.0.timestamp] (LMS error 406: Data Model Element Type Mismatch — is not a valid time type)`.
-
-**Init / terminate logging.** `Initialize` failures fire a top-level warning that names the LMS error code and notes downstream writes will all 301. Malformed `cmi.suspend_data` and non-numeric `cmi.interactions._count` are logged loudly — the latter is dangerous to silently fall back to 0 (the next session would overwrite prior records). Terminate-path `Commit` / `Terminate` / `LMSFinish` failures route through `callSyncOrWarn` so the last-chance writes aren't silent.
-
-**Unload.** `terminate()` cannot run async retries; the page is going away. SCORM drains the queue synchronously (single attempt per pending op) before `Commit` + `Terminate` / `LMSFinish`. cmi5 marks the publisher unloading and uses `keepalive: true` so the browser does not cancel in-flight statements.
-
-**Failure surface.** Anything thrown from `adapter.init()` is caught by `App.svelte` and rendered as a visible "This course can't run here" panel. Never a silent degradation.
+Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / interactions look right.
 
 ---
 
 ## Custom Layouts
 
-Drop `layout.svelte` at the project root to replace the default sidebar/topbar/prev-next chrome. The runtime uses it whenever it exists.
-
-The contract: the file receives a single `page` snippet prop and renders it where the active page should appear. Use the hooks for everything else.
+Drop `layout.svelte` at the project root to replace the default chrome. The contract: it receives a single `page` snippet prop and renders it where the active page goes. Use hooks for everything else.
 
 ```svelte
 <!-- layout.svelte -->
@@ -1400,17 +1179,17 @@ The contract: the file receives a single `page` snippet prop and renders it wher
 </footer>
 ```
 
-To keep most of the default chrome and swap one piece, import `DefaultLayout` from `tessera-learn` and compose around it.
+To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` and compose around it.
 
 ---
 
 ## Cookbook
 
-End-to-end recipes that exercise the full hooks API. Adapt to taste.
+End-to-end recipes exercising the full hooks API. Adapt to taste.
 
 ### Recipe 1: Custom "draw a line" question
 
-Learner connects a left-side label to a right-side label by drawing a line. Emits a `matching` interaction so the runtime scores it identically to `<Matching>`. Persists partial progress so an interrupted session resumes cleanly.
+Emits a `matching` interaction (scored like `<Matching>`); persists partial progress so an interrupted session resumes.
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -1465,7 +1244,7 @@ Learner connects a left-side label to a right-side label by drawing a line. Emit
 
 ### Recipe 2: Custom topbar layout
 
-Replace the default sidebar with a horizontal topbar showing breadcrumb + progress %. Drop `layout.svelte` at the project root; no other changes needed.
+Horizontal topbar with breadcrumb + progress %.
 
 ```svelte
 <!-- layout.svelte -->
@@ -1523,7 +1302,7 @@ Replace the default sidebar with a horizontal topbar showing breadcrumb + progre
 
 ### Recipe 3: Prerequisite-based access
 
-Lock lesson 5 until lessons 1–3 are visited. Composes with `sequentialAccess` instead of re-implementing it.
+Lock lesson 5 until lessons 1–3 are visited. Composes with `sequentialAccess`.
 
 ```js
 // course.config.js
@@ -1552,7 +1331,7 @@ export default {
 
 ### Recipe 4: Custom quiz shell via `quiz.svelte`
 
-Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The runtime wraps every page with `pageConfig.quiz` in your shell instead of the default. The shell uses only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
+Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
 
 ```svelte
 <!-- quiz.svelte -->
@@ -1562,8 +1341,6 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
   let { children } = $props();
   let host;
 
-  // useQuiz owns submission, retry, review, score, and dispatching
-  // tessera-quiz-complete. The shell only drives the UI on top of it.
   const quiz = useQuiz({ element: () => host });
 </script>
 
@@ -1594,11 +1371,11 @@ Drop `quiz.svelte` at the project root to replace the built-in `<Quiz>`. The run
 </div>
 ```
 
-Always submit through `useQuiz().submit()`. See [Data contract](#data-contract-what-the-lms-sees).
+Always submit through `useQuiz().submit()`.
 
 ### Recipe 4b: Custom question widget for a custom quiz shell
 
-Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle, registers a render snippet for the shell with `setRender`, pushes the learner's answer up with `setAnswer`, calls `commit()` when the answer is final, and reads `locked` / `feedbackVisible` / `answer` to render. No `getContext('tessera-quiz')`, no index tracking — `useQuestion` and `useQuiz` traffic in the same `Question` object.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, calls `commit()` when final, and reads `locked`/`feedbackVisible`/`answer`.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
@@ -1621,9 +1398,7 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
     },
   });
 
-  // Register the snippet the shell will render. mode === 'quiz' inside a quiz host;
-  // 'standalone' when used outside one. setRender is a no-op in standalone.
-  onMount(() => q.setRender(view));
+  onMount(() => q.setRender(view)); // no-op in standalone mode
 
   function pick(i) {
     if (q.locked) return;
@@ -1654,7 +1429,6 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
   {/if}
 {/snippet}
 
-<!-- Render the same snippet inline for standalone use (mode === 'standalone'). -->
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
@@ -1665,11 +1439,11 @@ Companion to Recipe 4. The widget calls `useQuestion()` for a `Question` handle,
 {/if}
 ```
 
-Under `feedbackMode: 'immediate'`, the shell calls `quiz.revealFeedback(q)` when it wants the next click to show feedback; that flips `q.feedbackVisible`, which in turn flips `q.locked`. Under `'review'`, feedback only appears after `quiz.submit()` followed by `quiz.startReview()`. Under `'never'`, `feedbackVisible` stays false, but `q.locked` still flips on submit.
+Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 
 ### Recipe 5: Graded standalone question
 
-A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts toward course success. Useful for "must answer to pass" gates without the quiz wrapper.
+A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts toward course success.
 
 ```svelte
 <!-- pages/04-reflection/01-reflect/reflect.svelte -->
@@ -1711,11 +1485,11 @@ A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts t
 {#if q.submitted}<p>Thanks. Your reflection has been recorded.</p>{/if}
 ```
 
-The LMS sees a graded `long-fill-in` interaction. Course success rolls up across all graded items: quizzes and standalones alike.
+Course success rolls up across all graded items: quizzes and standalones alike.
 
 ### Recipe 6: Chunked-reveal page with `markChunk`
 
-A page that reveals sections one at a time as the learner advances. `markChunk(pageIndex, chunkIndex)` records the highest revealed chunk so the page resumes mid-scroll on reload. `chunkProgress` is the page-keyed map of those highs.
+Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the highest revealed chunk so the page resumes mid-scroll on reload.
 
 ```svelte
 <!-- pages/02-deep-dive/01-concepts/long-read.svelte -->
@@ -1751,11 +1525,9 @@ A page that reveals sections one at a time as the learner advances. `markChunk(p
 {/if}
 ```
 
-Use this when a page is long enough that "fully visited" is a meaningful state separate from "loaded once." The runtime persists chunk progress through the same adapter pipeline as everything else.
-
 ### Recipe 7: Persisted UI state with `usePersistence`
 
-`usePersistence` is not just for question state. Any JSON-serialisable value the learner produces can survive reload through it. Here, a sidebar collapsed/expanded toggle that the learner expects to stay set across sessions.
+Any JSON-serialisable value can survive reload — here, a sidebar collapsed toggle.
 
 ```svelte
 <!-- in any page component, layout.svelte, or a custom widget -->
@@ -1772,13 +1544,13 @@ Use this when a page is long enough that "fully visited" is a meaningful state s
 </button>
 ```
 
-Keys are namespaced per course, so two courses on the same LMS don't collide. Under SCORM the value rides in `cmi.suspend_data`; under cmi5 in the xAPI State API; under web in `localStorage`.
+Keys are namespaced per course, so two courses on the same LMS don't collide.
 
 ---
 
 ## Constraints
 
 - **No runtime data fetching in pages.** Page content is static; no `fetch()` or dynamic loaders in page components.
-- **Public API only.** Import from `tessera-learn`. Do **not** import from `tessera-learn/runtime/*`; those paths are internal and may change.
-- **`pageConfig` must be a static object literal.** Trailing commas, unquoted keys, and single quotes are fine (JSON5-parseable); variables, function calls, template literals, and computed values are not.
+- **Public API only.** Import from `tessera-learn`. Never from `tessera-learn/runtime/*` — those paths are internal and may change.
+- **`pageConfig` must be a static object literal.** Trailing commas, unquoted keys, single quotes are fine (JSON5); variables, function calls, template literals, and computed values are not.
 - **Third-party libraries** must be project dependencies in `package.json`.
