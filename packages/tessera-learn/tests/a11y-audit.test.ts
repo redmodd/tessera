@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   axeTags,
   axeIgnoreRules,
+  installChromium,
   isMissingBrowserError,
+  launchWithInstall,
   mapNodeDetail,
   mapViolation,
 } from '../src/plugin/a11y/audit.js';
@@ -116,5 +118,142 @@ describe('isMissingBrowserError', () => {
     expect(isMissingBrowserError('connect ECONNREFUSED 127.0.0.1:5173')).toBe(
       false,
     );
+  });
+});
+
+const MISSING_BROWSER = "Executable doesn't exist at /cache/chromium/chrome";
+
+describe('launchWithInstall', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('returns the browser on first try without installing (common path)', async () => {
+    const install = vi.fn(async () => true);
+    const browser = { id: 'b' };
+    const result = await launchWithInstall({
+      launch: vi.fn(async () => browser),
+      install,
+    });
+    expect(result).toEqual({ ok: true, browser });
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it('installs then retries the launch when the browser is missing', async () => {
+    const browser = { id: 'b' };
+    const launch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(MISSING_BROWSER))
+      .mockResolvedValueOnce(browser);
+    const install = vi.fn(async () => true);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install });
+
+    expect(result).toEqual({ ok: true, browser });
+    expect(install).toHaveBeenCalledTimes(1);
+    expect(launch).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to the instructional message when the install fails', async () => {
+    const launch = vi.fn().mockRejectedValue(new Error(MISSING_BROWSER));
+    const install = vi.fn(async () => false);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install });
+
+    expect(result).toEqual({ ok: false, code: 1 });
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toContain('playwright install chromium');
+  });
+
+  it('guards a failed retry launch instead of throwing, with the Linux hint', async () => {
+    const launch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(MISSING_BROWSER))
+      .mockRejectedValueOnce(new Error('libnss3.so: cannot open'));
+    const install = vi.fn(async () => true);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install, isLinux: true });
+
+    expect(result).toEqual({ ok: false, code: 1 });
+    const msg = error.mock.calls[0][0];
+    expect(msg).toContain('failed to launch');
+    expect(msg).toContain('--with-deps');
+    expect(msg).toContain('libnss3.so: cannot open');
+  });
+
+  it('omits the --with-deps hint off Linux', async () => {
+    const launch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(MISSING_BROWSER))
+      .mockRejectedValueOnce(new Error('boom'));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await launchWithInstall({
+      launch,
+      install: async () => true,
+      isLinux: false,
+    });
+
+    expect(error.mock.calls[0][0]).not.toContain('--with-deps');
+  });
+
+  it('rethrows a non-missing-browser error without installing', async () => {
+    const launch = vi.fn().mockRejectedValue(new Error('boom'));
+    const install = vi.fn(async () => true);
+
+    await expect(launchWithInstall({ launch, install })).rejects.toThrow(
+      'boom',
+    );
+    expect(install).not.toHaveBeenCalled();
+  });
+});
+
+function fakeSpawn(behavior: 'exit0' | 'exit1' | 'error') {
+  const calls: { command: string; args: string[] }[] = [];
+  const fn = (command: string, args: string[]) => {
+    calls.push({ command, args });
+    return {
+      on(event: string, listener: (arg?: number | null | Error) => void) {
+        if (event === 'exit' && behavior !== 'error') {
+          listener(behavior === 'exit0' ? 0 : 1);
+        }
+        if (event === 'error' && behavior === 'error') {
+          listener(new Error('spawn ENOENT'));
+        }
+        return this;
+      },
+    };
+  };
+  return { fn, calls };
+}
+
+describe('installChromium', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('runs the resolved playwright bin with the current Node binary', async () => {
+    const spawn = fakeSpawn('exit0');
+    const ok = await installChromium('/workspace', spawn.fn);
+
+    expect(ok).toBe(true);
+    expect(spawn.calls[0].command).toBe(process.execPath);
+    expect(spawn.calls[0].args[0]).toMatch(/cli\.js$/);
+    expect(spawn.calls[0].args.slice(1)).toEqual(['install', 'chromium']);
+  });
+
+  it('returns false on a non-zero exit', async () => {
+    const ok = await installChromium('/workspace', fakeSpawn('exit1').fn);
+    expect(ok).toBe(false);
+  });
+
+  it('logs a breadcrumb and returns false on a spawn error', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ok = await installChromium('/workspace', fakeSpawn('error').fn);
+
+    expect(ok).toBe(false);
+    expect(error.mock.calls[0][0]).toContain('spawn ENOENT');
   });
 });

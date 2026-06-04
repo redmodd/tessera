@@ -1,5 +1,7 @@
-import { existsSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawn, type SpawnOptions } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 import { generateManifest, readCourseConfig } from '../manifest.js';
 import { normalizeA11y, type A11ySettings } from '../validation.js';
 
@@ -112,6 +114,117 @@ export function mapViolation(v: any): AxeViolation {
 
 export function isMissingBrowserError(message: string): boolean {
   return /Executable doesn't exist|playwright install/i.test(message);
+}
+
+type SpawnFn = (
+  command: string,
+  args: string[],
+  options: SpawnOptions,
+) => {
+  on(event: 'error', listener: (err: Error) => void): unknown;
+  on(event: 'exit', listener: (code: number | null) => void): unknown;
+};
+
+function resolvePlaywrightBin():
+  | { command: string; args: string[] }
+  | undefined {
+  const require = createRequire(import.meta.url);
+  for (const spec of ['playwright', '@playwright/test']) {
+    try {
+      const pkgPath = require.resolve(`${spec}/package.json`);
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+        bin?: string | Record<string, string>;
+      };
+      const binRel =
+        typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.playwright;
+      if (!binRel) continue;
+      return {
+        command: process.execPath,
+        args: [resolve(dirname(pkgPath), binRel), 'install', 'chromium'],
+      };
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
+// Run the workspace's own `playwright` bin with the current Node binary so the
+// install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
+export async function installChromium(
+  workspaceRoot: string,
+  spawnFn: SpawnFn = spawn,
+): Promise<boolean> {
+  const { command, args } = resolvePlaywrightBin() ?? {
+    command: 'npx',
+    args: ['playwright', 'install', 'chromium'],
+  };
+
+  return new Promise<boolean>((resolvePromise) => {
+    const child = spawnFn(command, args, {
+      stdio: 'inherit',
+      cwd: workspaceRoot,
+    });
+    child.on('error', (err) => {
+      console.error(
+        `\x1b[31m[tessera a11y]\x1b[0m Failed to start the Chromium install: ${err.message}`,
+      );
+      resolvePromise(false);
+    });
+    child.on('exit', (code) => resolvePromise(code === 0));
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LaunchResult = { ok: true; browser: any } | { ok: false; code: number };
+
+// Owns the catch → install → guarded-retry around chromium.launch(). The retry
+// is guarded because a binary-only install can still fail to launch (on Linux,
+// for want of system libs) rather than throw a raw error post-download.
+export async function launchWithInstall({
+  launch,
+  install,
+  isLinux = process.platform === 'linux',
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  launch: () => Promise<any>;
+  install: () => Promise<boolean>;
+  isLinux?: boolean;
+}): Promise<LaunchResult> {
+  try {
+    return { ok: true, browser: await launch() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!isMissingBrowserError(message)) throw err;
+
+    console.log(
+      "[tessera a11y] Chromium isn't installed for Playwright. Installing it once now…",
+    );
+    const installed = await install();
+    if (!installed) {
+      console.error(
+        `\x1b[31m[tessera a11y]\x1b[0m Chromium isn't installed for Playwright.\n` +
+          `  Install it once:\n` +
+          `    pnpm exec playwright install chromium`,
+      );
+      return { ok: false, code: 1 };
+    }
+
+    try {
+      return { ok: true, browser: await launch() };
+    } catch (retryErr) {
+      const retryMessage =
+        retryErr instanceof Error ? retryErr.message : String(retryErr);
+      console.error(
+        `\x1b[31m[tessera a11y]\x1b[0m Chromium installed but failed to launch.\n` +
+          (isLinux
+            ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
+            : ``) +
+          `  Original error: ${retryMessage}`,
+      );
+      return { ok: false, code: 1 };
+    }
+  }
 }
 
 // A violation with no impact is treated as failing rather than slipping the
@@ -240,21 +353,12 @@ export async function runAudit(
       return 1;
     }
 
-    let browser;
-    try {
-      browser = await chromium.launch();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (isMissingBrowserError(message)) {
-        console.error(
-          `\x1b[31m[tessera a11y]\x1b[0m Chromium isn't installed for Playwright.\n` +
-            `  Install it once:\n` +
-            `    pnpm exec playwright install chromium`,
-        );
-        return 1;
-      }
-      throw err;
-    }
+    const launched = await launchWithInstall({
+      launch: () => chromium.launch(),
+      install: () => installChromium(workspaceRoot),
+    });
+    if (!launched.ok) return launched.code;
+    const browser = launched.browser;
     const pages: PageAuditResult[] = [];
     try {
       // axe-core/playwright requires a page from an explicit context.
