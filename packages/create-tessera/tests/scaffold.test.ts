@@ -105,6 +105,7 @@ describe('create-tessera workspace scaffold', () => {
     expect(existsSync(resolve(ws, '.gitignore'))).toBe(true);
     expect(existsSync(resolve(ws, 'AGENTS.md'))).toBe(true);
     expect(existsSync(resolve(ws, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(resolve(ws, 'README.md'))).toBe(true);
     expect(existsSync(resolve(ws, 'shared/Button.svelte'))).toBe(true);
     expect(existsSync(resolve(ws, 'shared/tokens.css'))).toBe(true);
     // No course content at the workspace root — courses live under courses/.
@@ -168,6 +169,20 @@ describe('create-tessera workspace scaffold', () => {
     expect(agents.length).toBeLessThan(2000);
     // Pointers live only at the root — never stamped per course.
     expect(existsSync(resolve(ws, SEED, 'AGENTS.md'))).toBe(false);
+  });
+
+  it('scaffolds a human-facing README headed by the workspace name, not the guide', () => {
+    runCLI('my-courses', testDir);
+    const readme = readFileSync(
+      resolve(testDir, 'my-courses', 'README.md'),
+      'utf-8',
+    );
+    expect(readme).toContain('# my-courses');
+    expect(readme).toContain('pnpm install');
+    expect(readme).toContain('pnpm dev starter-course');
+    // Points at the guide rather than duplicating it.
+    expect(readme).toContain('AGENTS.md');
+    expect(readme).not.toContain('@./node_modules/tessera-learn/AGENTS.md');
   });
 
   it('derives the seed course title from the course name', () => {
