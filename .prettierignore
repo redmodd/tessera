@@ -7,6 +7,4 @@ tests/.e2e-variants/**
 pnpm-lock.yaml
 CHANGELOG.md
 *.tsbuildinfo
-
-# prettier reads __PROJECT_NAME__ as markdown bold and rewrites the scaffold token
 packages/create-tessera/templates/workspace/README.md
