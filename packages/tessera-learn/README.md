@@ -12,11 +12,11 @@ You probably don't want to install this package directly. Use the scaffolder:
 pnpm create tessera@latest my-course
 ```
 
-That creates a workspace with Tessera wired up, a seed course, and the authoring guide (`AGENTS.md`) at the workspace root. Add more courses with `pnpm tessera new <name>`.
+That creates a workspace with Tessera wired up, a seed course, and a root `AGENTS.md` that points to the authoring guide. Add more courses with `pnpm tessera new <name>`.
 
 ## What's included
 
-- **Hooks** (`tessera-learn`): `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`, `useXAPI`.
+- **Hooks** (`tessera-learn`): `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`.
 - **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` — wires page/layout discovery, the LMS adapter, the `$shared` alias, and the export pipeline. The `tessera` CLI (`new`/`dev`/`export`/`validate`/`a11y`/`check`) runs Vite with this plugin for you, so scaffolded workspaces need no `vite.config.js`.
 - **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `DefaultLayout`.
 - **LMS adapters**: SCORM 1.2, SCORM 2004 4th Edition, cmi5, static Web — selected via `course.config.js` `export.standard`.
@@ -26,7 +26,7 @@ See `AGENTS.md` for usage, signatures, and authoring conventions.
 
 ## Documentation
 
-The full authoring guide ships with this package at `node_modules/tessera-learn/AGENTS.md`, at the root of any scaffolded project, and on [GitHub](https://github.com/redmodd/tessera/blob/main/AGENTS.md).
+The full authoring guide ships with this package at `node_modules/tessera-learn/AGENTS.md` — scaffolded projects get a small root `AGENTS.md` that points to it — and is on [GitHub](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/AGENTS.md).
 
 ## License
 
