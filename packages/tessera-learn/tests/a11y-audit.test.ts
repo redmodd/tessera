@@ -184,6 +184,20 @@ describe('launchWithInstall', () => {
     expect(msg).toContain('libnss3.so: cannot open');
   });
 
+  it('points back at the install (not --with-deps) when the binary is still missing after install', async () => {
+    const launch = vi.fn().mockRejectedValue(new Error(MISSING_BROWSER));
+    const install = vi.fn(async () => true);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await launchWithInstall({ launch, install, isLinux: true });
+
+    expect(result).toEqual({ ok: false, code: 1 });
+    const msg = error.mock.calls[0][0];
+    expect(msg).toContain('playwright install chromium');
+    expect(msg).not.toContain('--with-deps');
+  });
+
   it('omits the --with-deps hint off Linux', async () => {
     const launch = vi
       .fn()

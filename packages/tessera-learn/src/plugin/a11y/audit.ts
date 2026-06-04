@@ -116,6 +116,8 @@ export function isMissingBrowserError(message: string): boolean {
   return /Executable doesn't exist|playwright install/i.test(message);
 }
 
+const INSTALL_CHROMIUM = 'pnpm exec playwright install chromium';
+
 type SpawnFn = (
   command: string,
   args: string[],
@@ -155,13 +157,16 @@ export async function installChromium(
   workspaceRoot: string,
   spawnFn: SpawnFn = spawn,
 ): Promise<boolean> {
-  const { command, args } = resolvePlaywrightBin() ?? {
-    command: 'npx',
-    args: ['playwright', 'install', 'chromium'],
-  };
+  const bin = resolvePlaywrightBin();
+  if (!bin) {
+    console.error(
+      `\x1b[31m[tessera a11y]\x1b[0m Could not locate the Playwright CLI to install Chromium.`,
+    );
+    return false;
+  }
 
   return new Promise<boolean>((resolvePromise) => {
-    const child = spawnFn(command, args, {
+    const child = spawnFn(bin.command, bin.args, {
       stdio: 'inherit',
       cwd: workspaceRoot,
     });
@@ -205,7 +210,7 @@ export async function launchWithInstall({
       console.error(
         `\x1b[31m[tessera a11y]\x1b[0m Chromium isn't installed for Playwright.\n` +
           `  Install it once:\n` +
-          `    pnpm exec playwright install chromium`,
+          `    ${INSTALL_CHROMIUM}`,
       );
       return { ok: false, code: 1 };
     }
@@ -215,13 +220,21 @@ export async function launchWithInstall({
     } catch (retryErr) {
       const retryMessage =
         retryErr instanceof Error ? retryErr.message : String(retryErr);
-      console.error(
-        `\x1b[31m[tessera a11y]\x1b[0m Chromium installed but failed to launch.\n` +
-          (isLinux
-            ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
-            : ``) +
-          `  Original error: ${retryMessage}`,
-      );
+      if (isMissingBrowserError(retryMessage)) {
+        console.error(
+          `\x1b[31m[tessera a11y]\x1b[0m Chromium still isn't installed after the install step.\n` +
+            `  Install it once:\n` +
+            `    ${INSTALL_CHROMIUM}`,
+        );
+      } else {
+        console.error(
+          `\x1b[31m[tessera a11y]\x1b[0m Chromium installed but failed to launch.\n` +
+            (isLinux
+              ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
+              : ``) +
+            `  Original error: ${retryMessage}`,
+        );
+      }
       return { ok: false, code: 1 };
     }
   }
@@ -293,7 +306,7 @@ export async function runAudit(
       `\x1b[31m[tessera a11y]\x1b[0m Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
         `  Install them to run the runtime audit:\n` +
         `    pnpm add -D playwright @axe-core/playwright\n` +
-        `    pnpm exec playwright install chromium`,
+        `    ${INSTALL_CHROMIUM}`,
     );
     return 1;
   }
