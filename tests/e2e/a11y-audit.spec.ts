@@ -14,10 +14,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
 
     // Standalone fixture has no shared/ dir, so workspaceRoot is just the course
     // dir — runAudit's second arg only feeds the (here unused) $shared alias.
-    const code = await runAudit(dir, dir, {
-      threshold: 'serious',
-      rebuild: true,
-    });
+    const code = await runAudit(dir, dir, { threshold: 'serious' });
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -34,9 +31,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     test.setTimeout(120_000);
     const dir = variantDir('custom-layout', 'web');
 
-    // rebuild: the variant's node_modules is a symlink to the source fixture,
-    // so runAudit's .tessera-a11y build would otherwise persist across runs.
-    await runAudit(dir, dir, { threshold: 'serious', rebuild: true });
+    await runAudit(dir, dir, { threshold: 'serious' });
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -58,10 +53,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     test.setTimeout(120_000);
     const dir = variantDir('broken-page', 'web');
 
-    const code = await runAudit(dir, dir, {
-      threshold: 'serious',
-      rebuild: true,
-    });
+    const code = await runAudit(dir, dir, { threshold: 'serious' });
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);

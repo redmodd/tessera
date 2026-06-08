@@ -5,21 +5,14 @@ const runAudit = vi.hoisted(() => vi.fn(async () => 0));
 vi.mock('../src/plugin/a11y/audit.js', () => ({ runAudit }));
 
 describe('parseA11yArgs', () => {
-  it('defaults to no threshold and no rebuild', () => {
-    expect(parseA11yArgs([])).toEqual({ ok: true, args: { rebuild: false } });
+  it('defaults to no threshold', () => {
+    expect(parseA11yArgs([])).toEqual({ ok: true, args: {} });
   });
 
   it('parses --threshold', () => {
     expect(parseA11yArgs(['--threshold', 'minor'])).toEqual({
       ok: true,
-      args: { threshold: 'minor', rebuild: false },
-    });
-  });
-
-  it('parses --build as rebuild', () => {
-    expect(parseA11yArgs(['--build'])).toEqual({
-      ok: true,
-      args: { rebuild: true },
+      args: { threshold: 'minor' },
     });
   });
 
@@ -28,6 +21,12 @@ describe('parseA11yArgs', () => {
     expect(result.ok).toBe(false);
     if (!result.ok)
       expect(result.error).toContain('--threshold must be one of');
+  });
+
+  it('rejects --build (the audit always rebuilds now)', () => {
+    const result = parseA11yArgs(['--build']);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Unknown argument: --build');
   });
 
   it('rejects unknown arguments', () => {
@@ -40,13 +39,10 @@ describe('parseA11yArgs', () => {
 describe('runA11y', () => {
   afterEach(() => runAudit.mockClear());
 
-  it('reuses an existing build by default', async () => {
-    await runA11y('/proj', '/ws', []);
-    expect(runAudit).toHaveBeenCalledWith('/proj', '/ws', { rebuild: false });
-  });
-
-  it('forces a rebuild when forceBuild is set (the check path)', async () => {
-    await runA11y('/proj', '/ws', [], true);
-    expect(runAudit).toHaveBeenCalledWith('/proj', '/ws', { rebuild: true });
+  it('passes the parsed threshold through to the audit', async () => {
+    await runA11y('/proj', '/ws', ['--threshold', 'minor']);
+    expect(runAudit).toHaveBeenCalledWith('/proj', '/ws', {
+      threshold: 'minor',
+    });
   });
 });

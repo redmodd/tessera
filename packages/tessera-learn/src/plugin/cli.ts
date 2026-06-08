@@ -14,13 +14,12 @@ Commands:
   export    [course]          Build and package the course for its LMS standard
   validate  [course]          Fast static structure checks
   a11y      [course]          Runtime accessibility audit (builds + drives Playwright)
-  check     [course]          Run validate, then a11y (always rebuilds first)
+  check     [course]          Run validate, then a11y
 
 Run a command from inside a course folder, or name the course explicitly.
 
 a11y/check options:
-  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)
-  --build                                          a11y: force a fresh build first (check always does)`;
+  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
 
 // The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the
 // first token can be the course, and only when it isn't a flag — otherwise a flag
@@ -76,7 +75,7 @@ export async function main(
         case 'check': {
           const validateCode = runValidate(courseRoot);
           if (validateCode !== 0) return validateCode;
-          return runA11y(courseRoot, workspaceRoot, flags, true);
+          return runA11y(courseRoot, workspaceRoot, flags);
         }
         case 'a11y':
           return runA11y(courseRoot, workspaceRoot, flags);

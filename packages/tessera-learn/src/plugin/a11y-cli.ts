@@ -13,7 +13,6 @@ export type ParsedA11yArgs =
 
 export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
   let threshold: ImpactLevel | undefined;
-  let rebuild = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -26,14 +25,12 @@ export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
         };
       }
       threshold = value;
-    } else if (arg === '--build') {
-      rebuild = true;
     } else {
       return { ok: false, error: `Unknown argument: ${arg}` };
     }
   }
 
-  const args: AuditOptions = { rebuild };
+  const args: AuditOptions = {};
   if (threshold !== undefined) args.threshold = threshold;
   return { ok: true, args };
 }
@@ -42,13 +39,11 @@ export async function runA11y(
   projectRoot: string,
   workspaceRoot: string,
   argv: string[],
-  forceBuild = false,
 ): Promise<number> {
   const parsed = parseA11yArgs(argv);
   if (!parsed.ok) {
     console.error(`[tessera a11y] ${parsed.error}`);
     return 1;
   }
-  const args = forceBuild ? { ...parsed.args, rebuild: true } : parsed.args;
-  return runAudit(projectRoot, workspaceRoot, args);
+  return runAudit(projectRoot, workspaceRoot, parsed.args);
 }
