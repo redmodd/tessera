@@ -840,7 +840,6 @@ Two passes plus components that are accessible by construction.
 ```bash
 pnpm a11y <course>                   # audit (threshold: serious)
 pnpm a11y <course> --threshold minor # stricter
-pnpm a11y <course> --build           # force a fresh build first
 ```
 
 It builds the course, renders **every** page headless (including quiz-gated pages), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), and exits non-zero on any violation at/above the impact threshold (default `serious`). It catches what a static scan can't: computed ARIA, focus order, rendered contrast. First run auto-installs Chromium. It uses the web adapter, so it works regardless of `export.standard`.

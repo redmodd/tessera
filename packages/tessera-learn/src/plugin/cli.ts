@@ -19,8 +19,7 @@ Commands:
 Run a command from inside a course folder, or name the course explicitly.
 
 a11y/check options:
-  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)
-  --build                                          Force a fresh build first`;
+  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
 
 // The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the
 // first token can be the course, and only when it isn't a flag — otherwise a flag
@@ -74,7 +73,7 @@ export async function main(
         case 'validate':
           return runValidate(courseRoot);
         case 'check': {
-          const validateCode = runValidate(courseRoot);
+          const validateCode = runValidate(courseRoot, { showA11yTip: false });
           if (validateCode !== 0) return validateCode;
           return runA11y(courseRoot, workspaceRoot, flags);
         }

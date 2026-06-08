@@ -1,5 +1,5 @@
 import { spawn, type SpawnOptions } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { generateManifest, readCourseConfig } from '../manifest.js';
@@ -8,8 +8,6 @@ import { normalizeA11y, type A11ySettings } from '../validation.js';
 export interface AuditOptions {
   /** Minimum violation impact that fails the run (CI gate). Default 'serious'. */
   threshold?: ImpactLevel;
-  /** Force a fresh `vite build` even if dist/ exists. */
-  rebuild?: boolean;
 }
 
 export type ImpactLevel = 'minor' | 'moderate' | 'serious' | 'critical';
@@ -378,7 +376,6 @@ export async function runAudit(
 
   // A throwaway web build, kept out of dist/ so a real LMS export is untouched.
   const auditDist = resolve(projectRoot, 'node_modules', '.tessera-a11y');
-  const distHtml = resolve(auditDist, 'index.html');
 
   const prevEnv = process.env[AUDIT_ENV_FLAG];
   process.env[AUDIT_ENV_FLAG] = '1';
@@ -386,15 +383,13 @@ export async function runAudit(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let server: any;
   try {
-    if (options.rebuild || !existsSync(distHtml)) {
-      console.log('[tessera a11y] Building course…');
-      await vite.build(
-        vite.mergeConfig(auditBaseConfig, {
-          build: { outDir: auditDist, emptyOutDir: true },
-          logLevel: 'warn',
-        }),
-      );
-    }
+    console.log('[tessera a11y] Building course…');
+    await vite.build(
+      vite.mergeConfig(auditBaseConfig, {
+        build: { outDir: auditDist, emptyOutDir: true },
+        logLevel: 'warn',
+      }),
+    );
 
     server = await vite.preview({
       root: projectRoot,
