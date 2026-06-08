@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
 import { copyTemplate } from 'tessera-learn/template-copy';
 
@@ -16,14 +15,10 @@ const ownPkg = JSON.parse(
 // into scaffolded workspaces.
 const TESSERA_VERSION = ownPkg.version;
 
-// Derive the scaffold's svelte pin from tessera-learn so the two can't drift on a bump.
-const frameworkPkg = JSON.parse(
-  readFileSync(
-    createRequire(import.meta.url).resolve('tessera-learn/package.json'),
-    'utf-8',
-  ),
-) as { dependencies: { svelte: string } };
-const SVELTE_VERSION = frameworkPkg.dependencies.svelte;
+// Injected at build time from tessera-learn's svelte pin (see tsdown.config.ts).
+declare const __SVELTE_VERSION__: string | undefined;
+const SVELTE_VERSION =
+  typeof __SVELTE_VERSION__ !== 'undefined' ? __SVELTE_VERSION__ : '';
 
 // The first course every workspace ships with. `tessera new <name>` adds more.
 const SEED_COURSE = 'starter-course';
