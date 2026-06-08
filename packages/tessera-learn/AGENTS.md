@@ -745,7 +745,7 @@ function useNavigation(): {
 };
 ```
 
-Each `ManifestPage` exposes `slug`, `title`, `section` (its section title), and `index`.
+Each `ManifestPage` exposes `slug`, `title`, and `index`.
 
 ### `useProgress`
 
