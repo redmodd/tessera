@@ -1,8 +1,8 @@
 packages:
   - 'packages/*'
   - 'tests/fixtures/*'
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
 publicHoistPattern:
   - svelte
   - svelte/*

@@ -24,6 +24,9 @@
   "author": "Derek Redmond <derek.redmond@redmondelearning.ca>",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "provenance": true
+  },
   "bin": {
     "create-tessera": "./dist/index.js"
   },
