@@ -28,6 +28,9 @@
   "author": "Derek Redmond <derek.redmond@redmondelearning.ca>",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "provenance": true
+  },
   "files": [
     "dist",
     "src",
