@@ -73,7 +73,7 @@ export async function main(
         case 'validate':
           return runValidate(courseRoot);
         case 'check': {
-          const validateCode = runValidate(courseRoot);
+          const validateCode = runValidate(courseRoot, { showA11yTip: false });
           if (validateCode !== 0) return validateCode;
           return runA11y(courseRoot, workspaceRoot, flags);
         }

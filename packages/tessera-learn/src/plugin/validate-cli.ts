@@ -1,7 +1,10 @@
 import { basename } from 'node:path';
 import { validateProject, reportValidationIssues } from './validation.js';
 
-export function runValidate(projectRoot: string): number {
+export function runValidate(
+  projectRoot: string,
+  { showA11yTip = true }: { showA11yTip?: boolean } = {},
+): number {
   const { errors, warnings } = validateProject(projectRoot);
 
   reportValidationIssues({ errors, warnings });
@@ -24,8 +27,10 @@ export function runValidate(projectRoot: string): number {
       '\x1b[32m[tessera]\x1b[0m Validation passed — no issues found.',
     );
   }
-  console.log(
-    `\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: pnpm a11y ${basename(projectRoot)}\x1b[0m`,
-  );
+  if (showA11yTip) {
+    console.log(
+      `\x1b[2m[tessera] Static checks only. For a full runtime accessibility audit, run: pnpm a11y ${basename(projectRoot)}\x1b[0m`,
+    );
+  }
   return 0;
 }
