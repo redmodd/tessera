@@ -1,5 +1,13 @@
 # create-tessera
 
+## 0.2.3
+
+### Patch Changes
+
+- 78abd9d: Scaffolded workspaces now derive their Svelte pin from `tessera-learn` at build time (the two release in lockstep), so the pin can't drift when `tessera-learn`'s Svelte dependency is bumped.
+- cd6595c: Declare publish provenance via `publishConfig` so it survives the pnpm 11 upgrade.
+- dfe4818: Scaffolded workspaces pin Svelte `^5.56.2`, matching the version `tessera-learn` ships.
+
 ## 0.2.2
 
 ### Patch Changes
