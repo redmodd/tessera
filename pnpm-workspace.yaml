@@ -3,8 +3,6 @@ packages:
   - 'tests/fixtures/*'
 allowBuilds:
   esbuild: true
-onlyBuiltDependencies:
-  - esbuild
 publicHoistPattern:
   - svelte
   - svelte/*
