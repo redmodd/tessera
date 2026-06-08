@@ -58,6 +58,7 @@
     "./virtual": {
       "types": "./src/virtual.d.ts"
     },
+    "./package.json": "./package.json",
     "./runtime/*": "./src/runtime/*"
   },
   "svelte": "./src/index.ts",
