@@ -42,11 +42,13 @@ export async function runA11y(
   projectRoot: string,
   workspaceRoot: string,
   argv: string[],
+  forceBuild = false,
 ): Promise<number> {
   const parsed = parseA11yArgs(argv);
   if (!parsed.ok) {
     console.error(`[tessera a11y] ${parsed.error}`);
     return 1;
   }
-  return runAudit(projectRoot, workspaceRoot, parsed.args);
+  const args = forceBuild ? { ...parsed.args, rebuild: true } : parsed.args;
+  return runAudit(projectRoot, workspaceRoot, args);
 }

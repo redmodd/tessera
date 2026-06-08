@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { parseA11yArgs } from '../src/plugin/a11y-cli.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { parseA11yArgs, runA11y } from '../src/plugin/a11y-cli.js';
+
+const runAudit = vi.hoisted(() => vi.fn(async () => 0));
+vi.mock('../src/plugin/a11y/audit.js', () => ({ runAudit }));
 
 describe('parseA11yArgs', () => {
   it('defaults to no threshold and no rebuild', () => {
@@ -31,5 +34,19 @@ describe('parseA11yArgs', () => {
     const result = parseA11yArgs(['--wat']);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('Unknown argument: --wat');
+  });
+});
+
+describe('runA11y', () => {
+  afterEach(() => runAudit.mockClear());
+
+  it('reuses an existing build by default', async () => {
+    await runA11y('/proj', '/ws', []);
+    expect(runAudit).toHaveBeenCalledWith('/proj', '/ws', { rebuild: false });
+  });
+
+  it('forces a rebuild when forceBuild is set (the check path)', async () => {
+    await runA11y('/proj', '/ws', [], true);
+    expect(runAudit).toHaveBeenCalledWith('/proj', '/ws', { rebuild: true });
   });
 });
