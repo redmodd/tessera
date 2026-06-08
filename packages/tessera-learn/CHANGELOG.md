@@ -1,5 +1,13 @@
 # tessera-learn
 
+## 0.2.3
+
+### Patch Changes
+
+- 8325e6f: `tessera a11y`/`tessera check` always rebuild before auditing (the `--build` flag is removed), and `tessera validate`'s accessibility tip now points at the working `pnpm a11y <course>` command.
+- 6ace627: Condense the course authoring guide for tighter LLM context without dropping any contract detail.
+- cd6595c: Declare publish provenance via `publishConfig` so it survives the pnpm 11 upgrade.
+
 ## 0.2.2
 
 ### Patch Changes
