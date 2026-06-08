@@ -15,6 +15,11 @@ const ownPkg = JSON.parse(
 // into scaffolded workspaces.
 const TESSERA_VERSION = ownPkg.version;
 
+// Injected at build time from tessera-learn's svelte pin (see tsdown.config.ts).
+declare const __SVELTE_VERSION__: string | undefined;
+const SVELTE_VERSION =
+  typeof __SVELTE_VERSION__ !== 'undefined' ? __SVELTE_VERSION__ : '';
+
 // The first course every workspace ships with. `tessera new <name>` adds more.
 const SEED_COURSE = 'starter-course';
 
@@ -119,6 +124,7 @@ function main() {
     PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(SEED_COURSE),
     TESSERA_VERSION,
+    SVELTE_VERSION,
   });
 
   process.stdout.write(

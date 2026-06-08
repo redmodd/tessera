@@ -5,6 +5,8 @@ import {
   readdirSync,
   mkdirSync,
   rmSync,
+  copyFileSync,
+  cpSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -153,6 +155,52 @@ describe('create-tessera workspace scaffold', () => {
         resolve(__dirname, '..', '..', 'tessera-learn', 'package.json'),
         'utf-8',
       ),
+    );
+    expect(scaffolded.devDependencies.svelte).toBe(
+      framework.dependencies.svelte,
+    );
+  });
+
+  it('scaffolds standalone when tessera-learn is not resolvable (published install)', () => {
+    const pkgRoot = resolve(__dirname, '..');
+    const cli = join(testDir, 'cli');
+    mkdirSync(join(cli, 'dist'), { recursive: true });
+    copyFileSync(
+      join(pkgRoot, 'dist', 'index.js'),
+      join(cli, 'dist', 'index.js'),
+    );
+    copyFileSync(join(pkgRoot, 'package.json'), join(cli, 'package.json'));
+    cpSync(join(pkgRoot, 'templates'), join(cli, 'templates'), {
+      recursive: true,
+    });
+
+    const out = join(testDir, 'out');
+    mkdirSync(out, { recursive: true });
+    const env = { ...process.env, npm_config_yes: 'true' };
+    delete env.NODE_PATH;
+    let exitCode = 0;
+    let output: string;
+    try {
+      output = execFileSync('node', [join(cli, 'dist', 'index.js'), 'ws'], {
+        cwd: out,
+        encoding: 'utf-8',
+        timeout: 30000,
+        env,
+      });
+    } catch (err: any) {
+      exitCode = err.status ?? 1;
+      output = (err.stdout?.toString() || '') + (err.stderr?.toString() || '');
+    }
+
+    expect(exitCode, output).toBe(0);
+    const framework = JSON.parse(
+      readFileSync(
+        resolve(pkgRoot, '..', 'tessera-learn', 'package.json'),
+        'utf-8',
+      ),
+    );
+    const scaffolded = JSON.parse(
+      readFileSync(join(out, 'ws', 'package.json'), 'utf-8'),
     );
     expect(scaffolded.devDependencies.svelte).toBe(
       framework.dependencies.svelte,
