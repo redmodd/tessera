@@ -11,7 +11,15 @@ const frameworkPkg = JSON.parse(
     ),
     'utf-8',
   ),
-) as { dependencies: { svelte: string } };
+) as { dependencies?: { svelte?: string } };
+
+const sveltePin = frameworkPkg.dependencies?.svelte;
+if (typeof sveltePin !== 'string' || sveltePin.length === 0) {
+  throw new Error(
+    "Could not derive the Svelte pin from tessera-learn's dependencies.svelte. " +
+      'If Svelte moved (e.g. to peerDependencies), update tsdown.config.ts to read it from there.',
+  );
+}
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -21,6 +29,6 @@ export default defineConfig({
   fixedExtension: false,
   banner: '#!/usr/bin/env node',
   define: {
-    __SVELTE_VERSION__: JSON.stringify(frameworkPkg.dependencies.svelte),
+    __SVELTE_VERSION__: JSON.stringify(sveltePin),
   },
 });
