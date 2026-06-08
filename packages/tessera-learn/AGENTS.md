@@ -42,16 +42,7 @@ The scaffolded root scripts (`pnpm dev`, `pnpm export`, …) pass through: `pnpm
 
 ### `$shared`
 
-`$shared` resolves to the workspace `shared/` directory and is bundled into each course's export. Import from it in any course:
-
-```svelte
-<script>
-  import Button from '$shared/Button.svelte';
-  import '$shared/tokens.css';
-</script>
-
-<Button>Continue</Button>
-```
+`$shared` resolves to the workspace `shared/` directory and is bundled into each course's export. Import from it in any course: `import Button from '$shared/Button.svelte'`, `import '$shared/tokens.css'`.
 
 ---
 
@@ -69,23 +60,17 @@ pnpm check <course>       # validate, then the runtime a11y audit (axe) over the
 ```
 
 - `dev` hot-reloads pages, layouts, components, and `course.config.js`.
-- `validate` runs the same static checks as `dev`/`export` and exits non-zero on failure. Use it as the fast feedback loop after editing.
-- `check` runs `validate` then `tessera a11y` (builds, renders every page headless, runs axe-core). First run auto-installs Chromium. See [Accessibility](#accessibility).
+- `validate` runs the same static checks as `dev`/`export`, exits non-zero on failure — the fast feedback loop.
+- `check` runs `validate` then `tessera a11y` (builds, renders every page headless, runs axe-core; first run auto-installs Chromium). See [Accessibility](#accessibility).
 - `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
 
 ### Updating the framework
 
-Plain dependency bump — there is no `create-tessera upgrade`:
-
-```bash
-pnpm add tessera-learn@latest      # or @0.1.0 to pin
-```
-
-The framework owns the build, the reserved scripts, and this guide, so a bump needs no reconciling. Your root `CLAUDE.md`/`AGENTS.md` point to this guide and aren't overwritten by updates — add your own workspace standards to their Project notes section freely.
+Plain dependency bump — there is no `create-tessera upgrade`: `pnpm add tessera-learn@latest` (or `@0.1.0` to pin). The framework owns the build, reserved scripts, and this guide, so a bump needs no reconciling; your root `CLAUDE.md`/`AGENTS.md` aren't overwritten — add workspace standards to their Project notes freely.
 
 ### Customising the build (optional)
 
-You never write `vite.config.js`. To extend the build, add `tessera.config.js` at the project root — a **partial** Vite config merged on top of Tessera's. `tesseraPlugin()` and the Svelte compiler stay wired in.
+You never write `vite.config.js`. To extend the build, add `tessera.config.js` at the project root — a **partial** Vite config merged on top of Tessera's (`tesseraPlugin()` and the Svelte compiler stay wired in). Never scaffolded, never touched by updates.
 
 ```js
 // tessera.config.js
@@ -94,8 +79,6 @@ export default {
   resolve: { alias: { $lib: '/src/lib' } },
 };
 ```
-
-It is never scaffolded and never touched by updates.
 
 ---
 
@@ -150,25 +133,16 @@ If none fit, surface the limitation — don't patch around it in `node_modules/`
 
 ### Hierarchy and ordering
 
-- Manifest is always **section → lesson → page**. Files directly in a section folder flatten into one implicit lesson titled after the section. Lesson subdirectories nest. Both shapes can coexist.
-- Sorting is alphabetical by directory/filename.
-- Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs/titles (`01-getting-started/` → slug `getting-started`, title "Getting Started").
+- Manifest is always **section → lesson → page**. Files directly in a section folder flatten into one implicit lesson titled after the section; lesson subdirectories nest. Both shapes can coexist.
+- Sorting is alphabetical by directory/filename. Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs/titles (`01-getting-started/` → slug `getting-started`, title "Getting Started").
 - Control page order **within a lesson** with `_meta.js`, not filename prefixes.
 
 ### `_meta.js`
 
-Optional everywhere. Default: titles fall back to the title-cased slug; pages sort alphabetically. **Omit the file when defaults are what you want** (`pages: ["only-page"]` and `title: "Splash"` on `01-splash/` are no-ops).
-
-Use it only for a real override:
+Optional everywhere; defaults are title-cased slug + alphabetical pages. **Omit it unless you need a real override.** Two fields: `title` (folder name doesn't derive to what you want) and `pages` (explicit order — listed first, unlisted `.svelte` appended alphabetically):
 
 ```js
-// title override (folder name doesn't derive to what you want)
-export default { title: 'How to play' }; // folder is `01-intro`
-```
-
-```js
-// explicit page order — listed pages first, unlisted .svelte appended alphabetically
-export default { title: 'Welcome', pages: ['welcome', 'objectives'] };
+export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 ```
 
 ---
@@ -187,47 +161,27 @@ A custom widget that calls `useQuestion` and emits an `Interaction` is scored, r
 
 ## Creating Pages
 
-Each page is a `.svelte` file inside a lesson folder. Standard HTML works as-is.
+Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is. Import components from `tessera-learn` (`import { Callout, Image } from 'tessera-learn'`).
 
-### Page configuration
-
-`pageConfig` sets the title and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse.
+`pageConfig` sets the title and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse. If `title` is omitted it derives from the filename (`my-page.svelte` → "My Page").
 
 ```svelte
 <script module>
-  export const pageConfig = {
-    title: 'Introduction to the Topic',
-  };
+  export const pageConfig = { title: 'Introduction to the Topic' };
 </script>
 
 <h1>Introduction to the Topic</h1>
-```
-
-If `title` is omitted, it derives from the filename: `my-page.svelte` → "My Page".
-
-### Importing components
-
-```svelte
-<script>
-  import { Callout, Image } from 'tessera-learn';
-</script>
-
-<Callout type="info"><p>Helpful information.</p></Callout>
 ```
 
 ---
 
 ## Component Reference
 
-All components import from `tessera-learn`. Nothing loads automatically.
+All components import from `tessera-learn`. Nothing loads automatically. Each is accessible by construction (ARIA roles, keyboard, focus management) — you only supply the props below.
 
 ### Callout
 
-Styled box. A11y: `role="note"` with type-appropriate `aria-label`. Children become the body.
-
-| Prop   | Type                                          | Default  |
-| ------ | --------------------------------------------- | -------- |
-| `type` | `"info" \| "warning" \| "tip" \| "important"` | `"info"` |
+Styled box; children become the body. Prop `type`: `"info"` (default) | `"warning"` | `"tip"` | `"important"`.
 
 ```svelte
 <Callout type="warning"><p>Be careful.</p></Callout>
@@ -235,7 +189,7 @@ Styled box. A11y: `role="note"` with type-appropriate `aria-label`. Children bec
 
 ### Image
 
-Lazy-loaded image, renders as `<figure>`/`<figcaption>`.
+Lazy-loaded, renders as `<figure>`/`<figcaption>`.
 
 | Prop         | Type      | Description                                                            |
 | ------------ | --------- | ---------------------------------------------------------------------- |
@@ -260,7 +214,7 @@ Rules:
 
 ### Accordion / AccordionItem
 
-Expandable panels, one open at a time. A11y: `aria-expanded`, `aria-controls`, `role="region"`, Enter/Space.
+Expandable panels, one open at a time. `AccordionItem` takes a `title` prop; children are the body.
 
 ```svelte
 <Accordion>
@@ -275,24 +229,24 @@ Expandable panels, one open at a time. A11y: `aria-expanded`, `aria-controls`, `
 
 ### Carousel / CarouselSlide
 
-Slide viewer. A11y: `role="region"`, `aria-roledescription="carousel"`, arrow keys, swipe.
+Slide viewer; wrap each slide's content in `<CarouselSlide>`.
 
 ```svelte
 <Carousel>
-  <CarouselSlide>
-    <h3>Step 1</h3>
-    <p>Plan.</p>
-  </CarouselSlide>
-  <CarouselSlide>
-    <h3>Step 2</h3>
-    <p>Build.</p>
-  </CarouselSlide>
+  <CarouselSlide
+    ><h3>Step 1</h3>
+    <p>Plan.</p></CarouselSlide
+  >
+  <CarouselSlide
+    ><h3>Step 2</h3>
+    <p>Build.</p></CarouselSlide
+  >
 </Carousel>
 ```
 
 ### RevealModal
 
-Modal triggered by interaction. Uses Svelte 5 snippets. A11y: `role="dialog"`, `aria-modal`, focus trap, Escape to close.
+Modal triggered by interaction. Uses Svelte 5 snippets.
 
 | Prop      | Type      | Description                       |
 | --------- | --------- | --------------------------------- |
@@ -310,29 +264,25 @@ Modal triggered by interaction. Uses Svelte 5 snippets. A11y: `role="dialog"`, `
 </RevealModal>
 ```
 
-### Video
+### Video / Audio
 
-YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files. Lazy-loads on scroll.
+`Video` is a YouTube/Vimeo iframe (auto-detected, responsive 16:9) or native `<video>` for direct files; `Audio` is a native player. Both lazy-load and share these props:
 
-| Prop         | Type     | Description                                                                                  |
-| ------------ | -------- | -------------------------------------------------------------------------------------------- |
-| `src`        | `string` | Video URL or `$assets/` path                                                                 |
-| `title`      | `string` | **Required.** Accessible label (empty/whitespace rejected)                                   |
-| `tracks`     | `array`  | Caption tracks for **native** video → `<track>`. Ignored for YouTube/Vimeo                   |
-| `transcript` | `string` | Transcript in a `<details>` below the player. Load from file via `?raw` import (see example) |
+| Prop         | Type     | Description                                                                                                                        |
+| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src`        | `string` | URL or `$assets/` path                                                                                                             |
+| `title`      | `string` | **Required.** Accessible label (empty/whitespace rejected)                                                                         |
+| `tracks`     | `array`  | Caption tracks → `<track>`; `{ src, kind?: 'captions' \| 'subtitles', srclang?, label? }`. Native only (ignored for YouTube/Vimeo) |
+| `transcript` | `string` | Transcript in a `<details>`. Load from file via `?raw` import                                                                      |
 
-Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed needs `transcript` (embeds can't carry `<track>` files). Each `tracks` entry is `{ src, kind?: 'captions' | 'subtitles', srclang?, label? }`.
+Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`, an embed needs `transcript` (embeds can't carry `<track>`); the validator warns when `<Audio>` has no `transcript`.
 
 ```svelte
 <script>
   import intro from '$assets/intro.txt?raw';
 </script>
 
-<Video
-  src="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-  title="Intro"
-  transcript={intro}
-/>
+<Video src="https://youtube.com/watch?v=ID" title="Intro" transcript={intro} />
 <Video
   src="$assets/demo.mp4"
   title="Demo"
@@ -345,27 +295,7 @@ Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`; an embed 
     },
   ]}
 />
-```
-
-### Audio
-
-Native player. A11y: `aria-label` from title.
-
-| Prop         | Type     | Description                                             |
-| ------------ | -------- | ------------------------------------------------------- |
-| `src`        | `string` | Audio URL or `$assets/` path                            |
-| `title`      | `string` | **Required.** Accessible label                          |
-| `tracks`     | `array`  | Caption tracks → `<track>` (same shape as `Video`)      |
-| `transcript` | `string` | Transcript in a `<details>` (load from file via `?raw`) |
-
-Transcript rule (WCAG 1.2.1): the validator warns when `<Audio>` has no `transcript`.
-
-```svelte
-<script>
-  import lecture from '$assets/lecture-01.txt?raw';
-</script>
-
-<Audio src="$assets/lecture-01.mp3" title="Lecture 1" transcript={lecture} />
+<Audio src="$assets/lecture.mp3" title="Lecture 1" transcript={intro} />
 ```
 
 ---
@@ -409,11 +339,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
 - **Question `id`s are unique within a page.** Duplicates collide in `cmi.interactions`.
 - **No `<Quiz>` wrapper.** Pages with `pageConfig.quiz` are wrapped automatically.
-- **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing. See [Data contract](#data-contract).
-
-### Data contract
-
-Whatever quiz UI you build, the LMS sees the same `cmi.interactions` as the built-in. Every question registered through `useQuestion` reports the moment its widget calls `q.commit()`; `useQuiz().submit()` commits any that haven't, as a safety net. **Bypass `useQuestion`/`useQuiz` and the quiz reports nothing.**
+- **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing.
 
 ### `pageConfig.quiz` fields
 
@@ -427,64 +353,17 @@ Whatever quiz UI you build, the LMS sees the same `cmi.interactions` as the buil
 
 ### Per-question weighting
 
-Pass `weight` (default 1; non-positive treated as 1) to change how much a question pulls on the page score. Works identically inside `<Quiz>` and standalone.
-
-```svelte
-<MultipleChoice id="q-easy" weight={1} ... />
-<MultipleChoice id="q-hard" weight={3} ... />
-```
-
-Page score = weighted-correct percentage: `Σ(weight × correct) / Σ(weight) × 100`, rounded. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction).
+Pass `weight` (default 1; non-positive treated as 1) to change how much a question pulls on the page score; works identically inside `<Quiz>` and standalone. Page score = `Σ(weight × correct) / Σ(weight) × 100`, rounded. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction).
 
 ### Question types
 
-#### MultipleChoice
+Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
-| Prop                | Type       | Description                          |
-| ------------------- | ---------- | ------------------------------------ |
-| `question`          | `string`   | Prompt                               |
-| `options`           | `string[]` | Answer options                       |
-| `correct`           | `number`   | Index of correct option (0-based)    |
-| `correctFeedback`   | `string`   | Optional                             |
-| `incorrectFeedback` | `string`   | Optional                             |
-| `optionFeedback`    | `string[]` | Optional per-option feedback         |
-| `weight`            | `number`   | Page-level rollup weight (default 1) |
+**MultipleChoice** — `question` `string`, `options` `string[]`, `correct` `number` (0-based index). Optional: `correctFeedback` / `incorrectFeedback` `string`, `optionFeedback` `string[]`.
 
-```svelte
-<MultipleChoice
-  question="What is the capital of France?"
-  options={['London', 'Berlin', 'Paris', 'Madrid']}
-  correct={2}
-/>
-```
+**FillInTheBlank** — `question` `string`, `answers` `string[]` (distinct spellings only), `caseSensitive` `boolean` (default `false`, handles case variants).
 
-#### FillInTheBlank
-
-| Prop            | Type       | Default | Description              |
-| --------------- | ---------- | ------- | ------------------------ |
-| `question`      | `string`   |         | Prompt                   |
-| `answers`       | `string[]` |         | Acceptable answers       |
-| `caseSensitive` | `boolean`  | `false` | Comparison casing        |
-| `weight`        | `number`   | `1`     | Page-level rollup weight |
-
-`answers` only needs distinct spellings; `caseSensitive: false` handles case variants.
-
-```svelte
-<FillInTheBlank
-  question="What element has the symbol 'O'?"
-  answers={['Oxygen']}
-/>
-```
-
-#### Matching
-
-Right column auto-shuffled. Click left then right to match (tap on mobile); click a pair to unmatch. All pairs must be correct.
-
-| Prop       | Type                              | Description                          |
-| ---------- | --------------------------------- | ------------------------------------ |
-| `question` | `string`                          | Prompt                               |
-| `pairs`    | `{left: string, right: string}[]` | Correct pairs                        |
-| `weight`   | `number`                          | Page-level rollup weight (default 1) |
+**Matching** — `question` `string`, `pairs` `{left, right}[]`. Right column auto-shuffled; click left then right to match (tap on mobile), click a pair to unmatch; all pairs must be correct.
 
 ```svelte
 <Matching
@@ -492,73 +371,39 @@ Right column auto-shuffled. Click left then right to match (tap on mobile); clic
   pairs={[
     { left: 'France', right: 'Paris' },
     { left: 'Germany', right: 'Berlin' },
-    { left: 'Japan', right: 'Tokyo' },
   ]}
 />
 ```
 
-#### Sorting
-
-Drag-and-drop (or click-to-place) into labelled categories.
-
-| Prop       | Type       | Description                                          |
-| ---------- | ---------- | ---------------------------------------------------- |
-| `question` | `string`   | Prompt                                               |
-| `items`    | `string[]` | Items to sort                                        |
-| `targets`  | `string[]` | Category labels                                      |
-| `correct`  | `number[]` | Per item, the index of its correct target (parallel) |
-| `weight`   | `number`   | Page-level rollup weight (default 1)                 |
+**Sorting** — `question` `string`, `items` `string[]`, `targets` `string[]` (category labels), `correct` `number[]` (parallel to `items`; each entry an index into `targets`). Drag-and-drop or click-to-place.
 
 ```svelte
 <Sorting
   question="Sort each animal:"
-  items={['Dog', 'Eagle', 'Salmon', 'Cat', 'Robin', 'Trout']}
+  items={['Dog', 'Eagle', 'Salmon', 'Cat']}
   targets={['Mammals', 'Birds', 'Fish']}
-  correct={[0, 1, 2, 0, 1, 2]}
+  correct={[0, 1, 2, 0]}
 />
 ```
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice and render their own Check/Retry.
-
-| Prop         | Type     | Default    | Description                    |
-| ------------ | -------- | ---------- | ------------------------------ |
-| `maxRetries` | `number` | `Infinity` | Max retries for standalone     |
-| `weight`     | `number` | `1`        | Per-question page-level weight |
-
-```svelte
-<MultipleChoice
-  question="What color is the sky on a clear day?"
-  options={['Red', 'Blue', 'Green']}
-  correct={1}
-  maxRetries={2}
-/>
-```
-
-Standalone questions are not graded by default. To grade one, build it with `useQuestion`. See [Recipe 5](#recipe-5-graded-standalone-question).
+All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`). Not graded by default — to grade one, build it with `useQuestion` (see [Recipe 3](#recipe-3-graded-standalone-question)).
 
 ---
 
 ## Manual completion
 
-Use `completion.mode: "manual"` when the author owns the completion moment (e.g. reading the final page, or a "click to acknowledge" button) rather than a quiz score or page-visit ratio.
+Use `completion.mode: "manual"` when the author owns the completion moment (final page read, "click to acknowledge") rather than a quiz score or visit ratio. Two triggers, both always active; first-to-fire wins, re-marks are idempotent (completion is monotonic — you can't un-complete):
 
-Both triggers below are always active under manual mode. First-to-fire wins; subsequent calls are idempotent.
-
-### Trigger A: page frontmatter
-
-Declare `completesOn: "view"` (the only v1 value) on any page. Completion fires the moment that page renders.
+- **Page frontmatter** — `completesOn: "view"` (only v1 value) in a page's `pageConfig`; fires when that page renders.
+- **Runtime hook** — `useCompletion().markComplete()`, composed with any event (modal close, video-ended, timer). Outside manual mode it's a no-op with a one-shot dev warning, so it's safe in shared components.
 
 ```svelte
 <script module>
   export const pageConfig = { title: "You're done", completesOn: 'view' };
 </script>
-
-<h1>Thanks for completing the briefing.</h1>
 ```
-
-### Trigger B: runtime hook
 
 ```svelte
 <script>
@@ -572,77 +417,35 @@ Declare `completesOn: "view"` (the only v1 value) on any page. Completion fires 
 >
   I acknowledge
 </button>
-
-{#if completionStatus === 'complete'}
-  <p>Recorded. You may now close this window.</p>
-{/if}
 ```
 
-`markComplete()` composes with any event (modal close, video-ended, timer). Outside `mode: "manual"` it is a no-op with a one-shot dev warning — safe to leave in shared components.
-
-### `completion.trigger` (build-time check)
-
-Optional. Set to `"page"` to fail the build when no page declares `completesOn: "view"`. Both triggers still work regardless.
-
-```js
-completion: { mode: "manual", trigger: "page" }
-```
-
-When omitted, the dev runtime warns once after 60s if completion hasn't fired.
+**Build-time check:** `completion: { mode: "manual", trigger: "page" }` fails the build when no page declares `completesOn: "view"`. Omitted, the dev runtime warns once after 60s if completion hasn't fired.
 
 ### Success status
 
-By default `successStatus` stays `"unknown"` under manual. For completion **and** an automatic pass:
+By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion:
 
-```js
-completion: { mode: "manual", requireSuccessStatus: "passed" }  // or "failed"
-```
+| Adapter        | `markComplete()`, default                                       | with `requireSuccessStatus: "passed"` |
+| -------------- | --------------------------------------------------------------- | ------------------------------------- |
+| SCORM 1.2      | `lesson_status = "completed"`                                   | `lesson_status = "passed"`            |
+| SCORM 2004 4th | `completion_status = "completed"`, `success_status = "unknown"` | `success_status = "passed"`           |
+| cmi5           | **Completed** (no Passed/Failed)                                | **Passed** alongside **Completed**    |
+| web            | `localStorage` only                                             | `localStorage` only                   |
 
-| Adapter        | `markComplete()` with no `requireSuccessStatus`                         |
-| -------------- | ----------------------------------------------------------------------- |
-| SCORM 1.2      | `cmi.core.lesson_status = "completed"`                                  |
-| SCORM 2004 4th | `cmi.completion_status = "completed"`, `cmi.success_status = "unknown"` |
-| cmi5           | **Completed** statement (no Passed / Failed)                            |
-| web            | `localStorage` only                                                     |
+### Rules and non-goals
 
-With `requireSuccessStatus: "passed"`: SCORM 1.2 → `lesson_status = "passed"`, SCORM 2004 → `success_status = "passed"`, cmi5 → **Passed** alongside **Completed**.
-
-### Quizzes under manual mode
-
-A graded quiz reports its score to the gradebook but does **not** drive completion/success — `markComplete()`/`completesOn` does. The build warns. Set `graded: false` if that's not what you want.
-
-### Non-goals
-
-- Combining manual + quiz/percentage rules → use `useCompletion()` in a custom `$effect`.
-- Per-learner conditional completion in config → do it in a component with `useCompletion()`.
-- Marking a course incomplete after completion. Completion is monotonic; re-marks are ignored.
+- A graded quiz reports its score but does **not** drive completion/success under manual — `markComplete()`/`completesOn` does (the build warns; set `graded: false` to silence).
+- Combining manual + quiz/percentage rules, or per-learner conditional completion → use `useCompletion()` in a custom `$effect`/component, not config.
 
 ---
 
 ## Assets
 
-Drop files into `assets/`. Reference with `$assets/` in built-in component props:
-
-```svelte
-<Image src="$assets/photo.png" alt="Photo" />
-<Video src="$assets/demo.mp4" title="Demo" />
-```
-
-In CSS, use a relative path from `styles/`:
-
-```css
-.bg {
-  background-image: url('../assets/bg.png');
-}
-```
-
-External URLs work too. At build the plugin copies `assets/` → `dist/assets/`, so `$assets/foo.png` resolves the same in dev and the shipped bundle.
+Drop files into `assets/`. Reference with `$assets/` in built-in component props (`<Image src="$assets/photo.png" alt="…" />`); in CSS use a relative path (`url('../assets/bg.png')`). External URLs work too. At build the plugin copies `assets/` → `dist/assets/`, so paths resolve the same in dev and the bundle.
 
 ### `$assets/` in custom components
 
-`$assets/` is **only** rewritten in two places: ES `import` statements (Vite alias) and the `src` prop of built-in `Image`/`Audio`/`Video`. **Raw HTML attributes are NOT rewritten** — `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and CSS `url()` strings built in JS all 404 with no warning.
-
-Pick by use case:
+`$assets/` is **only** rewritten in two places: ES `import` statements (Vite alias) and the `src` prop of built-in `Image`/`Audio`/`Video`. **Raw HTML attributes are NOT rewritten** — `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and JS-built CSS `url()` strings all 404 silently. Pick by use case:
 
 **One-off — ES import (preferred).** Build-time bundling, hashing, fails the build if missing:
 
@@ -665,19 +468,13 @@ const signs = import.meta.glob('$assets/signs/*.svg', {
 const url = signs[`/assets/signs/${filename}`]; // look up by full key
 ```
 
-**Pure runtime string (last resort).** No build-time guarantees; use only when the filename comes from server data:
-
-```js
-const src = `./assets/signs/${filename}`;
-```
+**Pure runtime string (last resort).** No build-time guarantees; only when the filename comes from server data: `` const src = `./assets/signs/${filename}` ``.
 
 ---
 
 ## Styling
 
-Add `.css` files to `styles/`. They load after framework styles and override them.
-
-Override these custom properties to theme globally:
+Add `.css` files to `styles/`; they load after framework styles and override them. Theme globally by overriding these custom properties:
 
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
@@ -733,8 +530,7 @@ export default {
   completion: {
     mode: 'percentage', // "percentage" | "quiz" | "manual"
     percentageThreshold: 100, // 0–100 (percentage mode)
-    // trigger: "page",              // (manual only) opt into build-time check
-    // requireSuccessStatus: "passed", // (manual only) "passed" | "failed"
+    // (manual only) trigger: "page", requireSuccessStatus: "passed" | "failed"
   },
 
   scoring: {
@@ -746,9 +542,9 @@ export default {
   },
 
   a11y: {
-    level: 'warn', // "warn" (default) | "error" — "error" makes promotable a11y rules block the build
-    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa" — axe ruleset
-    ignore: [], // rule IDs to suppress, e.g. ["tessera/heading-order", "color-contrast"]
+    level: 'warn', // "warn" (default) | "error"
+    standard: 'wcag2aa', // "wcag2a" | "wcag2aa" (default) | "wcag21aa"
+    ignore: [], // rule IDs to suppress, e.g. ["tessera/heading-order"]
   },
 };
 ```
@@ -768,47 +564,26 @@ export default {
 
 ### Minimum config
 
-Every field except `title` has a default, so `export default { title: "My Course" }` is complete (free nav, full-percentage completion, web export, `<html lang="en">`). Effective defaults:
-
-```js
-{
-  title: "Untitled Course",
-  language: "en",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-}
-```
+Every field except `title` has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`.
 
 ### Custom access rules
 
-For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess`. It runs synchronously on every navigation evaluation — keep it cheap.
+For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess` (with `mode`). It runs synchronously on every navigation evaluation — keep it cheap. Here, gate `lesson-5` on a prior quiz score:
 
 ```js
 import { sequentialAccess } from 'tessera-learn';
 
-export default {
-  navigation: {
-    mode: 'sequential',
-    canAccess: (ctx) => {
-      if (!sequentialAccess(ctx)) return false;
-      if (ctx.page.slug === 'lesson-5') {
-        const i = ctx.manifest.pages.findIndex(
-          (p) => p.slug === 'lesson-2-quiz',
-        );
-        return (
-          (ctx.progress.quizScores.get(i) ?? 0) >=
-          ctx.config.scoring.passingScore
-        );
-      }
-      return true;
-    },
-  },
+canAccess: (ctx) => {
+  if (!sequentialAccess(ctx)) return false;
+  if (ctx.page.slug !== 'lesson-5') return true;
+  const i = ctx.manifest.pages.findIndex((p) => p.slug === 'lesson-2-quiz');
+  return (
+    (ctx.progress.quizScores.get(i) ?? 0) >= ctx.config.scoring.passingScore
+  );
 };
 ```
 
-`AccessContext` exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. Presets `freeAccess` and `sequentialAccess` are re-exported for composition. `resolveAccess(config)` returns the predicate the runtime would use (custom `canAccess` if set, else the matching preset) — use it to wrap rather than replace.
+`AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. Presets `freeAccess` / `sequentialAccess` are re-exported for composition; `resolveAccess(config)` returns the predicate the runtime would use (custom `canAccess` if set, else the matching preset) — use it to wrap rather than replace.
 
 ### Build output
 
@@ -821,7 +596,7 @@ export default {
 | `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip` |
 | `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`      |
 
-Upload the LMS zips via your LMS's import flow. Drop `dist/` (web) on Netlify, GitHub Pages, S3, or any static host.
+Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
 
 ### Validation
 
@@ -835,14 +610,7 @@ Two passes plus components that are accessible by construction.
 
 **Static checks** run inside `validate` / `dev` / `export` — no setup. They cover: `<Image>` alt-or-`decorative`; `<Video>`/`<Audio>` `title` + captions/transcript; empty question labels; skipped heading levels; `branding.primaryColor` contrast against white; well-formed `language`; and the Svelte compiler's `a11y_*` warnings. Each diagnostic carries a rule ID (`[tessera/image-alt]`, `[a11y_missing_attribute]`) — that ID is what `a11y.ignore` and `a11y.level` match.
 
-**Runtime audit** (`tessera a11y`) is the opt-in deep pass. Run it directly or via `pnpm check <course>`:
-
-```bash
-pnpm a11y <course>                   # audit (threshold: serious)
-pnpm a11y <course> --threshold minor # stricter
-```
-
-It builds the course, renders **every** page headless (including quiz-gated pages), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), and exits non-zero on any violation at/above the impact threshold (default `serious`). It catches what a static scan can't: computed ARIA, focus order, rendered contrast. First run auto-installs Chromium. It uses the web adapter, so it works regardless of `export.standard`.
+**Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't — computed ARIA, focus order, rendered contrast — and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 
 Ruleset/severity come from the `a11y` block (`standard`, `ignore`). Hard errors (missing `alt`, missing media `title`) always block; everything else is a warning unless `a11y.level: "error"`.
 
@@ -867,7 +635,7 @@ import type { Interaction } from 'tessera-learn';
 
 ### The `Question` model
 
-`useQuiz()` and `useQuestion()` traffic in the same per-question object. A shell iterates `quiz.questions`; a widget gets its `Question` from `useQuestion()`. No indexes, no `getContext`.
+`useQuiz()` and `useQuestion()` share the same per-question object: a shell iterates `quiz.questions`, a widget gets its `Question` from `useQuestion()`. No indexes, no `getContext`.
 
 ```ts
 interface Question {
@@ -888,7 +656,7 @@ Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "alre
 
 `Interaction` uses SCORM 2004 vocabulary: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
 
-For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names; SCORM 1.2 maps each to its index in `options`. Omit `options` and SCORM 1.2 slugs the literal identifier.
+For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names, SCORM 1.2 maps each to its index in `options` (omit `options` and SCORM 1.2 slugs the literal identifier).
 
 ```ts
 response: () => ({
@@ -898,6 +666,14 @@ response: () => ({
   options: ['stop', 'yield', 'speed-limit', 'merge'],
 });
 // SCORM 1.2 → "2"   SCORM 2004 → "speed-limit"   cmi5 → "speed-limit"
+
+// sequencing: response/correct are ordered id lists; options carries every id
+response: () => ({
+  type: 'sequencing',
+  response: order, // e.g. ['mercury', 'venus', 'earth']
+  correct: ['mercury', 'venus', 'earth'],
+  options: ['venus', 'earth', 'mercury'],
+});
 ```
 
 ### `useQuestion`
@@ -927,29 +703,7 @@ function useQuestion(opts: {
 };
 ```
 
-```svelte
-<script>
-  import { useQuestion } from 'tessera-learn';
-
-  let order = $state(['Mercury', 'Venus', 'Earth', 'Mars']);
-
-  const q = useQuestion({
-    id: 'planet-rank',
-    response: () => ({
-      type: 'sequencing',
-      response: order,
-      correct: ['Mercury', 'Venus', 'Earth', 'Mars'],
-    }),
-    reset: () => {
-      order = ['Mercury', 'Venus', 'Earth', 'Mars'];
-    },
-  });
-</script>
-
-{#if q.mode === 'standalone'}
-  <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
-{/if}
-```
+See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a full widget and [Recipe 3](#recipe-3-graded-standalone-question) for a graded standalone.
 
 ### `useQuiz`
 
@@ -991,6 +745,8 @@ function useNavigation(): {
 };
 ```
 
+Each `ManifestPage` exposes `slug`, `title`, `section` (its section title), and `index`.
+
 ### `useProgress`
 
 ```ts
@@ -1027,15 +783,7 @@ function usePersistence<T>(key: string): {
 };
 ```
 
-```svelte
-<script>
-  import { usePersistence } from 'tessera-learn';
-
-  const store = usePersistence('whiteboard');
-  let state = $state(store.get() ?? { strokes: [] });
-  $effect(() => store.set(state));
-</script>
-```
+Usage in [Recipe 1](#recipe-1-custom-draw-a-line-question) (persists partial progress).
 
 ### `isCorrect(interaction)`
 
@@ -1061,11 +809,11 @@ xapi?.sendStatement({
 });
 ```
 
-`useXAPI()` is a plain function callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured or before adapter init resolves — **null-check and degrade gracefully**. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`. You supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
+`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured or before adapter init resolves — **null-check and degrade gracefully**. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
 
 ### Configure the destination
 
-`config.xapi` is one destination or an array. Always declared explicitly — no implicit default.
+`config.xapi` is one destination or an array, always explicit (no implicit default):
 
 ```js
 xapi: {
@@ -1122,7 +870,7 @@ OAuth at the publisher level, statement signing/attachment helpers, offline/Inde
 
 ## LMS behaviour
 
-The runtime translates author intent into adapter calls automatically; you don't write any of it. The author-relevant differences:
+The runtime translates author intent into adapter calls automatically. The author-relevant differences:
 
 | Concern              | SCORM 1.2                                                                            | SCORM 2004 4th                                                 | cmi5                                 |
 | -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------ |
@@ -1134,8 +882,8 @@ The runtime translates author intent into adapter calls automatically; you don't
 Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
-- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown" status). Pass/fail uses `scoring.passingScore`, not the LMS's mastery field.
-- **SCORM 2004 / cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore`. Read it via `useQuiz().passingScore`.
+- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown"); pass/fail uses `scoring.passingScore`, not the LMS's mastery field.
+- **SCORM 2004 / cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore` — read it via `useQuiz().passingScore`.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing
@@ -1153,7 +901,7 @@ Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / 
 
 ## Custom Layouts
 
-Drop `layout.svelte` at the project root to replace the default chrome. The contract: it receives a single `page` snippet prop and renders it where the active page goes. Use hooks for everything else.
+Drop `layout.svelte` at the project root to replace the default chrome. The contract: it receives a single `page` snippet prop and renders it where the active page goes; use hooks for everything else.
 
 ```svelte
 <!-- layout.svelte -->
@@ -1224,14 +972,7 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
   }
 </script>
 
-<svg
-  width="400"
-  height="200"
-  role="img"
-  aria-label="Drag to match elements to their symbols"
->
-  <!-- canvas + line-drawing UI calls connect(l, r) on drop -->
-</svg>
+<!-- line-drawing UI calls connect(l, r) on drop -->
 
 {#if q.mode === 'standalone'}
   <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
@@ -1241,94 +982,7 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 {/if}
 ```
 
-### Recipe 2: Custom topbar layout
-
-Horizontal topbar with breadcrumb + progress %.
-
-```svelte
-<!-- layout.svelte -->
-<script>
-  import { useNavigation, useProgress } from 'tessera-learn';
-
-  let { page } = $props();
-  const nav = useNavigation();
-  const progress = useProgress();
-
-  const percent = $derived(
-    Math.round((progress.visitedPages.size / nav.pages.length) * 100),
-  );
-</script>
-
-<header class="topbar">
-  <span class="brand">My Course</span>
-  <span class="crumb">{nav.currentPage.section} › {nav.currentPage.title}</span>
-  <span class="progress" aria-live="polite">{percent}% complete</span>
-</header>
-
-<main class="content">{@render page()}</main>
-
-<nav class="footer">
-  <button disabled={!nav.canGoPrev} onclick={() => nav.prev()}>← Back</button>
-  <select
-    onchange={(e) => nav.goTo(e.currentTarget.value)}
-    value={nav.currentPage.slug}
-  >
-    {#each nav.pages as p}<option value={p.slug}>{p.title}</option>{/each}
-  </select>
-  <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next →</button>
-</nav>
-
-<style>
-  .topbar {
-    display: flex;
-    gap: 1rem;
-    padding: 0.75rem 1.5rem;
-    border-bottom: 1px solid var(--tessera-border);
-  }
-  .content {
-    max-width: var(--tessera-content-max-width);
-    margin: 0 auto;
-    padding: 2rem;
-  }
-  .footer {
-    display: flex;
-    gap: 1rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--tessera-border);
-  }
-</style>
-```
-
-### Recipe 3: Prerequisite-based access
-
-Lock lesson 5 until lessons 1–3 are visited. Composes with `sequentialAccess`.
-
-```js
-// course.config.js
-import { sequentialAccess } from 'tessera-learn';
-
-const PREREQS = ['lesson-1', 'lesson-2', 'lesson-3'];
-
-export default {
-  title: 'My Course',
-  navigation: {
-    mode: 'sequential',
-    canAccess: (ctx) => {
-      if (!sequentialAccess(ctx)) return false;
-      if (ctx.page.slug !== 'lesson-5') return true;
-      return PREREQS.every((slug) => {
-        const i = ctx.manifest.pages.findIndex((p) => p.slug === slug);
-        return i >= 0 && ctx.progress.visitedPages.has(i);
-      });
-    },
-  },
-  completion: { mode: 'percentage', percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: 'web' },
-};
-```
-
-### Recipe 4: Custom quiz shell via `quiz.svelte`
+### Recipe 2: Custom quiz shell via `quiz.svelte`
 
 Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
 
@@ -1372,7 +1026,7 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
 
 Always submit through `useQuiz().submit()`.
 
-### Recipe 4b: Custom question widget for a custom quiz shell
+### Recipe 2b: Custom question widget for a custom quiz shell
 
 The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, calls `commit()` when final, and reads `locked`/`feedbackVisible`/`answer`.
 
@@ -1440,53 +1094,23 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 
-### Recipe 5: Graded standalone question
+### Recipe 3: Graded standalone question
 
-A single inline reflection, not in a `<Quiz>` but `graded: true`, so it counts toward course success.
+A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100; omit `correct` to accept any answer. Course success rolls up across all graded items, quizzes and standalones alike.
 
-```svelte
-<!-- pages/04-reflection/01-reflect/reflect.svelte -->
-<script module>
-  export const pageConfig = { title: 'Reflection' };
-</script>
-
-<script>
-  import { useQuestion } from 'tessera-learn';
-
-  let answer = $state('');
-
-  const q = useQuestion({
-    id: 'why-it-matters',
-    graded: true,
-    response: () => ({
-      type: 'long-fill-in',
-      response: answer,
-      // No `correct`: any answer accepted; we just want completion.
-    }),
-    score: () => (answer.trim().length >= 50 ? 100 : 0),
-    reset: () => {
-      answer = '';
-    },
-  });
-</script>
-
-<h1>Why does this matter to you?</h1>
-<p>At least 50 characters required to pass.</p>
-
-<textarea bind:value={answer} rows="6" disabled={q.submitted}></textarea>
-<button
-  onclick={() => q.submit()}
-  disabled={q.submitted || answer.trim().length < 50}
->
-  Submit
-</button>
-
-{#if q.submitted}<p>Thanks. Your reflection has been recorded.</p>{/if}
+```js
+const q = useQuestion({
+  id: 'why-it-matters',
+  graded: true,
+  response: () => ({ type: 'long-fill-in', response: answer }),
+  score: () => (answer.trim().length >= 50 ? 100 : 0),
+  reset: () => {
+    answer = '';
+  },
+});
 ```
 
-Course success rolls up across all graded items: quizzes and standalones alike.
-
-### Recipe 6: Chunked-reveal page with `markChunk`
+### Recipe 4: Chunked-reveal page with `markChunk`
 
 Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the highest revealed chunk so the page resumes mid-scroll on reload.
 
@@ -1523,27 +1147,6 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
   <button onclick={reveal}>Show next</button>
 {/if}
 ```
-
-### Recipe 7: Persisted UI state with `usePersistence`
-
-Any JSON-serialisable value can survive reload — here, a sidebar collapsed toggle.
-
-```svelte
-<!-- in any page component, layout.svelte, or a custom widget -->
-<script>
-  import { usePersistence } from 'tessera-learn';
-
-  const ui = usePersistence('sidebar-prefs');
-  let collapsed = $state(ui.get()?.collapsed ?? false);
-  $effect(() => ui.set({ collapsed }));
-</script>
-
-<button onclick={() => (collapsed = !collapsed)}>
-  {collapsed ? 'Expand' : 'Collapse'}
-</button>
-```
-
-Keys are namespaced per course, so two courses on the same LMS don't collide.
 
 ---
 
