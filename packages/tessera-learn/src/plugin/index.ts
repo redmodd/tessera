@@ -326,6 +326,12 @@ function completionDefaults(mode: string | undefined): {
   if (mode === 'manual') {
     return { completion: { mode: 'manual' }, passingScore: 0 };
   }
+  if (mode === 'quiz') {
+    return {
+      completion: { mode: 'quiz' },
+      passingScore: DEFAULT_PASSING_SCORE,
+    };
+  }
   return {
     completion: {
       mode: 'percentage',
@@ -353,6 +359,21 @@ function tesseraConfigDefaultsPlugin(): Plugin {
   };
 }
 
+/** Fill runtime defaults into a parsed course.config.js. Exported for tests. */
+export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
+  const { completion, passingScore } = completionDefaults(
+    userConfig.completion?.mode,
+  );
+  return {
+    ...userConfig,
+    title: userConfig.title || 'Untitled Course',
+    navigation: { mode: 'free', ...userConfig.navigation },
+    completion: { ...completion, ...userConfig.completion },
+    scoring: { passingScore, ...userConfig.scoring },
+    export: { standard: 'web', ...userConfig.export },
+  };
+}
+
 function tesseraConfigPlugin(): Plugin {
   return virtualModule(
     'tessera:config',
@@ -362,18 +383,7 @@ function tesseraConfigPlugin(): Plugin {
       if (existsSync(configPath)) this.addWatchFile(configPath);
       const read = readCourseConfig(projectRoot);
       const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
-      const { completion, passingScore } = completionDefaults(
-        userConfig.completion?.mode,
-      );
-      const merged = {
-        title: userConfig.title || 'Untitled Course',
-        ...userConfig,
-        navigation: { mode: 'free', ...userConfig.navigation },
-        completion: { ...completion, ...userConfig.completion },
-        scoring: { passingScore, ...userConfig.scoring },
-        export: { standard: 'web', ...userConfig.export },
-      };
-      return `export default ${JSON.stringify(merged)};`;
+      return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
     },
   );
 }

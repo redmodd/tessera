@@ -90,23 +90,7 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-export type DefaultExportLiteralResult =
-  | { kind: 'literal'; text: string }
-  | { kind: 'none' }
-  | { kind: 'invalid' }
-  | { kind: 'parse-error' };
-
-/**
- * Locate `export default { ... }` and return its object-literal text. Returns
- * a discriminated result so callers can tell parse failure from a missing or
- * non-literal default export. Used by both manifest extraction and project
- * validation.
- */
-export function extractDefaultExportObjectLiteral(
-  source: string,
-): DefaultExportLiteralResult {
-  return defaultExportObjectLiteral(source);
-}
+export { defaultExportObjectLiteral as extractDefaultExportObjectLiteral } from './ast.js';
 
 export type CourseConfigRead =
   | { ok: true; config: Partial<CourseConfig> }
@@ -126,9 +110,7 @@ export type CourseConfigRead =
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const configPath = resolve(projectRoot, 'course.config.js');
   if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
-  const result = extractDefaultExportObjectLiteral(
-    readSourceFileCached(configPath),
-  );
+  const result = defaultExportObjectLiteral(readSourceFileCached(configPath));
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
   if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
@@ -150,9 +132,7 @@ export function readMetaFile(metaPath: string): {
 } {
   if (!existsSync(metaPath)) return {};
 
-  const result = extractDefaultExportObjectLiteral(
-    readSourceFileCached(metaPath),
-  );
+  const result = defaultExportObjectLiteral(readSourceFileCached(metaPath));
   if (result.kind !== 'literal') return {};
 
   try {

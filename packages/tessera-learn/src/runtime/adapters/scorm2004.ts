@@ -1,4 +1,5 @@
 import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
+import type { Interaction } from '../interaction.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
@@ -113,7 +114,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
 
   reportInteraction(
     questionId: string,
-    interaction: import('../interaction.js').Interaction,
+    interaction: Interaction,
     correct: boolean | null,
   ): void {
     if (!this.#canWrite) return;
