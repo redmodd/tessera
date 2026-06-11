@@ -24,6 +24,8 @@ interface ExportConfig {
 
 // ---------- Helpers ----------
 
+const UNTITLED_TITLE = 'Untitled Course';
+
 function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -115,7 +117,7 @@ export function generateScormManifest(
   distDir: string,
 ): string {
   const dialect = SCORM_DIALECTS[version];
-  const title = escapeXml(config.title || 'Tessera Course');
+  const title = escapeXml(config.title || UNTITLED_TITLE);
   const files = collectFiles(distDir);
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
@@ -148,7 +150,7 @@ ${fileElements}
 }
 
 export function generateCMI5Xml(config: ExportConfig): string {
-  const title = escapeXml(config.title || 'Tessera Course');
+  const title = escapeXml(config.title || UNTITLED_TITLE);
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course title so they survive rebuilds without
   // orphaning existing learner records in the LRS.

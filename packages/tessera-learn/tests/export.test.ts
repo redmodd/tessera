@@ -84,6 +84,12 @@ describe('generateScormManifest 1.2', () => {
     expect(xml).toContain('<title>A &amp; B &lt;Course&gt;</title>');
   });
 
+  it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
+    const distDir = createDistDir(testRoot);
+    const xml = generateScormManifest('1.2', { title: '' }, distDir);
+    expect(xml).toContain('<title>Untitled Course</title>');
+  });
+
   it('lists all files in dist/', () => {
     const distDir = createDistDir(testRoot);
     const xml = generateScormManifest('1.2', { title: 'Test' }, distDir);
@@ -185,6 +191,13 @@ describe('generateCMI5Xml', () => {
   it('defaults masteryScore to 0.7', () => {
     const xml = generateCMI5Xml({ title: 'Test' });
     expect(xml).toContain('masteryScore="0.7"');
+  });
+
+  it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
+    const xml = generateCMI5Xml({ title: '' });
+    expect(xml).toContain(
+      '<langstring lang="en-US">Untitled Course</langstring>',
+    );
   });
 
   it('includes URN IRIs for course and AU ids', () => {
