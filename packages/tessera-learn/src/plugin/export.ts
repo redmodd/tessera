@@ -24,6 +24,8 @@ interface ExportConfig {
 
 // ---------- Helpers ----------
 
+const UNTITLED_TITLE = 'Untitled Course';
+
 function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -115,7 +117,7 @@ export function generateScormManifest(
   distDir: string,
 ): string {
   const dialect = SCORM_DIALECTS[version];
-  const title = escapeXml(config.title || 'Tessera Course');
+  const title = escapeXml(config.title || UNTITLED_TITLE);
   const files = collectFiles(distDir);
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
@@ -147,22 +149,8 @@ ${fileElements}
 </manifest>`;
 }
 
-export function generateSCORM12Manifest(
-  config: ExportConfig,
-  distDir: string,
-): string {
-  return generateScormManifest('1.2', config, distDir);
-}
-
-export function generateSCORM2004Manifest(
-  config: ExportConfig,
-  distDir: string,
-): string {
-  return generateScormManifest('2004', config, distDir);
-}
-
 export function generateCMI5Xml(config: ExportConfig): string {
-  const title = escapeXml(config.title || 'Tessera Course');
+  const title = escapeXml(config.title || UNTITLED_TITLE);
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course title so they survive rebuilds without
   // orphaning existing learner records in the LRS.
@@ -248,12 +236,14 @@ const PACKAGED_EXPORTS: Record<
   scorm12: {
     manifestFile: 'imsmanifest.xml',
     label: 'SCORM 1.2',
-    generate: generateSCORM12Manifest,
+    generate: (config, distDir) =>
+      generateScormManifest('1.2', config, distDir),
   },
   scorm2004: {
     manifestFile: 'imsmanifest.xml',
     label: 'SCORM 2004',
-    generate: generateSCORM2004Manifest,
+    generate: (config, distDir) =>
+      generateScormManifest('2004', config, distDir),
   },
   cmi5: {
     manifestFile: 'cmi5.xml',

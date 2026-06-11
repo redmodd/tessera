@@ -34,6 +34,27 @@ export function splitCourseArg(rest: string[]): {
   return { course: undefined, flags: rest };
 }
 
+type CourseCommand = (
+  courseRoot: string,
+  workspaceRoot: string,
+  flags: string[],
+) => number | Promise<number>;
+
+const COURSE_COMMANDS: Record<string, CourseCommand> = {
+  dev: async (courseRoot, workspaceRoot) =>
+    (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
+  export: async (courseRoot, workspaceRoot) =>
+    (await import('./build-commands.js')).runBuild(courseRoot, workspaceRoot),
+  validate: (courseRoot) => runValidate(courseRoot),
+  a11y: (courseRoot, workspaceRoot, flags) =>
+    runA11y(courseRoot, workspaceRoot, flags),
+  check: (courseRoot, workspaceRoot, flags) => {
+    const validateCode = runValidate(courseRoot, { showA11yTip: false });
+    if (validateCode !== 0) return validateCode;
+    return runA11y(courseRoot, workspaceRoot, flags);
+  },
+};
+
 export async function main(
   argv: string[],
   cwd: string = process.cwd(),
@@ -43,56 +64,34 @@ export async function main(
   if (sub === 'new') return runNew(rest[0], cwd);
   if (sub === 'duplicate') return runDuplicate(rest[0], rest[1], cwd);
 
-  switch (sub) {
-    case 'dev':
-    case 'export':
-    case 'validate':
-    case 'a11y':
-    case 'check': {
-      if (rest.includes('--help') || rest.includes('-h')) {
-        console.log(USAGE);
-        return 0;
-      }
-      const { course, flags } = splitCourseArg(rest);
-      const resolved = resolveCourse(cwd, course);
-      if (!resolved.ok) {
-        console.error(`[tessera] ${resolved.error}`);
-        return 1;
-      }
-      const { courseRoot, workspaceRoot } = resolved;
-
-      switch (sub) {
-        case 'dev': {
-          const { runDev } = await import('./build-commands.js');
-          return runDev(courseRoot, workspaceRoot);
-        }
-        case 'export': {
-          const { runBuild } = await import('./build-commands.js');
-          return runBuild(courseRoot, workspaceRoot);
-        }
-        case 'validate':
-          return runValidate(courseRoot);
-        case 'check': {
-          const validateCode = runValidate(courseRoot, { showA11yTip: false });
-          if (validateCode !== 0) return validateCode;
-          return runA11y(courseRoot, workspaceRoot, flags);
-        }
-        case 'a11y':
-          return runA11y(courseRoot, workspaceRoot, flags);
-      }
-      return 0;
-    }
-    case '--help':
-    case '-h':
+  if (sub !== undefined && Object.hasOwn(COURSE_COMMANDS, sub)) {
+    if (rest.includes('--help') || rest.includes('-h')) {
       console.log(USAGE);
       return 0;
-    case undefined:
-      console.error(`No command given.\n\n${USAGE}`);
+    }
+    const { course, flags } = splitCourseArg(rest);
+    const resolved = resolveCourse(cwd, course);
+    if (!resolved.ok) {
+      console.error(`[tessera] ${resolved.error}`);
       return 1;
-    default:
-      console.error(`Unknown command: ${sub}\n\n${USAGE}`);
-      return 1;
+    }
+    return COURSE_COMMANDS[sub](
+      resolved.courseRoot,
+      resolved.workspaceRoot,
+      flags,
+    );
   }
+
+  if (sub === '--help' || sub === '-h') {
+    console.log(USAGE);
+    return 0;
+  }
+  if (sub === undefined) {
+    console.error(`No command given.\n\n${USAGE}`);
+    return 1;
+  }
+  console.error(`Unknown command: ${sub}\n\n${USAGE}`);
+  return 1;
 }
 
 // import.meta.main is true only when this module is the program entry point,

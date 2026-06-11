@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import Sidebar from '../runtime/Sidebar.svelte';
   import { requireNavContext } from '../runtime/contexts.js';
 
@@ -49,10 +49,7 @@
 
   onMount(() => {
     window.addEventListener('keydown', handleKeyNav);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleKeyNav);
+    return () => window.removeEventListener('keydown', handleKeyNav);
   });
 </script>
 

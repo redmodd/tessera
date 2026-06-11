@@ -81,6 +81,22 @@
   }
 </script>
 
+{#snippet questionList(activeIndex)}
+  <div class="tessera-quiz-questions">
+    {#each handle.questions as q, i (q.id)}
+      <div
+        class="tessera-quiz-question-wrapper"
+        class:active={i === activeIndex}
+        aria-hidden={i !== activeIndex}
+      >
+        {#if q.render}
+          {@render q.render()}
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/snippet}
+
 <div
   class="tessera-quiz"
   bind:this={quizElement}
@@ -108,19 +124,7 @@
       </div>
     </div>
 
-    <div class="tessera-quiz-questions">
-      {#each handle.questions as q, i (q.id)}
-        <div
-          class="tessera-quiz-question-wrapper"
-          class:active={i === currentQuestionIndex}
-          aria-hidden={i !== currentQuestionIndex}
-        >
-          {#if q.render}
-            {@render q.render()}
-          {/if}
-        </div>
-      {/each}
-    </div>
+    {@render questionList(currentQuestionIndex)}
 
     <div class="tessera-quiz-nav">
       <button
@@ -170,19 +174,7 @@
       </span>
     </div>
 
-    <div class="tessera-quiz-questions">
-      {#each handle.questions as q, i (q.id)}
-        <div
-          class="tessera-quiz-question-wrapper"
-          class:active={i === reviewIndex}
-          aria-hidden={i !== reviewIndex}
-        >
-          {#if q.render}
-            {@render q.render()}
-          {/if}
-        </div>
-      {/each}
-    </div>
+    {@render questionList(reviewIndex)}
 
     <div class="tessera-quiz-nav">
       <button

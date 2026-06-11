@@ -209,10 +209,12 @@
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
-      c,
-      s,
-      gs: [...progress.gradedStandalonePages],
-      u: { ...userState },
+      ...(progress.chunkProgress.size > 0 ? { c } : {}),
+      ...(progress.standaloneQuestionScores.size > 0 ? { s } : {}),
+      ...(progress.gradedStandalonePages.size > 0
+        ? { gs: [...progress.gradedStandalonePages] }
+        : {}),
+      ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
     };
   }
@@ -297,7 +299,7 @@
 
   // ---- Persistence: report score/completion/success to adapter ----
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
-  let prevReportedScore = $state(null);
+  let prevReportedScore = null;
   $effect(() => {
     void progress.version;
     if (!persistenceReady) return;
@@ -322,7 +324,7 @@
     });
   });
 
-  let prevCompletionStatus = $state('incomplete');
+  let prevCompletionStatus = 'incomplete';
   $effect(() => {
     const status = progress.completionStatus;
     if (!persistenceReady) return;
@@ -335,7 +337,7 @@
     });
   });
 
-  let prevSuccessStatus = $state('unknown');
+  let prevSuccessStatus = 'unknown';
   $effect(() => {
     const status = progress.successStatus;
     if (!persistenceReady) return;

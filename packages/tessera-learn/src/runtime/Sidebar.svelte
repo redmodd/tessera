@@ -1,9 +1,11 @@
 <script>
+  import { SvelteSet } from 'svelte/reactivity';
+
   let { manifest, config, currentPageIndex, nav, onnavigate, onclose } =
     $props();
 
   // Track which sections are collapsed. All expanded by default.
-  let collapsedSections = $state(new Set());
+  const collapsedSections = new SvelteSet();
 
   function toggleSection(slug) {
     if (collapsedSections.has(slug)) {
