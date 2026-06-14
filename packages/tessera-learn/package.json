@@ -102,7 +102,7 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@vitest/coverage-v8": "^4.1.8",
     "jsdom": "^29.0.1",
     "scorm-again": "3.0.5",
