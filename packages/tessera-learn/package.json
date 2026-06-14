@@ -83,10 +83,10 @@
   "dependencies": {
     "@sveltejs/acorn-typescript": "^1.0.10",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "acorn": "^8.16.0",
+    "acorn": "^8.17.0",
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
-    "svelte": "^5.56.2",
+    "svelte": "^5.56.3",
     "vite": "^8.0.16"
   },
   "peerDependencies": {
