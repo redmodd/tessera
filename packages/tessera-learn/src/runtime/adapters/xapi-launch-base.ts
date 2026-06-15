@@ -21,23 +21,6 @@ export const VERBS = {
 const CMI_INTERACTION_TYPE =
   'http://adlnet.gov/expapi/activities/cmi.interaction';
 
-/** `.then` handler that warns on LRS non-2xx. The publisher resolves successfully on 4xx/5xx (failure is in the destination outcome), so `.catch` alone misses them. */
-export function warnOnLRSReject(
-  label: string,
-): (res: {
-  destinations?: Array<{ ok?: boolean; status?: number; error?: Error }>;
-}) => void {
-  return (res) => {
-    const dest = res.destinations?.[0];
-    if (dest && !dest.ok) {
-      console.warn(
-        `Tessera xAPI: ${label} statement rejected by LRS (${dest.status ?? 'network error'})`,
-        dest.error,
-      );
-    }
-  };
-}
-
 /**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
  * adapters. Subclasses set the protected fields in init() and may override
@@ -52,6 +35,8 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected registration: string | undefined;
   protected authToken = '';
   protected version = '1.0.3';
+  /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
+  protected logName = 'xAPI';
 
   protected score: number | null = null;
   protected durationSeconds = 0;
@@ -100,11 +85,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         });
         if (!resp.ok) {
           console.warn(
-            `Tessera xAPI: State API PUT returned ${resp.status}; learner progress did not persist.`,
+            `Tessera ${this.logName}: State API PUT returned ${resp.status}; learner progress did not persist.`,
           );
         }
       } catch (err) {
-        console.warn('Tessera xAPI: Failed to save state', err);
+        console.warn(`Tessera ${this.logName}: Failed to save state`, err);
       }
     });
   }
@@ -154,9 +139,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         result,
         context: this.buildContext({ moveOn: true }),
       })
-      .then(warnOnLRSReject('Completed'))
+      .then(this.warnOnLRSReject('Completed'))
       .catch((err) => {
-        console.warn('Tessera xAPI: failed to send Completed statement', err);
+        console.warn(
+          `Tessera ${this.logName}: failed to send Completed statement`,
+          err,
+        );
       });
   }
 
@@ -180,9 +168,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         result,
         context: this.buildContext({ moveOn: true, mastery: true }),
       })
-      .then(warnOnLRSReject(status === 'passed' ? 'Passed' : 'Failed'))
+      .then(this.warnOnLRSReject(status === 'passed' ? 'Passed' : 'Failed'))
       .catch((err) => {
-        console.warn(`Tessera xAPI: failed to send ${verbName} statement`, err);
+        console.warn(
+          `Tessera ${this.logName}: failed to send ${verbName} statement`,
+          err,
+        );
       });
   }
 
@@ -215,9 +206,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         },
         result,
       })
-      .then(warnOnLRSReject('Answered'))
+      .then(this.warnOnLRSReject('Answered'))
       .catch((err) => {
-        console.warn('Tessera xAPI: failed to send Answered statement', err);
+        console.warn(
+          `Tessera ${this.logName}: failed to send Answered statement`,
+          err,
+        );
       });
   }
 
@@ -233,9 +227,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         result: { duration },
         context: this.buildContext(),
       })
-      .then(warnOnLRSReject('Terminated'))
+      .then(this.warnOnLRSReject('Terminated'))
       .catch((err) => {
-        console.warn('Tessera xAPI: failed to send Terminated statement', err);
+        console.warn(
+          `Tessera ${this.logName}: failed to send Terminated statement`,
+          err,
+        );
       });
   }
 
@@ -251,6 +248,79 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     if (this.returnURL && typeof window !== 'undefined') {
       window.location.assign(this.returnURL);
     }
+  }
+
+  /** Parse the launch `actor` param into an Identified Agent, failing loud on malformed JSON. */
+  protected parseActorParam(raw: string): void {
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('actor must be an object');
+      }
+      this.actor = parsed as XAPIAgent;
+    } catch (err) {
+      throw new Error(
+        `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
+        { cause: err },
+      );
+    }
+  }
+
+  /** Construct the publisher from the resolved launch fields plus per-profile options. */
+  protected createPublisher(opts: {
+    sessionId?: string;
+    cmi5Mode?: boolean;
+  }): XAPIPublisher {
+    if (!this.actor) {
+      throw new Error(
+        `Tessera ${this.logName}: cannot create publisher before the launch actor is resolved.`,
+      );
+    }
+    this.publisher = new XAPIPublisher({
+      endpoint: this.endpoint,
+      auth: this.authToken,
+      actor: this.actor,
+      activityId: this.activityId,
+      registration: this.registration,
+      version: this.version,
+      ...opts,
+    });
+    return this.publisher;
+  }
+
+  /** Fire-and-forget Initialized statement (the first Defined Statement of the session). */
+  protected sendInitialized(): void {
+    if (!this.publisher) return;
+    this.publisher
+      .sendStatement({
+        verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
+        context: this.buildContext(),
+      })
+      .then(this.warnOnLRSReject('Initialized'))
+      .catch((err) => {
+        console.warn(
+          `Tessera ${this.logName}: failed to send Initialized statement`,
+          err,
+        );
+      });
+  }
+
+  /** `.then` handler that warns on LRS non-2xx. The publisher resolves successfully on 4xx/5xx (failure is in the destination outcome), so `.catch` alone misses them. */
+  protected warnOnLRSReject(
+    label: string,
+  ): (res: {
+    destinations?: Array<{ ok?: boolean; status?: number; error?: Error }>;
+  }) => void {
+    const logName = this.logName;
+    return (res) => {
+      const dest = res.destinations?.[0];
+      if (dest && !dest.ok) {
+        console.warn(
+          `Tessera ${logName}: ${label} statement rejected by LRS (${dest.status ?? 'network error'})`,
+          dest.error,
+        );
+      }
+    };
   }
 
   protected buildStateUrl(stateId: string = 'tessera-state'): string {
@@ -290,12 +360,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         this.state = await resp.json();
       } else if (resp.status !== 404) {
         console.warn(
-          `Tessera xAPI: State API GET returned ${resp.status}; resume disabled for this launch.`,
+          `Tessera ${this.logName}: State API GET returned ${resp.status}; resume disabled for this launch.`,
         );
       }
     } catch (err) {
       console.warn(
-        `Tessera xAPI: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`,
+        `Tessera ${this.logName}: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`,
       );
       this.state = null;
     }

@@ -1,11 +1,5 @@
 import { parseScaled01 } from './format.js';
-import { XAPIPublisher } from '../xapi/publisher.js';
-import type { XAPIAgent } from '../xapi/types.js';
-import {
-  BaseXAPILaunchAdapter,
-  warnOnLRSReject,
-  VERBS,
-} from './xapi-launch-base.js';
+import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -85,6 +79,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
 
   async init(): Promise<void> {
     this.version = '1.0.3';
+    this.logName = 'cmi5';
     const params = new URLSearchParams(window.location.search);
     const fetchUrl = params.get('fetch');
     // Normalize endpoint to always have a trailing slash so URL concatenation is safe
@@ -110,19 +105,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // Malformed actor JSON is a launch-time failure: an empty {} actor
     // would fail every Identified-Agent check downstream and produce
     // confusing 400s on every send. Fail loud here instead.
-    const rawActor = params.get('actor') || '';
-    try {
-      const parsed = JSON.parse(rawActor);
-      if (!parsed || typeof parsed !== 'object') {
-        throw new Error('actor must be an object');
-      }
-      this.actor = parsed as XAPIAgent;
-    } catch (err) {
-      throw new Error(
-        `Tessera cmi5: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
-        { cause: err },
-      );
-    }
+    this.parseActorParam(params.get('actor') || '');
 
     // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
     // and continuing with no token will 401-loop until auth is marked dead.
@@ -229,30 +212,13 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // is legitimate (no prefs set); the GET itself is what's required.
     await this.#fetchLearnerPreferences();
 
-    this.publisher = new XAPIPublisher({
-      endpoint: this.endpoint,
-      auth: this.authToken,
-      actor: this.actor,
-      activityId: this.activityId,
-      registration: this.registration,
-      sessionId,
-      cmi5Mode: true,
-      version: this.version,
-    });
-    await this.publisher.init();
+    const publisher = this.createPublisher({ sessionId, cmi5Mode: true });
+    await publisher.init();
 
     // cmi5 §9.3.2 — queue Initialized before the resume State GET so a
     // slow LRS can't push it past the spec's "reasonable period". The
     // publisher queue keeps it ordered before any later Defined Statement.
-    this.publisher
-      .sendStatement({
-        verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
-        context: this.buildContext(),
-      })
-      .then(warnOnLRSReject('Initialized'))
-      .catch((err) => {
-        console.warn('Tessera cmi5: failed to send Initialized statement', err);
-      });
+    this.sendInitialized();
 
     await this.loadResumeState();
   }
