@@ -46,6 +46,8 @@ export interface XAPIPublisherOptions {
    * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
    */
   cmi5Mode?: boolean;
+  /** xAPI version for the X-Experience-API-Version header. Defaults to X_API_VERSION (1.0.3). */
+  version?: string;
   /** When set, every send method rejects with the returned Error without hitting the network. */
   unavailableReason?: () => Error;
 }
@@ -94,6 +96,7 @@ export class XAPIPublisher {
   readonly #registration?: string;
   readonly #sessionId: string;
   readonly #cmi5Mode: boolean;
+  readonly #version: string;
 
   // When set, every send method short-circuits with a rejected promise.
   readonly #unavailableReason: (() => Error) | null;
@@ -138,6 +141,7 @@ export class XAPIPublisher {
     this.#activityId = opts.activityId;
     this.#registration = opts.registration;
     this.#cmi5Mode = !!opts.cmi5Mode;
+    this.#version = opts.version ?? X_API_VERSION;
     this.#authValue = opts.auth;
     this.#actorValue = opts.actor;
     this.#sessionId = opts.sessionId ?? uuidv4();
@@ -485,7 +489,7 @@ export class XAPIPublisher {
   #buildHeaders(token: string): Headers {
     const headers = new Headers();
     if (token) headers.set('Authorization', `Basic ${token}`);
-    headers.set('X-Experience-API-Version', X_API_VERSION);
+    headers.set('X-Experience-API-Version', this.#version);
     headers.set('Content-Type', 'application/json');
     return headers;
   }
