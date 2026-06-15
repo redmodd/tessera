@@ -800,7 +800,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
     expect(initStmt.context?.registration).toBe('test-registration-xapi');
 
-    // Every statement request declares xAPI 1.0.3 and the verbatim Basic credential.
+    // Every statement request declares xAPI 1.0.3 and the Basic credential
+    // (the launch `auth` header value, with its scheme normalized).
     expect(headers.length).toBeGreaterThan(0);
     expect(
       headers.every((h) => h['x-experience-api-version'] === '1.0.3'),

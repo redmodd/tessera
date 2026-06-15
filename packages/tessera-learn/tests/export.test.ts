@@ -279,7 +279,7 @@ describe('generateTincanXml', () => {
       /<activity id="urn:tessera:au:[0-9a-f]{32}" type="course">/,
     );
     expect(xml).toContain('My Course');
-    expect(xml).toContain('<launch lang="en-us">index.html</launch>');
+    expect(xml).toContain('<launch lang="en-US">index.html</launch>');
     // No xAPI version field exists in the tincan schema.
     expect(xml).not.toMatch(/1\.0\.3|2\.0/);
   });

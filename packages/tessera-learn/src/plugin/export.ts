@@ -196,7 +196,7 @@ export function generateTincanXml(config: ExportConfig): string {
     <activity id="${auId}" type="course">
       <name>${title}</name>
       <description lang="en-US">${description}</description>
-      <launch lang="en-us">index.html</launch>
+      <launch lang="en-US">index.html</launch>
     </activity>
   </activities>
 </tincan>`;

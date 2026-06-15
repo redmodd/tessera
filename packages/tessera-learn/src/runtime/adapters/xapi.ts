@@ -21,8 +21,9 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
     this.activityId = params.get('activity_id') || '';
     const reg = params.get('registration') || '';
     this.registration = reg ? reg : undefined;
-    // `auth` is the base64 Basic credential (the value after "Basic "), used verbatim.
-    this.authToken = params.get('auth') || '';
+    // Tin Can launch passes `auth` as the full "Basic <base64>" header value;
+    // strip the scheme so we don't double-prefix it when sending.
+    this.authToken = (params.get('auth') || '').replace(/^Basic\s+/i, '');
 
     const rawActor = params.get('actor') || '';
     try {

@@ -26,7 +26,9 @@ describe('XAPIAdapter', () => {
   it('parses snake_case Tin Can launch params and sends the version header', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
-      auth: 'Zm9vOmJhcg==',
+      // Tin Can launch sends the full "Basic <base64>" header value; the adapter
+      // must strip the scheme so it doesn't double-prefix on the wire.
+      auth: 'Basic Zm9vOmJhcg==',
       actor: JSON.stringify(ACTOR),
       activity_id: 'urn:tessera:au:abc',
       registration: '2d8b1e1e-0000-4000-8000-000000000000',

@@ -237,6 +237,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       registration: this.registration,
       sessionId,
       cmi5Mode: true,
+      version: this.version,
     });
     await this.publisher.init();
 
