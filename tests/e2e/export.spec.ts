@@ -144,3 +144,22 @@ test.describe('Export — CMI5', () => {
     expect(xml).toContain('masteryScore');
   });
 });
+
+test.describe('Export — xAPI', () => {
+  test('xAPI build produces a tincan.xml alongside index.html', async () => {
+    const distPath = resolve(variantDir('free', 'xapi'), 'dist');
+    const tincanPath = resolve(distPath, 'tincan.xml');
+    expect(existsSync(tincanPath)).toBe(true);
+    expect(existsSync(resolve(distPath, 'index.html'))).toBe(true);
+
+    const xml = readFileSync(tincanPath, 'utf-8');
+    expect(xml).toContain('<?xml version="1.0"');
+    expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
+    expect(xml).toContain('<activity id=');
+    expect(xml).toContain('<launch lang="en-us">index.html</launch>');
+    expect(xml).toContain('E2E Test Course');
+    // No SCORM/cmi5 manifest leaks into the Tin Can package.
+    expect(existsSync(resolve(distPath, 'cmi5.xml'))).toBe(false);
+    expect(existsSync(resolve(distPath, 'imsmanifest.xml'))).toBe(false);
+  });
+});

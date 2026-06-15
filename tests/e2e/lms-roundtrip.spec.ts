@@ -4,6 +4,7 @@ import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
+  xapiLaunchURL,
 } from './lms-mocks.js';
 import { variantDir, viteBin, type Standard } from './global-setup.js';
 
@@ -717,5 +718,201 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       );
       expect(s.result?.response).toBeTruthy();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plain xAPI ("Tin Can") — launch params straight off the URL, no fetch token
+// ---------------------------------------------------------------------------
+
+test.describe.serial('LMS round-trip — xAPI', () => {
+  const PORT = 5195;
+  const BASE = `http://localhost:${PORT}`;
+  let preview: ChildProcess;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    preview = startPreview('xapi', PORT);
+    const page = await browser.newPage();
+    try {
+      await waitForServer(page, BASE);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(async () => {
+    preview?.kill('SIGTERM');
+  });
+
+  /** Route the mock LRS, capturing posted statements and the request headers. */
+  async function routeLRS(
+    page: Page,
+    statements: any[],
+    headers: Array<Record<string, string>>,
+  ): Promise<void> {
+    await page.route('http://xapi-mock.test/**', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (url.includes('/xapi/statements')) {
+        headers.push(req.headers());
+        if (req.method() === 'POST' || req.method() === 'PUT') {
+          try {
+            statements.push(JSON.parse(req.postData() ?? '{}'));
+          } catch {}
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(['stmt-id']),
+        });
+        return;
+      }
+      if (url.includes('/xapi/activities/state')) {
+        // No saved state on first launch, and no fetch-token endpoint exists.
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: '{}',
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+  }
+
+  test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
+    page,
+  }) => {
+    const statements: any[] = [];
+    const headers: Array<Record<string, string>> = [];
+    await routeLRS(page, statements, headers);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await page.waitForTimeout(500);
+
+    const initStmt = statements.find(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
+    );
+    expect(initStmt).toBeTruthy();
+    expect(initStmt.actor?.account?.name).toBe('learner-1');
+    expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
+    expect(initStmt.context?.registration).toBe('test-registration-xapi');
+
+    // Every statement request declares xAPI 1.0.3 and the verbatim Basic credential.
+    expect(headers.length).toBeGreaterThan(0);
+    expect(
+      headers.every((h) => h['x-experience-api-version'] === '1.0.3'),
+    ).toBe(true);
+    expect(headers.every((h) => h['authorization'] === 'Basic dGVzdDp0ZXN0')).toBe(
+      true,
+    );
+  });
+
+  test('passing a graded quiz sends Passed + Answered, and pagehide sends Terminated', async ({
+    page,
+  }) => {
+    const statements: any[] = [];
+    const headers: Array<Record<string, string>> = [];
+    await routeLRS(page, statements, headers);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+      .click();
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+    await primary.click();
+    await page.waitForTimeout(300);
+    await primary.click();
+    await page.waitForTimeout(300);
+
+    await page
+      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
+      .fill('blue');
+    await primary.click();
+    await page.waitForTimeout(300);
+    await primary.click();
+    await page.waitForTimeout(300);
+
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
+    const left = active.locator('.tessera-matching-item.left');
+    const right = active.locator('.tessera-matching-item.right');
+    const n = await left.count();
+    const targets: Record<string, string> = {
+      '1': 'One',
+      '2': 'Two',
+      '3': 'Three',
+    };
+    for (let i = 0; i < n; i++) {
+      const key = (await left.nth(i).textContent())?.trim() ?? '';
+      const target = targets[key];
+      if (!target) continue;
+      await left.nth(i).click();
+      await right.filter({ hasText: target }).first().click();
+      await page.waitForTimeout(100);
+    }
+    await primary.click();
+    await page.waitForTimeout(300);
+
+    const submit = page.locator('.tessera-quiz-btn-submit');
+    await submit.waitFor({ state: 'visible', timeout: 5000 });
+    await submit.click();
+    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+
+    await expect
+      .poll(
+        () =>
+          statements.find(
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+          ) != null,
+        { timeout: 5000 },
+      )
+      .toBe(true);
+
+    const passed = statements.find(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+    );
+    expect(passed.result?.success).toBe(true);
+    expect(passed.result?.score?.scaled).toBe(1);
+    // Plain xAPI carries the launch registration but none of cmi5's Defined-
+    // Statement context (no cmi5/moveOn Category Activity).
+    expect(passed.context?.registration).toBe('test-registration-xapi');
+    expect(passed.context?.contextActivities?.category).toBeUndefined();
+
+    const answered = statements.filter(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+    );
+    expect(answered).toHaveLength(3);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
+
+    // Dispatch pagehide synchronously — the exit handler drains the queue and
+    // fires Terminated as the final statement of the session.
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new PageTransitionEvent('pagehide', { persisted: false }),
+      );
+    });
+    await expect
+      .poll(
+        () =>
+          statements.find(
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/terminated',
+          ) != null,
+        { timeout: 5000 },
+      )
+      .toBe(true);
   });
 });
