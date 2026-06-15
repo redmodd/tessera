@@ -7,18 +7,19 @@ import {
   synthesizeSCORM12Actor,
   synthesizeSCORM2004Actor,
 } from './derive-actor.js';
-import { CMI5Adapter } from '../adapters/cmi5.js';
+import { BaseXAPILaunchAdapter } from '../adapters/xapi-launch-base.js';
 import { SCORM12Adapter } from '../adapters/scorm12.js';
 import { SCORM2004Adapter } from '../adapters/scorm2004.js';
 
 /**
  * Wraps a value that the runtime knows how to materialize into an
  * `XAPIPublisher`. Either a fresh publisher constructed for an explicit
- * destination, or a reference to the cmi5 adapter's existing publisher
- * (for the `endpoint: 'lms'` sentinel — same instance, shared queue).
+ * destination, or a reference to a launch adapter's existing publisher
+ * (for the `endpoint: 'lms'` sentinel — same instance, shared queue). Both
+ * the cmi5 and plain-xAPI adapters expose that publisher via the base.
  */
 type DestinationSource =
-  | { kind: 'lms-shared'; adapter: CMI5Adapter }
+  | { kind: 'lms-shared'; adapter: BaseXAPILaunchAdapter }
   | { kind: 'explicit'; publisher: XAPIPublisher };
 
 /**
@@ -100,14 +101,15 @@ function resolveDestination(
   adapter: PersistenceAdapter | null,
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
-    if (config.export?.standard !== 'cmi5') {
+    const standard = config.export?.standard;
+    if (standard !== 'cmi5' && standard !== 'xapi') {
       // Build-time validator should reject this; defense in depth at runtime.
       console.warn(
-        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under non-cmi5 export.",
+        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under a non-launch export.",
       );
       return null;
     }
-    if (adapter instanceof CMI5Adapter) {
+    if (adapter instanceof BaseXAPILaunchAdapter) {
       return { kind: 'lms-shared', adapter };
     }
     // Dev fallback — cmi5 launch params absent, adapter is the WebAdapter
@@ -151,7 +153,11 @@ function resolveExplicitActor(
   if (explicit.actor !== undefined) {
     return { kind: 'actor', value: explicit.actor };
   }
-  if (config.export?.standard === 'cmi5' && adapter instanceof CMI5Adapter) {
+  const standard = config.export?.standard;
+  if (
+    (standard === 'cmi5' || standard === 'xapi') &&
+    adapter instanceof BaseXAPILaunchAdapter
+  ) {
     const inner = adapter.getPublisher();
     if (!inner) return null;
     try {
