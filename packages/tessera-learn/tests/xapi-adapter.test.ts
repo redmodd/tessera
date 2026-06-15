@@ -45,7 +45,12 @@ describe('XAPIAdapter', () => {
   });
 
   it('throws on malformed actor JSON', async () => {
-    launch({ endpoint: 'https://lrs/', auth: 'x', actor: 'not-json', activity_id: 'a' });
+    launch({
+      endpoint: 'https://lrs/',
+      auth: 'x',
+      actor: 'not-json',
+      activity_id: 'a',
+    });
     const adapter = new XAPIAdapter('1.0.3');
     await expect(adapter.init()).rejects.toThrow(/actor/);
   });

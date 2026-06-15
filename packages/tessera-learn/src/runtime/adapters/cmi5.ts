@@ -287,7 +287,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     const scaled = this.score / 100;
     if (this.#masteryScore !== null) {
       const violatesPassed = status === 'passed' && scaled < this.#masteryScore;
-      const violatesFailed = status === 'failed' && scaled >= this.#masteryScore;
+      const violatesFailed =
+        status === 'failed' && scaled >= this.#masteryScore;
       if (violatesPassed || violatesFailed) {
         console.warn(
           `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to ` +

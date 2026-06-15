@@ -805,9 +805,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(
       headers.every((h) => h['x-experience-api-version'] === '1.0.3'),
     ).toBe(true);
-    expect(headers.every((h) => h['authorization'] === 'Basic dGVzdDp0ZXN0')).toBe(
-      true,
-    );
+    expect(
+      headers.every((h) => h['authorization'] === 'Basic dGVzdDp0ZXN0'),
+    ).toBe(true);
   });
 
   test('passing a graded quiz sends Passed + Answered, and pagehide sends Terminated', async ({

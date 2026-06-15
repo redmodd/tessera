@@ -283,7 +283,9 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   /** Shared resume GET — call from a subclass init() after the publisher exists. */
   protected async loadResumeState(): Promise<void> {
     try {
-      const resp = await this.xapiFetch(this.buildStateUrl(), { method: 'GET' });
+      const resp = await this.xapiFetch(this.buildStateUrl(), {
+        method: 'GET',
+      });
       if (resp.ok) {
         this.state = await resp.json();
       } else if (resp.status !== 404) {
