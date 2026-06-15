@@ -29,7 +29,7 @@ Ship:
 pnpm validate <course>   # check structure & LMS rules
 pnpm a11y <course>       # accessibility audit
 pnpm check <course>      # validate + a11y (run before export)
-pnpm export <course>     # build a SCORM / cmi5 / web package
+pnpm export <course>     # build a SCORM / cmi5 / xAPI / web package
 ```
 
 Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md) — it loads the full guide

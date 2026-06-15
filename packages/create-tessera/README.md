@@ -2,7 +2,7 @@
 
 Scaffold a new [Tessera](https://www.npmjs.com/package/tessera-learn) workspace — a single project that holds many courses.
 
-Tessera is a toolkit for building interactive online courses that play in any LMS (SCORM 1.2, SCORM 2004, cmi5, or static Web), designed for AI-assisted authoring: open the scaffolded workspace in Claude Code, Codex, or any tool that reads `AGENTS.md`, and describe the course you want in plain English. This package is the entry point — it generates the workspace (one `package.json` and one `node_modules` shared by every course), wires up the runtime, seeds a first course, and drops `AGENTS.md` at the root so the agent knows the conventions.
+Tessera is a toolkit for building interactive online courses that play in any LMS (SCORM 1.2, SCORM 2004, cmi5, xAPI 1.0.3, or static Web), designed for AI-assisted authoring: open the scaffolded workspace in Claude Code, Codex, or any tool that reads `AGENTS.md`, and describe the course you want in plain English. This package is the entry point — it generates the workspace (one `package.json` and one `node_modules` shared by every course), wires up the runtime, seeds a first course, and drops `AGENTS.md` at the root so the agent knows the conventions.
 
 ## Prerequisites
 

@@ -94,12 +94,12 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Se
 
 ### The variant pre-build
 
-The `export` and `lms` projects don't run a dev server — they read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`).
+The `export` and `lms` projects don't run a dev server — they read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
 
 Building those mid-test would mutate the source fixtures and serialise the suite. Instead, [`tests/e2e/global-setup.ts`](./tests/e2e/global-setup.ts) runs once before any spec:
 
 1. Wipes `tests/.e2e-variants/`.
-2. For each fixture (`free`, `custom-quiz`) and standard (`web`/`scorm12`/`scorm2004`/`cmi5`):
+2. For each fixture (`free`, `custom-quiz`) and the standards it declares (`web`/`scorm12`/`scorm2004`/`cmi5`/`xapi`):
    - Copies the fixture into `tests/.e2e-variants/{fixture}/{standard}/`
    - Symlinks the fixture's `node_modules` into the variant (workspace deps aren't hoisted to the repo root).
    - Patches `course.config.js` to set `export.standard` to that variant.
@@ -116,7 +116,7 @@ If you change a fixture's content, treat it like any other source change: commit
 ## Writing tests
 
 - New features ship with tests. Bug fixes ship with a regression test that fails before the fix and passes after.
-- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS.
+- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS.
 - Keep e2e specs project-scoped: a spec should only depend on the fixture its project targets. `playwright.config.ts` enforces this with `testMatch` / `testIgnore`.
 - E2E tests get isolated browser contexts automatically, so localStorage and per-test state don't leak across tests. Don't add manual `beforeEach` resets for that.
 
@@ -135,7 +135,7 @@ pnpm exec playwright show-trace path/to/trace.zip
 
 ## Adapter changes
 
-Tessera supports four delivery modes — SCORM 1.2, SCORM 2004 4th Edition, cmi5, and static web. If your change touches the runtime API surface or any adapter:
+Tessera supports five delivery modes — SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3, and static web. If your change touches the runtime API surface or any adapter:
 
 - Run the full e2e suite: `pnpm test:e2e`
 - Note in the PR description which modes you tested and how.

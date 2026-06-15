@@ -5,8 +5,8 @@ export default defineConfig({
   timeout: 30000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'dot' : 'list',
-  // Pre-builds the four export-standard variants of tests/fixtures/free into
-  // tests/.e2e-variants/{web,scorm12,scorm2004,cmi5} so the export and lms
+  // Pre-builds the five export-standard variants of tests/fixtures/free into
+  // tests/.e2e-variants/{web,scorm12,scorm2004,cmi5,xapi} so the export and lms
   // projects can read pre-built dist/ output instead of mutating the source
   // fixture and rebuilding mid-suite.
   globalSetup: './tests/e2e/global-setup.ts',
