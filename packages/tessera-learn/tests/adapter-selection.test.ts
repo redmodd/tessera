@@ -8,6 +8,7 @@ import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
+import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 
 function makeConfig(standard: string): CourseConfig {
@@ -128,6 +129,22 @@ describe('createAdapter', () => {
     expect(adapter).toBeInstanceOf(CMI5Adapter);
   });
 
+  it('returns XAPIAdapter when xapi launch params are present', () => {
+    const params = new URLSearchParams({
+      endpoint: 'https://lrs.example.com/xapi/',
+      auth: 'Zm9vOmJhcg==',
+      actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    Object.defineProperty(window, 'location', {
+      value: new URL(`http://localhost/?${params.toString()}`),
+      writable: true,
+      configurable: true,
+    });
+    const adapter = createAdapter(makeConfig('xapi'));
+    expect(adapter).toBeInstanceOf(XAPIAdapter);
+  });
+
   describe('production fail-loud (allowFallback: false)', () => {
     it('throws LMSAdapterError for scorm12 when API missing', () => {
       expect(() =>
@@ -156,6 +173,17 @@ describe('createAdapter', () => {
       });
       expect(() =>
         createAdapter(makeConfig('cmi5'), { allowFallback: false }),
+      ).toThrow(LMSAdapterError);
+    });
+
+    it('throws LMSAdapterError for xapi when launch params missing', () => {
+      Object.defineProperty(window, 'location', {
+        value: new URL('http://localhost/'),
+        writable: true,
+        configurable: true,
+      });
+      expect(() =>
+        createAdapter(makeConfig('xapi'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
     });
 

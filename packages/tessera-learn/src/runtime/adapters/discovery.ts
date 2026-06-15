@@ -36,3 +36,13 @@ export function hasCMI5LaunchParams(): boolean {
     params.get('actor')
   );
 }
+
+/** Plain xAPI ("Tin Can") launch params on the URL. No fetch token required. */
+export function hasXAPILaunchParams(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return !!(
+    params.get('endpoint') &&
+    params.get('actor') &&
+    params.get('activity_id')
+  );
+}

@@ -4,15 +4,20 @@ import { WebAdapter } from './web.js';
 import { SCORM12Adapter } from './scorm12.js';
 import { SCORM2004Adapter } from './scorm2004.js';
 import { CMI5Adapter } from './cmi5.js';
+import { XAPIAdapter } from './xapi.js';
 import {
   findSCORM12API,
   findSCORM2004API,
   hasCMI5LaunchParams,
+  hasXAPILaunchParams,
 } from './discovery.js';
 
 export class LMSAdapterError extends Error {
-  standard: 'scorm12' | 'scorm2004' | 'cmi5';
-  constructor(standard: 'scorm12' | 'scorm2004' | 'cmi5', message: string) {
+  standard: 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
+  constructor(
+    standard: 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
+    message: string,
+  ) {
     super(message);
     this.name = 'LMSAdapterError';
     this.standard = standard;
@@ -28,7 +33,7 @@ export interface CreateAdapterOptions {
   allowFallback?: boolean;
 }
 
-type LMSStandard = 'scorm12' | 'scorm2004' | 'cmi5';
+type LMSStandard = 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 
 /** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. Labels are the single source for the dev warning and production error. */
 const LMS_ADAPTERS: Record<
@@ -67,6 +72,13 @@ const LMS_ADAPTERS: Record<
     missingDetail:
       'No cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
   },
+  xapi: {
+    detect: () => (hasXAPILaunchParams() ? new XAPIAdapter('1.0.3') : null),
+    warnLabel: 'xAPI launch parameters',
+    name: 'xAPI 1.0.3',
+    missingDetail:
+      'No xAPI launch parameters (endpoint / actor / activity_id) on the URL.',
+  },
 };
 
 function missingApiError(standard: LMSStandard): LMSAdapterError {
@@ -99,7 +111,8 @@ export function createAdapter(
   if (
     standard === 'scorm12' ||
     standard === 'scorm2004' ||
-    standard === 'cmi5'
+    standard === 'cmi5' ||
+    standard === 'xapi'
   ) {
     const entry = LMS_ADAPTERS[standard];
     const adapter = entry.detect();
