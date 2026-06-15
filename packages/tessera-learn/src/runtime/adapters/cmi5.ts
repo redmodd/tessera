@@ -4,11 +4,9 @@ import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
 
-// cmi5 §9.6 — every cmi5 Defined Statement MUST carry the "cmi5" Category
-// Activity in context.contextActivities.category, and "completed", "passed",
-// "failed" MUST additionally carry the "moveOn" Category. Without these, an
-// LRS will accept the statement as an arbitrary xAPI verb but won't roll it
-// up into cmi5 lifecycle state — the LMS never sees the AU as completed.
+// cmi5 §9.6.2 — Defined Statements MUST carry the "cmi5" Category; completed/
+// passed/failed MUST also carry "moveOn", or the LRS won't roll them up into
+// cmi5 lifecycle state and the LMS never sees the AU as completed.
 const CMI5_CATEGORY_CMI5 = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 const CMI5_CATEGORY_MOVEON =
   'https://w3id.org/xapi/cmi5/context/categories/moveon';
@@ -70,9 +68,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   // course's manifest passingScore for this launch — the LMS is the authority.
   #masteryScore: number | null = null;
 
-  // cmi5 §10 LMS.LaunchData. `contextTemplate` is the AU's base context
-  // (§9.6.2) — Publisher Activity and session id live there, and strict
-  // LRSes validate every Defined Statement against it.
+  // cmi5 §10 LMS.LaunchData; `contextTemplate` (§9.6.2) is the base context
+  // strict LRSes validate every Defined Statement against.
   #launchData: CMI5LaunchData | null = null;
   /** cmi5 §10.2.2 — Browse/Review forbid every Defined Statement except Initialized/Terminated. */
   #launchMode: CMI5LaunchMode = 'Normal';
@@ -82,7 +79,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     this.logName = 'cmi5';
     const params = new URLSearchParams(window.location.search);
     const fetchUrl = params.get('fetch');
-    // Normalize endpoint to always have a trailing slash so URL concatenation is safe
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
     const reg = params.get('registration') || '';
     // xAPI requires `context.registration` to be a UUID; sending an empty
@@ -102,9 +98,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
     }
 
-    // Malformed actor JSON is a launch-time failure: an empty {} actor
-    // would fail every Identified-Agent check downstream and produce
-    // confusing 400s on every send. Fail loud here instead.
     this.parseActorParam(params.get('actor') || '');
 
     // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
@@ -176,11 +169,9 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       );
     }
 
-    // cmi5 §10 — LaunchData is the only spec-defined channel for the
-    // session id (§9.6.3.1) and Publisher Activity (§9.6.2.3) the LRS
-    // validates against, plus launchMode/returnURL/masteryScore (§10.2).
-    // LaunchData values override the URL masteryScore parsed earlier
-    // (§10.2.4 makes it authoritative).
+    // cmi5 §10 — LaunchData carries the session id (§9.6.3.1), Publisher
+    // Activity (§9.6.2.3), and launchMode/returnURL/masteryScore (§10.2); its
+    // masteryScore overrides the URL value parsed earlier (§10.2.4).
     this.#launchData = await this.#fetchLaunchData();
     const tmpl = this.#launchData?.contextTemplate ?? {};
     let sessionId: string | undefined;
@@ -215,9 +206,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     const publisher = this.createPublisher({ sessionId, cmi5Mode: true });
     await publisher.init();
 
-    // cmi5 §9.3.2 — queue Initialized before the resume State GET so a
-    // slow LRS can't push it past the spec's "reasonable period". The
-    // publisher queue keeps it ordered before any later Defined Statement.
+    // cmi5 §9.3.2 — queue Initialized before the resume State GET so a slow
+    // LRS can't push it past the spec's "reasonable period".
     this.sendInitialized();
 
     await this.loadResumeState();
