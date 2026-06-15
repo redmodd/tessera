@@ -35,7 +35,7 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   },
   'custom-quiz': {
     source: resolve(REPO_ROOT, 'tests/fixtures/custom-quiz'),
-    standards: ['scorm12', 'scorm2004', 'cmi5'],
+    standards: ['scorm12', 'scorm2004', 'cmi5', 'xapi'],
   },
   'custom-layout': {
     source: resolve(REPO_ROOT, 'tests/fixtures/custom-layout'),
