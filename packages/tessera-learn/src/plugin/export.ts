@@ -183,6 +183,25 @@ export function generateCMI5Xml(config: ExportConfig): string {
 </courseStructure>`;
 }
 
+export function generateTincanXml(config: ExportConfig): string {
+  const title = escapeXml(config.title || UNTITLED_TITLE);
+  const description = escapeXml(config.description || '');
+  // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
+  const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
+  // tincan.xml carries NO xAPI version — the version is set at runtime by the
+  // adapter's X-Experience-API-Version header, not declared in the manifest.
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<tincan xmlns="http://projecttincan.com/tincan.xsd">
+  <activities>
+    <activity id="${auId}" type="course">
+      <name>${title}</name>
+      <description lang="en-US">${description}</description>
+      <launch lang="en-us">index.html</launch>
+    </activity>
+  </activities>
+</tincan>`;
+}
+
 // ---------- ZIP Packaging ----------
 
 export async function createZip(
@@ -226,7 +245,7 @@ function cleanOldZips(projectRoot: string, slug: string): void {
 
 /** Packaged (zipped) export targets: which manifest file to write and how. */
 const PACKAGED_EXPORTS: Record<
-  'scorm12' | 'scorm2004' | 'cmi5',
+  'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
   {
     manifestFile: string;
     label: string;
@@ -249,6 +268,11 @@ const PACKAGED_EXPORTS: Record<
     manifestFile: 'cmi5.xml',
     label: 'CMI5',
     generate: (config) => generateCMI5Xml(config),
+  },
+  xapi: {
+    manifestFile: 'tincan.xml',
+    label: 'xAPI 1.0.3',
+    generate: (config) => generateTincanXml(config),
   },
 };
 
