@@ -76,6 +76,12 @@ describe('xapi config validation — endpoint: lms', () => {
     expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
   });
 
+  it('accepts xapi: { endpoint: "lms" } under xapi', () => {
+    testRoot = projectWith(`{ endpoint: "lms" }`, 'xapi');
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes("endpoint: 'lms'"))).toEqual([]);
+  });
+
   it('errors on xapi.endpoint: "lms" under web export', () => {
     testRoot = projectWith(`{ endpoint: "lms" }`, 'web');
     const { errors } = validateProject(testRoot);
@@ -281,6 +287,17 @@ describe('xapi config validation — explicit endpoint', () => {
     expect(
       warnings.find((w) => w.includes('registration is a cmi5')),
     ).toBeDefined();
+  });
+
+  it('does not warn that registration is cmi5-only under xapi', () => {
+    testRoot = projectWith(
+      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "550e8400-e29b-41d4-a716-446655440000" }`,
+      'xapi',
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('registration is a cmi5')),
+    ).toHaveLength(0);
   });
 });
 

@@ -161,9 +161,25 @@ describe('config validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        '"export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "tin-can"',
+        '"export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "tin-can"',
       ),
     );
+  });
+
+  it('accepts export.standard "xapi"', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "xapi" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('export.standard'))).toHaveLength(0);
   });
 
   it('errors on passingScore out of range (too high)', () => {
