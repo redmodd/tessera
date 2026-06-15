@@ -276,7 +276,7 @@ describe('generateTincanXml', () => {
     const xml = generateTincanXml({ title: 'My Course' } as any);
     expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
     expect(xml).toMatch(
-      /<activity id="urn:tessera:au:[0-9a-f]{32}" type="course">/,
+      /<activity id="urn:tessera:au:[0-9a-f]{32}" type="http:\/\/adlnet\.gov\/expapi\/activities\/course">/,
     );
     expect(xml).toContain('My Course');
     expect(xml).toContain('<launch lang="en-US">index.html</launch>');

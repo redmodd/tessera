@@ -193,7 +193,7 @@ export function generateTincanXml(config: ExportConfig): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <tincan xmlns="http://projecttincan.com/tincan.xsd">
   <activities>
-    <activity id="${auId}" type="course">
+    <activity id="${auId}" type="http://adlnet.gov/expapi/activities/course">
       <name>${title}</name>
       <description lang="en-US">${description}</description>
       <launch lang="en-US">index.html</launch>

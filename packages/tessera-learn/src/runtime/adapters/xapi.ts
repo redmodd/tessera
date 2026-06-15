@@ -1,4 +1,8 @@
-import { BaseXAPILaunchAdapter, warnOnLRSReject } from './xapi-launch-base.js';
+import {
+  BaseXAPILaunchAdapter,
+  warnOnLRSReject,
+  VERBS,
+} from './xapi-launch-base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { uuidv4 } from '../xapi/uuid.js';
 import type { XAPIAgent } from '../xapi/types.js';
@@ -52,10 +56,7 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
 
     this.publisher
       .sendStatement({
-        verb: {
-          id: 'http://adlnet.gov/expapi/verbs/initialized',
-          display: { 'en-US': 'initialized' },
-        },
+        verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
         context: this.buildContext(),
       })
       .then(warnOnLRSReject('Initialized'))
