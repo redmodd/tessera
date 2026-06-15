@@ -1,5 +1,4 @@
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
-import { uuidv4 } from '../xapi/uuid.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
@@ -24,7 +23,7 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
     this.authToken = (params.get('auth') || '').replace(/^Basic\s+/i, '');
     this.parseActorParam(params.get('actor') || '');
 
-    const publisher = this.createPublisher({ sessionId: uuidv4() });
+    const publisher = this.createPublisher({});
     await publisher.init();
 
     this.sendInitialized();

@@ -48,11 +48,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   abstract init(): Promise<void>;
 
-  /** Profile context for a Defined Statement. Plain xAPI adds only registration. */
+  /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
     _opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> | undefined {
-    return this.registration ? { registration: this.registration } : undefined;
+    return undefined;
   }
 
   /** cmi5 Browse/Review gating hook. Plain xAPI always allows. */
