@@ -7,18 +7,19 @@ import {
   synthesizeSCORM12Actor,
   synthesizeSCORM2004Actor,
 } from './derive-actor.js';
-import { CMI5Adapter } from '../adapters/cmi5.js';
+import { BaseXAPILaunchAdapter } from '../adapters/xapi-launch-base.js';
 import { SCORM12Adapter } from '../adapters/scorm12.js';
 import { SCORM2004Adapter } from '../adapters/scorm2004.js';
 
 /**
  * Wraps a value that the runtime knows how to materialize into an
  * `XAPIPublisher`. Either a fresh publisher constructed for an explicit
- * destination, or a reference to the cmi5 adapter's existing publisher
- * (for the `endpoint: 'lms'` sentinel — same instance, shared queue).
+ * destination, or a reference to a launch adapter's existing publisher
+ * (for the `endpoint: 'lms'` sentinel — same instance, shared queue). Both
+ * the cmi5 and plain-xAPI adapters expose that publisher via the base.
  */
 type DestinationSource =
-  | { kind: 'lms-shared'; adapter: CMI5Adapter }
+  | { kind: 'lms-shared'; adapter: BaseXAPILaunchAdapter }
   | { kind: 'explicit'; publisher: XAPIPublisher };
 
 /**
@@ -29,10 +30,13 @@ type DestinationSource =
  * produces the "works in dev, silently broken in prod" footgun.
  */
 class XAPIDevFallbackError extends Error {
-  constructor() {
+  constructor(standard: 'cmi5' | 'xapi') {
+    const missing =
+      standard === 'cmi5'
+        ? 'cmi5 launch parameters (fetch / endpoint / activityId / actor)'
+        : 'xAPI launch parameters (endpoint / auth / actor / activity_id)';
     super(
-      "Tessera xAPI: xapi.endpoint is 'lms' but no cmi5 launch parameters " +
-        '(fetch / endpoint / activityId / actor) were present on the URL. ' +
+      `Tessera xAPI: xapi.endpoint is 'lms' but no ${missing} were present on the URL. ` +
         'Either launch this course from a real LMS / SCORM Cloud, or ' +
         'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
         'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
@@ -59,8 +63,8 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-function makeDevFallbackPublisher(): XAPIPublisher {
-  return makeRejectingPublisher(() => new XAPIDevFallbackError());
+function makeDevFallbackPublisher(standard: 'cmi5' | 'xapi'): XAPIPublisher {
+  return makeRejectingPublisher(() => new XAPIDevFallbackError(standard));
 }
 
 class XAPISCORMDevFallbackError extends Error {
@@ -100,20 +104,21 @@ function resolveDestination(
   adapter: PersistenceAdapter | null,
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
-    if (config.export?.standard !== 'cmi5') {
+    const standard = config.export?.standard;
+    if (standard !== 'cmi5' && standard !== 'xapi') {
       // Build-time validator should reject this; defense in depth at runtime.
       console.warn(
-        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under non-cmi5 export.",
+        "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under a non-launch export.",
       );
       return null;
     }
-    if (adapter instanceof CMI5Adapter) {
+    if (adapter instanceof BaseXAPILaunchAdapter) {
       return { kind: 'lms-shared', adapter };
     }
-    // Dev fallback — cmi5 launch params absent, adapter is the WebAdapter
+    // Dev fallback — launch params absent, adapter is the WebAdapter
     // fallback. Materialize a publisher whose sends reject with an
     // explicit error so author code surfaces the dev/prod gap.
-    return { kind: 'explicit', publisher: makeDevFallbackPublisher() };
+    return { kind: 'explicit', publisher: makeDevFallbackPublisher(standard) };
   }
 
   // Explicit endpoint.
@@ -151,7 +156,11 @@ function resolveExplicitActor(
   if (explicit.actor !== undefined) {
     return { kind: 'actor', value: explicit.actor };
   }
-  if (config.export?.standard === 'cmi5' && adapter instanceof CMI5Adapter) {
+  const standard = config.export?.standard;
+  if (
+    (standard === 'cmi5' || standard === 'xapi') &&
+    adapter instanceof BaseXAPILaunchAdapter
+  ) {
     const inner = adapter.getPublisher();
     if (!inner) return null;
     try {

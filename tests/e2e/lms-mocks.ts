@@ -93,3 +93,18 @@ export function cmi5LaunchURL(base: string): string {
   });
   return `${base}/?${params.toString()}`;
 }
+
+/** Plain xAPI ("Tin Can") launch URL — snake_case `activity_id`, no fetch token. `auth` is the full "Basic <base64>" header value, per the Tin Can launch convention. */
+export function xapiLaunchURL(base: string): string {
+  const params = new URLSearchParams({
+    endpoint: 'http://xapi-mock.test/xapi/',
+    auth: 'Basic dGVzdDp0ZXN0',
+    registration: 'test-registration-xapi',
+    activity_id: 'http://tessera.test/activity/course-1',
+    actor: JSON.stringify({
+      objectType: 'Agent',
+      account: { name: 'learner-1', homePage: 'http://tessera.test' },
+    }),
+  });
+  return `${base}/?${params.toString()}`;
+}

@@ -168,7 +168,7 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
-const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
+const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5', 'xapi'];
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
@@ -371,7 +371,7 @@ function parseConfig(
   if (config.export?.standard !== undefined) {
     if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
       errors.push(
-        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", or "cmi5", got "${config.export.standard}"`,
+        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
       );
     }
   }
@@ -567,7 +567,7 @@ function validateXAPIConfig(
     ).length;
     if (lmsCount > 1) {
       errors.push(
-        "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one cmi5 launch-inherited destination is allowed",
+        "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
       );
     }
     // Warn on duplicate explicit endpoints.
@@ -630,14 +630,15 @@ function validateSingleXAPIEntry(
   }
 
   if (endpoint === 'lms') {
-    // Forbid under non-cmi5 export.
-    if (standard !== 'cmi5') {
+    // 'lms' inherits the LRS from the launch — only the launch-based
+    // standards (cmi5, plain xAPI) carry one.
+    if (standard !== 'cmi5' && standard !== 'xapi') {
       errors.push(
-        `course.config.js: ${label}.endpoint: 'lms' requires export.standard: 'cmi5' (you have "${standard}"). ` +
+        `course.config.js: ${label}.endpoint: 'lms' requires export.standard: 'cmi5' or 'xapi' (you have "${standard}"). ` +
           'Either change the export standard or specify an explicit LRS endpoint.',
       );
     }
-    // Forbid extra fields — everything is inherited from the cmi5 launch.
+    // Forbid extra fields — everything is inherited from the launch.
     const forbidden = [
       'auth',
       'actor',
@@ -648,7 +649,7 @@ function validateSingleXAPIEntry(
     for (const f of forbidden) {
       if (entry[f] !== undefined) {
         errors.push(
-          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the cmi5 launch.`,
+          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
         );
       }
     }
@@ -764,7 +765,7 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
-    if (standard === 'cmi5' || standard === 'web') {
+    if (standard === 'cmi5' || standard === 'xapi' || standard === 'web') {
       warnings.push(
         `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
       );
@@ -794,7 +795,7 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
       );
     }
-    if (standard !== 'cmi5') {
+    if (standard !== 'cmi5' && standard !== 'xapi') {
       warnings.push(
         `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
       );

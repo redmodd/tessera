@@ -16,7 +16,7 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = process.cwd();
 export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
-export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5';
+export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
   | 'free'
   | 'custom-quiz'
@@ -31,11 +31,11 @@ interface FixtureSpec {
 const FIXTURES: Record<FixtureName, FixtureSpec> = {
   free: {
     source: resolve(REPO_ROOT, 'tests/fixtures/free'),
-    standards: ['web', 'scorm12', 'scorm2004', 'cmi5'],
+    standards: ['web', 'scorm12', 'scorm2004', 'cmi5', 'xapi'],
   },
   'custom-quiz': {
     source: resolve(REPO_ROOT, 'tests/fixtures/custom-quiz'),
-    standards: ['scorm12', 'scorm2004', 'cmi5'],
+    standards: ['scorm12', 'scorm2004', 'cmi5', 'xapi'],
   },
   'custom-layout': {
     source: resolve(REPO_ROOT, 'tests/fixtures/custom-layout'),

@@ -1,6 +1,6 @@
 # AGENTS.md: Tessera Course Authoring Guide
 
-Tessera is an LMS-tracking runtime for interactive learning content (SCORM 1.2 / SCORM 2004 4e / cmi5 / static web). It owns tracking, progress, completion/success rollup, persistence, and navigation gating. You own the presentation layer.
+Tessera is an LMS-tracking runtime for interactive learning content (SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / static web). It owns tracking, progress, completion/success rollup, persistence, and navigation gating. You own the presentation layer.
 
 This is the canonical reference for authoring a Tessera course. Read it before generating or editing course code. You are reading `node_modules/tessera-learn/AGENTS.md`; it updates when you bump `tessera-learn`.
 
@@ -430,6 +430,7 @@ By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed
 | SCORM 1.2      | `lesson_status = "completed"`                                   | `lesson_status = "passed"`            |
 | SCORM 2004 4th | `completion_status = "completed"`, `success_status = "unknown"` | `success_status = "passed"`           |
 | cmi5           | **Completed** (no Passed/Failed)                                | **Passed** alongside **Completed**    |
+| xapi           | **Completed** (no Passed/Failed)                                | **Passed** alongside **Completed**    |
 | web            | `localStorage` only                                             | `localStorage` only                   |
 
 ### Rules and non-goals
@@ -538,7 +539,7 @@ export default {
   },
 
   export: {
-    standard: 'web', // "web" | "scorm12" | "scorm2004" | "cmi5"
+    standard: 'web', // "web" | "scorm12" | "scorm2004" | "cmi5" | "xapi"
   },
 
   a11y: {
@@ -589,12 +590,13 @@ canAccess: (ctx) => {
 
 `pnpm export <course>` writes:
 
-| `export.standard` | What ships                            | Where                         |
-| ----------------- | ------------------------------------- | ----------------------------- |
-| `web`             | Static site (HTML/CSS/JS + `assets/`) | `dist/` (any static host)     |
-| `scorm12`         | SCORM 1.2 package                     | `dist/<course>-scorm12.zip`   |
-| `scorm2004`       | SCORM 2004 4th Edition package        | `dist/<course>-scorm2004.zip` |
-| `cmi5`            | cmi5 package (AU + manifest)          | `dist/<course>-cmi5.zip`      |
+| `export.standard` | What ships                                  | Where                         |
+| ----------------- | ------------------------------------------- | ----------------------------- |
+| `web`             | Static site (HTML/CSS/JS + `assets/`)       | `dist/` (any static host)     |
+| `scorm12`         | SCORM 1.2 package                           | `dist/<course>-scorm12.zip`   |
+| `scorm2004`       | SCORM 2004 4th Edition package              | `dist/<course>-scorm2004.zip` |
+| `cmi5`            | cmi5 package (AU + manifest)                | `dist/<course>-cmi5.zip`      |
+| `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `dist/<course>-xapi.zip`      |
 
 Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
 
@@ -823,7 +825,7 @@ xapi: {
   activityId: 'https://example.com/courses/intro-to-x',
 }
 
-// cmi5 only: inherit the LMS launch LRS:
+// cmi5 / xapi only: inherit the LMS launch LRS:
 xapi: { endpoint: 'lms' }
 
 // Fan out (at most one 'lms' entry):
@@ -840,6 +842,7 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 | Mode          | `xapi` not set     | `xapi.endpoint: 'lms'` | `xapi: {endpoint, ...}` (explicit)                      |
 | ------------- | ------------------ | ---------------------- | ------------------------------------------------------- |
 | **cmi5**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
+| **xapi**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
 | **scorm12**   | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.core.student_id` |
 | **scorm2004** | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.learner_id`      |
 | **web**       | `useXAPI()` → null | **Config error**       | Independent; `actor` **required** in config             |
@@ -893,6 +896,7 @@ Author-facing consequences:
 | scorm12   | Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player |
 | scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                       |
 | cmi5      | Upload `dist/*-cmi5.zip` to SCORM Cloud and use its generated cmi5 dispatch URL               |
+| xapi      | Upload `dist/*-xapi.zip` to SCORM Cloud (imports `tincan.xml`) and launch the generated URL   |
 | web       | Serve `dist/` from any static host                                                            |
 
 Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / interactions look right.

@@ -4,6 +4,7 @@ import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
+  xapiLaunchURL,
 } from './lms-mocks.js';
 import { variantDir, viteBin, type Standard } from './global-setup.js';
 
@@ -11,11 +12,12 @@ import { variantDir, viteBin, type Standard } from './global-setup.js';
  * Phase 5 Task 2 Step 4 — load-bearing custom-quiz LMS roundtrip.
  *
  * Mirrors `lms-roundtrip.spec.ts` but builds the *custom-quiz* fixture
- * (`tests/fixtures/custom-quiz/`) against each of the four export standards
- * and asserts that a project-supplied `quiz.svelte` reports per-question
- * interactions and a final score to every adapter the same way the built-in
- * `<Quiz>` does. Without this, the data contract for custom shells has only
- * unit-level coverage.
+ * (`tests/fixtures/custom-quiz/`) against each of the four LMS export
+ * standards (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI — no `web`, which has no
+ * LMS to report to) and asserts that a project-supplied `quiz.svelte` reports
+ * per-question interactions and a final score to every adapter the same way
+ * the built-in `<Quiz>` does. Without this, the data contract for custom
+ * shells has only unit-level coverage.
  */
 
 function startPreview(standard: Standard, port: number): ChildProcess {
@@ -290,6 +292,87 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     });
 
     await page.goto(cmi5LaunchURL(BASE));
+    await answerCustomQuizCorrectly(page);
+
+    await expect
+      .poll(
+        () =>
+          statements.find(
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+          ) != null,
+        { timeout: 5000 },
+      )
+      .toBe(true);
+
+    const passed = statements.find(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+    );
+    expect(passed.result?.success).toBe(true);
+    expect(passed.result?.score?.scaled).toBe(1);
+
+    const answered = statements.filter(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+    );
+    expect(answered).toHaveLength(2);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plain xAPI ("Tin Can") — launch params straight off the URL, no fetch token
+// ---------------------------------------------------------------------------
+
+test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
+  const PORT = 5298;
+  const BASE = `http://localhost:${PORT}`;
+  let preview: ChildProcess;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    preview = startPreview('xapi', PORT);
+    const page = await browser.newPage();
+    try {
+      await waitForServer(page, BASE);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(async () => {
+    preview?.kill('SIGTERM');
+  });
+
+  test('Custom quiz emits xAPI Passed and per-question Answered statements', async ({
+    page,
+  }) => {
+    const statements: any[] = [];
+    await page.route('http://xapi-mock.test/**', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (url.includes('/xapi/statements')) {
+        if (req.method() === 'POST' || req.method() === 'PUT') {
+          try {
+            statements.push(JSON.parse(req.postData() ?? '{}'));
+          } catch {}
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(['stmt-id']),
+        });
+        return;
+      }
+      if (url.includes('/xapi/activities/state')) {
+        await route.fulfill({ status: 404, body: '{}' });
+        return;
+      }
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+
+    await page.goto(xapiLaunchURL(BASE));
     await answerCustomQuizCorrectly(page);
 
     await expect

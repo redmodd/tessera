@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import {
   generateScormManifest,
   generateCMI5Xml,
+  generateTincanXml,
   createZip,
   runExport,
 } from '../src/plugin/export.js';
@@ -267,6 +268,26 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('A &amp; B');
     expect(xml).toContain('&lt;script&gt;');
     expect(xml).not.toContain('<script>');
+  });
+});
+
+describe('generateTincanXml', () => {
+  it('emits a tincan.xml with a stable activity id and the title', () => {
+    const xml = generateTincanXml({ title: 'My Course' } as any);
+    expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
+    expect(xml).toMatch(
+      /<activity id="urn:tessera:au:[0-9a-f]{32}" type="http:\/\/adlnet\.gov\/expapi\/activities\/course">/,
+    );
+    expect(xml).toContain('My Course');
+    expect(xml).toContain('<launch lang="en-US">index.html</launch>');
+    // No xAPI version field exists in the tincan schema.
+    expect(xml).not.toMatch(/1\.0\.3|2\.0/);
+  });
+
+  it('is identical regardless of which xapi version will run', () => {
+    const a = generateTincanXml({ title: 'Same' } as any);
+    const b = generateTincanXml({ title: 'Same' } as any);
+    expect(a).toBe(b);
   });
 });
 

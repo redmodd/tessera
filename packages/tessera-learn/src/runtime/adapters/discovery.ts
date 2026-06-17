@@ -36,3 +36,14 @@ export function hasCMI5LaunchParams(): boolean {
     params.get('actor')
   );
 }
+
+/** Plain xAPI ("Tin Can") launch params on the URL. No fetch token required; `auth` is the Basic credential the LMS supplies in the launch link. */
+export function hasXAPILaunchParams(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return !!(
+    params.get('endpoint') &&
+    params.get('auth') &&
+    params.get('actor') &&
+    params.get('activity_id')
+  );
+}

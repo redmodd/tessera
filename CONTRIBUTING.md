@@ -46,14 +46,14 @@ The course authoring guide lives at `packages/tessera-learn/AGENTS.md`. Edit it 
 ## Tests
 
 - Unit tests: `pnpm test` (Vitest, runs in both packages). Add `:coverage` for v8 reports.
-- E2E: `pnpm test:e2e`. If you change adapter behavior (SCORM 1.2, SCORM 2004, cmi5, web) or navigation/progress logic, run the e2e suite locally before opening a PR.
+- E2E: `pnpm test:e2e`. If you change adapter behavior (SCORM 1.2, SCORM 2004, cmi5, xAPI 1.0.3, web) or navigation/progress logic, run the e2e suite locally before opening a PR.
 - New features should ship with tests. Bug fixes should ship with a regression test that fails before your change and passes after.
 
 See [TESTING.md](./TESTING.md) for full details: single-test runs, the variant pre-build that produces `tests/.e2e-variants/`, debugging failed CI runs, etc.
 
 ## Adapter changes
 
-Tessera supports four delivery modes: SCORM 1.2, SCORM 2004 4th Edition, cmi5, and static web. If your change touches the runtime API surface or any adapter:
+Tessera supports five delivery modes: SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3, and static web. If your change touches the runtime API surface or any adapter:
 
 - Check that the change works (or is appropriately gated) in every mode.
 - Note in the PR description which modes were tested and how.
@@ -76,7 +76,7 @@ A "Version Packages" PR is opened automatically once changesets land on `main`. 
 
 ## Reporting bugs / requesting features
 
-Use the issue templates on GitHub. For bugs, please include the export mode (SCORM 1.2 / SCORM 2004 / cmi5 / web) and the LMS (if applicable). Adapter behavior is highly sensitive to LMS quirks.
+Use the issue templates on GitHub. For bugs, please include the export mode (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web) and the LMS (if applicable). Adapter behavior is highly sensitive to LMS quirks.
 
 ## Code of conduct
 

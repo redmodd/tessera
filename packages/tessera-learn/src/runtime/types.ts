@@ -46,7 +46,7 @@ export interface CourseConfig {
     passingScore: number;
   };
   export: {
-    standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5';
+    standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
   };
   /**
    * Optional xAPI destination(s) for custom statement publishing via
