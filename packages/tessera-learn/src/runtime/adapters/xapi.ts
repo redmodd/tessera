@@ -2,15 +2,9 @@ import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
- * URL — no cmi5 fetch-token, no LMS.LaunchData, no cmi5 context. Construct with
- * the xAPI version to declare on the wire ('1.0.3' or '2.0.0').
+ * URL — no cmi5 fetch-token, no LMS.LaunchData, no cmi5 context.
  */
 export class XAPIAdapter extends BaseXAPILaunchAdapter {
-  constructor(version: '1.0.3' | '2.0.0') {
-    super();
-    this.version = version;
-  }
-
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');

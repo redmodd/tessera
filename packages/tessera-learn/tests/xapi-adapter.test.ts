@@ -33,7 +33,7 @@ describe('XAPIAdapter', () => {
       activity_id: 'urn:tessera:au:abc',
       registration: '2d8b1e1e-0000-4000-8000-000000000000',
     });
-    const adapter = new XAPIAdapter('1.0.3');
+    const adapter = new XAPIAdapter();
     await adapter.init();
     adapter.setCompletionStatus('complete');
     await new Promise((r) => setTimeout(r, 0));
@@ -53,7 +53,7 @@ describe('XAPIAdapter', () => {
       actor: 'not-json',
       activity_id: 'a',
     });
-    const adapter = new XAPIAdapter('1.0.3');
+    const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
   });
 });

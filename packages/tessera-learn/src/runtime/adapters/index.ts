@@ -73,7 +73,7 @@ const LMS_ADAPTERS: Record<
       'No cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
   },
   xapi: {
-    detect: () => (hasXAPILaunchParams() ? new XAPIAdapter('1.0.3') : null),
+    detect: () => (hasXAPILaunchParams() ? new XAPIAdapter() : null),
     warnLabel: 'xAPI launch parameters',
     name: 'xAPI 1.0.3',
     missingDetail:

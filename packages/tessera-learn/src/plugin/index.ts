@@ -691,7 +691,7 @@ import { hasXAPILaunchParams } from 'tessera-learn/runtime/adapters/discovery.js
 import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
 export function createAdapter() {
   if (!hasXAPILaunchParams()) throw new LMSAdapterError('xapi', 'Tessera: xAPI launch parameters not present on URL. Course must be launched from an xAPI-compliant LMS.');
-  return new XAPIAdapter('1.0.3');
+  return new XAPIAdapter();
 }
 `;
         default:
