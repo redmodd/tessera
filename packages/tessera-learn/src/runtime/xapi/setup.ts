@@ -34,7 +34,7 @@ class XAPIDevFallbackError extends Error {
     const missing =
       standard === 'cmi5'
         ? 'cmi5 launch parameters (fetch / endpoint / activityId / actor)'
-        : 'xAPI launch parameters (endpoint / actor / activity_id)';
+        : 'xAPI launch parameters (endpoint / auth / actor / activity_id)';
     super(
       `Tessera xAPI: xapi.endpoint is 'lms' but no ${missing} were present on the URL. ` +
         'Either launch this course from a real LMS / SCORM Cloud, or ' +

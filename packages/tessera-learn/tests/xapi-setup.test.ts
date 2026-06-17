@@ -270,7 +270,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
         { retry: false },
       ),
     ).rejects.toThrow(
-      /xAPI launch parameters \(endpoint \/ actor \/ activity_id\)/,
+      /xAPI launch parameters \(endpoint \/ auth \/ actor \/ activity_id\)/,
     );
   });
 });

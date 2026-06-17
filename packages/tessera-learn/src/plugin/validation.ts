@@ -638,7 +638,7 @@ function validateSingleXAPIEntry(
           'Either change the export standard or specify an explicit LRS endpoint.',
       );
     }
-    // Forbid extra fields — everything is inherited from the cmi5 launch.
+    // Forbid extra fields — everything is inherited from the launch.
     const forbidden = [
       'auth',
       'actor',
@@ -649,7 +649,7 @@ function validateSingleXAPIEntry(
     for (const f of forbidden) {
       if (entry[f] !== undefined) {
         errors.push(
-          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the cmi5 launch.`,
+          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
         );
       }
     }
@@ -765,7 +765,7 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
-    if (standard === 'cmi5' || standard === 'web') {
+    if (standard === 'cmi5' || standard === 'xapi' || standard === 'web') {
       warnings.push(
         `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
       );
