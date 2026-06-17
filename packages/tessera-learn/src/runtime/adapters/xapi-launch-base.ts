@@ -7,7 +7,7 @@ import {
 } from '../interaction-format.js';
 import { formatISO8601Duration } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
-import type { XAPIAgent } from '../xapi/types.js';
+import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
 
 export const VERBS = {
   initialized: 'http://adlnet.gov/expapi/verbs/initialized',
@@ -133,19 +133,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       completion: true,
       duration: formatISO8601Duration(this.durationSeconds),
     };
-    this.publisher
-      .sendStatement({
-        verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
-        result,
-        context: this.buildContext({ moveOn: true }),
-      })
-      .then(this.warnOnLRSReject('Completed'))
-      .catch((err) => {
-        console.warn(
-          `Tessera ${this.logName}: failed to send Completed statement`,
-          err,
-        );
-      });
+    this.dispatch('Completed', {
+      verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
+      result,
+      context: this.buildContext({ moveOn: true }),
+    });
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
@@ -162,19 +154,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     };
     const scaled = this.scoreForSuccess(status);
     if (scaled !== null) result.score = { scaled };
-    this.publisher
-      .sendStatement({
-        verb: { id: verb, display: { 'en-US': verbName } },
-        result,
-        context: this.buildContext({ moveOn: true, mastery: true }),
-      })
-      .then(this.warnOnLRSReject(status === 'passed' ? 'Passed' : 'Failed'))
-      .catch((err) => {
-        console.warn(
-          `Tessera ${this.logName}: failed to send ${verbName} statement`,
-          err,
-        );
-      });
+    this.dispatch(status === 'passed' ? 'Passed' : 'Failed', {
+      verb: { id: verb, display: { 'en-US': verbName } },
+      result,
+      context: this.buildContext({ moveOn: true, mastery: true }),
+    });
   }
 
   reportInteraction(
@@ -196,23 +180,15 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     if (correct !== null) {
       result.success = correct;
     }
-    this.publisher
-      .sendStatement({
-        verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
-        object: {
-          id: `${this.activityId}#${questionId}`,
-          objectType: 'Activity',
-          definition,
-        },
-        result,
-      })
-      .then(this.warnOnLRSReject('Answered'))
-      .catch((err) => {
-        console.warn(
-          `Tessera ${this.logName}: failed to send Answered statement`,
-          err,
-        );
-      });
+    this.dispatch('Answered', {
+      verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
+      object: {
+        id: `${this.activityId}#${questionId}`,
+        objectType: 'Activity',
+        definition,
+      },
+      result,
+    });
   }
 
   terminate(): void {
@@ -221,19 +197,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     if (!this.publisher) return;
     this.publisher.markUnloading();
     const duration = formatISO8601Duration(this.durationSeconds);
-    this.publisher
-      .sendStatement({
-        verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-        result: { duration },
-        context: this.buildContext(),
-      })
-      .then(this.warnOnLRSReject('Terminated'))
-      .catch((err) => {
-        console.warn(
-          `Tessera ${this.logName}: failed to send Terminated statement`,
-          err,
-        );
-      });
+    this.dispatch('Terminated', {
+      verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
+      result: { duration },
+      context: this.buildContext(),
+    });
   }
 
   async exit(): Promise<void> {
@@ -290,16 +258,21 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   /** Fire-and-forget Initialized statement (the first Defined Statement of the session). */
   protected sendInitialized(): void {
+    this.dispatch('Initialized', {
+      verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
+      context: this.buildContext(),
+    });
+  }
+
+  /** Enqueue a lifecycle statement fire-and-forget. `label` names it in both the LRS-reject and send-failure warnings. */
+  protected dispatch(label: string, partial: PartialStatement): void {
     if (!this.publisher) return;
     this.publisher
-      .sendStatement({
-        verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
-        context: this.buildContext(),
-      })
-      .then(this.warnOnLRSReject('Initialized'))
+      .sendStatement(partial)
+      .then(this.warnOnLRSReject(label))
       .catch((err) => {
         console.warn(
-          `Tessera ${this.logName}: failed to send Initialized statement`,
+          `Tessera ${this.logName}: failed to send ${label} statement`,
           err,
         );
       });
