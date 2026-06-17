@@ -251,4 +251,26 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.actor.mbox).toBe('mailto:plain@example.com');
   });
+
+  it("dev fallback: 'lms' under xapi with no launch params surfaces an xAPI-specific error", async () => {
+    setSearchParams({});
+
+    const config = {
+      ...baseConfig(),
+      export: { standard: 'xapi' },
+    } as CourseConfig;
+    config.xapi = { endpoint: 'lms' };
+
+    const client = await buildXAPIClient(config, null);
+    expect(client).not.toBeNull();
+
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(
+      /xAPI launch parameters \(endpoint \/ actor \/ activity_id\)/,
+    );
+  });
 });

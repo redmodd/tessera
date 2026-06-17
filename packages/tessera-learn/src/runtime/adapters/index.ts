@@ -77,7 +77,7 @@ const LMS_ADAPTERS: Record<
     warnLabel: 'xAPI launch parameters',
     name: 'xAPI 1.0.3',
     missingDetail:
-      'No xAPI launch parameters (endpoint / actor / activity_id) on the URL.',
+      'No xAPI launch parameters (endpoint / auth / actor / activity_id) on the URL.',
   },
 };
 

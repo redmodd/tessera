@@ -30,10 +30,13 @@ type DestinationSource =
  * produces the "works in dev, silently broken in prod" footgun.
  */
 class XAPIDevFallbackError extends Error {
-  constructor() {
+  constructor(standard: 'cmi5' | 'xapi') {
+    const missing =
+      standard === 'cmi5'
+        ? 'cmi5 launch parameters (fetch / endpoint / activityId / actor)'
+        : 'xAPI launch parameters (endpoint / actor / activity_id)';
     super(
-      "Tessera xAPI: xapi.endpoint is 'lms' but no cmi5 launch parameters " +
-        '(fetch / endpoint / activityId / actor) were present on the URL. ' +
+      `Tessera xAPI: xapi.endpoint is 'lms' but no ${missing} were present on the URL. ` +
         'Either launch this course from a real LMS / SCORM Cloud, or ' +
         'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
         'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
@@ -60,8 +63,8 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-function makeDevFallbackPublisher(): XAPIPublisher {
-  return makeRejectingPublisher(() => new XAPIDevFallbackError());
+function makeDevFallbackPublisher(standard: 'cmi5' | 'xapi'): XAPIPublisher {
+  return makeRejectingPublisher(() => new XAPIDevFallbackError(standard));
 }
 
 class XAPISCORMDevFallbackError extends Error {
@@ -112,10 +115,10 @@ function resolveDestination(
     if (adapter instanceof BaseXAPILaunchAdapter) {
       return { kind: 'lms-shared', adapter };
     }
-    // Dev fallback — cmi5 launch params absent, adapter is the WebAdapter
+    // Dev fallback — launch params absent, adapter is the WebAdapter
     // fallback. Materialize a publisher whose sends reject with an
     // explicit error so author code surfaces the dev/prod gap.
-    return { kind: 'explicit', publisher: makeDevFallbackPublisher() };
+    return { kind: 'explicit', publisher: makeDevFallbackPublisher(standard) };
   }
 
   // Explicit endpoint.
