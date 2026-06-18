@@ -26,7 +26,6 @@ export class WebAdapter implements PersistenceAdapter {
   #state: SavedState | null = null;
 
   constructor(config: CourseConfig, manifest?: Manifest) {
-    // Identity is the explicit course id; id-less courses share one key.
     const base = courseIdentity(config) || 'tessera-course';
     const fp = manifest ? structureFingerprint(manifest) : '';
     this.#storageKey = `tessera-${base}${fp ? `-${fp}` : ''}`;
