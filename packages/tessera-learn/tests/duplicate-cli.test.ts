@@ -183,6 +183,86 @@ describe('runDuplicate', () => {
     ).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
   });
 
+  it('regenerates the real id past a comment that contains an apostrophe', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "export default {\n  // Acme's onboarding course\n  title: 'X',\n  id: 'urn:uuid:original',\n};",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readFileSync(
+      join(ws, 'courses', 'copy', 'course.config.js'),
+      'utf-8',
+    );
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+    // The comment is untouched and no second top-level id key is injected.
+    expect(copy).toContain("// Acme's onboarding course");
+    expect(copy.match(/^\s*id\s*:/gm)).toHaveLength(1);
+  });
+
+  it('ignores an id: written inside a comment above the real id', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "export default {\n  // remember to set the id: properly\n  title: 'X',\n  id: 'urn:uuid:original',\n};",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readFileSync(
+      join(ws, 'courses', 'copy', 'course.config.js'),
+      'utf-8',
+    );
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toContain('// remember to set the id: properly');
+    expect(copy.match(/^\s*id\s*:/gm)).toHaveLength(1);
+  });
+
+  it('regenerates the id of an indirectly exported config', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "const config = { title: 'X', id: 'urn:uuid:original' };\nexport default config;",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readFileSync(
+      join(ws, 'courses', 'copy', 'course.config.js'),
+      'utf-8',
+    );
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('injects an id into an indirectly exported config that has none', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "const config = { title: 'X' };\nexport default config;",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+    expect(
+      readFileSync(join(ws, 'courses', 'copy', 'course.config.js'), 'utf-8'),
+    ).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
   it('requires both arguments', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(runDuplicate('src', undefined, ws)).toBe(1);

@@ -17,17 +17,55 @@ function skipString(text: string, i: number): number {
   return i;
 }
 
-// Locate the value span of the *top-level* `id` property in an `export default
-// { … }` config. Depth-aware and quote-agnostic so a nested `id:` key is never
-// the one we touch and ' " ` are all handled; returns null if there's no
-// top-level id (caller then inserts one).
-function topLevelIdValueSpan(text: string): [number, number] | null {
-  const decl = /export\s+default\s*\{/.exec(text);
+function isComment(text: string, i: number): boolean {
+  return text[i] === '/' && (text[i + 1] === '/' || text[i + 1] === '*');
+}
+
+// Skip a `//` line or `/* */` block comment starting at i (a comment per
+// isComment). Returns the index just past it.
+function skipComment(text: string, i: number): number {
+  if (text[i + 1] === '/') {
+    i += 2;
+    while (i < text.length && text[i] !== '\n') i++;
+    return i;
+  }
+  i += 2;
+  while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+  return Math.min(i + 2, text.length);
+}
+
+// Index of the `{` opening the default-exported config object, across the
+// forms `export default { … }`, `export default ({ … })`, and
+// `export default name;` with a `const/let/var name = { … }` declaration.
+function configObjectBrace(text: string): number | null {
+  const decl = /export\s+default\s*/.exec(text);
   if (!decl) return null;
-  let i = text.indexOf('{', decl.index) + 1;
+  let i = decl.index + decl[0].length;
+  while (i < text.length && (/\s/.test(text[i]) || text[i] === '(')) i++;
+  if (text[i] === '{') return i;
+  const ident = /^[A-Za-z_$][\w$]*/.exec(text.slice(i));
+  if (!ident) return null;
+  const named = new RegExp(`(?:const|let|var)\\s+${ident[0]}\\s*=\\s*\\{`).exec(
+    text,
+  );
+  return named ? text.indexOf('{', named.index) : null;
+}
+
+// Locate the value span of the *top-level* `id` property in the config object.
+// Depth-aware and quote/comment-agnostic so a nested `id:` key — or one written
+// inside a comment — is never the one we touch and ' " ` are all handled;
+// returns null if there's no top-level id (caller then inserts one).
+function topLevelIdValueSpan(text: string): [number, number] | null {
+  const brace = configObjectBrace(text);
+  if (brace === null) return null;
+  let i = brace + 1;
   let depth = 1;
   while (i < text.length && depth > 0) {
     const ch = text[i];
+    if (isComment(text, i)) {
+      i = skipComment(text, i);
+      continue;
+    }
     if (ch === '"' || ch === "'" || ch === '`') {
       i = skipString(text, i);
       continue;
@@ -50,7 +88,8 @@ function topLevelIdValueSpan(text: string): [number, number] | null {
             end < text.length &&
             text[end] !== ',' &&
             text[end] !== '}' &&
-            text[end] !== '\n'
+            text[end] !== '\n' &&
+            !isComment(text, end)
           )
             end++;
           while (end > v && /\s/.test(text[end - 1])) end--;
@@ -73,13 +112,19 @@ function reidentifyCourse(courseRoot: string): void {
   const text = readFileSync(configPath, 'utf-8');
   const newId = `'urn:uuid:${randomUUID()}'`;
   const span = topLevelIdValueSpan(text);
-  const updated = span
-    ? text.slice(0, span[0]) + newId + text.slice(span[1])
-    : text.replace(
-        /export\s+default\s*\{/,
-        (m) => `${m}\n  id: ${newId},`,
-      );
-  writeFileSync(configPath, updated);
+  if (span) {
+    writeFileSync(
+      configPath,
+      text.slice(0, span[0]) + newId + text.slice(span[1]),
+    );
+    return;
+  }
+  const brace = configObjectBrace(text);
+  if (brace === null) return;
+  writeFileSync(
+    configPath,
+    `${text.slice(0, brace + 1)}\n  id: ${newId},${text.slice(brace + 1)}`,
+  );
 }
 
 const HELP =
