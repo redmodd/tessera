@@ -35,26 +35,64 @@ function skipComment(text: string, i: number): number {
 }
 
 // Index of the `{` opening the default-exported config object, across the
-// forms `export default { … }`, `export default ({ … })`, and
-// `export default name;` with a `const/let/var name = { … }` declaration.
+// forms `export default { … }`, `export default ({ … })`,
+// `export default wrap({ … })`, and `export default name;` with a
+// `const/let/var name = { … }` declaration.
 function configObjectBrace(text: string): number | null {
   const decl = /export\s+default\s*/.exec(text);
   if (!decl) return null;
   let i = decl.index + decl[0].length;
-  while (i < text.length && (/\s/.test(text[i]) || text[i] === '(')) i++;
+  const skipWs = () => {
+    while (i < text.length && /\s/.test(text[i])) i++;
+  };
+  skipWs();
+  while (text[i] === '(') {
+    i++;
+    skipWs();
+  }
   if (text[i] === '{') return i;
   const ident = /^[A-Za-z_$][\w$]*/.exec(text.slice(i));
   if (!ident) return null;
+  i += ident[0].length;
+  skipWs();
+  if (text[i] === '(') {
+    i++;
+    skipWs();
+    return text[i] === '{' ? i : null;
+  }
   const named = new RegExp(`(?:const|let|var)\\s+${ident[0]}\\s*=\\s*\\{`).exec(
     text,
   );
   return named ? text.indexOf('{', named.index) : null;
 }
 
+// Span of the value following a `:` at `afterColon`, trimmed of surrounding
+// whitespace. A quoted value is taken whole; otherwise it runs to the next
+// `,`, `}`, newline, or comment.
+function valueSpanFrom(text: string, afterColon: number): [number, number] {
+  let v = afterColon;
+  while (v < text.length && /\s/.test(text[v])) v++;
+  let end =
+    text[v] === '"' || text[v] === "'" || text[v] === '`'
+      ? skipString(text, v)
+      : v;
+  while (
+    end < text.length &&
+    text[end] !== ',' &&
+    text[end] !== '}' &&
+    text[end] !== '\n' &&
+    !isComment(text, end)
+  )
+    end++;
+  while (end > v && /\s/.test(text[end - 1])) end--;
+  return [v, end];
+}
+
 // Locate the value span of the *top-level* `id` property in the config object.
 // Depth-aware and quote/comment-agnostic so a nested `id:` key — or one written
-// inside a comment — is never the one we touch and ' " ` are all handled;
-// returns null if there's no top-level id (caller then inserts one).
+// inside a comment — is never the one we touch; bare and quoted `id` keys and
+// ' " ` string values are all handled. Returns null if there's no top-level id
+// (caller then inserts one).
 function topLevelIdValueSpan(text: string): [number, number] | null {
   const brace = configObjectBrace(text);
   if (brace === null) return null;
@@ -67,7 +105,15 @@ function topLevelIdValueSpan(text: string): [number, number] | null {
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') {
-      i = skipString(text, i);
+      const after = skipString(text, i);
+      if (depth === 1) {
+        let c = after;
+        while (c < text.length && /\s/.test(text[c])) c++;
+        if (text[c] === ':' && text.slice(i + 1, after - 1) === 'id') {
+          return valueSpanFrom(text, c + 1);
+        }
+      }
+      i = after;
       continue;
     }
     if (ch === '{' || ch === '[' || ch === '(') {
@@ -77,25 +123,8 @@ function topLevelIdValueSpan(text: string): [number, number] | null {
     } else if (depth === 1 && /[A-Za-z_$]/.test(ch)) {
       const key = /^([A-Za-z_$][\w$]*)\s*:/.exec(text.slice(i));
       if (key) {
-        let v = i + key[0].length;
-        while (v < text.length && /\s/.test(text[v])) v++;
-        if (key[1] === 'id') {
-          let end =
-            text[v] === '"' || text[v] === "'" || text[v] === '`'
-              ? skipString(text, v)
-              : v;
-          while (
-            end < text.length &&
-            text[end] !== ',' &&
-            text[end] !== '}' &&
-            text[end] !== '\n' &&
-            !isComment(text, end)
-          )
-            end++;
-          while (end > v && /\s/.test(text[end - 1])) end--;
-          return [v, end];
-        }
-        i = v;
+        if (key[1] === 'id') return valueSpanFrom(text, i + key[0].length);
+        i += key[0].length;
         continue;
       }
     }
@@ -120,7 +149,12 @@ function reidentifyCourse(courseRoot: string): void {
     return;
   }
   const brace = configObjectBrace(text);
-  if (brace === null) return;
+  if (brace === null) {
+    console.warn(
+      `[tessera duplicate] Could not set a unique id in ${configPath} — the copy shares the source's identity. Add a unique "id" manually.`,
+    );
+    return;
+  }
   writeFileSync(
     configPath,
     `${text.slice(0, brace + 1)}\n  id: ${newId},${text.slice(brace + 1)}`,

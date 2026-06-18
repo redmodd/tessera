@@ -10,6 +10,15 @@ export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
 
 /**
+ * Trimmed course identity, or '' when absent. Single source of truth for the
+ * "is there a usable id?" check shared by the web storage key, the cmi5/xAPI
+ * id derivation, and the config validator.
+ */
+export function courseIdentity(config: { id?: unknown }): string {
+  return (typeof config.id === 'string' && config.id.trim()) || '';
+}
+
+/**
  * Per-page quiz configuration. Single source of truth — the build plugin
  * extracts this from `pageConfig.quiz` and embeds it in the manifest;
  * the runtime reads it from there. Keep field shapes in sync.

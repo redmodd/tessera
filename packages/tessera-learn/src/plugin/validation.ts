@@ -24,7 +24,11 @@ import {
 } from '../runtime/xapi/agent-rules.js';
 import { httpOrigin } from '../runtime/xapi/derive-actor.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
-import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
+import {
+  FEEDBACK_MODES,
+  RETRY_MODES,
+  courseIdentity,
+} from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isVideoEmbed } from '../components/video-embed.js';
 
@@ -236,6 +240,7 @@ export function validateProject(projectRoot: string): ValidationResult {
 
 interface ParsedConfig {
   title?: string;
+  id?: string;
   navigation?: { mode?: string };
   completion?: {
     mode?: string;
@@ -325,10 +330,7 @@ function parseConfig(
     standard === 'web' ||
     standard === 'cmi5' ||
     standard === 'xapi';
-  if (
-    identityStandard &&
-    (typeof config.id !== 'string' || !config.id.trim())
-  ) {
+  if (identityStandard && !courseIdentity(config)) {
     warnings.push(
       `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );

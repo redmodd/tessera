@@ -10,6 +10,7 @@ import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { slugify } from '../runtime/slugify.js';
+import { courseIdentity } from '../runtime/types.js';
 
 // ---------- Types ----------
 
@@ -71,8 +72,11 @@ function stableUrn(kind: 'course' | 'au', seed: string): string {
   return `urn:tessera:${kind}:${h.slice(0, 32)}`;
 }
 
-function courseIdentity(config: ExportConfig): string {
-  return (typeof config.id === 'string' && config.id.trim()) || '';
+// AU activity id, derived from the course id so re-exports don't orphan LRS
+// records. Shared by the cmi5 and tincan manifests.
+function auIdFor(config: ExportConfig): string {
+  const id = courseIdentity(config);
+  return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
 function formatSize(bytes: number): string {
@@ -159,9 +163,11 @@ export function generateCMI5Xml(config: ExportConfig): string {
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course id so they survive rebuilds without
   // orphaning existing learner records in the LRS.
-  const id = courseIdentity(config);
-  const courseId = stableUrn('course', id || 'tessera-course');
-  const auId = stableUrn('au', id ? `${id}#au` : 'tessera-au');
+  const courseId = stableUrn(
+    'course',
+    courseIdentity(config) || 'tessera-course',
+  );
+  const auId = auIdFor(config);
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
     ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
@@ -193,8 +199,7 @@ export function generateTincanXml(config: ExportConfig): string {
   const title = escapeXml(config.title || UNTITLED_TITLE);
   const description = escapeXml(config.description || '');
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
-  const id = courseIdentity(config);
-  const auId = stableUrn('au', id ? `${id}#au` : 'tessera-au');
+  const auId = auIdFor(config);
   // tincan.xml carries NO xAPI version — the version is set at runtime by the
   // adapter's X-Experience-API-Version header, not declared in the manifest.
   return `<?xml version="1.0" encoding="UTF-8"?>
