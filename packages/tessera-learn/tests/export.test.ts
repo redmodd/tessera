@@ -229,6 +229,10 @@ describe('generateCMI5Xml', () => {
     expect(idOf({ title: 'Onboarding', id: 'urn:uuid:a' })).toBe(
       idOf({ title: 'Renamed', id: 'urn:uuid:a' }),
     );
+    // Whitespace-only id is treated as no id (matches the WebAdapter).
+    expect(idOf({ title: 'Onboarding', id: '   ' })).toBe(
+      idOf({ title: 'Onboarding' }),
+    );
   });
 
   it('defaults moveOn to Completed when completion mode is percentage', () => {

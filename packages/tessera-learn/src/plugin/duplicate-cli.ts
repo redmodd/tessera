@@ -10,8 +10,9 @@ function reidentifyCourse(configPath: string): void {
   if (!existsSync(configPath)) return;
   const text = readFileSync(configPath, 'utf-8');
   const newId = `urn:uuid:${randomUUID()}`;
-  const updated = /\bid\s*:/.test(text)
-    ? text.replace(/(\bid\s*:\s*['"])[^'"]*(['"])/, `$1${newId}$2`)
+  const idAssignment = /(\bid\s*:\s*)(['"`])[^'"`]*\2/;
+  const updated = idAssignment.test(text)
+    ? text.replace(idAssignment, `$1'${newId}'`)
     : text.replace(
         /export\s+default\s*\{/,
         `export default {\n  id: '${newId}',`,
