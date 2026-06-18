@@ -164,7 +164,10 @@ export function generateCMI5Xml(config: ExportConfig): string {
     'course',
     id || `tessera-course:${config.title || ''}`,
   );
-  const auId = stableUrn('au', id ? `${id}#au` : `tessera-au:${config.title || ''}`);
+  const auId = stableUrn(
+    'au',
+    id ? `${id}#au` : `tessera-au:${config.title || ''}`,
+  );
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
     ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
