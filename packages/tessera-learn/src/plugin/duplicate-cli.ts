@@ -9,7 +9,7 @@ import { validateProjectName } from './project-name.js';
 // inside a comment or a string value from matching, and CourseConfig has no
 // nested `id`, so the first match is always the course identity.
 const ID_LINE =
-  /^([ \t]*'?id'?[ \t]*:[ \t]*)('(?:\\.|[^'])*'|"(?:\\.|[^"])*"|`(?:\\.|[^`])*`|[^\n,}]*)/m;
+  /^([ \t]*'?id'?[ \t]*:[ \t]*)('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\n,}]*)/m;
 const DEFAULT_OBJECT = /export\s+default\s*\{/;
 
 // A verbatim copy inherits the source's `id`; mint a fresh one so the duplicate
