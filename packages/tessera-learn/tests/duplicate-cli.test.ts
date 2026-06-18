@@ -125,6 +125,48 @@ describe('runDuplicate', () => {
     expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
   });
 
+  it('rewrites only the top-level id, never a nested id: key', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "export default { title: 'Src', branding: { logo: { id: 'logo-1' } }, id: 'urn:uuid:original' };",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readFileSync(
+      join(ws, 'courses', 'copy', 'course.config.js'),
+      'utf-8',
+    );
+    expect(copy).toContain("id: 'logo-1'");
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('replaces a non-string id in place rather than duplicating the key', () => {
+    const src = join(ws, 'courses', 'src');
+    mkdirSync(join(src, 'pages'), { recursive: true });
+    writeFileSync(
+      join(src, 'course.config.js'),
+      "export default { title: 'Src', id: 123 };",
+    );
+    writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readFileSync(
+      join(ws, 'courses', 'copy', 'course.config.js'),
+      'utf-8',
+    );
+    expect(copy.match(/\bid\s*:/g)).toHaveLength(1);
+    expect(copy).not.toContain('id: 123');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
   it('injects an id when only a comment mentions id:', () => {
     const src = join(ws, 'courses', 'src');
     mkdirSync(join(src, 'pages'), { recursive: true });

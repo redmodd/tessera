@@ -330,7 +330,7 @@ function parseConfig(
     (typeof config.id !== 'string' || !config.id.trim())
   ) {
     warnings.push(
-      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id fall back to the title, which collides across courses sharing a title. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
+      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 

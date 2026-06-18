@@ -4,18 +4,80 @@ import { basename, join, relative } from 'node:path';
 import { resolveCourse } from './course-root.js';
 import { validateProjectName } from './project-name.js';
 
+function skipString(text: string, i: number): number {
+  const quote = text[i++];
+  while (i < text.length) {
+    if (text[i] === '\\') {
+      i += 2;
+      continue;
+    }
+    if (text[i] === quote) return i + 1;
+    i++;
+  }
+  return i;
+}
+
+// Locate the value span of the *top-level* `id` property in an `export default
+// { … }` config. Depth-aware and quote-agnostic so a nested `id:` key is never
+// the one we touch and ' " ` are all handled; returns null if there's no
+// top-level id (caller then inserts one).
+function topLevelIdValueSpan(text: string): [number, number] | null {
+  const decl = /export\s+default\s*\{/.exec(text);
+  if (!decl) return null;
+  let i = text.indexOf('{', decl.index) + 1;
+  let depth = 1;
+  while (i < text.length && depth > 0) {
+    const ch = text[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i = skipString(text, i);
+      continue;
+    }
+    if (ch === '{' || ch === '[' || ch === '(') {
+      depth++;
+    } else if (ch === '}' || ch === ']' || ch === ')') {
+      depth--;
+    } else if (depth === 1 && /[A-Za-z_$]/.test(ch)) {
+      const key = /^([A-Za-z_$][\w$]*)\s*:/.exec(text.slice(i));
+      if (key) {
+        let v = i + key[0].length;
+        while (v < text.length && /\s/.test(text[v])) v++;
+        if (key[1] === 'id') {
+          let end =
+            text[v] === '"' || text[v] === "'" || text[v] === '`'
+              ? skipString(text, v)
+              : v;
+          while (
+            end < text.length &&
+            text[end] !== ',' &&
+            text[end] !== '}' &&
+            text[end] !== '\n'
+          )
+            end++;
+          while (end > v && /\s/.test(text[end - 1])) end--;
+          return [v, end];
+        }
+        i = v;
+        continue;
+      }
+    }
+    i++;
+  }
+  return null;
+}
+
 // A verbatim copy inherits the source's `id`; mint a fresh one so the duplicate
 // is a distinct course (own storage key + LRS activity id).
-function reidentifyCourse(configPath: string): void {
+function reidentifyCourse(courseRoot: string): void {
+  const configPath = join(courseRoot, 'course.config.js');
   if (!existsSync(configPath)) return;
   const text = readFileSync(configPath, 'utf-8');
-  const newId = `urn:uuid:${randomUUID()}`;
-  const idAssignment = /(\bid\s*:\s*)(['"`])[^'"`]*\2/;
-  const updated = idAssignment.test(text)
-    ? text.replace(idAssignment, `$1'${newId}'`)
+  const newId = `'urn:uuid:${randomUUID()}'`;
+  const span = topLevelIdValueSpan(text);
+  const updated = span
+    ? text.slice(0, span[0]) + newId + text.slice(span[1])
     : text.replace(
         /export\s+default\s*\{/,
-        `export default {\n  id: '${newId}',`,
+        (m) => `${m}\n  id: ${newId},`,
       );
   writeFileSync(configPath, updated);
 }
@@ -79,7 +141,7 @@ export function runDuplicate(
     recursive: true,
     filter: (src) => src === srcDir || !skip(src),
   });
-  reidentifyCourse(join(destDir, 'course.config.js'));
+  reidentifyCourse(destDir);
 
   const rel = relative(workspaceRoot, destDir);
   const srcRel = relative(workspaceRoot, srcDir);

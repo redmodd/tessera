@@ -26,7 +26,7 @@ export interface CourseConfig {
   title: string;
   /** Stable, unique course identity (e.g. 'urn:uuid:…'). Seeds the web
    * localStorage key and the cmi5/xAPI LRS activity id; scaffolders generate one.
-   * Absent → both derive from the title, colliding across same-titled courses. */
+   * Absent → both fall back to a fixed value, colliding across courses. */
   id?: string;
   description?: string;
   author?: string;

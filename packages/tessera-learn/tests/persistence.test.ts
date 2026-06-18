@@ -176,24 +176,8 @@ describe('WebAdapter contract', () => {
         state = s;
         localStorage.setItem(storageKey, JSON.stringify(s));
       },
-      getStorageKey: () => storageKey,
     };
   }
-
-  it('derives storage key from course title', () => {
-    const adapter = createTestAdapter('My Course Title');
-    expect(adapter.getStorageKey()).toBe('tessera-my-course-title');
-  });
-
-  it('derives storage key with special characters', () => {
-    const adapter = createTestAdapter('Course: Advanced (v2.0)!');
-    expect(adapter.getStorageKey()).toBe('tessera-course-advanced-v20');
-  });
-
-  it('uses fallback key for empty title', () => {
-    const adapter = createTestAdapter('');
-    expect(adapter.getStorageKey()).toBe('tessera-tessera-course');
-  });
 
   it('init() reads from localStorage', async () => {
     const state: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
@@ -330,9 +314,9 @@ describe('WebAdapter storage key', () => {
     );
   });
 
-  it('falls back to the title slug when no id is set', () => {
+  it('falls back to a fixed key when no id is set (title is not used)', () => {
     expect(keyFor(makeConfig({ title: 'My Course' }))).toBe(
-      'tessera-my-course',
+      'tessera-tessera-course',
     );
   });
 });

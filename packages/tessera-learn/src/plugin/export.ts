@@ -157,17 +157,11 @@ ${fileElements}
 export function generateCMI5Xml(config: ExportConfig): string {
   const title = escapeXml(config.title || UNTITLED_TITLE);
   const description = escapeXml(config.description || '');
-  // Derive stable IDs from the course title so they survive rebuilds without
+  // Derive stable IDs from the course id so they survive rebuilds without
   // orphaning existing learner records in the LRS.
   const id = courseIdentity(config);
-  const courseId = stableUrn(
-    'course',
-    id || `tessera-course:${config.title || ''}`,
-  );
-  const auId = stableUrn(
-    'au',
-    id ? `${id}#au` : `tessera-au:${config.title || ''}`,
-  );
+  const courseId = stableUrn('course', id || 'tessera-course');
+  const auId = stableUrn('au', id ? `${id}#au` : 'tessera-au');
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
     ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
@@ -200,10 +194,7 @@ export function generateTincanXml(config: ExportConfig): string {
   const description = escapeXml(config.description || '');
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
   const id = courseIdentity(config);
-  const auId = stableUrn(
-    'au',
-    id ? `${id}#au` : `tessera-au:${config.title || ''}`,
-  );
+  const auId = stableUrn('au', id ? `${id}#au` : 'tessera-au');
   // tincan.xml carries NO xAPI version — the version is set at runtime by the
   // adapter's X-Experience-API-Version header, not declared in the manifest.
   return `<?xml version="1.0" encoding="UTF-8"?>
