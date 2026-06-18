@@ -697,8 +697,8 @@ export function createAdapter() {
         default:
           return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
-export function createAdapter(config) {
-  return new WebAdapter(config);
+export function createAdapter(config, options) {
+  return new WebAdapter(config, options && options.manifest);
 }
 `;
       }

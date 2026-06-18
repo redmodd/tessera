@@ -218,6 +218,19 @@ describe('generateCMI5Xml', () => {
     expect(courseId).not.toBe(auId);
   });
 
+  it('derives distinct ids from the course id, not the title', () => {
+    const idOf = (config: Parameters<typeof generateCMI5Xml>[0]) =>
+      generateCMI5Xml(config).match(/urn:tessera:course:[0-9a-f]{32}/)![0];
+    // Same title, different id → different activity id (no LRS record clash).
+    expect(idOf({ title: 'Onboarding', id: 'urn:uuid:a' })).not.toBe(
+      idOf({ title: 'Onboarding', id: 'urn:uuid:b' }),
+    );
+    // Same id → stable across re-export.
+    expect(idOf({ title: 'Onboarding', id: 'urn:uuid:a' })).toBe(
+      idOf({ title: 'Renamed', id: 'urn:uuid:a' }),
+    );
+  });
+
   it('defaults moveOn to Completed when completion mode is percentage', () => {
     const xml = generateCMI5Xml({
       title: 'Test',

@@ -24,6 +24,10 @@ export interface QuizConfig {
 
 export interface CourseConfig {
   title: string;
+  /** Stable, unique course identity (e.g. 'urn:uuid:…'). Seeds the web
+   * localStorage key and the cmi5/xAPI LRS activity id; scaffolders generate one.
+   * Absent → both fall back to the (collision-prone) title slug. */
+  id?: string;
   description?: string;
   author?: string;
   version?: string;

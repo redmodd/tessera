@@ -15,6 +15,7 @@ import { slugify } from '../runtime/slugify.js';
 
 interface ExportConfig {
   title: string;
+  id?: string;
   description?: string;
   version?: string;
   scoring?: { passingScore?: number };
@@ -154,8 +155,14 @@ export function generateCMI5Xml(config: ExportConfig): string {
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course title so they survive rebuilds without
   // orphaning existing learner records in the LRS.
-  const courseId = stableUrn('course', `tessera-course:${config.title || ''}`);
-  const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
+  const courseId = stableUrn(
+    'course',
+    config.id || `tessera-course:${config.title || ''}`,
+  );
+  const auId = stableUrn(
+    'au',
+    config.id ? `${config.id}#au` : `tessera-au:${config.title || ''}`,
+  );
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
   const masteryScore = Number(
     ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
@@ -187,7 +194,10 @@ export function generateTincanXml(config: ExportConfig): string {
   const title = escapeXml(config.title || UNTITLED_TITLE);
   const description = escapeXml(config.description || '');
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
-  const auId = stableUrn('au', `tessera-au:${config.title || ''}`);
+  const auId = stableUrn(
+    'au',
+    config.id ? `${config.id}#au` : `tessera-au:${config.title || ''}`,
+  );
   // tincan.xml carries NO xAPI version — the version is set at runtime by the
   // adapter's X-Experience-API-Version header, not declared in the manifest.
   return `<?xml version="1.0" encoding="UTF-8"?>

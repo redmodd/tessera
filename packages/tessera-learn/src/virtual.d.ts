@@ -7,7 +7,10 @@ declare module 'virtual:tessera-layout' {
 declare module 'virtual:tessera-adapter' {
   import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
   import type { CourseConfig } from 'tessera-learn/runtime/types.js';
-  export function createAdapter(config: CourseConfig): PersistenceAdapter;
+  export function createAdapter(
+    config: CourseConfig,
+    options?: { manifest?: unknown; allowFallback?: boolean },
+  ): PersistenceAdapter;
 }
 
 declare module 'virtual:tessera-xapi-setup' {

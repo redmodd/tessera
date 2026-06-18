@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
@@ -123,6 +124,7 @@ function main() {
   scaffold(projectDir, {
     PROJECT_NAME: name,
     PROJECT_TITLE: toTitleCase(SEED_COURSE),
+    COURSE_ID: `urn:uuid:${randomUUID()}`,
     TESSERA_VERSION,
     SVELTE_VERSION,
   });

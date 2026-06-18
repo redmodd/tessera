@@ -143,6 +143,7 @@ export function reportValidationIssues({
 // Known top-level config fields
 const KNOWN_CONFIG_FIELDS = new Set([
   'title',
+  'id',
   'description',
   'author',
   'version',
@@ -313,6 +314,23 @@ function parseConfig(
         A11Y_IDS.lang,
         `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
       ),
+    );
+  }
+
+  // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
+  // SCORM identity is owned by the LMS, so only nudge for the others.
+  const standard = config.export?.standard;
+  const identityStandard =
+    standard === undefined ||
+    standard === 'web' ||
+    standard === 'cmi5' ||
+    standard === 'xapi';
+  if (
+    identityStandard &&
+    (typeof config.id !== 'string' || !config.id.trim())
+  ) {
+    warnings.push(
+      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id fall back to the title, which collides across courses sharing a title. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 

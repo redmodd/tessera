@@ -1,7 +1,23 @@
-import { cpSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { basename, join, relative } from 'node:path';
 import { resolveCourse } from './course-root.js';
 import { validateProjectName } from './project-name.js';
+
+// A verbatim copy inherits the source's `id`; mint a fresh one so the duplicate
+// is a distinct course (own storage key + LRS activity id).
+function reidentifyCourse(configPath: string): void {
+  if (!existsSync(configPath)) return;
+  const text = readFileSync(configPath, 'utf-8');
+  const newId = `urn:uuid:${randomUUID()}`;
+  const updated = /\bid\s*:/.test(text)
+    ? text.replace(/(\bid\s*:\s*['"])[^'"]*(['"])/, `$1${newId}$2`)
+    : text.replace(
+        /export\s+default\s*\{/,
+        `export default {\n  id: '${newId}',`,
+      );
+  writeFileSync(configPath, updated);
+}
 
 const HELP =
   'Usage: tessera duplicate <source> <new>\n\n' +
@@ -62,6 +78,7 @@ export function runDuplicate(
     recursive: true,
     filter: (src) => src === srcDir || !skip(src),
   });
+  reidentifyCourse(join(destDir, 'course.config.js'));
 
   const rel = relative(workspaceRoot, destDir);
   const srcRel = relative(workspaceRoot, srcDir);

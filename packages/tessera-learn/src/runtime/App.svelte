@@ -24,7 +24,7 @@
   } from './contexts.js';
 
   // ---- Persistence ----
-  const adapter = createAdapter(config);
+  const adapter = createAdapter(config, { manifest });
   let persistenceReady = $state(false);
   // Holds the resolved xAPI client for unload-time markUnloading. Set
   // after adapter.init() resolves and registered globally so useXAPI()
