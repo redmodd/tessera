@@ -44,7 +44,11 @@ function collectFiles(dir: string, base: string = ''): string[] {
 
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const relPath = base ? `${base}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
+    // Dirent is lstat-based; stat symlinks so a symlinked dir still recurses.
+    const isDir = entry.isSymbolicLink()
+      ? statSync(resolve(dir, entry.name)).isDirectory()
+      : entry.isDirectory();
+    if (isDir) {
       files.push(...collectFiles(resolve(dir, entry.name), relPath));
     } else {
       files.push(relPath);

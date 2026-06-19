@@ -192,7 +192,7 @@ function tesseraEntryPlugin(): Plugin {
           resolve(projectRoot, 'index.html'),
           generateIndexHtml(
             readLanguage(projectRoot),
-            readExportStandard(projectRoot),
+            cspMeta(readExportStandard(projectRoot)),
           ),
           'utf-8',
         );
@@ -224,10 +224,7 @@ function tesseraEntryPlugin(): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(
-              readLanguage(projectRoot),
-              readExportStandard(projectRoot),
-            );
+            const html = generateIndexHtml(readLanguage(projectRoot));
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -269,8 +266,9 @@ function readExportStandard(projectRoot: string): string {
   return (read.ok ? read.config.export?.standard : undefined) || 'web';
 }
 
-// Web export only — never on LMS packages, whose iframe JS bridges a meta CSP
-// could break. 'unsafe-inline' stays because Vite injects an inline
+// Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
+// could break) and never on the dev server (a meta connect-src would block
+// Vite's HMR websocket). 'unsafe-inline' stays because Vite injects an inline
 // modulepreload polyfill and Svelte ships scoped <style>. Override via a
 // tessera.config.js transformIndexHtml hook.
 const WEB_CSP =
@@ -285,11 +283,13 @@ const WEB_CSP =
   "object-src 'none'; " +
   "base-uri 'self'";
 
-function generateIndexHtml(lang: string, standard: string): string {
-  const csp =
-    standard === 'web'
-      ? `\n  <meta http-equiv="Content-Security-Policy" content="${WEB_CSP}" />`
-      : '';
+function cspMeta(standard: string): string {
+  return standard === 'web'
+    ? `\n  <meta http-equiv="Content-Security-Policy" content="${WEB_CSP}" />`
+    : '';
+}
+
+function generateIndexHtml(lang: string, csp = ''): string {
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>

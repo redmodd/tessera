@@ -94,4 +94,35 @@ describe('generated index.html Content-Security-Policy', () => {
       expect(html).not.toContain('Content-Security-Policy');
     }
   });
+
+  it('omits the CSP meta from the dev server (would block Vite HMR)', async () => {
+    writeConfig('web');
+    const plugin = findPlugin('tessera:entry');
+    (plugin.configResolved as any).call(plugin, {
+      root: projectRoot,
+      build: { outDir: 'dist' },
+      command: 'serve',
+    });
+    let handler: any;
+    const server = {
+      middlewares: {
+        use(h: any) {
+          handler = h;
+        },
+      },
+      async transformIndexHtml(_url: string, html: string) {
+        return html;
+      },
+    };
+    (plugin.configureServer as any).call(plugin, server)();
+
+    const body = await new Promise<string>((done) => {
+      handler(
+        { url: '/' },
+        { setHeader() {}, statusCode: 0, end: (b: string) => done(b) },
+        () => {},
+      );
+    });
+    expect(body).not.toContain('Content-Security-Policy');
+  });
 });
