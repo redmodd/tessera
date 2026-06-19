@@ -33,6 +33,24 @@ test.describe('Export — Web', () => {
     expect(existsSync(resolve(distPath, 'imsmanifest.xml'))).toBe(false);
     expect(existsSync(resolve(distPath, 'cmi5.xml'))).toBe(false);
   });
+
+  test('web export ships the baseline Content-Security-Policy meta', () => {
+    const html = readFileSync(
+      resolve(variantDir('free', 'web'), 'dist', 'index.html'),
+      'utf-8',
+    );
+    expect(html).toContain('http-equiv="Content-Security-Policy"');
+    expect(html).toContain("object-src 'none'");
+    expect(html).toContain("base-uri 'self'");
+  });
+
+  test('the CSP meta is web-only — absent from an LMS build', () => {
+    const html = readFileSync(
+      resolve(variantDir('free', 'xapi'), 'dist', 'index.html'),
+      'utf-8',
+    );
+    expect(html).not.toContain('Content-Security-Policy');
+  });
 });
 
 test.describe('Export — Serve Built Output', () => {
