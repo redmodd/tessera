@@ -86,6 +86,29 @@ describe('generated index.html Content-Security-Policy', () => {
     expect(html).toContain("base-uri 'self'");
   });
 
+  it('allows blob: frames and blob: workers, but not data: frames', () => {
+    const html = buildHtml('web');
+    expect(html).toContain("frame-src 'self' blob: https:");
+    expect(html).toContain("worker-src 'self' blob:");
+  });
+
+  it('fails closed (no CSP) when the config cannot be read', () => {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default {',
+      'utf-8',
+    );
+    const plugin = findPlugin('tessera:entry');
+    (plugin.configResolved as any).call(plugin, {
+      root: projectRoot,
+      build: { outDir: 'dist' },
+      command: 'build',
+    });
+    (plugin.buildStart as any).call(plugin);
+    const html = readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
+    expect(html).not.toContain('Content-Security-Policy');
+  });
+
   it('omits the CSP meta for LMS packages (would break iframe bridges)', () => {
     for (const standard of ['scorm12', 'scorm2004', 'cmi5', 'xapi']) {
       const html = buildHtml(standard);

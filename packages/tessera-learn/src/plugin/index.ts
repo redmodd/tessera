@@ -10,7 +10,11 @@ import {
   cpSync,
   mkdirSync,
 } from 'node:fs';
-import { generateManifest, readCourseConfig } from './manifest.js';
+import {
+  generateManifest,
+  readCourseConfig,
+  type CourseConfigRead,
+} from './manifest.js';
 import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
 import {
@@ -188,11 +192,12 @@ function tesseraEntryPlugin(): Plugin {
     // For build mode: write index.html so Rollup can find it
     buildStart() {
       if (isBuild) {
+        const read = readCourseConfig(projectRoot);
         writeFileSync(
           resolve(projectRoot, 'index.html'),
           generateIndexHtml(
-            readLanguage(projectRoot),
-            cspMeta(readExportStandard(projectRoot)),
+            readLanguage(read),
+            cspMeta(readExportStandard(read)),
           ),
           'utf-8',
         );
@@ -224,7 +229,9 @@ function tesseraEntryPlugin(): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(readLanguage(projectRoot));
+            const html = generateIndexHtml(
+              readLanguage(readCourseConfig(projectRoot)),
+            );
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -255,15 +262,16 @@ function tesseraEntryPlugin(): Plugin {
 // 'en' fallback applied here: the config default-merge runs later than buildStart.
 // Only a validated BCP-47 tag is interpolated into <html lang>, so a malformed
 // value (caught separately as a warning) can't ship a broken attribute.
-function readLanguage(projectRoot: string): string {
-  const read = readCourseConfig(projectRoot);
+function readLanguage(read: CourseConfigRead): string {
   const lang = read.ok ? read.config.language : undefined;
   return isPlausibleLanguageTag(lang) ? lang : 'en';
 }
 
-function readExportStandard(projectRoot: string): string {
-  const read = readCourseConfig(projectRoot);
-  return (read.ok ? read.config.export?.standard : undefined) || 'web';
+// Fail closed on an unreadable config: cspMeta only emits for exactly 'web', so
+// an unknown standard withholds the CSP rather than guess the one mode it breaks.
+function readExportStandard(read: CourseConfigRead): string {
+  if (!read.ok) return 'unknown';
+  return read.config.export?.standard || 'web';
 }
 
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
@@ -279,7 +287,8 @@ const WEB_CSP =
   "script-src 'self' 'unsafe-inline'; " +
   "font-src 'self' data:; " +
   "connect-src 'self' https:; " +
-  'frame-src https:; ' +
+  "frame-src 'self' blob: https:; " +
+  "worker-src 'self' blob:; " +
   "object-src 'none'; " +
   "base-uri 'self'";
 
