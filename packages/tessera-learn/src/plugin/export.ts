@@ -44,11 +44,14 @@ function collectFiles(dir: string, base: string = ''): string[] {
   const files: string[] = [];
   if (!existsSync(dir)) return files;
 
-  for (const entry of readdirSync(dir)) {
-    const fullPath = resolve(dir, entry);
-    const relPath = base ? `${base}/${entry}` : entry;
-    if (statSync(fullPath).isDirectory()) {
-      files.push(...collectFiles(fullPath, relPath));
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const relPath = base ? `${base}/${entry.name}` : entry.name;
+    // Dirent is lstat-based; stat symlinks so a symlinked dir still recurses.
+    const isDir = entry.isSymbolicLink()
+      ? statSync(resolve(dir, entry.name)).isDirectory()
+      : entry.isDirectory();
+    if (isDir) {
+      files.push(...collectFiles(resolve(dir, entry.name), relPath));
     } else {
       files.push(relPath);
     }

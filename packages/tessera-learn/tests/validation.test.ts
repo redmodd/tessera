@@ -217,6 +217,61 @@ describe('config validation', () => {
     expect(errors.filter((e) => e.includes('export.standard'))).toHaveLength(0);
   });
 
+  it('accepts a well-formed export.csp on web export', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web", csp: { "font-src": ["https://fonts.gstatic.com"] } },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('export.csp'))).toHaveLength(0);
+    expect(warnings.filter((w) => w.includes('export.csp'))).toHaveLength(0);
+  });
+
+  it('warns on a malformed export.csp', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web", csp: { "font-src": "https://x" } },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"export.csp" must be false or an object of directive',
+      ),
+    );
+  });
+
+  it('warns that export.csp is ignored on non-web export', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12", csp: { "font-src": ["https://x"] } },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('"export.csp" is ignored when "export.standard"'),
+    );
+  });
+
   it('errors on passingScore out of range (too high)', () => {
     createValidProject(testRoot);
     writeConfig(

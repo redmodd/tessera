@@ -602,6 +602,24 @@ canAccess: (ctx) => {
 
 Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
 
+### Web export Content-Security-Policy
+
+Web builds emit a baseline CSP `<meta>` (LMS packages and the dev server don't). It allows any `https:` for images/media/frames/network, but **not** for scripts, styles, or fonts — so a CDN script/stylesheet/font is blocked until you allow its origin. Extend per-directive via `export.csp` (sources are **appended** to the baseline, never replaced):
+
+```js
+export: {
+  standard: 'web',
+  csp: {
+    'style-src': ['https://fonts.googleapis.com'],
+    'font-src': ['https://fonts.gstatic.com'],
+  },
+}
+```
+
+- `export.csp: false` drops the meta entirely (use when your host sets a CSP header).
+- To **tighten** or replace a directive (not just add), use a `transformIndexHtml` hook — `export.csp` only adds.
+- Ignored unless `standard` is `'web'`.
+
 ### Validation
 
 The plugin validates on every dev start and build (page syntax, manifest shape, `pageConfig`, question components, asset references, data-contract bypass). Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. Run `pnpm validate <course>` to check without building.
@@ -853,7 +871,7 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 
 - **Actor priority:** author-supplied `xapi.actor` always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
 - **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` function or run a proxy.
-- **Never ship a static `auth` string on web** — the bundle is public. Use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
+- **`course.config.js` is serialized verbatim into the client bundle** — every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in it; use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
 - **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).
 - **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
 - **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.

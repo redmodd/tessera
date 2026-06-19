@@ -10,7 +10,11 @@ import {
   cpSync,
   mkdirSync,
 } from 'node:fs';
-import { generateManifest, readCourseConfig } from './manifest.js';
+import {
+  generateManifest,
+  readCourseConfig,
+  type CourseConfigRead,
+} from './manifest.js';
 import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
 import {
@@ -25,6 +29,7 @@ import {
   isIgnored,
   type A11ySettings,
 } from './validation.js';
+import { buildCsp } from './csp.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
@@ -188,9 +193,10 @@ function tesseraEntryPlugin(): Plugin {
     // For build mode: write index.html so Rollup can find it
     buildStart() {
       if (isBuild) {
+        const read = readCourseConfig(projectRoot);
         writeFileSync(
           resolve(projectRoot, 'index.html'),
-          generateIndexHtml(readLanguage(projectRoot)),
+          generateIndexHtml(readLanguage(read), cspMeta(read)),
           'utf-8',
         );
       }
@@ -221,7 +227,9 @@ function tesseraEntryPlugin(): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(readLanguage(projectRoot));
+            const html = generateIndexHtml(
+              readLanguage(readCourseConfig(projectRoot)),
+            );
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -252,18 +260,35 @@ function tesseraEntryPlugin(): Plugin {
 // 'en' fallback applied here: the config default-merge runs later than buildStart.
 // Only a validated BCP-47 tag is interpolated into <html lang>, so a malformed
 // value (caught separately as a warning) can't ship a broken attribute.
-function readLanguage(projectRoot: string): string {
-  const read = readCourseConfig(projectRoot);
+function readLanguage(read: CourseConfigRead): string {
   const lang = read.ok ? read.config.language : undefined;
   return isPlausibleLanguageTag(lang) ? lang : 'en';
 }
 
-function generateIndexHtml(lang: string): string {
+// Fail closed on an unreadable config: cspMeta only emits for exactly 'web', so
+// an unknown standard withholds the CSP rather than guess the one mode it breaks.
+function readExportStandard(read: CourseConfigRead): string {
+  if (!read.ok) return 'unknown';
+  return read.config.export?.standard || 'web';
+}
+
+// Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
+// could break) and never on the dev server (a meta connect-src would block
+// Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
+// `false` drops the meta for deployments that set a CSP header themselves.
+function cspMeta(read: CourseConfigRead): string {
+  if (readExportStandard(read) !== 'web') return '';
+  const csp = read.ok ? read.config.export?.csp : undefined;
+  if (csp === false) return '';
+  return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
+}
+
+function generateIndexHtml(lang: string, csp = ''): string {
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />${csp}
   <title>Tessera Course</title>
 </head>
 <body>
@@ -621,7 +646,8 @@ function tesseraManifestPlugin(manifestRef: {
           value === Infinity ? 1e9 : value,
         );
         const b64 = Buffer.from(json).toString('base64');
-        return `export default JSON.parse(atob("${b64}"));`;
+        // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
+        return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
       }
       return null;
     },
