@@ -53,4 +53,15 @@ describe('isCspOverrides', () => {
     expect(isCspOverrides({ 'font-src': 'https://x' })).toBe(false);
     expect(isCspOverrides({ 'font-src': [1] })).toBe(false);
   });
+
+  it('rejects sources or directive keys that would corrupt the policy', () => {
+    // A ';' in a source would inject an adjacent directive once joined.
+    expect(isCspOverrides({ 'font-src': ['https://x; script-src *'] })).toBe(
+      false,
+    );
+    // Whitespace splits a single source into two.
+    expect(isCspOverrides({ 'font-src': ["'self' https://x"] })).toBe(false);
+    expect(isCspOverrides({ '': ["'self'"] })).toBe(false);
+    expect(isCspOverrides({ 'font src': ["'self'"] })).toBe(false);
+  });
 });

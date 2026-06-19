@@ -18,14 +18,21 @@ export const WEB_CSP_BASELINE: Record<string, string[]> = {
   'base-uri': ["'self'"],
 };
 
+// Reject the separators (whitespace ends a source, ';' ends a directive, ','
+// ends a policy) so a stray char can't inject directives when sources are joined.
+const CSP_DIRECTIVE = /^[a-zA-Z][a-zA-Z-]*$/;
+const CSP_SOURCE = /^[^\s;,]+$/;
+
 export function isCspOverrides(v: unknown): v is Record<string, string[]> {
   return (
     typeof v === 'object' &&
     v !== null &&
     !Array.isArray(v) &&
-    Object.values(v).every(
-      (sources) =>
-        Array.isArray(sources) && sources.every((s) => typeof s === 'string'),
+    Object.entries(v).every(
+      ([directive, sources]) =>
+        CSP_DIRECTIVE.test(directive) &&
+        Array.isArray(sources) &&
+        sources.every((s) => typeof s === 'string' && CSP_SOURCE.test(s)),
     )
   );
 }
