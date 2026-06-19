@@ -41,10 +41,12 @@ interface CacheEntry {
 }
 
 const rootCache = new Map<string, CacheEntry>();
+const jsModuleCache = new Map<string, Node | null>();
 
 /** Drop every cached root. Call at the start of a run to scope the cache. */
 export function clearParseCache(): void {
   rootCache.clear();
+  jsModuleCache.clear();
 }
 
 function parseRoot(source: string): CacheEntry {
@@ -168,14 +170,19 @@ const TsParser = Parser.extend(
 );
 
 function parseJsModule(source: string): Node | null {
+  const cached = jsModuleCache.get(source);
+  if (cached !== undefined) return cached;
+  let result: Node | null;
   try {
-    return TsParser.parse(source, {
+    result = TsParser.parse(source, {
       ecmaVersion: 'latest',
       sourceType: 'module',
     }) as unknown as Node;
   } catch {
-    return null;
+    result = null;
   }
+  jsModuleCache.set(source, result);
+  return result;
 }
 
 function unwrapTsCast(node: Node | null): Node | null {
