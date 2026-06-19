@@ -657,8 +657,7 @@ function tesseraManifestPlugin(manifestRef: {
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 
 // `takesApi`: SCORM detectors return the API object the constructor needs;
-// cmi5/xAPI ones return a boolean. `missingApiError` comes from the
-// adapter-free lms-error.js so the four unused adapters stay out of the bundle.
+// cmi5/xAPI ones return a boolean.
 const LMS_ADAPTER_GEN: Record<
   'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
   { adapter: string; module: string; detect: string; takesApi: boolean }
