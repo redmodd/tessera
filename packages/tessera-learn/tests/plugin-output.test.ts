@@ -61,8 +61,6 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
     ) as string;
 
     const expr = code.replace(/^export default /, '').replace(/;$/, '');
-    // Evaluate exactly what ships: atob + TextDecoder, all browser-available
-    // globals that exist in Node 24 too.
     const manifest = (0, eval)(expr) as { pages: { title: string }[] };
     expect(manifest.pages[0].title).toBe('Café 中文 🎓 Évaluation');
   });
