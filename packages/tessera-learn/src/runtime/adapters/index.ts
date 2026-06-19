@@ -1,4 +1,5 @@
 import type { CourseConfig } from '../types.js';
+import type { Manifest } from '../../plugin/manifest.js';
 import type { PersistenceAdapter } from '../persistence.js';
 import { WebAdapter } from './web.js';
 import { SCORM12Adapter } from './scorm12.js';
@@ -31,6 +32,8 @@ export interface CreateAdapterOptions {
    * so dev builds stay forgiving and production builds fail loud.
    */
   allowFallback?: boolean;
+  /** Course manifest — lets the WebAdapter fingerprint its page structure into the storage key. */
+  manifest?: Manifest;
 }
 
 type LMSStandard = 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
@@ -122,5 +125,5 @@ export function createAdapter(
       `Tessera (dev): ${entry.warnLabel} not found — falling back to localStorage`,
     );
   }
-  return new WebAdapter(config);
+  return new WebAdapter(config, options.manifest);
 }

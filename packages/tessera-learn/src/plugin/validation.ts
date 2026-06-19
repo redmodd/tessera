@@ -24,7 +24,11 @@ import {
 } from '../runtime/xapi/agent-rules.js';
 import { httpOrigin } from '../runtime/xapi/derive-actor.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
-import { FEEDBACK_MODES, RETRY_MODES } from '../runtime/types.js';
+import {
+  FEEDBACK_MODES,
+  RETRY_MODES,
+  courseIdentity,
+} from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isVideoEmbed } from '../components/video-embed.js';
 
@@ -143,6 +147,7 @@ export function reportValidationIssues({
 // Known top-level config fields
 const KNOWN_CONFIG_FIELDS = new Set([
   'title',
+  'id',
   'description',
   'author',
   'version',
@@ -235,6 +240,7 @@ export function validateProject(projectRoot: string): ValidationResult {
 
 interface ParsedConfig {
   title?: string;
+  id?: string;
   navigation?: { mode?: string };
   completion?: {
     mode?: string;
@@ -313,6 +319,20 @@ function parseConfig(
         A11Y_IDS.lang,
         `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
       ),
+    );
+  }
+
+  // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
+  // SCORM identity is owned by the LMS, so only nudge for the others.
+  const standard = config.export?.standard;
+  const identityStandard =
+    standard === undefined ||
+    standard === 'web' ||
+    standard === 'cmi5' ||
+    standard === 'xapi';
+  if (identityStandard && !courseIdentity(config)) {
+    warnings.push(
+      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 

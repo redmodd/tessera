@@ -38,6 +38,7 @@ function createValidProject(root: string): void {
     root,
     `export default {
   title: "Test Course",
+  id: "urn:uuid:test-course",
   language: "en",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
@@ -85,6 +86,40 @@ describe('config validation', () => {
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toHaveLength(0);
     expect(warnings).toHaveLength(0);
+  });
+
+  it('warns when a web course has no id', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  language: "en",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(expect.stringContaining('no "id" set'));
+  });
+
+  it('does not warn about a missing id for SCORM exports', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  language: "en",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(expect.stringContaining('no "id" set'));
   });
 
   it('warns on unknown config fields', () => {

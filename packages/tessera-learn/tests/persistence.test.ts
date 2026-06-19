@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { SavedState } from '../src/runtime/persistence.js';
+import { WebAdapter } from '../src/runtime/adapters/web.js';
+import type { CourseConfig } from '../src/runtime/types.js';
+import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 
 // We can't import WebAdapter directly in a Node test (no localStorage),
 // so we test the serialization logic and adapter contract here.
@@ -173,24 +176,8 @@ describe('WebAdapter contract', () => {
         state = s;
         localStorage.setItem(storageKey, JSON.stringify(s));
       },
-      getStorageKey: () => storageKey,
     };
   }
-
-  it('derives storage key from course title', () => {
-    const adapter = createTestAdapter('My Course Title');
-    expect(adapter.getStorageKey()).toBe('tessera-my-course-title');
-  });
-
-  it('derives storage key with special characters', () => {
-    const adapter = createTestAdapter('Course: Advanced (v2.0)!');
-    expect(adapter.getStorageKey()).toBe('tessera-course-advanced-v20');
-  });
-
-  it('uses fallback key for empty title', () => {
-    const adapter = createTestAdapter('');
-    expect(adapter.getStorageKey()).toBe('tessera-tessera-course');
-  });
 
   it('init() reads from localStorage', async () => {
     const state: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
@@ -256,5 +243,80 @@ describe('WebAdapter contract', () => {
     expect(state!.v).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(state!.q['3']).toBe(85);
     expect(state!.d).toBe(600);
+  });
+});
+
+describe('WebAdapter storage key', () => {
+  let storage: Map<string, string>;
+
+  beforeEach(() => {
+    storage = new Map();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+  });
+
+  const makeConfig = (over: Partial<CourseConfig>) =>
+    ({ title: 'My Course', ...over }) as CourseConfig;
+
+  const page = (slug: string, index: number): ManifestPage => ({
+    index,
+    title: slug,
+    slug,
+    importPath: `/pages/${slug}.svelte`,
+    quiz: null,
+  });
+
+  const manifestOf = (...slugs: string[]): Manifest => ({
+    sections: [],
+    pages: slugs.map(page),
+    totalPages: slugs.length,
+  });
+
+  const state = (): SavedState => ({ b: 1, v: [0, 1], q: {}, d: 5 });
+
+  const keyFor = (config: CourseConfig, manifest?: Manifest): string => {
+    storage.clear();
+    new WebAdapter(config, manifest).saveState(state());
+    return [...storage.keys()][0];
+  };
+
+  it('keys on the explicit id plus a structure fingerprint', () => {
+    const key = keyFor(
+      makeConfig({ id: 'urn:uuid:abc' }),
+      manifestOf('intro', 'quiz'),
+    );
+    expect(key).toMatch(/^tessera-urn:uuid:abc-[a-z0-9]+$/);
+  });
+
+  it('two courses with the same title but distinct ids never collide', () => {
+    const m = manifestOf('intro', 'quiz');
+    const a = keyFor(makeConfig({ id: 'urn:uuid:aaa' }), m);
+    const b = keyFor(makeConfig({ id: 'urn:uuid:bbb' }), m);
+    expect(a).not.toBe(b);
+  });
+
+  it('a structure change redirects to a fresh key', () => {
+    const c = makeConfig({ id: 'urn:uuid:abc' });
+    const before = keyFor(c, manifestOf('intro', 'quiz'));
+    const reordered = keyFor(c, manifestOf('quiz', 'intro'));
+    const added = keyFor(c, manifestOf('intro', 'quiz', 'summary'));
+    expect(reordered).not.toBe(before);
+    expect(added).not.toBe(before);
+  });
+
+  it('an unchanged structure keeps the same key (resume preserved)', () => {
+    const c = makeConfig({ id: 'urn:uuid:abc' });
+    expect(keyFor(c, manifestOf('intro', 'quiz'))).toBe(
+      keyFor(c, manifestOf('intro', 'quiz')),
+    );
+  });
+
+  it('falls back to a fixed key when no id is set (title is not used)', () => {
+    expect(keyFor(makeConfig({ title: 'My Course' }))).toBe(
+      'tessera-tessera-course',
+    );
   });
 });

@@ -242,6 +242,16 @@ describe('create-tessera workspace scaffold', () => {
     expect(config).toContain("title: 'Starter Course'");
   });
 
+  it('mints a unique urn:uuid id for the seed course', () => {
+    runCLI('my-courses', testDir);
+    const config = readFileSync(
+      resolve(testDir, 'my-courses', SEED, 'course.config.js'),
+      'utf-8',
+    );
+    expect(config).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+    expect(config).not.toContain('__COURSE_ID__');
+  });
+
   it('renames dotfiles on copy', () => {
     runCLI('dotfile-courses', testDir);
     const ws = resolve(testDir, 'dotfile-courses');

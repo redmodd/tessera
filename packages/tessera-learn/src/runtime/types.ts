@@ -10,6 +10,15 @@ export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
 
 /**
+ * Trimmed course identity, or '' when absent. Single source of truth for the
+ * "is there a usable id?" check shared by the web storage key, the cmi5/xAPI
+ * id derivation, and the config validator.
+ */
+export function courseIdentity(config: { id?: unknown }): string {
+  return (typeof config.id === 'string' && config.id.trim()) || '';
+}
+
+/**
  * Per-page quiz configuration. Single source of truth — the build plugin
  * extracts this from `pageConfig.quiz` and embeds it in the manifest;
  * the runtime reads it from there. Keep field shapes in sync.
@@ -24,6 +33,10 @@ export interface QuizConfig {
 
 export interface CourseConfig {
   title: string;
+  /** Stable, unique course identity (e.g. 'urn:uuid:…'). Seeds the web
+   * localStorage key and the cmi5/xAPI LRS activity id; scaffolders generate one.
+   * Absent → both fall back to a fixed value, colliding across courses. */
+  id?: string;
   description?: string;
   author?: string;
   version?: string;

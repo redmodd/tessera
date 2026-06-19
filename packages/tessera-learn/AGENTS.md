@@ -513,6 +513,7 @@ For the common case, set `branding.primaryColor` and `branding.fontFamily` in `c
 ```js
 export default {
   title: 'My Course', // required — the only field with no default
+  id: 'urn:uuid:…', // unique course identity; scaffolders generate one — keep it
   description: '',
   author: '',
   version: '1.0.0',
@@ -552,16 +553,17 @@ export default {
 
 ### Field behaviour
 
-| Field                           | Behaviour                                                                                                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                   |
-| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                 |
-| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes                                                                                                                                |
-| `completion.mode: "percentage"` | Completes when `visitedPages / totalPages * 100 >= percentageThreshold`                                                                                                     |
-| `completion.mode: "quiz"`       | Completes when graded quiz average >= `scoring.passingScore`                                                                                                                |
-| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                         |
-| `a11y.level: "error"`           | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless |
-| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs)                                                         |
+| Field                           | Behaviour                                                                                                                                                                                                                                       |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                            | Unique course identity; seeds the web localStorage key and the cmi5/xAPI activity id. Scaffolders mint a `urn:uuid:…`. Missing → falls back to a fixed value (collides across courses) and the build warns. `tessera duplicate` regenerates it. |
+| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                                                                                       |
+| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                                                                                     |
+| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes                                                                                                                                                                                                    |
+| `completion.mode: "percentage"` | Completes when `visitedPages / totalPages * 100 >= percentageThreshold`                                                                                                                                                                         |
+| `completion.mode: "quiz"`       | Completes when graded quiz average >= `scoring.passingScore`                                                                                                                                                                                    |
+| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                                                                                             |
+| `a11y.level: "error"`           | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless                                                                     |
+| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs)                                                                                                                             |
 
 ### Minimum config
 

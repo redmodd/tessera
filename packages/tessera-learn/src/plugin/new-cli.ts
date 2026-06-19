@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, relative, resolve } from 'node:path';
 import { findWorkspaceRoot } from './course-root.js';
 import { validateProjectName, toTitleCase } from './project-name.js';
@@ -43,6 +44,7 @@ export function runNew(name: string | undefined, cwd: string): number {
   const templateDir = join(resolvePackageRoot(), 'templates', 'course');
   copyTemplate(templateDir, courseDir, {
     PROJECT_TITLE: toTitleCase(name),
+    COURSE_ID: `urn:uuid:${randomUUID()}`,
   });
 
   const rel = relative(workspaceRoot, courseDir);

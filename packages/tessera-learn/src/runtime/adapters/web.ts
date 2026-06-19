@@ -1,7 +1,21 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { CourseConfig } from '../types.js';
+import { courseIdentity } from '../types.js';
 import type { Interaction } from '../interaction.js';
-import { slugify } from '../slugify.js';
+import type { Manifest } from '../../plugin/manifest.js';
+
+// FNV-1a over the ordered page slugs. SavedState is keyed by page index, so a
+// structure change must change the key — else stale state restores onto the
+// wrong pages. Slugs can't contain a NUL, so it's a collision-proof delimiter.
+function structureFingerprint(manifest: Manifest): string {
+  const slugs = manifest.pages.map((p) => p.slug).join('\0');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < slugs.length; i++) {
+    h ^= slugs.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
 
 /**
  * Web persistence adapter — stores course state in localStorage.
@@ -11,9 +25,10 @@ export class WebAdapter implements PersistenceAdapter {
   #storageKey: string;
   #state: SavedState | null = null;
 
-  constructor(config: CourseConfig) {
-    const courseId = slugify(config.title || '') || 'tessera-course';
-    this.#storageKey = `tessera-${courseId}`;
+  constructor(config: CourseConfig, manifest?: Manifest) {
+    const base = courseIdentity(config) || 'tessera-course';
+    const fp = manifest ? structureFingerprint(manifest) : '';
+    this.#storageKey = `tessera-${base}${fp ? `-${fp}` : ''}`;
   }
 
   async init(): Promise<void> {

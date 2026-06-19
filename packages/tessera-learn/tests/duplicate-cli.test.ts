@@ -31,6 +31,19 @@ function seedCourse(name: string): string {
   return dir;
 }
 
+// Seed courses/src with a hand-written config to exercise the id rewriter.
+function writeSrcConfig(config: string): string {
+  const src = join(ws, 'courses', 'src');
+  mkdirSync(join(src, 'pages'), { recursive: true });
+  writeFileSync(join(src, 'course.config.js'), config);
+  writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
+  return src;
+}
+
+function readCopyConfig(): string {
+  return readFileSync(join(ws, 'courses', 'copy', 'course.config.js'), 'utf-8');
+}
+
 beforeEach(() => {
   ws = makeWorkspace();
 });
@@ -70,6 +83,132 @@ describe('runDuplicate', () => {
     // Source untouched.
     expect(existsSync(join(src, 'dist', 'index.html'))).toBe(true);
     expect(existsSync(join(src, 'a11y-report.json'))).toBe(true);
+  });
+
+  it('regenerates the course id so the copy is a distinct course', () => {
+    const src = writeSrcConfig(
+      "export default {\n  title: 'Src',\n  id: 'urn:uuid:original',\n};",
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+    // Source id is untouched.
+    expect(readFileSync(join(src, 'course.config.js'), 'utf-8')).toContain(
+      'urn:uuid:original',
+    );
+  });
+
+  it('injects an id when the source course has none', () => {
+    seedCourse('src');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+    expect(readCopyConfig()).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('regenerates a backtick-quoted id', () => {
+    writeSrcConfig(
+      'export default {\n  title: "Src",\n  id: `urn:uuid:original`,\n};',
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('replaces a non-string id in place rather than duplicating the key', () => {
+    writeSrcConfig("export default {\n  title: 'Src',\n  id: 123,\n};");
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy.match(/\bid\s*:/g)).toHaveLength(1);
+    expect(copy).not.toContain('id: 123');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('rewrites a quoted top-level id key in place', () => {
+    writeSrcConfig(
+      "export default {\n  title: 'Src',\n  'id': 'urn:uuid:original',\n};",
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy.match(/\bid'?\s*:/g)).toHaveLength(1);
+    expect(copy).toMatch(/id': 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('rewrites the real id and leaves an id: mentioned in a comment alone', () => {
+    writeSrcConfig(
+      "export default {\n  // remember to set the id: properly\n  title: 'X',\n  id: 'urn:uuid:original',\n};",
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toContain('// remember to set the id: properly');
+    expect(copy.match(/^\s*id\s*:/gm)).toHaveLength(1);
+  });
+
+  it('injects an id when only a comment mentions id:', () => {
+    writeSrcConfig(
+      '// set the id: below\nexport default {\n  title: "Src",\n};',
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+    expect(readCopyConfig()).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('regenerates the id of an indirectly exported config', () => {
+    writeSrcConfig(
+      "const config = {\n  title: 'X',\n  id: 'urn:uuid:original',\n};\nexport default config;",
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('regenerates the id of a wrapped (call-form) export', () => {
+    writeSrcConfig(
+      "export default defineConfig({\n  title: 'Src',\n  id: 'urn:uuid:original',\n});",
+    );
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+
+    const copy = readCopyConfig();
+    expect(copy).not.toContain('urn:uuid:original');
+    expect(copy).toContain('defineConfig(');
+    expect(copy).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+  });
+
+  it('warns and leaves identity unset when no id-bearing object is found', () => {
+    writeSrcConfig("export default makeConfig('src');");
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(runDuplicate('src', 'copy', ws)).toBe(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not set a unique id'),
+    );
+    expect(readCopyConfig()).toContain("makeConfig('src')");
   });
 
   it('requires both arguments', () => {

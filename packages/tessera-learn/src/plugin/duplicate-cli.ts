@@ -1,7 +1,42 @@
-import { cpSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { basename, join, relative } from 'node:path';
 import { resolveCourse } from './course-root.js';
 import { validateProjectName } from './project-name.js';
+
+// The top-level `id` property as scaffolders write it: the key (bare or quoted)
+// first on its own line, then its value. Anchoring to line start keeps `id:`
+// inside a comment or a string value from matching, and CourseConfig has no
+// nested `id`, so the first match is always the course identity.
+const ID_LINE =
+  /^([ \t]*'?id'?[ \t]*:[ \t]*)('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\n,}]*)/m;
+const DEFAULT_OBJECT = /export\s+default\s*\{/;
+
+// A verbatim copy inherits the source's `id`; mint a fresh one so the duplicate
+// is a distinct course (own storage key + LRS activity id).
+function reidentifyCourse(courseRoot: string): void {
+  const configPath = join(courseRoot, 'course.config.js');
+  if (!existsSync(configPath)) return;
+  const text = readFileSync(configPath, 'utf-8');
+  const newId = `'urn:uuid:${randomUUID()}'`;
+
+  if (ID_LINE.test(text)) {
+    writeFileSync(configPath, text.replace(ID_LINE, `$1${newId}`));
+    return;
+  }
+  const obj = DEFAULT_OBJECT.exec(text);
+  if (obj) {
+    const at = obj.index + obj[0].length;
+    writeFileSync(
+      configPath,
+      `${text.slice(0, at)}\n  id: ${newId},${text.slice(at)}`,
+    );
+    return;
+  }
+  console.warn(
+    `[tessera duplicate] Could not set a unique id in ${configPath} — the copy shares the source's identity. Add a unique "id" manually.`,
+  );
+}
 
 const HELP =
   'Usage: tessera duplicate <source> <new>\n\n' +
@@ -62,6 +97,7 @@ export function runDuplicate(
     recursive: true,
     filter: (src) => src === srcDir || !skip(src),
   });
+  reidentifyCourse(destDir);
 
   const rel = relative(workspaceRoot, destDir);
   const srcRel = relative(workspaceRoot, srcDir);

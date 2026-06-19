@@ -48,6 +48,17 @@ describe('runNew', () => {
     expect(config).not.toContain('__PROJECT_TITLE__');
   });
 
+  it('mints a unique urn:uuid id', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    runNew('my-lesson', ws);
+    const config = readFileSync(
+      join(ws, 'courses', 'my-lesson', 'course.config.js'),
+      'utf-8',
+    );
+    expect(config).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
+    expect(config).not.toContain('__COURSE_ID__');
+  });
+
   it('rejects an invalid course name', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = runNew('Bad Name', ws);
