@@ -12,18 +12,14 @@ import {
   hasCMI5LaunchParams,
   hasXAPILaunchParams,
 } from './discovery.js';
+import {
+  LMSAdapterError,
+  lmsWarnLabel,
+  missingApiError,
+  type LMSStandard,
+} from './lms-error.js';
 
-export class LMSAdapterError extends Error {
-  standard: 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
-  constructor(
-    standard: 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
-    message: string,
-  ) {
-    super(message);
-    this.name = 'LMSAdapterError';
-    this.standard = standard;
-  }
-}
+export { LMSAdapterError, missingApiError };
 
 export interface CreateAdapterOptions {
   /**
@@ -36,63 +32,19 @@ export interface CreateAdapterOptions {
   manifest?: Manifest;
 }
 
-type LMSStandard = 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
-
-/** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. Labels are the single source for the dev warning and production error. */
-const LMS_ADAPTERS: Record<
-  LMSStandard,
-  {
-    detect: () => PersistenceAdapter | null;
-    warnLabel: string;
-    name: string;
-    missingDetail: string;
-  }
-> = {
-  scorm12: {
-    detect: () => {
-      const api = findSCORM12API();
-      return api ? new SCORM12Adapter(api) : null;
-    },
-    warnLabel: 'SCORM 1.2 API',
-    name: 'SCORM 1.2',
-    missingDetail:
-      'No SCORM 1.2 API object found in the window.parent or window.opener chain.',
+/** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. Labels and the fail-loud error live in `./lms-error.js`. */
+const LMS_ADAPTERS: Record<LMSStandard, () => PersistenceAdapter | null> = {
+  scorm12: () => {
+    const api = findSCORM12API();
+    return api ? new SCORM12Adapter(api) : null;
   },
-  scorm2004: {
-    detect: () => {
-      const api = findSCORM2004API();
-      return api ? new SCORM2004Adapter(api) : null;
-    },
-    warnLabel: 'SCORM 2004 API',
-    name: 'SCORM 2004',
-    missingDetail:
-      'No SCORM 2004 API object found in the window.parent or window.opener chain.',
+  scorm2004: () => {
+    const api = findSCORM2004API();
+    return api ? new SCORM2004Adapter(api) : null;
   },
-  cmi5: {
-    detect: () => (hasCMI5LaunchParams() ? new CMI5Adapter() : null),
-    warnLabel: 'cmi5 launch parameters',
-    name: 'cmi5',
-    missingDetail:
-      'No cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
-  },
-  xapi: {
-    detect: () => (hasXAPILaunchParams() ? new XAPIAdapter() : null),
-    warnLabel: 'xAPI launch parameters',
-    name: 'xAPI 1.0.3',
-    missingDetail:
-      'No xAPI launch parameters (endpoint / auth / actor / activity_id) on the URL.',
-  },
+  cmi5: () => (hasCMI5LaunchParams() ? new CMI5Adapter() : null),
+  xapi: () => (hasXAPILaunchParams() ? new XAPIAdapter() : null),
 };
-
-function missingApiError(standard: LMSStandard): LMSAdapterError {
-  const { name, missingDetail } = LMS_ADAPTERS[standard];
-  return new LMSAdapterError(
-    standard,
-    `Tessera: this course is configured for ${name} but ${missingDetail} ` +
-      `The course must be launched from an LMS that provides the ${name} runtime. ` +
-      `If you are testing locally, run \`npm run dev\` instead, or set export.standard to "web".`,
-  );
-}
 
 /**
  * Select the appropriate persistence adapter based on course config.
@@ -117,12 +69,11 @@ export function createAdapter(
     standard === 'cmi5' ||
     standard === 'xapi'
   ) {
-    const entry = LMS_ADAPTERS[standard];
-    const adapter = entry.detect();
+    const adapter = LMS_ADAPTERS[standard]();
     if (adapter) return adapter;
     if (!allowFallback) throw missingApiError(standard);
     console.warn(
-      `Tessera (dev): ${entry.warnLabel} not found — falling back to localStorage`,
+      `Tessera (dev): ${lmsWarnLabel(standard)} not found — falling back to localStorage`,
     );
   }
   return new WebAdapter(config, options.manifest);

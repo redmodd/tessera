@@ -656,6 +656,55 @@ function tesseraManifestPlugin(manifestRef: {
 
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 
+// `takesApi`: SCORM detectors return the API object the constructor needs;
+// cmi5/xAPI ones return a boolean.
+const LMS_ADAPTER_GEN: Record<
+  'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
+  { adapter: string; module: string; detect: string; takesApi: boolean }
+> = {
+  scorm12: {
+    adapter: 'SCORM12Adapter',
+    module: 'scorm12',
+    detect: 'findSCORM12API',
+    takesApi: true,
+  },
+  scorm2004: {
+    adapter: 'SCORM2004Adapter',
+    module: 'scorm2004',
+    detect: 'findSCORM2004API',
+    takesApi: true,
+  },
+  cmi5: {
+    adapter: 'CMI5Adapter',
+    module: 'cmi5',
+    detect: 'hasCMI5LaunchParams',
+    takesApi: false,
+  },
+  xapi: {
+    adapter: 'XAPIAdapter',
+    module: 'xapi',
+    detect: 'hasXAPILaunchParams',
+    takesApi: false,
+  },
+};
+
+function generateLmsAdapterModule(
+  standard: keyof typeof LMS_ADAPTER_GEN,
+): string {
+  const { adapter, module, detect, takesApi } = LMS_ADAPTER_GEN[standard];
+  const guard = takesApi
+    ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
+    : `if (!${detect}()) throw missingApiError('${standard}');\n  return new ${adapter}();`;
+  return `
+import { ${adapter} } from 'tessera-learn/runtime/adapters/${module}.js';
+import { ${detect} } from 'tessera-learn/runtime/adapters/discovery.js';
+import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
+export function createAdapter() {
+  ${guard}
+}
+`;
+}
+
 function tesseraAdapterPlugin(): Plugin {
   return virtualModule(
     'tessera:adapter',
@@ -677,57 +726,17 @@ function tesseraAdapterPlugin(): Plugin {
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
       if (isAuditBuild()) standard = 'web';
 
-      switch (standard) {
-        case 'scorm12':
-          return `
-import { SCORM12Adapter } from 'tessera-learn/runtime/adapters/scorm12.js';
-import { findSCORM12API } from 'tessera-learn/runtime/adapters/discovery.js';
-import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
-export function createAdapter() {
-  const api = findSCORM12API();
-  if (!api) throw new LMSAdapterError('scorm12', 'Tessera: SCORM 1.2 API not found in window.parent/opener chain. Course must be launched from a SCORM 1.2 LMS.');
-  return new SCORM12Adapter(api);
-}
-`;
-        case 'scorm2004':
-          return `
-import { SCORM2004Adapter } from 'tessera-learn/runtime/adapters/scorm2004.js';
-import { findSCORM2004API } from 'tessera-learn/runtime/adapters/discovery.js';
-import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
-export function createAdapter() {
-  const api = findSCORM2004API();
-  if (!api) throw new LMSAdapterError('scorm2004', 'Tessera: SCORM 2004 API not found in window.parent/opener chain. Course must be launched from a SCORM 2004 LMS.');
-  return new SCORM2004Adapter(api);
-}
-`;
-        case 'cmi5':
-          return `
-import { CMI5Adapter } from 'tessera-learn/runtime/adapters/cmi5.js';
-import { hasCMI5LaunchParams } from 'tessera-learn/runtime/adapters/discovery.js';
-import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
-export function createAdapter() {
-  if (!hasCMI5LaunchParams()) throw new LMSAdapterError('cmi5', 'Tessera: cmi5 launch parameters not present on URL. Course must be launched from a cmi5-compliant LMS.');
-  return new CMI5Adapter();
-}
-`;
-        case 'xapi':
-          return `
-import { XAPIAdapter } from 'tessera-learn/runtime/adapters/xapi.js';
-import { hasXAPILaunchParams } from 'tessera-learn/runtime/adapters/discovery.js';
-import { LMSAdapterError } from 'tessera-learn/runtime/adapters/index.js';
-export function createAdapter() {
-  if (!hasXAPILaunchParams()) throw new LMSAdapterError('xapi', 'Tessera: xAPI launch parameters not present on URL. Course must be launched from an xAPI-compliant LMS.');
-  return new XAPIAdapter();
-}
-`;
-        default:
-          return `
+      if (standard in LMS_ADAPTER_GEN) {
+        return generateLmsAdapterModule(
+          standard as keyof typeof LMS_ADAPTER_GEN,
+        );
+      }
+      return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
 export function createAdapter(config, options) {
   return new WebAdapter(config, options && options.manifest);
 }
 `;
-      }
     },
   );
 }
