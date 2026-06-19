@@ -853,7 +853,7 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 
 - **Actor priority:** author-supplied `xapi.actor` always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
 - **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` function or run a proxy.
-- **Never ship a static `auth` string on web** — the bundle is public. Use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
+- **`course.config.js` is serialized verbatim into the client bundle** — every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in it; use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
 - **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).
 - **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
 - **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.
