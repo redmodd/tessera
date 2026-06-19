@@ -79,6 +79,22 @@ describe('generated index.html Content-Security-Policy', () => {
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
 
+  function buildHtmlFromConfig(body: string): string {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      `export default ${body};`,
+      'utf-8',
+    );
+    const plugin = findPlugin('tessera:entry');
+    (plugin.configResolved as any).call(plugin, {
+      root: projectRoot,
+      build: { outDir: 'dist' },
+      command: 'build',
+    });
+    (plugin.buildStart as any).call(plugin);
+    return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
+  }
+
   it('emits a CSP meta for web export', () => {
     const html = buildHtml('web');
     expect(html).toContain('http-equiv="Content-Security-Policy"');
@@ -114,6 +130,30 @@ describe('generated index.html Content-Security-Policy', () => {
       const html = buildHtml(standard);
       expect(html).not.toContain('Content-Security-Policy');
     }
+  });
+
+  it('appends export.csp overrides onto the baseline directive', () => {
+    const html = buildHtmlFromConfig(
+      `{ title: "T", export: { standard: "web", csp: { "font-src": ["https://fonts.gstatic.com"] } } }`,
+    );
+    expect(html).toContain("font-src 'self' data: https://fonts.gstatic.com");
+  });
+
+  it('drops the CSP meta when export.csp is false', () => {
+    const html = buildHtmlFromConfig(
+      `{ title: "T", export: { standard: "web", csp: false } }`,
+    );
+    expect(html).not.toContain('Content-Security-Policy');
+  });
+
+  it('ignores a malformed export.csp and keeps the baseline', () => {
+    const html = buildHtmlFromConfig(
+      `{ title: "T", export: { standard: "web", csp: { "font-src": "https://x" } } }`,
+    );
+    expect(html).toContain('http-equiv="Content-Security-Policy"');
+    expect(html).toContain("object-src 'none'");
+    expect(html).toContain("font-src 'self' data:");
+    expect(html).not.toContain('https://x');
   });
 
   it('omits the CSP meta from the dev server (would block Vite HMR)', async () => {

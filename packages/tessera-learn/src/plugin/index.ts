@@ -29,6 +29,7 @@ import {
   isIgnored,
   type A11ySettings,
 } from './validation.js';
+import { buildCsp } from './csp.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
@@ -195,10 +196,7 @@ function tesseraEntryPlugin(): Plugin {
         const read = readCourseConfig(projectRoot);
         writeFileSync(
           resolve(projectRoot, 'index.html'),
-          generateIndexHtml(
-            readLanguage(read),
-            cspMeta(readExportStandard(read)),
-          ),
+          generateIndexHtml(readLanguage(read), cspMeta(read)),
           'utf-8',
         );
       }
@@ -276,26 +274,13 @@ function readExportStandard(read: CourseConfigRead): string {
 
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
 // could break) and never on the dev server (a meta connect-src would block
-// Vite's HMR websocket). 'unsafe-inline' stays because Vite injects an inline
-// modulepreload polyfill and Svelte ships scoped <style>. Override via a
-// tessera.config.js transformIndexHtml hook.
-const WEB_CSP =
-  "default-src 'self'; " +
-  "img-src 'self' data: https:; " +
-  "media-src 'self' blob: data: https:; " +
-  "style-src 'self' 'unsafe-inline'; " +
-  "script-src 'self' 'unsafe-inline'; " +
-  "font-src 'self' data:; " +
-  "connect-src 'self' https:; " +
-  "frame-src 'self' blob: https:; " +
-  "worker-src 'self' blob:; " +
-  "object-src 'none'; " +
-  "base-uri 'self'";
-
-function cspMeta(standard: string): string {
-  return standard === 'web'
-    ? `\n  <meta http-equiv="Content-Security-Policy" content="${WEB_CSP}" />`
-    : '';
+// Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
+// `false` drops the meta for deployments that set a CSP header themselves.
+function cspMeta(read: CourseConfigRead): string {
+  if (readExportStandard(read) !== 'web') return '';
+  const csp = read.ok ? read.config.export?.csp : undefined;
+  if (csp === false) return '';
+  return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
 }
 
 function generateIndexHtml(lang: string, csp = ''): string {
