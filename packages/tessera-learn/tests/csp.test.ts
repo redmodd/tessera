@@ -63,5 +63,25 @@ describe('isCspOverrides', () => {
     expect(isCspOverrides({ 'font-src': ["'self' https://x"] })).toBe(false);
     expect(isCspOverrides({ '': ["'self'"] })).toBe(false);
     expect(isCspOverrides({ 'font src': ["'self'"] })).toBe(false);
+    // A " or > would break out of the content="..." meta attribute into markup.
+    expect(
+      isCspOverrides({ 'font-src': ['https://x"><script>alert(1)</script>'] }),
+    ).toBe(false);
+  });
+
+  it('accepts the legitimate source forms', () => {
+    for (const src of [
+      "'self'",
+      "'unsafe-inline'",
+      "'none'",
+      'https:',
+      'data:',
+      'blob:',
+      'https://fonts.gstatic.com',
+      "'nonce-abc123=='",
+      "'sha256-AbC+/dEf='",
+    ]) {
+      expect(isCspOverrides({ 'font-src': [src] })).toBe(true);
+    }
   });
 });

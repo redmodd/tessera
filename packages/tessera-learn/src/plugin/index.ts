@@ -278,9 +278,7 @@ function readExportStandard(read: CourseConfigRead): string {
 // `false` drops the meta for deployments that set a CSP header themselves.
 function cspMeta(read: CourseConfigRead): string {
   if (readExportStandard(read) !== 'web') return '';
-  const csp = read.ok
-    ? (read.config.export as { csp?: unknown } | undefined)?.csp
-    : undefined;
+  const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
 }

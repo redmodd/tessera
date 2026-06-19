@@ -19,9 +19,10 @@ export const WEB_CSP_BASELINE: Record<string, string[]> = {
 };
 
 // Reject the separators (whitespace ends a source, ';' ends a directive, ','
-// ends a policy) so a stray char can't inject directives when sources are joined.
+// ends a policy) so a stray char can't inject directives when sources are joined,
+// plus " < > so a source can't break out of the content="..." meta attribute.
 const CSP_DIRECTIVE = /^[a-zA-Z][a-zA-Z-]*$/;
-const CSP_SOURCE = /^[^\s;,]+$/;
+const CSP_SOURCE = /^[^\s;,"<>]+$/;
 
 export function isCspOverrides(v: unknown): v is Record<string, string[]> {
   return (
@@ -37,9 +38,8 @@ export function isCspOverrides(v: unknown): v is Record<string, string[]> {
   );
 }
 
-// Append each override directive's sources onto the baseline (deduped); a
-// directive absent from the baseline is added. Malformed input falls back to the
-// baseline unchanged — validation surfaces the warning separately.
+// Malformed input falls back to the baseline unchanged — validation surfaces the
+// warning separately.
 export function buildCsp(overrides?: unknown): string {
   const merged = new Map(
     Object.entries(WEB_CSP_BASELINE).map(([k, v]) => [k, [...v]]),
