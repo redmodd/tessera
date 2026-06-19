@@ -602,6 +602,24 @@ canAccess: (ctx) => {
 
 Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
 
+### Web export Content-Security-Policy
+
+Web builds emit a baseline CSP `<meta>` (LMS packages and the dev server don't). It allows any `https:` for images/media/frames/network, but **not** for scripts, styles, or fonts — so a CDN script/stylesheet/font is blocked until you allow its origin. Extend per-directive via `export.csp` (sources are **appended** to the baseline, never replaced):
+
+```js
+export: {
+  standard: 'web',
+  csp: {
+    'style-src': ['https://fonts.googleapis.com'],
+    'font-src': ['https://fonts.gstatic.com'],
+  },
+}
+```
+
+- `export.csp: false` drops the meta entirely (use when your host sets a CSP header).
+- To **tighten** or replace a directive (not just add), use a `transformIndexHtml` hook — `export.csp` only adds.
+- Ignored unless `standard` is `'web'`.
+
 ### Validation
 
 The plugin validates on every dev start and build (page syntax, manifest shape, `pageConfig`, question components, asset references, data-contract bypass). Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. Run `pnpm validate <course>` to check without building.

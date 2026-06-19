@@ -30,6 +30,7 @@ import {
   courseIdentity,
 } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
+import { isCspOverrides } from './csp.js';
 import { isVideoEmbed } from '../components/video-embed.js';
 
 // ---------- Types ----------
@@ -249,7 +250,7 @@ interface ParsedConfig {
     requireSuccessStatus?: string;
   };
   scoring?: { passingScore?: number };
-  export?: { standard?: string };
+  export?: { standard?: string; csp?: unknown };
   [key: string]: unknown;
 }
 
@@ -392,6 +393,20 @@ function parseConfig(
     if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
       errors.push(
         `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
+      );
+    }
+  }
+
+  // Validate export.csp (web-only CSP extension)
+  if (config.export?.csp !== undefined) {
+    const csp = config.export.csp;
+    if (csp !== false && !isCspOverrides(csp)) {
+      warnings.push(
+        'course.config.js: "export.csp" must be false or an object of directive → string[]; ignoring it and using the baseline CSP',
+      );
+    } else if ((config.export.standard ?? 'web') !== 'web') {
+      warnings.push(
+        `course.config.js: "export.csp" is ignored when "export.standard" is "${config.export.standard}" (the CSP meta is web-export only)`,
       );
     }
   }

@@ -60,6 +60,11 @@ export interface CourseConfig {
   };
   export: {
     standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
+    /** Web export only: extend the baseline Content-Security-Policy. Each key is
+     * a directive; its sources are appended (unioned) onto the baseline. `false`
+     * drops the CSP meta entirely (for deployments that set a CSP header).
+     * Ignored unless `standard` is 'web'. */
+    csp?: false | Record<string, string[]>;
   };
   /**
    * Optional xAPI destination(s) for custom statement publishing via
