@@ -1,5 +1,19 @@
 # tessera-learn
 
+## 0.3.0
+
+### Minor Changes
+
+- dd0da8d: Add a generated course `id` that uniquely keys web localStorage and the cmi5/xAPI activity id, with a page-structure fingerprint so reorders don't restore stale state.
+- fa546cc: Add xAPI 1.0.3 (`export.standard: 'xapi'`) as a plain Tin Can launch package.
+
+### Patch Changes
+
+- e82ffe5: Add `export.csp` to extend the web-export Content-Security-Policy per-directive (or `false` to disable it).
+- 5d495af: Fix non-ASCII course/page titles shipping as mojibake, add a baseline CSP to web exports, and trim a syscall per file in export packaging.
+- e7a2794: Share one fail-loud LMS error across the runtime and build-time adapter selectors, and cache JS-module parses in the build pipeline.
+- 385f41e: Fix sidebar section collapse and the "Untitled Course" fallback for empty titles, trim empty keys from suspend_data, and pin scaffolded workspaces to pnpm 11.5.2.
+
 ## 0.2.3
 
 ### Patch Changes
