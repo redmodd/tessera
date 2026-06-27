@@ -2015,3 +2015,46 @@ describe('a11y config block — level and ignore', () => {
     expect(has(warnings, 'tessera/lang')).toBe(false);
   });
 });
+
+describe('resume policy validation', () => {
+  it('accepts resume: "never" with no warning or error', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: "never",
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('unknown field "resume"'),
+    );
+  });
+
+  it('errors on an invalid resume value', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: "sometimes",
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"resume" must be "auto" or "never"'),
+    );
+  });
+});

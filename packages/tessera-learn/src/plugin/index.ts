@@ -392,6 +392,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
   return {
     ...userConfig,
     title: userConfig.title || 'Untitled Course',
+    resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
     completion: { ...completion, ...userConfig.completion },
     scoring: { passingScore, ...userConfig.scoring },

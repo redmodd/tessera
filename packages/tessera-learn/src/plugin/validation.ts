@@ -152,6 +152,7 @@ const KNOWN_CONFIG_FIELDS = new Set([
   'description',
   'author',
   'version',
+  'resume',
   'language',
   'branding',
   'navigation',
@@ -242,6 +243,7 @@ export function validateProject(projectRoot: string): ValidationResult {
 interface ParsedConfig {
   title?: string;
   id?: string;
+  resume?: string;
   navigation?: { mode?: string };
   completion?: {
     mode?: string;
@@ -395,6 +397,17 @@ function parseConfig(
         `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
       );
     }
+  }
+
+  // Validate resume policy
+  if (
+    config.resume !== undefined &&
+    config.resume !== 'auto' &&
+    config.resume !== 'never'
+  ) {
+    errors.push(
+      `course.config.js: "resume" must be "auto" or "never", got "${config.resume}"`,
+    );
   }
 
   // Validate export.csp (web-only CSP extension)
