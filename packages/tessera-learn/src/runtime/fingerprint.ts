@@ -14,10 +14,9 @@ export function structureFingerprint(manifest: Manifest): string {
   return (h >>> 0).toString(36);
 }
 
-// Decide whether saved resume state may be restored. `never` always starts
-// fresh; otherwise a saved fingerprint that no longer matches the current
-// structure is discarded. State saved before fingerprinting (no `f`) is trusted
-// so upgrading the runtime never wipes an in-progress learner.
+// `never` always starts fresh; otherwise a saved fingerprint that no longer
+// matches the current structure is discarded. State saved before fingerprinting
+// (no `f`) is trusted so upgrading the runtime never wipes an in-progress learner.
 export function shouldRestore(
   saved: SavedState,
   currentFingerprint: string,

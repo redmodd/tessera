@@ -1,6 +1,6 @@
 ---
-'tessera-learn': patch
-'create-tessera': patch
+'tessera-learn': minor
+'create-tessera': minor
 ---
 
-Discard saved resume state when the course page structure changed since it was saved, and add a `resume: 'auto' | 'never'` config option.
+Add a `resume: 'auto' | 'never'` option; `'auto'` discards saved progress when the page structure changed.
