@@ -1,5 +1,4 @@
 import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
-import type { Interaction } from '../interaction.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
@@ -75,7 +74,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     return this.#masteryScore;
   }
 
-  get #canWrite(): boolean {
+  protected canWrite(): boolean {
     return this.#mode === 'normal';
   }
 
@@ -98,80 +97,38 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   saveState(state: SavedState): void {
-    if (!this.#canWrite) return;
     super.saveState(state);
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.location', String(state.b)),
-      'cmi.location',
-    );
-  }
-
-  setDuration(seconds: number): void {
-    if (!this.#canWrite) return;
-    super.setDuration(seconds);
-  }
-
-  reportInteraction(
-    questionId: string,
-    interaction: Interaction,
-    correct: boolean | null,
-  ): void {
-    if (!this.#canWrite) return;
-    super.reportInteraction(questionId, interaction, correct);
+    this.set('cmi.location', String(state.b));
   }
 
   setScore(score: number): void {
-    if (!this.#canWrite) return;
-    const raw = formatReal107(score);
+    this.set('cmi.score.raw', formatReal107(score));
+    this.set('cmi.score.min', '0');
+    this.set('cmi.score.max', '100');
     // §4.2.4.3.5 — score.scaled is bounded to [-1, 1].
-    const scaled = formatReal107(Math.max(0, Math.min(1, score / 100)));
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.score.raw', raw),
-      'cmi.score.raw',
-    );
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.score.min', '0'),
-      'cmi.score.min',
-    );
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.score.max', '100'),
-      'cmi.score.max',
-    );
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.score.scaled', scaled),
+    this.set(
       'cmi.score.scaled',
+      formatReal107(Math.max(0, Math.min(1, score / 100))),
     );
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
-    if (!this.#canWrite) return;
-    const value = status === 'complete' ? 'completed' : 'incomplete';
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.completion_status', value),
+    this.set(
       'cmi.completion_status',
+      status === 'complete' ? 'completed' : 'incomplete',
     );
     // §4.2.4.2 — writing 1.0 surfaces a "100%" reading on LMS dashboards.
-    if (status === 'complete') {
-      this.queue.enqueue(
-        () => this.api.SetValue('cmi.progress_measure', '1'),
-        'cmi.progress_measure',
-      );
-    }
+    if (status === 'complete') this.set('cmi.progress_measure', '1');
   }
 
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
-    if (!this.#canWrite) return;
     // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
     // a null status to "passed".
-    this.queue.enqueue(
-      () => this.api.SetValue('cmi.success_status', status),
-      'cmi.success_status',
-    );
+    this.set('cmi.success_status', status);
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
-    if (!this.#canWrite) return;
-    this.queue.enqueue(() => this.api.SetValue('cmi.exit', mode), 'cmi.exit');
+    this.set('cmi.exit', mode);
   }
 }

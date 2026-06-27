@@ -66,6 +66,16 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     return this.api;
   }
 
+  // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
+  protected canWrite(): boolean {
+    return true;
+  }
+
+  protected set(key: string, value: string): void {
+    if (!this.canWrite()) return;
+    this.queue.enqueue(() => this.dialect.setValue(this.api, key, value), key);
+  }
+
   async init(): Promise<void> {
     const initialized = await withRetry(
       () => this.dialect.initialize(this.api),
@@ -129,6 +139,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   }
 
   saveState(state: SavedState): void {
+    if (!this.canWrite()) return;
     this.#state = state;
     const json = JSON.stringify(state);
     if (
@@ -144,19 +155,11 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
           `larger-limit standard (scorm2004/cmi5).`,
       );
     }
-    this.queue.enqueue(
-      () => this.dialect.setValue(this.api, 'cmi.suspend_data', json),
-      'cmi.suspend_data',
-    );
+    this.set('cmi.suspend_data', json);
   }
 
   setDuration(seconds: number): void {
-    const formatted = this.dialect.formatDuration(seconds);
-    this.queue.enqueue(
-      () =>
-        this.dialect.setValue(this.api, this.dialect.sessionTimeKey, formatted),
-      this.dialect.sessionTimeKey,
-    );
+    this.set(this.dialect.sessionTimeKey, this.dialect.formatDuration(seconds));
   }
 
   reportInteraction(
@@ -164,6 +167,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     interaction: Interaction,
     correct: boolean | null,
   ): void {
+    if (!this.canWrite()) return;
     const n = this.interactionCount++;
     const fields = buildScormInteractionFields(
       `cmi.interactions.${n}`,
@@ -180,10 +184,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
       },
     );
     for (const [key, value] of fields) {
-      this.queue.enqueue(
-        () => this.dialect.setValue(this.api, key, value),
-        key,
-      );
+      this.set(key, value);
     }
   }
 
