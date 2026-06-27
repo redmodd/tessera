@@ -4,6 +4,7 @@ import { runA11y } from './a11y-cli.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
+import { VALID_EXPORT_STANDARDS } from './validation.js';
 
 const USAGE = `Usage: tessera <command> [course] [options]
 
@@ -18,8 +19,31 @@ Commands:
 
 Run a command from inside a course folder, or name the course explicitly.
 
+export options:
+  --standard <web|scorm12|scorm2004|cmi5|xapi>    Override course.config.js export.standard
+
 a11y/check options:
   --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
+
+// Validate here, against the config validator's list, so an unknown standard
+// fails before Vite spins up.
+export function parseExportFlags(flags: string[]): {
+  standardOverride?: string;
+  error?: string;
+} {
+  const i = flags.indexOf('--standard');
+  if (i === -1) return {};
+  const value = flags[i + 1];
+  if (value === undefined || value.startsWith('-')) {
+    return { error: '--standard requires a value' };
+  }
+  if (!VALID_EXPORT_STANDARDS.includes(value)) {
+    return {
+      error: `--standard must be one of ${VALID_EXPORT_STANDARDS.join(', ')}, got "${value}"`,
+    };
+  }
+  return { standardOverride: value };
+}
 
 // The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the
 // first token can be the course, and only when it isn't a flag — otherwise a flag
@@ -43,8 +67,18 @@ type CourseCommand = (
 const COURSE_COMMANDS: Record<string, CourseCommand> = {
   dev: async (courseRoot, workspaceRoot) =>
     (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
-  export: async (courseRoot, workspaceRoot) =>
-    (await import('./build-commands.js')).runBuild(courseRoot, workspaceRoot),
+  export: async (courseRoot, workspaceRoot, flags) => {
+    const { standardOverride, error } = parseExportFlags(flags);
+    if (error) {
+      console.error(`[tessera] ${error}`);
+      return 1;
+    }
+    return (await import('./build-commands.js')).runBuild(
+      courseRoot,
+      workspaceRoot,
+      standardOverride,
+    );
+  },
   validate: (courseRoot) => runValidate(courseRoot),
   a11y: (courseRoot, workspaceRoot, flags) =>
     runA11y(courseRoot, workspaceRoot, flags),

@@ -2,7 +2,36 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { main, splitCourseArg } from '../src/plugin/cli.js';
+import { main, splitCourseArg, parseExportFlags } from '../src/plugin/cli.js';
+
+describe('parseExportFlags', () => {
+  it('returns no override when --standard is absent', () => {
+    expect(parseExportFlags([])).toEqual({});
+  });
+
+  it('extracts a valid --standard value', () => {
+    expect(parseExportFlags(['--standard', 'scorm2004'])).toEqual({
+      standardOverride: 'scorm2004',
+    });
+  });
+
+  it('accepts web as a standard override', () => {
+    expect(parseExportFlags(['--standard', 'web'])).toEqual({
+      standardOverride: 'web',
+    });
+  });
+
+  it('errors on an unknown standard value', () => {
+    const result = parseExportFlags(['--standard', 'bogus']);
+    expect(result.error).toContain('bogus');
+    expect(result.standardOverride).toBeUndefined();
+  });
+
+  it('errors when --standard has no value', () => {
+    const result = parseExportFlags(['--standard']);
+    expect(result.error).toMatch(/--standard/);
+  });
+});
 
 describe('splitCourseArg', () => {
   it('treats a leading non-flag token as the course name', () => {
@@ -78,5 +107,15 @@ describe('main dispatch', () => {
     const code = await main(['dev'], ws);
     expect(code).toBe(1);
     expect(err.mock.calls.flat().join(' ')).toContain('getting-started');
+  });
+
+  it('rejects export with an invalid --standard before building', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const code = await main(
+      ['export', 'getting-started', '--standard', 'bogus'],
+      ws,
+    );
+    expect(code).toBe(1);
+    expect(err.mock.calls.flat().join(' ')).toContain('bogus');
   });
 });

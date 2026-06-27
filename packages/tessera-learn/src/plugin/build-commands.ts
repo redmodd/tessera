@@ -20,12 +20,15 @@ export async function runDev(
 export async function runBuild(
   projectRoot: string,
   workspaceRoot: string,
+  standardOverride?: string,
 ): Promise<number> {
   const vite = await import('vite');
-  const config = await resolveTesseraConfig(projectRoot, workspaceRoot, {
-    command: 'build',
-    mode: 'production',
-  });
+  const config = await resolveTesseraConfig(
+    projectRoot,
+    workspaceRoot,
+    { command: 'build', mode: 'production' },
+    standardOverride,
+  );
   await vite.build(config);
   return 0;
 }

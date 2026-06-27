@@ -119,7 +119,8 @@ function virtualModule(
   };
 }
 
-export function tesseraPlugin() {
+export function tesseraPlugin(options: { standardOverride?: string } = {}) {
+  const { standardOverride } = options;
   const manifestRef: { current: Manifest | null; root: string } = {
     current: null,
     root: '',
@@ -151,17 +152,17 @@ export function tesseraPlugin() {
     }),
     tesseraA11yCompilerPlugin(a11y),
     tesseraValidationPlugin(),
-    tesseraEntryPlugin(),
+    tesseraEntryPlugin(standardOverride),
     tesseraConfigDefaultsPlugin(),
-    tesseraConfigPlugin(),
+    tesseraConfigPlugin(standardOverride),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(manifestRef),
     tesseraLayoutPlugin(),
     tesseraQuizPlugin(),
-    tesseraAdapterPlugin(),
-    tesseraXAPISetupPlugin(),
+    tesseraAdapterPlugin(standardOverride),
+    tesseraXAPISetupPlugin(standardOverride),
     tesseraFirstPagePreloadPlugin(manifestRef),
-    tesseraExportPlugin(),
+    tesseraExportPlugin(standardOverride),
   ];
 }
 
@@ -172,7 +173,7 @@ const RESOLVED_ENTRY_ID = '\0' + VIRTUAL_ENTRY_ID;
 const VIRTUAL_MAIN_ID = '/virtual:tessera-main';
 const RESOLVED_MAIN_ID = '\0virtual:tessera-main';
 
-function tesseraEntryPlugin(): Plugin {
+function tesseraEntryPlugin(standardOverride?: string): Plugin {
   const runtimeDir = resolveRuntimeDir();
   const stylesDir = resolveStylesDir();
   const appSveltePath = resolve(runtimeDir, 'App.svelte');
@@ -196,7 +197,10 @@ function tesseraEntryPlugin(): Plugin {
         const read = readCourseConfig(projectRoot);
         writeFileSync(
           resolve(projectRoot, 'index.html'),
-          generateIndexHtml(readLanguage(read), cspMeta(read)),
+          generateIndexHtml(
+            readLanguage(read),
+            cspMeta(read, standardOverride),
+          ),
           'utf-8',
         );
       }
@@ -265,9 +269,14 @@ function readLanguage(read: CourseConfigRead): string {
   return isPlausibleLanguageTag(lang) ? lang : 'en';
 }
 
-// Fail closed on an unreadable config: cspMeta only emits for exactly 'web', so
-// an unknown standard withholds the CSP rather than guess the one mode it breaks.
-function readExportStandard(read: CourseConfigRead): string {
+// Override wins, else course.config.js, else 'web'. An unreadable config with no
+// override fails closed with 'unknown' so cspMeta withholds the CSP rather than
+// guess the one mode it breaks. Exported for tests.
+export function resolveExportStandard(
+  read: CourseConfigRead,
+  override?: string,
+): string {
+  if (override) return override;
   if (!read.ok) return 'unknown';
   return read.config.export?.standard || 'web';
 }
@@ -276,8 +285,8 @@ function readExportStandard(read: CourseConfigRead): string {
 // could break) and never on the dev server (a meta connect-src would block
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
-function cspMeta(read: CourseConfigRead): string {
-  if (readExportStandard(read) !== 'web') return '';
+function cspMeta(read: CourseConfigRead, override?: string): string {
+  if (resolveExportStandard(read, override) !== 'web') return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -400,7 +409,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
   };
 }
 
-function tesseraConfigPlugin(): Plugin {
+function tesseraConfigPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:config',
     VIRTUAL_CONFIG_ID,
@@ -409,7 +418,18 @@ function tesseraConfigPlugin(): Plugin {
       if (existsSync(configPath)) this.addWatchFile(configPath);
       const read = readCourseConfig(projectRoot);
       const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
-      return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
+      // The runtime reads export.standard too, so the override must reach the
+      // bundled config, not just the manifest/adapter.
+      const withOverride: Partial<CourseConfig> = standardOverride
+        ? {
+            ...userConfig,
+            export: {
+              ...userConfig.export,
+              standard: standardOverride as CourseConfig['export']['standard'],
+            },
+          }
+        : userConfig;
+      return `export default ${JSON.stringify(mergeCourseConfig(withOverride))};`;
     },
   );
 }
@@ -519,7 +539,7 @@ function runValidation(projectRoot: string): void {
 
 // ---------- Export Plugin ----------
 
-function tesseraExportPlugin(): Plugin {
+function tesseraExportPlugin(standardOverride?: string): Plugin {
   let projectRoot: string;
   let isBuild = false;
 
@@ -556,10 +576,13 @@ function tesseraExportPlugin(): Plugin {
         );
       }
 
-      await runExport(
-        projectRoot,
-        read.config as Parameters<typeof runExport>[1],
-      );
+      const config = standardOverride
+        ? {
+            ...read.config,
+            export: { ...read.config.export, standard: standardOverride },
+          }
+        : read.config;
+      await runExport(projectRoot, config as Parameters<typeof runExport>[1]);
     },
   };
 }
@@ -706,7 +729,7 @@ export function createAdapter() {
 `;
 }
 
-function tesseraAdapterPlugin(): Plugin {
+function tesseraAdapterPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:adapter',
     VIRTUAL_ADAPTER_ID,
@@ -717,11 +740,10 @@ function tesseraAdapterPlugin(): Plugin {
         return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
       }
 
-      let standard = 'web';
-      const read = readCourseConfig(projectRoot);
-      if (read.ok && typeof read.config.export?.standard === 'string') {
-        standard = read.config.export.standard;
-      }
+      let standard = resolveExportStandard(
+        readCourseConfig(projectRoot),
+        standardOverride,
+      );
 
       // The audit renders headless with no LMS in the frame chain; the SCORM/
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
@@ -744,7 +766,7 @@ export function createAdapter(config, options) {
 
 const VIRTUAL_XAPI_SETUP_ID = 'virtual:tessera-xapi-setup';
 
-function tesseraXAPISetupPlugin(): Plugin {
+function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:xapi-setup',
     VIRTUAL_XAPI_SETUP_ID,
@@ -758,14 +780,9 @@ function tesseraXAPISetupPlugin(): Plugin {
         return `export async function buildXAPIClient() { return null; }`;
       }
 
-      let standard = 'web';
-      let hasXapi = false;
       const read = readCourseConfig(projectRoot);
-      if (read.ok) {
-        if (typeof read.config.export?.standard === 'string')
-          standard = read.config.export.standard;
-        hasXapi = read.config.xapi != null;
-      }
+      const standard = resolveExportStandard(read, standardOverride);
+      const hasXapi = read.ok && read.config.xapi != null;
 
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of

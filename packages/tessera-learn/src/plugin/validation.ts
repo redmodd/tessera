@@ -184,7 +184,13 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
-const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5', 'xapi'];
+export const VALID_EXPORT_STANDARDS = [
+  'web',
+  'scorm12',
+  'scorm2004',
+  'cmi5',
+  'xapi',
+];
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
