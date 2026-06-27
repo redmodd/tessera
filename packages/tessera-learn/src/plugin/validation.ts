@@ -40,6 +40,18 @@ export interface ValidationResult {
   warnings: string[];
 }
 
+/** Collects errors and warnings so checkers thread one argument, not a pair. */
+export class Diagnostics implements ValidationResult {
+  errors: string[] = [];
+  warnings: string[] = [];
+  error(message: string): void {
+    this.errors.push(message);
+  }
+  warn(message: string): void {
+    this.warnings.push(message);
+  }
+}
+
 // ---------- A11y rule IDs ----------
 
 /** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
@@ -111,24 +123,21 @@ export function normalizeA11y(raw: unknown): A11ySettings {
  * promotable a11y warnings to errors) to a result in place. `ignore` suppresses
  * at any severity, including hard contract errors; `level` only re-rates.
  */
-function applyA11ySettings(
-  result: ValidationResult,
-  settings: A11ySettings,
-): void {
+function applyA11ySettings(d: Diagnostics, settings: A11ySettings): void {
   if (settings.ignore.length > 0) {
     const ignored = new Set(settings.ignore);
     const keep = (msg: string) => !isIgnored(msg, ignored);
-    result.errors = result.errors.filter(keep);
-    result.warnings = result.warnings.filter(keep);
+    d.errors = d.errors.filter(keep);
+    d.warnings = d.warnings.filter(keep);
   }
   if (settings.level === 'error') {
     const remaining: string[] = [];
-    for (const msg of result.warnings) {
+    for (const msg of d.warnings) {
       const id = diagnosticId(msg);
-      if (id !== null && PROMOTABLE_A11Y_IDS.has(id)) result.errors.push(msg);
+      if (id !== null && PROMOTABLE_A11Y_IDS.has(id)) d.error(msg);
       else remaining.push(msg);
     }
-    result.warnings = remaining;
+    d.warnings = remaining;
   }
 }
 
@@ -191,18 +200,17 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  */
 export function validateProject(projectRoot: string): ValidationResult {
   clearParseCache();
-  const errors: string[] = [];
-  const warnings: string[] = [];
+  const d = new Diagnostics();
 
   // 1. Check course.config.js exists
   const configPath = resolve(projectRoot, 'course.config.js');
   if (!existsSync(configPath)) {
-    errors.push('course.config.js not found in project root');
-    return { errors, warnings };
+    d.error('course.config.js not found in project root');
+    return d;
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(projectRoot, errors, warnings);
+  const config = parseConfig(projectRoot, d);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -211,31 +219,25 @@ export function validateProject(projectRoot: string): ValidationResult {
     pagesDir,
     assetsDir,
     projectRoot,
+    d,
     config?.export?.standard,
   );
-  errors.push(...pageResults.errors);
-  warnings.push(...pageResults.warnings);
 
   // 4. Contract-bypass checks on project-root shell files
   for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
-      validateContractBypass(
-        readSourceFileCached(shellPath),
-        shellFile,
-        errors,
-      );
+      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
     }
   }
 
   // 5. Cross-cutting validations
   if (config) {
-    crossValidate(config, pageResults, errors, warnings);
+    crossValidate(config, pageResults, d);
   }
 
-  const result: ValidationResult = { errors, warnings };
-  applyA11ySettings(result, normalizeA11y(config?.a11y));
-  return result;
+  applyA11ySettings(d, normalizeA11y(config?.a11y));
+  return d;
 }
 
 // ---------- Config Validation ----------
@@ -256,20 +258,14 @@ interface ParsedConfig {
   [key: string]: unknown;
 }
 
-function parseConfig(
-  projectRoot: string,
-  errors: string[],
-  warnings: string[],
-): ParsedConfig | null {
+function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
-      errors.push('course.config.js: must use `export default { ... }` syntax');
+      d.error('course.config.js: must use `export default { ... }` syntax');
     } else if (read.reason === 'parse-error') {
-      errors.push(
-        'course.config.js: could not parse — JavaScript syntax error',
-      );
+      d.error('course.config.js: could not parse — JavaScript syntax error');
     }
     return null;
   }
@@ -278,9 +274,7 @@ function parseConfig(
   // Check for unknown fields
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
-      warnings.push(
-        `course.config.js: unknown field "${key}" — will be ignored`,
-      );
+      d.warn(`course.config.js: unknown field "${key}" — will be ignored`);
     }
   }
 
@@ -290,34 +284,34 @@ function parseConfig(
   // non-string is a misconfiguration — a truthy one ships as-is, a falsy one
   // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
-    errors.push(
+    d.error(
       `course.config.js: "title" must be a string, got ${typeof config.title}`,
     );
   } else if (config.title === undefined || config.title === '') {
-    warnings.push(
+    d.warn(
       'course.config.js: "title" is missing or empty — the course will ship as "Untitled Course"',
     );
   } else if (config.title.trim() === '') {
-    warnings.push(
+    d.warn(
       'course.config.js: "title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
     );
   }
 
   // Validate branding
   if (config.branding !== undefined) {
-    validateBranding(config.branding, warnings);
+    validateBranding(config.branding, d);
   }
 
   // Rule 1.8: language present and well-formed (BCP-47)
   if (config.language === undefined) {
-    warnings.push(
+    d.warn(
       tag(
         A11Y_IDS.lang,
         `course.config.js: "language" is not set — defaulting <html lang> to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
       ),
     );
   } else if (!isPlausibleLanguageTag(config.language)) {
-    warnings.push(
+    d.warn(
       tag(
         A11Y_IDS.lang,
         `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
@@ -334,20 +328,20 @@ function parseConfig(
     standard === 'cmi5' ||
     standard === 'xapi';
   if (identityStandard && !courseIdentity(config)) {
-    warnings.push(
+    d.warn(
       `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 
   // Validate a11y config block
   if (config.a11y !== undefined) {
-    validateA11yConfig(config.a11y, errors);
+    validateA11yConfig(config.a11y, d);
   }
 
   // Validate navigation.mode
   if (config.navigation?.mode !== undefined) {
     if (!VALID_NAV_MODES.includes(config.navigation.mode)) {
-      errors.push(
+      d.error(
         `course.config.js: "navigation.mode" must be "free" or "sequential", got "${config.navigation.mode}"`,
       );
     }
@@ -356,7 +350,7 @@ function parseConfig(
   // Validate completion.mode
   if (config.completion?.mode !== undefined) {
     if (!VALID_COMPLETION_MODES.includes(config.completion.mode)) {
-      errors.push(
+      d.error(
         `course.config.js: "completion.mode" must be "quiz", "percentage", or "manual", got "${config.completion.mode}"`,
       );
     }
@@ -364,11 +358,11 @@ function parseConfig(
 
   if (config.completion?.trigger !== undefined) {
     if (config.completion.mode !== 'manual') {
-      warnings.push(
+      d.warn(
         `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
     } else if (!VALID_MANUAL_TRIGGERS.includes(config.completion.trigger)) {
-      errors.push(
+      d.error(
         `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`,
       );
     }
@@ -376,7 +370,7 @@ function parseConfig(
 
   if (config.completion?.requireSuccessStatus !== undefined) {
     if (config.completion.mode !== 'manual') {
-      warnings.push(
+      d.warn(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
     } else if (
@@ -384,7 +378,7 @@ function parseConfig(
         config.completion.requireSuccessStatus,
       )
     ) {
-      errors.push(
+      d.error(
         `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
       );
     }
@@ -393,7 +387,7 @@ function parseConfig(
   // Validate export.standard
   if (config.export?.standard !== undefined) {
     if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
-      errors.push(
+      d.error(
         `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
       );
     }
@@ -405,7 +399,7 @@ function parseConfig(
     config.resume !== 'auto' &&
     config.resume !== 'never'
   ) {
-    errors.push(
+    d.error(
       `course.config.js: "resume" must be "auto" or "never", got "${config.resume}"`,
     );
   }
@@ -414,11 +408,11 @@ function parseConfig(
   if (config.export?.csp !== undefined) {
     const csp = config.export.csp;
     if (csp !== false && !isCspOverrides(csp)) {
-      warnings.push(
+      d.warn(
         'course.config.js: "export.csp" must be false or an object of directive → string[]; ignoring it and using the baseline CSP',
       );
     } else if ((config.export.standard ?? 'web') !== 'web') {
-      warnings.push(
+      d.warn(
         `course.config.js: "export.csp" is ignored when "export.standard" is "${config.export.standard}" (the CSP meta is web-export only)`,
       );
     }
@@ -428,7 +422,7 @@ function parseConfig(
   if (config.scoring?.passingScore !== undefined) {
     const score = config.scoring.passingScore;
     if (typeof score !== 'number' || score < 0 || score > 100) {
-      errors.push(
+      d.error(
         `course.config.js: "scoring.passingScore" must be 0–100, got ${score}`,
       );
     }
@@ -438,7 +432,7 @@ function parseConfig(
   if (config.completion?.percentageThreshold !== undefined) {
     const threshold = config.completion.percentageThreshold;
     if (typeof threshold !== 'number' || threshold < 0 || threshold > 100) {
-      errors.push(
+      d.error(
         `course.config.js: "completion.percentageThreshold" must be 0–100, got ${threshold}`,
       );
     }
@@ -446,12 +440,7 @@ function parseConfig(
 
   // Validate xapi (publisher destinations)
   if (config.xapi !== undefined) {
-    validateXAPIConfig(
-      config.xapi,
-      config.export?.standard ?? 'web',
-      errors,
-      warnings,
-    );
+    validateXAPIConfig(config.xapi, config.export?.standard ?? 'web', d);
   }
 
   return config;
@@ -486,9 +475,9 @@ function describeType(raw: unknown): string {
   return raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw;
 }
 
-function validateBranding(raw: unknown, warnings: string[]): void {
+function validateBranding(raw: unknown, d: Diagnostics): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    warnings.push(
+    d.warn(
       `course.config.js: "branding" must be an object, got ${describeType(raw)} — will be ignored`,
     );
     return;
@@ -498,11 +487,11 @@ function validateBranding(raw: unknown, warnings: string[]): void {
   const logo = branding.logo;
   if (logo !== undefined) {
     if (typeof logo !== 'string') {
-      warnings.push(
+      d.warn(
         `course.config.js: "branding.logo" must be a string, got ${typeof logo}`,
       );
     } else if (logo.startsWith('$assets/')) {
-      warnings.push(
+      d.warn(
         'course.config.js: "branding.logo" starts with "$assets/", but branding paths are not asset-resolved — it will ship as a literal, broken src. Use a URL or a path relative to the deployed root.',
       );
     }
@@ -511,11 +500,11 @@ function validateBranding(raw: unknown, warnings: string[]): void {
   const primaryColor = branding.primaryColor;
   if (primaryColor !== undefined) {
     if (typeof primaryColor !== 'string') {
-      warnings.push(
+      d.warn(
         `course.config.js: "branding.primaryColor" must be a string, got ${typeof primaryColor}`,
       );
     } else if (!isPlausibleColor(primaryColor)) {
-      warnings.push(
+      d.warn(
         `course.config.js: "branding.primaryColor" "${primaryColor}" does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
       );
     } else {
@@ -524,7 +513,7 @@ function validateBranding(raw: unknown, warnings: string[]): void {
       // ratio covers both. Non-#hex valid colors return null and defer to Tier 2.
       const ratio = contrastRatio(primaryColor, '#ffffff');
       if (ratio !== null && ratio < 4.5) {
-        warnings.push(
+        d.warn(
           tag(
             A11Y_IDS.primaryContrast,
             `course.config.js: branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white — it's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
@@ -536,7 +525,7 @@ function validateBranding(raw: unknown, warnings: string[]): void {
 
   const fontFamily = branding.fontFamily;
   if (fontFamily !== undefined && typeof fontFamily !== 'string') {
-    warnings.push(
+    d.warn(
       `course.config.js: "branding.fontFamily" must be a string, got ${typeof fontFamily}`,
     );
   }
@@ -545,9 +534,9 @@ function validateBranding(raw: unknown, warnings: string[]): void {
 // ---------- a11y Config Validation ----------
 
 /** Shape-check the `a11y` block. Malformed values can't be silenced by `ignore`. */
-function validateA11yConfig(raw: unknown, errors: string[]): void {
+function validateA11yConfig(raw: unknown, d: Diagnostics): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    errors.push(
+    d.error(
       `course.config.js: "a11y" must be an object, got ${describeType(raw)}`,
     );
     return;
@@ -558,7 +547,7 @@ function validateA11yConfig(raw: unknown, errors: string[]): void {
     a11y.level !== undefined &&
     !VALID_A11Y_LEVELS.includes(a11y.level as string)
   ) {
-    errors.push(
+    d.error(
       `course.config.js: "a11y.level" must be "warn" or "error", got ${JSON.stringify(a11y.level)}`,
     );
   }
@@ -566,7 +555,7 @@ function validateA11yConfig(raw: unknown, errors: string[]): void {
     a11y.standard !== undefined &&
     !VALID_A11Y_STANDARDS.includes(a11y.standard as string)
   ) {
-    errors.push(
+    d.error(
       `course.config.js: "a11y.standard" must be "wcag2a", "wcag2aa", or "wcag21aa", got ${JSON.stringify(a11y.standard)}`,
     );
   }
@@ -575,7 +564,7 @@ function validateA11yConfig(raw: unknown, errors: string[]): void {
       !Array.isArray(a11y.ignore) ||
       a11y.ignore.some((x) => typeof x !== 'string')
     ) {
-      errors.push(
+      d.error(
         `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,
       );
     }
@@ -590,8 +579,7 @@ const UUID_RE =
 function validateXAPIConfig(
   raw: unknown,
   standard: string,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
 ): void {
   if (raw === undefined || raw === null) return;
 
@@ -601,7 +589,7 @@ function validateXAPIConfig(
 
   if (Array.isArray(raw)) {
     if (entries.length === 0) {
-      errors.push(
+      d.error(
         'course.config.js: xapi must contain at least one destination, or be omitted',
       );
       return;
@@ -614,7 +602,7 @@ function validateXAPIConfig(
         (e as { endpoint?: unknown }).endpoint === 'lms',
     ).length;
     if (lmsCount > 1) {
-      errors.push(
+      d.error(
         "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
       );
     }
@@ -630,16 +618,14 @@ function validateXAPIConfig(
     }
     for (const [ep, count] of seen) {
       if (count > 1) {
-        warnings.push(
+        d.warn(
           `course.config.js: xapi has ${count} entries with endpoint "${ep}" — usually a copy-paste mistake; ` +
             'fan-out to the same LRS with different actors/activityIds is supported but uncommon.',
         );
       }
     }
   } else if (typeof raw !== 'object') {
-    errors.push(
-      'course.config.js: xapi must be an object or an array of objects',
-    );
+    d.error('course.config.js: xapi must be an object or an array of objects');
     return;
   }
 
@@ -647,15 +633,14 @@ function validateXAPIConfig(
     const entry = entries[i];
     const label = Array.isArray(raw) ? `xapi[${i}]` : 'xapi';
     if (!entry || typeof entry !== 'object') {
-      errors.push(`course.config.js: ${label} must be an object`);
+      d.error(`course.config.js: ${label} must be an object`);
       continue;
     }
     validateSingleXAPIEntry(
       entry as Record<string, unknown>,
       label,
       standard,
-      errors,
-      warnings,
+      d,
     );
   }
 }
@@ -664,16 +649,15 @@ function validateSingleXAPIEntry(
   entry: Record<string, unknown>,
   label: string,
   standard: string,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
 ): void {
   const endpoint = entry.endpoint;
   if (endpoint === undefined) {
-    errors.push(`course.config.js: ${label}.endpoint is required`);
+    d.error(`course.config.js: ${label}.endpoint is required`);
     return;
   }
   if (typeof endpoint !== 'string') {
-    errors.push(`course.config.js: ${label}.endpoint must be a string`);
+    d.error(`course.config.js: ${label}.endpoint must be a string`);
     return;
   }
 
@@ -681,7 +665,7 @@ function validateSingleXAPIEntry(
     // 'lms' inherits the LRS from the launch — only the launch-based
     // standards (cmi5, plain xAPI) carry one.
     if (standard !== 'cmi5' && standard !== 'xapi') {
-      errors.push(
+      d.error(
         `course.config.js: ${label}.endpoint: 'lms' requires export.standard: 'cmi5' or 'xapi' (you have "${standard}"). ` +
           'Either change the export standard or specify an explicit LRS endpoint.',
       );
@@ -696,7 +680,7 @@ function validateSingleXAPIEntry(
     ];
     for (const f of forbidden) {
       if (entry[f] !== undefined) {
-        errors.push(
+        d.error(
           `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
         );
       }
@@ -709,24 +693,24 @@ function validateSingleXAPIEntry(
   try {
     url = new URL(endpoint);
   } catch {
-    errors.push(
+    d.error(
       `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got "${endpoint}"`,
     );
     return;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    errors.push(
+    d.error(
       `course.config.js: ${label}.endpoint must use http: or https:, got "${url.protocol}"`,
     );
     return;
   }
   if (url.protocol === 'http:' && process.env.NODE_ENV === 'production') {
-    warnings.push(
+    d.warn(
       `course.config.js: ${label}.endpoint uses http:; LRS credentials will travel in cleartext. Use https in production.`,
     );
   }
   if (!endpoint.endsWith('/')) {
-    warnings.push(
+    d.warn(
       `course.config.js: ${label}.endpoint should end with a slash to avoid concatenation surprises ` +
         `(e.g. 'https://lrs.example.com/xapi/' not 'https://lrs.example.com/xapi'). Runtime normalizes regardless.`,
     );
@@ -735,21 +719,19 @@ function validateSingleXAPIEntry(
   // auth — required for explicit endpoints.
   const auth = entry.auth;
   if (auth === undefined) {
-    errors.push(`course.config.js: ${label}.auth is required`);
+    d.error(`course.config.js: ${label}.auth is required`);
   } else if (typeof auth === 'string') {
     const authErr = validateAuthCredential(auth);
     if (authErr) {
-      errors.push(
-        `course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`,
-      );
+      d.error(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
     } else {
-      warnings.push(
+      d.warn(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
           'For production, pass a function that fetches a short-lived token from a server endpoint.',
       );
     }
   } else if (typeof auth !== 'function') {
-    errors.push(
+    d.error(
       `course.config.js: ${label}.auth must be a string or a function, got ${typeof auth}`,
     );
   }
@@ -757,15 +739,15 @@ function validateSingleXAPIEntry(
   // activityId — required IRI.
   const activityId = entry.activityId;
   if (activityId === undefined || activityId === '') {
-    errors.push(`course.config.js: ${label}.activityId is required`);
+    d.error(`course.config.js: ${label}.activityId is required`);
   } else if (typeof activityId !== 'string') {
-    errors.push(`course.config.js: ${label}.activityId must be a string`);
+    d.error(`course.config.js: ${label}.activityId must be a string`);
   } else {
     try {
       // Any absolute IRI — the URL constructor accepts uncommon schemes.
       new URL(activityId);
     } catch {
-      errors.push(
+      d.error(
         `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`,
       );
     }
@@ -775,7 +757,7 @@ function validateSingleXAPIEntry(
   const actor = entry.actor;
   if (actor === undefined) {
     if (standard === 'web') {
-      errors.push(
+      d.error(
         `course.config.js: ${label}.actor is required for web export — there is no LMS to derive a learner identity from. ` +
           'Provide either a static actor object or a function that resolves one (e.g. from your auth system).',
       );
@@ -783,10 +765,10 @@ function validateSingleXAPIEntry(
   } else if (typeof actor === 'object' && actor !== null) {
     const err = validateAgent(actor);
     if (err) {
-      errors.push(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
+      d.error(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
     }
   } else if (typeof actor !== 'function') {
-    errors.push(
+    d.error(
       `course.config.js: ${label}.actor must be an object or function, got ${typeof actor}`,
     );
   }
@@ -796,25 +778,25 @@ function validateSingleXAPIEntry(
   const aahp = entry.actorAccountHomePage;
   if (aahp !== undefined) {
     if (typeof aahp !== 'string') {
-      errors.push(
+      d.error(
         `course.config.js: ${label}.actorAccountHomePage must be a string`,
       );
     } else {
       try {
         new URL(aahp);
       } catch {
-        errors.push(
+        d.error(
           `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`,
         );
       }
     }
     if (actor !== undefined) {
-      warnings.push(
+      d.warn(
         `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
     if (standard === 'cmi5' || standard === 'xapi' || standard === 'web') {
-      warnings.push(
+      d.warn(
         `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
       );
     }
@@ -829,7 +811,7 @@ function validateSingleXAPIEntry(
     httpOrigin(activityId) === null &&
     aahp === undefined
   ) {
-    errors.push(
+    d.error(
       `course.config.js: ${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
         `Provide ${label}.actorAccountHomePage explicitly.`,
     );
@@ -839,12 +821,12 @@ function validateSingleXAPIEntry(
   const registration = entry.registration;
   if (registration !== undefined) {
     if (typeof registration !== 'string' || !UUID_RE.test(registration)) {
-      errors.push(
+      d.error(
         `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
       );
     }
     if (standard !== 'cmi5' && standard !== 'xapi') {
-      warnings.push(
+      d.warn(
         `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
       );
     }
@@ -861,7 +843,7 @@ interface PageInfo {
   completesOnView: boolean;
 }
 
-interface PagesValidationResult extends ValidationResult {
+interface PagesValidationResult {
   totalPages: number;
   totalQuizzes: number;
   hasGradedQuiz: boolean;
@@ -879,8 +861,7 @@ function validatePageFile(
   projectRoot: string,
   assetsDir: string,
   navIndex: number,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
   assetExistsCache: Map<string, boolean>,
   exportStandard?: string,
 ): {
@@ -894,7 +875,7 @@ function validatePageFile(
 
   const parseError = getParseError(content);
   if (parseError) {
-    errors.push(`${fileRel}: could not parse — ${parseError}`);
+    d.error(`${fileRel}: could not parse — ${parseError}`);
     return {
       page: {
         fileRel,
@@ -909,37 +890,31 @@ function validatePageFile(
     };
   }
 
-  const pageConfig = validatePageConfig(content, fileRel, errors);
+  const pageConfig = validatePageConfig(content, fileRel, d);
 
   const isQuiz = !!pageConfig?.quiz;
   let isGradedQuiz = false;
   if (pageConfig?.quiz) {
-    validateQuizConfig(pageConfig.quiz, fileRel, errors);
+    validateQuizConfig(pageConfig.quiz, fileRel, d);
     if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
       isGradedQuiz = true;
     }
   }
 
-  const completesOnView = validateCompletesOn(pageConfig, fileRel, errors);
+  const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
 
-  validateAssetRefs(content, fileRel, assetsDir, warnings, assetExistsCache);
-  validateQuestionComponents(
-    content,
-    fileRel,
-    errors,
-    warnings,
-    exportStandard,
-  );
-  validateMediaComponents(content, fileRel, errors, warnings);
-  validateHeadingOrder(content, fileRel, warnings);
-  validateContractBypass(content, fileRel, errors);
+  validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
+  validateQuestionComponents(content, fileRel, d, exportStandard);
+  validateMediaComponents(content, fileRel, d);
+  validateHeadingOrder(content, fileRel, d);
+  validateContractBypass(content, fileRel, d);
   if (
     pageConfig?.quiz &&
     !HAS_USE_QUESTION_RE.test(content) &&
     !HAS_QUESTION_TAG_RE.test(content) &&
     !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
   ) {
-    warnings.push(
+    d.warn(
       `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
         `the quiz will have nothing to score`,
     );
@@ -963,10 +938,9 @@ function validatePages(
   pagesDir: string,
   assetsDir: string,
   projectRoot: string,
+  d: Diagnostics,
   exportStandard?: string,
 ): PagesValidationResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
   const pages: PageInfo[] = [];
   let totalPages = 0;
   let totalQuizzes = 0;
@@ -976,18 +950,10 @@ function validatePages(
   const assetExistsCache = new Map<string, boolean>();
 
   const noPages = (): PagesValidationResult => {
-    errors.push(
+    d.error(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return {
-      errors,
-      warnings,
-      totalPages,
-      totalQuizzes,
-      hasGradedQuiz,
-      hasParseErrors,
-      pages,
-    };
+    return { totalPages, totalQuizzes, hasGradedQuiz, hasParseErrors, pages };
   };
 
   if (!existsSync(pagesDir)) return noPages();
@@ -996,7 +962,7 @@ function validatePages(
   for (const entry of readdirSync(pagesDir)) {
     const fullPath = resolve(pagesDir, entry);
     if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
-      warnings.push(
+      d.warn(
         `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
       );
     }
@@ -1014,7 +980,7 @@ function validatePages(
       for (const pageName of meta.pages) {
         const fileName = ensureSvelteSuffix(pageName);
         if (!lesson.files.includes(fileName)) {
-          errors.push(
+          d.error(
             `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
           );
         }
@@ -1024,7 +990,7 @@ function validatePages(
       const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
       for (const file of lesson.files) {
         if (!listedSet.has(file)) {
-          warnings.push(
+          d.warn(
             `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
           );
         }
@@ -1037,8 +1003,7 @@ function validatePages(
         projectRoot,
         assetsDir,
         totalPages,
-        errors,
-        warnings,
+        d,
         assetExistsCache,
         exportStandard,
       );
@@ -1054,7 +1019,7 @@ function validatePages(
     const sectionRel = relative(projectRoot, section.dir);
     const pagesBeforeSection = totalPages;
 
-    const sectionMeta = validateMetaFile(section.metaPath, sectionRel, errors);
+    const sectionMeta = validateMetaFile(section.metaPath, sectionRel, d);
 
     for (const lesson of section.lessons) {
       if (lesson.name === null) {
@@ -1064,7 +1029,7 @@ function validatePages(
         const meta = validateMetaFile(
           lesson.metaPath,
           relative(projectRoot, lesson.dir),
-          errors,
+          d,
         );
         validateLesson(lesson, meta);
       }
@@ -1072,23 +1037,13 @@ function validatePages(
 
     // The page-count delta covers both the no-lessons and empty-lessons cases.
     if (totalPages === pagesBeforeSection) {
-      warnings.push(
-        `${sectionRel}: section contributed no pages and will be empty`,
-      );
+      d.warn(`${sectionRel}: section contributed no pages and will be empty`);
     }
   }
 
   if (totalPages === 0) return noPages();
 
-  return {
-    errors,
-    warnings,
-    totalPages,
-    totalQuizzes,
-    hasGradedQuiz,
-    hasParseErrors,
-    pages,
-  };
+  return { totalPages, totalQuizzes, hasGradedQuiz, hasParseErrors, pages };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1096,7 +1051,7 @@ function validatePages(
 function validateMetaFile(
   metaPath: string,
   parentRel: string,
-  errors: string[],
+  d: Diagnostics,
 ): { title?: string; pages?: string[] } | null {
   if (!existsSync(metaPath)) return null;
 
@@ -1106,13 +1061,11 @@ function validateMetaFile(
   );
 
   if (result.kind === 'parse-error') {
-    errors.push(`${metaRel}: could not parse — JavaScript syntax error`);
+    d.error(`${metaRel}: could not parse — JavaScript syntax error`);
     return null;
   }
   if (result.kind !== 'literal') {
-    errors.push(
-      `${metaRel}: syntax error — must export default { title: "..." }`,
-    );
+    d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
     return null;
   }
 
@@ -1120,14 +1073,12 @@ function validateMetaFile(
   try {
     meta = JSON5.parse(result.text);
   } catch {
-    errors.push(
-      `${metaRel}: syntax error — must export default { title: "..." }`,
-    );
+    d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
     return null;
   }
 
   if (!meta.title) {
-    errors.push(`${metaRel}: missing required "title" field`);
+    d.error(`${metaRel}: missing required "title" field`);
   }
 
   return meta;
@@ -1138,12 +1089,12 @@ function validateMetaFile(
 function validatePageConfig(
   content: string,
   fileRel: string,
-  errors: string[],
+  d: Diagnostics,
 ): { title?: string; quiz?: unknown; completesOn?: unknown } | null {
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
-    errors.push(
+    d.error(
       `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
     );
   }
@@ -1153,11 +1104,11 @@ function validatePageConfig(
 function validateCompletesOn(
   pageConfig: { completesOn?: unknown } | null,
   fileRel: string,
-  errors: string[],
+  d: Diagnostics,
 ): boolean {
   if (!pageConfig || pageConfig.completesOn === undefined) return false;
   if (pageConfig.completesOn === 'view') return true;
-  errors.push(
+  d.error(
     `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`,
   );
   return false;
@@ -1168,7 +1119,7 @@ function validateCompletesOn(
 function validateQuizConfig(
   quiz: unknown,
   fileRel: string,
-  errors: string[],
+  d: Diagnostics,
 ): void {
   if (!quiz || typeof quiz !== 'object') return;
   const cfg = quiz as Record<string, unknown>;
@@ -1179,7 +1130,7 @@ function validateQuizConfig(
       val !== Infinity &&
       (typeof val !== 'number' || val <= 0 || !Number.isFinite(val))
     ) {
-      errors.push(
+      d.error(
         `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`,
       );
     }
@@ -1187,7 +1138,7 @@ function validateQuizConfig(
 
   for (const field of ['graded', 'gatesProgress']) {
     if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
-      errors.push(
+      d.error(
         `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
       );
     }
@@ -1197,7 +1148,7 @@ function validateQuizConfig(
     cfg.feedbackMode !== undefined &&
     !VALID_FEEDBACK_MODES.includes(cfg.feedbackMode as string)
   ) {
-    errors.push(
+    d.error(
       `${fileRel}: quiz.feedbackMode must be "review", "immediate", or "never", got "${String(cfg.feedbackMode)}"`,
     );
   }
@@ -1205,7 +1156,7 @@ function validateQuizConfig(
     cfg.retryMode !== undefined &&
     !VALID_RETRY_MODES.includes(cfg.retryMode as string)
   ) {
-    errors.push(
+    d.error(
       `${fileRel}: quiz.retryMode must be "full" or "incorrect-only", got "${String(cfg.retryMode)}"`,
     );
   }
@@ -1243,8 +1194,7 @@ function staticNumber(prop: PropValue | undefined): number | null {
 function validateQuestionComponents(
   content: string,
   fileRel: string,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
   exportStandard?: string,
 ): void {
   const components = findComponents(
@@ -1257,7 +1207,7 @@ function validateQuestionComponents(
   for (const { name, props, hasSpread } of components) {
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
       if (!hasSpread && !props.has(req)) {
-        errors.push(`${fileRel}: <${name}> is missing required prop "${req}"`);
+        d.error(`${fileRel}: <${name}> is missing required prop "${req}"`);
       }
     }
 
@@ -1265,7 +1215,7 @@ function validateQuestionComponents(
     for (const labelProp of ['options', 'answers']) {
       const entries = staticArray(props.get(labelProp));
       if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
-        warnings.push(
+        d.warn(
           tag(
             A11Y_IDS.questionLabel,
             `${fileRel}: <${name}> has an empty ${labelProp === 'options' ? 'option' : 'answer'} label`,
@@ -1277,7 +1227,7 @@ function validateQuestionComponents(
     const idProp = props.get('id');
     if (idProp?.kind === 'string') {
       if (seenIds.has(idProp.value)) {
-        errors.push(
+        d.error(
           `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`,
         );
       } else if (exportStandard === 'scorm12') {
@@ -1286,12 +1236,12 @@ function validateQuestionComponents(
         // flagged above) to avoid double-reporting the same id.
         const sane = shortIdentifier(idProp.value);
         if (sane !== idProp.value) {
-          warnings.push(
+          d.warn(
             `${fileRel}: question id "${idProp.value}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
-          errors.push(
+          d.error(
             `${fileRel}: question id "${idProp.value}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
           );
         }
@@ -1302,18 +1252,18 @@ function validateQuestionComponents(
 
     const weightProp = props.get('weight');
     if (weightProp?.kind === 'string') {
-      warnings.push(
+      d.warn(
         `${fileRel}: <${name}> weight="${weightProp.value}" is a string and is ignored (treated as 1) — pass a number: weight={${weightProp.value}}`,
       );
     } else {
       const weight = staticNumber(weightProp);
       if (weight !== null) {
         if (!Number.isFinite(weight)) {
-          errors.push(
+          d.error(
             `${fileRel}: <${name}> weight must be finite — a non-finite weight makes the weighted score NaN, got ${weight}`,
           );
         } else if (!(weight > 0)) {
-          warnings.push(
+          d.warn(
             `${fileRel}: <${name}> weight ${weight} is not positive and is ignored (treated as 1)`,
           );
         }
@@ -1329,14 +1279,14 @@ function validateQuestionComponents(
           correct < 0 ||
           correct >= options.length
         ) {
-          errors.push(
+          d.error(
             `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`,
           );
         }
       }
       const optionFeedback = staticArray(props.get('optionFeedback'));
       if (options && optionFeedback && optionFeedback.length > options.length) {
-        warnings.push(
+        d.warn(
           `${fileRel}: <MultipleChoice> optionFeedback has ${optionFeedback.length} entries but only ${options.length} options — the extra entries can never be shown`,
         );
       }
@@ -1345,7 +1295,7 @@ function validateQuestionComponents(
       const targets = staticArray(props.get('targets'));
       const correct = staticArray(props.get('correct'));
       if (items && correct && correct.length !== items.length) {
-        errors.push(
+        d.error(
           `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`,
         );
       }
@@ -1357,7 +1307,7 @@ function validateQuestionComponents(
             idx < 0 ||
             idx >= targets.length
           ) {
-            errors.push(
+            d.error(
               `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
             );
             break;
@@ -1375,7 +1325,7 @@ function validateQuestionComponents(
             typeof (p as { right?: unknown }).right !== 'string',
         );
         if (bad) {
-          errors.push(
+          d.error(
             `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`,
           );
         }
@@ -1384,9 +1334,9 @@ function validateQuestionComponents(
       const answers = staticArray(props.get('answers'));
       if (answers) {
         if (answers.length === 0) {
-          errors.push(`${fileRel}: <FillInTheBlank> answers must not be empty`);
+          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
         } else if (answers.some((a) => typeof a !== 'string')) {
-          errors.push(
+          d.error(
             `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
           );
         }
@@ -1417,14 +1367,13 @@ function stripRepeated(input: string, patterns: RegExp[]): string {
 
 /**
  * Sibling to validateQuestionComponents kept out of QUESTION_COMPONENT_REQUIRED
- * so media isn't treated as gradable questions. Declares `warnings` directly.
+ * so media isn't treated as gradable questions.
  * Non-static (kind 'expr') values are skipped, matching the rest of the linter.
  */
 function validateMediaComponents(
   content: string,
   fileRel: string,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
 ): void {
   const components = findComponents(
     content,
@@ -1438,7 +1387,7 @@ function validateMediaComponents(
       // A string value is truthy at runtime (so decorative="false" hides the
       // image), but the parser sees a string, not a boolean — flag the misuse.
       if (decorative?.kind === 'string') {
-        errors.push(
+        d.error(
           tag(
             A11Y_IDS.imageAlt,
             `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${JSON.stringify(decorative.value)}`,
@@ -1451,7 +1400,7 @@ function validateMediaComponents(
         (decorative?.kind === 'expr' && decorative.raw.trim() === 'true');
       const altIsEmpty = alt?.kind === 'string' && alt.value.trim() === '';
       if (!hasDecorative && !hasSpread && (alt === undefined || altIsEmpty)) {
-        errors.push(
+        d.error(
           tag(
             A11Y_IDS.imageAlt,
             `${fileRel}: <Image> needs alt text, or mark it decorative={true} if purely ornamental`,
@@ -1459,7 +1408,7 @@ function validateMediaComponents(
         );
       }
       if (hasDecorative && alt?.kind === 'string' && alt.value.trim() !== '') {
-        warnings.push(
+        d.warn(
           tag(
             A11Y_IDS.imageAlt,
             `${fileRel}: <Image> is decorative but also has alt text — the alt will be dropped`,
@@ -1473,7 +1422,7 @@ function validateMediaComponents(
     const title = props.get('title');
     const titleIsEmpty = title?.kind === 'string' && title.value.trim() === '';
     if (!hasSpread && (title === undefined || titleIsEmpty)) {
-      errors.push(
+      d.error(
         tag(
           A11Y_IDS.mediaTitle,
           `${fileRel}: <${name}> needs a title — it's the accessible name for the player`,
@@ -1488,7 +1437,7 @@ function validateMediaComponents(
       isEmbed &&
       props.get('transcript') === undefined
     ) {
-      warnings.push(
+      d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
           `${fileRel}: <Video> embeds can't carry caption tracks — provide a transcript for WCAG 1.2`,
@@ -1503,7 +1452,7 @@ function validateMediaComponents(
       props.get('tracks') === undefined &&
       props.get('transcript') === undefined
     ) {
-      warnings.push(
+      d.warn(
         tag(
           A11Y_IDS.mediaCaptions,
           `${fileRel}: native <Video> has no caption tracks or transcript — add tracks={[…]} or a transcript for WCAG 1.2.2`,
@@ -1515,7 +1464,7 @@ function validateMediaComponents(
       !hasSpread &&
       props.get('transcript') === undefined
     ) {
-      warnings.push(
+      d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
           `${fileRel}: <Audio> has no transcript — required for WCAG 1.2.1`,
@@ -1537,14 +1486,14 @@ function validateMediaComponents(
 function validateHeadingOrder(
   content: string,
   fileRel: string,
-  warnings: string[],
+  d: Diagnostics,
 ): void {
   const html = stripRepeated(content, [SCRIPT_STYLE_RE, HTML_COMMENT_RE]);
   const levels = [...html.matchAll(/<h([1-6])\b/gi)].map((h) => Number(h[1]));
   let prevSeen: number | null = null;
   for (const level of levels) {
     if (prevSeen !== null && level - prevSeen > 1) {
-      warnings.push(
+      d.warn(
         tag(
           A11Y_IDS.headingOrder,
           `${fileRel}: heading level jumps from h${prevSeen} to h${level} — don't skip levels (WCAG 1.3.1)`,
@@ -1577,16 +1526,16 @@ const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
 function validateContractBypass(
   content: string,
   fileRel: string,
-  errors: string[],
+  d: Diagnostics,
 ): void {
   if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
-    errors.push(
+    d.error(
       `${fileRel}: dispatches "tessera-quiz-complete" directly — submit through ` +
         `useQuiz().submit() so the result reaches the LMS`,
     );
   }
   if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
-    errors.push(
+    d.error(
       `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
         `(useQuiz, useQuestion, useNavigation, …) instead`,
     );
@@ -1612,7 +1561,7 @@ function validateAssetRefs(
   content: string,
   fileRel: string,
   assetsDir: string,
-  warnings: string[],
+  d: Diagnostics,
   existsCache: Map<string, boolean>,
 ): void {
   for (const assetPath of collectAssetRefs(content)) {
@@ -1623,7 +1572,7 @@ function validateAssetRefs(
       existsCache.set(fullAssetPath, exists);
     }
     if (!exists) {
-      warnings.push(
+      d.warn(
         `${fileRel}: "$assets/${assetPath}" not found in assets/ directory`,
       );
     }
@@ -1635,8 +1584,7 @@ function validateAssetRefs(
 function crossValidate(
   config: ParsedConfig,
   pageResults: PagesValidationResult,
-  errors: string[],
-  warnings: string[],
+  d: Diagnostics,
 ): void {
   // completion.mode "quiz" but no graded quizzes
   if (
@@ -1644,7 +1592,7 @@ function crossValidate(
     !pageResults.hasGradedQuiz &&
     !pageResults.hasParseErrors
   ) {
-    errors.push(
+    d.error(
       'completion.mode is "quiz" but no pages have quiz config with graded: true',
     );
   }
@@ -1655,7 +1603,7 @@ function crossValidate(
     config.completion?.mode === 'quiz' &&
     config.scoring?.passingScore === undefined
   ) {
-    warnings.push(
+    d.warn(
       'completion.mode is "quiz" but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.',
     );
   }
@@ -1669,7 +1617,7 @@ function crossValidate(
     completesOnPages.length === 0 &&
     !pageResults.hasParseErrors
   ) {
-    errors.push(
+    d.error(
       'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view". ' +
         'Either add a completesOn page or remove the trigger field to drop the static check.',
     );
@@ -1678,7 +1626,7 @@ function crossValidate(
   if (isManual) {
     for (const page of pageResults.pages) {
       if (page.hasGradedQuiz) {
-        warnings.push(
+        d.warn(
           `${page.fileRel}: quiz.graded is true under completion.mode: "manual". ` +
             'The score will be reported to the LMS for transcripts, but it will not drive ' +
             "completion or success status — `markComplete()` / completesOn does. If that's " +
@@ -1689,20 +1637,20 @@ function crossValidate(
   }
 
   if (isManual && config.completion?.percentageThreshold !== undefined) {
-    warnings.push(
+    d.warn(
       'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"',
     );
   }
   if (!isManual) {
     for (const page of completesOnPages) {
-      warnings.push(
+      d.warn(
         `${page.fileRel}: pageConfig.completesOn is ignored — completion.mode is "${config.completion?.mode ?? 'percentage'}"`,
       );
     }
   }
   for (const page of pageResults.pages) {
     if (page.completesOnView && page.hasQuiz) {
-      warnings.push(
+      d.warn(
         `${page.fileRel}: completion fires on view, before the quiz can be answered — likely a mistake`,
       );
     }
@@ -1711,7 +1659,7 @@ function crossValidate(
   if (isManual) {
     const firstPage = pageResults.pages.find((p) => p.navIndex === 0);
     if (firstPage?.completesOnView) {
-      warnings.push(
+      d.warn(
         `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`,
       );
     }
@@ -1748,7 +1696,7 @@ function crossValidate(
       userStateBuffer;
 
     if (estimatedSize > 3200) {
-      warnings.push(
+      d.warn(
         `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated SCORM 1.2 suspend_data ~${estimatedSize} bytes may exceed the 4096-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider using "scorm2004" or "cmi5".`,
       );
     }
