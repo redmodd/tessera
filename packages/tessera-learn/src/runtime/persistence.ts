@@ -60,4 +60,8 @@ export interface SavedState {
   gs?: number[];
   /** Manual completion latch. 1 if the learner triggered manual completion. Absent otherwise. */
   m?: 1;
+  /** Structure fingerprint (FNV-1a over ordered page slugs) at save time.
+   * On resume, a mismatch discards the blob — the course structure changed.
+   * Absent on state saved before fingerprinting; treated as a match. */
+  f?: string;
 }
