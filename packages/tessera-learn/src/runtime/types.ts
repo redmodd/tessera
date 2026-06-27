@@ -40,6 +40,9 @@ export interface CourseConfig {
   description?: string;
   author?: string;
   version?: string;
+  /** Resume policy. 'auto' (default) restores saved progress unless the page
+   * structure changed since it was saved; 'never' always starts fresh. */
+  resume?: 'auto' | 'never';
   /** BCP-47 language tag for <html lang>. Defaults to 'en'. WCAG 3.1.1. */
   language?: string;
   /** Accessibility checker configuration. */
