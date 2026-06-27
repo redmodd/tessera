@@ -3,19 +3,7 @@ import type { CourseConfig } from '../types.js';
 import { courseIdentity } from '../types.js';
 import type { Interaction } from '../interaction.js';
 import type { Manifest } from '../../plugin/manifest.js';
-
-// FNV-1a over the ordered page slugs. SavedState is keyed by page index, so a
-// structure change must change the key — else stale state restores onto the
-// wrong pages. Slugs can't contain a NUL, so it's a collision-proof delimiter.
-function structureFingerprint(manifest: Manifest): string {
-  const slugs = manifest.pages.map((p) => p.slug).join('\0');
-  let h = 0x811c9dc5;
-  for (let i = 0; i < slugs.length; i++) {
-    h ^= slugs.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(36);
-}
+import { structureFingerprint } from '../fingerprint.js';
 
 /**
  * Web persistence adapter — stores course state in localStorage.
@@ -27,6 +15,10 @@ export class WebAdapter implements PersistenceAdapter {
 
   constructor(config: CourseConfig, manifest?: Manifest) {
     const base = courseIdentity(config) || 'tessera-course';
+    // Fingerprint in the key invalidates web resume on a structure change (a
+    // changed key misses, so getState() returns null). LMS adapters can't key
+    // their storage, so they rely on SavedState.f + shouldRestore instead. Keep
+    // both — neither mechanism covers the other's adapters.
     const fp = manifest ? structureFingerprint(manifest) : '';
     this.#storageKey = `tessera-${base}${fp ? `-${fp}` : ''}`;
   }

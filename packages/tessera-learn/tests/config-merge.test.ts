@@ -34,4 +34,12 @@ describe('mergeCourseConfig', () => {
     expect(merged.completion).toEqual({ mode: 'manual' });
     expect(merged.scoring.passingScore).toBe(0);
   });
+
+  it('defaults resume to "auto" when absent', () => {
+    expect(mergeCourseConfig({}).resume).toBe('auto');
+  });
+
+  it('keeps an author-supplied resume policy', () => {
+    expect(mergeCourseConfig({ resume: 'never' }).resume).toBe('never');
+  });
 });

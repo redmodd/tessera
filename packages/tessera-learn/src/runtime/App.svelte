@@ -14,6 +14,7 @@
   import { applyBranding } from './branding.js';
   import { DurationTracker } from './duration.js';
   import { createAdapter } from 'virtual:tessera-adapter';
+  import { structureFingerprint, shouldRestore } from './fingerprint.js';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
   import { registerXAPIClient } from './xapi/registry.js';
   import {
@@ -25,6 +26,7 @@
 
   // ---- Persistence ----
   const adapter = createAdapter(config, { manifest });
+  const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
   // Holds the resolved xAPI client for unload-time markUnloading. Set
   // after adapter.init() resolves and registered globally so useXAPI()
@@ -206,6 +208,7 @@
     }
     return {
       b: nav.currentPageIndex,
+      f: currentFingerprint,
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
@@ -403,7 +406,7 @@
     }
 
     const saved = adapter.getState();
-    if (saved) {
+    if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
       restoreState(saved);
       prevCompletionStatus = progress.completionStatus;
       prevSuccessStatus = progress.successStatus;
