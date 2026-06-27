@@ -204,7 +204,10 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  * Validate a Tessera project at the given root.
  * Returns errors (block build) and warnings (informational).
  */
-export function validateProject(projectRoot: string): ValidationResult {
+export function validateProject(
+  projectRoot: string,
+  standardOverride?: string,
+): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
 
@@ -216,7 +219,7 @@ export function validateProject(projectRoot: string): ValidationResult {
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(projectRoot, d);
+  const config = parseConfig(projectRoot, d, standardOverride);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -264,7 +267,11 @@ interface ParsedConfig {
   [key: string]: unknown;
 }
 
-function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
+function parseConfig(
+  projectRoot: string,
+  d: Diagnostics,
+  standardOverride?: string,
+): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
@@ -397,6 +404,12 @@ function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
         `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
       );
     }
+  }
+
+  // Apply the override after validating the file value above, so the
+  // standard-dependent checks below (csp, xapi) see what actually ships.
+  if (standardOverride) {
+    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Validate resume policy

@@ -31,6 +31,24 @@ describe('parseExportFlags', () => {
     const result = parseExportFlags(['--standard']);
     expect(result.error).toMatch(/--standard/);
   });
+
+  it('accepts the --standard=value form', () => {
+    expect(parseExportFlags(['--standard=scorm2004'])).toEqual({
+      standardOverride: 'scorm2004',
+    });
+  });
+
+  it('errors on an unknown standard given as --standard=value', () => {
+    const result = parseExportFlags(['--standard=bogus']);
+    expect(result.error).toContain('bogus');
+    expect(result.standardOverride).toBeUndefined();
+  });
+
+  it('rejects an unrecognized flag instead of ignoring it', () => {
+    const result = parseExportFlags(['--standrd', 'scorm2004']);
+    expect(result.error).toMatch(/Unknown argument/);
+    expect(result.standardOverride).toBeUndefined();
+  });
 });
 
 describe('splitCourseArg', () => {

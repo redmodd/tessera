@@ -151,7 +151,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
       },
     }),
     tesseraA11yCompilerPlugin(a11y),
-    tesseraValidationPlugin(),
+    tesseraValidationPlugin(standardOverride),
     tesseraEntryPlugin(standardOverride),
     tesseraConfigDefaultsPlugin(),
     tesseraConfigPlugin(standardOverride),
@@ -279,6 +279,14 @@ export function resolveExportStandard(
   if (override) return override;
   if (!read.ok) return 'unknown';
   return read.config.export?.standard || 'web';
+}
+
+/** Apply a CLI `--standard` override onto a config's export.standard. Exported for tests. */
+export function applyStandardOverride<
+  T extends { export?: { standard?: string } },
+>(config: T, override?: string): T {
+  if (!override) return config;
+  return { ...config, export: { ...config.export, standard: override } };
 }
 
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
@@ -420,15 +428,7 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
       const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
       // The runtime reads export.standard too, so the override must reach the
       // bundled config, not just the manifest/adapter.
-      const withOverride: Partial<CourseConfig> = standardOverride
-        ? {
-            ...userConfig,
-            export: {
-              ...userConfig.export,
-              standard: standardOverride as CourseConfig['export']['standard'],
-            },
-          }
-        : userConfig;
+      const withOverride = applyStandardOverride(userConfig, standardOverride);
       return `export default ${JSON.stringify(mergeCourseConfig(withOverride))};`;
     },
   );
@@ -469,7 +469,7 @@ function tesseraPagesPlugin(): Plugin {
 
 // ---------- Validation Plugin ----------
 
-function tesseraValidationPlugin(): Plugin {
+function tesseraValidationPlugin(standardOverride?: string): Plugin {
   let projectRoot: string;
   let isBuild = false;
 
@@ -482,14 +482,14 @@ function tesseraValidationPlugin(): Plugin {
       isBuild = config.command === 'build';
       // Run validation during dev (configResolved fires before server starts)
       if (!isBuild) {
-        runValidation(projectRoot);
+        runValidation(projectRoot, standardOverride);
       }
     },
 
     buildStart() {
       // Run validation during build (buildStart fires once before bundling)
       if (isBuild) {
-        runValidation(projectRoot);
+        runValidation(projectRoot, standardOverride);
       }
     },
   };
@@ -527,8 +527,8 @@ function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
   };
 }
 
-function runValidation(projectRoot: string): void {
-  const result = validateProject(projectRoot);
+function runValidation(projectRoot: string, standardOverride?: string): void {
+  const result = validateProject(projectRoot, standardOverride);
   reportValidationIssues(result);
   if (result.errors.length > 0) {
     throw new Error(
@@ -576,12 +576,7 @@ function tesseraExportPlugin(standardOverride?: string): Plugin {
         );
       }
 
-      const config = standardOverride
-        ? {
-            ...read.config,
-            export: { ...read.config.export, standard: standardOverride },
-          }
-        : read.config;
+      const config = applyStandardOverride(read.config, standardOverride);
       await runExport(projectRoot, config as Parameters<typeof runExport>[1]);
     },
   };

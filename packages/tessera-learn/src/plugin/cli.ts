@@ -31,18 +31,28 @@ export function parseExportFlags(flags: string[]): {
   standardOverride?: string;
   error?: string;
 } {
-  const i = flags.indexOf('--standard');
-  if (i === -1) return {};
-  const value = flags[i + 1];
-  if (value === undefined || value.startsWith('-')) {
-    return { error: '--standard requires a value' };
+  let standardOverride: string | undefined;
+  for (let i = 0; i < flags.length; i++) {
+    const arg = flags[i];
+    let value: string | undefined;
+    if (arg === '--standard') {
+      value = flags[++i];
+    } else if (arg.startsWith('--standard=')) {
+      value = arg.slice('--standard='.length);
+    } else {
+      return { error: `Unknown argument: ${arg}` };
+    }
+    if (value === undefined || value.startsWith('-')) {
+      return { error: '--standard requires a value' };
+    }
+    if (!VALID_EXPORT_STANDARDS.includes(value)) {
+      return {
+        error: `--standard must be one of ${VALID_EXPORT_STANDARDS.join(', ')}, got "${value}"`,
+      };
+    }
+    standardOverride = value;
   }
-  if (!VALID_EXPORT_STANDARDS.includes(value)) {
-    return {
-      error: `--standard must be one of ${VALID_EXPORT_STANDARDS.join(', ')}, got "${value}"`,
-    };
-  }
-  return { standardOverride: value };
+  return standardOverride ? { standardOverride } : {};
 }
 
 // The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the

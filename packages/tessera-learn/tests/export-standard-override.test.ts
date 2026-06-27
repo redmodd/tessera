@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { resolveExportStandard } from '../src/plugin/index.js';
+import {
+  resolveExportStandard,
+  applyStandardOverride,
+} from '../src/plugin/index.js';
 import type { CourseConfigRead } from '../src/plugin/manifest.js';
 
 const ok = (standard?: string): CourseConfigRead => ({
@@ -30,5 +33,27 @@ describe('resolveExportStandard', () => {
     expect(
       resolveExportStandard({ ok: false, reason: 'missing' }, 'scorm2004'),
     ).toBe('scorm2004');
+  });
+});
+
+describe('applyStandardOverride', () => {
+  it('returns the config unchanged when no override is given', () => {
+    const config = { export: { standard: 'web' } };
+    expect(applyStandardOverride(config)).toBe(config);
+  });
+
+  it('overrides export.standard while preserving other export fields', () => {
+    expect(
+      applyStandardOverride(
+        { export: { standard: 'web', csp: false } },
+        'cmi5',
+      ),
+    ).toEqual({ export: { standard: 'cmi5', csp: false } });
+  });
+
+  it('sets export.standard when the config has no export block', () => {
+    expect(applyStandardOverride({}, 'scorm2004')).toEqual({
+      export: { standard: 'scorm2004' },
+    });
   });
 });
