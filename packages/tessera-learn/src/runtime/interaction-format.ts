@@ -165,7 +165,6 @@ export function formatCorrectPattern(
 export function scorm12Type(type: Interaction['type']): string {
   switch (type) {
     case 'long-fill-in':
-      return 'fill-in';
     case 'other':
       return 'fill-in';
     default:

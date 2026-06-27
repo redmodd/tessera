@@ -62,8 +62,7 @@
   function getOptionClass(optIndex) {
     if (!q.feedbackVisible) return '';
     if (isCorrectOption(optIndex)) return 'correct';
-    if (optIndex === selectedOption && !isCorrectOption(optIndex))
-      return 'incorrect';
+    if (optIndex === selectedOption) return 'incorrect';
     return '';
   }
 </script>

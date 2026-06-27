@@ -494,17 +494,21 @@ export class XAPIPublisher {
     return headers;
   }
 
-  #fetchWithToken(
-    token: string,
-    body: string,
-    keepalive: boolean,
-  ): Promise<SendOutcome> {
+  #post(token: string, body: string, keepalive: boolean): Promise<Response> {
     return fetch(this.#statementsUrl, {
       method: 'POST',
       headers: this.#buildHeaders(token),
       body,
       keepalive,
-    })
+    });
+  }
+
+  #fetchWithToken(
+    token: string,
+    body: string,
+    keepalive: boolean,
+  ): Promise<SendOutcome> {
+    return this.#post(token, body, keepalive)
       .then((resp) => this.#handleResponse(resp, body, keepalive))
       .catch((err) => ({
         ok: false,
@@ -529,14 +533,7 @@ export class XAPIPublisher {
     ) {
       this.#cachedAuth = null;
       return this.#resolveAuth(true)
-        .then((newToken) =>
-          fetch(this.#statementsUrl, {
-            method: 'POST',
-            headers: this.#buildHeaders(newToken),
-            body,
-            keepalive,
-          }),
-        )
+        .then((newToken) => this.#post(newToken, body, keepalive))
         .then((retryResp): SendOutcome => {
           if (retryResp.ok || retryResp.status === 409) {
             return { ok: true, status: retryResp.status };

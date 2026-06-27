@@ -66,25 +66,13 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   saveState(state: SavedState): void {
     super.saveState(state);
     // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.lesson_location', String(state.b)),
-      'cmi.core.lesson_location',
-    );
+    this.set('cmi.core.lesson_location', String(state.b));
   }
 
   setScore(score: number): void {
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.score.raw', formatReal107(score)),
-      'cmi.core.score.raw',
-    );
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.score.min', '0'),
-      'cmi.core.score.min',
-    );
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.score.max', '100'),
-      'cmi.core.score.max',
-    );
+    this.set('cmi.core.score.raw', formatReal107(score));
+    this.set('cmi.core.score.min', '0');
+    this.set('cmi.core.score.max', '100');
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {
@@ -101,18 +89,11 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   #flushLessonStatus(): void {
     const value = this.#successStatus ?? this.#completionStatus;
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.lesson_status', value),
-      'cmi.core.lesson_status',
-    );
+    this.set('cmi.core.lesson_status', value);
   }
 
   setExit(mode: 'suspend' | 'normal'): void {
     // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
-    const value = mode === 'suspend' ? 'suspend' : '';
-    this.queue.enqueue(
-      () => this.api.LMSSetValue('cmi.core.exit', value),
-      'cmi.core.exit',
-    );
+    this.set('cmi.core.exit', mode === 'suspend' ? 'suspend' : '');
   }
 }
