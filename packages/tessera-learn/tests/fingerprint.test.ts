@@ -38,9 +38,9 @@ describe('structureFingerprint', () => {
   it('changes when a page is reordered, added, or renamed', () => {
     const base = structureFingerprint(manifestOf('intro', 'quiz'));
     expect(structureFingerprint(manifestOf('quiz', 'intro'))).not.toBe(base);
-    expect(structureFingerprint(manifestOf('intro', 'quiz', 'summary'))).not.toBe(
-      base,
-    );
+    expect(
+      structureFingerprint(manifestOf('intro', 'quiz', 'summary')),
+    ).not.toBe(base);
     expect(structureFingerprint(manifestOf('intro', 'test'))).not.toBe(base);
   });
 });
