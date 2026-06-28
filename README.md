@@ -42,6 +42,7 @@ cd my-courses
 pnpm install
 pnpm dev starter-course      # local dev server at http://localhost:5173
 pnpm export starter-course   # build + package the course for the configured standard
+pnpm export starter-course --standard scorm2004 # override export.standard for this build
 pnpm validate starter-course # check the course for structural errors, no server or build
 pnpm tessera new intro # add another course at courses/intro/
 pnpm tessera duplicate intro intro-v2 # copy an existing course

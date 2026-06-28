@@ -54,7 +54,8 @@ From the workspace root (`pnpm`; corepack provisions it). Each command takes the
 pnpm install              # first time only
 pnpm dev <course>         # dev server at http://localhost:5173 (Ctrl+C to stop)
 pnpm export <course>      # build + package for the LMS standard in course.config.js
-pnpm validate <course>    # run validation only — no server, no bundle
+pnpm export <course> --standard <web|scorm12|scorm2004|cmi5|xapi>   # override that standard for this build
+pnpm validate <course>    # run validation only — no server, no bundle (also takes --standard)
 pnpm a11y <course>        # runtime a11y audit on its own (the audit half of check)
 pnpm check <course>       # validate, then the runtime a11y audit (axe) over the built course
 ```
@@ -603,6 +604,8 @@ canAccess: (ctx) => {
 | `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `dist/<course>-xapi.zip`      |
 
 Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
+
+`--standard <web|scorm12|scorm2004|cmi5|xapi>` overrides `export.standard` for one build without editing `course.config.js` — e.g. `pnpm export <course> --standard scorm2004`. Useful for packaging the same course for multiple LMSs from one config. `pnpm validate <course> --standard <value>` takes the same flag to preview validation against the overridden standard. An unknown value fails before the build runs.
 
 ### Web export Content-Security-Policy
 

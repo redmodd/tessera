@@ -96,6 +96,17 @@ describe('xapi config validation — endpoint: lms', () => {
     expect(errors.find((e) => e.includes('scorm12'))).toBeDefined();
   });
 
+  it('errors on endpoint: "lms" when --standard overrides cmi5 to web', () => {
+    testRoot = projectWith(`{ endpoint: "lms" }`, 'cmi5');
+    expect(
+      validateProject(testRoot).errors.filter((e) => e.includes('xapi')),
+    ).toEqual([]);
+    const { errors } = validateProject(testRoot, 'web');
+    expect(
+      errors.find((e) => e.includes("'lms' requires export.standard: 'cmi5'")),
+    ).toBeDefined();
+  });
+
   it('errors when extra fields appear alongside endpoint: "lms"', () => {
     testRoot = projectWith(
       `{ endpoint: "lms", auth: "x", activityId: "https://example.com/a" }`,

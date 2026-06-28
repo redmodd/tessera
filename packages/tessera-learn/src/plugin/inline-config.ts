@@ -15,11 +15,12 @@ import { tesseraPlugin } from './index.js';
 export function buildInlineConfig(
   projectRoot: string,
   workspaceRoot: string,
+  standardOverride?: string,
 ): InlineConfig {
   return {
     root: projectRoot,
     configFile: false,
-    plugins: [tesseraPlugin()],
+    plugins: [tesseraPlugin({ standardOverride })],
     resolve: { alias: { $shared: resolve(workspaceRoot, 'shared') } },
     server: { fs: { allow: [workspaceRoot] } },
   };
@@ -46,9 +47,10 @@ export async function resolveTesseraConfig(
   projectRoot: string,
   workspaceRoot: string,
   env: ConfigEnv,
+  standardOverride?: string,
 ): Promise<InlineConfig> {
   const vite = await import('vite');
-  const base = buildInlineConfig(projectRoot, workspaceRoot);
+  const base = buildInlineConfig(projectRoot, workspaceRoot, standardOverride);
   const user = await loadUserConfig(projectRoot, env);
   return user ? vite.mergeConfig(base, user) : base;
 }

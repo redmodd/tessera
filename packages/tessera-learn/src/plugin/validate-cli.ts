@@ -3,9 +3,12 @@ import { validateProject, reportValidationIssues } from './validation.js';
 
 export function runValidate(
   projectRoot: string,
-  { showA11yTip = true }: { showA11yTip?: boolean } = {},
+  {
+    showA11yTip = true,
+    standardOverride,
+  }: { showA11yTip?: boolean; standardOverride?: string } = {},
 ): number {
-  const { errors, warnings } = validateProject(projectRoot);
+  const { errors, warnings } = validateProject(projectRoot, standardOverride);
 
   reportValidationIssues({ errors, warnings });
 

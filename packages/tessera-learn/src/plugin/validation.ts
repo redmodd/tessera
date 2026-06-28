@@ -184,7 +184,13 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
-const VALID_EXPORT_STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5', 'xapi'];
+export const VALID_EXPORT_STANDARDS = [
+  'web',
+  'scorm12',
+  'scorm2004',
+  'cmi5',
+  'xapi',
+];
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
@@ -198,7 +204,10 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  * Validate a Tessera project at the given root.
  * Returns errors (block build) and warnings (informational).
  */
-export function validateProject(projectRoot: string): ValidationResult {
+export function validateProject(
+  projectRoot: string,
+  standardOverride?: string,
+): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
 
@@ -210,7 +219,7 @@ export function validateProject(projectRoot: string): ValidationResult {
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(projectRoot, d);
+  const config = parseConfig(projectRoot, d, standardOverride);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -258,7 +267,11 @@ interface ParsedConfig {
   [key: string]: unknown;
 }
 
-function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
+function parseConfig(
+  projectRoot: string,
+  d: Diagnostics,
+  standardOverride?: string,
+): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
@@ -317,6 +330,22 @@ function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
         `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
       ),
     );
+  }
+
+  // Validate export.standard
+  if (config.export?.standard !== undefined) {
+    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
+      d.error(
+        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
+      );
+    }
+  }
+
+  // Apply the override after validating the file value above, so every
+  // standard-dependent check below (identity, csp, xapi, crossValidate) sees
+  // what actually ships.
+  if (standardOverride) {
+    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
@@ -380,15 +409,6 @@ function parseConfig(projectRoot: string, d: Diagnostics): ParsedConfig | null {
     ) {
       d.error(
         `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
-      );
-    }
-  }
-
-  // Validate export.standard
-  if (config.export?.standard !== undefined) {
-    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
-      d.error(
-        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
       );
     }
   }

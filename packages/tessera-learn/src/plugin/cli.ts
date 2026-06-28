@@ -4,6 +4,7 @@ import { runA11y } from './a11y-cli.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
+import { VALID_EXPORT_STANDARDS } from './validation.js';
 
 const USAGE = `Usage: tessera <command> [course] [options]
 
@@ -18,8 +19,41 @@ Commands:
 
 Run a command from inside a course folder, or name the course explicitly.
 
+export/validate options:
+  --standard <web|scorm12|scorm2004|cmi5|xapi>    Override course.config.js export.standard
+
 a11y/check options:
   --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
+
+// Validate here, against the config validator's list, so an unknown standard
+// fails before Vite spins up.
+export function parseExportFlags(flags: string[]): {
+  standardOverride?: string;
+  error?: string;
+} {
+  let standardOverride: string | undefined;
+  for (let i = 0; i < flags.length; i++) {
+    const arg = flags[i];
+    let value: string | undefined;
+    if (arg === '--standard') {
+      value = flags[++i];
+    } else if (arg.startsWith('--standard=')) {
+      value = arg.slice('--standard='.length);
+    } else {
+      return { error: `Unknown argument: ${arg}` };
+    }
+    if (value === undefined || value.startsWith('-')) {
+      return { error: '--standard requires a value' };
+    }
+    if (!VALID_EXPORT_STANDARDS.includes(value)) {
+      return {
+        error: `--standard must be one of ${VALID_EXPORT_STANDARDS.join(', ')}, got "${value}"`,
+      };
+    }
+    standardOverride = value;
+  }
+  return standardOverride ? { standardOverride } : {};
+}
 
 // The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the
 // first token can be the course, and only when it isn't a flag — otherwise a flag
@@ -43,9 +77,26 @@ type CourseCommand = (
 const COURSE_COMMANDS: Record<string, CourseCommand> = {
   dev: async (courseRoot, workspaceRoot) =>
     (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
-  export: async (courseRoot, workspaceRoot) =>
-    (await import('./build-commands.js')).runBuild(courseRoot, workspaceRoot),
-  validate: (courseRoot) => runValidate(courseRoot),
+  export: async (courseRoot, workspaceRoot, flags) => {
+    const { standardOverride, error } = parseExportFlags(flags);
+    if (error) {
+      console.error(`[tessera] ${error}`);
+      return 1;
+    }
+    return (await import('./build-commands.js')).runBuild(
+      courseRoot,
+      workspaceRoot,
+      standardOverride,
+    );
+  },
+  validate: (courseRoot, _workspaceRoot, flags) => {
+    const { standardOverride, error } = parseExportFlags(flags);
+    if (error) {
+      console.error(`[tessera] ${error}`);
+      return 1;
+    }
+    return runValidate(courseRoot, { standardOverride });
+  },
   a11y: (courseRoot, workspaceRoot, flags) =>
     runA11y(courseRoot, workspaceRoot, flags),
   check: (courseRoot, workspaceRoot, flags) => {
