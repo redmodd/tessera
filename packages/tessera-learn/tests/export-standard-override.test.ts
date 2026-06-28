@@ -40,16 +40,10 @@ describe('readResolvedConfig', () => {
     expect(readResolvedConfig(projectRoot).standard).toBe('web');
   });
 
-  it('lets a CLI override win over the config standard', () => {
-    writeConfig(`{ export: { standard: "web" } }`);
-    const read = readResolvedConfig(projectRoot, 'cmi5');
-    expect(read.standard).toBe('cmi5');
-    expect(read.ok && read.config.export?.standard).toBe('cmi5');
-  });
-
-  it('applies the override while preserving other export fields', () => {
+  it('lets a CLI override win while preserving other export fields', () => {
     writeConfig(`{ export: { standard: "web", csp: false } }`);
     const read = readResolvedConfig(projectRoot, 'cmi5');
+    expect(read.standard).toBe('cmi5');
     expect(read.ok && read.config.export).toEqual({
       standard: 'cmi5',
       csp: false,
