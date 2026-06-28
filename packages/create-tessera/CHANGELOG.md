@@ -1,5 +1,18 @@
 # create-tessera
 
+## 0.4.0
+
+### Minor Changes
+
+- db4c3a3: Add `--standard <web|scorm12|scorm2004|cmi5|xapi>` to `tessera export` and `tessera validate` to override `course.config.js` export.standard for a single build.
+- 208cfc1: Add a `resume: 'auto' | 'never'` option; `'auto'` discards saved progress when the page structure changed.
+
+### Patch Changes
+
+- c54a2e0: Centralize export-standard resolution behind a single `readResolvedConfig` helper (no user-facing change).
+- 9f28e18: Internal refactor of the SCORM adapters and xAPI publisher; no behavior change.
+- 71205a0: Internal refactor of the project validator to a single diagnostics collector; no behavior change.
+
 ## 0.3.0
 
 ### Minor Changes
