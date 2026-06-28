@@ -332,6 +332,22 @@ function parseConfig(
     );
   }
 
+  // Validate export.standard
+  if (config.export?.standard !== undefined) {
+    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
+      d.error(
+        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
+      );
+    }
+  }
+
+  // Apply the override after validating the file value above, so every
+  // standard-dependent check below (identity, csp, xapi, crossValidate) sees
+  // what actually ships.
+  if (standardOverride) {
+    config.export = { ...config.export, standard: standardOverride };
+  }
+
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
   // SCORM identity is owned by the LMS, so only nudge for the others.
   const standard = config.export?.standard;
@@ -395,21 +411,6 @@ function parseConfig(
         `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
       );
     }
-  }
-
-  // Validate export.standard
-  if (config.export?.standard !== undefined) {
-    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
-      d.error(
-        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
-      );
-    }
-  }
-
-  // Apply the override after validating the file value above, so the
-  // standard-dependent checks below (csp, xapi) see what actually ships.
-  if (standardOverride) {
-    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Validate resume policy

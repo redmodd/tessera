@@ -122,6 +122,48 @@ describe('config validation', () => {
     expect(warnings).not.toContainEqual(expect.stringContaining('no "id" set'));
   });
 
+  it('warns about a missing id when --standard overrides SCORM to web', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  language: "en",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    expect(validateProject(testRoot).warnings).not.toContainEqual(
+      expect.stringContaining('no "id" set'),
+    );
+    expect(validateProject(testRoot, 'web').warnings).toContainEqual(
+      expect.stringContaining('no "id" set'),
+    );
+  });
+
+  it('drops the missing-id warning when --standard overrides web to SCORM', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  language: "en",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    expect(validateProject(testRoot).warnings).toContainEqual(
+      expect.stringContaining('no "id" set'),
+    );
+    expect(validateProject(testRoot, 'scorm12').warnings).not.toContainEqual(
+      expect.stringContaining('no "id" set'),
+    );
+  });
+
   it('warns on unknown config fields', () => {
     createValidProject(testRoot);
     writeConfig(

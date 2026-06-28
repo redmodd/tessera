@@ -19,7 +19,7 @@ Commands:
 
 Run a command from inside a course folder, or name the course explicitly.
 
-export options:
+export/validate options:
   --standard <web|scorm12|scorm2004|cmi5|xapi>    Override course.config.js export.standard
 
 a11y/check options:
@@ -89,7 +89,14 @@ const COURSE_COMMANDS: Record<string, CourseCommand> = {
       standardOverride,
     );
   },
-  validate: (courseRoot) => runValidate(courseRoot),
+  validate: (courseRoot, _workspaceRoot, flags) => {
+    const { standardOverride, error } = parseExportFlags(flags);
+    if (error) {
+      console.error(`[tessera] ${error}`);
+      return 1;
+    }
+    return runValidate(courseRoot, { standardOverride });
+  },
   a11y: (courseRoot, workspaceRoot, flags) =>
     runA11y(courseRoot, workspaceRoot, flags),
   check: (courseRoot, workspaceRoot, flags) => {

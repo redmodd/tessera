@@ -136,4 +136,14 @@ describe('main dispatch', () => {
     expect(code).toBe(1);
     expect(err.mock.calls.flat().join(' ')).toContain('bogus');
   });
+
+  it('rejects validate with an invalid --standard', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const code = await main(
+      ['validate', 'getting-started', '--standard', 'bogus'],
+      ws,
+    );
+    expect(code).toBe(1);
+    expect(err.mock.calls.flat().join(' ')).toContain('bogus');
+  });
 });
