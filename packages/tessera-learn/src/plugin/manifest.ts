@@ -122,13 +122,11 @@ export function readCourseConfig(projectRoot: string): CourseConfigRead {
 }
 
 /**
- * Read a project's course.config.js and resolve its effective export standard
- * in one place: the optional CLI `--standard` override wins, else the file's
- * `export.standard`, else `'web'`; an unreadable config with no override fails
- * closed with `'unknown'` so callers withhold standard-specific output rather
- * than guess. The returned `config` already reflects the override, so every
- * downstream consumer can just read `config.export.standard` (or `.standard`)
- * without re-applying it. Exported for tests.
+ * Resolve a project's effective export standard once: the CLI `--standard`
+ * override wins, else `export.standard`, else `'web'`. An unreadable config with
+ * no override fails closed with `'unknown'` so callers withhold standard-specific
+ * output rather than guess. The returned `config` already has the override
+ * applied, so consumers read it back directly. Exported for tests.
  */
 export function readResolvedConfig(
   projectRoot: string,
