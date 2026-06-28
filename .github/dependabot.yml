@@ -3,6 +3,7 @@ registries:
   npmjs:
     type: npm-registry
     url: https://registry.npmjs.org
+    token: ${{secrets.DEPENDABOT_NPM_TOKEN}}
     replaces-base: true
 updates:
   - package-ecosystem: npm
