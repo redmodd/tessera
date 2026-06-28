@@ -13,6 +13,7 @@ import {
 import {
   generateManifest,
   readCourseConfig,
+  readResolvedConfig,
   type CourseConfigRead,
 } from './manifest.js';
 import type { Manifest } from './manifest.js';
@@ -194,13 +195,10 @@ function tesseraEntryPlugin(standardOverride?: string): Plugin {
     // For build mode: write index.html so Rollup can find it
     buildStart() {
       if (isBuild) {
-        const read = readCourseConfig(projectRoot);
+        const read = readResolvedConfig(projectRoot, standardOverride);
         writeFileSync(
           resolve(projectRoot, 'index.html'),
-          generateIndexHtml(
-            readLanguage(read),
-            cspMeta(read, standardOverride),
-          ),
+          generateIndexHtml(readLanguage(read), cspMeta(read)),
           'utf-8',
         );
       }
@@ -269,32 +267,12 @@ function readLanguage(read: CourseConfigRead): string {
   return isPlausibleLanguageTag(lang) ? lang : 'en';
 }
 
-// Override wins, else course.config.js, else 'web'. An unreadable config with no
-// override fails closed with 'unknown' so cspMeta withholds the CSP rather than
-// guess the one mode it breaks. Exported for tests.
-export function resolveExportStandard(
-  read: CourseConfigRead,
-  override?: string,
-): string {
-  if (override) return override;
-  if (!read.ok) return 'unknown';
-  return read.config.export?.standard || 'web';
-}
-
-/** Apply a CLI `--standard` override onto a config's export.standard. Exported for tests. */
-export function applyStandardOverride<
-  T extends { export?: { standard?: string } },
->(config: T, override?: string): T {
-  if (!override) return config;
-  return { ...config, export: { ...config.export, standard: override } };
-}
-
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP
 // could break) and never on the dev server (a meta connect-src would block
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
-function cspMeta(read: CourseConfigRead, override?: string): string {
-  if (resolveExportStandard(read, override) !== 'web') return '';
+function cspMeta(read: CourseConfigRead & { standard: string }): string {
+  if (read.standard !== 'web') return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -424,12 +402,11 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
     function ({ projectRoot }) {
       const configPath = resolve(projectRoot, 'course.config.js');
       if (existsSync(configPath)) this.addWatchFile(configPath);
-      const read = readCourseConfig(projectRoot);
+      // The runtime reads export.standard too, so readResolvedConfig must apply
+      // the override here — the bundled config, not just the manifest/adapter.
+      const read = readResolvedConfig(projectRoot, standardOverride);
       const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
-      // The runtime reads export.standard too, so the override must reach the
-      // bundled config, not just the manifest/adapter.
-      const withOverride = applyStandardOverride(userConfig, standardOverride);
-      return `export default ${JSON.stringify(mergeCourseConfig(withOverride))};`;
+      return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
     },
   );
 }
@@ -556,7 +533,7 @@ function tesseraExportPlugin(standardOverride?: string): Plugin {
       if (!isBuild) return;
       if (isAuditBuild()) return;
 
-      const read = readCourseConfig(projectRoot);
+      const read = readResolvedConfig(projectRoot, standardOverride);
       if (!read.ok) {
         // Validation already required a parseable course.config.js — getting
         // here means it vanished or broke mid-build. Surface that loudly
@@ -576,8 +553,10 @@ function tesseraExportPlugin(standardOverride?: string): Plugin {
         );
       }
 
-      const config = applyStandardOverride(read.config, standardOverride);
-      await runExport(projectRoot, config as Parameters<typeof runExport>[1]);
+      await runExport(
+        projectRoot,
+        read.config as Parameters<typeof runExport>[1],
+      );
     },
   };
 }
@@ -735,10 +714,7 @@ function tesseraAdapterPlugin(standardOverride?: string): Plugin {
         return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
       }
 
-      let standard = resolveExportStandard(
-        readCourseConfig(projectRoot),
-        standardOverride,
-      );
+      let standard = readResolvedConfig(projectRoot, standardOverride).standard;
 
       // The audit renders headless with no LMS in the frame chain; the SCORM/
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
@@ -775,8 +751,8 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
         return `export async function buildXAPIClient() { return null; }`;
       }
 
-      const read = readCourseConfig(projectRoot);
-      const standard = resolveExportStandard(read, standardOverride);
+      const read = readResolvedConfig(projectRoot, standardOverride);
+      const standard = read.standard;
       const hasXapi = read.ok && read.config.xapi != null;
 
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime

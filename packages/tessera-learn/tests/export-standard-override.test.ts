@@ -1,59 +1,70 @@
-import { describe, it, expect } from 'vitest';
-import {
-  resolveExportStandard,
-  applyStandardOverride,
-} from '../src/plugin/index.js';
-import type { CourseConfigRead } from '../src/plugin/manifest.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { readResolvedConfig } from '../src/plugin/manifest.js';
 
-const ok = (standard?: string): CourseConfigRead => ({
-  ok: true,
-  config: standard === undefined ? {} : { export: { standard } },
+let projectRoot: string;
+
+beforeEach(() => {
+  projectRoot = resolve(
+    tmpdir(),
+    `tessera-resolve-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(projectRoot, { recursive: true });
 });
 
-describe('resolveExportStandard', () => {
+afterEach(() => {
+  if (existsSync(projectRoot))
+    rmSync(projectRoot, { recursive: true, force: true });
+});
+
+function writeConfig(body: string) {
+  writeFileSync(
+    resolve(projectRoot, 'course.config.js'),
+    `export default ${body};`,
+    'utf-8',
+  );
+}
+
+describe('readResolvedConfig', () => {
   it('uses the course config standard when no override is given', () => {
-    expect(resolveExportStandard(ok('scorm12'))).toBe('scorm12');
+    writeConfig(`{ export: { standard: "scorm12" } }`);
+    const read = readResolvedConfig(projectRoot);
+    expect(read.standard).toBe('scorm12');
+    expect(read.ok && read.config.export?.standard).toBe('scorm12');
   });
 
   it('defaults to web when the config omits export.standard', () => {
-    expect(resolveExportStandard(ok())).toBe('web');
+    writeConfig(`{ title: "x" }`);
+    expect(readResolvedConfig(projectRoot).standard).toBe('web');
   });
 
   it('lets a CLI override win over the config standard', () => {
-    expect(resolveExportStandard(ok('web'), 'cmi5')).toBe('cmi5');
+    writeConfig(`{ export: { standard: "web" } }`);
+    const read = readResolvedConfig(projectRoot, 'cmi5');
+    expect(read.standard).toBe('cmi5');
+    expect(read.ok && read.config.export?.standard).toBe('cmi5');
+  });
+
+  it('applies the override while preserving other export fields', () => {
+    writeConfig(`{ export: { standard: "web", csp: false } }`);
+    const read = readResolvedConfig(projectRoot, 'cmi5');
+    expect(read.ok && read.config.export).toEqual({
+      standard: 'cmi5',
+      csp: false,
+    });
   });
 
   it('reports unknown for an unreadable config with no override', () => {
-    expect(resolveExportStandard({ ok: false, reason: 'missing' })).toBe(
-      'unknown',
-    );
+    const read = readResolvedConfig(projectRoot);
+    expect(read.ok).toBe(false);
+    expect(read.standard).toBe('unknown');
   });
 
   it('honours the override even when the config is unreadable', () => {
-    expect(
-      resolveExportStandard({ ok: false, reason: 'missing' }, 'scorm2004'),
-    ).toBe('scorm2004');
-  });
-});
-
-describe('applyStandardOverride', () => {
-  it('returns the config unchanged when no override is given', () => {
-    const config = { export: { standard: 'web' } };
-    expect(applyStandardOverride(config)).toBe(config);
-  });
-
-  it('overrides export.standard while preserving other export fields', () => {
-    expect(
-      applyStandardOverride(
-        { export: { standard: 'web', csp: false } },
-        'cmi5',
-      ),
-    ).toEqual({ export: { standard: 'cmi5', csp: false } });
-  });
-
-  it('sets export.standard when the config has no export block', () => {
-    expect(applyStandardOverride({}, 'scorm2004')).toEqual({
-      export: { standard: 'scorm2004' },
-    });
+    const read = readResolvedConfig(projectRoot, 'scorm2004');
+    expect(read.ok).toBe(false);
+    expect(read.standard).toBe('scorm2004');
   });
 });

@@ -122,6 +122,29 @@ export function readCourseConfig(projectRoot: string): CourseConfigRead {
 }
 
 /**
+ * Read a project's course.config.js and resolve its effective export standard
+ * in one place: the optional CLI `--standard` override wins, else the file's
+ * `export.standard`, else `'web'`; an unreadable config with no override fails
+ * closed with `'unknown'` so callers withhold standard-specific output rather
+ * than guess. The returned `config` already reflects the override, so every
+ * downstream consumer can just read `config.export.standard` (or `.standard`)
+ * without re-applying it. Exported for tests.
+ */
+export function readResolvedConfig(
+  projectRoot: string,
+  standardOverride?: string,
+): CourseConfigRead & { standard: string } {
+  const read = readCourseConfig(projectRoot);
+  if (!read.ok) return { ...read, standard: standardOverride ?? 'unknown' };
+  // The CLI validates --standard against the allowed set before it reaches here.
+  const override = standardOverride as CourseConfig['export']['standard'];
+  const config: Partial<CourseConfig> = override
+    ? { ...read.config, export: { ...read.config.export, standard: override } }
+    : read.config;
+  return { ok: true, config, standard: config.export?.standard || 'web' };
+}
+
+/**
  * Read a _meta.js file and extract its default export object.
  * Uses the same JSON5 approach as pageConfig extraction — find the object literal
  * after `export default` and parse it.
