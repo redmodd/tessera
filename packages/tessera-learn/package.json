@@ -87,7 +87,7 @@
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
     "svelte": "^5.56.3",
-    "vite": "^8.0.16"
+    "vite": "^8.1.0"
   },
   "peerDependencies": {
     "@axe-core/playwright": ">=4",
