@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.4.1
+
+### Patch Changes
+
+- 30ac0a6: tessera-learn 0.4.0 -> 0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
