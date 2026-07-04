@@ -17,13 +17,17 @@ jobs:
       - uses: dependabot/fetch-metadata@v2
         id: meta
 
-      # Dev-dependency bumps don't change published output, so no release needed.
-      - if: contains(steps.meta.outputs.dependency-type, 'production')
+      # Only npm production bumps change published output; skip github-actions et al.
+      - if: >-
+          steps.meta.outputs.package-ecosystem == 'npm' &&
+          contains(steps.meta.outputs.dependency-type, 'production')
         uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
 
-      - if: contains(steps.meta.outputs.dependency-type, 'production')
+      - if: >-
+          steps.meta.outputs.package-ecosystem == 'npm' &&
+          contains(steps.meta.outputs.dependency-type, 'production')
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
