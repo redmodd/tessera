@@ -18,14 +18,14 @@ jobs:
         id: meta
 
       - if: >-
-          steps.meta.outputs.package-ecosystem == 'npm' &&
+          steps.meta.outputs.package-ecosystem == 'npm_and_yarn' &&
           contains(steps.meta.outputs.dependency-type, 'production')
         uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
 
       - if: >-
-          steps.meta.outputs.package-ecosystem == 'npm' &&
+          steps.meta.outputs.package-ecosystem == 'npm_and_yarn' &&
           contains(steps.meta.outputs.dependency-type, 'production')
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
