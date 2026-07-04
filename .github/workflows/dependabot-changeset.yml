@@ -17,7 +17,6 @@ jobs:
       - uses: dependabot/fetch-metadata@v2
         id: meta
 
-      # Only npm production bumps change published output; skip github-actions et al.
       - if: >-
           steps.meta.outputs.package-ecosystem == 'npm' &&
           contains(steps.meta.outputs.dependency-type, 'production')
