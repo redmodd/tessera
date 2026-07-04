@@ -1,5 +1,5 @@
 ---
-"tessera-learn": patch
+'tessera-learn': patch
 ---
 
 chore(deps-dev): bump the dev-dependencies group with 9 updates
