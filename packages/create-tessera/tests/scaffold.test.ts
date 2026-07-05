@@ -161,6 +161,21 @@ describe('create-tessera workspace scaffold', () => {
     );
   });
 
+  it('pins the pnpm version that matches the monorepo root', () => {
+    runCLI('my-courses', testDir);
+    const scaffolded = JSON.parse(
+      readFileSync(resolve(testDir, 'my-courses', 'package.json'), 'utf-8'),
+    );
+    const root = JSON.parse(
+      readFileSync(
+        resolve(__dirname, '..', '..', '..', 'package.json'),
+        'utf-8',
+      ),
+    );
+    expect(scaffolded.packageManager).toBe(root.packageManager);
+    expect(scaffolded.packageManager).not.toContain('__');
+  });
+
   it('scaffolds standalone when tessera-learn is not resolvable (published install)', () => {
     const pkgRoot = resolve(__dirname, '..');
     const cli = join(testDir, 'cli');

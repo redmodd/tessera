@@ -21,6 +21,11 @@ declare const __SVELTE_VERSION__: string | undefined;
 const SVELTE_VERSION =
   typeof __SVELTE_VERSION__ !== 'undefined' ? __SVELTE_VERSION__ : '';
 
+// Injected at build time from the root package.json pnpm pin (see tsdown.config.ts).
+declare const __PACKAGE_MANAGER__: string | undefined;
+const PACKAGE_MANAGER =
+  typeof __PACKAGE_MANAGER__ !== 'undefined' ? __PACKAGE_MANAGER__ : '';
+
 // The first course every workspace ships with. `tessera new <name>` adds more.
 const SEED_COURSE = 'starter-course';
 
@@ -127,6 +132,7 @@ function main() {
     COURSE_ID: `urn:uuid:${randomUUID()}`,
     TESSERA_VERSION,
     SVELTE_VERSION,
+    PACKAGE_MANAGER,
   });
 
   process.stdout.write(

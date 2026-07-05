@@ -2,7 +2,7 @@
   "name": "__PROJECT_NAME__",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.5.2",
+  "packageManager": "__PACKAGE_MANAGER__",
   "scripts": {
     "new": "tessera new",
     "dev": "tessera dev",
