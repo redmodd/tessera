@@ -8,8 +8,7 @@ const VALID_THRESHOLDS: ImpactLevel[] = [
 ];
 
 export type ParsedA11yArgs =
-  | { ok: true; args: AuditOptions }
-  | { ok: false; error: string };
+  { ok: true; args: AuditOptions } | { ok: false; error: string };
 
 export function parseA11yArgs(argv: string[]): ParsedA11yArgs {
   let threshold: ImpactLevel | undefined;

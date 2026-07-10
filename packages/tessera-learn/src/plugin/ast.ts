@@ -24,9 +24,7 @@ export interface ComponentMatch {
 }
 
 export type NamedObjectLiteral =
-  | { kind: 'none' }
-  | { kind: 'invalid' }
-  | { kind: 'literal'; text: string };
+  { kind: 'none' } | { kind: 'invalid' } | { kind: 'literal'; text: string };
 
 interface Node {
   type: string;
