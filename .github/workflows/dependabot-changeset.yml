@@ -34,7 +34,7 @@ jobs:
           file=".changeset/dependabot-${PR_NUMBER}.md"
           cat > "$file" <<'EOF'
           ---
-          "tessera-learn": patch
+          'tessera-learn': patch
           ---
           EOF
           printf '\n%s\n' "$PR_TITLE" >> "$file"
