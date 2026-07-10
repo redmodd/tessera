@@ -18,10 +18,7 @@ export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
-  | 'free'
-  | 'custom-quiz'
-  | 'custom-layout'
-  | 'broken-page';
+  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page';
 
 interface FixtureSpec {
   source: string;

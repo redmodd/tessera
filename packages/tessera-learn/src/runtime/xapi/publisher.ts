@@ -554,13 +554,11 @@ export class XAPIPublisher {
             error: new Error(`LRS responded ${retryResp.status}`),
           };
         })
-        .catch(
-          (err): SendOutcome => ({
-            ok: false,
-            status: 401,
-            error: err instanceof Error ? err : new Error(String(err)),
-          }),
-        );
+        .catch((err): SendOutcome => ({
+          ok: false,
+          status: 401,
+          error: err instanceof Error ? err : new Error(String(err)),
+        }));
     }
     // Append the LRS body to the error message so callers see the
     // specific reason (e.g. "Forbidden cmi5 defined statement: ...").

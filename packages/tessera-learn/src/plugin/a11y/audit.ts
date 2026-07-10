@@ -144,8 +144,7 @@ type SpawnFn = (
 };
 
 function resolvePlaywrightBin():
-  | { command: string; args: string[] }
-  | undefined {
+  { command: string; args: string[] } | undefined {
   const require = createRequire(import.meta.url);
   for (const spec of PLAYWRIGHT_SPECS) {
     try {
