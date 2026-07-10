@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.4.2
+
+### Patch Changes
+
+- 4c8e174: chore(deps-dev): bump @types/node from 26.0.1 to 26.1.0
+- 3a49779: Bump pnpm to 11.10.0 and sync the scaffolded workspace pin from the monorepo root at build time.
+
 ## 0.4.1
 
 ### Patch Changes

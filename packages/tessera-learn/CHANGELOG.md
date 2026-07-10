@@ -1,5 +1,12 @@
 # tessera-learn
 
+## 0.4.2
+
+### Patch Changes
+
+- 4c8e174: chore(deps-dev): bump @types/node from 26.0.1 to 26.1.0
+- fb5f09b: chore(deps): bump vite from 8.1.0 to 8.1.3
+
 ## 0.4.1
 
 ### Patch Changes
