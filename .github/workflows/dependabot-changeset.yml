@@ -31,6 +31,7 @@ jobs:
         run: |
           git diff --name-only "origin/${BASE_REF}...HEAD" | grep -q '^packages/' || exit 0
           file=".changeset/dependabot-${PR_NUMBER}.md"
+          [ -e "$file" ] && exit 0
           cat > "$file" <<'EOF'
           ---
           'tessera-learn': patch
