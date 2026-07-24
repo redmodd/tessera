@@ -29,7 +29,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          git diff --name-only "origin/${BASE_REF}...HEAD" | grep -q '^packages/' || exit 0
+          manifests=$(git diff --name-only "origin/${BASE_REF}...HEAD" | grep '^packages/.*/package\.json$') || exit 0
           file=".changeset/dependabot-${PR_NUMBER}.md"
           [ -e "$file" ] && exit 0
           cat > "$file" <<'EOF'
@@ -38,6 +38,14 @@ jobs:
           ---
           EOF
           printf '\n%s\n' "$PR_TITLE" >> "$file"
+          for manifest in $manifests; do
+            bumps=$(git diff -U0 "origin/${BASE_REF}...HEAD" -- "$manifest" | awk -F'"' '
+              /^-[[:space:]]+"/ { gsub(/^[~^]/, "", $4); old[$2] = $4 }
+              /^\+[[:space:]]+"/ { gsub(/^[~^]/, "", $4); new[$2] = $4 }
+              END { for (n in new) if (n in old && old[n] != new[n]) print "- `" n "` " old[n] " → " new[n] }
+            ' | sort)
+            [ -n "$bumps" ] && printf '\n`%s`:\n\n%s\n' "$(basename "$(dirname "$manifest")")" "$bumps" >> "$file"
+          done
           git config user.name 'dependabot[bot]'
           git config user.email '49699333+dependabot[bot]@users.noreply.github.com'
           git add .changeset
