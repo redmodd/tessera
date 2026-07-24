@@ -39,8 +39,8 @@ importers:
         specifier: ^4.1.1
         version: 4.1.1(prettier@3.9.5)(svelte@5.56.6(@typescript-eslint/types@8.65.0))
       scorm-again:
-        specifier: 3.1.1
-        version: 3.1.1
+        specifier: 3.0.5
+        version: 3.0.5
       svelte-eslint-parser:
         specifier: ^1.8.0
         version: 1.8.0(svelte@5.56.6(@typescript-eslint/types@8.65.0))
@@ -115,8 +115,8 @@ importers:
         specifier: ^29.0.1
         version: 29.1.1
       scorm-again:
-        specifier: 3.1.1
-        version: 3.1.1
+        specifier: 3.0.5
+        version: 3.0.5
       svelte-check:
         specifier: ^4.7.3
         version: 4.7.3(picomatch@4.0.5)(svelte@5.56.6(@typescript-eslint/types@8.65.0))(typescript@7.0.2)
@@ -2092,8 +2092,8 @@ packages:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
 
-  scorm-again@3.1.1:
-    resolution: {integrity: sha512-WoZkssQoMJnZE5jzTXgxOeAAlgp5P9kjeT0ha506poljdfJ+t9vhQwQjmGTWEiHwDFVxNI3lpDuFrXA90/QcVw==}
+  scorm-again@3.0.5:
+    resolution: {integrity: sha512-UW4VvfGrB7+izNtABATQrp6ztPUV43Poyah3CbMdMkeF0gTrKu8RsnYXy2LRGmnIN2rPvQ6fnVk3HPYmAMiyVg==}
     engines: {node: '>=20.19.0'}
 
   semver@7.8.4:
@@ -4202,7 +4202,7 @@ snapshots:
     dependencies:
       xmlchars: 2.2.0
 
-  scorm-again@3.1.1: {}
+  scorm-again@3.0.5: {}
 
   semver@7.8.4: {}
 
