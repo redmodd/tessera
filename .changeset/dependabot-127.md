@@ -9,7 +9,6 @@ chore(deps-dev): bump the dev-dependencies group across 1 directory with 11 upda
 - `@types/node` 26.1.0 → 26.1.1
 - `@vitest/coverage-v8` 4.1.9 → 4.1.10
 - `tsdown` 0.22.3 → 0.22.9
-- `typescript` 6.0.3 → 7.0.2
 - `vitest` 4.1.9 → 4.1.10
 
 `tessera-learn`:
@@ -18,5 +17,4 @@ chore(deps-dev): bump the dev-dependencies group across 1 directory with 11 upda
 - `@vitest/coverage-v8` 4.1.9 → 4.1.10
 - `svelte-check` 4.7.1 → 4.7.3
 - `tsdown` 0.22.3 → 0.22.9
-- `typescript` 6.0.3 → 7.0.2
 - `vitest` 4.1.9 → 4.1.10

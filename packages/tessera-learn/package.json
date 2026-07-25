@@ -108,7 +108,7 @@
     "scorm-again": "3.0.5",
     "svelte-check": "^4.7.3",
     "tsdown": "^0.22.9",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }
 }
