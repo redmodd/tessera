@@ -19,6 +19,9 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
