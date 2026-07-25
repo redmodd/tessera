@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.4.3
+
+### Patch Changes
+
+- 238423b: Bump pnpm to 11.17.0; scaffolded workspaces pick up the new pin.
+
 ## 0.4.2
 
 ### Patch Changes
