@@ -1,5 +1,30 @@
 # tessera-learn
 
+## 0.4.3
+
+### Patch Changes
+
+- 4243160: chore(deps): bump @sveltejs/vite-plugin-svelte from 7.1.2 to 7.2.0
+- d407370: chore(deps): bump @sveltejs/acorn-typescript from 1.0.10 to 1.0.11
+- 8b7cf3e: chore(deps): bump vite from 8.1.3 to 8.1.5
+- 0e8a9d2: chore(deps): bump svelte from 5.56.4 to 5.56.6
+- d970ea7: chore(deps-dev): bump the dev-dependencies group across 1 directory with 9 updates
+
+  `create-tessera`:
+
+  - `@types/node` 26.1.0 → 26.1.1
+  - `@vitest/coverage-v8` 4.1.9 → 4.1.10
+  - `tsdown` 0.22.3 → 0.22.9
+  - `vitest` 4.1.9 → 4.1.10
+
+  `tessera-learn`:
+
+  - `@types/node` 26.1.0 → 26.1.1
+  - `@vitest/coverage-v8` 4.1.9 → 4.1.10
+  - `svelte-check` 4.7.1 → 4.7.3
+  - `tsdown` 0.22.3 → 0.22.9
+  - `vitest` 4.1.9 → 4.1.10
+
 ## 0.4.2
 
 ### Patch Changes

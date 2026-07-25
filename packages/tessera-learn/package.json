@@ -1,6 +1,6 @@
 {
   "name": "tessera-learn",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "LMS tracking runtime for interactive learning content. One adapter layer (SCORM 1.2, SCORM 2004 4th Edition, cmi5, static Web), your choice of components.",
   "keywords": [
     "svelte",
