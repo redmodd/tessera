@@ -22,7 +22,6 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
-      - dependency-name: scorm-again
   - package-ecosystem: github-actions
     directory: /
     schedule:
