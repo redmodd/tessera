@@ -162,11 +162,11 @@ describe('SCORM12Adapter against scorm-again', () => {
   it('the wrapper has teeth: an out-of-range score is flagged', async () => {
     await start();
     // The adapter does not clamp score.raw to 0..100; 150 is out of the SCORM
-    // 1.2 range and a real LMS rejects it (407). The always-true mock never
+    // 1.2 range and a real LMS rejects it (405). The always-true mock never
     // would. We await the retry queue draining before asserting.
     adapter.setScore(150);
     await new Promise((r) => setTimeout(r, 400));
     expect(lms.errors.some((e) => e.key === 'cmi.core.score.raw')).toBe(true);
-    expect(lms.errors[0].code).toBe('407');
+    expect(lms.errors[0].code).toBe('405');
   });
 });
