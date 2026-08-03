@@ -1,5 +1,15 @@
 # create-tessera
 
+## 0.5.0
+
+### Minor Changes
+
+- 9d7ec59: `svelte` is now a peer dependency (`^5.56.0`) rather than a direct dependency, so a project resolves exactly one copy. Scaffolded projects already declare it; others need `pnpm add -D svelte`.
+
+### Patch Changes
+
+- a6c32a3: Remove redundant internal indirection; WriteQueue now warns on final-retry throws.
+
 ## 0.4.3
 
 ### Patch Changes
