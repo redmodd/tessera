@@ -3,4 +3,4 @@
 'create-tessera': patch
 ---
 
-Remove redundant internal indirection; no user-facing behaviour change.
+Remove redundant internal indirection; WriteQueue now warns on final-retry throws.
