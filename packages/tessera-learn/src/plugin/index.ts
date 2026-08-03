@@ -32,8 +32,7 @@ import {
 } from './validation.js';
 import { buildCsp } from './csp.js';
 import { runExport } from './export.js';
-import { tesseraLayoutPlugin } from './layout.js';
-import { tesseraQuizPlugin } from './quiz.js';
+import { createOverridePlugin } from './override-plugin.js';
 import { resolvePackageRoot } from './package-root.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
@@ -158,8 +157,22 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraConfigPlugin(standardOverride),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(manifestRef),
-    tesseraLayoutPlugin(),
-    tesseraQuizPlugin(),
+    createOverridePlugin({
+      name: 'tessera:layout',
+      virtualId: 'virtual:tessera-layout',
+      projectFile: 'layout.svelte',
+    }),
+    createOverridePlugin({
+      name: 'tessera:quiz',
+      virtualId: 'virtual:tessera-quiz',
+      projectFile: 'quiz.svelte',
+      builtinFile: resolve(
+        resolvePackageRoot(),
+        'src',
+        'components',
+        'Quiz.svelte',
+      ),
+    }),
     tesseraAdapterPlugin(standardOverride),
     tesseraXAPISetupPlugin(standardOverride),
     tesseraFirstPagePreloadPlugin(manifestRef),

@@ -63,17 +63,13 @@ export function createAdapter(
 ): PersistenceAdapter {
   const allowFallback = options.allowFallback ?? import.meta.env?.DEV === true;
   const standard = config.export?.standard;
-  if (
-    standard === 'scorm12' ||
-    standard === 'scorm2004' ||
-    standard === 'cmi5' ||
-    standard === 'xapi'
-  ) {
-    const adapter = LMS_ADAPTERS[standard]();
+  if (standard && standard in LMS_ADAPTERS) {
+    const lms = standard as LMSStandard;
+    const adapter = LMS_ADAPTERS[lms]();
     if (adapter) return adapter;
-    if (!allowFallback) throw missingApiError(standard);
+    if (!allowFallback) throw missingApiError(lms);
     console.warn(
-      `Tessera (dev): ${lmsWarnLabel(standard)} not found — falling back to localStorage`,
+      `Tessera (dev): ${lmsWarnLabel(lms)} not found — falling back to localStorage`,
     );
   }
   return new WebAdapter(config, options.manifest);

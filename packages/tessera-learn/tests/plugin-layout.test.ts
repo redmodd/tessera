@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { tesseraLayoutPlugin } from '../src/plugin/layout.js';
+import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 
 describe('tessera:layout virtual module', () => {
   let projectRoot: string;
@@ -22,7 +22,11 @@ describe('tessera:layout virtual module', () => {
   });
 
   function makePlugin() {
-    const plugin = tesseraLayoutPlugin();
+    const plugin = createOverridePlugin({
+      name: 'tessera:layout',
+      virtualId: 'virtual:tessera-layout',
+      projectFile: 'layout.svelte',
+    });
     // Manually invoke the lifecycle hooks so we can test load() without spinning up Vite.
     (plugin as any).configResolved?.({ root: projectRoot });
     return plugin;
