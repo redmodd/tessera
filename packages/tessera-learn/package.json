@@ -86,12 +86,12 @@
     "acorn": "^8.17.0",
     "archiver": "^8.0.0",
     "json5": "^2.0.0",
-    "svelte": "^5.56.6",
     "vite": "^8.1.5"
   },
   "peerDependencies": {
     "@axe-core/playwright": ">=4",
-    "playwright": ">=1.40"
+    "playwright": ">=1.40",
+    "svelte": "^5.56.0"
   },
   "peerDependenciesMeta": {
     "@axe-core/playwright": {
@@ -106,6 +106,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^29.0.1",
     "scorm-again": "3.0.5",
+    "svelte": "^5.56.6",
     "svelte-check": "^4.7.3",
     "tsdown": "^0.22.9",
     "typescript": "^6.0.3",
