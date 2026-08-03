@@ -157,7 +157,7 @@ describe('create-tessera workspace scaffold', () => {
       ),
     );
     expect(scaffolded.devDependencies.svelte).toBe(
-      framework.dependencies.svelte,
+      framework.peerDependencies.svelte,
     );
   });
 
@@ -218,7 +218,7 @@ describe('create-tessera workspace scaffold', () => {
       readFileSync(join(out, 'ws', 'package.json'), 'utf-8'),
     );
     expect(scaffolded.devDependencies.svelte).toBe(
-      framework.dependencies.svelte,
+      framework.peerDependencies.svelte,
     );
   });
 

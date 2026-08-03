@@ -7,13 +7,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 const frameworkPkg = JSON.parse(
   readFileSync(resolve(here, '../tessera-learn/package.json'), 'utf-8'),
-) as { dependencies?: { svelte?: string } };
+) as { peerDependencies?: { svelte?: string } };
 
-const sveltePin = frameworkPkg.dependencies?.svelte;
+const sveltePin = frameworkPkg.peerDependencies?.svelte;
 if (typeof sveltePin !== 'string' || sveltePin.length === 0) {
   throw new Error(
-    "Could not derive the Svelte pin from tessera-learn's dependencies.svelte. " +
-      'If Svelte moved (e.g. to peerDependencies), update tsdown.config.ts to read it from there.',
+    "Could not derive the Svelte pin from tessera-learn's peerDependencies.svelte.",
   );
 }
 
