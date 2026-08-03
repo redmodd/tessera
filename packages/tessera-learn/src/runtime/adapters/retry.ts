@@ -108,16 +108,12 @@ export async function withRetry(
   return (await retryLoop(fn, maxRetries, errorReporter, context)) === 'ok';
 }
 
-/**
- * `aborted` is only reachable via `hooks.onResume` — a caller that decides,
- * after a backoff, that the loop should stop without logging a give-up.
- */
+// `aborted` skips the give-up warning that `failed` logs.
 type RetryOutcome = 'ok' | 'failed' | 'aborted';
 
 interface RetryHooks {
-  /** Runs immediately before each backoff sleep. */
   onBackoff(): void;
-  /** Runs immediately after each backoff sleep; return false to abandon. */
+  /** Return false to abandon the retry loop. */
   onResume(): boolean;
 }
 

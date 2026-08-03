@@ -11,7 +11,6 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity } from '../runtime/types.js';
 
-// URL-safe / filename-safe slug for the export zip name.
 function slugify(text: string): string {
   return text
     .toLowerCase()

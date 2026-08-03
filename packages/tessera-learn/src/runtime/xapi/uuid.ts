@@ -1,7 +1,6 @@
 /**
  * RFC 4122 v4 UUID. `crypto.randomUUID` is secure-context-only, so an LMS
- * serving the course over plain http falls back to `getRandomValues` — which
- * is not context-gated and is present wherever `crypto` is.
+ * serving the course over plain http falls back to `getRandomValues`.
  */
 export function uuidv4(): string {
   const c = globalThis.crypto;
