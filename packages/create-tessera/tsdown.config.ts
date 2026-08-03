@@ -12,8 +12,7 @@ const frameworkPkg = JSON.parse(
 const sveltePin = frameworkPkg.peerDependencies?.svelte;
 if (typeof sveltePin !== 'string' || sveltePin.length === 0) {
   throw new Error(
-    "Could not derive the Svelte pin from tessera-learn's peerDependencies.svelte. " +
-      'Svelte must stay a peer so consumers resolve exactly one copy.',
+    "Could not derive the Svelte pin from tessera-learn's peerDependencies.svelte.",
   );
 }
 
