@@ -9,8 +9,17 @@ import { resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
-import { slugify } from '../runtime/slugify.js';
 import { courseIdentity } from '../runtime/types.js';
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 // ---------- Types ----------
 

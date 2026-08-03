@@ -10,13 +10,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const createTesseraRoot = resolve(here, '..');
 const tesseraLearnRoot = resolve(createTesseraRoot, '..', 'tessera-learn');
 
-const TEMPLATES = ['course'];
-
-for (const name of TEMPLATES) {
-  const src = resolve(tesseraLearnRoot, 'templates', name);
-  const dest = resolve(createTesseraRoot, 'templates', name);
-  rmSync(dest, { recursive: true, force: true });
-  mkdirSync(dirname(dest), { recursive: true });
-  cpSync(src, dest, { recursive: true });
-  console.log(`[sync-templates] ${name} → templates/${name}`);
-}
+const src = resolve(tesseraLearnRoot, 'templates', 'course');
+const dest = resolve(createTesseraRoot, 'templates', 'course');
+rmSync(dest, { recursive: true, force: true });
+mkdirSync(dirname(dest), { recursive: true });
+cpSync(src, dest, { recursive: true });
+console.log('[sync-templates] course → templates/course');

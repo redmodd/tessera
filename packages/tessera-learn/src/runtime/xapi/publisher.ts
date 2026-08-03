@@ -58,7 +58,6 @@ interface SendOutcome {
   error?: Error;
 }
 
-const STATEMENT_RETRY_ATTEMPTS = RETRY_ATTEMPTS;
 /**
  * Soft cap on the number of in-flight statements queued behind the head of
  * the chain. We log a one-time warning when the queue grows past this so
@@ -424,7 +423,7 @@ export class XAPIPublisher {
   ): Promise<SendOutcome> {
     const body = JSON.stringify(statementOrBatch);
     const retry = options?.retry !== false; // default: retry enabled
-    const maxAttempts = retry ? STATEMENT_RETRY_ATTEMPTS : 1;
+    const maxAttempts = retry ? RETRY_ATTEMPTS : 1;
 
     const attempt = (n: number): Promise<SendOutcome> => {
       const isFinal = n === maxAttempts - 1;
