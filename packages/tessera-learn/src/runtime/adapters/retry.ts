@@ -105,20 +105,45 @@ export async function withRetry(
   errorReporter?: LMSErrorReporter,
   context?: string,
 ): Promise<boolean> {
+  return (await retryLoop(fn, maxRetries, errorReporter, context)) === 'ok';
+}
+
+/**
+ * `aborted` is only reachable via `hooks.onResume` — a caller that decides,
+ * after a backoff, that the loop should stop without logging a give-up.
+ */
+type RetryOutcome = 'ok' | 'failed' | 'aborted';
+
+interface RetryHooks {
+  /** Runs immediately before each backoff sleep. */
+  onBackoff(): void;
+  /** Runs immediately after each backoff sleep; return false to abandon. */
+  onResume(): boolean;
+}
+
+async function retryLoop(
+  fn: () => unknown,
+  maxRetries: number,
+  errorReporter: LMSErrorReporter | undefined,
+  context: string | undefined,
+  hooks?: RetryHooks,
+): Promise<RetryOutcome> {
   let lastErrCode = '';
   let threw = false;
   let lastError: unknown;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     threw = false;
     try {
-      if (lmsCallSucceeded(fn())) return true;
+      if (lmsCallSucceeded(fn())) return 'ok';
     } catch (err) {
       threw = true;
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
     if (attempt < maxRetries - 1) {
+      hooks?.onBackoff();
       await new Promise((r) => setTimeout(r, backoffMs(attempt)));
+      if (hooks && !hooks.onResume()) return 'aborted';
     }
   }
   if (threw) {
@@ -126,7 +151,7 @@ export async function withRetry(
     console.warn(`Tessera: LMS call threw${ctx} on final retry`, lastError);
   }
   logRetryGiveUp(errorReporter, lastErrCode, context);
-  return false;
+  return 'failed';
 }
 
 /**
@@ -180,9 +205,8 @@ export class WriteQueue {
    * Flush the queue sequentially. If an operation fails after retries,
    * re-insert it at the front and stop — retry on next trigger.
    *
-   * Retry is inlined (not delegated to `withRetry`) so we can mark
-   * `#inFlight` *only* while awaiting a backoff. drainSync re-runs an
-   * in-flight entry synchronously, which is only safe when the current
+   * `#inFlight` is marked *only* while awaiting a backoff: drainSync re-runs
+   * an in-flight entry synchronously, which is only safe when the current
    * attempt has failed and the next attempt is what we're waiting on.
    */
   async #flush(): Promise<void> {
@@ -197,37 +221,30 @@ export class WriteQueue {
       }
 
       const entry = this.#queue.shift()!;
-      let succeeded = false;
-      let lastErrCode = '';
-
-      for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-        let ok = false;
-        try {
-          ok = lmsCallSucceeded(entry.fn());
-        } catch {
-          // API call threw — treat as failure
-        }
-        if (ok) {
-          succeeded = true;
-          break;
-        }
-        lastErrCode = readLastErrorCode(this.errorReporter);
-        if (attempt < RETRY_ATTEMPTS - 1) {
+      const outcome = await retryLoop(
+        entry.fn,
+        RETRY_ATTEMPTS,
+        this.errorReporter,
+        entry.context,
+        {
           // The next attempt is gated on a backoff timer that won't fire
-          // during page unload. Mark in-flight so drainSync can re-run
-          // the entry synchronously if it interrupts here.
-          this.#inFlight = entry;
-          await new Promise((r) => setTimeout(r, backoffMs(attempt)));
-          this.#inFlight = null;
-          if (this.#aborted) {
-            this.#flushing = false;
-            return;
-          }
-        }
-      }
+          // during page unload; drainSync re-runs the entry instead.
+          onBackoff: () => {
+            this.#inFlight = entry;
+          },
+          onResume: () => {
+            this.#inFlight = null;
+            return !this.#aborted;
+          },
+        },
+      );
 
-      if (!succeeded) {
-        logRetryGiveUp(this.errorReporter, lastErrCode, entry.context);
+      // Aborted: drainSync already re-ran this entry synchronously.
+      if (outcome === 'aborted') {
+        this.#flushing = false;
+        return;
+      }
+      if (outcome === 'failed') {
         this.#queue.unshift(entry);
         this.#flushing = false;
         return;
