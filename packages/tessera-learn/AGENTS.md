@@ -48,7 +48,7 @@ The scaffolded root scripts (`pnpm dev`, `pnpm export`, …) pass through: `pnpm
 
 ## Running the project
 
-From the workspace root (`pnpm`; corepack provisions it). Each command takes the course name:
+From the workspace root. Each command takes the course name:
 
 ```bash
 pnpm install              # first time only
@@ -63,7 +63,7 @@ pnpm check <course>       # validate, then the runtime a11y audit (axe) over the
 - `dev` hot-reloads pages, layouts, components, and `course.config.js`.
 - `validate` runs the same static checks as `dev`/`export`, exits non-zero on failure — the fast feedback loop.
 - `check` runs `validate` then `tessera a11y` (builds, renders every page headless, runs axe-core; first run auto-installs Chromium). See [Accessibility](#accessibility).
-- `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
+- `new` / `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them.
 
 ### Updating the framework
 
@@ -106,7 +106,6 @@ my-course/
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
 ├── assets/                    # Images, audio, video (referenced via $assets/)
 ├── styles/                    # Custom CSS overrides
-├── CLAUDE.md / AGENTS.md      # Pointers to this guide
 └── pages/
     └── 01-intro/              # Numeric prefix → controls order
         ├── _meta.js           # Override section title; control page order

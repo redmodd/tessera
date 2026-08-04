@@ -56,14 +56,14 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 - **Build before e2e.** The fixtures import `tessera-learn`'s Vite plugin from its built `dist/`, so `pnpm build` must run first.
 - **Fixtures are committed and hand-tailored.** `tests/fixtures/*` are tracked source, not scaffolder output — edit them like any other code; don't regenerate them with `npm create tessera`. Only `tests/.e2e-variants/` (per-run build output) is gitignored.
 - **Five delivery modes, always.** Any change to the runtime API surface or an adapter must hold across SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / web. Prefer a unit test in `packages/tessera-learn/tests/` plus an e2e roundtrip, and note in the PR which modes you tested.
-- **The authoring guide is owned by `tessera-learn`.** Edit `packages/tessera-learn/AGENTS.md` directly — it ships in that package's `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy anywhere else: `create-tessera` scaffolds only small `CLAUDE.md` / `AGENTS.md` pointers to it (templates under `packages/create-tessera/templates/base/`). The repo-root `AGENTS.md` (this file) is a separate dev guide, unrelated to the authoring guide.
+- **The authoring guide is owned by `tessera-learn`.** Edit `packages/tessera-learn/AGENTS.md` directly — it ships in that package's `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy anywhere else: `create-tessera` scaffolds only a small pointer stub (`packages/create-tessera/templates/workspace/AGENTS.md`, copied to `CLAUDE.md` at scaffold time). The repo-root `AGENTS.md` (this file) is a separate dev guide, unrelated to the authoring guide.
 - **Releases run on changesets; the two packages version-lock.** CI gates every PR on `pnpm changeset status --since=origin/main`, so **any PR that changes a file under a published package (`packages/tessera-learn/` or `packages/create-tessera/`) needs a `pnpm changeset`** — including no-API-impact refactors, their tests, and in-package docs. An _empty_ changeset does **not** satisfy the gate; use a real `patch` when there's no user-facing change. Only PRs confined to root-level files (root docs, CI, the top-level `tests/` suite) can skip it. `create-tessera` and `tessera-learn` release in lockstep (changesets `fixed`) — a changeset for either bumps both to the same version, which is what lets `create-tessera` pin `tessera-learn` to its own version. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Package internals
 
 The directory tree is discoverable with `ls`; these are the facts that aren't.
 
-**`tessera-learn`** — runtime (`src/runtime/`) + the Vite plugin and `tessera` CLI (`src/plugin/`, subcommands `dev` / `export` / `validate` / `a11y` / `check`).
+**`tessera-learn`** — runtime (`src/runtime/`) + the Vite plugin and `tessera` CLI (`src/plugin/`, subcommands `new` / `duplicate` / `dev` / `export` / `validate` / `a11y` / `check`).
 
 - `dev`/`export` run Vite programmatically through the shared `buildInlineConfig()` — there is no scaffolded `vite.config.js`, and `vite` is a runtime dependency.
 - Playwright and `@axe-core/playwright` are **optional peers**: the `tessera a11y` audit (Tier 2) is opt-in, so the static gate stays dependency-free.
