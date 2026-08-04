@@ -9,6 +9,8 @@
 
 Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
 
+📖 **[tesseralearn.dev](https://tesseralearn.dev)** — docs, guides, and demo courses.
+
 Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
 **There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
@@ -41,14 +43,24 @@ pnpm create tessera@latest my-courses
 cd my-courses
 pnpm install
 pnpm dev starter-course      # local dev server at http://localhost:5173
-pnpm export starter-course   # build + package the course for the configured standard
-pnpm export starter-course --standard scorm2004 # override export.standard for this build
-pnpm validate starter-course # check the course for structural errors, no server or build
-pnpm tessera new intro # add another course at courses/intro/
-pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
-This scaffolds a workspace with one seed course (`starter-course`). The root scripts forward to whichever course you name — `pnpm dev <course>` runs it, while a bare `pnpm dev` lists the available courses rather than guessing. You can also `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+
+## Commands
+
+Every command names the course it works on. The root scripts forward to whichever course you name; a bare `pnpm dev` lists the available courses rather than guessing.
+
+```bash
+pnpm dev <course>       # local dev server, hot-reloads as you edit
+pnpm validate <course>  # structural errors only — no server, no build
+pnpm check <course>     # validation + full accessibility audit (axe-core, headless browser)
+pnpm export <course>    # build + package for the course's configured standard
+pnpm export <course> --standard scorm2004  # override export.standard for this build
+
+pnpm tessera new intro                  # add another course at courses/intro/
+pnpm tessera duplicate intro intro-v2   # copy an existing course
+```
 
 Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
@@ -95,7 +107,9 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 ## Documentation
 
-The authoring guide (workspaces, components, hooks, quizzes, layouts, custom xAPI, the full `course.config.js` shape) lives in [`AGENTS.md`](./AGENTS.md), shipped at the root of every scaffolded workspace for both human authors and AI agents.
+- **[tesseralearn.dev/docs](https://tesseralearn.dev/docs/)** — getting started, workspaces, quizzes, validation & accessibility, exporting, how SCORM/xAPI work.
+- **[Authoring guide](./packages/tessera-learn/AGENTS.md)** — the full technical reference (components, hooks, quizzes, layouts, custom xAPI, the `course.config.js` shape). Ships inside `tessera-learn`; every scaffolded workspace points its agent at it.
+- **[tessera-demo-courses](https://github.com/redmodd/tessera-demo-courses)** — a complete example workspace.
 
 ## Contributing
 
