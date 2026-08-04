@@ -1,7 +1,7 @@
 {
   "name": "create-tessera",
   "version": "0.5.0",
-  "description": "Scaffold a new Tessera course.",
+  "description": "Scaffold a new Tessera course workspace.",
   "keywords": [
     "tessera",
     "create",

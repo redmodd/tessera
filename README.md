@@ -11,7 +11,7 @@ Tessera is a toolkit for building interactive online courses that play in any le
 
 📖 **[tesseralearn.dev](https://tesseralearn.dev)** — docs, guides, and demo courses.
 
-Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
+Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (scaffolded at the root of every project, pointing at the guide that ships inside the framework) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
 **There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
 
@@ -60,7 +60,8 @@ Every command names the course it works on. The root scripts forward to whicheve
 ```bash
 pnpm dev <course>       # local dev server, hot-reloads as you edit
 pnpm validate <course>  # structural errors only — no server, no build
-pnpm check <course>     # validation + full accessibility audit (axe-core, headless browser)
+pnpm a11y <course>      # accessibility audit on its own (axe-core, headless browser)
+pnpm check <course>     # validate, then the accessibility audit — run before export
 pnpm export <course>    # build + package for the course's configured standard
 pnpm export <course> --standard scorm2004  # override export.standard for this build
 
@@ -93,7 +94,7 @@ Once your project is running, ask the agent for what you want:
 
 > _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
-`AGENTS.md` (at the root of your workspace) teaches the agent the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
+`AGENTS.md` (at the root of your workspace) points the agent at the authoring guide, which teaches it the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 
 You review the output, ask for changes, and iterate. The dev server hot-reloads as the agent writes, so you see each change immediately.
 
