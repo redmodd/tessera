@@ -9,7 +9,9 @@
 
 Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
 
-Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (shipped at the root of every scaffolded project) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
+📖 **[tesseralearn.dev](https://tesseralearn.dev)** — docs, guides, and demo courses.
+
+Open your course in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (scaffolded at the root of every project, pointing at the guide that ships inside the framework) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
 **There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, persistence) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
 
@@ -32,6 +34,12 @@ Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window 
 node --version    # should print v24.x.x or higher
 ```
 
+Then install **pnpm**, the package manager the commands below use:
+
+```bash
+npm install -g pnpm
+```
+
 **Editor (optional):** While Tessera is designed for AI-assisted authoring, you can see and edit course files in any text editor, such as [Visual Studio Code](https://code.visualstudio.com/) which is a good free choice. Install the [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) extension for syntax highlighting on `.svelte` files.
 
 ## Quick start
@@ -41,16 +49,27 @@ pnpm create tessera@latest my-courses
 cd my-courses
 pnpm install
 pnpm dev starter-course      # local dev server at http://localhost:5173
-pnpm export starter-course   # build + package the course for the configured standard
-pnpm export starter-course --standard scorm2004 # override export.standard for this build
-pnpm validate starter-course # check the course for structural errors, no server or build
-pnpm tessera new intro # add another course at courses/intro/
-pnpm tessera duplicate intro intro-v2 # copy an existing course
 ```
 
-This scaffolds a workspace with one seed course (`starter-course`). The root scripts forward to whichever course you name — `pnpm dev <course>` runs it, while a bare `pnpm dev` lists the available courses rather than guessing. You can also `cd courses/intro` and run `pnpm exec tessera dev`. Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
-Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
+## Commands
+
+Every command names the course it works on. The root scripts forward to whichever course you name; a bare `pnpm dev` lists the available courses rather than guessing.
+
+```bash
+pnpm dev <course>       # local dev server, hot-reloads as you edit
+pnpm validate <course>  # structural errors only — no server, no build
+pnpm a11y <course>      # accessibility audit on its own (axe-core, headless browser)
+pnpm check <course>     # validate, then the accessibility audit — run before export
+pnpm export <course>    # build + package for the course's configured standard
+pnpm export <course> --standard scorm2004  # override export.standard for this build
+
+pnpm tessera new intro                  # add another course at courses/intro/
+pnpm tessera duplicate intro intro-v2   # copy an existing course
+```
+
+Every scaffolded workspace ships with `AGENTS.md` at its root, pointing your agent at the full authoring guide inside the installed framework (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
 ```svelte
 <script module>
@@ -75,7 +94,7 @@ Once your project is running, ask the agent for what you want:
 
 > _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
-`AGENTS.md` (at the root of your workspace) teaches the agent the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
+`AGENTS.md` (at the root of your workspace) points the agent at the authoring guide, which teaches it the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 
 You review the output, ask for changes, and iterate. The dev server hot-reloads as the agent writes, so you see each change immediately.
 
@@ -89,13 +108,15 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 **`pnpm install` fails with network errors**: check your internet connection and retry. If you're behind a corporate proxy or firewall, pnpm needs proxy configuration (search "pnpm proxy settings" or ask your IT team).
 
-**Permission errors during `pnpm install`**: don't use `sudo`. See [pnpm's guide to resolving permission errors](https://pnpm.io/cli/install#--no-optional).
+**Permission errors during `pnpm install`**: don't use `sudo` — it leaves root-owned files that break later installs. Fix ownership of the affected directory instead (`sudo chown -R $(whoami) ~/.local/share/pnpm ~/path/to/my-courses` on macOS/Linux).
 
 **The browser shows a blank page after `pnpm dev <course>`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
 
 ## Documentation
 
-The authoring guide (workspaces, components, hooks, quizzes, layouts, custom xAPI, the full `course.config.js` shape) lives in [`AGENTS.md`](./AGENTS.md), shipped at the root of every scaffolded workspace for both human authors and AI agents.
+- **[tesseralearn.dev/docs](https://tesseralearn.dev/docs/)** — getting started, workspaces, quizzes, validation & accessibility, exporting, how SCORM/xAPI work.
+- **[Authoring guide](./packages/tessera-learn/AGENTS.md)** — the full technical reference (components, hooks, quizzes, layouts, custom xAPI, the `course.config.js` shape). Ships inside `tessera-learn`; every scaffolded workspace points its agent at it.
+- **[tessera-demo-courses](https://github.com/redmodd/tessera-demo-courses)** — a complete example workspace.
 
 ## Contributing
 

@@ -17,6 +17,8 @@ Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window 
 node --version    # should print v24.x.x or higher
 ```
 
+The scaffolded workspace is set up for **pnpm**; install it with `npm install -g pnpm` (or `corepack enable pnpm`).
+
 ## Usage
 
 ```bash
@@ -46,7 +48,7 @@ The Vite build is owned by the `tessera` CLI — there is no `vite.config.js` to
 
 Every course gets `assets/` (drop images, audio, video here), a root `layout.svelte` to customise the course shell, and `styles/custom.css` for optional CSS overrides.
 
-Then (the workspace is set up for `pnpm` — Node's corepack provisions it automatically):
+Then:
 
 ```bash
 cd my-courses
@@ -59,7 +61,7 @@ pnpm tessera new <name>      # add another course at courses/<name>/
 pnpm tessera duplicate <source> <new>   # copy an existing course to courses/<new>/
 ```
 
-The root scripts forward to whichever course you name: `pnpm dev <course>` runs that course, while a bare command at the workspace root lists the available courses rather than guessing. You can also `cd` into a course folder and run `pnpm exec tessera dev`.
+The root scripts forward to whichever course you name: `pnpm dev <course>` runs that course, while a bare command at the workspace root lists the available courses rather than guessing.
 
 The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing.
 
@@ -76,6 +78,10 @@ pnpm add tessera-learn@latest
 To pin a specific release instead of the newest — for reproducible builds, or to avoid an unwanted major — name the version: `pnpm add tessera-learn@0.1.0` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
 
 The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your workspace tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically — your `CLAUDE.md` / `AGENTS.md` pointers don't change.
+
+## Documentation
+
+Guides and examples: [tesseralearn.dev](https://tesseralearn.dev).
 
 ## Flags
 

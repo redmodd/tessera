@@ -9,7 +9,7 @@ Tessera is a toolkit for building interactive online courses, designed for AI-as
 You probably don't want to install this package directly. Use the scaffolder:
 
 ```bash
-pnpm create tessera@latest my-course
+pnpm create tessera@latest my-courses
 ```
 
 That creates a workspace with Tessera wired up, a seed course, and a root `AGENTS.md` that points to the authoring guide. Add more courses with `pnpm tessera new <name>`.
@@ -17,7 +17,7 @@ That creates a workspace with Tessera wired up, a seed course, and a root `AGENT
 ## What's included
 
 - **Hooks** (`tessera-learn`): `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`.
-- **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` — wires page/layout discovery, the LMS adapter, the `$shared` alias, and the export pipeline. The `tessera` CLI (`new`/`dev`/`export`/`validate`/`a11y`/`check`) runs Vite with this plugin for you, so scaffolded workspaces need no `vite.config.js`.
+- **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` — wires page/layout discovery, the LMS adapter, the `$shared` alias, and the export pipeline. The `tessera` CLI (`new`/`duplicate`/`dev`/`export`/`validate`/`a11y`/`check`) runs Vite with this plugin for you, so scaffolded workspaces need no `vite.config.js`.
 - **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `DefaultLayout`.
 - **LMS adapters**: SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3 ("Tin Can"), static Web — selected via `course.config.js` `export.standard`, or overridden per build with `tessera export --standard <value>`.
 - **Accessibility checks**: static rules (alt text, media titles/captions, heading order, contrast, `<html lang>`) run inside validation and the build with zero extra dependencies; an opt-in runtime audit (`tessera a11y`, with `playwright` + `@axe-core/playwright` as optional peers) renders every page and gates on axe-core violations.
@@ -25,6 +25,8 @@ That creates a workspace with Tessera wired up, a seed course, and a root `AGENT
 See `AGENTS.md` for usage, signatures, and authoring conventions.
 
 ## Documentation
+
+Guides and examples: [tesseralearn.dev](https://tesseralearn.dev).
 
 The full authoring guide ships with this package at `node_modules/tessera-learn/AGENTS.md` — scaffolded projects get a small root `AGENTS.md` that points to it — and is on [GitHub](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/AGENTS.md).
 
