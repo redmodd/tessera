@@ -3,4 +3,4 @@
 'tessera-learn': patch
 ---
 
-Correct and tighten the package READMEs.
+Correct stale commands, paths, and links in the package docs.
