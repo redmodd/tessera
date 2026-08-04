@@ -34,6 +34,12 @@ Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window 
 node --version    # should print v24.x.x or higher
 ```
 
+Then install **pnpm**, the package manager the commands below use:
+
+```bash
+npm install -g pnpm
+```
+
 **Editor (optional):** While Tessera is designed for AI-assisted authoring, you can see and edit course files in any text editor, such as [Visual Studio Code](https://code.visualstudio.com/) which is a good free choice. Install the [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) extension for syntax highlighting on `.svelte` files.
 
 ## Quick start
@@ -62,7 +68,7 @@ pnpm tessera new intro                  # add another course at courses/intro/
 pnpm tessera duplicate intro intro-v2   # copy an existing course
 ```
 
-Every scaffolded workspace ships with `AGENTS.md` at its root. Your agent will read this file for the full authoring guide (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
+Every scaffolded workspace ships with `AGENTS.md` at its root, pointing your agent at the full authoring guide inside the installed framework (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
 ```svelte
 <script module>
@@ -87,7 +93,7 @@ Once your project is running, ask the agent for what you want:
 
 > _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
-`AGENTS.md` (at the root of your workspace) teaches the agent the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `usePersistence`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
+`AGENTS.md` (at the root of your workspace) teaches the agent the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 
 You review the output, ask for changes, and iterate. The dev server hot-reloads as the agent writes, so you see each change immediately.
 
@@ -101,7 +107,7 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 **`pnpm install` fails with network errors**: check your internet connection and retry. If you're behind a corporate proxy or firewall, pnpm needs proxy configuration (search "pnpm proxy settings" or ask your IT team).
 
-**Permission errors during `pnpm install`**: don't use `sudo`. See [pnpm's guide to resolving permission errors](https://pnpm.io/cli/install#--no-optional).
+**Permission errors during `pnpm install`**: don't use `sudo` — it leaves root-owned files that break later installs. Fix ownership of the affected directory instead (`sudo chown -R $(whoami) ~/.local/share/pnpm ~/path/to/my-courses` on macOS/Linux).
 
 **The browser shows a blank page after `pnpm dev <course>`**: open your browser's developer console (`F12` → Console tab) for the actual error. Common causes: a typo in a `.svelte` file, an unclosed tag, or a missing asset reference.
 
