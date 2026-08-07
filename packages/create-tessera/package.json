@@ -49,7 +49,7 @@
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^4.1.10",
     "tessera-learn": "workspace:*",
     "tsdown": "^0.22.14",
