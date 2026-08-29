@@ -172,6 +172,17 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.raw.GetValue('cmi.interactions.1.id')).toBe('q2');
   });
 
+  it('the session_time written at exit accumulates into total_time across a relaunch', async () => {
+    await start();
+    adapter.setDuration(90);
+    adapter.terminate();
+    expect(lms.errors).toEqual([]);
+
+    lms = relaunch2004(lms);
+    await new SCORM2004Adapter(lms.api).init();
+    expect(lms.raw.GetValue('cmi.total_time')).toBe('PT1M30S');
+  });
+
   it('the wrapper has teeth: an invalid vocabulary write is flagged', async () => {
     await start();
     // Drive an out-of-vocabulary completion_status straight at the runtime to
