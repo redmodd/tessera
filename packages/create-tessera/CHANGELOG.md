@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.5.1
+
+### Patch Changes
+
+- 77a8bd3: Correct stale commands, paths, and links in the package docs.
+
 ## 0.5.0
 
 ### Minor Changes

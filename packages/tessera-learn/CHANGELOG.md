@@ -1,5 +1,49 @@
 # tessera-learn
 
+## 0.5.1
+
+### Patch Changes
+
+- 15357a3: chore(deps): bump acorn from 8.17.0 to 8.18.0
+  
+  `tessera-learn`:
+  
+  - `acorn` 8.17.0 → 8.18.0
+- c7063dd: chore(deps): bump vite from 8.1.5 to 8.2.1
+  
+  `tessera-learn`:
+  
+  - `vite` 8.1.5 → 8.2.1
+- 541e37d: chore(deps): bump @sveltejs/acorn-typescript from 1.0.11 to 1.0.13
+  
+  `tessera-learn`:
+  
+  - `@sveltejs/acorn-typescript` 1.0.11 → 1.0.13
+- a90dd4c: chore(deps): bump @sveltejs/vite-plugin-svelte from 7.2.0 to 7.3.0
+  
+  `tessera-learn`:
+  
+  - `@sveltejs/vite-plugin-svelte` 7.2.0 → 7.3.0
+- 133f208: chore(deps-dev): bump the dev-dependencies group across 1 directory with 15 updates
+  
+  `create-tessera`:
+  
+  - `@types/node` 26.1.1 → 26.2.0
+  - `@vitest/coverage-v8` 4.1.10 → 4.1.11
+  - `vitest` 4.1.10 → 4.1.11
+  
+  `tessera-learn`:
+  
+  - `@types/node` 26.1.1 → 26.2.0
+  - `@vitest/coverage-v8` 4.1.10 → 4.1.11
+  - `jsdom` 29.0.1 → 30.0.1
+  - `scorm-again` 3.2.0 → 3.3.0
+  - `svelte-check` 4.7.3 → 4.7.6
+  - `svelte` 5.56.8 → 5.56.10
+  - `vitest` 4.1.10 → 4.1.11
+- 22158ad: Cover SCORM 2004 `total_time` accumulation across a relaunch in the conformance suite.
+- 77a8bd3: Correct stale commands, paths, and links in the package docs.
+
 ## 0.5.0
 
 ### Minor Changes
