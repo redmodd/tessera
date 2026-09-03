@@ -260,6 +260,77 @@ describe('XAPIAdapter', () => {
     });
   });
 
+  it('falls through to the mbox when the account is null', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        account: null,
+        mbox: 'mailto:learner@example.com',
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('falls through to the mbox when the account homePage is not a URL', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        mbox: ['mailto:learner@example.com'],
+        account: [{ accountServiceHomePage: '/lms', accountName: 'learner' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('drops keys the LMS invented, including a non-array member', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        member: { mbox: 'mailto:other@example.com' },
+        mbox: 'mailto:learner@example.com',
+        lmsUserId: 42,
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
   it('drops an empty member array instead of reading it as a Group', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',

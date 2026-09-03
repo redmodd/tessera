@@ -7,6 +7,7 @@ import {
 } from '../interaction-format.js';
 import { formatISO8601Duration } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
+import { validateAgent } from '../xapi/agent-rules.js';
 import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
 
 export const VERBS = {
@@ -20,23 +21,31 @@ export const VERBS = {
 
 /** Some LMSes send `actor` in xAPI Person shape (seen from SCORM Cloud). */
 function normalizeLaunchActor(parsed: Record<string, unknown>): XAPIAgent {
-  const out = { ...parsed };
-  for (const k of ['name', 'mbox', 'mbox_sha1sum', 'openid', 'account']) {
-    if (Array.isArray(out[k])) out[k] = out[k][0];
-    if (out[k] === undefined) delete out[k];
+  const out: Record<string, unknown> = {};
+  for (const k of [
+    'objectType',
+    'name',
+    'mbox',
+    'mbox_sha1sum',
+    'openid',
+    'account',
+  ]) {
+    const v = Array.isArray(parsed[k]) ? parsed[k][0] : parsed[k];
+    if (v !== undefined) out[k] = v;
   }
-  const acc = out.account as Record<string, unknown> | undefined;
-  if (acc !== undefined) {
-    const homePage = acc.homePage ?? acc.accountServiceHomePage;
-    const name = acc.name ?? acc.accountName;
-    if (homePage !== undefined && name !== undefined) {
-      out.account = { homePage, name };
-    } else {
-      delete out.account;
-    }
+  if (Array.isArray(parsed.member) && parsed.member.length > 0) {
+    out.member = parsed.member;
   }
-  if (Array.isArray(out.member) && out.member.length === 0) delete out.member;
-  if (out.objectType !== undefined && !Array.isArray(out.member)) {
+  if (out.account !== undefined) {
+    const acc = out.account as Record<string, unknown> | null;
+    const account = {
+      homePage: acc?.homePage ?? acc?.accountServiceHomePage,
+      name: acc?.name ?? acc?.accountName,
+    };
+    if (validateAgent({ account }) === null) out.account = account;
+    else delete out.account;
+  }
+  if (out.objectType !== undefined && out.member === undefined) {
     out.objectType = 'Agent';
   }
   const ifis = ['account', 'mbox', 'mbox_sha1sum', 'openid'];
