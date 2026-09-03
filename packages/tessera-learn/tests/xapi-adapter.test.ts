@@ -379,6 +379,21 @@ describe('XAPIAdapter', () => {
     });
   });
 
+  it('rejects a launch actor left with no IFI, blaming the launch param', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ objectType: 'Person', name: ['Learner Name'] }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    await expect(new XAPIAdapter().init()).rejects.toThrow(
+      /launch parameter 'actor' is malformed \(actor: must have one of mbox/,
+    );
+    expect(
+      fetchMock.mock.calls.filter(([u]) => String(u).includes('/xapi')),
+    ).toHaveLength(0);
+  });
+
   it('drops an empty member array instead of reading it as a Group', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',

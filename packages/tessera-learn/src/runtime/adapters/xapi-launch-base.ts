@@ -7,7 +7,7 @@ import {
 } from '../interaction-format.js';
 import { formatISO8601Duration } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
-import { validateAgent } from '../xapi/agent-rules.js';
+import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
 
 export const VERBS = {
@@ -263,7 +263,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('actor must be an object');
       }
-      this.actor = normalizeLaunchActor(parsed as Record<string, unknown>);
+      const actor = normalizeLaunchActor(parsed as Record<string, unknown>);
+      const invalid = validateAgent(actor);
+      if (invalid) throw new Error(joinFieldError('actor', invalid));
+      this.actor = actor;
     } catch (err) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
