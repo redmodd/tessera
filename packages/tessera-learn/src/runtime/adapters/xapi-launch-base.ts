@@ -29,20 +29,19 @@ function normalizeLaunchActor(
   for (const k of ['mbox', 'mbox_sha1sum', 'openid']) {
     if (Array.isArray(out[k])) out[k] = out[k][0];
   }
-  if (Array.isArray(out.account)) {
-    const acc = out.account[0] as Record<string, unknown> | undefined;
-    out.account = acc
-      ? {
-          homePage: acc.homePage ?? acc.accountServiceHomePage,
-          name: acc.name ?? acc.accountName,
-        }
-      : undefined;
+  const acc = (Array.isArray(out.account) ? out.account[0] : out.account) as
+    Record<string, unknown> | undefined;
+  if (acc && typeof acc === 'object') {
+    out.account = {
+      homePage: acc.homePage ?? acc.accountServiceHomePage,
+      name: acc.name ?? acc.accountName,
+    };
+  } else if (Array.isArray(out.account)) {
+    out.account = undefined;
   }
-  if (out.objectType === 'Person') {
-    out.objectType = 'Agent';
-    for (const k of IFIS.filter((k) => out[k] !== undefined).slice(1)) {
-      delete out[k];
-    }
+  if (out.objectType === 'Person') out.objectType = 'Agent';
+  for (const k of IFIS.filter((k) => out[k] !== undefined).slice(1)) {
+    delete out[k];
   }
   return out;
 }
