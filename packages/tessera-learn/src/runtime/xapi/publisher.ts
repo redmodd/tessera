@@ -185,8 +185,7 @@ export class XAPIPublisher {
     } else if (this.#cachedActor) {
       const err = validateAgent(this.#cachedActor);
       if (err) {
-        // Drop the invalid actor so a caller that swallows this rejection
-        // can't go on to send statements with it.
+        // So a caller that swallows this rejection can't keep sending with it.
         this.#cachedActor = null;
         throw new XAPIConfigError(joinFieldError('xapi.actor', err));
       }

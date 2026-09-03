@@ -18,17 +18,17 @@ export const VERBS = {
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
 } as const;
 
-/**
- * Some LMSes (SCORM Cloud's test launch) send the launch `actor` in xAPI
- * Person shape — array-valued `name`/`account`, with the account keys named
- * `accountServiceHomePage`/`accountName`. Collapse it to an Agent; anything
- * else falls through to the publisher's validateAgent() error.
- */
+/** SCORM Cloud's test launch sends `actor` in xAPI Person shape. */
+const IFIS = ['mbox', 'mbox_sha1sum', 'openid', 'account'] as const;
+
 function normalizeLaunchActor(
   parsed: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...parsed };
   if (Array.isArray(out.name)) out.name = out.name[0];
+  for (const k of ['mbox', 'mbox_sha1sum', 'openid']) {
+    if (Array.isArray(out[k])) out[k] = out[k][0];
+  }
   if (Array.isArray(out.account)) {
     const acc = out.account[0] as Record<string, unknown> | undefined;
     out.account = acc
@@ -37,6 +37,12 @@ function normalizeLaunchActor(
           name: acc.name ?? acc.accountName,
         }
       : undefined;
+  }
+  if (out.objectType === 'Person') {
+    out.objectType = 'Agent';
+    for (const k of IFIS.filter((k) => out[k] !== undefined).slice(1)) {
+      delete out[k];
+    }
   }
   return out;
 }
