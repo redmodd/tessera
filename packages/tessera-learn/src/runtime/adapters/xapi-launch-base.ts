@@ -25,20 +25,23 @@ function normalizeLaunchActor(
   parsed: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...parsed };
-  if (Array.isArray(out.name)) out.name = out.name[0];
-  for (const k of ['mbox', 'mbox_sha1sum', 'openid']) {
-    if (Array.isArray(out[k])) out[k] = out[k][0];
+  for (const k of ['name', 'mbox', 'mbox_sha1sum', 'openid']) {
+    if (!Array.isArray(out[k])) continue;
+    if (out[k].length > 0) out[k] = out[k][0];
+    else delete out[k];
   }
   const acc = (Array.isArray(out.account) ? out.account[0] : out.account) as
     Record<string, unknown> | undefined;
-  if (acc && typeof acc === 'object') {
-    out.account = {
-      homePage: acc.homePage ?? acc.accountServiceHomePage,
-      name: acc.name ?? acc.accountName,
-    };
-  } else if (Array.isArray(out.account)) {
-    out.account = undefined;
+  if (acc !== undefined) {
+    const homePage = acc.homePage ?? acc.accountServiceHomePage;
+    const name = acc.name ?? acc.accountName;
+    if (homePage !== undefined && name !== undefined) {
+      out.account = { homePage, name };
+    } else {
+      delete out.account;
+    }
   }
+  if (Array.isArray(out.member) && out.member.length === 0) delete out.member;
   if (out.objectType !== undefined && !Array.isArray(out.member)) {
     out.objectType = 'Agent';
   }
@@ -267,10 +270,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   /** Construct the publisher from the resolved launch fields plus per-profile options. */
-  protected createPublisher(opts: {
+  protected async createPublisher(opts: {
     sessionId?: string;
     cmi5Mode?: boolean;
-  }): XAPIPublisher {
+  }): Promise<XAPIPublisher> {
     if (!this.actor) {
       throw new Error(
         `Tessera ${this.logName}: cannot create publisher before the launch actor is resolved.`,
@@ -285,6 +288,13 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       version: this.version,
       ...opts,
     });
+    try {
+      await this.publisher.init();
+    } catch (err) {
+      this.publisher = null;
+      this.actor = null;
+      throw err;
+    }
     return this.publisher;
   }
 

@@ -234,4 +234,71 @@ describe('XAPIAdapter', () => {
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
   });
+  it('falls through to the mbox when the account has no homePage', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        name: ['Learner Name'],
+        mbox: ['mailto:learner@example.com'],
+        account: [{ accountName: 'APPID|learner@example.com' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      name: 'Learner Name',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('drops an empty member array instead of reading it as a Group', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        member: [],
+        account: { homePage: 'http://cloud.scorm.com', name: 'APPID|l' },
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      account: { homePage: 'http://cloud.scorm.com', name: 'APPID|l' },
+    });
+  });
+
+  it('stops State API writes after the actor fails validation', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ name: 'Learner Name' }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await expect(adapter.init()).rejects.toThrow(/actor/);
+    adapter.saveState({ page: 1 } as never);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      fetchMock.mock.calls.find(([u]) =>
+        String(u).includes('activities/state'),
+      ),
+    ).toBeFalsy();
+  });
 });

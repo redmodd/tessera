@@ -198,8 +198,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
     }
 
-    const publisher = this.createPublisher({ sessionId, cmi5Mode: true });
-    await publisher.init();
+    await this.createPublisher({ sessionId, cmi5Mode: true });
 
     // cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict
     // LRSes track the GET and reject Initialized otherwise. A 404 here
