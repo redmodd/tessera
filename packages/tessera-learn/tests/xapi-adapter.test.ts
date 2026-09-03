@@ -46,12 +46,11 @@ describe('XAPIAdapter', () => {
     expect(headers.get('Authorization')).toBe('Basic Zm9vOmJhcg==');
   });
 
-  it('reshapes a Person-shaped launch actor into an Agent', async () => {
+  it('reshapes the SCORM Cloud array-shaped launch actor', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
       auth: 'Basic Zm9vOmJhcg==',
       actor: JSON.stringify({
-        objectType: 'Person',
         name: ['Learner Name'],
         account: [
           {
@@ -59,6 +58,7 @@ describe('XAPIAdapter', () => {
             accountName: 'APPID|learner@example.com',
           },
         ],
+        objectType: 'Agent',
       }),
       activity_id: 'urn:tessera:au:abc',
     });
