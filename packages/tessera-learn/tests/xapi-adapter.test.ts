@@ -46,6 +46,61 @@ describe('XAPIAdapter', () => {
     expect(headers.get('Authorization')).toBe('Basic Zm9vOmJhcg==');
   });
 
+  it('reshapes a Person-shaped launch actor into an Agent', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        name: ['Learner Name'],
+        account: [
+          {
+            accountServiceHomePage: 'http://cloud.scorm.com',
+            accountName: 'APPID|learner@example.com',
+          },
+        ],
+        objectType: 'Agent',
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      name: 'Learner Name',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
+      objectType: 'Agent',
+    });
+    const stateUrl = String(
+      fetchMock.mock.calls.find(([u]) =>
+        String(u).includes('activities/state'),
+      )![0],
+    );
+    expect(stateUrl).toContain(encodeURIComponent('"homePage"'));
+  });
+
+  it('sends nothing after init rejects an actor it cannot reshape', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ name: 'Learner Name' }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await expect(adapter.init()).rejects.toThrow(/actor/);
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      fetchMock.mock.calls.find(([u]) => String(u).includes('/statements')),
+    ).toBeFalsy();
+  });
+
   it('throws on malformed actor JSON', async () => {
     launch({
       endpoint: 'https://lrs/',

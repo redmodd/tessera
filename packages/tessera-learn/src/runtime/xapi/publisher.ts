@@ -184,7 +184,12 @@ export class XAPIPublisher {
       this.#cachedActor = resolved as XAPIAgent;
     } else if (this.#cachedActor) {
       const err = validateAgent(this.#cachedActor);
-      if (err) throw new XAPIConfigError(joinFieldError('xapi.actor', err));
+      if (err) {
+        // Drop the invalid actor so a caller that swallows this rejection
+        // can't go on to send statements with it.
+        this.#cachedActor = null;
+        throw new XAPIConfigError(joinFieldError('xapi.actor', err));
+      }
     } else {
       throw new XAPIConfigError('xapi.actor is required');
     }

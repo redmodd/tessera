@@ -18,6 +18,29 @@ export const VERBS = {
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
 } as const;
 
+/**
+ * Some LMSes (SCORM Cloud's test launch) send the launch `actor` in xAPI
+ * Person shape — array-valued `name`/`account`, with the account keys named
+ * `accountServiceHomePage`/`accountName`. Collapse it to an Agent; anything
+ * else falls through to the publisher's validateAgent() error.
+ */
+function normalizeLaunchActor(
+  parsed: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...parsed };
+  if (Array.isArray(out.name)) out.name = out.name[0];
+  if (Array.isArray(out.account)) {
+    const acc = out.account[0] as Record<string, unknown> | undefined;
+    out.account = acc
+      ? {
+          homePage: acc.homePage ?? acc.accountServiceHomePage,
+          name: acc.name ?? acc.accountName,
+        }
+      : undefined;
+  }
+  return out;
+}
+
 const CMI_INTERACTION_TYPE =
   'http://adlnet.gov/expapi/activities/cmi.interaction';
 
@@ -225,7 +248,9 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('actor must be an object');
       }
-      this.actor = parsed as XAPIAgent;
+      this.actor = normalizeLaunchActor(
+        parsed as Record<string, unknown>,
+      ) as XAPIAgent;
     } catch (err) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
