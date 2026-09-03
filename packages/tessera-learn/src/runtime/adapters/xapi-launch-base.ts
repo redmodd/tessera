@@ -19,19 +19,13 @@ export const VERBS = {
 } as const;
 
 /** Some LMSes send `actor` in xAPI Person shape (seen from SCORM Cloud). */
-const IFIS = ['account', 'mbox', 'mbox_sha1sum', 'openid'] as const;
-
-function normalizeLaunchActor(
-  parsed: Record<string, unknown>,
-): Record<string, unknown> {
+function normalizeLaunchActor(parsed: Record<string, unknown>): XAPIAgent {
   const out = { ...parsed };
-  for (const k of ['name', 'mbox', 'mbox_sha1sum', 'openid']) {
-    if (!Array.isArray(out[k])) continue;
-    if (out[k].length > 0) out[k] = out[k][0];
-    else delete out[k];
+  for (const k of ['name', 'mbox', 'mbox_sha1sum', 'openid', 'account']) {
+    if (Array.isArray(out[k])) out[k] = out[k][0];
+    if (out[k] === undefined) delete out[k];
   }
-  const acc = (Array.isArray(out.account) ? out.account[0] : out.account) as
-    Record<string, unknown> | undefined;
+  const acc = out.account as Record<string, unknown> | undefined;
   if (acc !== undefined) {
     const homePage = acc.homePage ?? acc.accountServiceHomePage;
     const name = acc.name ?? acc.accountName;
@@ -45,10 +39,11 @@ function normalizeLaunchActor(
   if (out.objectType !== undefined && !Array.isArray(out.member)) {
     out.objectType = 'Agent';
   }
-  for (const k of IFIS.filter((k) => out[k] !== undefined).slice(1)) {
+  const ifis = ['account', 'mbox', 'mbox_sha1sum', 'openid'];
+  for (const k of ifis.filter((k) => out[k] !== undefined).slice(1)) {
     delete out[k];
   }
-  return out;
+  return out as XAPIAgent;
 }
 
 const CMI_INTERACTION_TYPE =
@@ -258,9 +253,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('actor must be an object');
       }
-      this.actor = normalizeLaunchActor(
-        parsed as Record<string, unknown>,
-      ) as XAPIAgent;
+      this.actor = normalizeLaunchActor(parsed as Record<string, unknown>);
     } catch (err) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
