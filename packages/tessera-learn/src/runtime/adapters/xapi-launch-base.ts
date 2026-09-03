@@ -19,7 +19,7 @@ export const VERBS = {
 } as const;
 
 /** Some LMSes send `actor` in xAPI Person shape (seen from SCORM Cloud). */
-const IFIS = ['mbox', 'mbox_sha1sum', 'openid', 'account'] as const;
+const IFIS = ['account', 'mbox', 'mbox_sha1sum', 'openid'] as const;
 
 function normalizeLaunchActor(
   parsed: Record<string, unknown>,
@@ -39,7 +39,9 @@ function normalizeLaunchActor(
   } else if (Array.isArray(out.account)) {
     out.account = undefined;
   }
-  if (out.objectType === 'Person') out.objectType = 'Agent';
+  if (out.objectType !== undefined && !Array.isArray(out.member)) {
+    out.objectType = 'Agent';
+  }
   for (const k of IFIS.filter((k) => out[k] !== undefined).slice(1)) {
     delete out[k];
   }

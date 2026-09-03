@@ -85,7 +85,7 @@ describe('XAPIAdapter', () => {
     expect(stateUrl).toContain(encodeURIComponent('"homePage"'));
   });
 
-  it('reshapes a Person carrying an mbox and drops its extra IFIs', async () => {
+  it('reshapes a Person with several IFIs down to its account', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
       auth: 'Basic Zm9vOmJhcg==',
@@ -112,11 +112,14 @@ describe('XAPIAdapter', () => {
     expect(JSON.parse(send![1].body).actor).toEqual({
       objectType: 'Agent',
       name: 'Learner Name',
-      mbox: 'mailto:learner@example.com',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
     });
   });
 
-  it('drops extra IFIs on a Person-shaped actor labelled Agent', async () => {
+  it('keeps the account when a Person-shaped actor is labelled Agent', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
       auth: 'Basic Zm9vOmJhcg==',
@@ -143,8 +146,35 @@ describe('XAPIAdapter', () => {
     expect(JSON.parse(send![1].body).actor).toEqual({
       objectType: 'Agent',
       name: 'Learner Name',
-      mbox: 'mailto:learner@example.com',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
     });
+  });
+
+  it('normalizes a member-less Group launch actor to an Agent', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        name: 'Learner Name',
+        account: {
+          homePage: 'http://cloud.scorm.com',
+          name: 'APPID|learner@example.com',
+        },
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor.objectType).toBe('Agent');
   });
 
   it('maps account key aliases on an unwrapped account object', async () => {
