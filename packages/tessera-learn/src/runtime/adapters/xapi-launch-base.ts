@@ -38,19 +38,20 @@ function normalizeLaunchActor(parsed: Record<string, unknown>): XAPIAgent {
   }
   if (out.account !== undefined) {
     const acc = out.account as Record<string, unknown> | null;
-    const account = {
+    out.account = {
       homePage: acc?.homePage ?? acc?.accountServiceHomePage,
       name: acc?.name ?? acc?.accountName,
     };
-    if (validateAgent({ account }) === null) out.account = account;
-    else delete out.account;
   }
+  if (typeof out.name !== 'string') delete out.name;
   if (out.objectType !== undefined && out.member === undefined) {
     out.objectType = 'Agent';
   }
-  const ifis = ['account', 'mbox', 'mbox_sha1sum', 'openid'];
-  for (const k of ifis.filter((k) => out[k] !== undefined).slice(1)) {
-    delete out[k];
+  let kept = false;
+  for (const k of ['account', 'mbox', 'mbox_sha1sum', 'openid']) {
+    if (out[k] === undefined) continue;
+    if (!kept && validateAgent({ [k]: out[k] }) === null) kept = true;
+    else delete out[k];
   }
   return out as XAPIAgent;
 }
@@ -294,7 +295,6 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       await this.publisher.init();
     } catch (err) {
       this.publisher = null;
-      this.actor = null;
       throw err;
     }
     return this.publisher;

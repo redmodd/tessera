@@ -234,6 +234,54 @@ describe('XAPIAdapter', () => {
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
   });
+  it('falls through to the mbox_sha1sum when the mbox has no mailto: scheme', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        mbox: ['learner@example.com'],
+        mbox_sha1sum: ['a'.repeat(40)],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox_sha1sum: 'a'.repeat(40),
+    });
+  });
+
+  it('drops a non-string name', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        name: [{ given: 'Jo' }],
+        account: [{ accountServiceHomePage: 'http://lms', accountName: 'l1' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      account: { homePage: 'http://lms', name: 'l1' },
+    });
+  });
+
   it('falls through to the mbox when the account has no homePage', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
