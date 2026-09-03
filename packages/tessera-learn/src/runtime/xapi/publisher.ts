@@ -114,6 +114,8 @@ export class XAPIPublisher {
   // Actor — object or resolver. Resolved during init and cached.
   readonly #actorValue: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>);
   #cachedActor: XAPIAgent | null = null;
+  /** Why the actor is unusable, so post-init reads report the real cause. */
+  #actorError: string | null = null;
   #initPromise: Promise<void> | null = null;
 
   // Sequential send chain — chains promises so statements arrive at the
@@ -180,11 +182,14 @@ export class XAPIPublisher {
         );
       }
       const err = validateAgent(resolved);
-      if (err) throw new XAPIConfigError(joinFieldError('xapi.actor', err));
+      if (err) throw this.#rejectActor(joinFieldError('xapi.actor', err));
       this.#cachedActor = resolved as XAPIAgent;
     } else if (this.#cachedActor) {
       const err = validateAgent(this.#cachedActor);
-      if (err) throw new XAPIConfigError(joinFieldError('xapi.actor', err));
+      if (err) {
+        this.#cachedActor = null;
+        throw this.#rejectActor(joinFieldError('xapi.actor', err));
+      }
     } else {
       throw new XAPIConfigError('xapi.actor is required');
     }
@@ -198,11 +203,17 @@ export class XAPIPublisher {
     }
   }
 
+  #rejectActor(message: string): XAPIConfigError {
+    this.#actorError = message;
+    return new XAPIConfigError(message);
+  }
+
   /** Returns the cached actor. Must be called after `init()` resolves. */
   getActor(): XAPIAgent {
     if (!this.#cachedActor) {
       throw new XAPIConfigError(
-        'XAPIPublisher.getActor() called before init() resolved. Await publisher.init() before reading the actor.',
+        this.#actorError ??
+          'XAPIPublisher.getActor() called before init() resolved. Await publisher.init() before reading the actor.',
       );
     }
     return this.#cachedActor;

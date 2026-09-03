@@ -17,8 +17,7 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
     this.authToken = (params.get('auth') || '').replace(/^Basic\s+/i, '');
     this.parseActorParam(params.get('actor') || '');
 
-    const publisher = this.createPublisher({});
-    await publisher.init();
+    await this.createPublisher({});
 
     this.sendInitialized();
     await this.loadResumeState();

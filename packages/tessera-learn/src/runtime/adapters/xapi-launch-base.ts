@@ -7,6 +7,7 @@ import {
 } from '../interaction-format.js';
 import { formatISO8601Duration } from './format.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
+import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
 
 export const VERBS = {
@@ -17,6 +18,43 @@ export const VERBS = {
   failed: 'http://adlnet.gov/expapi/verbs/failed',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
 } as const;
+
+/** Some LMSes send `actor` in xAPI Person shape (seen from SCORM Cloud). */
+function normalizeLaunchActor(parsed: Record<string, unknown>): XAPIAgent {
+  const out: Record<string, unknown> = {};
+  for (const k of [
+    'objectType',
+    'name',
+    'mbox',
+    'mbox_sha1sum',
+    'openid',
+    'account',
+  ]) {
+    const v = Array.isArray(parsed[k]) ? parsed[k][0] : parsed[k];
+    if (v !== undefined) out[k] = v;
+  }
+  if (Array.isArray(parsed.member) && parsed.member.length > 0) {
+    out.member = parsed.member;
+  }
+  if (out.account !== undefined) {
+    const acc = out.account as Record<string, unknown> | null;
+    out.account = {
+      homePage: acc?.homePage ?? acc?.accountServiceHomePage,
+      name: acc?.name ?? acc?.accountName,
+    };
+  }
+  if (typeof out.name !== 'string') delete out.name;
+  if (out.objectType !== undefined && out.member === undefined) {
+    out.objectType = 'Agent';
+  }
+  let kept = false;
+  for (const k of ['account', 'mbox', 'mbox_sha1sum', 'openid']) {
+    if (out[k] === undefined) continue;
+    if (!kept && validateAgent({ [k]: out[k] }) === null) kept = true;
+    else delete out[k];
+  }
+  return out as XAPIAgent;
+}
 
 const CMI_INTERACTION_TYPE =
   'http://adlnet.gov/expapi/activities/cmi.interaction';
@@ -225,7 +263,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('actor must be an object');
       }
-      this.actor = parsed as XAPIAgent;
+      const actor = normalizeLaunchActor(parsed as Record<string, unknown>);
+      const invalid = validateAgent(actor);
+      if (invalid) throw new Error(joinFieldError('actor', invalid));
+      this.actor = actor;
     } catch (err) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
@@ -235,10 +276,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   /** Construct the publisher from the resolved launch fields plus per-profile options. */
-  protected createPublisher(opts: {
+  protected async createPublisher(opts: {
     sessionId?: string;
     cmi5Mode?: boolean;
-  }): XAPIPublisher {
+  }): Promise<XAPIPublisher> {
     if (!this.actor) {
       throw new Error(
         `Tessera ${this.logName}: cannot create publisher before the launch actor is resolved.`,
@@ -253,6 +294,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       version: this.version,
       ...opts,
     });
+    try {
+      await this.publisher.init();
+    } catch (err) {
+      this.publisher = null;
+      throw err;
+    }
     return this.publisher;
   }
 

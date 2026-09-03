@@ -28,6 +28,9 @@ export function validateAgent(actor: unknown): string | null {
   if (Array.isArray(a.member) && a.member.length > 0) {
     return 'is a Group (has `member`); v1 supports Identified Agents only';
   }
+  if (a.objectType !== undefined && a.objectType !== 'Agent') {
+    return '.objectType must be "Agent"';
+  }
   let count = 0;
   if (a.mbox !== undefined) count++;
   if (a.mbox_sha1sum !== undefined) count++;

@@ -198,13 +198,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
     }
 
+    await this.createPublisher({ sessionId, cmi5Mode: true });
+
     // cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict
     // LRSes track the GET and reject Initialized otherwise. A 404 here
     // is legitimate (no prefs set); the GET itself is what's required.
     await this.#fetchLearnerPreferences();
-
-    const publisher = this.createPublisher({ sessionId, cmi5Mode: true });
-    await publisher.init();
 
     // cmi5 §9.3.2 — queue Initialized before the resume State GET so a slow
     // LRS can't push it past the spec's "reasonable period".

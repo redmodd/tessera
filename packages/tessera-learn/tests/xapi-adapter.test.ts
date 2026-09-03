@@ -46,6 +46,184 @@ describe('XAPIAdapter', () => {
     expect(headers.get('Authorization')).toBe('Basic Zm9vOmJhcg==');
   });
 
+  it('reshapes an array-shaped launch actor into an Agent', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        name: ['Learner Name'],
+        account: [
+          {
+            accountServiceHomePage: 'http://cloud.scorm.com',
+            accountName: 'APPID|learner@example.com',
+          },
+        ],
+        objectType: 'Agent',
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      name: 'Learner Name',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
+      objectType: 'Agent',
+    });
+    const stateUrl = String(
+      fetchMock.mock.calls.find(([u]) =>
+        String(u).includes('activities/state'),
+      )![0],
+    );
+    expect(stateUrl).toContain(encodeURIComponent('"homePage"'));
+  });
+
+  it('reshapes a Person with several IFIs down to its account', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        name: ['Learner Name'],
+        mbox: ['mailto:learner@example.com'],
+        account: [
+          {
+            accountServiceHomePage: 'http://cloud.scorm.com',
+            accountName: 'APPID|learner@example.com',
+          },
+        ],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      name: 'Learner Name',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
+    });
+  });
+
+  it('keeps the account when a Person-shaped actor is labelled Agent', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Agent',
+        name: ['Learner Name'],
+        mbox: ['mailto:learner@example.com'],
+        account: [
+          {
+            accountServiceHomePage: 'http://cloud.scorm.com',
+            accountName: 'APPID|learner@example.com',
+          },
+        ],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      name: 'Learner Name',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
+    });
+  });
+
+  it('normalizes a member-less Group launch actor to an Agent', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        name: 'Learner Name',
+        account: {
+          homePage: 'http://cloud.scorm.com',
+          name: 'APPID|learner@example.com',
+        },
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor.objectType).toBe('Agent');
+  });
+
+  it('maps account key aliases on an unwrapped account object', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Agent',
+        name: 'Learner Name',
+        account: {
+          accountServiceHomePage: 'http://cloud.scorm.com',
+          accountName: 'APPID|learner@example.com',
+        },
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      name: 'Learner Name',
+      account: {
+        homePage: 'http://cloud.scorm.com',
+        name: 'APPID|learner@example.com',
+      },
+    });
+  });
+
+  it('sends nothing after init rejects an actor it cannot reshape', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ name: 'Learner Name' }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await expect(adapter.init()).rejects.toThrow(/actor/);
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      fetchMock.mock.calls.find(([u]) => String(u).includes('/statements')),
+    ).toBeFalsy();
+  });
+
   it('throws on malformed actor JSON', async () => {
     launch({
       endpoint: 'https://lrs/',
@@ -55,5 +233,206 @@ describe('XAPIAdapter', () => {
     });
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
+  });
+  it('falls through to the mbox_sha1sum when the mbox has no mailto: scheme', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        mbox: ['learner@example.com'],
+        mbox_sha1sum: ['a'.repeat(40)],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox_sha1sum: 'a'.repeat(40),
+    });
+  });
+
+  it('drops a non-string name', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        name: [{ given: 'Jo' }],
+        account: [{ accountServiceHomePage: 'http://lms', accountName: 'l1' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      account: { homePage: 'http://lms', name: 'l1' },
+    });
+  });
+
+  it('falls through to the mbox when the account has no homePage', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        name: ['Learner Name'],
+        mbox: ['mailto:learner@example.com'],
+        account: [{ accountName: 'APPID|learner@example.com' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      name: 'Learner Name',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('falls through to the mbox when the account is null', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        account: null,
+        mbox: 'mailto:learner@example.com',
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('falls through to the mbox when the account homePage is not a URL', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Person',
+        mbox: ['mailto:learner@example.com'],
+        account: [{ accountServiceHomePage: '/lms', accountName: 'learner' }],
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('drops keys the LMS invented, including a non-array member', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        member: { mbox: 'mailto:other@example.com' },
+        mbox: 'mailto:learner@example.com',
+        lmsUserId: 42,
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      mbox: 'mailto:learner@example.com',
+    });
+  });
+
+  it('rejects a launch actor left with no IFI, blaming the launch param', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ objectType: 'Person', name: ['Learner Name'] }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    await expect(new XAPIAdapter().init()).rejects.toThrow(
+      /launch parameter 'actor' is malformed \(actor: must have one of mbox/,
+    );
+    expect(
+      fetchMock.mock.calls.filter(([u]) => String(u).includes('/xapi')),
+    ).toHaveLength(0);
+  });
+
+  it('drops an empty member array instead of reading it as a Group', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({
+        objectType: 'Group',
+        member: [],
+        account: { homePage: 'http://cloud.scorm.com', name: 'APPID|l' },
+      }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 0));
+    const send = fetchMock.mock.calls.find(([u]) =>
+      String(u).includes('/statements'),
+    );
+    expect(JSON.parse(send![1].body).actor).toEqual({
+      objectType: 'Agent',
+      account: { homePage: 'http://cloud.scorm.com', name: 'APPID|l' },
+    });
+  });
+
+  it('stops State API writes after the actor fails validation', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ name: 'Learner Name' }),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await expect(adapter.init()).rejects.toThrow(/actor/);
+    adapter.saveState({ page: 1 } as never);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      fetchMock.mock.calls.find(([u]) =>
+        String(u).includes('activities/state'),
+      ),
+    ).toBeFalsy();
   });
 });
