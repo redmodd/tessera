@@ -46,7 +46,7 @@ describe('XAPIAdapter', () => {
     expect(headers.get('Authorization')).toBe('Basic Zm9vOmJhcg==');
   });
 
-  it('reshapes the SCORM Cloud array-shaped launch actor', async () => {
+  it('reshapes an array-shaped launch actor into an Agent', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',
       auth: 'Basic Zm9vOmJhcg==',

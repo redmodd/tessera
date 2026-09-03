@@ -18,7 +18,7 @@ export const VERBS = {
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
 } as const;
 
-/** SCORM Cloud's test launch sends `actor` in xAPI Person shape. */
+/** Some LMSes send `actor` in xAPI Person shape (seen from SCORM Cloud). */
 const IFIS = ['mbox', 'mbox_sha1sum', 'openid', 'account'] as const;
 
 function normalizeLaunchActor(
