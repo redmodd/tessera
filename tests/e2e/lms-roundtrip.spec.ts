@@ -208,6 +208,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       ).filter(
         (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
       );
+    await page.waitForTimeout(300);
     expect(await interactionWrites()).toEqual([]);
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
@@ -851,6 +852,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       statements.filter(
         (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
       );
+    await page.waitForTimeout(300);
     expect(answered()).toEqual([]);
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');

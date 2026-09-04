@@ -145,12 +145,12 @@
           disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
         >
-          {#if !isImmediateMode}
-            Next
-          {:else if currentQuestion?.feedbackVisible}
+          {#if needsReveal(currentQuestion)}
+            Submit
+          {:else if isImmediateMode && currentQuestion?.feedbackVisible}
             Next Question
           {:else}
-            Submit
+            Next
           {/if}
         </button>
       {:else if needsReveal(currentQuestion)}
