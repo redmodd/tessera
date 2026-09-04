@@ -145,16 +145,20 @@
           disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
         >
-          {currentQuestion?.feedbackVisible && isImmediateMode
-            ? 'Continue'
-            : 'Next'}
+          {#if !isImmediateMode}
+            Next
+          {:else if currentQuestion?.feedbackVisible}
+            Next Question
+          {:else}
+            Submit Answer
+          {/if}
         </button>
       {:else if needsReveal(currentQuestion)}
         <button
           class="tessera-quiz-btn tessera-btn-primary"
           onclick={revealCurrent}
         >
-          Check Answer
+          Submit Answer
         </button>
       {:else}
         <button
@@ -162,7 +166,7 @@
           disabled={!handle.canSubmit}
           onclick={handleSubmit}
         >
-          Submit
+          {isImmediateMode ? 'See Results' : 'Submit'}
         </button>
       {/if}
     </div>
