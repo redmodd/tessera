@@ -139,7 +139,7 @@ test.describe('Persistence — localStorage', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
-    await expect(primaryBtn).toHaveText('Submit Answer');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click(); // show feedback
     await expect(primaryBtn).toHaveText('Next Question');
     await primaryBtn.click(); // advance
@@ -149,7 +149,7 @@ test.describe('Persistence — localStorage', () => {
     await page
       .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
       .fill('blue');
-    await expect(primaryBtn).toHaveText('Submit Answer');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click();
     await expect(primaryBtn).toHaveText('Next Question');
     await primaryBtn.click();
@@ -175,7 +175,7 @@ test.describe('Persistence — localStorage', () => {
       await expect(matched).toHaveCount(expectedMatches);
     }
 
-    await expect(primaryBtn).toHaveText('Submit Answer');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click();
 
     const submitBtn = page.locator('.tessera-quiz-btn-submit');

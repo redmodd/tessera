@@ -150,7 +150,7 @@
           {:else if currentQuestion?.feedbackVisible}
             Next Question
           {:else}
-            Submit Answer
+            Submit
           {/if}
         </button>
       {:else if needsReveal(currentQuestion)}
@@ -158,7 +158,7 @@
           class="tessera-quiz-btn tessera-btn-primary"
           onclick={revealCurrent}
         >
-          Submit Answer
+          Submit
         </button>
       {:else}
         <button

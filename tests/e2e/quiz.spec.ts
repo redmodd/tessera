@@ -63,20 +63,20 @@ async function answerMatching(page: Page, matchMap: Record<string, string>) {
 
 /**
  * Advance past one immediate-feedback question. The primary button cycles:
- *   - mid-quiz: "Submit Answer" (with answer) → first click reveals feedback and
+ *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
  *     relabels to "Next Question" → second click advances.
- *   - last question: "Submit Answer" → click reveals feedback → primary button
+ *   - last question: "Submit" → click reveals feedback → primary button
  *     becomes the "See Results" button.
  * We wait on the label text to change instead of sleeping.
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
   const btn = primaryBtn(page);
   if (isLast) {
-    await expect(btn).toHaveText('Submit Answer');
+    await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
   } else {
-    await expect(btn).toHaveText('Submit Answer');
+    await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(btn).toHaveText('Next Question');
     await btn.click();
