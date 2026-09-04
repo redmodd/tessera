@@ -92,12 +92,16 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#internalQuestions.length;
   }
 
+  #isComplete(i: number): boolean {
+    return this.#internalQuestions[i].complete?.() ?? true;
+  }
+
   get #allAnswered(): boolean {
     void this.#answersVersion;
     return (
       this.#totalQuestions > 0 &&
       this.#internalQuestions.every(
-        (q, i) => this.#answers.has(i) && (q.complete?.() ?? true),
+        (_, i) => this.#answers.has(i) && this.#isComplete(i),
       )
     );
   }
@@ -337,7 +341,7 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.getAnswer(i);
       },
       get answerComplete() {
-        return engine.#internalQuestions[i].complete?.() ?? true;
+        return engine.#isComplete(i);
       },
       get feedbackVisible() {
         return engine.feedbackVisible(i);

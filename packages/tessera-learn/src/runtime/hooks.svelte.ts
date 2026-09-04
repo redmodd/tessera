@@ -24,11 +24,7 @@ export interface Question {
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
-  /**
-   * False while the answer is only partially built (e.g. two of five pairs
-   * matched). Widgets that accept an answer incrementally report this so the
-   * shell does not offer to finalise a half-filled response.
-   */
+  /** False while the answer is only partly built (2 of 5 pairs matched). */
   readonly answerComplete: boolean;
   /** Whether feedback should currently render for this question. */
   readonly feedbackVisible: boolean;

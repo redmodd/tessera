@@ -723,14 +723,16 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answeredStatements = statements.filter(
+    const answered = statements.filter(
       (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
     );
-    expect(answeredStatements).toHaveLength(3);
-    expect(
-      answeredStatements.map((s) => s.object?.definition?.interactionType),
-    ).toEqual(['choice', 'fill-in', 'matching']);
-    for (const s of answeredStatements) {
+    expect(answered).toHaveLength(3);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
+    for (const s of answered) {
       expect(String(s.object?.id)).toMatch(
         /^http:\/\/tessera\.test\/activity\/course-1#/,
       );
@@ -849,18 +851,16 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .nth(1)
       .click();
 
-    const answered = () =>
+    const answeredSoFar = () =>
       statements.filter(
         (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
       );
     await page.waitForTimeout(300);
-    expect(answered()).toEqual([]);
+    expect(answeredSoFar()).toEqual([]);
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
-    await page.waitForTimeout(300);
-
-    await expect.poll(() => answered().length, { timeout: 5000 }).toBe(1);
+    await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(1);
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -896,7 +896,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await submit.waitFor({ state: 'visible', timeout: 5000 });
 
     // Every answer was revealed, so every answer is already reported.
-    await expect.poll(() => answered().length, { timeout: 5000 }).toBe(3);
+    await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(3);
 
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
@@ -921,11 +921,13 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
 
-    const answeredStatements = answered();
-    expect(answeredStatements).toHaveLength(3);
-    expect(
-      answeredStatements.map((s) => s.object?.definition?.interactionType),
-    ).toEqual(['choice', 'fill-in', 'matching']);
+    const answered = answeredSoFar();
+    expect(answered).toHaveLength(3);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
 
     // Dispatch pagehide synchronously — the exit handler drains the queue and
     // fires Terminated as the final statement of the session.
