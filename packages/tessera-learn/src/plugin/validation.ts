@@ -685,9 +685,11 @@ function validateSingleXAPIEntry(
     // 'lms' inherits the LRS from the launch — only the launch-based
     // standards (cmi5, plain xAPI) carry one.
     if (standard !== 'cmi5' && standard !== 'xapi') {
-      d.error(
-        `course.config.js: ${label}.endpoint: 'lms' requires export.standard: 'cmi5' or 'xapi' (you have "${standard}"). ` +
-          'Either change the export standard or specify an explicit LRS endpoint.',
+      // Only cmi5/xAPI launches carry an LRS to inherit. The runtime drops the
+      // entry, so one config can still export to every standard.
+      d.warn(
+        `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${standard}" — ` +
+          'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
       );
     }
     // Forbid extra fields — everything is inherited from the launch.

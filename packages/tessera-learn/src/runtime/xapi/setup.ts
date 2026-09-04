@@ -88,16 +88,15 @@ function makeSCORMDevFallbackPublisher(
   return makeRejectingPublisher(() => new XAPISCORMDevFallbackError(standard));
 }
 
-/**
- * Resolve a single `XAPIConfig` entry into a destination source. Returns
- * null when the entry can't materialize (e.g., 'lms' with no cmi5
- * adapter present in non-cmi5 export modes — the validator should have
- * caught this at build time).
- */
 type ActorResolution =
   | { kind: 'actor'; value: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>) }
   | { kind: 'scorm-fallback'; standard: 'scorm12' | 'scorm2004' };
 
+/**
+ * Resolve a single `XAPIConfig` entry into a destination source. Returns null
+ * when the entry can't materialize, which includes the supported case of
+ * `endpoint: 'lms'` under a non-launch export standard.
+ */
 function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
@@ -106,7 +105,6 @@ function resolveDestination(
   if (entry.endpoint === 'lms') {
     const standard = config.export?.standard;
     if (standard !== 'cmi5' && standard !== 'xapi') {
-      // Build-time validator should reject this; defense in depth at runtime.
       console.warn(
         "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under a non-launch export.",
       );
