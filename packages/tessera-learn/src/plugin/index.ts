@@ -65,6 +65,13 @@ interface A11yCompilerState {
   settings: A11ySettings;
 }
 
+// Gates post-build side effects (asset copy, packaging) on a bundle that wrote
+// cleanly. Set from the enforce:'post' plugin, so a throw in an earlier
+// writeBundle leaves it closed.
+interface BuildState {
+  written: boolean;
+}
+
 // Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
 // in build and may be absolute or a virtual id elsewhere. Return the
 // project-relative path for a real author file, or null to skip framework /
@@ -132,6 +139,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     isBuild: false,
     settings: normalizeA11y(undefined),
   };
+  const build = { written: false };
   return [
     svelte({
       compilerOptions: { css: 'external' },
@@ -153,7 +161,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     }),
     tesseraA11yCompilerPlugin(a11y),
     tesseraValidationPlugin(standardOverride),
-    tesseraEntryPlugin(standardOverride),
+    tesseraEntryPlugin(standardOverride, build),
     tesseraConfigDefaultsPlugin(),
     tesseraConfigPlugin(standardOverride),
     tesseraPagesPlugin(),
@@ -163,7 +171,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraAdapterPlugin(standardOverride),
     tesseraXAPISetupPlugin(standardOverride),
     tesseraFirstPagePreloadPlugin(manifestRef),
-    tesseraExportPlugin(standardOverride),
+    tesseraExportPlugin(standardOverride, build),
   ];
 }
 
@@ -174,7 +182,10 @@ const RESOLVED_ENTRY_ID = '\0' + VIRTUAL_ENTRY_ID;
 const VIRTUAL_MAIN_ID = '/virtual:tessera-main';
 const RESOLVED_MAIN_ID = '\0virtual:tessera-main';
 
-function tesseraEntryPlugin(standardOverride?: string): Plugin {
+function tesseraEntryPlugin(
+  standardOverride: string | undefined,
+  build: BuildState,
+): Plugin {
   const runtimeDir = resolveRuntimeDir();
   const stylesDir = resolveStylesDir();
   const appSveltePath = resolve(runtimeDir, 'App.svelte');
@@ -213,6 +224,8 @@ function tesseraEntryPlugin(standardOverride?: string): Plugin {
             unlinkSync(htmlPath);
           } catch {}
         }
+
+        if (!build.written) return;
 
         // Copy assets/ into the build's assets/ so $assets/ references resolve
         const assetsDir = resolve(projectRoot, 'assets');
@@ -516,7 +529,10 @@ function runValidation(projectRoot: string, standardOverride?: string): void {
 
 // ---------- Export Plugin ----------
 
-function tesseraExportPlugin(standardOverride?: string): Plugin {
+function tesseraExportPlugin(
+  standardOverride: string | undefined,
+  build: BuildState,
+): Plugin {
   let projectRoot: string;
   let isBuild = false;
 
@@ -529,9 +545,16 @@ function tesseraExportPlugin(standardOverride?: string): Plugin {
       isBuild = config.command === 'build';
     },
 
+    writeBundle() {
+      build.written = true;
+    },
+
     async closeBundle() {
+      const written = build.written;
+      build.written = false;
       if (!isBuild) return;
       if (isAuditBuild()) return;
+      if (!written) return;
 
       const read = readResolvedConfig(projectRoot, standardOverride);
       if (!read.ok) {
