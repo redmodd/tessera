@@ -669,6 +669,7 @@ interface Question {
   readonly submitted: boolean;
   readonly correct: boolean | null;
   readonly answer: unknown;
+  readonly answerComplete: boolean; // false while the answer is only partly built (2 of 5 pairs matched)
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
   readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
@@ -679,6 +680,8 @@ interface Question {
 ```
 
 Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "already correct" banner.
+
+A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
 `Interaction` uses SCORM 2004 vocabulary: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
 
@@ -717,6 +720,7 @@ function useQuestion(opts: {
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
+  complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op

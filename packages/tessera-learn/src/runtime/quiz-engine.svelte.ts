@@ -95,7 +95,10 @@ export class QuizEngine implements UseQuizInternalHandle {
   get #allAnswered(): boolean {
     void this.#answersVersion;
     return (
-      this.#totalQuestions > 0 && this.#answers.size >= this.#totalQuestions
+      this.#totalQuestions > 0 &&
+      this.#internalQuestions.every(
+        (q, i) => this.#answers.has(i) && (q.complete?.() ?? true),
+      )
     );
   }
 

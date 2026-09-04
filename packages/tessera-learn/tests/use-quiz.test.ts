@@ -116,6 +116,21 @@ describe('QuizEngine', () => {
     expect(engine.canSubmit).toBe(true);
   });
 
+  it('canSubmit stays false while an answer is only partially built', () => {
+    const { engine } = makeEngine();
+    let filled = 0;
+    engine.registerQuestion({
+      ...tfQuestion('a', true, true),
+      complete: () => filled === 2,
+    });
+    engine.registerQuestion(tfQuestion('b', true, true));
+    engine.setAnswer(0, true);
+    engine.setAnswer(1, true);
+    expect(engine.canSubmit).toBe(false);
+    filled = 2;
+    expect(engine.canSubmit).toBe(true);
+  });
+
   it('submit() dispatches tessera-quiz-complete with the rolled-up score', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct

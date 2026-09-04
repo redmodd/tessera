@@ -41,6 +41,7 @@
     get maxRetries() {
       return maxRetries;
     },
+    complete: () => inputValue.trim() !== '',
     response: () => ({
       type: 'fill-in',
       response: inputValue,
