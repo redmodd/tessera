@@ -484,9 +484,11 @@
     <ErrorPage error={pageError} onretry={retryPage} />
   {:else if PageComponent}
     {#if pageContext.quiz}
-      <Quiz>
-        <PageComponent />
-      </Quiz>
+      {#key renderedPageIndex}
+        <Quiz>
+          <PageComponent />
+        </Quiz>
+      {/key}
     {:else}
       <PageComponent />
     {/if}
