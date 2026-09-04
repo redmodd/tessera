@@ -44,12 +44,17 @@
   function goNextQuestion() {
     // Immediate-mode: first click reveals feedback, second advances.
     if (needsReveal(currentQuestion)) {
-      handle.revealFeedback(currentQuestion);
+      revealCurrent();
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
     }
+  }
+
+  function revealCurrent() {
+    currentQuestion.commit();
+    handle.revealFeedback(currentQuestion);
   }
 
   function goPrevQuestion() {
@@ -147,7 +152,7 @@
       {:else if needsReveal(currentQuestion)}
         <button
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={() => handle.revealFeedback(currentQuestion)}
+          onclick={revealCurrent}
         >
           Check Answer
         </button>

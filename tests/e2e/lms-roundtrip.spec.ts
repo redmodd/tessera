@@ -201,9 +201,20 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
+
+    const interactionWrites = async () =>
+      (
+        (await page.evaluate(() => (window as any).__scormLog)) as string[][]
+      ).filter(
+        (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
+      );
+    expect(await interactionWrites()).toEqual([]);
+
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click(); // immediate feedback
     await page.waitForTimeout(300);
+
+    expect((await interactionWrites()).length).toBeGreaterThan(0);
     await primary.click(); // continue
     await page.waitForTimeout(300);
 
@@ -240,15 +251,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Nothing is reported before the learner submits.
-    const preSubmitLog = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    expect(
-      preSubmitLog.filter(
-        (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
-      ),
-    ).toEqual([]);
+    // Every answer was revealed, so every answer is already reported.
+    const preSubmitIds = new Set(
+      (await interactionWrites()).map((e) => e[1].split('.')[2]),
+    );
+    expect(preSubmitIds.size).toBe(3);
 
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
@@ -714,16 +721,14 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answered = statements.filter(
+    const answeredStatements = statements.filter(
       (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
     );
-    expect(answered).toHaveLength(3);
-    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
-      'choice',
-      'fill-in',
-      'matching',
-    ]);
-    for (const s of answered) {
+    expect(answeredStatements).toHaveLength(3);
+    expect(
+      answeredStatements.map((s) => s.object?.definition?.interactionType),
+    ).toEqual(['choice', 'fill-in', 'matching']);
+    for (const s of answeredStatements) {
       expect(String(s.object?.id)).toMatch(
         /^http:\/\/tessera\.test\/activity\/course-1#/,
       );
@@ -841,9 +846,18 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
+
+    const answered = () =>
+      statements.filter(
+        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+      );
+    expect(answered()).toEqual([]);
+
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
     await page.waitForTimeout(300);
+
+    await expect.poll(() => answered().length, { timeout: 5000 }).toBe(1);
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -878,12 +892,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Nothing is reported before the learner submits.
-    expect(
-      statements.filter(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-      ),
-    ).toEqual([]);
+    // Every answer was revealed, so every answer is already reported.
+    await expect.poll(() => answered().length, { timeout: 5000 }).toBe(3);
 
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
@@ -908,15 +918,11 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
 
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
-    expect(answered).toHaveLength(3);
-    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
-      'choice',
-      'fill-in',
-      'matching',
-    ]);
+    const answeredStatements = answered();
+    expect(answeredStatements).toHaveLength(3);
+    expect(
+      answeredStatements.map((s) => s.object?.definition?.interactionType),
+    ).toEqual(['choice', 'fill-in', 'matching']);
 
     // Dispatch pagehide synchronously — the exit handler drains the queue and
     // fires Terminated as the final statement of the session.

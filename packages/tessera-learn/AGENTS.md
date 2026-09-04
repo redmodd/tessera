@@ -343,13 +343,13 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                        |
-| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                     |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                        |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                       |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: after `revealFeedback(q)`, locks the answer. `review`: post-submit only. `never`: off |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked       |
+| Field           | Type                                 | Default    | Description                                                                                                       |
+| --------------- | ------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                    |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                       |
+| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                      |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: after `revealFeedback(q)`, locks the answer and reports it. `review`: post-submit only. `never`: off |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked                      |
 
 ### Per-question weighting
 
@@ -674,7 +674,7 @@ interface Question {
   readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void; // report this answer to the LMS now. Idempotent. Only for a shell with no Submit button.
+  commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
 }
 ```
 
@@ -735,7 +735,7 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
 
-**Report on submit, not on click.** Widgets call `setAnswer()` only; an answer reaches the LMS when `submit()` runs. Exception: a shell with no Submit button, where the click is the submission, calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`.
+**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {

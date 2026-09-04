@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Report quiz answers to the LMS when the learner submits, not when they click an option.
+Report a quiz answer when it becomes final (immediate-mode reveal, or submit) rather than on the option click.
