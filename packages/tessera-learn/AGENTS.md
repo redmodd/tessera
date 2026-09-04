@@ -849,7 +849,7 @@ xapi: {
   activityId: 'https://example.com/courses/intro-to-x',
 }
 
-// cmi5 / xapi only: inherit the LMS launch LRS:
+// Inherit the LMS launch LRS (cmi5 / xapi; ignored under other standards):
 xapi: { endpoint: 'lms' }
 
 // Fan out (at most one 'lms' entry):
@@ -863,13 +863,13 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 
 ### Per-mode behaviour
 
-| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'` | `xapi: {endpoint, ...}` (explicit)                      |
-| ------------- | ------------------ | ---------------------- | ------------------------------------------------------- |
-| **cmi5**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
-| **xapi**      | `useXAPI()` → null | Inherits launch LRS    | Independent publisher; `actor` defaults to launch actor |
-| **scorm12**   | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.core.student_id` |
-| **scorm2004** | `useXAPI()` → null | **Config error**       | Independent; `actor` derived from `cmi.learner_id`      |
-| **web**       | `useXAPI()` → null | **Config error**       | Independent; `actor` **required** in config             |
+| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'`  | `xapi: {endpoint, ...}` (explicit)                      |
+| ------------- | ------------------ | ----------------------- | ------------------------------------------------------- |
+| **cmi5**      | `useXAPI()` → null | Inherits launch LRS     | Independent publisher; `actor` defaults to launch actor |
+| **xapi**      | `useXAPI()` → null | Inherits launch LRS     | Independent publisher; `actor` defaults to launch actor |
+| **scorm12**   | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.core.student_id` |
+| **scorm2004** | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.learner_id`      |
+| **web**       | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` **required** in config             |
 
 ### Gotchas
 
