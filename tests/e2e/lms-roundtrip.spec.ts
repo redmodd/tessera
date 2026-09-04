@@ -239,6 +239,17 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Nothing is reported before the learner submits.
+    const preSubmitLog = (await page.evaluate(
+      () => (window as any).__scormLog,
+    )) as string[][];
+    expect(
+      preSubmitLog.filter(
+        (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
+      ),
+    ).toEqual([]);
+
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
@@ -866,6 +877,14 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Nothing is reported before the learner submits.
+    expect(
+      statements.filter(
+        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+      ),
+    ).toEqual([]);
+
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 

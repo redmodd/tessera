@@ -126,7 +126,6 @@
 
     if (inQuiz) {
       q.setAnswer(new Map(matches));
-      if (matches.size === pairs.length) q.commit();
     } else if (matches.size === pairs.length && !q.submitted) {
       q.submit();
     }

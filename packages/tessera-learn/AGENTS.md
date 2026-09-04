@@ -674,7 +674,7 @@ interface Question {
   readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void; // mark answer final; triggers the per-question LMS write. Idempotent.
+  commit(): void; // report this answer to the LMS now. Idempotent. Only for a shell with no Submit button.
 }
 ```
 
@@ -706,14 +706,14 @@ response: () => ({
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `commit()` when final, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. `submit()`/`retry()` are no-ops here.
+- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
 - **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id
   graded?: boolean; // standalone only
-  response: () => Interaction; // current answer; called on each commit() and on submit
+  response: () => Interaction; // current answer; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
@@ -733,7 +733,9 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 ### `useQuiz`
 
-Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Question widgets call `q.commit()` when final; that triggers the per-question LMS write. `submit()` commits any uncommitted questions, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
+Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
+
+**Report on submit, not on click.** Widgets call `setAnswer()` only; an answer reaches the LMS when `submit()` runs. Exception: a shell with no Submit button, where the click is the submission, calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -1056,7 +1058,7 @@ Always submit through `useQuiz().submit()`.
 
 ### Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, calls `commit()` when final, and reads `locked`/`feedbackVisible`/`answer`.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. Reporting is `useQuiz().submit()`'s job.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
@@ -1085,7 +1087,6 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     if (q.locked) return;
     selected = i;
     q.setAnswer(i);
-    q.commit();
   }
 </script>
 

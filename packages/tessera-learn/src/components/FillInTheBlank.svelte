@@ -61,11 +61,6 @@
     if (inQuiz) q.setAnswer(inputValue);
   }
 
-  function handleBlur() {
-    if (!inQuiz || q.locked) return;
-    if (inputValue.trim()) q.commit();
-  }
-
   function handleKeydown(e) {
     if (inQuiz || q.submitted) return;
     if (e.key === 'Enter' && inputValue.trim()) {
@@ -87,7 +82,6 @@
       value={inputValue}
       oninput={handleInput}
       onkeydown={handleKeydown}
-      onblur={handleBlur}
       disabled={q.locked}
       placeholder="Type your answer..."
       autocomplete="off"

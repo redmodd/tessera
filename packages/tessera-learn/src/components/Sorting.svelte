@@ -102,7 +102,6 @@
     cardSelected = false;
     if (inQuiz) {
       q.setAnswer(new Map(placements));
-      if (placements.size === items.length) q.commit();
     }
   }
 
