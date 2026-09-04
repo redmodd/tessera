@@ -753,12 +753,14 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
 
       const read = readResolvedConfig(projectRoot, standardOverride);
       const standard = read.standard;
-      const hasXapi = read.ok && read.config.xapi != null;
+      const entries =
+        read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
+      const hasExplicit = entries.some((e) => e?.endpoint !== 'lms');
 
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of
       // explicit xapi config.
-      if (hasXapi || standard === 'cmi5' || standard === 'xapi') {
+      if (hasExplicit || standard === 'cmi5' || standard === 'xapi') {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 

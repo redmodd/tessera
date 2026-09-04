@@ -82,28 +82,34 @@ describe('xapi config validation — endpoint: lms', () => {
     expect(errors.filter((e) => e.includes("endpoint: 'lms'"))).toEqual([]);
   });
 
-  it('errors on xapi.endpoint: "lms" under web export', () => {
+  it('warns, and does not error, on xapi.endpoint: "lms" under web export', () => {
     testRoot = projectWith(`{ endpoint: "lms" }`, 'web');
-    const { errors } = validateProject(testRoot);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
     expect(
-      errors.find((e) => e.includes("'lms' requires export.standard: 'cmi5'")),
+      warnings.find((w) => w.includes("endpoint: 'lms' has no launch LRS")),
     ).toBeDefined();
   });
 
-  it('errors on xapi.endpoint: "lms" under scorm12 export', () => {
-    testRoot = projectWith(`{ endpoint: "lms" }`, 'scorm12');
-    const { errors } = validateProject(testRoot);
-    expect(errors.find((e) => e.includes('scorm12'))).toBeDefined();
-  });
+  it.each(['scorm12', 'scorm2004'])(
+    'warns, and does not error, on xapi.endpoint: "lms" under %s export',
+    (standard) => {
+      testRoot = projectWith(`{ endpoint: "lms" }`, standard);
+      const { errors, warnings } = validateProject(testRoot);
+      expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
+      expect(warnings.find((w) => w.includes(standard))).toBeDefined();
+    },
+  );
 
-  it('errors on endpoint: "lms" when --standard overrides cmi5 to web', () => {
+  it('warns on endpoint: "lms" when --standard overrides cmi5 to scorm12', () => {
     testRoot = projectWith(`{ endpoint: "lms" }`, 'cmi5');
     expect(
-      validateProject(testRoot).errors.filter((e) => e.includes('xapi')),
+      validateProject(testRoot).warnings.filter((w) => w.includes('xapi')),
     ).toEqual([]);
-    const { errors } = validateProject(testRoot, 'web');
+    const { errors, warnings } = validateProject(testRoot, 'scorm12');
+    expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
     expect(
-      errors.find((e) => e.includes("'lms' requires export.standard: 'cmi5'")),
+      warnings.find((w) => w.includes("endpoint: 'lms' has no launch LRS")),
     ).toBeDefined();
   });
 
