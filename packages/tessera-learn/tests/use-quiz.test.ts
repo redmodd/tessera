@@ -477,13 +477,27 @@ describe('QuizEngine', () => {
     }
   });
 
+  it('stays quiet about incomplete answers when no question registered', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { engine } = makeEngine();
+      engine.submit();
+      const matched = warn.mock.calls.some((args) =>
+        args.some((a) => typeof a === 'string' && /only partly built/i.test(a)),
+      );
+      expect(matched).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('warns when submit() runs with a null host element (silent LMS dropout)', () => {
     // A null host means dispatch() returns false: no LMS bridge listener exists,
     // so the score would never be persisted. The engine warns instead of failing
     // silently. (In the wrapper, a null host element produces this same false.)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { engine, events } = makeEngine(
+      const { engine, events, reports } = makeEngine(
         { graded: true },
         { hostNull: true },
       );
@@ -491,6 +505,9 @@ describe('QuizEngine', () => {
       engine.setAnswer(0, true);
       engine.submit();
       expect(completes(events)).toHaveLength(0);
+      // The answer still reaches the LMS: report() goes straight to the adapter,
+      // so a missing host costs the score, not the interactions.
+      expect(reports).toHaveLength(1);
       const matched = warn.mock.calls.some((args) =>
         args.some(
           (a) => typeof a === 'string' && /host element was null/i.test(a),

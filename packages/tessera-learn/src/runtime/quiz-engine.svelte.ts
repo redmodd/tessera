@@ -224,14 +224,19 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#submitCalled = true;
     if (this.#submitted) return;
     if (!this.#allAnswered) {
-      console.warn(
-        '[tessera] useQuiz: submit() ran but at least one question is unanswered or ' +
-          'only partly built, so nothing was scored. Gate your Submit button on ' +
-          'handle.canSubmit, and make sure every widget passes a complete() that ' +
-          'turns true once its answer is whole.',
-      );
+      if (this.#totalQuestions > 0) {
+        console.warn(
+          '[tessera] useQuiz: submit() ran but at least one question is unanswered or ' +
+            'only partly built, so nothing was scored. Gate your Submit button on ' +
+            'handle.canSubmit, and make sure every widget passes a complete() that ' +
+            'turns true once its answer is whole.',
+        );
+      }
       return;
     }
+
+    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
+
     // Combined null-host guard + before-submit dispatch: dispatch() returns false
     // when the host element is null, which is the silent-LMS-dropout case.
     if (!this.#deps.dispatch('tessera-quiz-before-submit')) {
@@ -242,8 +247,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       );
       return;
     }
-
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
