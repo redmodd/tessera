@@ -223,7 +223,15 @@ export class QuizEngine implements UseQuizInternalHandle {
   submit(): void {
     this.#submitCalled = true;
     if (this.#submitted) return;
-    if (!this.#allAnswered) return;
+    if (!this.#allAnswered) {
+      console.warn(
+        '[tessera] useQuiz: submit() ran but at least one question is unanswered or ' +
+          'only partly built, so nothing was scored. Gate your Submit button on ' +
+          'handle.canSubmit, and make sure every widget passes a complete() that ' +
+          'turns true once its answer is whole.',
+      );
+      return;
+    }
     // Combined null-host guard + before-submit dispatch: dispatch() returns false
     // when the host element is null, which is the silent-LMS-dropout case.
     if (!this.#deps.dispatch('tessera-quiz-before-submit')) {

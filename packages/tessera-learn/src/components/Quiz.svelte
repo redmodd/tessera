@@ -166,7 +166,9 @@
           disabled={!handle.canSubmit}
           onclick={handleSubmit}
         >
-          {isImmediateMode ? 'See Results' : 'Submit'}
+          {isImmediateMode && isAnswered(currentQuestion)
+            ? 'See Results'
+            : 'Submit'}
         </button>
       {/if}
     </div>
