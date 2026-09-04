@@ -28,7 +28,7 @@
 
   function isAnswered(q) {
     if (!q) return false;
-    return q.answer !== undefined || q.isLockedCorrect;
+    return (q.answer !== undefined && q.answerComplete) || q.isLockedCorrect;
   }
 
   function needsReveal(q) {

@@ -70,6 +70,7 @@
     get maxRetries() {
       return maxRetries;
     },
+    complete: () => matches.size === pairs.length,
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),

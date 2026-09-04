@@ -91,6 +91,20 @@ describe('QuizEngine', () => {
     expect(engine.questions.map((qq) => qq.id)).toEqual(['a', 'b', 'c']);
   });
 
+  it('answerComplete mirrors the question API, defaulting to true', () => {
+    const { engine } = makeEngine();
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    let filled = 0;
+    const b = engine.registerQuestion({
+      ...tfQuestion('b', true, true),
+      complete: () => filled === 2,
+    });
+    expect(a.answerComplete).toBe(true);
+    expect(b.answerComplete).toBe(false);
+    filled = 2;
+    expect(b.answerComplete).toBe(true);
+  });
+
   it('canSubmit flips true once every registered question has an answer', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));

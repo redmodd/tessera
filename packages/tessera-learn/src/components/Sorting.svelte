@@ -59,6 +59,7 @@
     get maxRetries() {
       return maxRetries;
     },
+    complete: () => placements.size === items.length,
     response: () => ({
       type: 'matching',
       response: [...placements.entries()].map(([i, t]) => [

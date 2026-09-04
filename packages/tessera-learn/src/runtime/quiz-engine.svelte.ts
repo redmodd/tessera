@@ -47,6 +47,7 @@ interface InternalQuestion {
   weight: number;
   checkAnswer: (answer?: unknown) => boolean;
   reset?: () => void;
+  complete?: () => boolean;
   interaction?: () => Interaction;
   render: unknown;
 }
@@ -156,6 +157,7 @@ export class QuizEngine implements UseQuizInternalHandle {
       weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
       checkAnswer: api.checkAnswer,
       reset: api.reset,
+      complete: api.complete,
       interaction: api.interaction,
       render: undefined,
     };
@@ -330,6 +332,9 @@ export class QuizEngine implements UseQuizInternalHandle {
       },
       get answer() {
         return engine.getAnswer(i);
+      },
+      get answerComplete() {
+        return engine.#internalQuestions[i].complete?.() ?? true;
       },
       get feedbackVisible() {
         return engine.feedbackVisible(i);

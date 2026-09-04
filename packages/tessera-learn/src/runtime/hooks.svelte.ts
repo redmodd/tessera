@@ -24,6 +24,12 @@ export interface Question {
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
+  /**
+   * False while the answer is only partially built (e.g. two of five pairs
+   * matched). Widgets that accept an answer incrementally report this so the
+   * shell does not offer to finalise a half-filled response.
+   */
+  readonly answerComplete: boolean;
   /** Whether feedback should currently render for this question. */
   readonly feedbackVisible: boolean;
   /**
@@ -62,6 +68,8 @@ export interface UseQuestionOptions {
   maxRetries?: number;
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
+  /** Whether the current answer is fully specified. Default: true. */
+  complete?: () => boolean;
   /**
    * Optional score override (0–100). Standalone mode only — per-question
    * scoring inside a quiz is the quiz's responsibility.
@@ -120,6 +128,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       weight: opts.weight,
       checkAnswer: () => isCorrectInteraction(opts.response()) === true,
       reset: opts.reset,
+      complete: opts.complete,
       interaction: () => opts.response(),
     });
     const handle = q as UseQuestionHandle;
@@ -203,6 +212,9 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     },
     get answer() {
       return currentAnswer;
+    },
+    get answerComplete() {
+      return opts.complete?.() ?? true;
     },
     get feedbackVisible() {
       return submitted;
@@ -355,6 +367,7 @@ export interface UseQuizQuestionApi {
   weight?: number;
   checkAnswer: (answer?: unknown) => boolean;
   reset?: () => void;
+  complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
   interaction?: () => Interaction;
 }

@@ -213,9 +213,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click(); // immediate feedback
-    await page.waitForTimeout(300);
-
-    expect((await interactionWrites()).length).toBeGreaterThan(0);
+    await expect
+      .poll(() => interactionWrites().then((w) => w.length), { timeout: 5000 })
+      .toBeGreaterThan(0);
     await primary.click(); // continue
     await page.waitForTimeout(300);
 
@@ -253,10 +253,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await submit.waitFor({ state: 'visible', timeout: 5000 });
 
     // Every answer was revealed, so every answer is already reported.
-    const preSubmitIds = new Set(
-      (await interactionWrites()).map((e) => e[1].split('.')[2]),
-    );
-    expect(preSubmitIds.size).toBe(3);
+    const preSubmitIds = () =>
+      interactionWrites().then(
+        (w) => new Set(w.map((e) => e[1].split('.')[2])).size,
+      );
+    await expect.poll(preSubmitIds, { timeout: 5000 }).toBe(3);
 
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
