@@ -187,3 +187,49 @@ describe('generated index.html Content-Security-Policy', () => {
     expect(body).not.toContain('Content-Security-Policy');
   });
 });
+
+describe('xapi setup virtual module', () => {
+  function loadSetup(body: string): string {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      `export default ${body};`,
+      'utf-8',
+    );
+    const plugin = findPlugin('tessera:xapi-setup');
+    (plugin.configResolved as any).call(plugin, {
+      root: projectRoot,
+      command: 'build',
+    });
+    return (plugin.load as any).call({}, '\0virtual:tessera-xapi-setup');
+  }
+
+  const real = `export { buildXAPIClient }`;
+
+  it('stubs the client when the only xapi entry is an inert lms endpoint', () => {
+    for (const standard of ['scorm12', 'scorm2004', 'web']) {
+      expect(
+        loadSetup(
+          `{ title: "T", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
+        ),
+      ).not.toContain(real);
+    }
+  });
+
+  it('wires the client for an explicit endpoint alongside an inert lms entry', () => {
+    expect(
+      loadSetup(
+        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { endpoint: "https://lrs.example/xapi/", auth: "Basic x", actor: { mbox: "mailto:a@b.c" } }] }`,
+      ),
+    ).toContain(real);
+  });
+
+  it('wires the client for endpoint: "lms" under cmi5 and xapi', () => {
+    for (const standard of ['cmi5', 'xapi']) {
+      expect(
+        loadSetup(
+          `{ title: "T", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
+        ),
+      ).toContain(real);
+    }
+  });
+});
