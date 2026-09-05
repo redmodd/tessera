@@ -33,6 +33,7 @@ export default defineConfig({
         /layout-override\.spec\.ts$/,
         /custom-quiz\.spec\.ts$/,
         /a11y-audit\.spec\.ts$/,
+        /lms-variants\.spec\.ts$/,
       ],
     },
     {
@@ -78,6 +79,11 @@ export default defineConfig({
       name: 'lms',
       use: { browserName: 'chromium' },
       testMatch: /lms-roundtrip\.spec\.ts$/,
+    },
+    {
+      name: 'lms-variants',
+      use: { browserName: 'chromium' },
+      testMatch: /lms-variants\.spec\.ts$/,
     },
     {
       name: 'a11y-audit',

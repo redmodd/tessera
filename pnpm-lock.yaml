@@ -182,6 +182,19 @@ importers:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@26.4.0)(yaml@2.9.0)
 
+  tests/fixtures/quiz-timing:
+    dependencies:
+      tessera-learn:
+        specifier: workspace:*
+        version: link:../../../packages/tessera-learn
+    devDependencies:
+      svelte:
+        specifier: ^5.57.0
+        version: 5.57.0(@typescript-eslint/types@8.68.0)
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2(@types/node@26.4.0)(yaml@2.9.0)
+
   tests/fixtures/sequential:
     dependencies:
       tessera-learn:

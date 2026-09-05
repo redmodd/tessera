@@ -158,6 +158,59 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
       .map((e) => e[2]);
     expect(idWrites).toEqual(['q_planet', 'q_water']);
   });
+
+  test('Null host element loses the score but still reports interactions', async ({
+    page,
+  }) => {
+    // The nav never touches the URL, so ?nohost on the initial load holds for
+    // the whole session and useQuiz() sees element: () => null.
+    await page.goto(`${BASE}/?nohost`);
+    await page.locator('.tessera-nav-page', { hasText: 'Exam' }).click();
+    await waitForCustomQuiz(page);
+    await expect(
+      page.locator('[data-testid="custom-quiz-status"]'),
+    ).toContainText('host: null');
+
+    await page
+      .locator('[data-question-id="q-planet"] .tessera-mc-option')
+      .nth(1)
+      .click();
+    await page
+      .locator('[data-question-id="q-water"] input[type="text"]')
+      .fill('H2O');
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+
+    // Both answers reach the adapter even though the dispatch had no element.
+    await expect
+      .poll(
+        async () =>
+          new Set(
+            (
+              (await page.evaluate(
+                () => (window as any).__scormLog,
+              )) as string[][]
+            )
+              .filter(
+                (e) =>
+                  e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
+              )
+              .map((e) => e[1].split('.')[2]),
+          ).size,
+        { timeout: 5000 },
+      )
+      .toBe(2);
+
+    // The score is what a missing host costs: no dispatch, so the shell never
+    // leaves `answering` and no score lands.
+    await expect(
+      page.locator('[data-testid="custom-quiz-status"]'),
+    ).toContainText('state: answering');
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
+    // The mock seeds the key empty, so "no score" is '' rather than absent.
+    expect(data['cmi.core.score.raw'] ?? '').toBe('');
+  });
 });
 
 // ---------------------------------------------------------------------------
