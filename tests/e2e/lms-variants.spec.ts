@@ -107,9 +107,10 @@ async function snapshot(page: Page): Promise<Record<string, string>> {
 }
 
 /**
- * The adapter writes cmi.core.score.raw once per revealed question, so the
- * value climbs 33 → 67 → 100 and a snapshot taken on the first write is stale.
- * Poll the value itself rather than waiting for the key to appear at all.
+ * The adapter writes cmi.core.score.raw from the progress rollup at submit,
+ * asynchronously relative to the click, so a snapshot taken right after the
+ * results render can still be missing it. Poll the value itself rather than
+ * waiting for the key to appear at all.
  */
 async function expectScormValue(
   page: Page,
@@ -354,7 +355,7 @@ test.describe.serial("completion: { mode: 'manual' }", () => {
     // No page declares completesOn: 'view' and nothing calls markComplete(),
     // so completion is the host's to set, not the quiz's.
     const data = await snapshot(page);
-    expect(data['cmi.core.lesson_status']).not.toBe('completed');
+    expect(data['cmi.core.lesson_status']).toBe('incomplete');
   });
 });
 
