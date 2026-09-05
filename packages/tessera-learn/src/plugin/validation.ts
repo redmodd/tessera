@@ -191,6 +191,9 @@ export const VALID_EXPORT_STANDARDS = [
   'cmi5',
   'xapi',
 ];
+const EXPORT_STANDARD_LIST = VALID_EXPORT_STANDARDS.map((s) => `"${s}"`).join(
+  ', ',
+);
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
@@ -336,7 +339,7 @@ function parseConfig(
   if (config.export?.standard !== undefined) {
     if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
       d.error(
-        `course.config.js: "export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${config.export.standard}"`,
+        `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
       );
     }
   }
@@ -347,7 +350,7 @@ function parseConfig(
   if (standardOverride) {
     if (!VALID_EXPORT_STANDARDS.includes(standardOverride)) {
       d.error(
-        `standardOverride must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${standardOverride}"`,
+        `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
       );
     } else {
       config.export = { ...config.export, standard: standardOverride };

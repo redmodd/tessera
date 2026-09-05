@@ -108,6 +108,26 @@ async function run(
   }
 }
 
+// Paths whose value JSON.stringify would drop (function, undefined, symbol) or
+// rewrite into something else (Date to a string, Map/Set/RegExp to {}, NaN and
+// Infinity to null).
+function lossyPaths(value: unknown, path = ''): string[] {
+  const type = typeof value;
+  if (value === null || type === 'string' || type === 'boolean') return [];
+  if (type === 'number')
+    return Number.isFinite(value) ? [] : [path || '(root)'];
+  if (Array.isArray(value))
+    return value.flatMap((item, i) => lossyPaths(item, `${path}[${i}]`));
+  if (type === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    if (proto === Object.prototype || proto === null)
+      return Object.entries(value as object).flatMap(([key, item]) =>
+        lossyPaths(item, path ? `${path}.${key}` : key),
+      );
+  }
+  return [path || '(root)'];
+}
+
 // Importing and re-serializing rather than patching the source text: a regex has
 // to guess where a setting's braces end, and patches the wrong span once that
 // setting gains a nested object.
@@ -117,22 +137,60 @@ async function applyOverrides(
 ): Promise<void> {
   const configPath = resolve(dir, 'course.config.js');
   const base = (await import(pathToFileURL(configPath).href)).default;
-  const dropped: string[] = [];
-  const json = JSON.stringify(
-    { ...base, ...overrides },
-    (key, value) => {
-      if (typeof value === 'function' || value === undefined) dropped.push(key);
-      return value;
-    },
-    2,
-  );
-  if (dropped.length > 0) {
+  const merged = { ...base, ...overrides };
+  const lossy = lossyPaths(merged);
+  if (lossy.length > 0) {
     throw new Error(
-      `${configPath} holds values JSON cannot carry (${dropped.join(', ')}); ` +
-        `an overridden variant would silently ship without them.`,
+      `${configPath} holds values JSON cannot carry (${lossy.join(', ')}); ` +
+        `an overridden variant would silently ship something else.`,
     );
   }
-  writeFileSync(configPath, `export default ${json};\n`);
+  writeFileSync(
+    configPath,
+    `export default ${JSON.stringify(merged, null, 2)};\n`,
+  );
+}
+
+// What each standard leaves in dist/. The standard only reaches the build if the
+// fixture's vite.config.js passes TESSERA_STANDARD to the plugin as
+// standardOverride; without that the variant silently builds the standard in its
+// own course.config.js, and the failure surfaces much later as a missing manifest
+// in an unrelated spec.
+const BUILD_MARKERS: Record<Standard, { file: string; contains?: string }[]> = {
+  web: [],
+  scorm12: [{ file: 'imsmanifest.xml', contains: '<schemaversion>1.2' }],
+  scorm2004: [{ file: 'imsmanifest.xml', contains: '<schemaversion>2004' }],
+  cmi5: [{ file: 'cmi5.xml' }],
+  xapi: [{ file: 'tincan.xml' }],
+};
+
+const ALL_MARKER_FILES = ['imsmanifest.xml', 'cmi5.xml', 'tincan.xml'];
+
+function assertBuiltStandard(
+  fixtureName: FixtureName,
+  standard: Standard,
+  distDir: string,
+): void {
+  const wrong = (detail: string): Error =>
+    new Error(
+      `[e2e globalSetup] ${fixtureName} built for "${standard}" but ${detail}. ` +
+        `Check that ${fixtureName}/vite.config.js passes the standard through: ` +
+        `tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }).`,
+    );
+
+  const expected = BUILD_MARKERS[standard];
+  for (const { file, contains } of expected) {
+    const path = resolve(distDir, file);
+    if (!existsSync(path)) throw wrong(`dist/${file} is missing`);
+    if (contains && !readFileSync(path, 'utf-8').includes(contains))
+      throw wrong(`dist/${file} does not contain "${contains}"`);
+  }
+
+  const expectedFiles = expected.map((m) => m.file);
+  for (const file of ALL_MARKER_FILES) {
+    if (!expectedFiles.includes(file) && existsSync(resolve(distDir, file)))
+      throw wrong(`dist/ also holds ${file}`);
+  }
 }
 
 async function buildVariant(
@@ -159,26 +217,6 @@ async function buildVariant(
     'dir',
   );
 
-  // The standard reaches the build only if the fixture's vite.config.js passes
-  // TESSERA_STANDARD to the plugin. Without that line every variant silently
-  // builds the file's own standard, and the failure surfaces much later as a
-  // missing manifest in an unrelated spec.
-  const viteConfigPath = resolve(dir, 'vite.config.js');
-  const viteConfig = existsSync(viteConfigPath)
-    ? readFileSync(viteConfigPath, 'utf-8')
-    : '';
-  if (
-    !viteConfig.includes('TESSERA_STANDARD') ||
-    !viteConfig.includes('standardOverride')
-  ) {
-    throw new Error(
-      `[e2e globalSetup] ${fixtureName}/vite.config.js does not pass TESSERA_STANDARD ` +
-        `to the plugin as standardOverride, so the "${standard}" variant would build as ` +
-        `its course.config.js standard. ` +
-        `Pass it through: tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }).`,
-    );
-  }
-
   if (spec.overrides) {
     await applyOverrides(dir, spec.overrides);
   }
@@ -189,6 +227,8 @@ async function buildVariant(
     timeout: 60_000,
     env: { ...process.env, TESSERA_STANDARD: standard },
   });
+
+  assertBuiltStandard(fixtureName, standard, resolve(dir, 'dist'));
 }
 
 export default async function globalSetup(): Promise<void> {
