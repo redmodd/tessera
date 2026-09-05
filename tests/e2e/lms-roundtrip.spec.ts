@@ -407,8 +407,11 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     );
     expect(data['cmi.score.raw']).toBe('100');
     expect(data['cmi.score.scaled']).toBe('1');
-    // SCORM 2004 keeps completion and success as separate fields
+    // SCORM 2004 keeps completion and success as separate fields. This course
+    // completes on percentage, so passing the quiz sets success only; the
+    // completion-quiz variant in lms-variants.spec.ts is the contrast.
     expect(data['cmi.success_status']).toBe('passed');
+    expect(data['cmi.completion_status']).toBe('incomplete');
 
     // Per-question Interaction writes: 2004 emits the SCORM vocab verbatim.
     expect(await interactionField(page, 'type')).toEqual([
