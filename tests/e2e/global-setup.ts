@@ -1,6 +1,13 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 
 const execFileAsync = promisify(execFile);
@@ -109,6 +116,19 @@ async function buildVariant(
     resolve(dir, 'node_modules'),
     'dir',
   );
+
+  // The standard reaches the build only if the fixture's vite.config.js passes
+  // TESSERA_STANDARD to the plugin. Without that line every variant silently
+  // builds the file's own standard, and the failure surfaces much later as a
+  // missing manifest in an unrelated spec.
+  const viteConfig = readFileSync(resolve(dir, 'vite.config.js'), 'utf-8');
+  if (!viteConfig.includes('TESSERA_STANDARD')) {
+    throw new Error(
+      `[e2e globalSetup] ${fixtureName}/vite.config.js does not read TESSERA_STANDARD, ` +
+        `so the "${standard}" variant would build as its course.config.js standard. ` +
+        `Pass it through: tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }).`,
+    );
+  }
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
   await run(viteBin(fixtureName), ['build', dir], {

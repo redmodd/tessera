@@ -99,11 +99,18 @@ The `export` and `lms` projects don't run a dev server — they read pre-built `
 Building those mid-test would mutate the source fixtures and serialise the suite. Instead, [`tests/e2e/global-setup.ts`](./tests/e2e/global-setup.ts) runs once before any spec:
 
 1. Wipes `tests/.e2e-variants/`.
-2. For each fixture (`free`, `custom-quiz`) and the standards it declares (`web`/`scorm12`/`scorm2004`/`cmi5`/`xapi`):
+2. For each fixture in the `FIXTURES` map and the standards it declares (`web`/`scorm12`/`scorm2004`/`cmi5`/`xapi`):
    - Copies the fixture into `tests/.e2e-variants/{fixture}/{standard}/`
    - Symlinks the fixture's `node_modules` into the variant (workspace deps aren't hoisted to the repo root).
-   - Patches `course.config.js` to set `export.standard` to that variant.
-   - Runs `vite build` in parallel.
+   - Runs `vite build` in parallel with `TESSERA_STANDARD` set to that variant.
+
+A variant-built fixture's `vite.config.js` must forward that env var to the plugin:
+
+```js
+tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD });
+```
+
+Without it the variant builds whatever `course.config.js` declares, so globalSetup fails the build rather than let the wrong standard through.
 
 Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. The first e2e run after `pnpm install` therefore takes ~30–60s of build time before any spec executes — that's expected.
 

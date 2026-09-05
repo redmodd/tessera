@@ -91,10 +91,14 @@ export default defineConfig({
       testMatch: /a11y-audit\.spec\.ts$/,
     },
   ],
+  // The fixtures read TESSERA_STANDARD for the variant pre-build; these servers
+  // blank it so an exported value in a developer's shell can't turn a dev server
+  // into an LMS build.
   webServer: [
     {
       command: 'cd tests/fixtures/free && pnpm dev --port 5180',
       port: 5180,
+      env: { TESSERA_STANDARD: '' },
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },
@@ -107,12 +111,14 @@ export default defineConfig({
     {
       command: 'cd tests/fixtures/custom-layout && pnpm dev --port 5182',
       port: 5182,
+      env: { TESSERA_STANDARD: '' },
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },
     {
       command: 'cd tests/fixtures/custom-quiz && pnpm dev --port 5183',
       port: 5183,
+      env: { TESSERA_STANDARD: '' },
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },

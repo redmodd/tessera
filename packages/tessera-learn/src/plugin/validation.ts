@@ -345,6 +345,12 @@ function parseConfig(
   // standard-dependent check below (identity, csp, xapi, crossValidate) sees
   // what actually ships.
   if (standardOverride) {
+    if (!VALID_EXPORT_STANDARDS.includes(standardOverride)) {
+      d.error(
+        `standardOverride must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${standardOverride}"`,
+      );
+      return null;
+    }
     config.export = { ...config.export, standard: standardOverride };
   }
 
