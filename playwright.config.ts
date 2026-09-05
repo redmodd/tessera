@@ -91,9 +91,10 @@ export default defineConfig({
       testMatch: /a11y-audit\.spec\.ts$/,
     },
   ],
-  // The fixtures read TESSERA_STANDARD for the variant pre-build; these servers
-  // blank it so an exported value in a developer's shell can't turn a dev server
-  // into an LMS build.
+  // The fixtures read TESSERA_STANDARD for the variant pre-build; the servers
+  // Playwright starts blank it so an exported value in a developer's shell can't
+  // turn a dev server into an LMS build. A server reused via reuseExistingServer
+  // keeps whatever environment it was started with.
   webServer: [
     {
       command: 'cd tests/fixtures/free && pnpm dev --port 5180',

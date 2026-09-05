@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readResolvedConfig } from '../src/plugin/manifest.js';
+import { validateProject } from '../src/plugin/validation.js';
 
 let projectRoot: string;
 
@@ -60,5 +61,19 @@ describe('readResolvedConfig', () => {
     const read = readResolvedConfig(projectRoot, 'scorm2004');
     expect(read.ok).toBe(false);
     expect(read.standard).toBe('scorm2004');
+  });
+});
+
+describe('validateProject standardOverride', () => {
+  it('rejects an override outside the allowed set', () => {
+    writeConfig(`{ export: { standard: "web" } }`);
+    const { errors } = validateProject(projectRoot, 'scorm13');
+    expect(errors.some((e) => e.includes('standardOverride'))).toBe(true);
+  });
+
+  it('accepts a valid override', () => {
+    writeConfig(`{ export: { standard: "web" } }`);
+    const { errors } = validateProject(projectRoot, 'cmi5');
+    expect(errors.some((e) => e.includes('standardOverride'))).toBe(false);
   });
 });

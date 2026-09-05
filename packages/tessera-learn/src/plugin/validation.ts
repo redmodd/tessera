@@ -349,9 +349,9 @@ function parseConfig(
       d.error(
         `standardOverride must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "${standardOverride}"`,
       );
-      return null;
+    } else {
+      config.export = { ...config.export, standard: standardOverride };
     }
-    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
