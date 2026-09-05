@@ -1,14 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const execFileAsync = promisify(execFile);
@@ -82,7 +74,7 @@ export function fixtureSource(fixture: FixtureName): string {
 async function run(
   file: string,
   args: string[],
-  opts: { cwd: string; timeout: number },
+  opts: { cwd: string; timeout: number; env?: NodeJS.ProcessEnv },
 ): Promise<void> {
   try {
     await execFileAsync(file, args, opts);
@@ -118,25 +110,11 @@ async function buildVariant(
     'dir',
   );
 
-  const configPath = resolve(dir, 'course.config.js');
-  const original = readFileSync(configPath, 'utf-8');
-  const pattern = /export:\s*\{\s*standard:\s*["'][^"']*["']\s*\}/;
-  if (!pattern.test(original)) {
-    throw new Error(
-      `[e2e globalSetup] ${fixtureName}/course.config.js: failed to substitute export.standard for "${standard}". ` +
-        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*["'][^"']*["']\\s*\\}/.`,
-    );
-  }
-  const patched = original.replace(
-    pattern,
-    `export: { standard: '${standard}' }`,
-  );
-  writeFileSync(configPath, patched);
-
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
   await run(viteBin(fixtureName), ['build', dir], {
     cwd: dir,
     timeout: 60_000,
+    env: { ...process.env, TESSERA_STANDARD: standard },
   });
 }
 
