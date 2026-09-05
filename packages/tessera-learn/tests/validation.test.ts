@@ -238,7 +238,7 @@ describe('config validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        '"export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "tin-can"',
+        '"export.standard" must be one of "web", "scorm12", "scorm2004", "cmi5", "xapi", got "tin-can"',
       ),
     );
   });

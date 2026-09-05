@@ -1,5 +1,12 @@
 import { defineConfig } from '@playwright/test';
 
+const PORTS = {
+  free: 5180,
+  sequential: 5181,
+  'custom-layout': 5182,
+  'custom-quiz': 5183,
+} as const;
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30000,
@@ -23,7 +30,7 @@ export default defineConfig({
       name: 'free-mode',
       use: {
         browserName: 'chromium',
-        baseURL: 'http://localhost:5180',
+        baseURL: `http://localhost:${PORTS.free}`,
       },
       testIgnore: [
         /sequential\.spec\.ts$/,
@@ -40,7 +47,7 @@ export default defineConfig({
       name: 'custom-layout',
       use: {
         browserName: 'chromium',
-        baseURL: 'http://localhost:5182',
+        baseURL: `http://localhost:${PORTS['custom-layout']}`,
       },
       testMatch: /layout-override\.spec\.ts$/,
     },
@@ -48,7 +55,7 @@ export default defineConfig({
       name: 'custom-quiz',
       use: {
         browserName: 'chromium',
-        baseURL: 'http://localhost:5183',
+        baseURL: `http://localhost:${PORTS['custom-quiz']}`,
       },
       testMatch: /custom-quiz\.spec\.ts$/,
     },
@@ -56,7 +63,7 @@ export default defineConfig({
       name: 'sequential-mode',
       use: {
         browserName: 'chromium',
-        baseURL: 'http://localhost:5181',
+        baseURL: `http://localhost:${PORTS.sequential}`,
       },
       testMatch: /sequential\.spec\.ts$/,
     },
@@ -64,7 +71,7 @@ export default defineConfig({
       name: 'mobile',
       use: {
         browserName: 'chromium',
-        baseURL: 'http://localhost:5180',
+        baseURL: `http://localhost:${PORTS.free}`,
         viewport: { width: 375, height: 667 },
         hasTouch: true,
       },
@@ -91,30 +98,15 @@ export default defineConfig({
       testMatch: /a11y-audit\.spec\.ts$/,
     },
   ],
-  webServer: [
-    {
-      command: 'cd tests/fixtures/free && pnpm dev --port 5180',
-      port: 5180,
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/sequential && pnpm dev --port 5181',
-      port: 5181,
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/custom-layout && pnpm dev --port 5182',
-      port: 5182,
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/custom-quiz && pnpm dev --port 5183',
-      port: 5183,
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-  ],
+  // The fixtures read TESSERA_STANDARD for the variant pre-build; the servers
+  // Playwright starts blank it so an exported value in a developer's shell can't
+  // turn a dev server into an LMS build. A server reused via reuseExistingServer
+  // keeps whatever environment it was started with.
+  webServer: Object.entries(PORTS).map(([fixture, port]) => ({
+    command: `cd tests/fixtures/${fixture} && pnpm dev --port ${port}`,
+    port,
+    env: { TESSERA_STANDARD: '' },
+    reuseExistingServer: !process.env.CI,
+    timeout: 20000,
+  })),
 });

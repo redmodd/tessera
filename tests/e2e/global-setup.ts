@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,11 +19,19 @@ export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
-  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page' | 'quiz-timing';
+  | 'free'
+  | 'custom-quiz'
+  | 'custom-layout'
+  | 'broken-page'
+  | 'quiz-timing'
+  | 'completion-quiz';
 
 interface FixtureSpec {
   source: string;
   standards: readonly Standard[];
+  // Course-level settings for this variant. Keys are replaced whole, so
+  // `completion` arrives without the fields of the mode it replaces.
+  overrides?: Record<string, unknown>;
 }
 
 const FIXTURES: Record<FixtureName, FixtureSpec> = {
@@ -45,6 +54,11 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   // Its own fixture, not extra pages in `free`: cmi.core.score.raw is the
   // course score, so adding graded quizzes to `free` would change what every
   // existing roundtrip assertion there sees.
+  'completion-quiz': {
+    source: resolve(REPO_ROOT, 'tests/fixtures/free'),
+    standards: ['scorm2004'],
+    overrides: { completion: { mode: 'quiz' } },
+  },
   'quiz-timing': {
     source: resolve(REPO_ROOT, 'tests/fixtures/quiz-timing'),
     standards: ['scorm12'],
@@ -82,7 +96,7 @@ export function fixtureSource(fixture: FixtureName): string {
 async function run(
   file: string,
   args: string[],
-  opts: { cwd: string; timeout: number },
+  opts: { cwd: string; timeout: number; env?: NodeJS.ProcessEnv },
 ): Promise<void> {
   try {
     await execFileAsync(file, args, opts);
@@ -91,6 +105,87 @@ async function run(
     throw new Error(
       `${e.message}\n--- stdout ---\n${e.stdout ?? ''}\n--- stderr ---\n${e.stderr ?? ''}`,
     );
+  }
+}
+
+// Paths JSON.stringify would drop or rewrite: functions, undefined, symbols,
+// non-finite numbers, and anything that isn't a plain object or array.
+function lossyPaths(value: unknown, path = ''): string[] {
+  const type = typeof value;
+  if (value === null || type === 'string' || type === 'boolean') return [];
+  if (type === 'number')
+    return Number.isFinite(value) ? [] : [path || '(root)'];
+  if (Array.isArray(value))
+    return value.flatMap((item, i) => lossyPaths(item, `${path}[${i}]`));
+  if (type === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    if (proto === Object.prototype || proto === null)
+      return Object.entries(value as object).flatMap(([key, item]) =>
+        lossyPaths(item, path ? `${path}.${key}` : key),
+      );
+  }
+  return [path || '(root)'];
+}
+
+// Importing and re-serializing rather than patching the source text: a regex has
+// to guess where a setting's braces end, and patches the wrong span once that
+// setting gains a nested object.
+async function applyOverrides(
+  dir: string,
+  overrides: Record<string, unknown>,
+): Promise<void> {
+  const configPath = resolve(dir, 'course.config.js');
+  const base = (await import(pathToFileURL(configPath).href)).default;
+  const merged = { ...base, ...overrides };
+  const lossy = lossyPaths(merged);
+  if (lossy.length > 0) {
+    throw new Error(
+      `${configPath} holds values JSON cannot carry (${lossy.join(', ')}); ` +
+        `an overridden variant would silently ship something else.`,
+    );
+  }
+  writeFileSync(
+    configPath,
+    `export default ${JSON.stringify(merged, null, 2)};\n`,
+  );
+}
+
+// What each standard leaves in dist/: the proof that TESSERA_STANDARD actually
+// reached the plugin, since a fixture that ignores it still builds successfully.
+const BUILD_MARKERS: Record<Standard, { file: string; contains?: string }[]> = {
+  web: [],
+  scorm12: [{ file: 'imsmanifest.xml', contains: '<schemaversion>1.2' }],
+  scorm2004: [{ file: 'imsmanifest.xml', contains: '<schemaversion>2004' }],
+  cmi5: [{ file: 'cmi5.xml' }],
+  xapi: [{ file: 'tincan.xml' }],
+};
+
+const ALL_MARKER_FILES = ['imsmanifest.xml', 'cmi5.xml', 'tincan.xml'];
+
+function assertBuiltStandard(
+  fixtureName: FixtureName,
+  standard: Standard,
+  distDir: string,
+): void {
+  const wrong = (detail: string): Error =>
+    new Error(
+      `[e2e globalSetup] ${fixtureName} built for "${standard}" but ${detail}. ` +
+        `Check that ${fixtureName}/vite.config.js passes the standard through: ` +
+        `tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }).`,
+    );
+
+  const expected = BUILD_MARKERS[standard];
+  for (const { file, contains } of expected) {
+    const path = resolve(distDir, file);
+    if (!existsSync(path)) throw wrong(`dist/${file} is missing`);
+    if (contains && !readFileSync(path, 'utf-8').includes(contains))
+      throw wrong(`dist/${file} does not contain "${contains}"`);
+  }
+
+  const expectedFiles = expected.map((m) => m.file);
+  for (const file of ALL_MARKER_FILES) {
+    if (!expectedFiles.includes(file) && existsSync(resolve(distDir, file)))
+      throw wrong(`dist/ also holds ${file}`);
   }
 }
 
@@ -118,26 +213,18 @@ async function buildVariant(
     'dir',
   );
 
-  const configPath = resolve(dir, 'course.config.js');
-  const original = readFileSync(configPath, 'utf-8');
-  const pattern = /export:\s*\{\s*standard:\s*["'][^"']*["']\s*\}/;
-  if (!pattern.test(original)) {
-    throw new Error(
-      `[e2e globalSetup] ${fixtureName}/course.config.js: failed to substitute export.standard for "${standard}". ` +
-        `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*["'][^"']*["']\\s*\\}/.`,
-    );
+  if (spec.overrides) {
+    await applyOverrides(dir, spec.overrides);
   }
-  const patched = original.replace(
-    pattern,
-    `export: { standard: '${standard}' }`,
-  );
-  writeFileSync(configPath, patched);
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
   await run(viteBin(fixtureName), ['build', dir], {
     cwd: dir,
     timeout: 60_000,
+    env: { ...process.env, TESSERA_STANDARD: standard },
   });
+
+  assertBuiltStandard(fixtureName, standard, resolve(dir, 'dist'));
 }
 
 export default async function globalSetup(): Promise<void> {
