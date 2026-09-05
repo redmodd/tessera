@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { installScorm12Mock } from './lms-mocks.js';
+import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
 import {
   answerMatching,
   interactionWrites,
@@ -122,5 +122,91 @@ test.describe.serial('quiz reporting timing — review and never', () => {
     await expect
       .poll(() => reportedQuestionCount(page), { timeout: 5000 })
       .toBe(2);
+  });
+});
+
+/**
+ * The same course as `free`, built with completion.mode 'quiz' through the
+ * fixture's overrides. Under `free`'s own percentage/100 completion, passing
+ * the graded quiz leaves the course incomplete until every page has been
+ * visited; here the quiz alone completes it. SCORM 2004 is the standard that
+ * keeps completion and success in separate fields, so it can show the
+ * difference — SCORM 1.2 folds both into lesson_status.
+ */
+test.describe('completion.mode quiz', () => {
+  const PORT = 5311;
+  const BASE = `http://localhost:${PORT}`;
+  let preview: ChildProcess;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    preview = startPreview('completion-quiz', 'scorm2004', PORT);
+    const page = await browser.newPage();
+    try {
+      await waitForServer(page, BASE);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(() => preview?.kill('SIGTERM'));
+  test.beforeEach(async ({ page }) => installScorm2004Mock(page));
+
+  test('passing the graded quiz completes the course with pages left unvisited', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    const totalPages = await page.locator('.tessera-nav-page').count();
+
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+      .click();
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
+    // Q1 — "What is 2 + 2?" → option index 1 ("4").
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
+    await primary.click();
+    await page.waitForTimeout(300);
+    await primary.click();
+
+    // Q2 — FillInTheBlank.
+    await page
+      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
+      .fill('blue');
+    await primary.click();
+    await page.waitForTimeout(300);
+    await primary.click();
+    await page.waitForTimeout(300);
+
+    // Q3 — Matching.
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+    await primary.click();
+    await page.waitForTimeout(300);
+
+    const submit = page.locator('.tessera-quiz-btn-submit');
+    await submit.waitFor({ state: 'visible', timeout: 5000 });
+    await submit.click();
+    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as any).__scormDataSnapshot()['cmi.completion_status'],
+          ),
+        { timeout: 5000 },
+      )
+      .toBe('completed');
+
+    const visited = await page.locator('.tessera-nav-page.visited').count();
+    expect(visited).toBeLessThan(totalPages);
   });
 });

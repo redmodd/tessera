@@ -7,8 +7,10 @@ import {
   readFileSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,11 +19,20 @@ export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
-  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page' | 'quiz-timing';
+  | 'free'
+  | 'custom-quiz'
+  | 'custom-layout'
+  | 'broken-page'
+  | 'quiz-timing'
+  | 'completion-quiz';
 
 interface FixtureSpec {
   source: string;
   standards: readonly Standard[];
+  // Course-level settings to change for this variant, since one course.config.js
+  // holds one value per axis. Keys are replaced whole rather than deep-merged,
+  // so `completion` arrives without the fields of the mode it replaces.
+  overrides?: Record<string, unknown>;
 }
 
 const FIXTURES: Record<FixtureName, FixtureSpec> = {
@@ -44,6 +55,13 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   // Its own fixture, not extra pages in `free`: cmi.core.score.raw is the
   // course score, so adding graded quizzes to `free` would change what every
   // existing roundtrip assertion there sees.
+  // Same course as `free`, completed by passing the graded quiz instead of by
+  // visiting every page.
+  'completion-quiz': {
+    source: resolve(REPO_ROOT, 'tests/fixtures/free'),
+    standards: ['scorm2004'],
+    overrides: { completion: { mode: 'quiz' } },
+  },
   'quiz-timing': {
     source: resolve(REPO_ROOT, 'tests/fixtures/quiz-timing'),
     standards: ['scorm12'],
@@ -106,6 +124,36 @@ async function run(
   }
 }
 
+/**
+ * Re-emit the variant's course.config.js with `overrides` applied. Importing and
+ * re-serializing beats patching the source text: a regex has to guess where a
+ * setting's braces end, and silently patches the wrong span once a setting gains
+ * a nested object.
+ */
+async function applyOverrides(
+  dir: string,
+  fixtureName: FixtureName,
+  overrides: Record<string, unknown>,
+): Promise<void> {
+  const configPath = resolve(dir, 'course.config.js');
+  const base = (await import(pathToFileURL(configPath).href)).default;
+  const json = JSON.stringify(
+    { ...base, ...overrides },
+    (_key, value) => {
+      if (typeof value === 'function') {
+        throw new Error(
+          `[e2e globalSetup] ${fixtureName}/course.config.js holds a function, which ` +
+            `overrides cannot carry: the config is re-emitted as JSON and the function ` +
+            `would be dropped silently. Move that setting out of the overridden fixture.`,
+        );
+      }
+      return value;
+    },
+    2,
+  );
+  writeFileSync(configPath, `export default ${json};\n`);
+}
+
 async function buildVariant(
   fixtureName: FixtureName,
   standard: Standard,
@@ -148,6 +196,10 @@ async function buildVariant(
         `its course.config.js standard. ` +
         `Pass it through: tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }).`,
     );
+  }
+
+  if (spec.overrides) {
+    await applyOverrides(dir, fixtureName, spec.overrides);
   }
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.
