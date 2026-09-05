@@ -1,0 +1,111 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { structureFingerprint } from '../src/runtime/fingerprint.js';
+
+const page = {
+  index: 0,
+  title: 'Welcome',
+  slug: 'welcome',
+  importPath: '/pages/01-intro/01-lesson/welcome.svelte',
+  quiz: null,
+};
+const secondPage = { ...page, index: 1, title: 'Next', slug: 'next' };
+
+const manifest = {
+  sections: [
+    {
+      title: 'Intro',
+      slug: 'intro',
+      lessons: [{ title: 'Lesson', slug: 'lesson', pages: [page, secondPage] }],
+    },
+  ],
+  pages: [page, secondPage],
+  totalPages: 2,
+};
+
+function makeConfig(resume: 'auto' | 'never') {
+  return {
+    title: 'Demo',
+    resume,
+    branding: {},
+    navigation: { mode: 'free' },
+    scoring: { passingScore: 80 },
+    completion: { mode: 'percentage', percentageThreshold: 100 },
+    export: { standard: 'web' },
+  };
+}
+
+function makeAdapter(saved: unknown) {
+  const seedLifecycle = vi.fn();
+  return {
+    seedLifecycle,
+    adapter: {
+      init: async () => {},
+      getState: () => saved,
+      seedLifecycle,
+      saveState: () => {},
+      setDuration: () => {},
+      setExit: () => {},
+      setScore: () => {},
+      setCompletionStatus: () => {},
+      setSuccessStatus: () => {},
+      commit: () => {},
+      terminate: () => {},
+    },
+  };
+}
+
+async function mountApp(resume: 'auto' | 'never') {
+  const savedState = {
+    b: 1,
+    v: [0, 1],
+    q: {},
+    d: 42,
+    f: structureFingerprint(manifest),
+  };
+  const { adapter, seedLifecycle } = makeAdapter(savedState);
+  // App.svelte imports config at module scope, so the stub modules have to be
+  // re-evaluated for the second mount to see a different resume mode. Svelte
+  // and the page component come from the same fresh registry or they meet a
+  // second runtime instance and every $effect is orphaned.
+  vi.resetModules();
+  const { mount, unmount } = await import('svelte');
+  (globalThis as any).__tesseraTest = {
+    config: makeConfig(resume),
+    manifest,
+    pageModules: {
+      [page.importPath]: () => import('./fixtures/app-page.svelte'),
+    },
+    adapter,
+  };
+  const App = (await import('../src/runtime/App.svelte')).default;
+  const component = mount(App, { target: document.body });
+  await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
+  return { component, seedLifecycle, unmount };
+}
+
+// shouldRestore itself is covered in fingerprint.test.ts. This covers the
+// argument App.svelte passes into it: config.resume, not a hardcoded mode.
+describe('App restore gate honours config.resume', () => {
+  let cleanup: (() => void) | null = null;
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = null;
+    document.body.innerHTML = '';
+    delete (globalThis as any).__tesseraTest;
+  });
+
+  it('restores saved state when resume is "auto"', async () => {
+    const { component, seedLifecycle, unmount } = await mountApp('auto');
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(seedLifecycle).toHaveBeenCalled());
+  });
+
+  it('ignores saved state when resume is "never"', async () => {
+    const { component, seedLifecycle, unmount } = await mountApp('never');
+    cleanup = () => unmount(component);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(seedLifecycle).not.toHaveBeenCalled();
+  });
+});
