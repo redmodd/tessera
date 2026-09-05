@@ -134,7 +134,7 @@ async function waitForScormValue(page: Page, key: string): Promise<void> {
 }
 
 test.describe.serial('quiz reporting timing — review and never', () => {
-  const PORT = 5296;
+  const PORT = 5310;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;
 
@@ -290,7 +290,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
 });
 
 test.describe.serial("completion: { mode: 'quiz' }", () => {
-  const PORT = 5297;
+  const PORT = 5311;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;
 
@@ -324,7 +324,7 @@ test.describe.serial("completion: { mode: 'quiz' }", () => {
 });
 
 test.describe.serial("completion: { mode: 'manual' }", () => {
-  const PORT = 5298;
+  const PORT = 5312;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;
 
@@ -359,7 +359,7 @@ test.describe.serial("completion: { mode: 'manual' }", () => {
 });
 
 test.describe.serial("resume: 'never'", () => {
-  const PORT = 5299;
+  const PORT = 5313;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;
 
