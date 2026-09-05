@@ -108,9 +108,8 @@ async function run(
   }
 }
 
-// Paths whose value JSON.stringify would drop (function, undefined, symbol) or
-// rewrite into something else (Date to a string, Map/Set/RegExp to {}, NaN and
-// Infinity to null).
+// Paths JSON.stringify would drop or rewrite: functions, undefined, symbols,
+// non-finite numbers, and anything that isn't a plain object or array.
 function lossyPaths(value: unknown, path = ''): string[] {
   const type = typeof value;
   if (value === null || type === 'string' || type === 'boolean') return [];
@@ -151,11 +150,8 @@ async function applyOverrides(
   );
 }
 
-// What each standard leaves in dist/. The standard only reaches the build if the
-// fixture's vite.config.js passes TESSERA_STANDARD to the plugin as
-// standardOverride; without that the variant silently builds the standard in its
-// own course.config.js, and the failure surfaces much later as a missing manifest
-// in an unrelated spec.
+// What each standard leaves in dist/: the proof that TESSERA_STANDARD actually
+// reached the plugin, since a fixture that ignores it still builds successfully.
 const BUILD_MARKERS: Record<Standard, { file: string; contains?: string }[]> = {
   web: [],
   scorm12: [{ file: 'imsmanifest.xml', contains: '<schemaversion>1.2' }],

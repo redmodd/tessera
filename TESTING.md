@@ -110,7 +110,7 @@ A variant-built fixture's `vite.config.js` must forward that env var to the plug
 tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD });
 ```
 
-Without it the variant builds whatever `course.config.js` declares, so globalSetup fails the build rather than let the wrong standard through.
+Without it the variant builds whatever `course.config.js` declares, so globalSetup checks the built `dist/` for that standard's manifest and fails the run rather than let the wrong standard through.
 
 A fixture entry can also carry `overrides` for a variant that differs by a course-level setting, since one `course.config.js` holds one value per axis. globalSetup re-emits the copied config with those keys replaced:
 
