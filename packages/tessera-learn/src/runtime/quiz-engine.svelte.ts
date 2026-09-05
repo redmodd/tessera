@@ -54,9 +54,9 @@ interface InternalQuestion {
 
 /**
  * The quiz engine: all reactive state, scoring, retry/feedback policy and the
- * register/submit/retry lifecycle that used to live inside the `useQuiz`
- * closure. Directly instantiable (and unit-testable) because the only two
- * side-effecting touchpoints — DOM events and LMS reporting — are injected.
+ * register/submit/retry lifecycle. Directly instantiable (and unit-testable)
+ * because the only two side-effecting touchpoints — DOM events and LMS
+ * reporting — are injected.
  */
 export class QuizEngine implements UseQuizInternalHandle {
   #deps: QuizEngineDeps;

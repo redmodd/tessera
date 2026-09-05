@@ -62,8 +62,8 @@ test.describe.serial('quiz reporting timing — review and never', () => {
     expect(await interactionWrites(page)).toEqual([]);
     await primary.click();
 
-    // Q2 — FillInTheBlank. Blurring the input used to commit the answer; the
-    // PR removed that onblur commit, so the log must still be empty after it.
+    // Q2 — FillInTheBlank. Blurring the input commits nothing, so the log
+    // must still be empty after it.
     const input = page.locator(
       '.tessera-quiz-question-wrapper.active input[type="text"]',
     );
