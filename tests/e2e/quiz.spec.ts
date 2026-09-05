@@ -317,6 +317,34 @@ test.describe('Quiz — Accessibility', () => {
   });
 });
 
+test.describe('Quiz — adjacent quiz pages', () => {
+  test('a second quiz page starts fresh instead of inheriting the first', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/');
+    await waitForContent(page);
+
+    await navigateToPage(page, 'Practice Quiz');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    const progress = page.locator('.tessera-quiz-progress-desktop').first();
+    await expect(progress).toContainText('Question 1 of 2');
+    await answerMultipleChoice(page, 1);
+    await primaryBtn(page).click();
+    await expect(progress).toContainText('Question 2 of 2');
+    await answerFillInTheBlank(page, 'H2O');
+    await page.locator('.tessera-quiz-btn-submit').click();
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+
+    await expect(page.locator('.tessera-quiz-results')).toHaveCount(0);
+    await expect(progress).toContainText('Question 1 of 3');
+  });
+});
+
 test.describe('Quiz — Practice', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
