@@ -20,7 +20,7 @@ const STUBS: Record<string, string> = {
 const tesseraVirtualStubs = {
   name: 'tessera-test-virtual-stubs',
   resolveId(id: string) {
-    return id in STUBS ? '\0' + id : null;
+    return Object.hasOwn(STUBS, id) ? '\0' + id : null;
   },
   load(id: string) {
     return id.startsWith('\0') ? (STUBS[id.slice(1)] ?? null) : null;

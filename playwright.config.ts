@@ -95,34 +95,13 @@ export default defineConfig({
   // Playwright starts blank it so an exported value in a developer's shell can't
   // turn a dev server into an LMS build. A server reused via reuseExistingServer
   // keeps whatever environment it was started with.
-  webServer: [
-    {
-      command: 'cd tests/fixtures/free && pnpm dev --port 5180',
-      port: 5180,
+  webServer: ['free', 'sequential', 'custom-layout', 'custom-quiz'].map(
+    (fixture, i) => ({
+      command: `cd tests/fixtures/${fixture} && pnpm dev --port ${5180 + i}`,
+      port: 5180 + i,
       env: { TESSERA_STANDARD: '' },
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/sequential && pnpm dev --port 5181',
-      port: 5181,
-      env: { TESSERA_STANDARD: '' },
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/custom-layout && pnpm dev --port 5182',
-      port: 5182,
-      env: { TESSERA_STANDARD: '' },
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-    {
-      command: 'cd tests/fixtures/custom-quiz && pnpm dev --port 5183',
-      port: 5183,
-      env: { TESSERA_STANDARD: '' },
-      reuseExistingServer: !process.env.CI,
-      timeout: 20000,
-    },
-  ],
+    }),
+  ),
 });

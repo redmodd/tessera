@@ -104,3 +104,38 @@ export async function answerMatching(
     await expect(matched).toHaveCount(expected);
   }
 }
+
+/**
+ * Answer the `free` fixture's three-question graded quiz correctly and submit,
+ * returning once the results panel is visible. Asserts on button text rather
+ * than sleeping, so it stays in step with the quiz's feedback transitions.
+ */
+export async function answerGradedQuiz(page: Page): Promise<void> {
+  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
+  await page
+    .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+    .nth(1)
+    .click();
+  await expect(primary).toHaveText('Submit');
+  await primary.click();
+  await expect(primary).toHaveText('Next Question');
+  await primary.click();
+
+  await page
+    .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
+    .fill('blue');
+  await expect(primary).toHaveText('Submit');
+  await primary.click();
+  await expect(primary).toHaveText('Next Question');
+  await primary.click();
+
+  await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+  await expect(primary).toHaveText('Submit');
+  await primary.click();
+
+  const submit = page.locator('.tessera-quiz-btn-submit');
+  await expect(submit).toBeVisible();
+  await submit.click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}

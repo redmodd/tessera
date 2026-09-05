@@ -7,6 +7,7 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  answerGradedQuiz,
   answerMatching,
   interactionField,
   interactionWrites,
@@ -367,35 +368,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    // Answer Q1 correctly
-    await page
-      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-      .nth(1)
-      .click();
-    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    // Answer Q2 correctly
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    // Answer Q3 correctly
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    const submit = page.locator('.tessera-quiz-btn-submit');
-    await submit.waitFor({ state: 'visible', timeout: 5000 });
-    await submit.click();
-    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+    await answerGradedQuiz(page);
 
     await waitForScormCall(
       page,
@@ -582,33 +555,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    // Answer all 3 questions correctly (same flow as the SCORM tests)
-    await page
-      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-      .nth(1)
-      .click();
-    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    const submit = page.locator('.tessera-quiz-btn-submit');
-    await submit.waitFor({ state: 'visible', timeout: 5000 });
-    await submit.click();
-    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+    await answerGradedQuiz(page);
 
     // Wait for the Passed statement to land
     await expect

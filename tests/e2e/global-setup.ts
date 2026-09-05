@@ -84,19 +84,6 @@ export function tesseraCli(fixture: FixtureName): string {
   );
 }
 
-// runAudit rebuilds the course from the variant's course.config.js with no
-// standard override, so a non-web variant would be audited as the standard its
-// course.config.js declares rather than the one its dist/ was built for.
-export function auditDir(fixture: FixtureName, standard: Standard): string {
-  if (standard !== 'web') {
-    throw new Error(
-      `[e2e] runAudit ignores the variant standard and rebuilds from course.config.js, ` +
-        `so only "web" variants can be audited (got "${standard}" for ${fixture}).`,
-    );
-  }
-  return variantDir(fixture, standard);
-}
-
 export function fixtureSource(fixture: FixtureName): string {
   return FIXTURES[fixture].source;
 }
@@ -126,25 +113,11 @@ async function run(
 // setting gains a nested object.
 async function applyOverrides(
   dir: string,
-  fixtureName: FixtureName,
   overrides: Record<string, unknown>,
 ): Promise<void> {
   const configPath = resolve(dir, 'course.config.js');
   const base = (await import(pathToFileURL(configPath).href)).default;
-  const json = JSON.stringify(
-    { ...base, ...overrides },
-    (_key, value) => {
-      if (typeof value === 'function') {
-        throw new Error(
-          `[e2e globalSetup] ${fixtureName}/course.config.js holds a function, which ` +
-            `overrides cannot carry: the config is re-emitted as JSON and the function ` +
-            `would be dropped silently. Move that setting out of the overridden fixture.`,
-        );
-      }
-      return value;
-    },
-    2,
-  );
+  const json = JSON.stringify({ ...base, ...overrides }, null, 2);
   writeFileSync(configPath, `export default ${json};\n`);
 }
 
@@ -193,7 +166,7 @@ async function buildVariant(
   }
 
   if (spec.overrides) {
-    await applyOverrides(dir, fixtureName, spec.overrides);
+    await applyOverrides(dir, spec.overrides);
   }
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.

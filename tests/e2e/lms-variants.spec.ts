@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
 import {
+  answerGradedQuiz,
   answerMatching,
   interactionWrites,
   reportedQuestionCount,
@@ -162,35 +163,7 @@ test.describe.serial('completion.mode quiz', () => {
       .click();
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
-
-    // Q1 — "What is 2 + 2?" → option index 1 ("4").
-    await page
-      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-      .nth(1)
-      .click();
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-
-    // Q2 — FillInTheBlank.
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await primary.click();
-    await page.waitForTimeout(300);
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    // Q3 — Matching.
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-    await primary.click();
-    await page.waitForTimeout(300);
-
-    const submit = page.locator('.tessera-quiz-btn-submit');
-    await submit.waitFor({ state: 'visible', timeout: 5000 });
-    await submit.click();
-    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+    await answerGradedQuiz(page);
 
     await expect
       .poll(

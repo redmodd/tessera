@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { auditDir } from './global-setup.js';
+import { variantDir } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
 
 // runAudit serves dist/ and launches its own browser, so this is a single
@@ -9,7 +9,7 @@ import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
 test.describe('Tier 2 — runtime accessibility audit', () => {
   test('passes axe on the pre-built free/web fixture', async () => {
     test.setTimeout(120_000);
-    const dir = auditDir('free', 'web');
+    const dir = variantDir('free', 'web');
     expect(existsSync(resolve(dir, 'dist', 'index.html'))).toBe(true);
 
     // Standalone fixture has no shared/ dir, so workspaceRoot is just the course
@@ -29,7 +29,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
   // must come from the manifest, not clicked DOM buttons.
   test('audits every page of a custom-layout course (no sidebar)', async () => {
     test.setTimeout(120_000);
-    const dir = auditDir('custom-layout', 'web');
+    const dir = variantDir('custom-layout', 'web');
 
     await runAudit(dir, dir, { threshold: 'serious' });
 
@@ -51,7 +51,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
   // accessible ErrorPage it renders.
   test('flags and fails on a page that fails to load', async () => {
     test.setTimeout(120_000);
-    const dir = auditDir('broken-page', 'web');
+    const dir = variantDir('broken-page', 'web');
 
     const code = await runAudit(dir, dir, { threshold: 'serious' });
 
