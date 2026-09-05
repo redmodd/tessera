@@ -48,6 +48,8 @@ export interface SavedState {
   v: number[];
   /** Quiz scores — pageIndex (as string key) to score */
   q: Record<string, number>;
+  /** Quiz attempts — pageIndex (as string key) to submitted attempt count */
+  qa?: Record<string, number>;
   /** Duration — accumulated seconds */
   d: number;
   /** Chunk progress — pageIndex (as string key) to highest revealed chunk index */

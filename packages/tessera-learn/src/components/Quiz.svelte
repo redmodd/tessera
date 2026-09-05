@@ -225,12 +225,18 @@
           {passed ? 'Passed' : 'Not Passed'}
         </span>
       </div>
-      <p class="tessera-quiz-results-detail">
-        You answered {correctCount} of {totalQuestions} questions correctly.
-      </p>
+      {#if handle.restored}
+        <p class="tessera-quiz-results-detail">
+          Your result from an earlier session.
+        </p>
+      {:else}
+        <p class="tessera-quiz-results-detail">
+          You answered {correctCount} of {totalQuestions} questions correctly.
+        </p>
+      {/if}
 
       <div class="tessera-quiz-results-actions">
-        {#if !feedbackDisabled}
+        {#if !feedbackDisabled && !handle.restored}
           <button
             class="tessera-quiz-btn tessera-quiz-btn-secondary"
             onclick={handleStartReview}

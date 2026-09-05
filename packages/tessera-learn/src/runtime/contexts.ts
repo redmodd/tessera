@@ -35,8 +35,15 @@ export interface AdapterContext {
   readonly adapter: PersistenceAdapter;
 }
 
+/** Saved quiz progress for the current page, seeded into a fresh QuizEngine. */
+export interface QuizPageState {
+  attempts: number;
+  score: number;
+}
+
 export interface PageContext {
   quiz: QuizConfig | null;
+  quizState: QuizPageState | null;
   passingScore: number;
 }
 

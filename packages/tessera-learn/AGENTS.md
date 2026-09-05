@@ -343,13 +343,13 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                                                                       |
-| --------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                    |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                       |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                                                      |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked                                                      |
+| Field           | Type                                 | Default    | Description                                                                                                                                        |
+| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                     |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                        |
+| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off  |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked                                                       |
 
 ### Per-question weighting
 

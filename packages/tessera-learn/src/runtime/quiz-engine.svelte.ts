@@ -40,6 +40,13 @@ export interface QuizEngineDeps {
    * element is null (the engine treats that as "no LMS bridge listener").
    */
   dispatch: (name: string, detail?: unknown) => boolean;
+  /**
+   * Saved attempt count and score for this quiz page. With attempts > 0 the
+   * engine starts in the results phase, so `maxAttempts` and the recorded score
+   * carry across sessions. Answers are not persisted, so a restored engine
+   * cannot review them — see {@link QuizEngine.restored}.
+   */
+  restore?: { attempts: number; score: number };
 }
 
 interface InternalQuestion {
@@ -73,6 +80,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   #reviewing = $state(false);
   #score = $state(0);
   #attemptCount = $state(0);
+  #restored = $state(false);
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
@@ -83,6 +91,12 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#maxAttempts = deps.quizConfig.maxAttempts ?? Infinity;
     this.#feedbackPredicate = resolveFeedbackMode(deps.quizConfig);
     this.#retryPredicate = resolveRetryStrategy(deps.quizConfig);
+    if (deps.restore && deps.restore.attempts > 0) {
+      this.#attemptCount = deps.restore.attempts;
+      this.#score = deps.restore.score;
+      this.#submitted = true;
+      this.#restored = true;
+    }
   }
 
   // Derived values are plain getters over $state, mirroring ProgressState (which
@@ -136,6 +150,15 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   get attemptCount(): number {
     return this.#attemptCount;
+  }
+
+  /**
+   * True while the displayed results come from a previous session rather than a
+   * submit in this one. The answers behind them were not persisted, so per-question
+   * results and review are unavailable until the learner retries and submits again.
+   */
+  get restored(): boolean {
+    return this.#restored;
   }
 
   /** Dev-warning inputs the wrapper reads in onDestroy. */
@@ -247,13 +270,14 @@ export class QuizEngine implements UseQuizInternalHandle {
     const { rounded } = this.#computeScore();
     this.#score = rounded;
     this.#submitted = true;
+    this.#restored = false;
     this.#attemptCount++;
 
     this.#deps.dispatch('tessera-quiz-complete', { score: rounded });
   }
 
   startReview(): void {
-    if (!this.#submitted) return;
+    if (!this.#submitted || this.#restored) return;
     this.#reviewing = true;
   }
 
@@ -290,6 +314,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#answersVersion++;
     this.#feedbackShown.clear();
     this.#submitted = false;
+    this.#restored = false;
     this.#reviewing = false;
     this.#score = 0;
     this.#deps.dispatch('tessera-quiz-retry');

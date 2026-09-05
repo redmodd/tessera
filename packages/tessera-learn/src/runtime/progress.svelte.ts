@@ -20,6 +20,11 @@ export class ProgressState {
   visitedPages = $state(new SvelteSet<number>());
   quizScores = $state(new SvelteMap<number, number>());
   /**
+   * Submitted attempts per quiz page. Persisted alongside the scores so
+   * `maxAttempts` survives leaving and reopening the course.
+   */
+  quizAttempts = $state(new SvelteMap<number, number>());
+  /**
    * Chunk progress — for pages that reveal content in stages (Continue buttons).
    * Maps pageIndex → highest revealed chunk index (0-based).
    */
@@ -64,8 +69,27 @@ export class ProgressState {
     this.version++;
   }
 
+  /**
+   * Record a quiz submission. The recorded score is the learner's best across
+   * attempts, so a weaker retry can't lower it.
+   */
   quizCompleted(pageIndex: number, score: number) {
+    const best = this.quizScores.get(pageIndex);
+    this.quizScores.set(
+      pageIndex,
+      best === undefined ? score : Math.max(best, score),
+    );
+    this.quizAttempts.set(
+      pageIndex,
+      (this.quizAttempts.get(pageIndex) ?? 0) + 1,
+    );
+    this.version++;
+  }
+
+  /** Seed a quiz page from saved state, without counting a new attempt. */
+  restoreQuiz(pageIndex: number, score: number, attempts: number) {
     this.quizScores.set(pageIndex, score);
+    if (attempts > 0) this.quizAttempts.set(pageIndex, attempts);
     this.version++;
   }
 

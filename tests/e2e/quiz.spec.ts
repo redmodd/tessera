@@ -199,6 +199,48 @@ test.describe('Quiz — Graded Assessment', () => {
 
     const exhaustedMsg = page.locator('.tessera-quiz-attempts-exhausted');
     await expect(exhaustedMsg).toBeVisible();
+
+    // Attempts are persisted, so reopening the course doesn't hand back a
+    // fresh allowance.
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
+    ).not.toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-attempts-exhausted'),
+    ).toBeVisible();
+  });
+
+  test('a submitted quiz comes back as results, keeping the best score', async ({
+    page,
+  }) => {
+    await completeGradedQuiz(page);
+    const score = await page.locator('.tessera-quiz-score-value').textContent();
+    expect(score).toBe('100%');
+
+    await page.reload();
+    await waitForContent(page);
+
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+
+    // A weaker retry must not lower the recorded score.
+    await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+    await completeGradedQuiz(page, {
+      mc: 0,
+      fill: 'wrong',
+      matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
+    });
+    const stored = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) =>
+        k.startsWith('tessera-'),
+      );
+      return JSON.parse(localStorage.getItem(key!)!);
+    });
+    expect(Math.max(...Object.values<number>(stored.q))).toBe(100);
+    expect(Math.max(...Object.values<number>(stored.qa))).toBe(2);
   });
 });
 
@@ -355,5 +397,14 @@ test.describe('Quiz — Practice', () => {
 
     const retryBtn = page.locator('.tessera-quiz-btn', { hasText: 'Retry' });
     await expect(retryBtn).toBeVisible();
+
+    // A practice quiz you already submitted reopens on its results, not a
+    // blank first question, and retry stays on offer.
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
+    ).toBeVisible();
   });
 });

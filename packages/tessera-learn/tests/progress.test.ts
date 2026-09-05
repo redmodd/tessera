@@ -36,10 +36,37 @@ describe('ProgressState', () => {
       expect(progress.quizScores.get(2)).toBe(85);
     });
 
-    it('replaces previous score on retry', () => {
+    it('keeps the best score across attempts', () => {
       const progress = new ProgressState(new Set(), createConfig(), 0);
       progress.quizCompleted(2, 50);
       progress.quizCompleted(2, 90);
+      progress.quizCompleted(2, 60);
+      expect(progress.quizScores.get(2)).toBe(90);
+    });
+
+    it('counts attempts per page', () => {
+      const progress = new ProgressState(new Set(), createConfig(), 0);
+      progress.quizCompleted(2, 50);
+      progress.quizCompleted(2, 90);
+      progress.quizCompleted(3, 70);
+      expect(progress.quizAttempts.get(2)).toBe(2);
+      expect(progress.quizAttempts.get(3)).toBe(1);
+    });
+  });
+
+  describe('restoreQuiz', () => {
+    it('seeds score and attempts without counting a new attempt', () => {
+      const progress = new ProgressState(new Set(), createConfig(), 0);
+      progress.restoreQuiz(2, 90, 2);
+      expect(progress.quizScores.get(2)).toBe(90);
+      expect(progress.quizAttempts.get(2)).toBe(2);
+    });
+
+    it('a later submit continues the restored attempt count', () => {
+      const progress = new ProgressState(new Set(), createConfig(), 0);
+      progress.restoreQuiz(2, 90, 2);
+      progress.quizCompleted(2, 40);
+      expect(progress.quizAttempts.get(2)).toBe(3);
       expect(progress.quizScores.get(2)).toBe(90);
     });
   });

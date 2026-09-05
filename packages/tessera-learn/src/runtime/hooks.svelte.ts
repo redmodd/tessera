@@ -377,6 +377,12 @@ export interface UseQuizHandle {
   /** Resolved passing threshold (config + LMS mastery override). */
   readonly passingScore: number;
   readonly attemptCount: number;
+  /**
+   * True while the results shown were restored from a previous session. The
+   * learner's answers are not persisted, so per-question results and review are
+   * unavailable until they retry and submit again.
+   */
+  readonly restored: boolean;
   submit(): void;
   startReview(): void;
   exitReview(): void;
@@ -456,6 +462,7 @@ export function useQuiz(opts: {
       el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
       return true;
     },
+    restore: pageCtx.quizState ?? undefined,
   });
 
   setContext<QuizContextValue>(TESSERA_QUIZ, {
