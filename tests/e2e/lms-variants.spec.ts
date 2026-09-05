@@ -130,7 +130,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
  * into lesson_status, so 2004 is the standard that can show the quiz alone
  * completing the course.
  */
-test.describe('completion.mode quiz', () => {
+test.describe.serial('completion.mode quiz', () => {
   const PORT = 5311;
   const BASE = `http://localhost:${PORT}`;
   let preview: ChildProcess;

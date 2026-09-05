@@ -37,8 +37,10 @@ function makeConfig(resume: 'auto' | 'never') {
 
 function makeAdapter(saved: unknown) {
   const seedLifecycle = vi.fn();
+  const setCompletionStatus = vi.fn();
   return {
     seedLifecycle,
+    setCompletionStatus,
     adapter: {
       init: async () => {},
       getState: () => saved,
@@ -47,7 +49,7 @@ function makeAdapter(saved: unknown) {
       setDuration: () => {},
       setExit: () => {},
       setScore: () => {},
-      setCompletionStatus: () => {},
+      setCompletionStatus,
       setSuccessStatus: () => {},
       commit: () => {},
       terminate: () => {},
@@ -63,7 +65,8 @@ async function mountApp(resume: 'auto' | 'never') {
     d: 42,
     f: structureFingerprint(manifest),
   };
-  const { adapter, seedLifecycle } = makeAdapter(savedState);
+  const { adapter, seedLifecycle, setCompletionStatus } =
+    makeAdapter(savedState);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -81,7 +84,7 @@ async function mountApp(resume: 'auto' | 'never') {
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return { component, seedLifecycle, unmount };
+  return { component, seedLifecycle, setCompletionStatus, unmount };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
@@ -103,9 +106,13 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('ignores saved state when resume is "never"', async () => {
-    const { component, seedLifecycle, unmount } = await mountApp('never');
+    const { component, seedLifecycle, setCompletionStatus, unmount } =
+      await mountApp('never');
     cleanup = () => unmount(component);
-    await new Promise((r) => setTimeout(r, 50));
+    // App pushes completion status unconditionally just past the restore gate,
+    // so waiting on it proves the gate ran and declined rather than that init
+    // is still in flight.
+    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     expect(seedLifecycle).not.toHaveBeenCalled();
   });
 });
