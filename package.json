@@ -15,10 +15,10 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@changesets/cli": "^3.0.0",
+    "@changesets/cli": "^3.0.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.11.0",
@@ -27,7 +27,7 @@
     "scorm-again": "3.3.0",
     "svelte-eslint-parser": "^1.8.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^4.1.11"
   },
   "engines": {

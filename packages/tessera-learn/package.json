@@ -102,11 +102,11 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^30.0.1",
     "scorm-again": "3.3.0",
-    "svelte": "^5.56.10",
+    "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "tsdown": "^0.22.14",
     "typescript": "^6.0.3",
