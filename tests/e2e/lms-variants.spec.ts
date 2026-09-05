@@ -126,12 +126,9 @@ test.describe.serial('quiz reporting timing — review and never', () => {
 });
 
 /**
- * The same course as `free`, built with completion.mode 'quiz' through the
- * fixture's overrides. Under `free`'s own percentage/100 completion, passing
- * the graded quiz leaves the course incomplete until every page has been
- * visited; here the quiz alone completes it. SCORM 2004 is the standard that
- * keeps completion and success in separate fields, so it can show the
- * difference — SCORM 1.2 folds both into lesson_status.
+ * `free` with completion.mode 'quiz'. SCORM 1.2 folds completion and success
+ * into lesson_status, so 2004 is the standard that can show the quiz alone
+ * completing the course.
  */
 test.describe('completion.mode quiz', () => {
   const PORT = 5311;

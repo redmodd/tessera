@@ -112,6 +112,16 @@ tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD });
 
 Without it the variant builds whatever `course.config.js` declares, so globalSetup fails the build rather than let the wrong standard through.
 
+A fixture entry can also carry `overrides` for a variant that differs by a course-level setting, since one `course.config.js` holds one value per axis. globalSetup re-emits the copied config with those keys replaced:
+
+```js
+'completion-quiz': {
+  source: resolve(REPO_ROOT, 'tests/fixtures/free'),
+  standards: ['scorm2004'],
+  overrides: { completion: { mode: 'quiz' } },
+},
+```
+
 Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. The first e2e run after `pnpm install` therefore takes ~30–60s of build time before any spec executes — that's expected.
 
 ### Fixtures are committed

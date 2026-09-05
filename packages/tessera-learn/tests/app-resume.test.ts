@@ -64,10 +64,10 @@ async function mountApp(resume: 'auto' | 'never') {
     f: structureFingerprint(manifest),
   };
   const { adapter, seedLifecycle } = makeAdapter(savedState);
-  // App.svelte imports config at module scope, so the stub modules have to be
-  // re-evaluated for the second mount to see a different resume mode. Svelte
-  // and the page component come from the same fresh registry or they meet a
-  // second runtime instance and every $effect is orphaned.
+  // App.svelte imports config at module scope, so the stubs need re-evaluating
+  // for the second mount to see a different resume mode. Svelte and the page
+  // come from that same fresh registry or every $effect is orphaned against a
+  // second runtime instance.
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {

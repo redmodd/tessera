@@ -29,9 +29,8 @@ export type FixtureName =
 interface FixtureSpec {
   source: string;
   standards: readonly Standard[];
-  // Course-level settings to change for this variant, since one course.config.js
-  // holds one value per axis. Keys are replaced whole rather than deep-merged,
-  // so `completion` arrives without the fields of the mode it replaces.
+  // Course-level settings for this variant. Keys are replaced whole, so
+  // `completion` arrives without the fields of the mode it replaces.
   overrides?: Record<string, unknown>;
 }
 
@@ -55,8 +54,6 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   // Its own fixture, not extra pages in `free`: cmi.core.score.raw is the
   // course score, so adding graded quizzes to `free` would change what every
   // existing roundtrip assertion there sees.
-  // Same course as `free`, completed by passing the graded quiz instead of by
-  // visiting every page.
   'completion-quiz': {
     source: resolve(REPO_ROOT, 'tests/fixtures/free'),
     standards: ['scorm2004'],
@@ -124,12 +121,9 @@ async function run(
   }
 }
 
-/**
- * Re-emit the variant's course.config.js with `overrides` applied. Importing and
- * re-serializing beats patching the source text: a regex has to guess where a
- * setting's braces end, and silently patches the wrong span once a setting gains
- * a nested object.
- */
+// Importing and re-serializing rather than patching the source text: a regex has
+// to guess where a setting's braces end, and patches the wrong span once that
+// setting gains a nested object.
 async function applyOverrides(
   dir: string,
   fixtureName: FixtureName,
