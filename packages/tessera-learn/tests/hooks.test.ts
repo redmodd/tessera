@@ -86,6 +86,21 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('is not answerComplete until an answer is set, with no complete callback', () => {
+    const progress = new ProgressState(new Set(), createConfig(), 0);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const q = useQuestion({
+      id: 'q1',
+      response: () => ({ type: 'choice', response: ['a'], correct: ['a'] }),
+    });
+
+    expect(q.answerComplete).toBe(false);
+    q.setAnswer('a');
+    expect(q.answerComplete).toBe(true);
+  });
+
   it('flags incorrect when response does not match', () => {
     const progress = new ProgressState(new Set(), createConfig(), 0);
     const adapter = makeAdapter();

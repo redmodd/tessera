@@ -210,7 +210,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       return currentAnswer;
     },
     get answerComplete() {
-      return opts.complete?.() ?? true;
+      return currentAnswer !== undefined && (opts.complete?.() ?? true);
     },
     get feedbackVisible() {
       return submitted;

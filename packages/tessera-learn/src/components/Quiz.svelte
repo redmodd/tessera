@@ -139,9 +139,6 @@
       >
         Back
       </button>
-      <!-- Immediate mode submits per question: the mid-quiz button reads
-           "Submit" for the answer, and the last one reads "See Results" for
-           the quiz. Both saying "Submit" is intended, not a copy slip. -->
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           class="tessera-quiz-btn tessera-btn-primary"

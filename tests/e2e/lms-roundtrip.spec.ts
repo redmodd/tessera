@@ -7,6 +7,7 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  answerMatching,
   interactionField,
   interactionWrites,
   reportedQuestionCount,
@@ -200,23 +201,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.waitForTimeout(300);
 
     // Q3: Matching 1→One, 2→Two, 3→Three
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -403,23 +388,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.waitForTimeout(300);
 
     // Answer Q3 correctly
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -629,23 +598,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await primary.click();
     await page.waitForTimeout(300);
 
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -822,23 +775,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await primary.click();
     await page.waitForTimeout(300);
 
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
