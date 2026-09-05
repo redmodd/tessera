@@ -226,9 +226,7 @@
         </span>
       </div>
       {#if handle.restored}
-        <p class="tessera-quiz-results-detail">
-          Your result from an earlier session.
-        </p>
+        <p class="tessera-quiz-results-detail">Your previous result.</p>
       {:else}
         <p class="tessera-quiz-results-detail">
           You answered {correctCount} of {totalQuestions} questions correctly.

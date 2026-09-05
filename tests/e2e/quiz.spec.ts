@@ -19,6 +19,13 @@ async function navigateToPage(page: Page, pageTitle: string) {
   await waitForContent(page);
 }
 
+async function readSavedState(page: Page) {
+  return page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('tessera-'));
+    return JSON.parse(localStorage.getItem(key!)!);
+  });
+}
+
 const primaryBtn = (page: Page) =>
   page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
@@ -220,6 +227,9 @@ test.describe('Quiz — Graded Assessment', () => {
     const score = await page.locator('.tessera-quiz-score-value').textContent();
     expect(score).toBe('100%');
 
+    // A single attempt is the restore default, so it costs no suspend data.
+    expect(await readSavedState(page)).not.toHaveProperty('qa');
+
     await page.reload();
     await waitForContent(page);
 
@@ -233,12 +243,7 @@ test.describe('Quiz — Graded Assessment', () => {
       fill: 'wrong',
       matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
     });
-    const stored = await page.evaluate(() => {
-      const key = Object.keys(localStorage).find((k) =>
-        k.startsWith('tessera-'),
-      );
-      return JSON.parse(localStorage.getItem(key!)!);
-    });
+    const stored = await readSavedState(page);
     expect(Math.max(...Object.values<number>(stored.q))).toBe(100);
     expect(Math.max(...Object.values<number>(stored.qa))).toBe(2);
   });

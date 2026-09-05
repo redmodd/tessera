@@ -43,8 +43,8 @@ export interface QuizEngineDeps {
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
    * engine starts in the results phase, so `maxAttempts` and the recorded score
-   * carry across sessions. Answers are not persisted, so a restored engine
-   * cannot review them — see {@link QuizEngine.restored}.
+   * survive both a revisit and a new session. Answers are not persisted, so a
+   * restored engine cannot review them — see {@link QuizEngine.restored}.
    */
   restore?: { attempts: number; score: number };
 }
@@ -153,8 +153,8 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   /**
-   * True while the displayed results come from a previous session rather than a
-   * submit in this one. The answers behind them were not persisted, so per-question
+   * True while the displayed results come from saved progress rather than a
+   * submit on this mount. The answers behind them were not persisted, so per-question
    * results and review are unavailable until the learner retries and submits again.
    */
   get restored(): boolean {

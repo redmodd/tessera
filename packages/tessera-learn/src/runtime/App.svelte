@@ -177,10 +177,14 @@
       });
   }
 
-  // React to page index changes
+  // React to page index changes. Held until persistence has been restored: a
+  // quiz seeds its attempt count from restored progress at mount, and adapters
+  // whose init() awaits the network (cmi5, xAPI) resolve well after the first
+  // page module would otherwise have loaded.
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;
+    if (!persistenceReady) return;
     untrack(() => loadPage(index));
   });
 
@@ -203,7 +207,7 @@
     }
     const qa = {};
     for (const [pageIndex, attempts] of progress.quizAttempts) {
-      qa[String(pageIndex)] = attempts;
+      if (attempts > 1) qa[String(pageIndex)] = attempts;
     }
     const c = {};
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
@@ -221,7 +225,7 @@
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
-      ...(progress.quizAttempts.size > 0 ? { qa } : {}),
+      ...(Object.keys(qa).length > 0 ? { qa } : {}),
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
       ...(progress.standaloneQuestionScores.size > 0 ? { s } : {}),
       ...(progress.gradedStandalonePages.size > 0

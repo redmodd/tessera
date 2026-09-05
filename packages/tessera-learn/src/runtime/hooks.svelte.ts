@@ -378,9 +378,10 @@ export interface UseQuizHandle {
   readonly passingScore: number;
   readonly attemptCount: number;
   /**
-   * True while the results shown were restored from a previous session. The
-   * learner's answers are not persisted, so per-question results and review are
-   * unavailable until they retry and submit again.
+   * True while the results shown were restored from saved progress rather than
+   * submitted on this mount. The learner's answers are not persisted, so
+   * per-question results and review are unavailable until they retry and submit
+   * again.
    */
   readonly restored: boolean;
   submit(): void;
