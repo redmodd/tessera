@@ -343,13 +343,13 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                        |
-| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                     |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                        |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                       |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: after `revealFeedback(q)`, locks the answer. `review`: post-submit only. `never`: off |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked       |
+| Field           | Type                                 | Default    | Description                                                                                                                                       |
+| --------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                    |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                       |
+| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                                                      |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked                                                      |
 
 ### Per-question weighting
 
@@ -669,16 +669,19 @@ interface Question {
   readonly submitted: boolean;
   readonly correct: boolean | null;
   readonly answer: unknown;
+  readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
   readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
-  commit(): void; // mark answer final; triggers the per-question LMS write. Idempotent.
+  commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
 }
 ```
 
 Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "already correct" banner.
+
+A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
 `Interaction` uses SCORM 2004 vocabulary: `choice`, `true-false`, `fill-in`, `long-fill-in`, `matching`, `sequencing`, `numeric`, `likert`, `performance`, `other`. Each is `{ type, response, correct? }`. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
 
@@ -706,17 +709,18 @@ response: () => ({
 
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
-- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `commit()` when final, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. `submit()`/`retry()` are no-ops here.
+- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
 - **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id
   graded?: boolean; // standalone only
-  response: () => Interaction; // current answer; called on each commit() and on submit
+  response: () => Interaction; // current answer; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
+  complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
@@ -733,7 +737,9 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 ### `useQuiz`
 
-Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Question widgets call `q.commit()` when final; that triggers the per-question LMS write. `submit()` commits any uncommitted questions, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
+Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
+
+**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {
@@ -1056,7 +1062,7 @@ Always submit through `useQuiz().submit()`.
 
 ### Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, calls `commit()` when final, and reads `locked`/`feedbackVisible`/`answer`.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. Reporting is `useQuiz().submit()`'s job.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
@@ -1085,7 +1091,6 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     if (q.locked) return;
     selected = i;
     q.setAnswer(i);
-    q.commit();
   }
 </script>
 

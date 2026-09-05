@@ -24,6 +24,8 @@ export interface Question {
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
+  /** Whether the answer is whole enough to submit (5 of 5 pairs matched). */
+  readonly answerComplete: boolean;
   /** Whether feedback should currently render for this question. */
   readonly feedbackVisible: boolean;
   /**
@@ -62,6 +64,8 @@ export interface UseQuestionOptions {
   maxRetries?: number;
   /** Called on submit — returns the current learner response payload. */
   response: () => Interaction;
+  /** Whether the current answer is fully specified. Default: true. */
+  complete?: () => boolean;
   /**
    * Optional score override (0–100). Standalone mode only — per-question
    * scoring inside a quiz is the quiz's responsibility.
@@ -120,6 +124,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       weight: opts.weight,
       checkAnswer: () => isCorrectInteraction(opts.response()) === true,
       reset: opts.reset,
+      complete: opts.complete,
       interaction: () => opts.response(),
     });
     const handle = q as UseQuestionHandle;
@@ -203,6 +208,9 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     },
     get answer() {
       return currentAnswer;
+    },
+    get answerComplete() {
+      return currentAnswer !== undefined && (opts.complete?.() ?? true);
     },
     get feedbackVisible() {
       return submitted;
@@ -355,6 +363,7 @@ export interface UseQuizQuestionApi {
   weight?: number;
   checkAnswer: (answer?: unknown) => boolean;
   reset?: () => void;
+  complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
   interaction?: () => Interaction;
 }

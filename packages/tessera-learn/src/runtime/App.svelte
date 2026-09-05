@@ -275,8 +275,7 @@
 
   // ---- Persistence: coalesced save on state changes ----
   // A single microtask-batched scheduler. Multiple state mutations within one
-  // tick collapse to one persistState() call (and one LMS commit). Replaces
-  // four independent $effects, each of which used to fire its own write.
+  // tick collapse to one persistState() call (and one LMS commit).
   let persistScheduled = false;
 
   function requestPersist() {

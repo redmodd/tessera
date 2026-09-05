@@ -1,12 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { execFile, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
-import { variantDir, viteBin, type Standard } from './global-setup.js';
+import { interactionField, startPreview, waitForServer } from './helpers.js';
 
 /**
  * Phase 5 Task 2 Step 4 — load-bearing custom-quiz LMS roundtrip.
@@ -19,28 +19,6 @@ import { variantDir, viteBin, type Standard } from './global-setup.js';
  * the built-in `<Quiz>` does. Without this, the data contract for custom
  * shells has only unit-level coverage.
  */
-
-function startPreview(standard: Standard, port: number): ChildProcess {
-  const dir = variantDir('custom-quiz', standard);
-  return execFile(
-    viteBin('custom-quiz'),
-    ['preview', dir, '--port', String(port), '--strictPort'],
-    { cwd: dir },
-  );
-}
-
-async function waitForServer(page: Page, url: string): Promise<void> {
-  for (let i = 0; i < 30; i++) {
-    try {
-      const res = await page.request.get(url, { timeout: 1000 });
-      if (res.ok()) return;
-    } catch {
-      // retry
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`Server at ${url} did not start within 15s`);
-}
 
 async function waitForCustomQuiz(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 15000 });
@@ -96,7 +74,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm12', PORT);
+    preview = startPreview('custom-quiz', 'scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -139,24 +117,8 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     expect(data['cmi.core.score.raw']).toBe('100');
     expect(data['cmi.core.lesson_status']).toBe('passed');
 
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in']);
-
-    const idWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(idWrites).toEqual(['q_planet', 'q_water']);
+    expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
+    expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
   });
 });
 
@@ -171,7 +133,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm2004', PORT);
+    preview = startPreview('custom-quiz', 'scorm2004', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -213,22 +175,8 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     expect(data['cmi.score.scaled']).toBe('1');
     expect(data['cmi.success_status']).toBe('passed');
 
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in']);
-    const idWrites = log
-      .filter(
-        (e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(idWrites).toEqual(['q-planet', 'q-water']);
+    expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
+    expect(await interactionField(page, 'id')).toEqual(['q-planet', 'q-water']);
   });
 });
 
@@ -243,7 +191,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('cmi5', PORT);
+    preview = startPreview('custom-quiz', 'cmi5', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -332,7 +280,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('xapi', PORT);
+    preview = startPreview('custom-quiz', 'xapi', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);

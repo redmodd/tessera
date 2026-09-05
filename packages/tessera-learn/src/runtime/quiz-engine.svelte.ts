@@ -47,15 +47,16 @@ interface InternalQuestion {
   weight: number;
   checkAnswer: (answer?: unknown) => boolean;
   reset?: () => void;
+  complete?: () => boolean;
   interaction?: () => Interaction;
   render: unknown;
 }
 
 /**
  * The quiz engine: all reactive state, scoring, retry/feedback policy and the
- * register/submit/retry lifecycle that used to live inside the `useQuiz`
- * closure. Directly instantiable (and unit-testable) because the only two
- * side-effecting touchpoints — DOM events and LMS reporting — are injected.
+ * register/submit/retry lifecycle. Directly instantiable (and unit-testable)
+ * because the only two side-effecting touchpoints — DOM events and LMS
+ * reporting — are injected.
  */
 export class QuizEngine implements UseQuizInternalHandle {
   #deps: QuizEngineDeps;
@@ -91,10 +92,17 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#internalQuestions.length;
   }
 
-  get #allAnswered(): boolean {
+  #answerComplete(i: number): boolean {
     void this.#answersVersion;
     return (
-      this.#totalQuestions > 0 && this.#answers.size >= this.#totalQuestions
+      this.#answers.has(i) && (this.#internalQuestions[i].complete?.() ?? true)
+    );
+  }
+
+  get #allAnswered(): boolean {
+    return (
+      this.#totalQuestions > 0 &&
+      this.#internalQuestions.every((_, i) => this.#answerComplete(i))
     );
   }
 
@@ -156,6 +164,7 @@ export class QuizEngine implements UseQuizInternalHandle {
       weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
       checkAnswer: api.checkAnswer,
       reset: api.reset,
+      complete: api.complete,
       interaction: api.interaction,
       render: undefined,
     };
@@ -213,8 +222,17 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   submit(): void {
     this.#submitCalled = true;
-    if (this.#submitted) return;
-    if (!this.#allAnswered) return;
+    if (this.#submitted || this.#totalQuestions === 0) return;
+    if (!this.#allAnswered) {
+      console.warn(
+        '[tessera] useQuiz: submit() ran with an unanswered or half-built question, ' +
+          'so nothing was scored. Gate your Submit button on handle.canSubmit.',
+      );
+      return;
+    }
+
+    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
+
     // Combined null-host guard + before-submit dispatch: dispatch() returns false
     // when the host element is null, which is the silent-LMS-dropout case.
     if (!this.#deps.dispatch('tessera-quiz-before-submit')) {
@@ -225,8 +243,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       );
       return;
     }
-
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
@@ -330,6 +346,9 @@ export class QuizEngine implements UseQuizInternalHandle {
       },
       get answer() {
         return engine.getAnswer(i);
+      },
+      get answerComplete() {
+        return engine.#answerComplete(i);
       },
       get feedbackVisible() {
         return engine.feedbackVisible(i);

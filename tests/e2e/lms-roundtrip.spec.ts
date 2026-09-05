@@ -1,44 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
-import { execFile, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
-import { variantDir, viteBin, type Standard } from './global-setup.js';
-
-function startPreview(standard: Standard, port: number): ChildProcess {
-  const dir = variantDir('free', standard);
-  return execFile(
-    viteBin('free'),
-    ['preview', dir, '--port', String(port), '--strictPort'],
-    { cwd: dir },
-  );
-}
-
-async function waitForServer(page: Page, url: string): Promise<void> {
-  for (let i = 0; i < 30; i++) {
-    try {
-      const res = await page.request.get(url, { timeout: 1000 });
-      if (res.ok()) return;
-    } catch {
-      // retry
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`Server at ${url} did not start within 15s`);
-}
-
-async function waitForTesseraContent(page: Page): Promise<void> {
-  await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
-}
+import {
+  answerMatching,
+  interactionField,
+  interactionWrites,
+  reportedQuestionCount,
+  startPreview,
+  waitForServer,
+  waitForTesseraContent,
+} from './helpers.js';
 
 /**
  * Wait until the SCORM mock has received at least one LMSCommit / Commit
@@ -74,7 +50,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm12', PORT);
+    preview = startPreview('free', 'scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -201,9 +177,17 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
+
+    await page.waitForTimeout(300);
+    expect(await interactionWrites(page)).toEqual([]);
+
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click(); // immediate feedback
-    await page.waitForTimeout(300);
+    await expect
+      .poll(() => interactionWrites(page).then((w) => w.length), {
+        timeout: 5000,
+      })
+      .toBeGreaterThan(0);
     await primary.click(); // continue
     await page.waitForTimeout(300);
 
@@ -217,28 +201,18 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.waitForTimeout(300);
 
     // Q3: Matching 1→One, 2→Two, 3→Three
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Every answer was revealed, so every answer is already reported.
+    await expect
+      .poll(() => reportedQuestionCount(page), { timeout: 5000 })
+      .toBe(3);
+
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
@@ -259,23 +233,13 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     // Per-question Interaction writes land before the final score, so by now
     // each built-in must have emitted cmi.interactions.<n>.id / .type.
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
 
-    const idWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
+    const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
@@ -324,7 +288,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm2004', PORT);
+    preview = startPreview('free', 'scorm2004', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -424,23 +388,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.waitForTimeout(300);
 
     // Answer Q3 correctly
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -463,22 +411,13 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     expect(data['cmi.success_status']).toBe('passed');
 
     // Per-question Interaction writes: 2004 emits the SCORM vocab verbatim.
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
 
-    const idWrites = log
-      .filter(
-        (e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
+    const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
@@ -522,7 +461,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('cmi5', PORT);
+    preview = startPreview('free', 'cmi5', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -659,23 +598,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await primary.click();
     await page.waitForTimeout(300);
 
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -732,7 +655,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('xapi', PORT);
+    preview = startPreview('free', 'xapi', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -830,9 +753,17 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
+
+    const answeredSoFar = () =>
+      statements.filter(
+        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+      );
+    await page.waitForTimeout(300);
+    expect(answeredSoFar()).toEqual([]);
+
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
-    await page.waitForTimeout(300);
+    await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(1);
     await primary.click();
     await page.waitForTimeout(300);
 
@@ -844,28 +775,16 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await primary.click();
     await page.waitForTimeout(300);
 
-    const active = page.locator('.tessera-quiz-question-wrapper.active');
-    const left = active.locator('.tessera-matching-item.left');
-    const right = active.locator('.tessera-matching-item.right');
-    const n = await left.count();
-    const targets: Record<string, string> = {
-      '1': 'One',
-      '2': 'Two',
-      '3': 'Three',
-    };
-    for (let i = 0; i < n; i++) {
-      const key = (await left.nth(i).textContent())?.trim() ?? '';
-      const target = targets[key];
-      if (!target) continue;
-      await left.nth(i).click();
-      await right.filter({ hasText: target }).first().click();
-      await page.waitForTimeout(100);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await primary.click();
     await page.waitForTimeout(300);
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Every answer was revealed, so every answer is already reported.
+    await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(3);
+
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
@@ -889,9 +808,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
 
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = answeredSoFar();
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',

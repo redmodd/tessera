@@ -28,7 +28,7 @@
 
   function isAnswered(q) {
     if (!q) return false;
-    return q.answer !== undefined || q.isLockedCorrect;
+    return q.answerComplete || q.isLockedCorrect;
   }
 
   function needsReveal(q) {
@@ -44,12 +44,17 @@
   function goNextQuestion() {
     // Immediate-mode: first click reveals feedback, second advances.
     if (needsReveal(currentQuestion)) {
-      handle.revealFeedback(currentQuestion);
+      revealCurrent();
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
     }
+  }
+
+  function revealCurrent() {
+    currentQuestion.commit();
+    handle.revealFeedback(currentQuestion);
   }
 
   function goPrevQuestion() {
@@ -140,16 +145,20 @@
           disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
         >
-          {currentQuestion?.feedbackVisible && isImmediateMode
-            ? 'Continue'
-            : 'Next'}
+          {#if needsReveal(currentQuestion)}
+            Submit
+          {:else if isImmediateMode && currentQuestion?.feedbackVisible}
+            Next Question
+          {:else}
+            Next
+          {/if}
         </button>
       {:else if needsReveal(currentQuestion)}
         <button
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={() => handle.revealFeedback(currentQuestion)}
+          onclick={revealCurrent}
         >
-          Check Answer
+          Submit
         </button>
       {:else}
         <button
@@ -157,7 +166,9 @@
           disabled={!handle.canSubmit}
           onclick={handleSubmit}
         >
-          Submit
+          {isImmediateMode && isAnswered(currentQuestion)
+            ? 'See Results'
+            : 'Submit'}
         </button>
       {/if}
     </div>

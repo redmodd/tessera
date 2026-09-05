@@ -70,6 +70,7 @@
     get maxRetries() {
       return maxRetries;
     },
+    complete: () => matches.size === pairs.length,
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
@@ -126,8 +127,7 @@
 
     if (inQuiz) {
       q.setAnswer(new Map(matches));
-      if (matches.size === pairs.length) q.commit();
-    } else if (matches.size === pairs.length && !q.submitted) {
+    } else if (q.answerComplete && !q.submitted) {
       q.submit();
     }
   }

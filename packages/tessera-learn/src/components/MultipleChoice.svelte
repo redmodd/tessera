@@ -49,7 +49,6 @@
     selectedOption = optIndex;
     if (inQuiz) {
       q.setAnswer(optIndex);
-      q.commit();
     } else {
       q.submit();
     }

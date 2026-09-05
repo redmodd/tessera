@@ -1,0 +1,16 @@
+{
+  "name": "test-project-e2e-quiz-timing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "tessera-learn": "workspace:*"
+  },
+  "devDependencies": {
+    "svelte": "^5.57.0",
+    "vite": "^8.2.2"
+  }
+}

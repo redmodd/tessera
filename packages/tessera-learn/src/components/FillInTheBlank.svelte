@@ -41,6 +41,7 @@
     get maxRetries() {
       return maxRetries;
     },
+    complete: () => inputValue.trim() !== '',
     response: () => ({
       type: 'fill-in',
       response: inputValue,
@@ -61,14 +62,9 @@
     if (inQuiz) q.setAnswer(inputValue);
   }
 
-  function handleBlur() {
-    if (!inQuiz || q.locked) return;
-    if (inputValue.trim()) q.commit();
-  }
-
   function handleKeydown(e) {
     if (inQuiz || q.submitted) return;
-    if (e.key === 'Enter' && inputValue.trim()) {
+    if (e.key === 'Enter' && q.answerComplete) {
       q.submit();
     }
   }
@@ -87,7 +83,6 @@
       value={inputValue}
       oninput={handleInput}
       onkeydown={handleKeydown}
-      onblur={handleBlur}
       disabled={q.locked}
       placeholder="Type your answer..."
       autocomplete="off"
@@ -95,7 +90,7 @@
     {#if !inQuiz && !q.submitted}
       <button
         class="tessera-btn-primary tessera-fitb-check-btn"
-        disabled={!inputValue.trim()}
+        disabled={!q.answerComplete}
         onclick={() => {
           q.submit();
         }}

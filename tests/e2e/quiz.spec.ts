@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { answerMatching } from './helpers.js';
 
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content');
@@ -36,49 +37,23 @@ async function answerFillInTheBlank(page: Page, text: string) {
 }
 
 /**
- * Click each left item and select its mapped right item by visible text.
- * Waits for the matched count to advance after each pair so we don't race the
- * Svelte effect that records the pairing.
- */
-async function answerMatching(page: Page, matchMap: Record<string, string>) {
-  const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
-  const leftItems = activeQ.locator('.tessera-matching-item.left');
-  const matched = activeQ.locator('.tessera-matching-item.left.matched');
-
-  const leftCount = await leftItems.count();
-  let expected = 0;
-  for (let i = 0; i < leftCount; i++) {
-    const leftText = (await leftItems.nth(i).textContent())?.trim();
-    const targetRight = matchMap[leftText || ''];
-    if (!targetRight) continue;
-    await leftItems.nth(i).click();
-    await activeQ
-      .locator('.tessera-matching-item.right', { hasText: targetRight })
-      .first()
-      .click();
-    expected++;
-    await expect(matched).toHaveCount(expected);
-  }
-}
-
-/**
  * Advance past one immediate-feedback question. The primary button cycles:
- *   - mid-quiz: "Next" (with answer) → first click reveals feedback and relabels
- *     to "Continue" → second click advances to the next question.
- *   - last question: "Check Answer" → click reveals feedback → primary button
- *     becomes the "Submit" button.
+ *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
+ *     relabels to "Next Question" → second click advances.
+ *   - last question: "Submit" → click reveals feedback → primary button
+ *     becomes the "See Results" button.
  * We wait on the label text to change instead of sleeping.
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
   const btn = primaryBtn(page);
   if (isLast) {
-    await expect(btn).toHaveText('Check Answer');
+    await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
   } else {
-    await expect(btn).toHaveText('Next');
+    await expect(btn).toHaveText('Submit');
     await btn.click();
-    await expect(btn).toHaveText('Continue');
+    await expect(btn).toHaveText('Next Question');
     await btn.click();
   }
 }

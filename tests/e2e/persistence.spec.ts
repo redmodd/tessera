@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { answerMatching } from './helpers.js';
 
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
@@ -139,9 +140,9 @@ test.describe('Persistence — localStorage', () => {
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
       .nth(1)
       .click();
-    await expect(primaryBtn).toHaveText('Next');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click(); // show feedback
-    await expect(primaryBtn).toHaveText('Continue');
+    await expect(primaryBtn).toHaveText('Next Question');
     await primaryBtn.click(); // advance
 
     // Q2: fill-in "blue"
@@ -149,33 +150,16 @@ test.describe('Persistence — localStorage', () => {
     await page
       .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
       .fill('blue');
-    await expect(primaryBtn).toHaveText('Next');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click();
-    await expect(primaryBtn).toHaveText('Continue');
+    await expect(primaryBtn).toHaveText('Next Question');
     await primaryBtn.click();
 
     // Q3: matching, all correct
     await expect(progress).toContainText('Question 3 of 3');
-    const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
-    const leftItems = activeQ.locator('.tessera-matching-item.left');
-    const matched = activeQ.locator('.tessera-matching-item.left.matched');
-    const matchMap = { '1': 'One', '2': 'Two', '3': 'Three' };
-    const leftCount = await leftItems.count();
-    let expectedMatches = 0;
-    for (let i = 0; i < leftCount; i++) {
-      const leftText = (await leftItems.nth(i).textContent())?.trim();
-      const target = matchMap[leftText || ''];
-      if (!target) continue;
-      await leftItems.nth(i).click();
-      await activeQ
-        .locator('.tessera-matching-item.right', { hasText: target })
-        .first()
-        .click();
-      expectedMatches++;
-      await expect(matched).toHaveCount(expectedMatches);
-    }
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
 
-    await expect(primaryBtn).toHaveText('Check Answer');
+    await expect(primaryBtn).toHaveText('Submit');
     await primaryBtn.click();
 
     const submitBtn = page.locator('.tessera-quiz-btn-submit');

@@ -18,7 +18,7 @@ export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
-  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page';
+  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page' | 'quiz-timing';
 
 interface FixtureSpec {
   source: string;
@@ -41,6 +41,13 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   'broken-page': {
     source: resolve(REPO_ROOT, 'tests/fixtures/broken-page'),
     standards: ['web'],
+  },
+  // Its own fixture, not extra pages in `free`: cmi.core.score.raw is the
+  // course score, so adding graded quizzes to `free` would change what every
+  // existing roundtrip assertion there sees.
+  'quiz-timing': {
+    source: resolve(REPO_ROOT, 'tests/fixtures/quiz-timing'),
+    standards: ['scorm12'],
   },
 };
 
