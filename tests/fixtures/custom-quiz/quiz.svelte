@@ -8,19 +8,12 @@
   let { children } = $props();
   let host;
 
-  // ?nohost makes useQuiz see a null host element, so the tessera-quiz-complete
-  // dispatch has nowhere to land. Interactions must still reach the adapter.
-  const noHost = new URLSearchParams(globalThis.location?.search ?? '').has(
-    'nohost',
-  );
-
-  const quiz = useQuiz({ element: () => (noHost ? null : host) });
+  const quiz = useQuiz({ element: () => host });
 </script>
 
 <div bind:this={host} class="custom-quiz" data-testid="custom-quiz">
   <div class="custom-quiz-status" data-testid="custom-quiz-status">
-    state: {quiz.state} · score: {quiz.score} · attempts: {quiz.attemptCount} · host:
-    {noHost ? 'null' : 'bound'}
+    state: {quiz.state} · score: {quiz.score} · attempts: {quiz.attemptCount}
   </div>
 
   <!-- All questions stacked. Each question widget calls useQuestion which

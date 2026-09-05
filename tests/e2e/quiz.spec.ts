@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { answerMatching } from './helpers.js';
 
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content');
@@ -33,32 +34,6 @@ async function answerFillInTheBlank(page: Page, text: string) {
     '.tessera-quiz-question-wrapper.active input[type="text"]',
   );
   await input.fill(text);
-}
-
-/**
- * Click each left item and select its mapped right item by visible text.
- * Waits for the matched count to advance after each pair so we don't race the
- * Svelte effect that records the pairing.
- */
-async function answerMatching(page: Page, matchMap: Record<string, string>) {
-  const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
-  const leftItems = activeQ.locator('.tessera-matching-item.left');
-  const matched = activeQ.locator('.tessera-matching-item.left.matched');
-
-  const leftCount = await leftItems.count();
-  let expected = 0;
-  for (let i = 0; i < leftCount; i++) {
-    const leftText = (await leftItems.nth(i).textContent())?.trim();
-    const targetRight = matchMap[leftText || ''];
-    if (!targetRight) continue;
-    await leftItems.nth(i).click();
-    await activeQ
-      .locator('.tessera-matching-item.right', { hasText: targetRight })
-      .first()
-      .click();
-    expected++;
-    await expect(matched).toHaveCount(expected);
-  }
 }
 
 /**

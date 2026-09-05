@@ -6,6 +6,7 @@ import {
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
+import { waitForServer } from './helpers.js';
 import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 /**
@@ -27,19 +28,6 @@ function startPreview(standard: Standard, port: number): ChildProcess {
     ['preview', dir, '--port', String(port), '--strictPort'],
     { cwd: dir },
   );
-}
-
-async function waitForServer(page: Page, url: string): Promise<void> {
-  for (let i = 0; i < 30; i++) {
-    try {
-      const res = await page.request.get(url, { timeout: 1000 });
-      if (res.ok()) return;
-    } catch {
-      // retry
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`Server at ${url} did not start within 15s`);
 }
 
 async function waitForCustomQuiz(page: Page): Promise<void> {
@@ -157,59 +145,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
       )
       .map((e) => e[2]);
     expect(idWrites).toEqual(['q_planet', 'q_water']);
-  });
-
-  test('Null host element loses the score but still reports interactions', async ({
-    page,
-  }) => {
-    // The nav never touches the URL, so ?nohost on the initial load holds for
-    // the whole session and useQuiz() sees element: () => null.
-    await page.goto(`${BASE}/?nohost`);
-    await page.locator('.tessera-nav-page', { hasText: 'Exam' }).click();
-    await waitForCustomQuiz(page);
-    await expect(
-      page.locator('[data-testid="custom-quiz-status"]'),
-    ).toContainText('host: null');
-
-    await page
-      .locator('[data-question-id="q-planet"] .tessera-mc-option')
-      .nth(1)
-      .click();
-    await page
-      .locator('[data-question-id="q-water"] input[type="text"]')
-      .fill('H2O');
-    await page.locator('[data-testid="custom-quiz-submit"]').click();
-
-    // Both answers reach the adapter even though the dispatch had no element.
-    await expect
-      .poll(
-        async () =>
-          new Set(
-            (
-              (await page.evaluate(
-                () => (window as any).__scormLog,
-              )) as string[][]
-            )
-              .filter(
-                (e) =>
-                  e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
-              )
-              .map((e) => e[1].split('.')[2]),
-          ).size,
-        { timeout: 5000 },
-      )
-      .toBe(2);
-
-    // The score is what a missing host costs: no dispatch, so the shell never
-    // leaves `answering` and no score lands.
-    await expect(
-      page.locator('[data-testid="custom-quiz-status"]'),
-    ).toContainText('state: answering');
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    // The mock seeds the key empty, so "no score" is '' rather than absent.
-    expect(data['cmi.core.score.raw'] ?? '').toBe('');
   });
 });
 

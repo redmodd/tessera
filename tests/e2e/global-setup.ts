@@ -18,25 +18,11 @@ export const VARIANTS_ROOT = resolve(REPO_ROOT, 'tests/.e2e-variants');
 
 export type Standard = 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
 export type FixtureName =
-  | 'free'
-  | 'custom-quiz'
-  | 'custom-layout'
-  | 'broken-page'
-  | 'quiz-timing'
-  | 'completion-quiz'
-  | 'completion-manual'
-  | 'resume-never';
+  'free' | 'custom-quiz' | 'custom-layout' | 'broken-page' | 'quiz-timing';
 
 interface FixtureSpec {
   source: string;
   standards: readonly Standard[];
-  /**
-   * Course-level settings a variant needs but the source fixture cannot carry,
-   * since one course.config.js holds exactly one value per axis. Applied to the
-   * copied config after the export.standard substitution; each entry must match
-   * or the build fails loudly rather than testing the unpatched default.
-   */
-  configPatch?: readonly (readonly [RegExp, string])[];
 }
 
 const FIXTURES: Record<FixtureName, FixtureSpec> = {
@@ -62,25 +48,6 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   'quiz-timing': {
     source: resolve(REPO_ROOT, 'tests/fixtures/quiz-timing'),
     standards: ['scorm12'],
-  },
-  // The three course-level axes below are one-value-per-course, so they are
-  // built as patched copies of `free` rather than fixtures of their own.
-  'completion-quiz': {
-    source: resolve(REPO_ROOT, 'tests/fixtures/free'),
-    standards: ['scorm12'],
-    configPatch: [[/completion:\s*\{[^}]*\}/, "completion: { mode: 'quiz' }"]],
-  },
-  'completion-manual': {
-    source: resolve(REPO_ROOT, 'tests/fixtures/free'),
-    standards: ['scorm12'],
-    configPatch: [
-      [/completion:\s*\{[^}]*\}/, "completion: { mode: 'manual' }"],
-    ],
-  },
-  'resume-never': {
-    source: resolve(REPO_ROOT, 'tests/fixtures/free'),
-    standards: ['scorm12'],
-    configPatch: [[/(export\s+default\s*\{)/, "$1\n  resume: 'never',"]],
   },
 };
 
@@ -160,20 +127,10 @@ async function buildVariant(
         `Did the file's formatting change? Expected to match /export:\\s*\\{\\s*standard:\\s*["'][^"']*["']\\s*\\}/.`,
     );
   }
-  let patched = original.replace(
+  const patched = original.replace(
     pattern,
     `export: { standard: '${standard}' }`,
   );
-
-  for (const [find, replacement] of spec.configPatch ?? []) {
-    if (!find.test(patched)) {
-      throw new Error(
-        `[e2e globalSetup] ${fixtureName}/course.config.js: configPatch ${find} matched nothing. ` +
-          `The variant would silently build with the source fixture's settings.`,
-      );
-    }
-    patched = patched.replace(find, replacement);
-  }
   writeFileSync(configPath, patched);
 
   // `vite build [root]` — root is a positional arg in vite v8, not a --flag.

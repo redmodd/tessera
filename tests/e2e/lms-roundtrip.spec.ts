@@ -6,6 +6,12 @@ import {
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
+import {
+  interactionWrites,
+  reportedQuestionCount,
+  waitForServer,
+  waitForTesseraContent,
+} from './helpers.js';
 import { variantDir, viteBin, type Standard } from './global-setup.js';
 
 function startPreview(standard: Standard, port: number): ChildProcess {
@@ -15,29 +21,6 @@ function startPreview(standard: Standard, port: number): ChildProcess {
     ['preview', dir, '--port', String(port), '--strictPort'],
     { cwd: dir },
   );
-}
-
-async function waitForServer(page: Page, url: string): Promise<void> {
-  for (let i = 0; i < 30; i++) {
-    try {
-      const res = await page.request.get(url, { timeout: 1000 });
-      if (res.ok()) return;
-    } catch {
-      // retry
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`Server at ${url} did not start within 15s`);
-}
-
-async function waitForTesseraContent(page: Page): Promise<void> {
-  await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
 }
 
 /**
@@ -202,19 +185,15 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       .nth(1)
       .click();
 
-    const interactionWrites = async () =>
-      (
-        (await page.evaluate(() => (window as any).__scormLog)) as string[][]
-      ).filter(
-        (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
-      );
     await page.waitForTimeout(300);
-    expect(await interactionWrites()).toEqual([]);
+    expect(await interactionWrites(page)).toEqual([]);
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click(); // immediate feedback
     await expect
-      .poll(() => interactionWrites().then((w) => w.length), { timeout: 5000 })
+      .poll(() => interactionWrites(page).then((w) => w.length), {
+        timeout: 5000,
+      })
       .toBeGreaterThan(0);
     await primary.click(); // continue
     await page.waitForTimeout(300);
@@ -253,11 +232,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await submit.waitFor({ state: 'visible', timeout: 5000 });
 
     // Every answer was revealed, so every answer is already reported.
-    const preSubmitIds = () =>
-      interactionWrites().then(
-        (w) => new Set(w.map((e) => e[1].split('.')[2])).size,
-      );
-    await expect.poll(preSubmitIds, { timeout: 5000 }).toBe(3);
+    await expect
+      .poll(() => reportedQuestionCount(page), { timeout: 5000 })
+      .toBe(3);
 
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
