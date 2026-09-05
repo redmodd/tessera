@@ -134,8 +134,8 @@ export function readResolvedConfig(
 ): CourseConfigRead & { standard: string } {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) return { ...read, standard: standardOverride || 'unknown' };
-  // The config validator rejects an override outside the allowed set and blocks
-  // the build, so the cast is safe by the time anything reads this.
+  // `standardOverride` arrives as a raw CLI string; `parseConfig` errors on a
+  // value outside the allowed set, so no build reaches output with a bad one.
   const override = standardOverride as CourseConfig['export']['standard'];
   const config: Partial<CourseConfig> = override
     ? { ...read.config, export: { ...read.config.export, standard: override } }

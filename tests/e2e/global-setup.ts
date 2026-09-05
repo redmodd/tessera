@@ -117,7 +117,21 @@ async function applyOverrides(
 ): Promise<void> {
   const configPath = resolve(dir, 'course.config.js');
   const base = (await import(pathToFileURL(configPath).href)).default;
-  const json = JSON.stringify({ ...base, ...overrides }, null, 2);
+  const dropped: string[] = [];
+  const json = JSON.stringify(
+    { ...base, ...overrides },
+    (key, value) => {
+      if (typeof value === 'function' || value === undefined) dropped.push(key);
+      return value;
+    },
+    2,
+  );
+  if (dropped.length > 0) {
+    throw new Error(
+      `${configPath} holds values JSON cannot carry (${dropped.join(', ')}); ` +
+        `an overridden variant would silently ship without them.`,
+    );
+  }
   writeFileSync(configPath, `export default ${json};\n`);
 }
 

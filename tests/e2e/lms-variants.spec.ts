@@ -176,7 +176,10 @@ test.describe.serial('completion.mode quiz', () => {
       )
       .toBe('completed');
 
-    const visited = await page.locator('.tessera-nav-page.visited').count();
-    expect(visited).toBeLessThan(totalPages);
+    const data = await page.evaluate(() =>
+      (window as any).__scormDataSnapshot(),
+    );
+    const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
+    expect(visited.length).toBeLessThan(totalPages);
   });
 });
