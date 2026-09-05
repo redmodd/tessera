@@ -1,5 +1,25 @@
 // Shared page-driving helpers for the preview-server specs.
 import { expect, type Page } from '@playwright/test';
+import { execFile, type ChildProcess } from 'node:child_process';
+import {
+  variantDir,
+  viteBin,
+  type FixtureName,
+  type Standard,
+} from './global-setup.js';
+
+export function startPreview(
+  fixture: FixtureName,
+  standard: Standard,
+  port: number,
+): ChildProcess {
+  const dir = variantDir(fixture, standard);
+  return execFile(
+    viteBin(fixture),
+    ['preview', dir, '--port', String(port), '--strictPort'],
+    { cwd: dir },
+  );
+}
 
 export async function waitForServer(page: Page, url: string): Promise<void> {
   for (let i = 0; i < 30; i++) {
@@ -24,14 +44,27 @@ export async function waitForTesseraContent(page: Page): Promise<void> {
     .catch(() => {});
 }
 
-/** Every cmi.interactions.* write the SCORM mock has logged so far. */
+/**
+ * Every cmi.interactions.* write the SCORM mock has logged so far. Matches
+ * both mocks: SCORM 1.2 logs LMSSetValue, SCORM 2004 logs SetValue.
+ */
 export async function interactionWrites(page: Page): Promise<string[][]> {
   const log = (await page.evaluate(
     () => (window as any).__scormLog,
   )) as string[][];
   return log.filter(
-    (e) => e[0] === 'LMSSetValue' && /^cmi\.interactions\./.test(e[1]),
+    (e) => /^(LMS)?SetValue$/.test(e[0]) && /^cmi\.interactions\./.test(e[1]),
   );
+}
+
+/** Values written to cmi.interactions.<n>.<field>, in write order. */
+export async function interactionField(
+  page: Page,
+  field: string,
+): Promise<string[]> {
+  const re = new RegExp(String.raw`^cmi\.interactions\.\d+\.${field}$`);
+  const writes = await interactionWrites(page);
+  return writes.filter((e) => re.test(e[1])).map((e) => e[2]);
 }
 
 /** How many distinct questions have reported an interaction. */

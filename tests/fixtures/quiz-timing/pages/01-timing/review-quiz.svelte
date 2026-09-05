@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   export const pageConfig = {
     title: 'Review Timing Quiz',
     quiz: {
@@ -26,7 +26,7 @@
 
 <FillInTheBlank
   question="What is the chemical formula for water?"
-  answers={['H2O', 'h2o']}
+  answers={['H2O']}
   correctFeedback="Correct!"
   incorrectFeedback="The answer is H2O."
 />

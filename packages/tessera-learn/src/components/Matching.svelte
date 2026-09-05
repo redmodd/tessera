@@ -127,7 +127,7 @@
 
     if (inQuiz) {
       q.setAnswer(new Map(matches));
-    } else if (matches.size === pairs.length && !q.submitted) {
+    } else if (q.answerComplete && !q.submitted) {
       q.submit();
     }
   }

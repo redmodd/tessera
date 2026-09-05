@@ -1,14 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
-import { execFile, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
 import { installScorm12Mock } from './lms-mocks.js';
 import {
   answerMatching,
   interactionWrites,
   reportedQuestionCount,
+  startPreview,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
-import { variantDir, viteBin, type FixtureName } from './global-setup.js';
 
 /**
  * SCORM 1.2 roundtrips that `free` cannot host.
@@ -18,15 +18,6 @@ import { variantDir, viteBin, type FixtureName } from './global-setup.js';
  * assertion in lms-roundtrip.spec.ts — so they run against the quiz-timing
  * fixture.
  */
-
-function startPreview(fixture: FixtureName, port: number): ChildProcess {
-  const dir = variantDir(fixture, 'scorm12');
-  return execFile(
-    viteBin(fixture),
-    ['preview', dir, '--port', String(port), '--strictPort'],
-    { cwd: dir },
-  );
-}
 
 async function openQuiz(page: Page, base: string, title: string) {
   await page.goto(base);
@@ -42,7 +33,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('quiz-timing', PORT);
+    preview = startPreview('quiz-timing', 'scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);

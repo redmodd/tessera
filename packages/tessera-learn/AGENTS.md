@@ -669,7 +669,7 @@ interface Question {
   readonly submitted: boolean;
   readonly correct: boolean | null;
   readonly answer: unknown;
-  readonly answerComplete: boolean; // false while the answer is only partly built (2 of 5 pairs matched)
+  readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
   readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct

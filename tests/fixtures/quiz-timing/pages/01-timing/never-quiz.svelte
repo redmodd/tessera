@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   export const pageConfig = {
     title: 'Never Timing Quiz',
     quiz: {
@@ -22,13 +22,6 @@
   question="How many continents are there?"
   options={['5', '6', '7', '8']}
   correct={2}
-  correctFeedback="Correct!"
-  incorrectFeedback="There are 7 continents."
 />
 
-<FillInTheBlank
-  question="What is the capital of Japan?"
-  answers={['Tokyo', 'tokyo']}
-  correctFeedback="Correct!"
-  incorrectFeedback="The answer is Tokyo."
-/>
+<FillInTheBlank question="What is the capital of Japan?" answers={['Tokyo']} />

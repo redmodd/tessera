@@ -24,7 +24,7 @@ export interface Question {
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
-  /** False while the answer is only partly built (2 of 5 pairs matched). */
+  /** Whether the answer is whole enough to submit (5 of 5 pairs matched). */
   readonly answerComplete: boolean;
   /** Whether feedback should currently render for this question. */
   readonly feedbackVisible: boolean;

@@ -28,7 +28,7 @@
 
   function isAnswered(q) {
     if (!q) return false;
-    return (q.answer !== undefined && q.answerComplete) || q.isLockedCorrect;
+    return q.answerComplete || q.isLockedCorrect;
   }
 
   function needsReveal(q) {
@@ -139,6 +139,9 @@
       >
         Back
       </button>
+      <!-- Immediate mode submits per question: the mid-quiz button reads
+           "Submit" for the answer, and the last one reads "See Results" for
+           the quiz. Both saying "Submit" is intended, not a copy slip. -->
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           class="tessera-quiz-btn tessera-btn-primary"

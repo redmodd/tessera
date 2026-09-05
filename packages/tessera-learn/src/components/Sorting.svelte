@@ -308,7 +308,7 @@
   {/if}
 
   <!-- Standalone Check button (shown once all cards are placed) -->
-  {#if !inQuiz && !q.submitted && placements.size === items.length}
+  {#if !inQuiz && !q.submitted && q.answerComplete}
     <div class="tessera-sorting-actions">
       <button
         class="tessera-btn-primary tessera-sorting-check"

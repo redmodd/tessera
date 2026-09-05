@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { execFile, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
@@ -7,21 +7,13 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  interactionField,
   interactionWrites,
   reportedQuestionCount,
+  startPreview,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
-import { variantDir, viteBin, type Standard } from './global-setup.js';
-
-function startPreview(standard: Standard, port: number): ChildProcess {
-  const dir = variantDir('free', standard);
-  return execFile(
-    viteBin('free'),
-    ['preview', dir, '--port', String(port), '--strictPort'],
-    { cwd: dir },
-  );
-}
 
 /**
  * Wait until the SCORM mock has received at least one LMSCommit / Commit
@@ -57,7 +49,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm12', PORT);
+    preview = startPreview('free', 'scorm12', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -256,23 +248,13 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     // Per-question Interaction writes land before the final score, so by now
     // each built-in must have emitted cmi.interactions.<n>.id / .type.
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
 
-    const idWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'LMSSetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
+    const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
@@ -321,7 +303,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('scorm2004', PORT);
+    preview = startPreview('free', 'scorm2004', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -460,22 +442,13 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     expect(data['cmi.success_status']).toBe('passed');
 
     // Per-question Interaction writes: 2004 emits the SCORM vocab verbatim.
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
-    const typeWrites = log
-      .filter(
-        (e) =>
-          e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.type$/.test(e[1]),
-      )
-      .map((e) => e[2]);
-    expect(typeWrites).toEqual(['choice', 'fill-in', 'matching']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
 
-    const idWrites = log
-      .filter(
-        (e) => e[0] === 'SetValue' && /^cmi\.interactions\.\d+\.id$/.test(e[1]),
-      )
-      .map((e) => e[2]);
+    const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
@@ -519,7 +492,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('cmi5', PORT);
+    preview = startPreview('free', 'cmi5', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);
@@ -729,7 +702,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
-    preview = startPreview('xapi', PORT);
+    preview = startPreview('free', 'xapi', PORT);
     const page = await browser.newPage();
     try {
       await waitForServer(page, BASE);

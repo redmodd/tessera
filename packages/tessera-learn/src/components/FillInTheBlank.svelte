@@ -64,7 +64,7 @@
 
   function handleKeydown(e) {
     if (inQuiz || q.submitted) return;
-    if (e.key === 'Enter' && inputValue.trim()) {
+    if (e.key === 'Enter' && q.answerComplete) {
       q.submit();
     }
   }
@@ -90,7 +90,7 @@
     {#if !inQuiz && !q.submitted}
       <button
         class="tessera-btn-primary tessera-fitb-check-btn"
-        disabled={!inputValue.trim()}
+        disabled={!q.answerComplete}
         onclick={() => {
           q.submit();
         }}

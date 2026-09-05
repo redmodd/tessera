@@ -92,17 +92,17 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#internalQuestions.length;
   }
 
-  #isComplete(i: number): boolean {
-    return this.#internalQuestions[i].complete?.() ?? true;
+  #answerComplete(i: number): boolean {
+    void this.#answersVersion;
+    return (
+      this.#answers.has(i) && (this.#internalQuestions[i].complete?.() ?? true)
+    );
   }
 
   get #allAnswered(): boolean {
-    void this.#answersVersion;
     return (
       this.#totalQuestions > 0 &&
-      this.#internalQuestions.every(
-        (_, i) => this.#answers.has(i) && this.#isComplete(i),
-      )
+      this.#internalQuestions.every((_, i) => this.#answerComplete(i))
     );
   }
 
@@ -222,16 +222,12 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   submit(): void {
     this.#submitCalled = true;
-    if (this.#submitted) return;
+    if (this.#submitted || this.#totalQuestions === 0) return;
     if (!this.#allAnswered) {
-      if (this.#totalQuestions > 0) {
-        console.warn(
-          '[tessera] useQuiz: submit() ran but at least one question is unanswered or ' +
-            'only partly built, so nothing was scored. Gate your Submit button on ' +
-            'handle.canSubmit, and make sure every widget passes a complete() that ' +
-            'turns true once its answer is whole.',
-        );
-      }
+      console.warn(
+        '[tessera] useQuiz: submit() ran with an unanswered or half-built question, ' +
+          'so nothing was scored. Gate your Submit button on handle.canSubmit.',
+      );
       return;
     }
 
@@ -352,7 +348,7 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.getAnswer(i);
       },
       get answerComplete() {
-        return engine.#isComplete(i);
+        return engine.#answerComplete(i);
       },
       get feedbackVisible() {
         return engine.feedbackVisible(i);

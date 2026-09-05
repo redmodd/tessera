@@ -483,7 +483,9 @@ describe('QuizEngine', () => {
       const { engine } = makeEngine();
       engine.submit();
       const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /only partly built/i.test(a)),
+        args.some(
+          (a) => typeof a === 'string' && /nothing was scored/i.test(a),
+        ),
       );
       expect(matched).toBe(false);
     } finally {
