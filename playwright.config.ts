@@ -106,6 +106,7 @@ export default defineConfig({
     {
       command: 'cd tests/fixtures/sequential && pnpm dev --port 5181',
       port: 5181,
+      env: { TESSERA_STANDARD: '' },
       reuseExistingServer: !process.env.CI,
       timeout: 20000,
     },

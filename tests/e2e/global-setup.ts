@@ -69,6 +69,19 @@ export function tesseraCli(fixture: FixtureName): string {
   );
 }
 
+// runAudit rebuilds the course from the variant's course.config.js with no
+// standard override, so a non-web variant would be audited as the standard its
+// course.config.js declares rather than the one its dist/ was built for.
+export function auditDir(fixture: FixtureName, standard: Standard): string {
+  if (standard !== 'web') {
+    throw new Error(
+      `[e2e] runAudit ignores the variant standard and rebuilds from course.config.js, ` +
+        `so only "web" variants can be audited (got "${standard}" for ${fixture}).`,
+    );
+  }
+  return variantDir(fixture, standard);
+}
+
 export function fixtureSource(fixture: FixtureName): string {
   return FIXTURES[fixture].source;
 }
@@ -121,7 +134,10 @@ async function buildVariant(
   // TESSERA_STANDARD to the plugin. Without that line every variant silently
   // builds the file's own standard, and the failure surfaces much later as a
   // missing manifest in an unrelated spec.
-  const viteConfig = readFileSync(resolve(dir, 'vite.config.js'), 'utf-8');
+  const viteConfigPath = resolve(dir, 'vite.config.js');
+  const viteConfig = existsSync(viteConfigPath)
+    ? readFileSync(viteConfigPath, 'utf-8')
+    : '';
   if (
     !viteConfig.includes('TESSERA_STANDARD') ||
     !viteConfig.includes('standardOverride')

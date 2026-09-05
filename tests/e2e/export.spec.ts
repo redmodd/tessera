@@ -63,7 +63,7 @@ test.describe('Export — Serve Built Output', () => {
     const previewProcess = execFile(
       viteBin('free'),
       ['preview', webDir, '--port', '5190', '--strictPort'],
-      { cwd: webDir },
+      { cwd: webDir, env: { ...process.env, TESSERA_STANDARD: '' } },
     );
 
     try {

@@ -17,7 +17,10 @@ export function startPreview(
   return execFile(
     viteBin(fixture),
     ['preview', dir, '--port', String(port), '--strictPort'],
-    { cwd: dir },
+    // vite preview loads the variant's vite.config.js, which reads
+    // TESSERA_STANDARD. An invalid value exported in the developer's shell
+    // fails validation and the server never binds.
+    { cwd: dir, env: { ...process.env, TESSERA_STANDARD: '' } },
   );
 }
 
