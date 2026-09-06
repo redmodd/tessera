@@ -67,4 +67,17 @@ describe('shouldRestore', () => {
   it('defaults resume to "auto" when omitted', () => {
     expect(shouldRestore(savedWith(fp), fp)).toBe(true);
   });
+
+  it.each([
+    ['v is not an array', { v: 'nope' }],
+    ['q is null', { q: null }],
+    ['q is an array', { q: [] }],
+    ['c is not a record', { c: 3 }],
+    ['s is not a record', { s: [] }],
+    ['gs is not an array', { gs: {} }],
+    ['qa is not a record', { qa: 'nope' }],
+  ])('discards a saved document where %s', (_label, bad) => {
+    const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
+    expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+  });
 });
