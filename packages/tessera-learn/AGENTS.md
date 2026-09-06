@@ -792,12 +792,32 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 function useProgress(): {
   readonly visitedPages: Set<number>;
   readonly quizScores: Map<number, number>; // pageIndex → score 0–100
+  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, exactly what the LMS is sent
+  readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
   readonly successStatus: 'unknown' | 'passed' | 'failed';
   markVisited(pageIndex: number): void;
   markChunk(pageIndex: number, chunkIndex: number): void;
 };
+```
+
+`gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScores` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
+
+```svelte
+<script>
+  import { useProgress } from 'tessera-learn';
+  const progress = useProgress();
+  const { average, attempted } = $derived(progress.gradedScore);
+</script>
+
+{#if attempted}
+  <p>
+    Overall: {Math.round(average)}% ({average >= progress.passingScore
+      ? 'Passed'
+      : 'Not yet passed'})
+  </p>
+{/if}
 ```
 
 ### `useCompletion`
