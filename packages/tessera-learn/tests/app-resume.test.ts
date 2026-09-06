@@ -114,6 +114,7 @@ describe('App restore gate honours config.resume', () => {
 
   it('leaves a malformed saved record untouched', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, setCompletionStatus, saveState, unmount } =
       await mountApp('auto', {
         saved: {
@@ -128,6 +129,7 @@ describe('App restore gate honours config.resume', () => {
     cleanup = () => {
       unmount(component);
       errors.mockRestore();
+      warns.mockRestore();
     };
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     expect(saveState).not.toHaveBeenCalled();

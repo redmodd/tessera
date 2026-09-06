@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   structureFingerprint,
   shouldRestore,
@@ -68,16 +68,41 @@ describe('shouldRestore', () => {
     expect(shouldRestore(savedWith(fp), fp)).toBe(true);
   });
 
+  describe('malformed documents', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    it.each([
+      ['v is not an array', { v: 'nope' }],
+      ['q is null', { q: null }],
+      ['q is an array', { q: [] }],
+      ['c is not a record', { c: 3 }],
+      ['s is not a record', { s: [] }],
+      ['a page in s is not a record', { s: { '0': null } }],
+      ['gs is not an array', { gs: {} }],
+      ['qa is not a record', { qa: 'nope' }],
+    ])('discards a saved document where %s', (_label, bad) => {
+      const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
+      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+    });
+
+    it('warns so a corrupt record is distinguishable from a first launch', () => {
+      const saved = { ...savedWith(fp), q: null } as unknown as SavedState;
+      shouldRestore(saved, fp, 'auto');
+      expect(console.warn).toHaveBeenCalled();
+    });
+  });
+
+  // restoreState() skips a null optional, so rejecting the whole document
+  // would drop the bookmark, quiz scores and duration that are still intact.
   it.each([
-    ['v is not an array', { v: 'nope' }],
-    ['q is null', { q: null }],
-    ['q is an array', { q: [] }],
-    ['c is not a record', { c: 3 }],
-    ['s is not a record', { s: [] }],
-    ['gs is not an array', { gs: {} }],
-    ['qa is not a record', { qa: 'nope' }],
-  ])('discards a saved document where %s', (_label, bad) => {
-    const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
-    expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+    ['c is null', { c: null }],
+    ['s is null', { s: null }],
+    ['gs is null', { gs: null }],
+    ['qa is null', { qa: null }],
+  ])('restores a saved document where %s', (_label, nulled) => {
+    const saved = { ...savedWith(fp), ...nulled } as unknown as SavedState;
+    expect(shouldRestore(saved, fp, 'auto')).toBe(true);
   });
 });

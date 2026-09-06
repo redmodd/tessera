@@ -17,6 +17,18 @@ export function structureFingerprint(manifest: Manifest): string {
 const isRecord = (value: unknown): boolean =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+// A document restoreState() would throw partway through is rejected whole:
+// the mutations applied before the throw get written back over the record.
+// Optional fields tolerate an explicit null, which restoreState skips.
+const isMalformed = (saved: SavedState): boolean =>
+  !Array.isArray(saved.v) ||
+  !isRecord(saved.q) ||
+  (saved.c != null && !isRecord(saved.c)) ||
+  (saved.s != null &&
+    (!isRecord(saved.s) || !Object.values(saved.s).every(isRecord))) ||
+  (saved.gs != null && !Array.isArray(saved.gs)) ||
+  (saved.qa != null && !isRecord(saved.qa));
+
 // `never` always starts fresh; otherwise a saved fingerprint that no longer
 // matches the current structure is discarded. State saved before fingerprinting
 // (no `f`) is trusted so upgrading the runtime never wipes an in-progress learner.
@@ -27,12 +39,9 @@ export function shouldRestore(
 ): boolean {
   if (resume === 'never') return false;
   if (saved.f !== undefined && saved.f !== currentFingerprint) return false;
-  // A document restoreState() would throw partway through is rejected whole:
-  // the mutations applied before the throw get written back over the record.
-  if (!Array.isArray(saved.v) || !isRecord(saved.q)) return false;
-  if (saved.c !== undefined && !isRecord(saved.c)) return false;
-  if (saved.s !== undefined && !isRecord(saved.s)) return false;
-  if (saved.gs !== undefined && !Array.isArray(saved.gs)) return false;
-  if (saved.qa !== undefined && !isRecord(saved.qa)) return false;
+  if (isMalformed(saved)) {
+    console.warn('Tessera: discarding malformed resume state');
+    return false;
+  }
   return true;
 }
