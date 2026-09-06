@@ -17,8 +17,7 @@ export interface InteractionFormat {
   supportsNumericRange: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
-   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax and takes one
-   * pattern per acceptable answer instead.
+   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
   formatBoolean(value: boolean): string;
@@ -139,10 +138,14 @@ export function formatCorrectPattern(
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
     case 'long-fill-in': {
-      const alternatives = i.correct as string[];
-      if (!fmt.supportsCasePrefix) return [...alternatives];
+      const limit =
+        i.type === 'long-fill-in' && fmt !== SCORM12_INTERACTION_FORMAT
+          ? 1
+          : 10;
+      const alternatives = (i.correct as string[]).slice(0, limit);
+      if (!fmt.supportsCasePrefix) return alternatives;
       const prefix = i.caseMatters ? '{case_matters=true}' : '';
-      return [prefix + alternatives.join(fmt.itemDelim)];
+      return alternatives.map((a) => prefix + a);
     }
     case 'matching':
       return [

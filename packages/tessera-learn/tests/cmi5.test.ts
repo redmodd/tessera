@@ -1127,7 +1127,8 @@ describe('CMI5Adapter', () => {
         true,
       );
       expect(body.object.definition.correctResponsesPattern).toEqual([
-        '{case_matters=true}Paris[,]paris',
+        '{case_matters=true}Paris',
+        '{case_matters=true}paris',
       ]);
     });
 
