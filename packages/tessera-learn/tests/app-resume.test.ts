@@ -131,8 +131,6 @@ describe('App restore gate honours config.resume', () => {
     expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');
   });
 
-  // The optional fields have no other coverage, and shouldRestore now proves
-  // every value is a finite number, so restoreState reads them uncoerced.
   it('restores every optional field intact', async () => {
     const saved = {
       b: 1,
