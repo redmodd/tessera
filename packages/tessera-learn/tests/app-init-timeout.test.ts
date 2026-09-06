@@ -34,10 +34,11 @@ const config = {
 function makeAdapter(
   init: () => Promise<void>,
   loadState: () => Promise<void> = async () => {},
+  getState: () => unknown = () => null,
 ) {
   return {
     init,
-    getState: () => null,
+    getState,
     loadState,
     saveState: () => {},
     setDuration: () => {},
@@ -53,6 +54,7 @@ function makeAdapter(
 async function mountApp(
   init: () => Promise<void>,
   loadState?: () => Promise<void>,
+  getState?: () => unknown,
 ) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
@@ -62,7 +64,7 @@ async function mountApp(
     pageModules: {
       [page.importPath]: () => import('./fixtures/app-page.svelte'),
     },
-    adapter: makeAdapter(init, loadState),
+    adapter: makeAdapter(init, loadState, getState),
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
@@ -116,6 +118,24 @@ describe('App bounds adapter.init()', () => {
     cleanup = () => {
       unmount(component);
       warn.mockRestore();
+    };
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+    expect(document.body.textContent).not.toContain('This page failed to load');
+  });
+
+  it('renders the page when the saved state is malformed', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { component, unmount } = await mountApp(
+      async () => {},
+      undefined,
+      () => ({ d: 0 }),
+    );
+    cleanup = () => {
+      unmount(component);
+      error.mockRestore();
     };
 
     await vi.waitFor(() =>

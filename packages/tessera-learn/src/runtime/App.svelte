@@ -433,23 +433,30 @@
     // imported config object once before any UI reads it so every
     // downstream consumer (the derived completion/success status, navigation
     // gating, Quiz page context) sees the same effective value.
-    const lmsMastery = adapter.getMasteryScore?.();
-    if (typeof lmsMastery === 'number') {
-      config.scoring.passingScore = lmsMastery * 100;
-      pageContext.passingScore = lmsMastery * 100;
-    }
+    // The first page is gated on persistenceReady, so a malformed saved
+    // document must cost the resume, not the course.
+    try {
+      const lmsMastery = adapter.getMasteryScore?.();
+      if (typeof lmsMastery === 'number') {
+        config.scoring.passingScore = lmsMastery * 100;
+        pageContext.passingScore = lmsMastery * 100;
+      }
 
-    const saved = adapter.getState();
-    if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
-      restoreState(saved);
-      prevCompletionStatus = progress.completionStatus;
-      prevSuccessStatus = progress.successStatus;
-      adapter.seedLifecycle?.(
-        progress.completionStatus,
-        progress.successStatus,
-      );
+      const saved = adapter.getState();
+      if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
+        restoreState(saved);
+        prevCompletionStatus = progress.completionStatus;
+        prevSuccessStatus = progress.successStatus;
+        adapter.seedLifecycle?.(
+          progress.completionStatus,
+          progress.successStatus,
+        );
+      }
+    } catch (err) {
+      console.error('Tessera: resume state could not be restored', err);
+    } finally {
+      persistenceReady = true;
     }
-    persistenceReady = true;
 
     // Build the xAPI client (custom destinations + cmi5 'lms' shared
     // queue) once the adapter has resolved its launch context. Failure
