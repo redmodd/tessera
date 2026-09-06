@@ -61,7 +61,7 @@ function makeAdapter(saved: unknown) {
 
 async function mountApp(
   resume: 'auto' | 'never',
-  options: { saved?: unknown; pageLoadFails?: boolean } = {},
+  options: { saved?: unknown } = {},
 ) {
   const savedState = options.saved ?? {
     b: 1,
@@ -82,9 +82,7 @@ async function mountApp(
     config: makeConfig(resume),
     manifest,
     pageModules: {
-      [page.importPath]: options.pageLoadFails
-        ? () => Promise.reject(new Error('page module missing'))
-        : () => import('./fixtures/app-page.svelte'),
+      [page.importPath]: () => import('./fixtures/app-page.svelte'),
     },
     adapter,
   };
@@ -113,9 +111,8 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('leaves a malformed saved record untouched', async () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { component, setCompletionStatus, saveState, unmount } =
+    const { component, seedLifecycle, setCompletionStatus, unmount } =
       await mountApp('auto', {
         saved: {
           b: 1,
@@ -124,15 +121,42 @@ describe('App restore gate honours config.resume', () => {
           d: 120,
           f: structureFingerprint(manifest),
         },
-        pageLoadFails: true,
       });
     cleanup = () => {
       unmount(component);
-      errors.mockRestore();
       warns.mockRestore();
     };
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
-    expect(saveState).not.toHaveBeenCalled();
+    expect(seedLifecycle).not.toHaveBeenCalled();
+    expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');
+  });
+
+  // The optional fields have no other coverage, and shouldRestore now proves
+  // every value is a finite number, so restoreState reads them uncoerced.
+  it('restores every optional field intact', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      q: { '0': 80 },
+      qa: { '0': 3 },
+      d: 120,
+      c: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+      f: structureFingerprint(manifest),
+    };
+    const { component, saveState, unmount } = await mountApp('auto', { saved });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+      v: [0, 1],
+      q: { '0': 80 },
+      qa: { '0': 3 },
+      d: 120,
+      c: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+    });
   });
 
   it('ignores saved state when resume is "never"', async () => {

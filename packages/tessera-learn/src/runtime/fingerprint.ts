@@ -23,22 +23,20 @@ const isNumber = (value: unknown): value is number =>
 const isNumberRecord = (value: unknown): boolean =>
   isRecord(value) && Object.values(value).every(isNumber);
 
-// A document that can't be restored faithfully is rejected whole. A shape
-// restoreState() iterates unguarded throws partway through, and the mutations
-// applied before the throw get written back over the record; a page index or
-// score of the wrong type doesn't throw but lands in arithmetic that reports a
-// nonsense score, duration or bookmark to the LMS. Optional fields tolerate an
-// explicit null, which restoreState skips.
+const isNumberArray = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(isNumber);
+
+// Rejected whole: a shape restoreState() iterates unguarded throws partway
+// through and the mutations already applied get written back over the record.
+// A null optional is fine, restoreState skips it.
 const isMalformed = (saved: SavedState): boolean =>
   !isNumber(saved.b) ||
   !isNumber(saved.d) ||
-  !Array.isArray(saved.v) ||
-  !saved.v.every(isNumber) ||
+  !isNumberArray(saved.v) ||
   !isNumberRecord(saved.q) ||
   (saved.c != null && !isNumberRecord(saved.c)) ||
   (saved.qa != null && !isNumberRecord(saved.qa)) ||
-  (saved.gs != null &&
-    (!Array.isArray(saved.gs) || !saved.gs.every(isNumber))) ||
+  (saved.gs != null && !isNumberArray(saved.gs)) ||
   (saved.s != null &&
     (!isRecord(saved.s) || !Object.values(saved.s).every(isNumberRecord)));
 
