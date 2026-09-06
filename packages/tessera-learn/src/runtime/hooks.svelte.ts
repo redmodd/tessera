@@ -462,11 +462,11 @@ export function useQuiz(opts: {
     passingScore: () => pageCtx.passingScore,
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
+    hasHost: () => opts.element() != null,
     dispatch: (name, detail) => {
-      const el = opts.element();
-      if (!el) return false;
-      el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
-      return true;
+      opts
+        .element()
+        ?.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
     },
     restore: pageCtx.quizState ?? undefined,
   });

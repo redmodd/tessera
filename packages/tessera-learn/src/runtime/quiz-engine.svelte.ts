@@ -36,10 +36,12 @@ export interface QuizEngineDeps {
     correct: boolean | null,
   ) => void;
   /**
-   * Wraps the host-element `CustomEvent` dispatch. Returns `false` when the host
-   * element is null (the engine treats that as "no LMS bridge listener").
+   * Whether the host element exists. It carries the LMS bridge listener, so
+   * `false` means nothing this engine reports can ever be scored.
    */
-  dispatch: (name: string, detail?: unknown) => boolean;
+  hasHost: () => boolean;
+  /** Wraps the host-element `CustomEvent` dispatch; a no-op with no host. */
+  dispatch: (name: string, detail?: unknown) => void;
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
    * engine starts in the results phase; answers aren't persisted, so it cannot
@@ -259,9 +261,7 @@ export class QuizEngine implements UseQuizInternalHandle {
       return;
     }
 
-    // Combined null-host guard + before-submit dispatch: dispatch() returns false
-    // when the host element is null, which is the silent-LMS-dropout case.
-    if (!this.#deps.dispatch('tessera-quiz-before-submit')) {
+    if (!this.#deps.hasHost()) {
       console.warn(
         '[tessera] useQuiz: submit() ran but the host element was null — no LMS bridge ' +
           'listener exists, so this score will not be persisted. Make sure your custom ' +
@@ -269,6 +269,8 @@ export class QuizEngine implements UseQuizInternalHandle {
       );
       return;
     }
+
+    this.#deps.dispatch('tessera-quiz-before-submit');
 
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
@@ -334,6 +336,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   #commit(index: number): void {
+    if (!this.#deps.hasHost()) return;
     const q = this.#internalQuestions[index];
     if (!q || typeof q.interaction !== 'function') return;
     const interaction = q.interaction();

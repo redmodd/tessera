@@ -41,11 +41,10 @@ function makeEngine(
     passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct) =>
       reports.push({ id, interaction, correct }),
-    // dispatch() returns false when the host element is null; model that with hostNull.
+    hasHost: () => !opts.hostNull,
     dispatch: (name, detail) => {
-      if (opts.hostNull) return false;
+      if (opts.hostNull) return;
       events.push({ name, detail });
-      return true;
     },
     restore: opts.restore,
   });
@@ -586,6 +585,31 @@ describe('QuizEngine', () => {
       'tessera-quiz-complete',
       'tessera-quiz-retry',
     ]);
+  });
+
+  it('reports nothing on an immediate-mode commit with a null host element', () => {
+    // The built-in shell commits a question when immediate feedback reveals it,
+    // which is ahead of any submit. With no host that submit can never land, so
+    // the interaction would sit in the LMS with no score behind it.
+    const { engine, reports } = makeEngine(
+      { graded: true, feedbackMode: 'immediate' },
+      { hostNull: true },
+    );
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.questions[0].commit();
+    expect(reports).toHaveLength(0);
+  });
+
+  it('commits on reveal when a host element is present', () => {
+    const { engine, reports } = makeEngine({
+      graded: true,
+      feedbackMode: 'immediate',
+    });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.questions[0].commit();
+    expect(reports.map((r) => r.id)).toEqual(['a']);
   });
 
   it('rewrites a duplicate question id instead of registering it twice', () => {

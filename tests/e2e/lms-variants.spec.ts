@@ -4,6 +4,7 @@ import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
+  interactionField,
   interactionWrites,
   reportedQuestionCount,
   startPreview,
@@ -123,6 +124,42 @@ test.describe.serial('quiz reporting timing — review and never', () => {
     await expect
       .poll(() => reportedQuestionCount(page), { timeout: 5000 })
       .toBe(2);
+  });
+
+  test('questions whose ids collide at runtime both render and report separately', async ({
+    page,
+  }) => {
+    await openQuiz(page, BASE, 'Id Collision Quiz');
+
+    // The shell keys its {#each} on the question id, and Svelte throws on a
+    // duplicate key in production, so a collision that survives registration
+    // white-screens the page instead of rendering it.
+    await expect(page.locator('.tessera-quiz-question-wrapper')).toHaveCount(2);
+
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
+    await primary.click();
+    await primary.click();
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(0)
+      .click();
+    await primary.click();
+
+    const submit = page.locator('.tessera-quiz-btn-submit');
+    await submit.waitFor({ state: 'visible', timeout: 5000 });
+    await submit.click();
+    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+
+    // Second registration is renamed, so the two answers land in their own
+    // interaction records rather than overwriting each other.
+    await expect
+      .poll(() => interactionField(page, 'id'), { timeout: 5000 })
+      .toEqual(['dupid', 'dupid_2']);
   });
 });
 
