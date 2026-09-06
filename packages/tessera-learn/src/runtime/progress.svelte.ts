@@ -6,15 +6,18 @@ export class ProgressState {
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #totalPages: number;
+  #quizPageIndices: ReadonlySet<number>;
 
   constructor(
     quizGradedIndices: ReadonlySet<number>,
     config: CourseConfig,
     totalPages: number,
+    quizPageIndices: ReadonlySet<number>,
   ) {
     this.#quizGradedIndices = quizGradedIndices;
     this.#config = config;
     this.#totalPages = totalPages;
+    this.#quizPageIndices = quizPageIndices;
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -140,7 +143,7 @@ export class ProgressState {
         DEFAULT_PERCENTAGE_THRESHOLD;
       const percent =
         this.#totalPages > 0
-          ? (this.visitedPages.size / this.#totalPages) * 100
+          ? (this.completedPages / this.#totalPages) * 100
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
@@ -149,6 +152,15 @@ export class ProgressState {
     return this.#gradedAverage(indices) >= this.#config.scoring.passingScore
       ? 'complete'
       : 'incomplete';
+  });
+
+  completedPages = $derived.by<number>(() => {
+    let count = 0;
+    for (const i of this.visitedPages) {
+      if (this.#quizPageIndices.has(i) && !this.quizScores.has(i)) continue;
+      count++;
+    }
+    return count;
   });
 
   successStatus = $derived.by<'unknown' | 'passed' | 'failed'>(() => {

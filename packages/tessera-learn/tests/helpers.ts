@@ -7,6 +7,10 @@ export function gradedQuizIndices(manifest: Manifest): Set<number> {
   );
 }
 
+export function quizPageIndices(manifest: Manifest): Set<number> {
+  return new Set(manifest.pages.filter((p) => p.quiz).map((p) => p.index));
+}
+
 export function createManifest(
   pageCount: number,
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
