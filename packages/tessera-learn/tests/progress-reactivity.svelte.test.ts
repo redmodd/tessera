@@ -23,7 +23,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('promotes a page whose only question is retried correctly', () => {
-    const progress = new ProgressState(new Set(), config, 3);
+    const progress = new ProgressState(new Set(), config, 3, new Set());
     const { cleanup } = trackStatuses(progress);
 
     progress.markStandaloneQuestion(0, 'q1', 0, true);
@@ -40,7 +40,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('demotes a page when a second question on it fails', () => {
-    const progress = new ProgressState(new Set(), config, 3);
+    const progress = new ProgressState(new Set(), config, 3, new Set());
     const { cleanup } = trackStatuses(progress);
 
     progress.markStandaloneQuestion(0, 'q1', 100, true);
@@ -57,7 +57,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('keeps gradedScore and successStatus in agreement across rescores', () => {
-    const progress = new ProgressState(new Set(), config, 3);
+    const progress = new ProgressState(new Set(), config, 3, new Set());
     const { cleanup } = trackStatuses(progress);
 
     for (const score of [0, 100, 40, 90]) {

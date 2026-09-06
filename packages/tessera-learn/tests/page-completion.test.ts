@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isPageComplete } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
-import { createConfig, gradedQuizIndices } from './helpers.js';
+import { createConfig, gradedQuizIndices, quizPageIndices } from './helpers.js';
 
 function createPage(
   index: number,
@@ -40,6 +40,7 @@ describe('isPageComplete', () => {
       gradedQuizIndices(manifest),
       config,
       manifest.totalPages,
+      quizPageIndices(manifest),
     );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -60,6 +61,7 @@ describe('isPageComplete', () => {
       gradedQuizIndices(manifest),
       config,
       manifest.totalPages,
+      quizPageIndices(manifest),
     );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -80,6 +82,7 @@ describe('isPageComplete', () => {
       gradedQuizIndices(manifest),
       config,
       manifest.totalPages,
+      quizPageIndices(manifest),
     );
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
@@ -103,6 +106,7 @@ describe('isPageComplete', () => {
       gradedQuizIndices(manifest),
       config,
       manifest.totalPages,
+      quizPageIndices(manifest),
     );
 
     progress.quizCompleted(0, 85);

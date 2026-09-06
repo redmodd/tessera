@@ -12,7 +12,7 @@ export class ProgressState {
     quizGradedIndices: ReadonlySet<number>,
     config: CourseConfig,
     totalPages: number,
-    quizPageIndices: ReadonlySet<number> = quizGradedIndices,
+    quizPageIndices: ReadonlySet<number>,
   ) {
     this.#quizGradedIndices = quizGradedIndices;
     this.#config = config;
