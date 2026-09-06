@@ -17,6 +17,7 @@ export const VERBS = {
   completed: 'http://adlnet.gov/expapi/verbs/completed',
   passed: 'http://adlnet.gov/expapi/verbs/passed',
   failed: 'http://adlnet.gov/expapi/verbs/failed',
+  scored: 'http://adlnet.gov/expapi/verbs/scored',
   terminated: 'http://adlnet.gov/expapi/verbs/terminated',
 } as const;
 
@@ -90,6 +91,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected stateLoadFailed = false;
   protected completedEmitted = false;
   protected lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
+  protected lastScoreEmitted: number | null = null;
   protected terminated = false;
   protected returnURL: string | undefined;
 
@@ -162,16 +164,31 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   commit(): void {
-    // Statements are sent individually. No-op.
+    if (!this.publisher || this.score === null) return;
+    const scaled = this.score / 100;
+    if (scaled === this.lastScoreEmitted) return;
+    this.lastScoreEmitted = scaled;
+    this.dispatch('Scored', {
+      verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
+      result: {
+        score: { scaled },
+        duration: formatISO8601Duration(this.durationSeconds),
+      },
+    });
   }
 
   seedLifecycle(
     completion: 'incomplete' | 'complete',
     success: 'unknown' | 'passed' | 'failed',
+    score?: number | null,
   ): void {
     if (completion === 'complete') this.completedEmitted = true;
     if (success === 'passed' || success === 'failed') {
       this.lastSuccessEmitted = success;
+    }
+    if (typeof score === 'number' && Number.isFinite(score)) {
+      this.setScore(score);
+      this.lastScoreEmitted = this.score === null ? null : this.score / 100;
     }
   }
 
@@ -204,7 +221,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       duration: formatISO8601Duration(this.durationSeconds),
     };
     const scaled = this.scoreForSuccess(status);
-    if (scaled !== null) result.score = { scaled };
+    if (scaled !== null) {
+      result.score = { scaled };
+      this.lastScoreEmitted = scaled;
+    }
     this.dispatch(status === 'passed' ? 'Passed' : 'Failed', {
       verb: { id: verb, display: { 'en-US': verbName } },
       result,

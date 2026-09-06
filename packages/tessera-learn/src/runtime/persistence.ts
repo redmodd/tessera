@@ -27,6 +27,7 @@ export interface PersistenceAdapter {
   seedLifecycle?(
     completion: 'incomplete' | 'complete',
     success: 'unknown' | 'passed' | 'failed',
+    score?: number | null,
   ): void;
   setDuration(seconds: number): void;
   /**

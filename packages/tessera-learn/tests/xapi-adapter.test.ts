@@ -436,4 +436,66 @@ describe('XAPIAdapter', () => {
       ),
     ).toBeFalsy();
   });
+
+  it('sends a scored statement when the score changes without a Passed/Failed', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify(ACTOR),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await new Promise((r) => setTimeout(r, 0));
+    fetchMock.mockClear();
+
+    adapter.setScore(50);
+    adapter.setSuccessStatus('failed');
+    adapter.commit();
+    await new Promise((r) => setTimeout(r, 0));
+
+    adapter.setScore(70);
+    adapter.setSuccessStatus('failed');
+    adapter.setDuration(120);
+    adapter.commit();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const bodies = fetchMock.mock.calls
+      .filter(
+        ([u, o]) => String(u).includes('/statements') && o?.method === 'POST',
+      )
+      .map(([, o]) => JSON.parse(o.body));
+    expect(bodies.map((b) => b.verb.id)).toEqual([
+      'http://adlnet.gov/expapi/verbs/failed',
+      'http://adlnet.gov/expapi/verbs/scored',
+    ]);
+    expect(bodies[0].result.score.scaled).toBe(0.5);
+    expect(bodies[1].result.score.scaled).toBe(0.7);
+    expect(bodies[1].result.duration).toBe('PT2M');
+  });
+
+  it('does not re-send the resumed score on launch', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify(ACTOR),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await new Promise((r) => setTimeout(r, 0));
+    fetchMock.mockClear();
+    adapter.seedLifecycle('incomplete', 'failed', 60);
+
+    adapter.setScore(60);
+    adapter.setSuccessStatus('failed');
+    adapter.commit();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(
+      fetchMock.mock.calls.filter(
+        ([u, o]) => String(u).includes('/statements') && o?.method === 'POST',
+      ),
+    ).toHaveLength(0);
+  });
 });
