@@ -407,6 +407,11 @@
       return;
     }
 
+    // Resume state is a separate step from init(): the adapter bounds it and
+    // degrades to an unrestored launch on its own, so a stalled State API
+    // costs the learner their bookmark rather than the course.
+    await adapter.loadState?.();
+
     // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
     // threshold for this launch and overrides the manifest. Mutate the
     // imported config object once before any UI reads it so every

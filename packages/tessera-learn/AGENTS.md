@@ -667,7 +667,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null;
+  readonly correct: boolean | null; // null while answering, and null on a restored result (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -750,6 +750,7 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly score: number;
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
+  readonly restored: boolean; // results came from saved progress, not this session
   submit(): void;
   retry(): void;
   startReview(): void;
@@ -757,6 +758,8 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   revealFeedback(q: Question): void; // immediate-feedback flow
 };
 ```
+
+**Branch on `restored`.** A quiz whose result came from saved progress opens in the `submitted` state with the score and attempt count intact, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 
 Throws on a page without `pageConfig.quiz`. Use `passingScore` from here, not `course.config.js` directly — importing the config skips the LMS mastery override (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`).
 
@@ -1050,7 +1053,9 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
   {:else if quiz.state === 'submitted'}
     <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
-    <button onclick={() => quiz.startReview()}>Review</button>
+    {#if !quiz.restored}<button onclick={() => quiz.startReview()}
+        >Review</button
+      >{/if}
   {/if}
 
   <!-- Children render hidden so widget state survives submit/review. -->

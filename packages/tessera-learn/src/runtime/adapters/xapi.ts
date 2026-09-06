@@ -20,6 +20,5 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
     await this.createPublisher({});
 
     this.sendInitialized();
-    await this.loadResumeState();
   }
 }

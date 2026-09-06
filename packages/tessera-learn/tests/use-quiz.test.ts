@@ -368,6 +368,17 @@ describe('QuizEngine', () => {
       expect(engine.state).toBe('submitted');
     });
 
+    it('reports correct as null rather than flagging every question wrong', () => {
+      const { engine } = makeEngine(
+        { graded: true },
+        { restore: { attempts: 1, score: 100 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      engine.registerQuestion(tfQuestion('b', true, true));
+      expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
+      expect(engine.questions.every((q) => q.feedbackVisible)).toBe(false);
+    });
+
     it('ignores a zero-attempt restore', () => {
       const { engine } = makeEngine(
         { graded: true },

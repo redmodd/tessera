@@ -365,7 +365,7 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.#submitted;
       },
       get correct() {
-        if (!engine.#submitted) return null;
+        if (!engine.#submitted || engine.#restored) return null;
         const a = engine.#answers.has(i) ? engine.#answers.get(i) : undefined;
         return engine.#internalQuestions[i].checkAnswer(a);
       },

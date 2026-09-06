@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
 
 const mockFetch = vi.fn();
 
@@ -133,11 +134,135 @@ describe('CMI5Adapter', () => {
     expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/initialized');
   });
 
+  it('does not fetch resume state during init', async () => {
+    setupInitMocks({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    const resumeGets = mockFetch.mock.calls.filter(
+      ([url, options]: any[]) =>
+        String(url).includes('activities/state') &&
+        !String(url).includes('stateId=LMS.LaunchData') &&
+        (!options || options.method === 'GET'),
+    );
+    expect(resumeGets).toHaveLength(0);
+    expect(adapter.getState()).toBeNull();
+
+    await adapter.loadState();
+    expect(adapter.getState()).toEqual({
+      b: 3,
+      v: [0, 1, 2, 3],
+      q: {},
+      d: 100,
+    });
+  });
+
+  it('retries a transient resume GET failure and restores on success', async () => {
+    const saved: SavedState = { b: 2, v: [0, 1, 2], q: {}, d: 5 };
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    let resumeGets = 0;
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
+        resumeGets++;
+        if (resumeGets === 1) throw new Error('transient');
+        if (resumeGets === 2) return { ok: false, status: 503 };
+        return { ok: true, json: async () => saved };
+      }
+      return { ok: true, text: async () => '', json: async () => ({}) };
+    });
+    await adapter.loadState();
+
+    expect(resumeGets).toBe(3);
+    expect(adapter.getState()).toEqual(saved);
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 9 });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      mockFetch.mock.calls.filter(
+        ([url, options]: any[]) =>
+          String(url).includes('activities/state') && options?.method === 'PUT',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('does not retry a 404, which is a definitive empty answer', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    let resumeGets = 0;
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
+        resumeGets++;
+        return { ok: false, status: 404 };
+      }
+      return { ok: true, text: async () => '', json: async () => ({}) };
+    });
+    await adapter.loadState();
+    expect(resumeGets).toBe(1);
+  });
+
+  it('refuses to save after a failed resume GET, so it cannot clobber', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    let resumeGets = 0;
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
+        resumeGets++;
+        throw new Error('network down');
+      }
+      return { ok: true, text: async () => '', json: async () => ({}) };
+    });
+    await adapter.loadState();
+    expect(adapter.getState()).toBeNull();
+    expect(resumeGets).toBe(RETRY_ATTEMPTS);
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    const puts = mockFetch.mock.calls.filter(
+      ([url, options]: any[]) =>
+        String(url).includes('activities/state') && options?.method === 'PUT',
+    );
+    expect(puts).toHaveLength(0);
+  });
+
+  it('still saves when the resume GET legitimately 404s', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    await adapter.loadState();
+    expect(adapter.getState()).toBeNull();
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    const puts = mockFetch.mock.calls.filter(
+      ([url, options]: any[]) =>
+        String(url).includes('activities/state') && options?.method === 'PUT',
+    );
+    expect(puts).toHaveLength(1);
+  });
+
   it('restores state from xAPI State API', async () => {
     const saved: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
     setupInitMocks(saved);
     adapter = new CMI5Adapter();
     await adapter.init();
+    await adapter.loadState();
     expect(adapter.getState()).toEqual(saved);
   });
 
@@ -145,6 +270,7 @@ describe('CMI5Adapter', () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
+    await adapter.loadState();
     expect(adapter.getState()).toBeNull();
   });
 
