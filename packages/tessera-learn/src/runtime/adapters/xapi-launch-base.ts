@@ -219,13 +219,13 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   ): void {
     if (!this.publisher) return;
     const response = formatResponse(interaction, XAPI_INTERACTION_FORMAT);
-    const pattern = formatCorrectPattern(interaction, XAPI_INTERACTION_FORMAT);
+    const patterns = formatCorrectPattern(interaction, XAPI_INTERACTION_FORMAT);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    if (pattern !== null) {
-      definition.correctResponsesPattern = [pattern];
+    if (patterns !== null) {
+      definition.correctResponsesPattern = patterns;
     }
     const result: Record<string, unknown> = { response };
     if (correct !== null) {

@@ -1115,6 +1115,39 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
+    it('prefixes fill-in patterns with case_matters when set', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: true,
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        '{case_matters=true}Paris',
+        '{case_matters=true}paris',
+      ]);
+    });
+
+    it('keeps every long-fill-in alternative (no SCORM 2004 cap)', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'long-fill-in',
+          response: 'answer two',
+          correct: ['answer one', 'answer two'],
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        'answer one',
+        'answer two',
+      ]);
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

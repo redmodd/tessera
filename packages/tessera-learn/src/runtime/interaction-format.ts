@@ -15,6 +15,17 @@ export interface InteractionFormat {
    * is a single CMIDecimal. SCORM 2004 supports `min[:]max`.
    */
   supportsNumericRange: boolean;
+  /**
+   * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
+   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
+   */
+  supportsCasePrefix: boolean;
+  /**
+   * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
+   * `fill-in` and 1 for `long-fill-in`; xAPI has no such limit.
+   */
+  fillInLimit: number;
+  longFillInLimit: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -24,6 +35,9 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '.',
   rangeDelim: ':',
   supportsNumericRange: false,
+  supportsCasePrefix: false,
+  fillInLimit: 10,
+  longFillInLimit: 10,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -37,13 +51,20 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '[.]',
   rangeDelim: '[:]',
   supportsNumericRange: true,
+  supportsCasePrefix: true,
+  fillInLimit: 10,
+  longFillInLimit: 1,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
 
 // xAPI reuses SCORM 2004's delimiters, numeric-range support, and identity
-// identifier verbatim, so it's the same format object.
-export const XAPI_INTERACTION_FORMAT = SCORM2004_INTERACTION_FORMAT;
+// identifier, but the RTE caps on `correct_responses` are SCORM-only.
+export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
+  ...SCORM2004_INTERACTION_FORMAT,
+  fillInLimit: Infinity,
+  longFillInLimit: Infinity,
+};
 
 /**
  * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +
@@ -117,47 +138,65 @@ export function formatResponse(
 export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
-): string | null {
+): string[] | null {
   if (i.correct === undefined) return null;
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return (i.correct as string[])
-        .map((v) => encodeListItem(v, i.options, fmt))
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as string[])
+          .map((v) => encodeListItem(v, i.options, fmt))
+          .join(fmt.itemDelim),
+      ];
     case 'true-false':
-      return fmt.formatBoolean(i.correct as boolean);
+      return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
-    case 'long-fill-in':
-      return (i.correct as string[]).join(fmt.itemDelim);
+    case 'long-fill-in': {
+      const limit =
+        i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
+      const all = i.correct as string[];
+      if (all.length > limit) {
+        console.warn(
+          `Tessera: ${i.type} declares ${all.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
+        );
+      }
+      const alternatives = all.slice(0, limit);
+      if (!fmt.supportsCasePrefix) return alternatives;
+      const prefix = i.caseMatters ? '{case_matters=true}' : '';
+      return alternatives.map((a) => prefix + a);
+    }
     case 'matching':
-      return (i.correct as Array<[string, string]>)
-        .map(
-          ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-        )
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as Array<[string, string]>)
+          .map(
+            ([l, r]) =>
+              `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
+          )
+          .join(fmt.itemDelim),
+      ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
       if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
-        return String(c.min);
+        return [String(c.min)];
       }
-      if (c.min !== undefined && c.max === undefined) return String(c.min);
-      if (c.min === undefined && c.max !== undefined) return String(c.max);
+      if (c.min !== undefined && c.max === undefined) return [String(c.min)];
+      if (c.min === undefined && c.max !== undefined) return [String(c.max)];
       // True range — drop the pattern in 1.2 (rely on `result` for pass/fail).
       if (!fmt.supportsNumericRange) return null;
-      return `${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`;
+      return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
     case 'likert':
     case 'other':
-      return i.correct as string;
+      return [i.correct as string];
     case 'performance':
-      return (i.correct as Array<[string, string | number]>)
-        .map(
-          ([s, v]) =>
-            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-        )
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as Array<[string, string | number]>)
+          .map(
+            ([s, v]) =>
+              `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
+          )
+          .join(fmt.itemDelim),
+      ];
   }
 }
 
@@ -192,9 +231,11 @@ export function buildScormInteractionFields(
     [`${prefix}.id`, spec.format.identifier(questionId)],
     [`${prefix}.type`, spec.typeValue],
   ];
-  const pattern = formatCorrectPattern(interaction, spec.format);
-  if (pattern !== null) {
-    fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);
+  const patterns = formatCorrectPattern(interaction, spec.format);
+  if (patterns !== null) {
+    patterns.forEach((pattern, n) => {
+      fields.push([`${prefix}.correct_responses.${n}.pattern`, pattern]);
+    });
   }
   fields.push([
     `${prefix}.${spec.responseField}`,

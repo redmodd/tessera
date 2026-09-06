@@ -387,9 +387,89 @@ describe('SCORM2004Adapter', () => {
       const v = setValuesFor('cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('fill-in');
       expect(v['cmi.interactions.0.learner_response']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'Paris[,]paris',
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
+      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+    });
+
+    it('prefixes fill-in patterns with case_matters when set', async () => {
+      adapter.reportInteraction(
+        'fi2',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: true,
+        },
+        true,
       );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        '{case_matters=true}Paris',
+      );
+      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe(
+        '{case_matters=true}paris',
+      );
+    });
+
+    it('omits the prefix when caseMatters is false', async () => {
+      adapter.reportInteraction(
+        'fi3',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: false,
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
+      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+    });
+
+    it('writes a single pattern for long-fill-in (2004 allows only one)', async () => {
+      adapter.reportInteraction(
+        'lf1',
+        {
+          type: 'long-fill-in',
+          response: 'answer one',
+          correct: ['answer one', 'answer two'],
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'answer one',
+      );
+      expect(
+        v['cmi.interactions.0.correct_responses.1.pattern'],
+      ).toBeUndefined();
+    });
+
+    it('caps fill-in patterns at the 10 allowed by the RTE', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'fi4',
+        {
+          type: 'fill-in',
+          response: 'a0',
+          correct: Array.from({ length: 12 }, (_, n) => `a${n}`),
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.9.pattern']).toBe('a9');
+      expect(
+        v['cmi.interactions.0.correct_responses.10.pattern'],
+      ).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('declares 12 correct answers'),
+      );
+      warn.mockRestore();
     });
 
     it('writes matching interaction', async () => {

@@ -461,6 +461,34 @@ describe('SCORM12Adapter', () => {
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('7');
     });
 
+    it('writes one pattern per fill-in alternative', async () => {
+      adapter.reportInteraction(
+        'fi1',
+        { type: 'fill-in', response: 'blue', correct: ['blue', 'Blue'] },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('blue');
+      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('Blue');
+    });
+
+    it('emits no case_matters prefix (SCORM 1.2 has no such syntax)', async () => {
+      adapter.reportInteraction(
+        'fi2',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris'],
+          caseMatters: true,
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
+    });
+
     it('maps long-fill-in to fill-in (SCORM 1.2 has no long-fill-in type)', async () => {
       adapter.reportInteraction(
         'lf1',
