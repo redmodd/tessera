@@ -25,9 +25,8 @@
   } from './contexts.js';
 
   // ---- Persistence ----
-  // Ceiling on adapter.init(). The LMS handshake it performs (cmi5 auth token,
-  // LaunchData, Agent Profile) has no deadline of its own, and the first page
-  // waits on it.
+  // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
+  // have no deadline of their own, and the first page waits on all three.
   const INIT_TIMEOUT_MS = 15_000;
 
   const adapter = createAdapter(config, { manifest });
@@ -183,9 +182,7 @@
   }
 
   // React to page index changes. Held until persistence has been restored: a
-  // quiz seeds its attempt count from restored progress at mount, and adapters
-  // whose init() awaits the network (cmi5, xAPI) resolve well after the first
-  // page module would otherwise have loaded.
+  // quiz seeds its attempt count from restored progress at mount.
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;
@@ -402,9 +399,7 @@
     // for malformed launch params (cmi5 actor JSON, missing fetch URL,
     // failed token request). Surface that to the UI rather than crashing
     // silently: a launch-time error means the LMS context is wrong and
-    // the user can't continue regardless. The first page is held until this
-    // resolves, so the deadline is what keeps an LMS that never answers from
-    // showing a loading bar forever.
+    // the user can't continue regardless.
     try {
       await Promise.race([
         adapter.init(),

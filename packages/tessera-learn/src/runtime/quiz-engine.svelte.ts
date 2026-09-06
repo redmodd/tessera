@@ -146,11 +146,6 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#score;
   }
 
-  /**
-   * Highest score across this learner's attempts, restored ones included. The
-   * LMS is given this rather than `score`, so a shell that offers retries has
-   * to show it whenever it exceeds the attempt just submitted.
-   */
   get bestScore(): number {
     return this.#bestScore;
   }
@@ -163,11 +158,6 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#attemptCount;
   }
 
-  /**
-   * True while the displayed results come from saved progress rather than a
-   * submit on this mount. The answers behind them were not persisted, so per-question
-   * results and review are unavailable until the learner retries and submits again.
-   */
   get restored(): boolean {
     return this.#restored;
   }

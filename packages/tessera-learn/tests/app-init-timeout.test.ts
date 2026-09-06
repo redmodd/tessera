@@ -64,8 +64,7 @@ async function mountApp(init: () => Promise<void>) {
 }
 
 // The first page is held until adapter.init() resolves, and the LMS handshake
-// it performs has no deadline of its own. Without the race in App.svelte a
-// wedged LMS leaves the learner on the loading bar with no way out.
+// it performs has no deadline of its own.
 describe('App bounds adapter.init()', () => {
   let cleanup: (() => void) | null = null;
 
