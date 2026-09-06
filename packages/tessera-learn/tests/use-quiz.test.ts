@@ -198,7 +198,7 @@ describe('QuizEngine', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion({
       id: 'a',
-      checkAnswer: (answer) => answer === true,
+      checkAnswer: () => engine.getAnswer(0) === true,
       interaction: () => ({
         type: 'true-false',
         response: engine.getAnswer(0) === true,
@@ -493,6 +493,18 @@ describe('QuizEngine', () => {
     engine.revealFeedback(a);
     expect(a.feedbackVisible).toBe(true);
     expect(engine.feedbackVisible(0)).toBe(true);
+  });
+
+  it('correct is a boolean once feedback is visible, before submit', () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const b = engine.registerQuestion(tfQuestion('b', false, true));
+    expect(a.correct).toBeNull();
+    engine.revealFeedback(a);
+    expect(a.correct).toBe(true);
+    expect(b.correct).toBeNull();
+    engine.revealFeedback(b);
+    expect(b.correct).toBe(false);
   });
 
   it('setRender stores the snippet returned via getRender', () => {

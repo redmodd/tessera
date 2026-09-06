@@ -21,16 +21,6 @@
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
 
-  function checkAnswer(userAnswer) {
-    if (!userAnswer || typeof userAnswer !== 'string') return false;
-    const trimmed = userAnswer.trim();
-    return answers.some((acceptable) => {
-      const a = acceptable.trim();
-      if (caseSensitive) return trimmed === a;
-      return trimmed.toLowerCase() === a.toLowerCase();
-    });
-  }
-
   const q = useQuestion({
     get id() {
       return questionId(id, 'fitb', question);
@@ -44,8 +34,10 @@
     complete: () => inputValue.trim() !== '',
     response: () => ({
       type: 'fill-in',
-      response: inputValue,
-      correct: Array.isArray(answers) ? answers : [answers],
+      response: inputValue.trim(),
+      correct: (Array.isArray(answers) ? answers : [answers]).map((a) =>
+        a.trim(),
+      ),
       caseMatters: !!caseSensitive,
     }),
     reset: () => {
@@ -59,7 +51,7 @@
   function handleInput(e) {
     if (q.locked) return;
     inputValue = e.target.value;
-    if (inQuiz) q.setAnswer(inputValue);
+    q.setAnswer(inputValue);
   }
 
   function handleKeydown(e) {
@@ -78,8 +70,8 @@
       type="text"
       id={inputId}
       class="tessera-fitb-input"
-      class:correct={q.feedbackVisible && checkAnswer(inputValue)}
-      class:incorrect={q.feedbackVisible && !checkAnswer(inputValue)}
+      class:correct={q.feedbackVisible && q.correct}
+      class:incorrect={q.feedbackVisible && !q.correct}
       value={inputValue}
       oninput={handleInput}
       onkeydown={handleKeydown}
@@ -101,7 +93,7 @@
   </div>
 
   {#if q.feedbackVisible}
-    {@const isCorrect = checkAnswer(inputValue)}
+    {@const isCorrect = q.correct}
     <div class="tessera-fitb-review">
       {#if isCorrect}
         <div class="tessera-fitb-result correct">

@@ -51,7 +51,7 @@ export interface QuizEngineDeps {
 interface InternalQuestion {
   id: string;
   weight: number;
-  checkAnswer: (answer?: unknown) => boolean;
+  checkAnswer: () => boolean;
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction;
@@ -298,11 +298,10 @@ export class QuizEngine implements UseQuizInternalHandle {
     if (!this.canRetry) return;
     const results: QuizQuestionResult[] = [];
     for (let i = 0; i < this.#internalQuestions.length; i++) {
-      const a = this.#answers.has(i) ? this.#answers.get(i) : undefined;
       results.push({
         interaction:
           this.#internalQuestions[i].interaction?.() ?? ({} as never),
-        correct: this.#internalQuestions[i].checkAnswer(a),
+        correct: this.#internalQuestions[i].checkAnswer(),
         weight: this.#internalQuestions[i].weight,
       });
     }
@@ -336,10 +335,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     if (!interaction) return;
     const fingerprint = JSON.stringify(interaction);
     if (this.#reportedAnswers.get(index) === fingerprint) return;
-    const answer = this.#answers.has(index)
-      ? this.#answers.get(index)
-      : undefined;
-    this.#deps.report(q.id, interaction, q.checkAnswer(answer));
+    this.#deps.report(q.id, interaction, q.checkAnswer());
     this.#reportedAnswers.set(index, fingerprint);
   }
 
@@ -349,8 +345,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     let correctCount = 0;
     for (let i = 0; i < this.#internalQuestions.length; i++) {
       const q = this.#internalQuestions[i];
-      const a = this.#answers.has(i) ? this.#answers.get(i) : undefined;
-      const ok = q.checkAnswer(a);
+      const ok = q.checkAnswer();
       totalWeight += q.weight;
       if (ok) {
         weighted += q.weight;
@@ -374,9 +369,9 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.#submitted;
       },
       get correct() {
-        if (!engine.#submitted || engine.#restored) return null;
-        const a = engine.#answers.has(i) ? engine.#answers.get(i) : undefined;
-        return engine.#internalQuestions[i].checkAnswer(a);
+        if (engine.#restored) return null;
+        if (!engine.#submitted && !engine.feedbackVisible(i)) return null;
+        return engine.#internalQuestions[i].checkAnswer();
       },
       get answer() {
         return engine.getAnswer(i);

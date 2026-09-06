@@ -43,15 +43,6 @@
     );
   }
 
-  function checkAnswer(answer) {
-    if (!answer || !(answer instanceof Map)) return false;
-    if (answer.size !== pairs.length) return false;
-    for (let i = 0; i < pairs.length; i++) {
-      if (answer.get(i) !== i) return false;
-    }
-    return true;
-  }
-
   function resetState() {
     matches.clear();
     rightToLeft.clear();
@@ -125,9 +116,8 @@
     selectedLeft = null;
     selectedRight = null;
 
-    if (inQuiz) {
-      q.setAnswer(new Map(matches));
-    } else if (q.answerComplete && !q.submitted) {
+    q.setAnswer(new Map(matches));
+    if (!inQuiz && q.answerComplete && !q.submitted) {
       q.submit();
     }
   }
@@ -137,7 +127,7 @@
     const right = matches.get(leftIndex);
     matches.delete(leftIndex);
     if (right !== undefined) rightToLeft.delete(right);
-    if (inQuiz) q.setAnswer(new Map(matches));
+    q.setAnswer(new Map(matches));
   }
 
   function getMatchColor(leftIndex) {
@@ -233,7 +223,7 @@
   </div>
 
   {#if q.feedbackVisible}
-    {@const isCorrect = checkAnswer(matches)}
+    {@const isCorrect = q.correct}
     <div class="tessera-matching-review">
       {#if isCorrect}
         <div class="tessera-matching-result correct">

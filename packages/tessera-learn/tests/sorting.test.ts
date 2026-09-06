@@ -3,23 +3,9 @@ import { describe, it, expect } from 'vitest';
 /**
  * Tests for Sorting question type logic.
  *
- * The Sorting component's checkAnswer and getItemsForTarget logic is pure and
- * doesn't require DOM/Svelte rendering — we test it inline here.
+ * The Sorting component's getItemsForTarget logic is pure and doesn't require
+ * DOM/Svelte rendering — we test it inline here.
  */
-
-// Mirror of Sorting.svelte checkAnswer
-function checkAnswer(
-  answer: Map<number, number> | null,
-  items: string[],
-  correct: number[],
-): boolean {
-  if (!answer || !(answer instanceof Map)) return false;
-  if (answer.size !== items.length) return false;
-  for (let i = 0; i < items.length; i++) {
-    if (answer.get(i) !== correct[i]) return false;
-  }
-  return true;
-}
 
 // Mirror of Sorting.svelte getItemsForTarget
 function getItemsForTarget(
@@ -32,81 +18,6 @@ function getItemsForTarget(
   }
   return result;
 }
-
-describe('Sorting checkAnswer', () => {
-  const items = ['Dog', 'Cat', 'Eagle', 'Salmon'];
-  // correct[i] = target index for items[i]
-  // Mammals (0): Dog(0), Cat(1)
-  // Birds (1): Eagle(2)
-  // Fish (2): Salmon(3)
-  const correct = [0, 0, 1, 2];
-
-  it('returns true when all items placed in correct targets', () => {
-    const answer = new Map<number, number>([
-      [0, 0], // Dog → Mammals
-      [1, 0], // Cat → Mammals
-      [2, 1], // Eagle → Birds
-      [3, 2], // Salmon → Fish
-    ]);
-    expect(checkAnswer(answer, items, correct)).toBe(true);
-  });
-
-  it('returns false when one item is in the wrong target', () => {
-    const answer = new Map<number, number>([
-      [0, 0], // Dog → Mammals ✓
-      [1, 1], // Cat → Birds ✗ (should be Mammals)
-      [2, 1], // Eagle → Birds ✓
-      [3, 2], // Salmon → Fish ✓
-    ]);
-    expect(checkAnswer(answer, items, correct)).toBe(false);
-  });
-
-  it('returns false when not all items are placed', () => {
-    const answer = new Map<number, number>([
-      [0, 0],
-      [1, 0],
-      [2, 1],
-      // Salmon missing
-    ]);
-    expect(checkAnswer(answer, items, correct)).toBe(false);
-  });
-
-  it('returns false for null answer', () => {
-    expect(checkAnswer(null, items, correct)).toBe(false);
-  });
-
-  it('returns false for empty map', () => {
-    expect(checkAnswer(new Map(), items, correct)).toBe(false);
-  });
-
-  it('returns false when all items swapped to wrong targets', () => {
-    const answer = new Map<number, number>([
-      [0, 2], // Dog → Fish
-      [1, 2], // Cat → Fish
-      [2, 0], // Eagle → Mammals
-      [3, 1], // Salmon → Birds
-    ]);
-    expect(checkAnswer(answer, items, correct)).toBe(false);
-  });
-
-  it('handles single-item single-target case', () => {
-    const single = ['Apple'];
-    const singleCorrect = [0];
-    expect(checkAnswer(new Map([[0, 0]]), single, singleCorrect)).toBe(true);
-    expect(checkAnswer(new Map([[0, 1]]), single, singleCorrect)).toBe(false);
-  });
-
-  it('handles all items going to the same target', () => {
-    const allSame = ['A', 'B', 'C'];
-    const allCorrect = [0, 0, 0];
-    const answer = new Map<number, number>([
-      [0, 0],
-      [1, 0],
-      [2, 0],
-    ]);
-    expect(checkAnswer(answer, allSame, allCorrect)).toBe(true);
-  });
-});
 
 describe('Sorting getItemsForTarget', () => {
   it('returns items assigned to a given target', () => {

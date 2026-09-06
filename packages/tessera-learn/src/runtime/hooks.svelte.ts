@@ -20,7 +20,7 @@ export interface Question {
   readonly id: string;
   /** True once the quiz containing this question has been submitted. */
   readonly submitted: boolean;
-  /** True/false once submitted; null while answering, and null on a restored result (answers aren't persisted). */
+  /** True/false once submitted or once feedback is visible; null while answering, and null on a restored result (answers aren't persisted). */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
@@ -361,7 +361,7 @@ export interface UseQuizQuestionApi {
   id: string;
   /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)·100`. */
   weight?: number;
-  checkAnswer: (answer?: unknown) => boolean;
+  checkAnswer: () => boolean;
   reset?: () => void;
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
