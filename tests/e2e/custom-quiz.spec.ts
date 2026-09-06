@@ -24,8 +24,15 @@ async function waitForContent(page: Page) {
 }
 
 async function navigateToExam(page: Page) {
-  await page.locator('.tessera-nav-page', { hasText: 'Exam' }).click();
+  await page.locator('.tessera-nav-page', { hasText: /^\s*Exam\s*$/ }).click();
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 10000 });
+}
+
+async function navigateToInlineExam(page: Page) {
+  await page.locator('.tessera-nav-page', { hasText: 'Inline Exam' }).click();
+  await page.waitForSelector('[data-testid="inline-heading"]', {
+    timeout: 10000,
+  });
 }
 
 test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
@@ -161,5 +168,76 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await expect(
       page.locator('[data-testid="custom-quiz-status"]'),
     ).toContainText('state: answering');
+  });
+});
+
+/**
+ * Inline layout: the shell renders `children` in place and never calls
+ * `q.render()`. Widgets that skip `setRender` then sit in document order
+ * between the page's own prose, which the snippet layout cannot express.
+ */
+test.describe('Custom quiz.svelte — inline layout', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/');
+    await waitForContent(page);
+  });
+
+  test('page prose and inline widgets render interleaved, in document order', async ({
+    page,
+  }) => {
+    await navigateToInlineExam(page);
+    const pageContent = page.locator('[data-testid="custom-quiz-page"]');
+    await expect(pageContent).toBeVisible();
+    await expect(page.locator('[data-testid="inline-prose-2"]')).toBeVisible();
+
+    const order = await pageContent.evaluate((el) =>
+      [...el.querySelectorAll('[data-testid], [data-question-id]')].map(
+        (n) =>
+          n.getAttribute('data-testid') ?? n.getAttribute('data-question-id'),
+      ),
+    );
+    expect(order).toEqual([
+      'inline-heading',
+      'inline-prose-1',
+      'q-inline-planet',
+      'inline-prose-2',
+      'q-inline-ocean',
+      'inline-prose-3',
+    ]);
+  });
+
+  test('widgets that skip setRender still register, gate Submit, and score', async ({
+    page,
+  }) => {
+    await navigateToInlineExam(page);
+    // Nothing registered a snippet, so the shell's snippet list stays empty.
+    await expect(
+      page.locator('[data-testid="custom-quiz"] .custom-quiz-item'),
+    ).toHaveCount(0);
+
+    const submit = page.locator('[data-testid="custom-quiz-submit"]');
+    await expect(submit).toBeDisabled();
+
+    await page
+      .locator('[data-question-id="q-inline-planet"] input')
+      .nth(1)
+      .check();
+    await expect(submit).toBeDisabled();
+
+    await page
+      .locator('[data-question-id="q-inline-ocean"] input')
+      .nth(2)
+      .check();
+    await expect(submit).toBeEnabled();
+
+    await submit.click();
+    await expect(
+      page.locator('[data-testid="custom-quiz-status"]'),
+    ).toContainText('state: submitted');
+    await expect(
+      page.locator('[data-testid="custom-quiz-status"]'),
+    ).toContainText('score: 100');
   });
 });

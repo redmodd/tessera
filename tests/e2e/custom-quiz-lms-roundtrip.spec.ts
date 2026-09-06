@@ -48,7 +48,7 @@ async function waitForScormCall(
  * Answer both, click Submit, wait for the bridge to fire.
  */
 async function answerCustomQuizCorrectly(page: Page): Promise<void> {
-  await page.locator('.tessera-nav-page', { hasText: 'Exam' }).click();
+  await page.locator('.tessera-nav-page', { hasText: /^\s*Exam\s*$/ }).click();
   await waitForCustomQuiz(page);
   await page
     .locator('[data-question-id="q-planet"] .tessera-mc-option')

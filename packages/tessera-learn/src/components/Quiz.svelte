@@ -109,6 +109,10 @@
   role="region"
   aria-label="Quiz"
 >
+  <div class="tessera-quiz-intro" hidden={handle.state !== 'answering'}>
+    {@render children?.()}
+  </div>
+
   {#if handle.state === 'answering'}
     <!-- Question phase -->
     <div class="tessera-quiz-progress" aria-live="polite">
@@ -265,15 +269,19 @@
       </div>
     </div>
   {/if}
-  <!-- Children always mounted so snippets survive submit/review phases -->
-  <div style="display:none">
-    {@render children?.()}
-  </div>
 </div>
 
 <style>
   .tessera-quiz {
     margin: var(--tessera-spacing-xl) 0;
+  }
+
+  .tessera-quiz-intro:not(:empty) {
+    margin-bottom: var(--tessera-spacing-lg);
+  }
+
+  .tessera-quiz-intro[hidden] {
+    display: none;
   }
 
   .tessera-quiz-progress {
