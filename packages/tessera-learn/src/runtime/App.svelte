@@ -197,8 +197,7 @@
 
   function handleQuizComplete(e) {
     const { score } = e.detail;
-    const pageIndex = nav.currentPageIndex;
-    progress.quizCompleted(pageIndex, score);
+    progress.quizCompleted(nav.currentPageIndex, score);
   }
 
   // ---- Persistence: serialize / restore ----
@@ -309,9 +308,11 @@
     //   - currentPageIndex (bookmark)
     //   - progress.version (bumped by markVisited / quizCompleted /
     //     markChunk / markStandaloneQuestion)
+    //   - persistenceReady (requestPersist() drops writes until it flips)
     // userState writes go through requestPersist() directly from the setter.
     void nav.currentPageIndex;
     void progress.version;
+    void persistenceReady;
     untrack(requestPersist);
   });
 
