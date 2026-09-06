@@ -400,27 +400,34 @@
     // failed token request). Surface that to the UI rather than crashing
     // silently: a launch-time error means the LMS context is wrong and
     // the user can't continue regardless.
+    let initDeadline;
     try {
       await Promise.race([
         adapter.init(),
-        new Promise((_, reject) =>
-          setTimeout(
+        new Promise((_, reject) => {
+          initDeadline = setTimeout(
             () => reject(new Error('adapter init timed out')),
             INIT_TIMEOUT_MS,
-          ),
-        ),
+          );
+        }),
       ]);
     } catch (err) {
       console.error('Tessera: adapter init failed', err);
       pageError = err instanceof Error ? err : new Error(String(err));
       pageLoading = false;
       return;
+    } finally {
+      clearTimeout(initDeadline);
     }
 
     // Resume state is a separate step from init(): the adapter bounds it and
     // degrades to an unrestored launch on its own, so a stalled State API
     // costs the learner their bookmark rather than the course.
-    await adapter.loadState?.();
+    try {
+      await adapter.loadState?.();
+    } catch (err) {
+      console.warn('Tessera: resume state load failed', err);
+    }
 
     // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
     // threshold for this launch and overrides the manifest. Mutate the

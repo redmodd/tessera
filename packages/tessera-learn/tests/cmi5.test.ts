@@ -290,6 +290,39 @@ describe('CMI5Adapter', () => {
     expect(puts).toHaveLength(1);
   });
 
+  it('overwrites an unparseable saved document instead of locking saves out', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    let resumeGets = 0;
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
+        resumeGets++;
+        return { ok: true, text: async () => 'not json{{{' };
+      }
+      return { ok: true, text: async () => '', json: async () => ({}) };
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await adapter.loadState();
+    warn.mockRestore();
+
+    // Re-reading identical bytes can't change the answer, so one attempt only.
+    expect(resumeGets).toBe(1);
+    expect(adapter.getState()).toBeNull();
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    const puts = mockFetch.mock.calls.filter(
+      ([url, options]: any[]) =>
+        String(url).includes('activities/state') && options?.method === 'PUT',
+    );
+    expect(puts).toHaveLength(1);
+  });
+
   it('restores state from xAPI State API', async () => {
     const saved: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
     setupInitMocks(saved);

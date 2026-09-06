@@ -62,7 +62,11 @@ export interface SavedState {
   v: number[];
   /** Quiz scores — pageIndex (as string key) to score */
   q: Record<string, number>;
-  /** Quiz attempts — pageIndex (as string key) to submitted attempt count */
+  /**
+   * Quiz attempts — pageIndex (as string key) to submitted attempt count.
+   * A count of 1 is omitted and assumed on restore, so every key in `q` has at
+   * least one attempt. Writing a `q` entry with no attempt breaks that.
+   */
   qa?: Record<string, number>;
   /** Duration — accumulated seconds */
   d: number;

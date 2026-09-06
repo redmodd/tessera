@@ -386,10 +386,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   /**
    * Resume GET, retried on the shared LMS backoff schedule. Runs after init()
-   * so a stalled State API costs the bookmark rather than the launch. A 404, or
-   * a 2xx with an empty body, is a definitive answer (no state stored yet) and
-   * returns immediately with saving enabled. Exhausting the attempts or the
-   * deadline sets `stateLoadFailed`, which withholds every later write.
+   * so a stalled State API costs the bookmark rather than the launch. A 404, an
+   * empty body, or an unparseable one is a definitive answer (there is no state
+   * worth keeping) and returns immediately with saving enabled. Exhausting the
+   * attempts or the deadline leaves the stored state unread, so `stateLoadFailed`
+   * withholds every later write rather than clobber it.
    */
   async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
@@ -406,7 +407,14 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         });
         if (resp.ok) {
           const body = (await resp.text()).trim();
-          this.state = body ? JSON.parse(body) : null;
+          try {
+            this.state = body ? JSON.parse(body) : null;
+          } catch {
+            this.state = null;
+            console.warn(
+              `Tessera ${this.logName}: State API returned an unparseable document; starting fresh and overwriting it.`,
+            );
+          }
           return;
         }
         if (resp.status === 404) return;

@@ -31,11 +31,14 @@ const config = {
   export: { standard: 'web' },
 };
 
-function makeAdapter(init: () => Promise<void>) {
+function makeAdapter(
+  init: () => Promise<void>,
+  loadState: () => Promise<void> = async () => {},
+) {
   return {
     init,
     getState: () => null,
-    loadState: async () => {},
+    loadState,
     saveState: () => {},
     setDuration: () => {},
     setExit: () => {},
@@ -47,7 +50,10 @@ function makeAdapter(init: () => Promise<void>) {
   };
 }
 
-async function mountApp(init: () => Promise<void>) {
+async function mountApp(
+  init: () => Promise<void>,
+  loadState?: () => Promise<void>,
+) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
@@ -56,7 +62,7 @@ async function mountApp(init: () => Promise<void>) {
     pageModules: {
       [page.importPath]: () => import('./fixtures/app-page.svelte'),
     },
-    adapter: makeAdapter(init),
+    adapter: makeAdapter(init, loadState),
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
@@ -96,6 +102,25 @@ describe('App bounds adapter.init()', () => {
     cleanup = () => unmount(component);
 
     await vi.advanceTimersByTimeAsync(20_000);
+    expect(document.body.textContent).not.toContain('This page failed to load');
+  });
+
+  it('renders the page when loadState rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { component, unmount } = await mountApp(
+      async () => {},
+      async () => {
+        throw new Error('LRS unreachable');
+      },
+    );
+    cleanup = () => {
+      unmount(component);
+      warn.mockRestore();
+    };
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
     expect(document.body.textContent).not.toContain('This page failed to load');
   });
 });
