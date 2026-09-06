@@ -337,7 +337,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 - **`correct` is a 0-based index, not the answer text.** `correct={1}` is the second option; it must be in range for `options`.
 - **All required props present:** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
-- **Question `id`s are unique within a page.** Duplicates collide in `cmi.interactions`.
+- **Question `id`s are unique within a page.** Omitting `id` derives one from the prompt text, so two identically worded questions collide; the build errors on a collision, and at runtime the second registration is renamed (`q1-2`), which changes its `cmi.interactions` key.
 - **No `<Quiz>` wrapper.** Pages with `pageConfig.quiz` are wrapped automatically.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` puts it above the first question and hides it on the results screen. Built-in widgets render only through the snippet they register, so under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2](#recipe-2-custom-quiz-shell-via-quizsvelte)).
 - **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing.

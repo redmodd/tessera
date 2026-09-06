@@ -175,15 +175,20 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   registerQuestion(api: UseQuizQuestionApi): QuestionInternal {
-    if (this.#seenIds.has(api.id)) {
+    let id = api.id;
+    if (this.#seenIds.has(id)) {
+      let n = 2;
+      while (this.#seenIds.has(`${api.id}-${n}`)) n++;
+      id = `${api.id}-${n}`;
       console.warn(
-        `[tessera] useQuiz: duplicate question id "${api.id}" — ` +
-          'each question id must be unique within a quiz (LMS interaction records key by id).',
+        `[tessera] useQuiz: duplicate question id "${api.id}" — registered as "${id}" instead. ` +
+          'Each question id must be unique within a quiz; give this question an explicit id, ' +
+          'because the rewritten one is the key its LMS interaction is recorded under.',
       );
     }
-    this.#seenIds.add(api.id);
+    this.#seenIds.add(id);
     const internal: InternalQuestion = {
-      id: api.id,
+      id,
       weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
       checkAnswer: api.checkAnswer,
       reset: api.reset,
@@ -254,8 +259,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       return;
     }
 
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
-
     // Combined null-host guard + before-submit dispatch: dispatch() returns false
     // when the host element is null, which is the silent-LMS-dropout case.
     if (!this.#deps.dispatch('tessera-quiz-before-submit')) {
@@ -266,6 +269,8 @@ export class QuizEngine implements UseQuizInternalHandle {
       );
       return;
     }
+
+    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
