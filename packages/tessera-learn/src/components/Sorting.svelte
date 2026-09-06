@@ -33,15 +33,6 @@
     isDragging = false;
   }
 
-  function checkAnswer(answer) {
-    if (!answer || !(answer instanceof Map)) return false;
-    if (answer.size !== items.length) return false;
-    for (let i = 0; i < items.length; i++) {
-      if (answer.get(i) !== correct[i]) return false;
-    }
-    return true;
-  }
-
   function resetState() {
     initQueue();
   }
@@ -101,16 +92,14 @@
     placements.set(itemIdx, targetIdx);
     queue = queue.slice(1);
     cardSelected = false;
-    if (inQuiz) {
-      q.setAnswer(new Map(placements));
-    }
+    q.setAnswer(new Map(placements));
   }
 
   function returnCard(itemIdx) {
     if (q.locked) return;
     placements.delete(itemIdx);
     queue = [itemIdx, ...queue];
-    if (inQuiz) q.setAnswer(new Map(placements));
+    q.setAnswer(new Map(placements));
   }
 
   // --- Drag handlers ---
@@ -274,7 +263,7 @@
 
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
   {#if q.feedbackVisible}
-    {@const isCorrect = checkAnswer(placements)}
+    {@const isCorrect = q.correct}
     <div class="tessera-sorting-review">
       {#if isCorrect}
         <div class="tessera-sorting-result correct">

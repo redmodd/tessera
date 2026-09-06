@@ -361,7 +361,7 @@ export interface UseQuizQuestionApi {
   id: string;
   /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)·100`. */
   weight?: number;
-  checkAnswer: (answer?: unknown) => boolean;
+  checkAnswer: () => boolean;
   reset?: () => void;
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */

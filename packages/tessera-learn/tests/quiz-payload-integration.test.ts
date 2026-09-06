@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount, unmount } from 'svelte';
+import { mount, unmount, flushSync } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
+
+const flush = async () => {
+  flushSync();
+  await Promise.resolve();
+};
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
@@ -205,5 +210,49 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(registrations[1].interaction().type).toBe('fill-in');
     expect(registrations[2].interaction().type).toBe('matching');
     expect(registrations[3].interaction().type).toBe('matching');
+  });
+});
+
+describe('FillInTheBlank normalizes the response at the boundary', () => {
+  let toUnmount: any[] = [];
+
+  beforeEach(() => {
+    toUnmount = [];
+  });
+
+  afterEach(() => {
+    for (const c of toUnmount) unmount(c);
+    document.body.innerHTML = '';
+  });
+
+  it('a trailing space scores correct and reports the trimmed response', async () => {
+    const reports: Array<[string, Interaction, boolean | null]> = [];
+    const adapter = {
+      reportInteraction: (id: string, i: Interaction, c: boolean | null) =>
+        reports.push([id, i, c]),
+    };
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const component = mount(FillInTheBlank, {
+      target,
+      props: { question: 'Sky colour', answers: ['blue', 'Blue'] },
+      context: new Map<string, unknown>([['tessera-adapter', { adapter }]]),
+    });
+    toUnmount.push(component);
+
+    const input = target.querySelector('input') as HTMLInputElement;
+    input.value = 'blue ';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush();
+    (target.querySelector('button') as HTMLButtonElement).click();
+    await flush();
+
+    expect(reports).toHaveLength(1);
+    const [, interaction, correct] = reports[0];
+    expect(interaction.response).toBe('blue');
+    expect(correct).toBe(true);
+    expect(target.querySelector('.tessera-fitb-result')?.className).toContain(
+      'correct',
+    );
   });
 });
