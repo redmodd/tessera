@@ -25,6 +25,9 @@
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
   let passed = $derived(handle.score >= handle.passingScore);
+  // The LMS is given the best attempt, so a weaker retry would otherwise read
+  // as a plain fail on a quiz the learner has already passed.
+  let bestBeaten = $derived(handle.bestScore > handle.score);
 
   function isAnswered(q) {
     if (!q) return false;
@@ -230,6 +233,12 @@
       {:else}
         <p class="tessera-quiz-results-detail">
           You answered {correctCount} of {totalQuestions} questions correctly.
+        </p>
+      {/if}
+      {#if bestBeaten}
+        <p class="tessera-quiz-results-detail" data-testid="quiz-best-score">
+          Your best attempt was {handle.bestScore}%, which is the score on
+          record.
         </p>
       {/if}
 

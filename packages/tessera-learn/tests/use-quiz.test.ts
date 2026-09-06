@@ -318,6 +318,47 @@ describe('QuizEngine', () => {
     expect(engine.canRetry).toBe(false);
   });
 
+  it('keeps the best score across attempts while score follows the last one', () => {
+    let correct = true;
+    const swingQuestion = {
+      id: 'a',
+      checkAnswer: () => correct,
+      interaction: (): Interaction => ({
+        type: 'true-false' as const,
+        response: true,
+        correct: true,
+      }),
+    };
+    const { engine } = makeEngine({ graded: true, maxAttempts: 3 });
+    engine.registerQuestion(swingQuestion);
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.score).toBe(100);
+    expect(engine.bestScore).toBe(100);
+
+    correct = false;
+    engine.retry();
+    engine.setAnswer(0, false);
+    engine.submit();
+    expect(engine.score).toBe(0);
+    expect(engine.bestScore).toBe(100);
+  });
+
+  it('seeds bestScore from a restored result', () => {
+    const { engine } = makeEngine(
+      { graded: true, maxAttempts: 3 },
+      { restore: { attempts: 1, score: 80 } },
+    );
+    engine.registerQuestion(tfQuestion('a', true, false));
+    expect(engine.bestScore).toBe(80);
+
+    engine.retry();
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.score).toBe(0);
+    expect(engine.bestScore).toBe(80);
+  });
+
   describe('restored attempts', () => {
     it('starts in the results phase with the saved score', () => {
       const { engine } = makeEngine(

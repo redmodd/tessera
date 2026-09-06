@@ -96,7 +96,8 @@ describe('CMI5Adapter', () => {
           if (launchData) return { ok: true, json: async () => launchData };
           return { ok: false, status: 404 };
         }
-        if (savedState) return { ok: true, json: async () => savedState };
+        if (savedState)
+          return { ok: true, text: async () => JSON.stringify(savedState) };
         return { ok: false, status: 404 };
       }
       // Agent Profile GET (Learner Preferences)
@@ -171,7 +172,7 @@ describe('CMI5Adapter', () => {
         resumeGets++;
         if (resumeGets === 1) throw new Error('transient');
         if (resumeGets === 2) return { ok: false, status: 503 };
-        return { ok: true, json: async () => saved };
+        return { ok: true, text: async () => JSON.stringify(saved) };
       }
       return { ok: true, text: async () => '', json: async () => ({}) };
     });
@@ -209,6 +210,38 @@ describe('CMI5Adapter', () => {
     });
     await adapter.loadState();
     expect(resumeGets).toBe(1);
+  });
+
+  it('treats an empty 2xx body as no state, leaving saving enabled', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    let resumeGets = 0;
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (
+        url.includes('activities/state') &&
+        (!options || options.method === 'GET')
+      ) {
+        resumeGets++;
+        return { ok: true, status: 204, text: async () => '' };
+      }
+      return { ok: true, text: async () => '', json: async () => ({}) };
+    });
+    await adapter.loadState();
+
+    expect(resumeGets).toBe(1);
+    expect(adapter.getState()).toBeNull();
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 1, v: [0, 1], q: {}, d: 4 });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      mockFetch.mock.calls.filter(
+        ([url, options]: any[]) =>
+          String(url).includes('activities/state') && options?.method === 'PUT',
+      ),
+    ).toHaveLength(1);
   });
 
   it('refuses to save after a failed resume GET, so it cannot clobber', async () => {

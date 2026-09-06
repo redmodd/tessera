@@ -79,6 +79,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   #submitted = $state(false);
   #reviewing = $state(false);
   #score = $state(0);
+  #bestScore = $state(0);
   #attemptCount = $state(0);
   #restored = $state(false);
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
@@ -94,6 +95,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     if (deps.restore && deps.restore.attempts > 0) {
       this.#attemptCount = deps.restore.attempts;
       this.#score = deps.restore.score;
+      this.#bestScore = deps.restore.score;
       this.#submitted = true;
       this.#restored = true;
     }
@@ -142,6 +144,15 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   get score(): number {
     return this.#score;
+  }
+
+  /**
+   * Highest score across this learner's attempts, restored ones included. The
+   * LMS is given this rather than `score`, so a shell that offers retries has
+   * to show it whenever it exceeds the attempt just submitted.
+   */
+  get bestScore(): number {
+    return this.#bestScore;
   }
 
   get passingScore(): number {
@@ -269,6 +280,7 @@ export class QuizEngine implements UseQuizInternalHandle {
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
+    this.#bestScore = Math.max(this.#bestScore, rounded);
     this.#submitted = true;
     this.#restored = false;
     this.#attemptCount++;
@@ -277,7 +289,15 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   startReview(): void {
-    if (!this.#submitted || this.#restored) return;
+    if (!this.#submitted) return;
+    if (this.#restored) {
+      console.warn(
+        '[tessera] useQuiz: startReview() did nothing because these results were ' +
+          'restored from a previous session, which does not persist answers. ' +
+          'Hide your Review control when handle.restored is true.',
+      );
+      return;
+    }
     this.#reviewing = true;
   }
 

@@ -386,10 +386,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   /**
    * Resume GET, retried on the shared LMS backoff schedule. Runs after init()
-   * so a stalled State API costs the bookmark rather than the launch. A 404 is
-   * a definitive answer — no state stored yet — and returns immediately with
-   * saving enabled. Exhausting the attempts or the deadline sets
-   * `stateLoadFailed`, which withholds every later write.
+   * so a stalled State API costs the bookmark rather than the launch. A 404, or
+   * a 2xx with an empty body, is a definitive answer (no state stored yet) and
+   * returns immediately with saving enabled. Exhausting the attempts or the
+   * deadline sets `stateLoadFailed`, which withholds every later write.
    */
   async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
@@ -405,7 +405,8 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
           signal: deadline,
         });
         if (resp.ok) {
-          this.state = await resp.json();
+          const body = (await resp.text()).trim();
+          this.state = body ? JSON.parse(body) : null;
           return;
         }
         if (resp.status === 404) return;

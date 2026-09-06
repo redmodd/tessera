@@ -373,7 +373,14 @@ export interface UseQuizHandle {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
+  /** Score for the attempt just submitted, or the restored result. */
   readonly score: number;
+  /**
+   * Highest score across attempts, restored ones included. This is what the
+   * LMS is given, so show it whenever it exceeds `score` or the learner sees a
+   * failing result on a quiz they have already passed.
+   */
+  readonly bestScore: number;
   /** Resolved passing threshold (config + LMS mastery override). */
   readonly passingScore: number;
   readonly attemptCount: number;

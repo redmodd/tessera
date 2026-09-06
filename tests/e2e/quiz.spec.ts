@@ -99,6 +99,23 @@ async function completeGradedQuiz(
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 }
 
+async function completePracticeQuiz(
+  page: Page,
+  { mc, fill }: { mc: number; fill: string },
+) {
+  const progress = page.locator('.tessera-quiz-progress-desktop').first();
+
+  await expect(progress).toContainText('Question 1 of 2');
+  await answerMultipleChoice(page, mc);
+  await primaryBtn(page).click();
+
+  await expect(progress).toContainText('Question 2 of 2');
+  await answerFillInTheBlank(page, fill);
+
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
 test.describe('Quiz — Graded Assessment', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -411,5 +428,28 @@ test.describe('Quiz — Practice', () => {
     await expect(
       page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
     ).toBeVisible();
+  });
+
+  test('a weaker retry shows its own score alongside the best attempt', async ({
+    page,
+  }) => {
+    await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
+
+    await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+    await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
+
+    // The learner sees the attempt they just finished, and the best one is
+    // named because that is what the LMS and the navigation gate are given.
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('0%');
+    await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
+
+    // Only the best attempt is persisted, so the restored result is that one
+    // and there is no weaker attempt left to caveat.
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
   });
 });

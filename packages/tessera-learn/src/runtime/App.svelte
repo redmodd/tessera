@@ -25,6 +25,11 @@
   } from './contexts.js';
 
   // ---- Persistence ----
+  // Ceiling on adapter.init(). The LMS handshake it performs (cmi5 auth token,
+  // LaunchData, Agent Profile) has no deadline of its own, and the first page
+  // waits on it.
+  const INIT_TIMEOUT_MS = 15_000;
+
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
@@ -396,10 +401,20 @@
     // Initialize persistence and restore state. Adapter init() may throw
     // for malformed launch params (cmi5 actor JSON, missing fetch URL,
     // failed token request). Surface that to the UI rather than crashing
-    // silently — a launch-time error means the LMS context is wrong and
-    // the user can't continue regardless.
+    // silently: a launch-time error means the LMS context is wrong and
+    // the user can't continue regardless. The first page is held until this
+    // resolves, so the deadline is what keeps an LMS that never answers from
+    // showing a loading bar forever.
     try {
-      await adapter.init();
+      await Promise.race([
+        adapter.init(),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('adapter init timed out')),
+            INIT_TIMEOUT_MS,
+          ),
+        ),
+      ]);
     } catch (err) {
       console.error('Tessera: adapter init failed', err);
       pageError = err instanceof Error ? err : new Error(String(err));

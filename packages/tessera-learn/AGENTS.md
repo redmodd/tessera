@@ -747,7 +747,8 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
-  readonly score: number;
+  readonly score: number; // the attempt just submitted, or the restored result
+  readonly bestScore: number; // highest across attempts; this is what the LMS gets
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
   readonly restored: boolean; // results came from saved progress, not this session
@@ -758,6 +759,8 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   revealFeedback(q: Question): void; // immediate-feedback flow
 };
 ```
+
+**Show `bestScore` when it beats `score`.** `score` is the attempt the learner just finished, so a weaker retry shows a failing result on a quiz they already passed. The LMS and the navigation gate are given `bestScore`, so a shell offering retries must surface it whenever `bestScore > score`.
 
 **Branch on `restored`.** A quiz whose result came from saved progress opens in the `submitted` state with the score and attempt count intact, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 
@@ -1052,6 +1055,7 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
     >
   {:else if quiz.state === 'submitted'}
     <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
+    {#if quiz.bestScore > quiz.score}<p>Best attempt: {quiz.bestScore}%</p>{/if}
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
     {#if !quiz.restored}<button onclick={() => quiz.startReview()}
         >Review</button

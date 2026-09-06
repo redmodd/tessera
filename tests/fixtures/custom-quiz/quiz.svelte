@@ -13,7 +13,8 @@
 
 <div bind:this={host} class="custom-quiz" data-testid="custom-quiz">
   <div class="custom-quiz-status" data-testid="custom-quiz-status">
-    state: {quiz.state} · score: {quiz.score} · attempts: {quiz.attemptCount}
+    state: {quiz.state} · score: {quiz.score} · best: {quiz.bestScore} · attempts:
+    {quiz.attemptCount}
   </div>
 
   <!-- All questions stacked. Each question widget calls useQuestion which
@@ -39,13 +40,15 @@
         Submit All
       </button>
     {:else if quiz.state === 'submitted'}
-      <button
-        type="button"
-        data-testid="custom-quiz-review"
-        onclick={() => quiz.startReview()}
-      >
-        Review
-      </button>
+      {#if !quiz.restored}
+        <button
+          type="button"
+          data-testid="custom-quiz-review"
+          onclick={() => quiz.startReview()}
+        >
+          Review
+        </button>
+      {/if}
       {#if quiz.canRetry}
         <button
           type="button"
