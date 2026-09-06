@@ -308,17 +308,20 @@
     });
   }
 
+  const launchPageIndex = nav.currentPageIndex;
+  const launchVersion = progress.version;
+
   $effect(() => {
     // Subscribe to every signal that influences serializeState():
     //   - currentPageIndex (bookmark)
     //   - progress.version (bumped by markVisited / quizCompleted /
     //     markChunk / markStandaloneQuestion)
     // userState writes go through requestPersist() directly from the setter.
-    void nav.currentPageIndex;
-    void progress.version;
+    const pageIndex = nav.currentPageIndex;
+    const version = progress.version;
     if (!persistEffectRan) {
       persistEffectRan = true;
-      return;
+      if (pageIndex === launchPageIndex && version === launchVersion) return;
     }
     untrack(requestPersist);
   });

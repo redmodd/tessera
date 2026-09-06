@@ -36,13 +36,18 @@ const config = {
 // loads, so the flip to persistenceReady is the only thing that can flush it.
 async function mountWithSlowInit(
   savedState: object | null = null,
-  { skipLayout = false } = {},
+  {
+    skipLayout = false,
+    layoutFixture = './fixtures/persisting-layout.svelte',
+    courseConfig = config,
+  } = {},
 ) {
   let releaseInit: () => void;
   const initGate = new Promise<void>((resolve) => {
     releaseInit = resolve;
   });
   const saveState = vi.fn();
+  const commit = vi.fn();
   const adapter = {
     init: () => initGate,
     getState: () => savedState,
@@ -52,14 +57,14 @@ async function mountWithSlowInit(
     setScore: () => {},
     setCompletionStatus: () => {},
     setSuccessStatus: () => {},
-    commit: () => {},
+    commit,
     terminate: () => {},
   };
 
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
-    config,
+    config: courseConfig,
     manifest,
     pageModules: Object.fromEntries(
       pages.map((p) => [p.importPath, () => new Promise(() => {})]),
@@ -70,12 +75,12 @@ async function mountWithSlowInit(
     ...(skipLayout
       ? {}
       : {
-          layout: (await import('./fixtures/persisting-layout.svelte')).default,
+          layout: (await import(/* @vite-ignore */ layoutFixture)).default,
         }),
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
-  return { component, saveState, releaseInit: releaseInit!, unmount };
+  return { component, saveState, commit, releaseInit: releaseInit!, unmount };
 }
 
 describe('state changed during adapter init survives', () => {
@@ -137,13 +142,31 @@ describe('state changed during adapter init survives', () => {
       d: 0,
       u: { 'other-note': 'from-a-previous-session' },
     };
-    const { component, saveState, releaseInit, unmount } =
+    const { component, saveState, commit, releaseInit, unmount } =
       await mountWithSlowInit(saved, { skipLayout: true });
     cleanup = () => unmount(component);
 
     releaseInit();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // commit() runs after the ready flip, so it lands strictly later than any
+    // flush the flip could have scheduled.
+    await vi.waitFor(() => expect(commit).toHaveBeenCalled());
 
     expect(saveState).not.toHaveBeenCalled();
+  });
+
+  it('persists a completion marked before the adapter is ready', async () => {
+    const { component, saveState, releaseInit, unmount } =
+      await mountWithSlowInit(null, {
+        layoutFixture: './fixtures/completing-layout.svelte',
+        courseConfig: { ...config, completion: { mode: 'manual' } },
+      });
+    cleanup = () => unmount(component);
+
+    releaseInit();
+
+    await vi.waitFor(() => {
+      expect(saveState).toHaveBeenCalled();
+      expect(saveState.mock.calls.at(-1)![0].m).toBe(1);
+    });
   });
 });
