@@ -280,6 +280,10 @@
     margin-bottom: var(--tessera-spacing-lg);
   }
 
+  .tessera-quiz-intro[hidden] {
+    display: none;
+  }
+
   .tessera-quiz-progress {
     display: flex;
     align-items: center;

@@ -30,7 +30,7 @@ async function navigateToExam(page: Page) {
 
 async function navigateToInlineExam(page: Page) {
   await page.locator('.tessera-nav-page', { hasText: 'Inline Exam' }).click();
-  await page.waitForSelector('[data-testid="custom-quiz-page"]', {
+  await page.waitForSelector('[data-testid="inline-heading"]', {
     timeout: 10000,
   });
 }
