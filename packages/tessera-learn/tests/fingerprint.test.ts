@@ -100,8 +100,6 @@ describe('shouldRestore', () => {
     });
   });
 
-  // restoreState() skips a null optional, so rejecting the whole document
-  // would drop the bookmark, quiz scores and duration that are still intact.
   it.each([
     ['c is null', { c: null }],
     ['s is null', { s: null }],
