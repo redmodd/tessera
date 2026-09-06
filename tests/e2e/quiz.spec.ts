@@ -453,8 +453,15 @@ test.describe('Quiz — Practice', () => {
     await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
     await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
 
-    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('0%');
-    await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
+    // The attempt and the record are labelled separately, so a failing retry
+    // cannot label a quiz the LMS has recorded as passed "Not Passed".
+    const attempt = page.getByTestId('quiz-attempt-score');
+    const record = page.getByTestId('quiz-best-score');
+    await expect(attempt).toContainText('0%');
+    await expect(attempt).toContainText('Not Passed');
+    await expect(record).toContainText('100%');
+    await expect(record).toContainText('Passed');
+    await expect(record).not.toContainText('Not Passed');
 
     // Only the best attempt is persisted, so that is what comes back.
     await page.reload();

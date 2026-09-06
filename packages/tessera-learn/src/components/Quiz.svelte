@@ -24,7 +24,8 @@
   let correctCount = $derived(
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
-  let passed = $derived(handle.score >= handle.passingScore);
+  let attemptPassed = $derived(handle.score >= handle.passingScore);
+  let passed = $derived(handle.bestScore >= handle.passingScore);
   let bestBeaten = $derived(handle.bestScore > handle.score);
 
   function isAnswered(q) {
@@ -220,16 +221,41 @@
     <!-- Results phase -->
     <div class="tessera-quiz-results" role="status" aria-live="polite">
       <h2 class="tessera-quiz-results-title">Quiz Results</h2>
-      <div class="tessera-quiz-score">
-        <span class="tessera-quiz-score-value">{handle.score}%</span>
-        <span
-          class="tessera-quiz-score-label"
-          class:passed
-          class:failed={!passed}
-        >
-          {passed ? 'Passed' : 'Not Passed'}
-        </span>
-      </div>
+      {#if bestBeaten}
+        <div class="tessera-quiz-score paired" data-testid="quiz-attempt-score">
+          <span class="tessera-quiz-score-caption">This attempt</span>
+          <span class="tessera-quiz-score-value">{handle.score}%</span>
+          <span
+            class="tessera-quiz-score-label"
+            class:passed={attemptPassed}
+            class:failed={!attemptPassed}
+          >
+            {attemptPassed ? 'Passed' : 'Not Passed'}
+          </span>
+        </div>
+        <div class="tessera-quiz-score paired" data-testid="quiz-best-score">
+          <span class="tessera-quiz-score-caption">On record</span>
+          <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
+          <span
+            class="tessera-quiz-score-label"
+            class:passed
+            class:failed={!passed}
+          >
+            {passed ? 'Passed' : 'Not Passed'}
+          </span>
+        </div>
+      {:else}
+        <div class="tessera-quiz-score">
+          <span class="tessera-quiz-score-value">{handle.score}%</span>
+          <span
+            class="tessera-quiz-score-label"
+            class:passed
+            class:failed={!passed}
+          >
+            {passed ? 'Passed' : 'Not Passed'}
+          </span>
+        </div>
+      {/if}
       {#if handle.restored}
         <p class="tessera-quiz-results-detail">Your previous result.</p>
       {:else}
@@ -237,13 +263,6 @@
           You answered {correctCount} of {totalQuestions} questions correctly.
         </p>
       {/if}
-      {#if bestBeaten}
-        <p class="tessera-quiz-results-detail" data-testid="quiz-best-score">
-          Your best attempt was {handle.bestScore}%, which is the score on
-          record.
-        </p>
-      {/if}
-
       <div class="tessera-quiz-results-actions">
         {#if !feedbackDisabled && !handle.restored}
           <button
@@ -367,6 +386,23 @@
     align-items: center;
     gap: var(--tessera-spacing-sm);
     margin-bottom: var(--tessera-spacing-lg);
+  }
+
+  .tessera-quiz-score.paired {
+    gap: 0.25rem;
+    margin-bottom: var(--tessera-spacing-md);
+  }
+
+  .tessera-quiz-score.paired .tessera-quiz-score-value {
+    font-size: 2rem;
+  }
+
+  .tessera-quiz-score-caption {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--tessera-text-light);
   }
 
   .tessera-quiz-score-value {

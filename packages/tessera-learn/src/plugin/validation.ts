@@ -24,6 +24,7 @@ import {
 } from '../runtime/xapi/agent-rules.js';
 import { httpOrigin } from '../runtime/xapi/derive-actor.js';
 import { shortIdentifier } from '../runtime/interaction-format.js';
+import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
@@ -1202,6 +1203,14 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   Sorting: ['question', 'items', 'targets', 'correct'],
 };
 
+/** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
+const QUESTION_ID_PREFIX: Record<string, string> = {
+  MultipleChoice: 'mc',
+  FillInTheBlank: 'fitb',
+  Matching: 'matching',
+  Sorting: 'sorting',
+};
+
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   try {
@@ -1256,29 +1265,42 @@ function validateQuestionComponents(
     }
 
     const idProp = props.get('id');
-    if (idProp?.kind === 'string') {
-      if (seenIds.has(idProp.value)) {
+    const questionProp = props.get('question');
+    // With no `id`, the widget derives one from the prompt text, so two
+    // identically worded questions collide on one page.
+    const derived = !hasSpread && !idProp && questionProp?.kind === 'string';
+    const resolvedId =
+      idProp?.kind === 'string'
+        ? idProp.value
+        : derived
+          ? `${QUESTION_ID_PREFIX[name]}-${slugFromQuestion((questionProp as { value: string }).value)}`
+          : null;
+
+    if (resolvedId !== null) {
+      if (seenIds.has(resolvedId)) {
         d.error(
-          `${fileRel}: duplicate question id "${idProp.value}" — each question on a page needs a unique id`,
+          derived
+            ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
+            : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
       } else if (exportStandard === 'scorm12') {
         // scorm12-only: shortIdentifier strips non-alphanumerics, so distinct
         // raw ids can collide after sanitization. Skip raw duplicates (already
         // flagged above) to avoid double-reporting the same id.
-        const sane = shortIdentifier(idProp.value);
-        if (sane !== idProp.value) {
+        const sane = shortIdentifier(resolvedId);
+        if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${idProp.value}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${idProp.value}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
+            `${fileRel}: question id "${resolvedId}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);
       }
-      seenIds.add(idProp.value);
+      seenIds.add(resolvedId);
     }
 
     const weightProp = props.get('weight');

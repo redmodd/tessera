@@ -1061,6 +1061,42 @@ describe('question component validation', () => {
     );
   });
 
+  it('errors when two un-idded questions derive the same id from their prompt', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice question="What is water?" options={["c", "d"]} correct={1} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('falls back to "mc-what-is-water"'),
+    );
+  });
+
+  it('does not derive an id when a spread may supply one', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';
+let a = {}; let b = {};</script>
+<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} {...a} />
+<MultipleChoice question="What is water?" options={["c", "d"]} correct={1} {...b} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('falls back to'))).toHaveLength(0);
+  });
+
+  it('accepts un-idded questions with different prompts', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice question="What is air?" options={["c", "d"]} correct={1} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('falls back to'))).toHaveLength(0);
+  });
+
   it('errors when Matching is missing pairs', () => {
     createValidProject(testRoot);
     writePage(

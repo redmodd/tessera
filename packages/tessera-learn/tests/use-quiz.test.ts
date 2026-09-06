@@ -41,11 +41,10 @@ function makeEngine(
     passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct) =>
       reports.push({ id, interaction, correct }),
-    // dispatch() returns false when the host element is null; model that with hostNull.
+    hasHost: () => !opts.hostNull,
     dispatch: (name, detail) => {
-      if (opts.hostNull) return false;
+      if (opts.hostNull) return;
       events.push({ name, detail });
-      return true;
     },
     restore: opts.restore,
   });
@@ -145,7 +144,8 @@ describe('QuizEngine', () => {
       quizConfig: { graded: true } as QuizConfig,
       passingScore: () => passingScore,
       report: () => {},
-      dispatch: () => true,
+      hasHost: () => true,
+      dispatch: () => {},
     });
 
     expect(engine.passingScore).toBe(70);
@@ -588,20 +588,90 @@ describe('QuizEngine', () => {
     ]);
   });
 
-  it('warns when registerQuestion is called with a duplicate id', () => {
-    // Duplicate ids overwrite per-question writes in cmi.interactions and produce
-    // nonsense xAPI statements. Make the failure local.
+  it('reports nothing on an immediate-mode commit with a null host element', () => {
+    // The built-in shell commits a question when immediate feedback reveals it,
+    // which is ahead of any submit. With no host that submit can never land, so
+    // the interaction would sit in the LMS with no score behind it.
+    const { engine, reports } = makeEngine(
+      { graded: true, feedbackMode: 'immediate' },
+      { hostNull: true },
+    );
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.questions[0].commit();
+    expect(reports).toHaveLength(0);
+  });
+
+  it('commits on reveal when a host element is present', () => {
+    const { engine, reports } = makeEngine({
+      graded: true,
+      feedbackMode: 'immediate',
+    });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.questions[0].commit();
+    expect(reports.map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('rewrites a duplicate question id instead of registering it twice', () => {
+    // The shell keys its {#each} on the id, and Svelte throws on a duplicate key
+    // in production as well as dev, so a collision has to be made unique.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const { engine } = makeEngine();
       engine.registerQuestion(tfQuestion('dup', true, true));
       engine.registerQuestion(tfQuestion('dup', false, true));
+      engine.registerQuestion(tfQuestion('dup', true, true));
+      expect(engine.questions.map((q) => q.id)).toEqual([
+        'dup',
+        'dup-2',
+        'dup-3',
+      ]);
       const matched = warn.mock.calls.some((args) =>
         args.some(
           (a) => typeof a === 'string' && /duplicate question id/i.test(a),
         ),
       );
       expect(matched).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns that a rewritten id took an id a later question owns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { engine } = makeEngine();
+      engine.registerQuestion(tfQuestion('dup', true, true));
+      engine.registerQuestion(tfQuestion('dup', false, true));
+      engine.registerQuestion(tfQuestion('dup-2', true, true));
+      expect(engine.questions.map((q) => q.id)).toEqual([
+        'dup',
+        'dup-2',
+        'dup-2-2',
+      ]);
+      const matched = warn.mock.calls.some((args) =>
+        args.some(
+          (a) =>
+            typeof a === 'string' && /is already taken by an earlier/.test(a),
+        ),
+      );
+      expect(matched).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('reports a rewritten duplicate id under its unique id', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { engine, reports } = makeEngine();
+      engine.registerQuestion(tfQuestion('dup', true, true));
+      engine.registerQuestion(tfQuestion('dup', true, true));
+      engine.setAnswer(0, true);
+      engine.setAnswer(1, true);
+      engine.submit();
+      expect(reports.map((r) => r.id)).toEqual(['dup', 'dup-2']);
     } finally {
       warn.mockRestore();
     }
@@ -637,9 +707,9 @@ describe('QuizEngine', () => {
       engine.setAnswer(0, true);
       engine.submit();
       expect(completes(events)).toHaveLength(0);
-      // The answer still reaches the LMS: report() goes straight to the adapter,
-      // so a missing host costs the score, not the interactions.
-      expect(reports).toHaveLength(1);
+      // Nothing reaches the LMS: interactions without a score, a success status
+      // or an attempt is a worse record than no record at all.
+      expect(reports).toHaveLength(0);
       const matched = warn.mock.calls.some((args) =>
         args.some(
           (a) => typeof a === 'string' && /host element was null/i.test(a),

@@ -337,7 +337,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 - **`correct` is a 0-based index, not the answer text.** `correct={1}` is the second option; it must be in range for `options`.
 - **All required props present:** `MultipleChoice` needs `question` + `options` + `correct`; `FillInTheBlank` needs `question` + `answers`; `Matching` needs `question` + `pairs`; `Sorting` needs `question` + `items` + `targets` + `correct`.
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
-- **Question `id`s are unique within a page.** Duplicates collide in `cmi.interactions`.
+- **Question `id`s are unique within a page.** Omitting `id` derives one from the prompt text, so two identically worded questions collide; the build errors on a collision, and at runtime the second registration is renamed (`q1-2`), which changes its `cmi.interactions` key.
 - **No `<Quiz>` wrapper.** Pages with `pageConfig.quiz` are wrapped automatically.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` puts it above the first question and hides it on the results screen. Built-in widgets render only through the snippet they register, so under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2](#recipe-2-custom-quiz-shell-via-quizsvelte)).
 - **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing.
@@ -740,7 +740,7 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
 
-**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`.
+**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`. Both `commit()` and `submit()` report nothing while the element passed to `useQuiz({ element })` is null, because the score behind those answers could never reach the LMS.
 
 ```ts
 function useQuiz(opts: { element: () => HTMLElement | null }): {

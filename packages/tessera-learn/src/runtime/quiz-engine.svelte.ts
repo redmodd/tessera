@@ -36,10 +36,12 @@ export interface QuizEngineDeps {
     correct: boolean | null,
   ) => void;
   /**
-   * Wraps the host-element `CustomEvent` dispatch. Returns `false` when the host
-   * element is null (the engine treats that as "no LMS bridge listener").
+   * Whether the host element exists. It carries the LMS bridge listener, so
+   * `false` means nothing this engine reports can ever be scored.
    */
-  dispatch: (name: string, detail?: unknown) => boolean;
+  hasHost: () => boolean;
+  /** Wraps the host-element `CustomEvent` dispatch; a no-op with no host. */
+  dispatch: (name: string, detail?: unknown) => void;
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
    * engine starts in the results phase; answers aren't persisted, so it cannot
@@ -85,6 +87,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
   #seenIds = new Set<string>();
+  #rewrittenIds = new Set<string>();
 
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
@@ -175,15 +178,26 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   registerQuestion(api: UseQuizQuestionApi): QuestionInternal {
-    if (this.#seenIds.has(api.id)) {
+    let id = api.id;
+    if (this.#seenIds.has(id)) {
+      let n = 2;
+      while (this.#seenIds.has(`${api.id}-${n}`)) n++;
+      id = `${api.id}-${n}`;
       console.warn(
-        `[tessera] useQuiz: duplicate question id "${api.id}" — ` +
-          'each question id must be unique within a quiz (LMS interaction records key by id).',
+        this.#rewrittenIds.has(api.id)
+          ? `[tessera] useQuiz: question id "${api.id}" is already taken by an earlier question whose ` +
+              `duplicate id was rewritten to it — registered as "${id}" instead. ` +
+              'Give the earlier duplicates explicit ids, because the rewritten one is the key ' +
+              "this question's LMS interaction is recorded under."
+          : `[tessera] useQuiz: duplicate question id "${api.id}" — registered as "${id}" instead. ` +
+              'Each question id must be unique within a quiz; give this question an explicit id, ' +
+              'because the rewritten one is the key its LMS interaction is recorded under.',
       );
+      this.#rewrittenIds.add(id);
     }
-    this.#seenIds.add(api.id);
+    this.#seenIds.add(id);
     const internal: InternalQuestion = {
-      id: api.id,
+      id,
       weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
       checkAnswer: api.checkAnswer,
       reset: api.reset,
@@ -254,11 +268,7 @@ export class QuizEngine implements UseQuizInternalHandle {
       return;
     }
 
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
-
-    // Combined null-host guard + before-submit dispatch: dispatch() returns false
-    // when the host element is null, which is the silent-LMS-dropout case.
-    if (!this.#deps.dispatch('tessera-quiz-before-submit')) {
+    if (!this.#deps.hasHost()) {
       console.warn(
         '[tessera] useQuiz: submit() ran but the host element was null — no LMS bridge ' +
           'listener exists, so this score will not be persisted. Make sure your custom ' +
@@ -266,6 +276,10 @@ export class QuizEngine implements UseQuizInternalHandle {
       );
       return;
     }
+
+    this.#deps.dispatch('tessera-quiz-before-submit');
+
+    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
@@ -329,6 +343,7 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   #commit(index: number): void {
+    if (!this.#deps.hasHost()) return;
     const q = this.#internalQuestions[index];
     if (!q || typeof q.interaction !== 'function') return;
     const interaction = q.interaction();
