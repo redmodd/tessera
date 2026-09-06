@@ -4,9 +4,7 @@ import { flushSync } from 'svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createConfig } from './helpers.js';
 
-// The derived statuses must be read inside a tracking context, before the
-// second mutation. A single read at the end passes even when the inner map
-// never signals.
+// Read inside a tracking context before the second mutation: a single read at the end passes even when the inner map never signals.
 function trackStatuses(progress: ProgressState) {
   const seen: string[] = [];
   const cleanup = $effect.root(() => {
