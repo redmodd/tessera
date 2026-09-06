@@ -14,20 +14,33 @@ export function structureFingerprint(manifest: Manifest): string {
   return (h >>> 0).toString(36);
 }
 
-const isRecord = (value: unknown): boolean =>
+const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-// A document restoreState() would throw partway through is rejected whole:
-// the mutations applied before the throw get written back over the record.
-// Optional fields tolerate an explicit null, which restoreState skips.
+const isNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const isNumberRecord = (value: unknown): boolean =>
+  isRecord(value) && Object.values(value).every(isNumber);
+
+// A document that can't be restored faithfully is rejected whole. A shape
+// restoreState() iterates unguarded throws partway through, and the mutations
+// applied before the throw get written back over the record; a page index or
+// score of the wrong type doesn't throw but lands in arithmetic that reports a
+// nonsense score, duration or bookmark to the LMS. Optional fields tolerate an
+// explicit null, which restoreState skips.
 const isMalformed = (saved: SavedState): boolean =>
+  !isNumber(saved.b) ||
+  !isNumber(saved.d) ||
   !Array.isArray(saved.v) ||
-  !isRecord(saved.q) ||
-  (saved.c != null && !isRecord(saved.c)) ||
+  !saved.v.every(isNumber) ||
+  !isNumberRecord(saved.q) ||
+  (saved.c != null && !isNumberRecord(saved.c)) ||
+  (saved.qa != null && !isNumberRecord(saved.qa)) ||
+  (saved.gs != null &&
+    (!Array.isArray(saved.gs) || !saved.gs.every(isNumber))) ||
   (saved.s != null &&
-    (!isRecord(saved.s) || !Object.values(saved.s).every(isRecord))) ||
-  (saved.gs != null && !Array.isArray(saved.gs)) ||
-  (saved.qa != null && !isRecord(saved.qa));
+    (!isRecord(saved.s) || !Object.values(saved.s).every(isNumberRecord)));
 
 // `never` always starts fresh; otherwise a saved fingerprint that no longer
 // matches the current structure is discarded. State saved before fingerprinting

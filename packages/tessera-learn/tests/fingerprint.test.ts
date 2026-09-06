@@ -82,6 +82,12 @@ describe('shouldRestore', () => {
       ['a page in s is not a record', { s: { '0': null } }],
       ['gs is not an array', { gs: {} }],
       ['qa is not a record', { qa: 'nope' }],
+      ['b is not a number', { b: '1' }],
+      ['d is not a number', { d: '120' }],
+      ['a visited page is not a number', { v: ['0', 1] }],
+      ['a quiz score is not a number', { q: { '0': '80' } }],
+      ['a standalone score is not a number', { s: { '0': { q1: '80' } } }],
+      ['a graded standalone page is not a number', { gs: ['0'] }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);
