@@ -19,6 +19,13 @@ async function navigateToPage(page: Page, pageTitle: string) {
   await waitForContent(page);
 }
 
+async function readSavedState(page: Page) {
+  return page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('tessera-'));
+    return JSON.parse(localStorage.getItem(key!)!);
+  });
+}
+
 const primaryBtn = (page: Page) =>
   page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
@@ -88,6 +95,23 @@ async function completeGradedQuiz(
   await checkThenContinue(page, true);
 
   // Submit and wait for the results panel.
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
+async function completePracticeQuiz(
+  page: Page,
+  { mc, fill }: { mc: number; fill: string },
+) {
+  const progress = page.locator('.tessera-quiz-progress-desktop').first();
+
+  await expect(progress).toContainText('Question 1 of 2');
+  await answerMultipleChoice(page, mc);
+  await primaryBtn(page).click();
+
+  await expect(progress).toContainText('Question 2 of 2');
+  await answerFillInTheBlank(page, fill);
+
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 }
@@ -199,6 +223,46 @@ test.describe('Quiz — Graded Assessment', () => {
 
     const exhaustedMsg = page.locator('.tessera-quiz-attempts-exhausted');
     await expect(exhaustedMsg).toBeVisible();
+
+    // Attempts are persisted, so reopening the course doesn't hand back a
+    // fresh allowance.
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
+    ).not.toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-attempts-exhausted'),
+    ).toBeVisible();
+  });
+
+  test('a submitted quiz comes back as results, keeping the best score', async ({
+    page,
+  }) => {
+    await completeGradedQuiz(page);
+    const score = await page.locator('.tessera-quiz-score-value').textContent();
+    expect(score).toBe('100%');
+
+    // A single attempt is the restore default, so it costs no suspend data.
+    expect(await readSavedState(page)).not.toHaveProperty('qa');
+
+    await page.reload();
+    await waitForContent(page);
+
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+
+    // A weaker retry must not lower the recorded score.
+    await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+    await completeGradedQuiz(page, {
+      mc: 0,
+      fill: 'wrong',
+      matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
+    });
+    const stored = await readSavedState(page);
+    expect(Math.max(...Object.values<number>(stored.q))).toBe(100);
+    expect(Math.max(...Object.values<number>(stored.qa))).toBe(2);
   });
 });
 
@@ -355,5 +419,32 @@ test.describe('Quiz — Practice', () => {
 
     const retryBtn = page.locator('.tessera-quiz-btn', { hasText: 'Retry' });
     await expect(retryBtn).toBeVisible();
+
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    await expect(
+      page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
+    ).toBeVisible();
+  });
+
+  test('a weaker retry shows its own score alongside the best attempt', async ({
+    page,
+  }) => {
+    await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
+
+    await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+    await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
+
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('0%');
+    await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
+
+    // Only the best attempt is persisted, so that is what comes back.
+    await page.reload();
+    await waitForContent(page);
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
   });
 });

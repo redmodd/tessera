@@ -28,7 +28,11 @@ interface EngineProbe {
 
 function makeEngine(
   quizConfig: Partial<QuizConfig> = { graded: true },
-  opts: { passingScore?: number; hostNull?: boolean } = {},
+  opts: {
+    passingScore?: number;
+    hostNull?: boolean;
+    restore?: { attempts: number; score: number };
+  } = {},
 ): EngineProbe {
   const events: EngineProbe['events'] = [];
   const reports: EngineProbe['reports'] = [];
@@ -43,6 +47,7 @@ function makeEngine(
       events.push({ name, detail });
       return true;
     },
+    restore: opts.restore,
   });
   return { engine, events, reports };
 }
@@ -313,6 +318,119 @@ describe('QuizEngine', () => {
     expect(engine.canRetry).toBe(false);
   });
 
+  it('keeps the best score across attempts while score follows the last one', () => {
+    let correct = true;
+    const swingQuestion = {
+      id: 'a',
+      checkAnswer: () => correct,
+      interaction: (): Interaction => ({
+        type: 'true-false' as const,
+        response: true,
+        correct: true,
+      }),
+    };
+    const { engine } = makeEngine({ graded: true, maxAttempts: 3 });
+    engine.registerQuestion(swingQuestion);
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.score).toBe(100);
+    expect(engine.bestScore).toBe(100);
+
+    correct = false;
+    engine.retry();
+    engine.setAnswer(0, false);
+    engine.submit();
+    expect(engine.score).toBe(0);
+    expect(engine.bestScore).toBe(100);
+  });
+
+  it('seeds bestScore from a restored result', () => {
+    const { engine } = makeEngine(
+      { graded: true, maxAttempts: 3 },
+      { restore: { attempts: 1, score: 80 } },
+    );
+    engine.registerQuestion(tfQuestion('a', true, false));
+    expect(engine.bestScore).toBe(80);
+
+    engine.retry();
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.score).toBe(0);
+    expect(engine.bestScore).toBe(80);
+  });
+
+  describe('restored attempts', () => {
+    it('starts in the results phase with the saved score', () => {
+      const { engine } = makeEngine(
+        { graded: true },
+        { restore: { attempts: 1, score: 80 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      expect(engine.state).toBe('submitted');
+      expect(engine.score).toBe(80);
+      expect(engine.attemptCount).toBe(1);
+      expect(engine.restored).toBe(true);
+      expect(engine.canSubmit).toBe(false);
+    });
+
+    it('spends the restored attempts against maxAttempts', () => {
+      const { engine } = makeEngine(
+        { graded: true, maxAttempts: 2 },
+        { restore: { attempts: 2, score: 40 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      expect(engine.canRetry).toBe(false);
+      expect(engine.score).toBe(40);
+    });
+
+    it('retry clears the restored flag and continues counting attempts', () => {
+      const { engine, events } = makeEngine(
+        { graded: true, maxAttempts: 3 },
+        { restore: { attempts: 1, score: 40 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      expect(engine.canRetry).toBe(true);
+      engine.retry();
+      expect(engine.restored).toBe(false);
+      expect(engine.state).toBe('answering');
+      engine.setAnswer(0, true);
+      engine.submit();
+      expect(engine.attemptCount).toBe(2);
+      expect(completeScore(events)).toBe(100);
+    });
+
+    it('does not review answers it never had', () => {
+      const { engine } = makeEngine(
+        { graded: true },
+        { restore: { attempts: 1, score: 80 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      engine.startReview();
+      expect(engine.state).toBe('submitted');
+    });
+
+    it('reports correct as null rather than flagging every question wrong', () => {
+      const { engine } = makeEngine(
+        { graded: true },
+        { restore: { attempts: 1, score: 100 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      engine.registerQuestion(tfQuestion('b', true, true));
+      expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
+      expect(engine.questions.every((q) => q.feedbackVisible)).toBe(false);
+    });
+
+    it('ignores a zero-attempt restore', () => {
+      const { engine } = makeEngine(
+        { graded: true },
+        { restore: { attempts: 0, score: 0 } },
+      );
+      engine.registerQuestion(tfQuestion('a', true, true));
+      expect(engine.state).toBe('answering');
+      expect(engine.restored).toBe(false);
+    });
+  });
+
   it('incorrect-only retry preserves correct answers and locks them', () => {
     const { engine } = makeEngine({
       graded: true,
@@ -534,7 +652,12 @@ interface HarnessRef {
 
 function mountHarness(
   quizConfig: unknown,
-  opts: { secondQuiz?: boolean; nullElement?: boolean; adapter?: unknown } = {},
+  opts: {
+    secondQuiz?: boolean;
+    nullElement?: boolean;
+    adapter?: unknown;
+    quizState?: { attempts: number; score: number };
+  } = {},
 ) {
   const ref: HarnessRef = {
     handle: null,
@@ -555,6 +678,7 @@ function mountHarness(
       secondQuiz: opts.secondQuiz ?? false,
       nullElement: opts.nullElement ?? false,
       adapter: opts.adapter ?? null,
+      quizState: opts.quizState ?? null,
     },
   });
   return { component, target, ref };
@@ -604,6 +728,18 @@ describe('useQuiz (Svelte wrapper)', () => {
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
     q.submit();
+    expect(q.canRetry).toBe(false);
+  });
+
+  it('seeds the engine from the saved quiz state on tessera-page context', () => {
+    const m = mountHarness(
+      { graded: true, maxAttempts: 2 },
+      { quizState: { attempts: 2, score: 60 } },
+    );
+    mountings.push(m);
+    const q = m.ref.handle!;
+    expect(q.state).toBe('submitted');
+    expect(q.score).toBe(60);
     expect(q.canRetry).toBe(false);
   });
 

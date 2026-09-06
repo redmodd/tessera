@@ -205,11 +205,10 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // is legitimate (no prefs set); the GET itself is what's required.
     await this.#fetchLearnerPreferences();
 
-    // cmi5 §9.3.2 — queue Initialized before the resume State GET so a slow
-    // LRS can't push it past the spec's "reasonable period".
+    // cmi5 §9.3.2 — Initialized is queued here, before the caller's
+    // loadState(), so a slow LRS can't push it past the spec's "reasonable
+    // period".
     this.sendInitialized();
-
-    await this.loadResumeState();
   }
 
   /**

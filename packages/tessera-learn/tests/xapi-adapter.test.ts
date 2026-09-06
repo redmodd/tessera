@@ -64,6 +64,7 @@ describe('XAPIAdapter', () => {
     });
     const adapter = new XAPIAdapter();
     await adapter.init();
+    await adapter.loadState();
     adapter.setCompletionStatus('complete');
     await new Promise((r) => setTimeout(r, 0));
     const send = fetchMock.mock.calls.find(([u]) =>

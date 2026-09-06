@@ -25,6 +25,7 @@
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
   let passed = $derived(handle.score >= handle.passingScore);
+  let bestBeaten = $derived(handle.bestScore > handle.score);
 
   function isAnswered(q) {
     if (!q) return false;
@@ -225,12 +226,22 @@
           {passed ? 'Passed' : 'Not Passed'}
         </span>
       </div>
-      <p class="tessera-quiz-results-detail">
-        You answered {correctCount} of {totalQuestions} questions correctly.
-      </p>
+      {#if handle.restored}
+        <p class="tessera-quiz-results-detail">Your previous result.</p>
+      {:else}
+        <p class="tessera-quiz-results-detail">
+          You answered {correctCount} of {totalQuestions} questions correctly.
+        </p>
+      {/if}
+      {#if bestBeaten}
+        <p class="tessera-quiz-results-detail" data-testid="quiz-best-score">
+          Your best attempt was {handle.bestScore}%, which is the score on
+          record.
+        </p>
+      {/if}
 
       <div class="tessera-quiz-results-actions">
-        {#if !feedbackDisabled}
+        {#if !feedbackDisabled && !handle.restored}
           <button
             class="tessera-quiz-btn tessera-quiz-btn-secondary"
             onclick={handleStartReview}

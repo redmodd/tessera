@@ -15,6 +15,7 @@
     secondQuiz = false,
     nullElement = false,
     adapter = null,
+    quizState = null,
   } = $props();
 
   const refSnap = untrack(() => ref);
@@ -25,6 +26,7 @@
 
   setContext('tessera-page', {
     quiz: untrack(() => quizConfig),
+    quizState: untrack(() => quizState),
     passingScore: 70,
   });
   if (adapterSnap) {

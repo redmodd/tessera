@@ -25,6 +25,10 @@
   } from './contexts.js';
 
   // ---- Persistence ----
+  // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
+  // have no deadline of their own, and the first page waits on all three.
+  const INIT_TIMEOUT_MS = 15_000;
+
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
@@ -80,6 +84,7 @@
   // ---- Page context (reactive, read by Quiz in Step 8) ----
   let pageContext = $state({
     quiz: null,
+    quizState: null,
     passingScore: config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE,
   });
   setContext(TESSERA_PAGE, pageContext);
@@ -151,6 +156,10 @@
         if (gen !== loadGeneration) return; // stale
         pageError = null;
         pageContext.quiz = page.quiz;
+        pageContext.quizState = {
+          attempts: progress.quizAttempts.get(index) ?? 0,
+          score: progress.quizScores.get(index) ?? 0,
+        };
         PageComponent = mod.default;
         pageLoading = false;
         renderedPageIndex = index;
@@ -172,10 +181,12 @@
       });
   }
 
-  // React to page index changes
+  // React to page index changes. Held until persistence is restored: a quiz
+  // seeds its attempt count from restored progress at mount.
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;
+    if (!persistenceReady) return;
     untrack(() => loadPage(index));
   });
 
@@ -196,6 +207,10 @@
     for (const [pageIndex, score] of progress.quizScores) {
       q[String(pageIndex)] = score;
     }
+    const qa = {};
+    for (const [pageIndex, attempts] of progress.quizAttempts) {
+      if (attempts > 1) qa[String(pageIndex)] = attempts;
+    }
     const c = {};
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
       c[String(pageIndex)] = chunkIndex;
@@ -212,6 +227,7 @@
       v: [...progress.visitedPages],
       q,
       d: duration.totalSeconds,
+      ...(Object.keys(qa).length > 0 ? { qa } : {}),
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
       ...(progress.standaloneQuestionScores.size > 0 ? { s } : {}),
       ...(progress.gradedStandalonePages.size > 0
@@ -228,9 +244,9 @@
     for (const idx of saved.v) {
       progress.markVisited(idx);
     }
-    // Restore quiz scores
+    // Restore quiz scores and attempt counts (qa absent on older saves)
     for (const [key, score] of Object.entries(saved.q)) {
-      progress.quizCompleted(Number(key), score);
+      progress.restoreQuiz(Number(key), score, Number(saved.qa?.[key] ?? 1));
     }
     // Restore chunk progress (may be absent on state saved before this field existed)
     if (saved.c) {
@@ -382,15 +398,34 @@
     // Initialize persistence and restore state. Adapter init() may throw
     // for malformed launch params (cmi5 actor JSON, missing fetch URL,
     // failed token request). Surface that to the UI rather than crashing
-    // silently — a launch-time error means the LMS context is wrong and
+    // silently: a launch-time error means the LMS context is wrong and
     // the user can't continue regardless.
+    let initDeadline;
     try {
-      await adapter.init();
+      await Promise.race([
+        adapter.init(),
+        new Promise((_, reject) => {
+          initDeadline = setTimeout(
+            () => reject(new Error('adapter init timed out')),
+            INIT_TIMEOUT_MS,
+          );
+        }),
+      ]);
     } catch (err) {
       console.error('Tessera: adapter init failed', err);
       pageError = err instanceof Error ? err : new Error(String(err));
       pageLoading = false;
       return;
+    } finally {
+      clearTimeout(initDeadline);
+    }
+
+    // Separate from init(): the adapter bounds this itself, so a stalled State
+    // API costs the bookmark rather than the launch.
+    try {
+      await adapter.loadState?.();
+    } catch (err) {
+      console.warn('Tessera: resume state load failed', err);
     }
 
     // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
@@ -398,23 +433,30 @@
     // imported config object once before any UI reads it so every
     // downstream consumer (the derived completion/success status, navigation
     // gating, Quiz page context) sees the same effective value.
-    const lmsMastery = adapter.getMasteryScore?.();
-    if (typeof lmsMastery === 'number') {
-      config.scoring.passingScore = lmsMastery * 100;
-      pageContext.passingScore = lmsMastery * 100;
-    }
+    // The first page is gated on persistenceReady, so a malformed saved
+    // document must cost the resume, not the course.
+    try {
+      const lmsMastery = adapter.getMasteryScore?.();
+      if (typeof lmsMastery === 'number') {
+        config.scoring.passingScore = lmsMastery * 100;
+        pageContext.passingScore = lmsMastery * 100;
+      }
 
-    const saved = adapter.getState();
-    if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
-      restoreState(saved);
-      prevCompletionStatus = progress.completionStatus;
-      prevSuccessStatus = progress.successStatus;
-      adapter.seedLifecycle?.(
-        progress.completionStatus,
-        progress.successStatus,
-      );
+      const saved = adapter.getState();
+      if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
+        restoreState(saved);
+        prevCompletionStatus = progress.completionStatus;
+        prevSuccessStatus = progress.successStatus;
+        adapter.seedLifecycle?.(
+          progress.completionStatus,
+          progress.successStatus,
+        );
+      }
+    } catch (err) {
+      console.error('Tessera: resume state could not be restored', err);
+    } finally {
+      persistenceReady = true;
     }
-    persistenceReady = true;
 
     // Build the xAPI client (custom destinations + cmi5 'lms' shared
     // queue) once the adapter has resolved its launch context. Failure

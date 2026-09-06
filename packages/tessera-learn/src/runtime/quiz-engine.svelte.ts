@@ -40,6 +40,12 @@ export interface QuizEngineDeps {
    * element is null (the engine treats that as "no LMS bridge listener").
    */
   dispatch: (name: string, detail?: unknown) => boolean;
+  /**
+   * Saved attempt count and score for this quiz page. With attempts > 0 the
+   * engine starts in the results phase; answers aren't persisted, so it cannot
+   * review them — see {@link QuizEngine.restored}.
+   */
+  restore?: { attempts: number; score: number };
 }
 
 interface InternalQuestion {
@@ -72,7 +78,9 @@ export class QuizEngine implements UseQuizInternalHandle {
   #submitted = $state(false);
   #reviewing = $state(false);
   #score = $state(0);
+  #bestScore = $state(0);
   #attemptCount = $state(0);
+  #restored = $state(false);
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
@@ -83,6 +91,13 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#maxAttempts = deps.quizConfig.maxAttempts ?? Infinity;
     this.#feedbackPredicate = resolveFeedbackMode(deps.quizConfig);
     this.#retryPredicate = resolveRetryStrategy(deps.quizConfig);
+    if (deps.restore && deps.restore.attempts > 0) {
+      this.#attemptCount = deps.restore.attempts;
+      this.#score = deps.restore.score;
+      this.#bestScore = deps.restore.score;
+      this.#submitted = true;
+      this.#restored = true;
+    }
   }
 
   // Derived values are plain getters over $state, mirroring ProgressState (which
@@ -130,12 +145,20 @@ export class QuizEngine implements UseQuizInternalHandle {
     return this.#score;
   }
 
+  get bestScore(): number {
+    return this.#bestScore;
+  }
+
   get passingScore(): number {
     return this.#deps.passingScore();
   }
 
   get attemptCount(): number {
     return this.#attemptCount;
+  }
+
+  get restored(): boolean {
+    return this.#restored;
   }
 
   /** Dev-warning inputs the wrapper reads in onDestroy. */
@@ -246,7 +269,9 @@ export class QuizEngine implements UseQuizInternalHandle {
 
     const { rounded } = this.#computeScore();
     this.#score = rounded;
+    this.#bestScore = Math.max(this.#bestScore, rounded);
     this.#submitted = true;
+    this.#restored = false;
     this.#attemptCount++;
 
     this.#deps.dispatch('tessera-quiz-complete', { score: rounded });
@@ -254,6 +279,14 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   startReview(): void {
     if (!this.#submitted) return;
+    if (this.#restored) {
+      console.warn(
+        '[tessera] useQuiz: startReview() did nothing because these results were ' +
+          'restored from a previous session, which does not persist answers. ' +
+          'Hide your Review control when handle.restored is true.',
+      );
+      return;
+    }
     this.#reviewing = true;
   }
 
@@ -290,6 +323,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#answersVersion++;
     this.#feedbackShown.clear();
     this.#submitted = false;
+    this.#restored = false;
     this.#reviewing = false;
     this.#score = 0;
     this.#deps.dispatch('tessera-quiz-retry');
@@ -340,7 +374,7 @@ export class QuizEngine implements UseQuizInternalHandle {
         return engine.#submitted;
       },
       get correct() {
-        if (!engine.#submitted) return null;
+        if (!engine.#submitted || engine.#restored) return null;
         const a = engine.#answers.has(i) ? engine.#answers.get(i) : undefined;
         return engine.#internalQuestions[i].checkAnswer(a);
       },

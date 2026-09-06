@@ -343,13 +343,13 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                                                                       |
-| --------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                    |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                       |
-| `maxAttempts`   | `number`                             | `Infinity` | Max attempts                                                                                                                                      |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked                                                      |
+| Field           | Type                                 | Default    | Description                                                                                                                                                                                        |
+| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                     |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                        |
+| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                                 |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                                  |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. Answers aren't persisted, so retrying a result restored from saved progress always resets everything |
 
 ### Per-question weighting
 
@@ -667,7 +667,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null;
+  readonly correct: boolean | null; // null while answering, and null on a restored result (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -747,9 +747,11 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
-  readonly score: number;
+  readonly score: number; // the attempt just submitted, or the restored result
+  readonly bestScore: number; // highest across attempts; this is what the LMS gets
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
+  readonly restored: boolean; // results came from saved progress, not this session
   submit(): void;
   retry(): void;
   startReview(): void;
@@ -757,6 +759,10 @@ function useQuiz(opts: { element: () => HTMLElement | null }): {
   revealFeedback(q: Question): void; // immediate-feedback flow
 };
 ```
+
+**Show `bestScore` when it beats `score`.** `score` is the attempt the learner just finished, so a weaker retry shows a failing result on a quiz they already passed. The LMS and the navigation gate are given `bestScore`, so a shell offering retries must surface it whenever `bestScore > score`.
+
+**Branch on `restored`.** A quiz whose result came from saved progress opens in the `submitted` state with the score and attempt count intact, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 
 Throws on a page without `pageConfig.quiz`. Use `passingScore` from here, not `course.config.js` directly — importing the config skips the LMS mastery override (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`).
 
@@ -1049,8 +1055,11 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
     >
   {:else if quiz.state === 'submitted'}
     <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
+    {#if quiz.bestScore > quiz.score}<p>Best attempt: {quiz.bestScore}%</p>{/if}
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
-    <button onclick={() => quiz.startReview()}>Review</button>
+    {#if !quiz.restored}<button onclick={() => quiz.startReview()}
+        >Review</button
+      >{/if}
   {/if}
 
   <!-- Children render hidden so widget state survives submit/review. -->

@@ -6,6 +6,7 @@ import {
   XAPI_INTERACTION_FORMAT,
 } from '../interaction-format.js';
 import { formatISO8601Duration } from './format.js';
+import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
@@ -60,6 +61,13 @@ const CMI_INTERACTION_TYPE =
   'http://adlnet.gov/expapi/activities/cmi.interaction';
 
 /**
+ * Overall budget for the resume GET, retries and backoff included. One deadline
+ * covers every attempt so a stalled State API can't hold the launch for
+ * attempts x per-request timeout.
+ */
+const STATE_LOAD_TIMEOUT_MS = 10_000;
+
+/**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
  * adapters. Subclasses set the protected fields in init() and may override
  * buildContext()/isDefinedStatementAllowed()/scoreForSuccess() to layer
@@ -79,6 +87,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected score: number | null = null;
   protected durationSeconds = 0;
   protected state: SavedState | null = null;
+  protected stateLoadFailed = false;
   protected completedEmitted = false;
   protected lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
   protected terminated = false;
@@ -112,6 +121,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   saveState(state: SavedState): void {
+    // The resume GET failed, so writing would replace state we never read with
+    // a blank-slate session. Grades travel as statements, so this costs the
+    // bookmark only.
+    if (this.stateLoadFailed) return;
     this.state = state;
     if (!this.publisher) return;
     void this.publisher.chainTask(async () => {
@@ -370,24 +383,48 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     });
   }
 
-  /** Shared resume GET — call from a subclass init() after the publisher exists. */
-  protected async loadResumeState(): Promise<void> {
-    try {
-      const resp = await this.xapiFetch(this.buildStateUrl(), {
-        method: 'GET',
-      });
-      if (resp.ok) {
-        this.state = await resp.json();
-      } else if (resp.status !== 404) {
-        console.warn(
-          `Tessera ${this.logName}: State API GET returned ${resp.status}; resume disabled for this launch.`,
-        );
+  /**
+   * Resume GET, retried on the shared LMS backoff schedule. A 404, an empty
+   * body, or an unparseable one is a definitive answer and returns with saving
+   * enabled. Exhausting the attempts or the deadline leaves the stored state
+   * unread, so `stateLoadFailed` withholds every later write.
+   */
+  async loadState(): Promise<void> {
+    const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
+    let lastDetail = '';
+    for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, backoffMs(attempt - 1)));
+        if (deadline.aborted) break;
       }
-    } catch (err) {
-      console.warn(
-        `Tessera ${this.logName}: State API GET failed (${err instanceof Error ? err.message : String(err)}); resume disabled for this launch.`,
-      );
-      this.state = null;
+      try {
+        const resp = await this.xapiFetch(this.buildStateUrl(), {
+          method: 'GET',
+          signal: deadline,
+        });
+        if (resp.ok) {
+          const body = (await resp.text()).trim();
+          try {
+            this.state = body ? JSON.parse(body) : null;
+          } catch {
+            this.state = null;
+            console.warn(
+              `Tessera ${this.logName}: State API returned an unparseable document; starting fresh and overwriting it.`,
+            );
+          }
+          return;
+        }
+        if (resp.status === 404) return;
+        lastDetail = `returned ${resp.status}`;
+      } catch (err) {
+        lastDetail = err instanceof Error ? err.message : String(err);
+        if (deadline.aborted) break;
+      }
     }
+    this.stateLoadFailed = true;
+    this.state = null;
+    console.warn(
+      `Tessera ${this.logName}: State API GET failed after ${RETRY_ATTEMPTS} attempts (${lastDetail}); resume disabled, and progress will not be saved this launch so the unread state is left intact.`,
+    );
   }
 }

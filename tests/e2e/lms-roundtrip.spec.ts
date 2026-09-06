@@ -654,6 +654,77 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     });
   }
 
+  /** `stateGet` scripts the resume read; `statePuts` collects attempted writes. */
+  async function routeLRSWithState(
+    page: Page,
+    stateGet: { status: number; body: string },
+    statePuts: string[],
+  ): Promise<void> {
+    await page.route('http://xapi-mock.test/**', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (url.includes('/xapi/statements')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(['stmt-id']),
+        });
+        return;
+      }
+      if (url.includes('/xapi/activities/state')) {
+        if (req.method() === 'PUT') {
+          statePuts.push(req.postData() ?? '');
+          await route.fulfill({ status: 204, body: '' });
+          return;
+        }
+        await route.fulfill({
+          status: stateGet.status,
+          contentType: 'application/json',
+          body: stateGet.body,
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+  }
+
+  test('resumes the bookmarked page from a populated State API', async ({
+    page,
+  }) => {
+    // No `f` — state saved before fingerprinting is trusted, which keeps this
+    // test independent of the fixture's page slugs.
+    const saved = { b: 3, v: [0, 1, 2, 3], q: {}, d: 42 };
+    await routeLRSWithState(
+      page,
+      { status: 200, body: JSON.stringify(saved) },
+      [],
+    );
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Accordion & Carousel',
+    );
+  });
+
+  test('a failed resume GET still launches the course and never overwrites state', async ({
+    page,
+  }) => {
+    const statePuts: string[] = [];
+    await routeLRSWithState(page, { status: 500, body: '{}' }, statePuts);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
+
+    // Navigating is what normally triggers a save.
+    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
+    await waitForTesseraContent(page);
+    await page.waitForTimeout(500);
+    expect(statePuts).toHaveLength(0);
+  });
+
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
     page,
   }) => {

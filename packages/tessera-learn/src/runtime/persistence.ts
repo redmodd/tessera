@@ -5,7 +5,19 @@
 import type { Interaction } from './interaction.js';
 
 export interface PersistenceAdapter {
+  /**
+   * Connect to the LMS. Failure is fatal: nothing can be reported, so the
+   * course must not start.
+   */
   init(): Promise<void>;
+  /**
+   * Fetch previously saved state, where that costs a network round trip. Split
+   * from `init()` so a stalled State API costs resume rather than the launch;
+   * the adapter bounds the request itself and resolves either way. An adapter
+   * that could not read its state must then refuse `saveState` rather than
+   * overwrite what it failed to read.
+   */
+  loadState?(): Promise<void>;
   getState(): SavedState | null;
   saveState(state: SavedState): void;
   setScore(score: number): void;
@@ -48,6 +60,12 @@ export interface SavedState {
   v: number[];
   /** Quiz scores — pageIndex (as string key) to score */
   q: Record<string, number>;
+  /**
+   * Quiz attempts — pageIndex (as string key) to submitted attempt count.
+   * A count of 1 is omitted and assumed on restore, so every key in `q` has at
+   * least one attempt. Writing a `q` entry with no attempt breaks that.
+   */
+  qa?: Record<string, number>;
   /** Duration — accumulated seconds */
   d: number;
   /** Chunk progress — pageIndex (as string key) to highest revealed chunk index */

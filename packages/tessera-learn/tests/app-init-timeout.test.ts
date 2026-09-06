@@ -1,0 +1,146 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest';
+
+const page = {
+  index: 0,
+  title: 'Welcome',
+  slug: 'welcome',
+  importPath: '/pages/01-intro/01-lesson/welcome.svelte',
+  quiz: null,
+};
+
+const manifest = {
+  sections: [
+    {
+      title: 'Intro',
+      slug: 'intro',
+      lessons: [{ title: 'Lesson', slug: 'lesson', pages: [page] }],
+    },
+  ],
+  pages: [page],
+  totalPages: 1,
+};
+
+const config = {
+  title: 'Demo',
+  resume: 'auto',
+  branding: {},
+  navigation: { mode: 'free' },
+  scoring: { passingScore: 80 },
+  completion: { mode: 'percentage', percentageThreshold: 100 },
+  export: { standard: 'web' },
+};
+
+function makeAdapter(
+  init: () => Promise<void>,
+  loadState: () => Promise<void> = async () => {},
+  getState: () => unknown = () => null,
+) {
+  return {
+    init,
+    getState,
+    loadState,
+    saveState: () => {},
+    setDuration: () => {},
+    setExit: () => {},
+    setScore: () => {},
+    setCompletionStatus: () => {},
+    setSuccessStatus: () => {},
+    commit: () => {},
+    terminate: () => {},
+  };
+}
+
+async function mountApp(
+  init: () => Promise<void>,
+  loadState?: () => Promise<void>,
+  getState?: () => unknown,
+) {
+  vi.resetModules();
+  const { mount, unmount } = await import('svelte');
+  (globalThis as any).__tesseraTest = {
+    config,
+    manifest,
+    pageModules: {
+      [page.importPath]: () => import('./fixtures/app-page.svelte'),
+    },
+    adapter: makeAdapter(init, loadState, getState),
+  };
+  const App = (await import('../src/runtime/App.svelte')).default;
+  const component = mount(App, { target: document.body });
+  return { component, unmount };
+}
+
+// The first page is held until adapter.init() resolves, and the LMS handshake
+// it performs has no deadline of its own.
+describe('App bounds adapter.init()', () => {
+  let cleanup: (() => void) | null = null;
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = null;
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+    delete (globalThis as any).__tesseraTest;
+  });
+
+  it('surfaces an error page when init never resolves', async () => {
+    vi.useFakeTimers();
+    const { component, unmount } = await mountApp(() => new Promise(() => {}));
+    cleanup = () => unmount(component);
+
+    expect(document.body.textContent).not.toContain('This page failed to load');
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(document.body.textContent).toContain('This page failed to load');
+    expect(document.body.textContent).toContain('adapter init timed out');
+  });
+
+  it('renders the page when init resolves inside the deadline', async () => {
+    vi.useFakeTimers();
+    const { component, unmount } = await mountApp(
+      () => new Promise((resolve) => setTimeout(resolve, 100)),
+    );
+    cleanup = () => unmount(component);
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(document.body.textContent).not.toContain('This page failed to load');
+  });
+
+  it('renders the page when loadState rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { component, unmount } = await mountApp(
+      async () => {},
+      async () => {
+        throw new Error('LRS unreachable');
+      },
+    );
+    cleanup = () => {
+      unmount(component);
+      warn.mockRestore();
+    };
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+    expect(document.body.textContent).not.toContain('This page failed to load');
+  });
+
+  it('renders the page when the saved state is malformed', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { component, unmount } = await mountApp(
+      async () => {},
+      undefined,
+      () => ({ d: 0 }),
+    );
+    cleanup = () => {
+      unmount(component);
+      error.mockRestore();
+    };
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+    expect(document.body.textContent).not.toContain('This page failed to load');
+  });
+});

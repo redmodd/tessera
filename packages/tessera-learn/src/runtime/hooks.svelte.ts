@@ -20,7 +20,7 @@ export interface Question {
   readonly id: string;
   /** True once the quiz containing this question has been submitted. */
   readonly submitted: boolean;
-  /** True/false once submitted; null while answering. */
+  /** True/false once submitted; null while answering, and null on a restored result (answers aren't persisted). */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
@@ -373,10 +373,22 @@ export interface UseQuizHandle {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
+  /** Score for the attempt just submitted, or the restored result. */
   readonly score: number;
+  /**
+   * Highest score across attempts. This is what the LMS is given, so show it
+   * whenever it exceeds `score`.
+   */
+  readonly bestScore: number;
   /** Resolved passing threshold (config + LMS mastery override). */
   readonly passingScore: number;
   readonly attemptCount: number;
+  /**
+   * True while the results shown came from saved progress rather than this
+   * mount. Answers aren't persisted, so per-question results and review are
+   * unavailable until the learner retries.
+   */
+  readonly restored: boolean;
   submit(): void;
   startReview(): void;
   exitReview(): void;
@@ -456,6 +468,7 @@ export function useQuiz(opts: {
       el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
       return true;
     },
+    restore: pageCtx.quizState ?? undefined,
   });
 
   setContext<QuizContextValue>(TESSERA_QUIZ, {
