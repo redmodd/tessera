@@ -144,7 +144,8 @@ describe('QuizEngine', () => {
       quizConfig: { graded: true } as QuizConfig,
       passingScore: () => passingScore,
       report: () => {},
-      dispatch: () => true,
+      hasHost: () => true,
+      dispatch: () => {},
     });
 
     expect(engine.passingScore).toBe(70);
@@ -629,6 +630,30 @@ describe('QuizEngine', () => {
       const matched = warn.mock.calls.some((args) =>
         args.some(
           (a) => typeof a === 'string' && /duplicate question id/i.test(a),
+        ),
+      );
+      expect(matched).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns that a rewritten id took an id a later question owns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { engine } = makeEngine();
+      engine.registerQuestion(tfQuestion('dup', true, true));
+      engine.registerQuestion(tfQuestion('dup', false, true));
+      engine.registerQuestion(tfQuestion('dup-2', true, true));
+      expect(engine.questions.map((q) => q.id)).toEqual([
+        'dup',
+        'dup-2',
+        'dup-2-2',
+      ]);
+      const matched = warn.mock.calls.some((args) =>
+        args.some(
+          (a) =>
+            typeof a === 'string' && /is already taken by an earlier/.test(a),
         ),
       );
       expect(matched).toBe(true);

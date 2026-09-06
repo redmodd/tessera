@@ -1268,7 +1268,7 @@ function validateQuestionComponents(
     const questionProp = props.get('question');
     // With no `id`, the widget derives one from the prompt text, so two
     // identically worded questions collide on one page.
-    const derived = !idProp && questionProp?.kind === 'string';
+    const derived = !hasSpread && !idProp && questionProp?.kind === 'string';
     const resolvedId =
       idProp?.kind === 'string'
         ? idProp.value
