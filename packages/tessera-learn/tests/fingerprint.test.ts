@@ -67,4 +67,17 @@ describe('shouldRestore', () => {
   it('defaults resume to "auto" when omitted', () => {
     expect(shouldRestore(savedWith(fp), fp)).toBe(true);
   });
+
+  it.each([
+    ['v is not an array', { v: 42 }],
+    ['q is not an object', { q: null }],
+    ['q is an array', { q: [] }],
+    ['c is not an object', { c: 7 }],
+    ['s is not an object', { s: 'nope' }],
+    ['gs is not an array', { gs: {} }],
+    ['qa is not an object', { qa: 3 }],
+  ])('discards a document that would throw mid-restore: %s', (_label, bad) => {
+    const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
+    expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+  });
 });

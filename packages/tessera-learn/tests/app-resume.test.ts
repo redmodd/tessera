@@ -38,14 +38,16 @@ function makeConfig(resume: 'auto' | 'never') {
 function makeAdapter(saved: unknown) {
   const seedLifecycle = vi.fn();
   const setCompletionStatus = vi.fn();
+  const saveState = vi.fn();
   return {
     seedLifecycle,
     setCompletionStatus,
+    saveState,
     adapter: {
       init: async () => {},
       getState: () => saved,
       seedLifecycle,
-      saveState: () => {},
+      saveState,
       setDuration: () => {},
       setExit: () => {},
       setScore: () => {},
@@ -57,15 +59,18 @@ function makeAdapter(saved: unknown) {
   };
 }
 
-async function mountApp(resume: 'auto' | 'never') {
-  const savedState = {
+async function mountApp(
+  resume: 'auto' | 'never',
+  options: { saved?: unknown; pageLoadFails?: boolean } = {},
+) {
+  const savedState = options.saved ?? {
     b: 1,
     v: [0, 1],
     q: {},
     d: 42,
     f: structureFingerprint(manifest),
   };
-  const { adapter, seedLifecycle, setCompletionStatus } =
+  const { adapter, seedLifecycle, setCompletionStatus, saveState } =
     makeAdapter(savedState);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
@@ -77,14 +82,16 @@ async function mountApp(resume: 'auto' | 'never') {
     config: makeConfig(resume),
     manifest,
     pageModules: {
-      [page.importPath]: () => import('./fixtures/app-page.svelte'),
+      [page.importPath]: options.pageLoadFails
+        ? () => Promise.reject(new Error('page module missing'))
+        : () => import('./fixtures/app-page.svelte'),
     },
     adapter,
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return { component, seedLifecycle, setCompletionStatus, unmount };
+  return { component, seedLifecycle, setCompletionStatus, saveState, unmount };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
@@ -103,6 +110,27 @@ describe('App restore gate honours config.resume', () => {
     const { component, seedLifecycle, unmount } = await mountApp('auto');
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(seedLifecycle).toHaveBeenCalled());
+  });
+
+  it('leaves a malformed saved record untouched', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { component, setCompletionStatus, saveState, unmount } =
+      await mountApp('auto', {
+        saved: {
+          b: 1,
+          v: [0, 1],
+          q: null,
+          d: 120,
+          f: structureFingerprint(manifest),
+        },
+        pageLoadFails: true,
+      });
+    cleanup = () => {
+      unmount(component);
+      errors.mockRestore();
+    };
+    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
+    expect(saveState).not.toHaveBeenCalled();
   });
 
   it('ignores saved state when resume is "never"', async () => {

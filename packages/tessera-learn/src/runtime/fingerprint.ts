@@ -14,9 +14,15 @@ export function structureFingerprint(manifest: Manifest): string {
   return (h >>> 0).toString(36);
 }
 
+const isRecord = (value: unknown): boolean =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 // `never` always starts fresh; otherwise a saved fingerprint that no longer
 // matches the current structure is discarded. State saved before fingerprinting
 // (no `f`) is trusted so upgrading the runtime never wipes an in-progress learner.
+// A document that would throw partway through restore is rejected whole: a
+// half-applied restore is worse than none, because the next save writes it back
+// over the learner's record.
 export function shouldRestore(
   saved: SavedState,
   currentFingerprint: string,
@@ -24,5 +30,10 @@ export function shouldRestore(
 ): boolean {
   if (resume === 'never') return false;
   if (saved.f !== undefined && saved.f !== currentFingerprint) return false;
+  if (!Array.isArray(saved.v) || !isRecord(saved.q)) return false;
+  if (saved.c !== undefined && !isRecord(saved.c)) return false;
+  if (saved.s !== undefined && !isRecord(saved.s)) return false;
+  if (saved.gs !== undefined && !Array.isArray(saved.gs)) return false;
+  if (saved.qa !== undefined && !isRecord(saved.qa)) return false;
   return true;
 }
