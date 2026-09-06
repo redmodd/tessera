@@ -280,6 +280,7 @@ export function useNavigation() {
 
 export function useProgress() {
   const { progress } = requireNavContext('useProgress()');
+  const pageCtx = getPageContext();
   return {
     get visitedPages() {
       return progress.visitedPages;
@@ -291,7 +292,7 @@ export function useProgress() {
       return progress.gradedScore();
     },
     get passingScore() {
-      return progress.passingScore;
+      return pageCtx?.passingScore ?? progress.passingScore;
     },
     get chunkProgress() {
       return progress.chunkProgress;

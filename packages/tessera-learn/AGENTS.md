@@ -804,6 +804,11 @@ function useProgress(): {
 
 `gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScores` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
 
+Two rules for displaying it:
+
+- **An unattempted graded page counts as 0.** `average` is the sum over every graded page divided by their count, so a learner who has aced the two quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
+- **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead.
+
 ```svelte
 <script>
   import { useProgress } from 'tessera-learn';
@@ -812,11 +817,8 @@ function useProgress(): {
 </script>
 
 {#if attempted}
-  <p>
-    Overall: {Math.round(average)}% ({average >= progress.passingScore
-      ? 'Passed'
-      : 'Not yet passed'})
-  </p>
+  <p>Course score so far: {Math.round(average)}%</p>
+  <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
 {/if}
 ```
 
