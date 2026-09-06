@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const pages = [0].map((index) => ({
   index,
@@ -33,7 +34,10 @@ const config = {
 
 // The layout writes through usePersistence() during init and the page never
 // loads, so the flip to persistenceReady is the only thing that can flush it.
-async function mountWithSlowInit() {
+async function mountWithSlowInit(
+  savedState: object | null = null,
+  { skipLayout = false } = {},
+) {
   let releaseInit: () => void;
   const initGate = new Promise<void>((resolve) => {
     releaseInit = resolve;
@@ -41,7 +45,7 @@ async function mountWithSlowInit() {
   const saveState = vi.fn();
   const adapter = {
     init: () => initGate,
-    getState: () => null,
+    getState: () => savedState,
     saveState,
     setDuration: () => {},
     setExit: () => {},
@@ -63,7 +67,11 @@ async function mountWithSlowInit() {
     adapter,
     // Imported after resetModules so it binds the same Svelte instance as App
     // and can read its context.
-    layout: (await import('./fixtures/persisting-layout.svelte')).default,
+    ...(skipLayout
+      ? {}
+      : {
+          layout: (await import('./fixtures/persisting-layout.svelte')).default,
+        }),
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
@@ -95,5 +103,47 @@ describe('state changed during adapter init survives', () => {
         'layout-note': 'written-before-ready',
       });
     });
+  });
+
+  it('keeps the write when a saved document is restored over it', async () => {
+    const { component, saveState, releaseInit, unmount } =
+      await mountWithSlowInit({
+        b: 0,
+        f: structureFingerprint(manifest as never),
+        v: [0],
+        q: {},
+        d: 0,
+        u: { 'other-note': 'from-a-previous-session' },
+      });
+    cleanup = () => unmount(component);
+
+    releaseInit();
+
+    await vi.waitFor(() => {
+      expect(saveState).toHaveBeenCalled();
+      expect(saveState.mock.calls.at(-1)![0].u).toEqual({
+        'layout-note': 'written-before-ready',
+        'other-note': 'from-a-previous-session',
+      });
+    });
+  });
+
+  it('does not write at launch when nothing changed', async () => {
+    const saved = {
+      b: 0,
+      f: 'stale-fingerprint',
+      v: [0],
+      q: {},
+      d: 0,
+      u: { 'other-note': 'from-a-previous-session' },
+    };
+    const { component, saveState, releaseInit, unmount } =
+      await mountWithSlowInit(saved, { skipLayout: true });
+    cleanup = () => unmount(component);
+
+    releaseInit();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(saveState).not.toHaveBeenCalled();
   });
 });

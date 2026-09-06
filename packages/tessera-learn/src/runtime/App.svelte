@@ -270,7 +270,7 @@
     }
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
-      userState = { ...saved.u };
+      userState = { ...userState, ...saved.u };
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
@@ -292,10 +292,15 @@
   // A single microtask-batched scheduler. Multiple state mutations within one
   // tick collapse to one persistState() call (and one LMS commit).
   let persistScheduled = false;
+  let persistPending = false;
+  let persistEffectRan = false;
 
   function requestPersist() {
+    if (!persistenceReady) {
+      persistPending = true;
+      return;
+    }
     if (persistScheduled) return;
-    if (!persistenceReady) return;
     persistScheduled = true;
     queueMicrotask(() => {
       persistScheduled = false;
@@ -308,11 +313,13 @@
     //   - currentPageIndex (bookmark)
     //   - progress.version (bumped by markVisited / quizCompleted /
     //     markChunk / markStandaloneQuestion)
-    //   - persistenceReady (requestPersist() drops writes until it flips)
     // userState writes go through requestPersist() directly from the setter.
     void nav.currentPageIndex;
     void progress.version;
-    void persistenceReady;
+    if (!persistEffectRan) {
+      persistEffectRan = true;
+      return;
+    }
     untrack(requestPersist);
   });
 
@@ -457,6 +464,10 @@
       console.error('Tessera: resume state could not be restored', err);
     } finally {
       persistenceReady = true;
+      if (persistPending) {
+        persistPending = false;
+        requestPersist();
+      }
     }
 
     // Build the xAPI client (custom destinations + cmi5 'lms' shared
