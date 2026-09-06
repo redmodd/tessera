@@ -11,7 +11,7 @@
 
   let progressPercent = $derived(
     manifest.totalPages > 0
-      ? Math.round((progress.visitedPages.size / manifest.totalPages) * 100)
+      ? Math.round((progress.completedPages / manifest.totalPages) * 100)
       : 0,
   );
 
@@ -130,7 +130,7 @@
       ></div>
     </div>
     <div class="tessera-progress-label">
-      {progress.visitedPages.size} of {manifest.totalPages} pages
+      {progress.completedPages} of {manifest.totalPages} pages
     </div>
   </footer>
 </div>

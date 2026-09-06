@@ -143,7 +143,7 @@ export class ProgressState {
         DEFAULT_PERCENTAGE_THRESHOLD;
       const percent =
         this.#totalPages > 0
-          ? (this.#completedPageCount() / this.#totalPages) * 100
+          ? (this.completedPages / this.#totalPages) * 100
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
@@ -154,14 +154,14 @@ export class ProgressState {
       : 'incomplete';
   });
 
-  #completedPageCount(): number {
+  completedPages = $derived.by<number>(() => {
     let count = 0;
     for (const i of this.visitedPages) {
       if (this.#quizPageIndices.has(i) && !this.quizScores.has(i)) continue;
       count++;
     }
     return count;
-  }
+  });
 
   successStatus = $derived.by<'unknown' | 'passed' | 'failed'>(() => {
     if (this.#config.completion.mode === 'manual') {
