@@ -450,6 +450,7 @@ describe('SCORM2004Adapter', () => {
     });
 
     it('caps fill-in patterns at the 10 allowed by the RTE', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'fi4',
         {
@@ -465,6 +466,10 @@ describe('SCORM2004Adapter', () => {
       expect(
         v['cmi.interactions.0.correct_responses.10.pattern'],
       ).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('declares 12 correct answers'),
+      );
+      warn.mockRestore();
     });
 
     it('writes matching interaction', async () => {

@@ -1132,6 +1132,22 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
+    it('keeps every long-fill-in alternative (no SCORM 2004 cap)', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'long-fill-in',
+          response: 'answer two',
+          correct: ['answer one', 'answer two'],
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        'answer one',
+        'answer two',
+      ]);
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

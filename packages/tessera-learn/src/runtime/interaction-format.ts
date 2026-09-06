@@ -20,6 +20,12 @@ export interface InteractionFormat {
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
+  /**
+   * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
+   * `fill-in` and 1 for `long-fill-in`; xAPI has no such limit.
+   */
+  fillInLimit: number;
+  longFillInLimit: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -30,6 +36,8 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: ':',
   supportsNumericRange: false,
   supportsCasePrefix: false,
+  fillInLimit: 10,
+  longFillInLimit: 10,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -44,13 +52,19 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsNumericRange: true,
   supportsCasePrefix: true,
+  fillInLimit: 10,
+  longFillInLimit: 1,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
 
 // xAPI reuses SCORM 2004's delimiters, numeric-range support, and identity
-// identifier verbatim, so it's the same format object.
-export const XAPI_INTERACTION_FORMAT = SCORM2004_INTERACTION_FORMAT;
+// identifier, but the RTE caps on `correct_responses` are SCORM-only.
+export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
+  ...SCORM2004_INTERACTION_FORMAT,
+  fillInLimit: Infinity,
+  longFillInLimit: Infinity,
+};
 
 /**
  * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +
@@ -139,10 +153,14 @@ export function formatCorrectPattern(
     case 'fill-in':
     case 'long-fill-in': {
       const limit =
-        i.type === 'long-fill-in' && fmt !== SCORM12_INTERACTION_FORMAT
-          ? 1
-          : 10;
-      const alternatives = (i.correct as string[]).slice(0, limit);
+        i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
+      const all = i.correct as string[];
+      if (all.length > limit) {
+        console.warn(
+          `Tessera: ${i.type} declares ${all.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
+        );
+      }
+      const alternatives = all.slice(0, limit);
       if (!fmt.supportsCasePrefix) return alternatives;
       const prefix = i.caseMatters ? '{case_matters=true}' : '';
       return alternatives.map((a) => prefix + a);
