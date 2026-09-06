@@ -1520,5 +1520,48 @@ describe('CMI5Adapter', () => {
       expect(failed.result.score).toBeUndefined();
       warn.mockRestore();
     });
+
+    it('sends Scored when a retry raises the score without flipping Passed', async () => {
+      setupInitMocks(undefined, { masteryScore: 0.7 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      adapter.setScore(85);
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      await new Promise((r) => setTimeout(r, 50));
+      mockFetch.mockClear();
+
+      adapter.setScore(95);
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      await new Promise((r) => setTimeout(r, 50));
+
+      const scored = findStatement('http://adlnet.gov/expapi/verbs/scored');
+      expect(scored.result.score.scaled).toBeCloseTo(0.95);
+      expect(scored.context?.contextActivities?.category).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/passed'),
+      ).toBeUndefined();
+    });
+
+    it('sends Scored under launchMode=Browse, where Defined Statements are barred (§10.2.2)', async () => {
+      setupInitMocks(undefined, { launchMode: 'Browse' });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+
+      adapter.setScore(60);
+      adapter.setSuccessStatus('failed');
+      adapter.commit();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/failed'),
+      ).toBeUndefined();
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/scored').result.score
+          .scaled,
+      ).toBeCloseTo(0.6);
+    });
   });
 });

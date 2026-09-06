@@ -462,9 +462,11 @@
         restoreState(saved);
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
+        const restoredScore = progress.gradedScore();
         adapter.seedLifecycle?.(
           progress.completionStatus,
           progress.successStatus,
+          restoredScore.attempted ? Math.round(restoredScore.average) : null,
         );
       }
     } catch (err) {
