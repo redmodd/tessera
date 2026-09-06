@@ -197,8 +197,7 @@
 
   function handleQuizComplete(e) {
     const { score } = e.detail;
-    const pageIndex = nav.currentPageIndex;
-    progress.quizCompleted(pageIndex, score);
+    progress.quizCompleted(nav.currentPageIndex, score);
   }
 
   // ---- Persistence: serialize / restore ----
@@ -271,7 +270,7 @@
     }
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
-      userState = { ...saved.u };
+      userState = { ...userState, ...saved.u };
     }
     // Restore duration
     duration = new DurationTracker(saved.d || 0);
@@ -293,10 +292,15 @@
   // A single microtask-batched scheduler. Multiple state mutations within one
   // tick collapse to one persistState() call (and one LMS commit).
   let persistScheduled = false;
+  let persistPending = false;
+  let persistEffectRan = false;
 
   function requestPersist() {
+    if (!persistenceReady) {
+      persistPending = true;
+      return;
+    }
     if (persistScheduled) return;
-    if (!persistenceReady) return;
     persistScheduled = true;
     queueMicrotask(() => {
       persistScheduled = false;
@@ -304,14 +308,21 @@
     });
   }
 
+  const launchPageIndex = nav.currentPageIndex;
+  const launchVersion = progress.version;
+
   $effect(() => {
     // Subscribe to every signal that influences serializeState():
     //   - currentPageIndex (bookmark)
     //   - progress.version (bumped by markVisited / quizCompleted /
     //     markChunk / markStandaloneQuestion)
     // userState writes go through requestPersist() directly from the setter.
-    void nav.currentPageIndex;
-    void progress.version;
+    const pageIndex = nav.currentPageIndex;
+    const version = progress.version;
+    if (!persistEffectRan) {
+      persistEffectRan = true;
+      if (pageIndex === launchPageIndex && version === launchVersion) return;
+    }
     untrack(requestPersist);
   });
 
@@ -456,6 +467,10 @@
       console.error('Tessera: resume state could not be restored', err);
     } finally {
       persistenceReady = true;
+      if (persistPending) {
+        persistPending = false;
+        requestPersist();
+      }
     }
 
     // Build the xAPI client (custom destinations + cmi5 'lms' shared

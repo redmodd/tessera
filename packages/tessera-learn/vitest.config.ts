@@ -11,7 +11,8 @@ const STUBS: Record<string, string> = {
     'export default globalThis.__tesseraTest.pageModules;',
   'virtual:tessera-adapter':
     'export function createAdapter() { return globalThis.__tesseraTest.adapter; }',
-  'virtual:tessera-layout': 'export default null;',
+  'virtual:tessera-layout':
+    'export default globalThis.__tesseraTest.layout ?? null;',
   'virtual:tessera-quiz': 'export default null;',
   'virtual:tessera-xapi-setup':
     'export async function buildXAPIClient() { return null; }',
