@@ -17,15 +17,20 @@
     {quiz.attemptCount}
   </div>
 
-  <!-- All questions stacked. Each question widget calls useQuestion which
-       registers its render snippet with the Quiz context. -->
+  <!-- Inline layout: page markup renders in place, so widgets that skip
+       setRender appear in document order between the page's own prose. -->
+  <div class="custom-quiz-page" data-testid="custom-quiz-page">
+    {@render children?.()}
+  </div>
+
+  <!-- Snippet layout: widgets that registered a snippet render here instead. -->
   <ol class="custom-quiz-list">
     {#each quiz.questions as q (q.id)}
-      <li class="custom-quiz-item" data-question-id={q.id}>
-        {#if q.render}
+      {#if q.render}
+        <li class="custom-quiz-item" data-question-id={q.id}>
           {@render q.render()}
-        {/if}
-      </li>
+        </li>
+      {/if}
     {/each}
   </ol>
 
@@ -68,11 +73,6 @@
       </button>
     {/if}
   </div>
-
-  <!-- Children mounted hidden so question widgets stay alive across submit/review. -->
-  <div style="display:none">
-    {@render children?.()}
-  </div>
 </div>
 
 <style>
@@ -88,6 +88,9 @@
   }
   .custom-quiz-item {
     margin-bottom: 1rem;
+  }
+  .custom-quiz-page :global(p) {
+    margin: 0.75rem 0;
   }
   .custom-quiz-actions {
     margin-top: 1rem;

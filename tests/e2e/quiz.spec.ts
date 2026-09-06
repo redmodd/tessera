@@ -138,6 +138,21 @@ test.describe('Quiz — Graded Assessment', () => {
     await expect(activeQuestion).toBeVisible();
   });
 
+  test('page content renders above the questions and hides on results', async ({
+    page,
+  }) => {
+    const intro = page.locator('.tessera-quiz-intro');
+    await expect(intro).toBeVisible();
+    await expect(intro.locator('h1')).toHaveText('Graded Assessment');
+    await expect(
+      intro.getByText('This quiz is graded and gates progress.'),
+    ).toBeVisible();
+
+    await completeGradedQuiz(page);
+
+    await expect(intro).toBeHidden();
+  });
+
   test('complete quiz with all correct answers — score 100%', async ({
     page,
   }) => {

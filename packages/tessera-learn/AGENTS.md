@@ -339,6 +339,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 - **`Sorting.correct` is a parallel array to `items`** — same length, each entry a valid index into `targets`.
 - **Question `id`s are unique within a page.** Duplicates collide in `cmi.interactions`.
 - **No `<Quiz>` wrapper.** Pages with `pageConfig.quiz` are wrapped automatically.
+- **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` puts it above the first question and hides it on the results screen. Built-in widgets render only through the snippet they register, so under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2](#recipe-2-custom-quiz-shell-via-quizsvelte)).
 - **Custom widgets register through `useQuestion` and submit through `useQuiz().submit()`** — otherwise the LMS sees nothing.
 
 ### `pageConfig.quiz` fields
@@ -1068,6 +1069,43 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
 ```
 
 Always submit through `useQuiz().submit()`.
+
+`children` is the whole page body as one snippet, and built-in widgets render nothing inside it. Two layouts:
+
+| Layout          | `children`       | `q.render()`          | Page prose         |
+| --------------- | ---------------- | --------------------- | ------------------ |
+| Snippet (above) | rendered hidden  | rendered per question | unavailable        |
+| Inline          | rendered visibly | never called          | interleaved freely |
+
+Inline layout needs custom widgets that render their own markup instead of calling `setRender`. Built-in widgets render nothing in that layout.
+
+### Recipe 2c: Inline layout (prose between questions)
+
+Render `children` visibly, never call `q.render()`, and let widgets render their own markup. Questions then sit in page order, interleaved with the page's prose.
+
+```svelte
+<!-- quiz.svelte -->
+<div bind:this={host}>
+  {@render children?.()}
+  <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
+    >Submit</button
+  >
+</div>
+```
+
+```svelte
+<!-- components/InlineChoice.svelte — no setRender, no mode branch -->
+<fieldset disabled={q.locked}>
+  <legend>{prompt}</legend>
+  {#each options as opt, i (i)}
+    <label
+      ><input type="radio" name={id} onchange={() => pick(i)} /> {opt}</label
+    >
+  {/each}
+</fieldset>
+```
+
+Built-in widgets render nothing in this layout (`QuestionShell` renders inline only when standalone). Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
 
 ### Recipe 2b: Custom question widget for a custom quiz shell
 
