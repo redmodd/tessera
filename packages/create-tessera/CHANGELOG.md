@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.5.2
+
+### Patch Changes
+
+- b16dde8: chore(deps-dev): bump @types/node from 26.2.0 to 26.4.0
+
 ## 0.5.1
 
 ### Patch Changes
