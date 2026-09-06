@@ -40,6 +40,9 @@
   const gradedQuizIndices = new Set(
     manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
   );
+  const quizPageIndices = new Set(
+    manifest.pages.filter((p) => p.quiz).map((p) => p.index),
+  );
 
   // ---- State classes ----
   // The Tier-2 auditor appends ?__tessera_audit to unlock navigation so it can
@@ -51,6 +54,7 @@
     gradedQuizIndices,
     config,
     manifest.totalPages,
+    quizPageIndices,
   );
   const nav = new NavigationState(manifest, progress, config, auditMode);
   nav.setPageModules(pageModules);

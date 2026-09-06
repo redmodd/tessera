@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig, gradedQuizIndices } from './helpers.js';
+import {
+  createManifest,
+  createConfig,
+  gradedQuizIndices,
+  quizPageIndices,
+} from './helpers.js';
 
 // ---------- ProgressState ----------
 
@@ -68,6 +73,48 @@ describe('ProgressState', () => {
       progress.quizCompleted(2, 40);
       expect(progress.quizAttempts.get(2)).toBe(3);
       expect(progress.quizScores.get(2)).toBe(90);
+    });
+  });
+
+  describe('recalculateCompletion — percentage mode with quiz pages', () => {
+    const setup = (quizPages: Record<number, { graded?: boolean }>) => {
+      const manifest = createManifest(4, quizPages);
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 100 },
+      });
+      const progress = new ProgressState(
+        gradedQuizIndices(manifest),
+        config,
+        manifest.totalPages,
+        quizPageIndices(manifest),
+      );
+      for (let i = 0; i < 4; i++) progress.markVisited(i);
+      return progress;
+    };
+
+    it('stays incomplete while a visited quiz page is unsubmitted', () => {
+      expect(setup({ 3: { graded: true } }).completionStatus).toBe(
+        'incomplete',
+      );
+    });
+
+    it('completes once the quiz is submitted, regardless of score', () => {
+      const progress = setup({ 3: { graded: true } });
+      progress.quizCompleted(3, 0);
+      expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('applies to ungraded quizzes too', () => {
+      const progress = setup({ 2: { graded: false } });
+      expect(progress.completionStatus).toBe('incomplete');
+      progress.quizCompleted(2, 100);
+      expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('counts a quiz restored from saved state', () => {
+      const progress = setup({ 1: { graded: true } });
+      progress.restoreQuiz(1, 80, 1);
+      expect(progress.completionStatus).toBe('complete');
     });
   });
 
