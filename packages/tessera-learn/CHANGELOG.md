@@ -1,5 +1,28 @@
 # tessera-learn
 
+## 0.5.2
+
+### Patch Changes
+
+- c2985c8: chore(deps): bump vite from 8.2.1 to 8.2.2
+- b16dde8: chore(deps-dev): bump @types/node from 26.2.0 to 26.4.0 and svelte from 5.56.10 to 5.57.0
+- f042e8a: Skip export packaging and the asset copy when the build fails, including a failed `build --watch` rebuild, so a failed run leaves the previous zip in place.
+- e377126: Persist state changed during adapter init instead of dropping it.
+- 86c8cf5: Persist quiz attempts and results across sessions, recording the best attempt rather than the last, and load xAPI/cmi5 resume state separately from adapter init so an unreachable State API costs the bookmark rather than the launch.
+- 8286c09: Fix fill-in-the-blank answers with surrounding whitespace showing as correct while scoring as wrong, make question widgets read correctness from the runtime instead of recomputing it, and fix standalone fill-in-the-blank, matching, and sorting questions that could not be submitted.
+- 33514c9: The built-in quiz shell now renders page content instead of hiding it along with the question widgets.
+- c89a1e2: Report a quiz answer when it becomes final (immediate-mode reveal, or submit) rather than on the option click, gate submit on every answer being fully built, and label the quiz nav buttons for what the click does. An abandoned attempt in review/never mode now leaves no interaction records, and standalone `useQuestion` reports `answerComplete: false` until an answer is set.
+- dafad66: Give each quiz page its own quiz shell. Adjacent quiz pages previously shared one engine, so the second page inherited the first page's submitted state, config and questions.
+- 0288f2b: Fix the quiz submit guard order, the results pass label, and duplicate question ids.
+- fa45a57: Reject a saved resume document that can't be restored faithfully, so a partially-applied restore can't report a bogus completion to the LMS
+- 97e11b4: Report fill-in correct responses faithfully: one pattern per acceptable answer, a `{case_matters=true}` prefix on each SCORM 2004 and xAPI pattern, and the SCORM RTE pattern caps applied only where they exist.
+- 7157199: Re-derive course completion and success status when a standalone question rescores.
+- 906ff51: Validate the plugin's `standardOverride` option against the allowed export standards.
+- 172ecb8: Reshape Person-shaped xAPI/cmi5 launch actors into a valid Agent instead of forwarding them to the LRS.
+  Reject a non-`Agent` `objectType` on a static `xapi.actor` at build time.
+  Fail the launch with a launch-parameter error when the LMS actor has no usable IFI, instead of a misleading `xapi.actor` config error.
+- e02e8fc: Treat `xapi.endpoint: 'lms'` as an ignored entry with a build warning under scorm12/scorm2004/web, and skip the xAPI runtime when it is the only entry, so one course config exports to every standard.
+
 ## 0.5.1
 
 ### Patch Changes

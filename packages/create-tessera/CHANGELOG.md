@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.5.2
+
+### Patch Changes
+
+- b16dde8: chore(deps-dev): bump @types/node from 26.2.0 to 26.4.0
+- 0288f2b: Fix the quiz submit guard order, the results pass label, and duplicate question ids.
+
 ## 0.5.1
 
 ### Patch Changes
