@@ -38,14 +38,16 @@ function makeConfig(resume: 'auto' | 'never') {
 function makeAdapter(saved: unknown) {
   const seedLifecycle = vi.fn();
   const setCompletionStatus = vi.fn();
+  const saveState = vi.fn();
   return {
     seedLifecycle,
     setCompletionStatus,
+    saveState,
     adapter: {
       init: async () => {},
       getState: () => saved,
       seedLifecycle,
-      saveState: () => {},
+      saveState,
       setDuration: () => {},
       setExit: () => {},
       setScore: () => {},
@@ -57,15 +59,18 @@ function makeAdapter(saved: unknown) {
   };
 }
 
-async function mountApp(resume: 'auto' | 'never') {
-  const savedState = {
+async function mountApp(
+  resume: 'auto' | 'never',
+  options: { saved?: unknown } = {},
+) {
+  const savedState = options.saved ?? {
     b: 1,
     v: [0, 1],
     q: {},
     d: 42,
     f: structureFingerprint(manifest),
   };
-  const { adapter, seedLifecycle, setCompletionStatus } =
+  const { adapter, seedLifecycle, setCompletionStatus, saveState } =
     makeAdapter(savedState);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
@@ -84,7 +89,7 @@ async function mountApp(resume: 'auto' | 'never') {
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return { component, seedLifecycle, setCompletionStatus, unmount };
+  return { component, seedLifecycle, setCompletionStatus, saveState, unmount };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
@@ -103,6 +108,53 @@ describe('App restore gate honours config.resume', () => {
     const { component, seedLifecycle, unmount } = await mountApp('auto');
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(seedLifecycle).toHaveBeenCalled());
+  });
+
+  it('leaves a malformed saved record untouched', async () => {
+    const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { component, seedLifecycle, setCompletionStatus, unmount } =
+      await mountApp('auto', {
+        saved: {
+          b: 1,
+          v: [0, 1],
+          q: null,
+          d: 120,
+          f: structureFingerprint(manifest),
+        },
+      });
+    cleanup = () => {
+      unmount(component);
+      warns.mockRestore();
+    };
+    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
+    expect(seedLifecycle).not.toHaveBeenCalled();
+    expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');
+  });
+
+  it('restores every optional field intact', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      q: { '0': 80 },
+      qa: { '0': 3 },
+      d: 120,
+      c: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+      f: structureFingerprint(manifest),
+    };
+    const { component, saveState, unmount } = await mountApp('auto', { saved });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+      v: [0, 1],
+      q: { '0': 80 },
+      qa: { '0': 3 },
+      d: 120,
+      c: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+    });
   });
 
   it('ignores saved state when resume is "never"', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   structureFingerprint,
   shouldRestore,
@@ -66,5 +66,47 @@ describe('shouldRestore', () => {
 
   it('defaults resume to "auto" when omitted', () => {
     expect(shouldRestore(savedWith(fp), fp)).toBe(true);
+  });
+
+  describe('malformed documents', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    it.each([
+      ['v is not an array', { v: 'nope' }],
+      ['q is null', { q: null }],
+      ['q is an array', { q: [] }],
+      ['c is not a record', { c: 3 }],
+      ['s is not a record', { s: [] }],
+      ['a page in s is not a record', { s: { '0': null } }],
+      ['gs is not an array', { gs: {} }],
+      ['qa is not a record', { qa: 'nope' }],
+      ['b is not a number', { b: '1' }],
+      ['d is not a number', { d: '120' }],
+      ['a visited page is not a number', { v: ['0', 1] }],
+      ['a quiz score is not a number', { q: { '0': '80' } }],
+      ['a standalone score is not a number', { s: { '0': { q1: '80' } } }],
+      ['a graded standalone page is not a number', { gs: ['0'] }],
+    ])('discards a saved document where %s', (_label, bad) => {
+      const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
+      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+    });
+
+    it('warns so a corrupt record is distinguishable from a first launch', () => {
+      const saved = { ...savedWith(fp), q: null } as unknown as SavedState;
+      shouldRestore(saved, fp, 'auto');
+      expect(console.warn).toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    ['c is null', { c: null }],
+    ['s is null', { s: null }],
+    ['gs is null', { gs: null }],
+    ['qa is null', { qa: null }],
+  ])('restores a saved document where %s', (_label, nulled) => {
+    const saved = { ...savedWith(fp), ...nulled } as unknown as SavedState;
+    expect(shouldRestore(saved, fp, 'auto')).toBe(true);
   });
 });

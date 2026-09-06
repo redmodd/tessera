@@ -245,24 +245,24 @@
     }
     // Restore quiz scores and attempt counts (qa absent on older saves)
     for (const [key, score] of Object.entries(saved.q)) {
-      progress.restoreQuiz(Number(key), score, Number(saved.qa?.[key] ?? 1));
+      progress.restoreQuiz(Number(key), score, saved.qa?.[key] ?? 1);
     }
     // Restore chunk progress (may be absent on state saved before this field existed)
     if (saved.c) {
       for (const [key, chunkIndex] of Object.entries(saved.c)) {
-        progress.markChunk(Number(key), Number(chunkIndex));
+        progress.markChunk(Number(key), chunkIndex);
       }
     }
     // Restore standalone question scores (absent on state saved before useQuestion existed)
     if (saved.s) {
-      const gradedSet = new Set((saved.gs ?? []).map(Number));
+      const gradedSet = new Set(saved.gs ?? []);
       for (const [pageKey, questions] of Object.entries(saved.s)) {
         const pageIndex = Number(pageKey);
         for (const [qid, score] of Object.entries(questions)) {
           progress.markStandaloneQuestion(
             pageIndex,
             qid,
-            Number(score),
+            score,
             gradedSet.has(pageIndex),
           );
         }
@@ -273,7 +273,7 @@
       userState = { ...userState, ...saved.u };
     }
     // Restore duration
-    duration = new DurationTracker(saved.d || 0);
+    duration = new DurationTracker(saved.d);
     if (saved.m === 1) {
       progress.markCompleteManually();
     }
