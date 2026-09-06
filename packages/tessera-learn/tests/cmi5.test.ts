@@ -1115,6 +1115,22 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
+    it('prefixes fill-in patterns with case_matters when set', async () => {
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: true,
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([
+        '{case_matters=true}Paris[,]paris',
+      ]);
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

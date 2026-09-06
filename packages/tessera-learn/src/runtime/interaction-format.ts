@@ -15,6 +15,12 @@ export interface InteractionFormat {
    * is a single CMIDecimal. SCORM 2004 supports `min[:]max`.
    */
   supportsNumericRange: boolean;
+  /**
+   * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
+   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax and takes one
+   * pattern per acceptable answer instead.
+   */
+  supportsCasePrefix: boolean;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -24,6 +30,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '.',
   rangeDelim: ':',
   supportsNumericRange: false,
+  supportsCasePrefix: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -37,6 +44,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '[.]',
   rangeDelim: '[:]',
   supportsNumericRange: true,
+  supportsCasePrefix: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
@@ -117,47 +125,57 @@ export function formatResponse(
 export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
-): string | null {
+): string[] | null {
   if (i.correct === undefined) return null;
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return (i.correct as string[])
-        .map((v) => encodeListItem(v, i.options, fmt))
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as string[])
+          .map((v) => encodeListItem(v, i.options, fmt))
+          .join(fmt.itemDelim),
+      ];
     case 'true-false':
-      return fmt.formatBoolean(i.correct as boolean);
+      return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
-    case 'long-fill-in':
-      return (i.correct as string[]).join(fmt.itemDelim);
+    case 'long-fill-in': {
+      const alternatives = i.correct as string[];
+      if (!fmt.supportsCasePrefix) return [...alternatives];
+      const prefix = i.caseMatters ? '{case_matters=true}' : '';
+      return [prefix + alternatives.join(fmt.itemDelim)];
+    }
     case 'matching':
-      return (i.correct as Array<[string, string]>)
-        .map(
-          ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-        )
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as Array<[string, string]>)
+          .map(
+            ([l, r]) =>
+              `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
+          )
+          .join(fmt.itemDelim),
+      ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
       if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
-        return String(c.min);
+        return [String(c.min)];
       }
-      if (c.min !== undefined && c.max === undefined) return String(c.min);
-      if (c.min === undefined && c.max !== undefined) return String(c.max);
+      if (c.min !== undefined && c.max === undefined) return [String(c.min)];
+      if (c.min === undefined && c.max !== undefined) return [String(c.max)];
       // True range — drop the pattern in 1.2 (rely on `result` for pass/fail).
       if (!fmt.supportsNumericRange) return null;
-      return `${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`;
+      return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
     case 'likert':
     case 'other':
-      return i.correct as string;
+      return [i.correct as string];
     case 'performance':
-      return (i.correct as Array<[string, string | number]>)
-        .map(
-          ([s, v]) =>
-            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-        )
-        .join(fmt.itemDelim);
+      return [
+        (i.correct as Array<[string, string | number]>)
+          .map(
+            ([s, v]) =>
+              `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
+          )
+          .join(fmt.itemDelim),
+      ];
   }
 }
 
@@ -192,9 +210,11 @@ export function buildScormInteractionFields(
     [`${prefix}.id`, spec.format.identifier(questionId)],
     [`${prefix}.type`, spec.typeValue],
   ];
-  const pattern = formatCorrectPattern(interaction, spec.format);
-  if (pattern !== null) {
-    fields.push([`${prefix}.correct_responses.0.pattern`, pattern]);
+  const patterns = formatCorrectPattern(interaction, spec.format);
+  if (patterns !== null) {
+    patterns.forEach((pattern, n) => {
+      fields.push([`${prefix}.correct_responses.${n}.pattern`, pattern]);
+    });
   }
   fields.push([
     `${prefix}.${spec.responseField}`,

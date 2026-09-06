@@ -392,6 +392,45 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
+    it('prefixes fill-in patterns with case_matters when set', async () => {
+      adapter.reportInteraction(
+        'fi2',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: true,
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        '{case_matters=true}Paris[,]paris',
+      );
+      expect(
+        v['cmi.interactions.0.correct_responses.1.pattern'],
+      ).toBeUndefined();
+    });
+
+    it('omits the prefix when caseMatters is false', async () => {
+      adapter.reportInteraction(
+        'fi3',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['Paris', 'paris'],
+          caseMatters: false,
+        },
+        true,
+      );
+      await flush();
+      const v = setValuesFor('cmi.interactions.0');
+      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+        'Paris[,]paris',
+      );
+    });
+
     it('writes matching interaction', async () => {
       adapter.reportInteraction(
         'm1',
