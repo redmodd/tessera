@@ -35,7 +35,7 @@ export class ProgressState {
    * while standalone questions score individually and average per page.
    */
   standaloneQuestionScores = $state(
-    new SvelteMap<number, Map<string, number>>(),
+    new SvelteMap<number, SvelteMap<string, number>>(),
   );
   /**
    * Set of page indices that have at least one graded standalone question.
@@ -111,7 +111,7 @@ export class ProgressState {
   ) {
     let pageMap = this.standaloneQuestionScores.get(pageIndex);
     if (!pageMap) {
-      pageMap = new Map<string, number>();
+      pageMap = new SvelteMap<string, number>();
       this.standaloneQuestionScores.set(pageIndex, pageMap);
     }
     pageMap.set(questionId, score);
