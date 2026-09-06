@@ -174,6 +174,32 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(reg.id).toMatch(/^sorting-/);
   });
 
+  it('Sorting maps each item to its own target, not to its own index', () => {
+    const { quiz, registrations } = makeQuizCtx();
+    const { component } = mountWithContext(
+      Sorting,
+      {
+        question: 'Sort these',
+        items: ['Dog', 'Cat', 'Eagle', 'Salmon'],
+        targets: ['Mammal', 'Bird', 'Fish'],
+        correct: [0, 0, 1, 2],
+      },
+      quiz,
+    );
+    toUnmount.push(component);
+
+    const ix = registrations[0].interaction();
+    expect(ix).toMatchObject({
+      type: 'matching',
+      correct: [
+        ['0', '0'],
+        ['1', '0'],
+        ['2', '1'],
+        ['3', '2'],
+      ],
+    });
+  });
+
   it('A Quiz-like round-trip: four built-ins all register with useful interaction payloads', () => {
     const { quiz, registrations } = makeQuizCtx();
     const mountings = [

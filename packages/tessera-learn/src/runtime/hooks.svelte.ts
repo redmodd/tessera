@@ -20,7 +20,7 @@ export interface Question {
   readonly id: string;
   /** True once the quiz containing this question has been submitted. */
   readonly submitted: boolean;
-  /** True/false once submitted; null while answering, and null on a restored result (answers aren't persisted). */
+  /** True/false once submitted or once feedback is visible; null while answering, and null on a restored result (answers aren't persisted). */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
