@@ -69,10 +69,7 @@ export class ProgressState {
     this.version++;
   }
 
-  /**
-   * Record a quiz submission. The recorded score is the learner's best across
-   * attempts, so a weaker retry can't lower it.
-   */
+  /** Records the learner's best score across attempts, not the latest. */
   quizCompleted(pageIndex: number, score: number) {
     const best = this.quizScores.get(pageIndex);
     this.quizScores.set(

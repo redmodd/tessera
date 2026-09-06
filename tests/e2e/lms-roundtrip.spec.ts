@@ -654,11 +654,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     });
   }
 
-  /**
-   * Route the mock LRS with a scripted resume GET, capturing State API writes.
-   * `stateGet` decides what the resume read returns; `statePuts` collects the
-   * bodies the runtime tries to save back.
-   */
+  /** `stateGet` scripts the resume read; `statePuts` collects attempted writes. */
   async function routeLRSWithState(
     page: Page,
     stateGet: { status: number; body: string },
@@ -722,8 +718,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
 
-    // Navigating is what normally triggers a save; the adapter must withhold it
-    // because it could not read what the learner already had stored.
+    // Navigating is what normally triggers a save.
     await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
     await waitForTesseraContent(page);
     await page.waitForTimeout(500);

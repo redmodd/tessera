@@ -181,8 +181,8 @@
       });
   }
 
-  // React to page index changes. Held until persistence has been restored: a
-  // quiz seeds its attempt count from restored progress at mount.
+  // React to page index changes. Held until persistence is restored: a quiz
+  // seeds its attempt count from restored progress at mount.
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;
@@ -420,9 +420,8 @@
       clearTimeout(initDeadline);
     }
 
-    // Resume state is a separate step from init(): the adapter bounds it and
-    // degrades to an unrestored launch on its own, so a stalled State API
-    // costs the learner their bookmark rather than the course.
+    // Separate from init(): the adapter bounds this itself, so a stalled State
+    // API costs the bookmark rather than the launch.
     try {
       await adapter.loadState?.();
     } catch (err) {

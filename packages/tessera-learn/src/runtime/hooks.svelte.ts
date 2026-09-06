@@ -376,19 +376,17 @@ export interface UseQuizHandle {
   /** Score for the attempt just submitted, or the restored result. */
   readonly score: number;
   /**
-   * Highest score across attempts, restored ones included. This is what the
-   * LMS is given, so show it whenever it exceeds `score` or the learner sees a
-   * failing result on a quiz they have already passed.
+   * Highest score across attempts. This is what the LMS is given, so show it
+   * whenever it exceeds `score`.
    */
   readonly bestScore: number;
   /** Resolved passing threshold (config + LMS mastery override). */
   readonly passingScore: number;
   readonly attemptCount: number;
   /**
-   * True while the results shown were restored from saved progress rather than
-   * submitted on this mount. The learner's answers are not persisted, so
-   * per-question results and review are unavailable until they retry and submit
-   * again.
+   * True while the results shown came from saved progress rather than this
+   * mount. Answers aren't persisted, so per-question results and review are
+   * unavailable until the learner retries.
    */
   readonly restored: boolean;
   submit(): void;

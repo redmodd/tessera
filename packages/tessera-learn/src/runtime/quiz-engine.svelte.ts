@@ -42,9 +42,8 @@ export interface QuizEngineDeps {
   dispatch: (name: string, detail?: unknown) => boolean;
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
-   * engine starts in the results phase, so `maxAttempts` and the recorded score
-   * survive both a revisit and a new session. Answers are not persisted, so a
-   * restored engine cannot review them — see {@link QuizEngine.restored}.
+   * engine starts in the results phase; answers aren't persisted, so it cannot
+   * review them — see {@link QuizEngine.restored}.
    */
   restore?: { attempts: number; score: number };
 }

@@ -6,18 +6,16 @@ import type { Interaction } from './interaction.js';
 
 export interface PersistenceAdapter {
   /**
-   * Connect to the LMS: acquire credentials, resolve launch data, announce the
-   * session. Failure is fatal — nothing can be reported, so the course must not
-   * start. Adapters whose LMS API is synchronous resolve immediately.
+   * Connect to the LMS. Failure is fatal: nothing can be reported, so the
+   * course must not start.
    */
   init(): Promise<void>;
   /**
-   * Fetch previously saved state, if that costs a network round trip. Split
-   * from `init()` so a slow or unreachable State API only costs resume, not the
-   * whole launch — the adapter bounds the request itself and resolves either
-   * way. Absent on adapters whose state is already in hand once `init()`
-   * resolves. An adapter that could not read its state must refuse subsequent
-   * `saveState` calls rather than overwrite what it failed to read.
+   * Fetch previously saved state, where that costs a network round trip. Split
+   * from `init()` so a stalled State API costs resume rather than the launch;
+   * the adapter bounds the request itself and resolves either way. An adapter
+   * that could not read its state must then refuse `saveState` rather than
+   * overwrite what it failed to read.
    */
   loadState?(): Promise<void>;
   getState(): SavedState | null;

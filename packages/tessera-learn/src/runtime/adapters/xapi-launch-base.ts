@@ -121,10 +121,9 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   saveState(state: SavedState): void {
-    // The resume GET failed, so we don't know what the learner already has
-    // stored. Writing now would replace it with a blank-slate session. Grades
-    // and completion travel as statements, not state, so withholding this
-    // costs the bookmark only.
+    // The resume GET failed, so writing would replace state we never read with
+    // a blank-slate session. Grades travel as statements, so this costs the
+    // bookmark only.
     if (this.stateLoadFailed) return;
     this.state = state;
     if (!this.publisher) return;
@@ -385,12 +384,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   /**
-   * Resume GET, retried on the shared LMS backoff schedule. Runs after init()
-   * so a stalled State API costs the bookmark rather than the launch. A 404, an
-   * empty body, or an unparseable one is a definitive answer (there is no state
-   * worth keeping) and returns immediately with saving enabled. Exhausting the
-   * attempts or the deadline leaves the stored state unread, so `stateLoadFailed`
-   * withholds every later write rather than clobber it.
+   * Resume GET, retried on the shared LMS backoff schedule. A 404, an empty
+   * body, or an unparseable one is a definitive answer and returns with saving
+   * enabled. Exhausting the attempts or the deadline leaves the stored state
+   * unread, so `stateLoadFailed` withholds every later write.
    */
   async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);

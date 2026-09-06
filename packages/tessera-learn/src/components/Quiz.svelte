@@ -25,8 +25,6 @@
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
   let passed = $derived(handle.score >= handle.passingScore);
-  // The LMS is given the best attempt, so a weaker retry would otherwise read
-  // as a plain fail on a quiz the learner has already passed.
   let bestBeaten = $derived(handle.bestScore > handle.score);
 
   function isAnswered(q) {

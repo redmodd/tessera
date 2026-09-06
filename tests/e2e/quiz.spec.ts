@@ -420,8 +420,6 @@ test.describe('Quiz — Practice', () => {
     const retryBtn = page.locator('.tessera-quiz-btn', { hasText: 'Retry' });
     await expect(retryBtn).toBeVisible();
 
-    // A practice quiz you already submitted reopens on its results, not a
-    // blank first question, and retry stays on offer.
     await page.reload();
     await waitForContent(page);
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
@@ -440,13 +438,10 @@ test.describe('Quiz — Practice', () => {
     await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
     await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
 
-    // The learner sees the attempt they just finished, and the best one is
-    // named because that is what the LMS and the navigation gate are given.
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('0%');
     await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
 
-    // Only the best attempt is persisted, so the restored result is that one
-    // and there is no weaker attempt left to caveat.
+    // Only the best attempt is persisted, so that is what comes back.
     await page.reload();
     await waitForContent(page);
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
