@@ -72,9 +72,7 @@ export class QuizEngine implements UseQuizHandle {
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
-  // Tags each handle with its index. Symbol-keyed rather than a WeakMap so a
-  // proxied copy (a custom shell storing handles in deep $state) still resolves,
-  // and unique per engine so a handle from another quiz on the page doesn't.
+  // Symbol, not a WeakMap: a proxied copy of a handle still resolves through it.
   #indexKey = Symbol('tessera.questionIndex');
   #seenIds = new Set<string>();
   #rewrittenIds = new Set<string>();

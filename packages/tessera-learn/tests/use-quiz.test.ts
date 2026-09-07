@@ -867,7 +867,6 @@ describe('useQuiz (Svelte wrapper)', () => {
     q.setAnswer(0, true);
     q.submit();
     expect(scored).toEqual([[3, 100]]);
-    // No element means no cosmetic event, but the score still landed.
     expect(m.ref.events).toHaveLength(0);
   });
 
