@@ -28,7 +28,7 @@ const isNumberArray = (value: unknown): boolean =>
 
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
-  (value.s == null || isNumber(value.s)) &&
+  ('s' in value ? isNumber(value.s) : true) &&
   (value.a == null || isNumber(value.a)) &&
   (value.q == null || isNumberRecord(value.q)) &&
   (value.g == null || value.g === 1);
