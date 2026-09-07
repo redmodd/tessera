@@ -12,7 +12,7 @@ export interface GradedUnit {
   /** Submitted quiz attempts. Persisted so `maxAttempts` survives a resume. */
   attempts: number;
   /** Standalone question scores, questionId → score 0-100. */
-  questions?: SvelteMap<string, number>;
+  questions?: Map<string, number>;
   /** The page carries at least one graded standalone question. */
   graded: boolean;
 }
@@ -121,7 +121,7 @@ export class ProgressState {
     graded: boolean,
   ) {
     const unit = this.gradedUnits.get(pageIndex);
-    const questions = unit?.questions ?? new SvelteMap<string, number>();
+    const questions = unit?.questions ?? new Map<string, number>();
     questions.set(questionId, score);
     this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
   }
@@ -147,28 +147,26 @@ export class ProgressState {
     this.version++;
   }
 
-  #graded = $derived.by<{ count: number; average: number; attempted: boolean }>(
-    () => {
-      const pages = new Set(this.#quizGradedIndices);
-      for (const [pageIndex, unit] of this.gradedUnits) {
-        if (unit.graded) pages.add(pageIndex);
+  #graded = $derived.by(() => {
+    const pages = new Set(this.#quizGradedIndices);
+    for (const [pageIndex, unit] of this.gradedUnits) {
+      if (unit.graded) pages.add(pageIndex);
+    }
+    let sum = 0;
+    let attempted = false;
+    for (const pageIndex of pages) {
+      const unit = this.gradedUnits.get(pageIndex);
+      if (unit?.quizScore !== undefined || unit?.questions?.size) {
+        attempted = true;
       }
-      let sum = 0;
-      let attempted = false;
-      for (const pageIndex of pages) {
-        const unit = this.gradedUnits.get(pageIndex);
-        if (unit?.quizScore !== undefined || unit?.questions?.size) {
-          attempted = true;
-        }
-        sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
-      }
-      return {
-        count: pages.size,
-        average: pages.size > 0 ? sum / pages.size : 0,
-        attempted,
-      };
-    },
-  );
+      sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+    }
+    return {
+      count: pages.size,
+      average: pages.size > 0 ? sum / pages.size : 0,
+      attempted,
+    };
+  });
 
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
     if (this.#manuallyCompleted) return 'complete';
@@ -216,7 +214,7 @@ export class ProgressState {
    * Effective graded score for LMS reporting — same union and averaging as
    * successStatus, so score and success status can't disagree.
    */
-  gradedScore(): { average: number; attempted: boolean } {
+  get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;
     return { average, attempted };
   }

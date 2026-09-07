@@ -456,6 +456,18 @@ describe('ProgressState', () => {
       expect(progress.gradedUnits.get(4)?.graded).toBe(true);
     });
 
+    it('keeps the unit graded when a later question on the page is not', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 80, true);
+      progress.markStandaloneQuestion(3, 'q2', 80, false);
+      expect(progress.gradedUnits.get(3)?.graded).toBe(true);
+    });
+
     it('replaces previous score for the same question id', () => {
       const progress = new ProgressState(
         new Set(),
@@ -618,7 +630,7 @@ describe('ProgressState', () => {
         quizPageIndices(manifest),
       );
 
-      expect(progress.gradedScore().attempted).toBe(false);
+      expect(progress.gradedScore.attempted).toBe(false);
     });
 
     it('includes graded standalone questions', () => {
@@ -632,7 +644,7 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);
 
-      expect(progress.gradedScore()).toEqual({ average: 80, attempted: true });
+      expect(progress.gradedScore).toEqual({ average: 80, attempted: true });
     });
 
     it('excludes non-graded standalone questions', () => {
@@ -646,7 +658,7 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(2, 'q1', 100, false);
 
-      expect(progress.gradedScore().attempted).toBe(false);
+      expect(progress.gradedScore.attempted).toBe(false);
     });
 
     it('averages quizzes and graded standalone pages together', () => {
@@ -662,7 +674,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 60, true);
 
       // (100 + 60) / 2 = 80
-      expect(progress.gradedScore().average).toBe(80);
+      expect(progress.gradedScore.average).toBe(80);
     });
 
     it('matches the average recalculateSuccess uses', () => {
@@ -678,7 +690,7 @@ describe('ProgressState', () => {
       progress.quizCompleted(1, 90);
       progress.markStandaloneQuestion(3, 'q1', 70, true);
 
-      const { average } = progress.gradedScore();
+      const { average } = progress.gradedScore;
       expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
     });
   });

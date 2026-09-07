@@ -220,7 +220,7 @@
         entry.q = questions;
       }
       if (unit.graded) entry.g = 1;
-      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
+      g[String(pageIndex)] = entry;
     }
     return {
       b: nav.currentPageIndex,
@@ -322,7 +322,7 @@
     void progress.version;
     if (!persistenceReady) return;
 
-    const { average, attempted } = progress.gradedScore();
+    const { average, attempted } = progress.gradedScore;
     if (!attempted) return;
 
     const rounded = Math.round(average);
@@ -446,7 +446,7 @@
         restoreState(saved);
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
-        const restoredScore = progress.gradedScore();
+        const restoredScore = progress.gradedScore;
         adapter.seedLifecycle?.(
           progress.completionStatus,
           progress.successStatus,

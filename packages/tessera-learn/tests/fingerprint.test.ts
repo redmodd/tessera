@@ -87,7 +87,6 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: '80' } } } },
       ],
       ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
-      ['it carries quiz scores under a top-level q', { q: { '0': 80 } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);
@@ -105,7 +104,32 @@ describe('shouldRestore', () => {
     it('warns so a corrupt record is distinguishable from a first launch', () => {
       const saved = { ...savedWith(fp), g: [] } as unknown as SavedState;
       shouldRestore(saved, fp, 'auto');
-      expect(console.warn).toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        'Tessera: discarding malformed resume state',
+      );
+    });
+  });
+
+  describe('outdated format', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    it('discards a save whose scores live under a top-level q', () => {
+      const saved = {
+        ...savedWith(fp),
+        q: { '0': 80 },
+        qa: { '0': 2 },
+      } as unknown as SavedState;
+      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+    });
+
+    it('says the format is outdated rather than corrupt', () => {
+      const saved = { ...savedWith(fp), q: {} } as unknown as SavedState;
+      shouldRestore(saved, fp, 'auto');
+      expect(console.warn).toHaveBeenCalledWith(
+        'Tessera: discarding resume state saved in an older format',
+      );
     });
   });
 

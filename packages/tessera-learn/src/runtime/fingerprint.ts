@@ -33,14 +33,17 @@ const isGradedUnit = (value: unknown): boolean =>
   (value.q == null || isNumberRecord(value.q)) &&
   (value.g == null || value.g === 1);
 
+// A top-level `q` marks a save whose scores live under the retired q/qa/s/gs
+// keys. Nothing reads those, so the blob is discarded rather than resumed with
+// every score silently missing.
+const isOutdatedFormat = (saved: SavedState): boolean =>
+  isRecord(saved) && 'q' in saved;
+
 // Rejected whole: a shape restoreState() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.
 // A null optional is fine, restoreState skips it.
 const isMalformed = (saved: SavedState): boolean =>
   !isRecord(saved) ||
-  // A top-level `q` marks a save whose scores live under q/qa/s/gs. Nothing
-  // reads those keys, so reject the blob rather than resume with no scores.
-  'q' in saved ||
   !isNumber(saved.b) ||
   !isNumber(saved.d) ||
   !isNumberArray(saved.v) ||
@@ -58,6 +61,10 @@ export function shouldRestore(
 ): boolean {
   if (resume === 'never') return false;
   if (saved.f !== undefined && saved.f !== currentFingerprint) return false;
+  if (isOutdatedFormat(saved)) {
+    console.warn('Tessera: discarding resume state saved in an older format');
+    return false;
+  }
   if (isMalformed(saved)) {
     console.warn('Tessera: discarding malformed resume state');
     return false;

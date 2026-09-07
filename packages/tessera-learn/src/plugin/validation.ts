@@ -1735,7 +1735,10 @@ function crossValidate(
       visitedChars += String(i).length + 1; // digit chars + comma
     }
     const overhead = 60; // top-level JSON overhead with all keys
-    const quizBytes = pageResults.totalQuizzes * 22; // g: "NNN":{"s":100,"a":2},
+    // A page's quiz and standalone scores share one `g` entry, so the entry
+    // wrapper is budgeted once (in standaloneBytes) and the quiz only adds its
+    // own fields.
+    const quizBytes = pageResults.totalQuizzes * 14; // g entry: "s":100,"a":2,
     const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
     const standaloneBytes = pageResults.totalPages * 38; // g: "NNN":{"q":{"q1":100,"q2":100},"g":1},
     const userStateBuffer = 256; // usePersistence headroom

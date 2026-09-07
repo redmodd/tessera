@@ -285,7 +285,7 @@ export function useProgress() {
       return progress.quizScore(pageIndex);
     },
     get gradedScore() {
-      return progress.gradedScore();
+      return progress.gradedScore;
     },
     get passingScore() {
       return progress.passingScore;
