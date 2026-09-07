@@ -33,9 +33,8 @@ const isGradedUnit = (value: unknown): boolean =>
   (value.q == null || isNumberRecord(value.q)) &&
   (value.g == null || value.g === 1);
 
-// A top-level `q` marks a save whose scores live under the retired q/qa/s/gs
-// keys. Nothing reads those, so the blob is discarded rather than resumed with
-// every score silently missing.
+// A top-level `q` marks a save whose scores live under keys nothing reads, so
+// the blob is discarded rather than resumed with every score silently missing.
 const isOutdatedFormat = (saved: SavedState): boolean =>
   isRecord(saved) && 'q' in saved;
 
