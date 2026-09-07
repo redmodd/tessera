@@ -1,5 +1,5 @@
 <script>
-  import config from 'virtual:tessera-config';
+  import rawConfig from 'virtual:tessera-config';
   import manifest from 'virtual:tessera-manifest';
   import pageModules from 'virtual:tessera-pages';
   import UserLayout from 'virtual:tessera-layout';
@@ -28,6 +28,8 @@
   // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
   // have no deadline of their own, and the first page waits on all three.
   const INIT_TIMEOUT_MS = 15_000;
+
+  const config = $state(rawConfig);
 
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
@@ -89,7 +91,9 @@
   let pageContext = $state({
     quiz: null,
     quizState: null,
-    passingScore: config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE,
+    get passingScore() {
+      return config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE;
+    },
   });
   setContext(TESSERA_PAGE, pageContext);
 
@@ -444,17 +448,16 @@
     }
 
     // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
-    // threshold for this launch and overrides the manifest. Mutate the
-    // imported config object once before any UI reads it so every
-    // downstream consumer (the derived completion/success status, navigation
-    // gating, Quiz page context) sees the same effective value.
+    // threshold for this launch and overrides the manifest. `config` is a
+    // $state proxy, so this one write re-derives every consumer: completion
+    // and success status, navigation gating, the Quiz page context, and
+    // useProgress().passingScore in a custom layout.
     // The first page is gated on persistenceReady, so a malformed saved
     // document must cost the resume, not the course.
     try {
       const lmsMastery = adapter.getMasteryScore?.();
       if (typeof lmsMastery === 'number') {
         config.scoring.passingScore = lmsMastery * 100;
-        pageContext.passingScore = lmsMastery * 100;
       }
 
       const saved = adapter.getState();

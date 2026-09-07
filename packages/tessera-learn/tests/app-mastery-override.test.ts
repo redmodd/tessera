@@ -6,7 +6,7 @@ const pages = [0].map((index) => ({
   title: `Page ${index}`,
   slug: `page-${index}`,
   importPath: `/pages/01-intro/01-lesson/page-${index}.svelte`,
-  quiz: null,
+  quiz: { graded: true },
 }));
 
 const manifest = {
@@ -71,6 +71,7 @@ describe('an LMS mastery override reaches a custom layout', () => {
     document.body.innerHTML = '';
     delete (globalThis as any).__tesseraTest;
     delete (globalThis as any).__tesseraSeenPassingScore;
+    delete (globalThis as any).__tesseraNavCtx;
   });
 
   it('re-renders useProgress().passingScore when the override lands', async () => {
@@ -80,6 +81,24 @@ describe('an LMS mastery override reaches a custom layout', () => {
     await vi.waitFor(() => {
       expect((globalThis as any).__tesseraSeenPassingScore).toContain(90);
     });
+  });
+
+  it('re-derives course status against the overridden threshold', async () => {
+    const { component, unmount } = await mountWithMastery(0.9);
+    cleanup = () => unmount(component);
+
+    await vi.waitFor(() => {
+      expect((globalThis as any).__tesseraSeenPassingScore).toContain(90);
+    });
+
+    const { progress, config } = (globalThis as any).__tesseraNavCtx;
+    expect(config.scoring.passingScore).toBe(90);
+
+    progress.quizCompleted(0, 80);
+    expect(progress.successStatus).toBe('failed');
+
+    progress.quizCompleted(0, 95);
+    expect(progress.successStatus).toBe('passed');
   });
 
   it('keeps the course threshold when the LMS supplies none', async () => {
