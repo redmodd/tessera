@@ -287,6 +287,12 @@ export function useProgress() {
     get quizScores() {
       return progress.quizScores;
     },
+    get gradedScore() {
+      return progress.gradedScore();
+    },
+    get passingScore() {
+      return progress.passingScore;
+    },
     get chunkProgress() {
       return progress.chunkProgress;
     },

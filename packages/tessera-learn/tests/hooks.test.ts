@@ -702,6 +702,30 @@ describe('useProgress', () => {
     expect(h.successStatus).toBe('unknown');
   });
 
+  it('exposes the course-wide graded score and pass threshold', () => {
+    const manifest = createManifest(4, {
+      1: { graded: true },
+      2: { graded: true },
+    });
+    const progress = new ProgressState(
+      gradedQuizIndices(manifest),
+      createConfig({ scoring: { passingScore: 80 } }),
+      4,
+      quizPageIndices(manifest),
+    );
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+
+    const h = useProgress();
+    expect(h.passingScore).toBe(80);
+    expect(h.gradedScore).toEqual({ average: 0, attempted: false });
+
+    progress.quizCompleted(1, 90);
+    expect(h.gradedScore).toEqual({ average: 45, attempted: true });
+
+    progress.quizCompleted(2, 70);
+    expect(h.gradedScore).toEqual({ average: 80, attempted: true });
+  });
+
   it('markVisited and markChunk delegate to ProgressState', () => {
     const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
     ctxStore.set('tessera-nav', makeNavCtx(progress));

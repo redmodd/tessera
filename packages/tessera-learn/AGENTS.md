@@ -792,12 +792,36 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 function useProgress(): {
   readonly visitedPages: Set<number>;
   readonly quizScores: Map<number, number>; // pageIndex → score 0–100
+  readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
+  readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
   readonly successStatus: 'unknown' | 'passed' | 'failed';
   markVisited(pageIndex: number): void;
   markChunk(pageIndex: number, chunkIndex: number): void;
 };
+```
+
+`gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScores` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
+
+Two rules for displaying it:
+
+- **An unattempted graded page counts as 0.** `average` is the sum over every graded page divided by their count, so a learner who has aced the two quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
+- **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
+
+```svelte
+<script>
+  import { useProgress } from 'tessera-learn';
+  const progress = useProgress();
+  const { average, attempted } = $derived(progress.gradedScore);
+</script>
+
+{#if attempted}
+  <p>Course score so far: {Math.round(average)}%</p>
+  {#if progress.passingScore > 0}
+    <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
+  {/if}
+{/if}
 ```
 
 ### `useCompletion`

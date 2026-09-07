@@ -59,6 +59,10 @@ export class ProgressState {
     return this.#manuallyCompleted;
   }
 
+  get passingScore(): number {
+    return this.#config.scoring.passingScore;
+  }
+
   /** Idempotent — only the first call per session has an effect. */
   markCompleteManually(): void {
     if (this.#manuallyCompleted) return;
