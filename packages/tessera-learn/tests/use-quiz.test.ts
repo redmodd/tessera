@@ -493,6 +493,14 @@ describe('QuizEngine', () => {
     expect(engine.feedbackVisible(0)).toBe(true);
   });
 
+  it('revealFeedback matches by id when the handle is not the stored object', () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const proxied = new Proxy(a, {});
+    engine.revealFeedback(proxied);
+    expect(engine.feedbackVisible(0)).toBe(true);
+  });
+
   it('correct is a boolean once feedback is visible, before submit', () => {
     const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
     const a = engine.registerQuestion(tfQuestion('a', true, true));

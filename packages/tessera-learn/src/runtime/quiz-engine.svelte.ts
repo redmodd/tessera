@@ -230,8 +230,10 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   revealFeedback(q: Question): void {
-    const index = this.#indexOf.get(q);
-    if (index !== undefined) this.revealFeedbackByIndex(index);
+    const index =
+      this.#indexOf.get(q) ??
+      this.#internalQuestions.findIndex((iq) => iq.id === q.id);
+    if (index >= 0) this.revealFeedbackByIndex(index);
   }
 
   submit(): void {
