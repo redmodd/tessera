@@ -165,8 +165,8 @@
         pageError = null;
         pageContext.quiz = page.quiz;
         pageContext.quizState = {
-          attempts: progress.quizAttempts.get(index) ?? 0,
-          score: progress.quizScores.get(index) ?? 0,
+          attempts: progress.quizAttempts(index),
+          score: progress.quizScore(index) ?? 0,
         };
         PageComponent = mod.default;
         pageLoading = false;
@@ -205,36 +205,30 @@
 
   // ---- Persistence: serialize / restore ----
   function serializeState() {
-    const q = {};
-    for (const [pageIndex, score] of progress.quizScores) {
-      q[String(pageIndex)] = score;
-    }
-    const qa = {};
-    for (const [pageIndex, attempts] of progress.quizAttempts) {
-      if (attempts > 1) qa[String(pageIndex)] = attempts;
-    }
     const c = {};
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
       c[String(pageIndex)] = chunkIndex;
     }
-    const s = {};
-    for (const [pageIndex, questionMap] of progress.standaloneQuestionScores) {
-      const obj = {};
-      for (const [qid, score] of questionMap) obj[qid] = score;
-      s[String(pageIndex)] = obj;
+    const g = {};
+    for (const [pageIndex, unit] of progress.gradedUnits) {
+      const entry = {};
+      if (unit.quizScore !== undefined) entry.s = unit.quizScore;
+      if (unit.attempts > 1) entry.a = unit.attempts;
+      if (unit.questions?.size) {
+        const questions = {};
+        for (const [qid, score] of unit.questions) questions[qid] = score;
+        entry.q = questions;
+      }
+      if (unit.graded) entry.g = 1;
+      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
       b: nav.currentPageIndex,
       f: currentFingerprint,
       v: [...progress.visitedPages],
-      q,
       d: duration.totalSeconds,
-      ...(Object.keys(qa).length > 0 ? { qa } : {}),
+      ...(Object.keys(g).length > 0 ? { g } : {}),
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
-      ...(progress.standaloneQuestionScores.size > 0 ? { s } : {}),
-      ...(progress.gradedStandalonePages.size > 0
-        ? { gs: [...progress.gradedStandalonePages] }
-        : {}),
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
     };
@@ -246,28 +240,21 @@
     for (const idx of saved.v) {
       progress.markVisited(idx);
     }
-    // Restore quiz scores and attempt counts (qa absent on older saves)
-    for (const [key, score] of Object.entries(saved.q)) {
-      progress.restoreQuiz(Number(key), score, saved.qa?.[key] ?? 1);
-    }
-    // Restore chunk progress (may be absent on state saved before this field existed)
+    // Restore chunk progress (absent when no page reveals content in stages)
     if (saved.c) {
       for (const [key, chunkIndex] of Object.entries(saved.c)) {
         progress.markChunk(Number(key), chunkIndex);
       }
     }
-    // Restore standalone question scores (absent on state saved before useQuestion existed)
-    if (saved.s) {
-      const gradedSet = new Set(saved.gs ?? []);
-      for (const [pageKey, questions] of Object.entries(saved.s)) {
-        const pageIndex = Number(pageKey);
-        for (const [qid, score] of Object.entries(questions)) {
-          progress.markStandaloneQuestion(
-            pageIndex,
-            qid,
-            score,
-            gradedSet.has(pageIndex),
-          );
+    // Restore quiz scores, attempt counts and standalone question scores
+    if (saved.g) {
+      for (const [key, unit] of Object.entries(saved.g)) {
+        const pageIndex = Number(key);
+        if (unit.s !== undefined) {
+          progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
+        }
+        for (const [qid, score] of Object.entries(unit.q ?? {})) {
+          progress.markStandaloneQuestion(pageIndex, qid, score, !!unit.g);
         }
       }
     }

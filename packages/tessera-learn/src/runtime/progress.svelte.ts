@@ -2,6 +2,22 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { CourseConfig } from './types.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
+/**
+ * Score state for one gradable page. A <Quiz> page fills `quizScore` and
+ * `attempts`; standalone `useQuestion` answers fill `questions`. Both can be
+ * present on the same page, and `quizScore` wins when they are.
+ */
+export interface GradedUnit {
+  /** Best score across attempts, or undefined until the quiz is submitted. */
+  quizScore?: number;
+  /** Submitted quiz attempts. Persisted so `maxAttempts` survives a resume. */
+  attempts: number;
+  /** Standalone question scores, questionId → score 0-100. */
+  questions?: SvelteMap<string, number>;
+  /** The page carries at least one graded standalone question. */
+  graded: boolean;
+}
+
 export class ProgressState {
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
@@ -21,30 +37,14 @@ export class ProgressState {
   }
 
   visitedPages = $state(new SvelteSet<number>());
-  quizScores = $state(new SvelteMap<number, number>());
-  /**
-   * Submitted attempts per quiz page. Persisted alongside the scores so
-   * `maxAttempts` survives leaving and reopening the course.
-   */
-  quizAttempts = $state(new SvelteMap<number, number>());
+
   /**
    * Chunk progress — for pages that reveal content in stages (Continue buttons).
    * Maps pageIndex → highest revealed chunk index (0-based).
    */
   chunkProgress = $state(new SvelteMap<number, number>());
-  /**
-   * Per-page standalone question scores from `useQuestion`. pageIndex → (questionId → score 0-100).
-   * Tracked separately from `quizScores` because <Quiz> blocks score as a unit
-   * while standalone questions score individually and average per page.
-   */
-  standaloneQuestionScores = $state(
-    new SvelteMap<number, SvelteMap<string, number>>(),
-  );
-  /**
-   * Set of page indices that have at least one graded standalone question.
-   * Pages in this set contribute to course success status via their standalone average.
-   */
-  gradedStandalonePages = $state(new SvelteSet<number>());
+
+  gradedUnits = $state(new SvelteMap<number, GradedUnit>());
 
   // Latch for manual completion. Monotonic; only flips forward.
   #manuallyCompleted = $state(false);
@@ -76,25 +76,32 @@ export class ProgressState {
     this.version++;
   }
 
+  /** Best quiz score on a page, or undefined if the quiz was never submitted. */
+  quizScore(pageIndex: number): number | undefined {
+    return this.gradedUnits.get(pageIndex)?.quizScore;
+  }
+
+  /** Submitted quiz attempts on a page. */
+  quizAttempts(pageIndex: number): number {
+    return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
+  }
+
   /** Records the learner's best score across attempts, not the latest. */
   quizCompleted(pageIndex: number, score: number) {
-    const best = this.quizScores.get(pageIndex);
-    this.quizScores.set(
-      pageIndex,
-      best === undefined ? score : Math.max(best, score),
-    );
-    this.quizAttempts.set(
-      pageIndex,
-      (this.quizAttempts.get(pageIndex) ?? 0) + 1,
-    );
-    this.version++;
+    const unit = this.gradedUnits.get(pageIndex);
+    this.#write(pageIndex, {
+      quizScore:
+        unit?.quizScore === undefined ? score : Math.max(unit.quizScore, score),
+      attempts: (unit?.attempts ?? 0) + 1,
+    });
   }
 
   /** Seed a quiz page from saved state, without counting a new attempt. */
   restoreQuiz(pageIndex: number, score: number, attempts: number) {
-    this.quizScores.set(pageIndex, score);
-    if (attempts > 0) this.quizAttempts.set(pageIndex, attempts);
-    this.version++;
+    this.#write(pageIndex, {
+      quizScore: score,
+      ...(attempts > 0 ? { attempts } : {}),
+    });
   }
 
   /** Record the highest chunk index revealed on a page. Only advances forward. */
@@ -116,42 +123,47 @@ export class ProgressState {
     score: number,
     graded: boolean,
   ) {
-    let pageMap = this.standaloneQuestionScores.get(pageIndex);
-    if (!pageMap) {
-      pageMap = new SvelteMap<string, number>();
-      this.standaloneQuestionScores.set(pageIndex, pageMap);
-    }
-    pageMap.set(questionId, score);
-    if (graded) {
-      this.gradedStandalonePages.add(pageIndex);
-    }
-    this.version++;
+    const unit = this.gradedUnits.get(pageIndex);
+    const questions = unit?.questions ?? new SvelteMap<string, number>();
+    questions.set(questionId, score);
+    this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
   }
 
   /** Average of standalone question scores on a page, or 0 if none. */
   getPageStandaloneAverage(pageIndex: number): number {
-    const pageMap = this.standaloneQuestionScores.get(pageIndex);
-    if (!pageMap || pageMap.size === 0) return 0;
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    if (!questions || questions.size === 0) return 0;
     let sum = 0;
-    for (const s of pageMap.values()) sum += s;
-    return sum / pageMap.size;
+    for (const s of questions.values()) sum += s;
+    return sum / questions.size;
+  }
+
+  // Replaces the entry rather than mutating it: SvelteMap tracks the value it
+  // holds for a key, not the fields of that value.
+  #write(pageIndex: number, patch: Partial<GradedUnit>) {
+    this.gradedUnits.set(pageIndex, {
+      attempts: 0,
+      graded: false,
+      ...this.gradedUnits.get(pageIndex),
+      ...patch,
+    });
+    this.version++;
   }
 
   #graded = $derived.by<{ count: number; average: number; attempted: boolean }>(
     () => {
       const pages = new Set(this.#quizGradedIndices);
-      for (const i of this.gradedStandalonePages) pages.add(i);
+      for (const [pageIndex, unit] of this.gradedUnits) {
+        if (unit.graded) pages.add(pageIndex);
+      }
       let sum = 0;
       let attempted = false;
-      for (const i of pages) {
-        const quizScore = this.quizScores.get(i);
-        if (
-          quizScore !== undefined ||
-          this.standaloneQuestionScores.get(i)?.size
-        ) {
+      for (const pageIndex of pages) {
+        const unit = this.gradedUnits.get(pageIndex);
+        if (unit?.quizScore !== undefined || unit?.questions?.size) {
           attempted = true;
         }
-        sum += quizScore ?? this.getPageStandaloneAverage(i);
+        sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
       }
       return {
         count: pages.size,
@@ -185,7 +197,9 @@ export class ProgressState {
   completedPages = $derived.by<number>(() => {
     let count = 0;
     for (const i of this.visitedPages) {
-      if (this.#quizPageIndices.has(i) && !this.quizScores.has(i)) continue;
+      if (this.#quizPageIndices.has(i) && this.quizScore(i) === undefined) {
+        continue;
+      }
       count++;
     }
     return count;

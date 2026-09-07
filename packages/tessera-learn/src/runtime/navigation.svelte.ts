@@ -17,10 +17,10 @@ export function isPageComplete(
   }
 
   if (!page.quiz.gatesProgress) {
-    return progress.quizScores.has(index);
+    return progress.quizScore(index) !== undefined;
   }
 
-  return (progress.quizScores.get(index) ?? 0) >= config.scoring.passingScore;
+  return (progress.quizScore(index) ?? 0) >= config.scoring.passingScore;
 }
 
 export type PageModuleMap = Record<string, () => Promise<unknown>>;

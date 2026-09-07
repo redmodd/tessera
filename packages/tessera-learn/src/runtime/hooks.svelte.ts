@@ -281,8 +281,8 @@ export function useProgress() {
     get visitedPages() {
       return progress.visitedPages;
     },
-    get quizScores() {
-      return progress.quizScores;
+    quizScore(pageIndex: number) {
+      return progress.quizScore(pageIndex);
     },
     get gradedScore() {
       return progress.gradedScore();

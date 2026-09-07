@@ -118,10 +118,9 @@ test.describe('Persistence — localStorage', () => {
     });
 
     expect(storageData).not.toBeNull();
-    // Should have compact keys: b, v, q, d
+    // Should have compact keys: b, v, d
     expect(storageData).toHaveProperty('b'); // bookmark
     expect(storageData).toHaveProperty('v'); // visited
-    expect(storageData).toHaveProperty('q'); // quiz scores
     expect(storageData).toHaveProperty('d'); // duration
     expect(Array.isArray(storageData.v)).toBe(true);
     expect(storageData.v.length).toBeGreaterThanOrEqual(2);
@@ -175,7 +174,7 @@ test.describe('Persistence — localStorage', () => {
       return JSON.parse(localStorage.getItem(tesseraKey)!);
     });
     expect(storageData).not.toBeNull();
-    expect(Object.keys(storageData.q).length).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(storageData.g).length).toBeGreaterThanOrEqual(1);
 
     // Reload and verify state is restored
     await page.reload();
@@ -188,7 +187,7 @@ test.describe('Persistence — localStorage', () => {
       return JSON.parse(localStorage.getItem(tesseraKey)!);
     });
     expect(restoredData).not.toBeNull();
-    expect(Object.keys(restoredData.q).length).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(restoredData.g).length).toBeGreaterThanOrEqual(1);
   });
 
   test('state includes duration tracking', async ({ page }) => {

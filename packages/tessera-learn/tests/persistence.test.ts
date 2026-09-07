@@ -12,13 +12,13 @@ describe('SavedState serialization', () => {
     const state: SavedState = {
       b: 5,
       v: [0, 1, 2, 3, 4, 5],
-      q: { '3': 85, '7': 90 },
+      g: { '3': { s: 85 }, '7': { s: 90, a: 2 } },
       d: 1234,
     };
     const json = JSON.stringify(state);
     expect(json).toContain('"b":5');
     expect(json).toContain('"v":[0,1,2,3,4,5]');
-    expect(json).toContain('"q":{"3":85,"7":90}');
+    expect(json).toContain('"g":{"3":{"s":85},"7":{"s":90,"a":2}}');
     expect(json).toContain('"d":1234');
   });
 
@@ -26,14 +26,14 @@ describe('SavedState serialization', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      q: { '2': 100 },
+      g: { '2': { s: 100, q: { q1: 80 }, g: 1 } },
       d: 500,
     };
     const json = JSON.stringify(state);
     const restored: SavedState = JSON.parse(json);
     expect(restored.b).toBe(3);
     expect(restored.v).toEqual([0, 1, 2, 3]);
-    expect(restored.q['2']).toBe(100);
+    expect(restored.g?.['2']).toEqual({ s: 100, q: { q1: 80 }, g: 1 });
     expect(restored.d).toBe(500);
   });
 
@@ -41,7 +41,13 @@ describe('SavedState serialization', () => {
     const state: SavedState = {
       b: 199,
       v: Array.from({ length: 200 }, (_, i) => i),
-      q: { '20': 85, '50': 90, '100': 75, '150': 95, '180': 60 },
+      g: {
+        '20': { s: 85 },
+        '50': { s: 90 },
+        '100': { s: 75 },
+        '150': { s: 95 },
+        '180': { s: 60 },
+      },
       d: 36000,
     };
     const json = JSON.stringify(state);
@@ -49,90 +55,13 @@ describe('SavedState serialization', () => {
   });
 
   it('empty state is valid', () => {
-    const state: SavedState = { b: 0, v: [], q: {}, d: 0 };
+    const state: SavedState = { b: 0, v: [], d: 0 };
     const json = JSON.stringify(state);
     const restored: SavedState = JSON.parse(json);
     expect(restored.b).toBe(0);
     expect(restored.v).toEqual([]);
-    expect(Object.keys(restored.q)).toHaveLength(0);
+    expect(restored.g).toBeUndefined();
     expect(restored.d).toBe(0);
-  });
-});
-
-describe('State serialization helpers', () => {
-  function serializeState(
-    currentPageIndex: number,
-    visitedPages: Set<number>,
-    quizScores: Map<number, number>,
-    durationSeconds: number,
-  ): SavedState {
-    const q: Record<string, number> = {};
-    for (const [pageIndex, score] of quizScores) {
-      q[String(pageIndex)] = score;
-    }
-    return {
-      b: currentPageIndex,
-      v: [...visitedPages],
-      q,
-      d: durationSeconds,
-    };
-  }
-
-  function restoreState(state: SavedState): {
-    currentPageIndex: number;
-    visitedPages: Set<number>;
-    quizScores: Map<number, number>;
-    durationSeconds: number;
-  } {
-    return {
-      currentPageIndex: state.b,
-      visitedPages: new Set(state.v),
-      quizScores: new Map(
-        Object.entries(state.q).map(([k, v]) => [Number(k), v]),
-      ),
-      durationSeconds: state.d,
-    };
-  }
-
-  it('round-trips through serialize → deserialize', () => {
-    const visited = new Set([0, 1, 2, 5, 8]);
-    const scores = new Map([
-      [3, 85],
-      [7, 90],
-    ]);
-
-    const saved = serializeState(5, visited, scores, 1234);
-    const json = JSON.stringify(saved);
-    const parsed: SavedState = JSON.parse(json);
-    const restored = restoreState(parsed);
-
-    expect(restored.currentPageIndex).toBe(5);
-    expect(restored.visitedPages).toEqual(new Set([0, 1, 2, 5, 8]));
-    expect(restored.quizScores).toEqual(
-      new Map([
-        [3, 85],
-        [7, 90],
-      ]),
-    );
-    expect(restored.durationSeconds).toBe(1234);
-  });
-
-  it('handles empty quiz scores', () => {
-    const saved = serializeState(0, new Set([0]), new Map(), 10);
-    const restored = restoreState(saved);
-    expect(restored.quizScores.size).toBe(0);
-  });
-
-  it('quiz score keys survive JSON round-trip as numbers', () => {
-    const scores = new Map([[42, 100]]);
-    const saved = serializeState(0, new Set(), scores, 0);
-    const json = JSON.stringify(saved);
-    const parsed: SavedState = JSON.parse(json);
-    // JSON keys are always strings
-    expect(parsed.q['42']).toBe(100);
-    // restoreState converts back to number keys
-    const restored = restoreState(parsed);
-    expect(restored.quizScores.get(42)).toBe(100);
   });
 });
 
@@ -180,7 +109,12 @@ describe('WebAdapter contract', () => {
   }
 
   it('init() reads from localStorage', async () => {
-    const state: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
+    const state: SavedState = {
+      b: 3,
+      v: [0, 1, 2, 3],
+      g: { '2': { s: 80 } },
+      d: 100,
+    };
     storage.set('tessera-test', JSON.stringify(state));
 
     const adapter = createTestAdapter('Test');
@@ -204,7 +138,7 @@ describe('WebAdapter contract', () => {
 
   it('saveState() writes to localStorage', () => {
     const adapter = createTestAdapter('Test');
-    const state: SavedState = { b: 5, v: [0, 1, 2, 3, 4, 5], q: {}, d: 200 };
+    const state: SavedState = { b: 5, v: [0, 1, 2, 3, 4, 5], g: {}, d: 200 };
     adapter.saveState(state);
 
     const raw = storage.get('tessera-test');
@@ -214,14 +148,14 @@ describe('WebAdapter contract', () => {
 
   it('saveState() overwrites previous state', () => {
     const adapter = createTestAdapter('Test');
-    adapter.saveState({ b: 1, v: [0, 1], q: {}, d: 10 });
-    adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: { '2': 90 }, d: 50 });
+    adapter.saveState({ b: 1, v: [0, 1], g: {}, d: 10 });
+    adapter.saveState({ b: 3, v: [0, 1, 2, 3], g: { '2': { s: 90 } }, d: 50 });
 
     const raw = storage.get('tessera-test');
     const restored = JSON.parse(raw!);
     expect(restored.b).toBe(3);
     expect(restored.v).toEqual([0, 1, 2, 3]);
-    expect(restored.q['2']).toBe(90);
+    expect(restored.g['2']).toEqual({ s: 90 });
   });
 
   it('full lifecycle: save, reload, restore', async () => {
@@ -229,7 +163,7 @@ describe('WebAdapter contract', () => {
     adapter1.saveState({
       b: 7,
       v: [0, 1, 2, 3, 4, 5, 6, 7],
-      q: { '3': 85 },
+      g: { '3': { s: 85 } },
       d: 600,
     });
 
@@ -241,7 +175,7 @@ describe('WebAdapter contract', () => {
     expect(state).not.toBeNull();
     expect(state!.b).toBe(7);
     expect(state!.v).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(state!.q['3']).toBe(85);
+    expect(state!.g!['3']).toEqual({ s: 85 });
     expect(state!.d).toBe(600);
   });
 });
@@ -275,7 +209,7 @@ describe('WebAdapter storage key', () => {
     totalPages: slugs.length,
   });
 
-  const state = (): SavedState => ({ b: 1, v: [0, 1], q: {}, d: 5 });
+  const state = (): SavedState => ({ b: 1, v: [0, 1], g: {}, d: 5 });
 
   const keyFor = (config: CourseConfig, manifest?: Manifest): string => {
     storage.clear();

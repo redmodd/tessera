@@ -33,7 +33,7 @@ export const freeAccess: AccessFn = ({
   for (let i = pageIndex - 1; i >= 0; i--) {
     const page = manifest.pages[i];
     if (page.quiz?.gatesProgress) {
-      return (progress.quizScores.get(i) ?? 0) >= config.scoring.passingScore;
+      return (progress.quizScore(i) ?? 0) >= config.scoring.passingScore;
     }
   }
   return true;

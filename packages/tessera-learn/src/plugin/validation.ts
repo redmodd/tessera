@@ -1725,9 +1725,8 @@ function crossValidate(
     // usePersistence / standalone-question state has accumulated.
     //
     // SavedState shape (see runtime/persistence.ts) — single-letter keys:
-    //   b (bookmark), v (visited[]), q (quiz scores), d (duration),
-    //   c (chunk progress), s (standalone scores), gs (graded standalone pages),
-    //   u (user state from usePersistence)
+    //   b (bookmark), v (visited[]), d (duration), c (chunk progress),
+    //   g (per-page quiz + standalone scores), u (user state from usePersistence)
     //
     // We can't statically detect calls to `useQuestion({ graded: true })` or
     // `usePersistence`, so reserve a fixed buffer per page for those.
@@ -1736,9 +1735,9 @@ function crossValidate(
       visitedChars += String(i).length + 1; // digit chars + comma
     }
     const overhead = 60; // top-level JSON overhead with all keys
-    const quizBytes = pageResults.totalQuizzes * 15; // q: "NNN":100,
+    const quizBytes = pageResults.totalQuizzes * 22; // g: "NNN":{"s":100,"a":2},
     const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
-    const standaloneBytes = pageResults.totalPages * 30; // s/gs: conservative buffer per page
+    const standaloneBytes = pageResults.totalPages * 30; // g: conservative buffer per page
     const userStateBuffer = 256; // usePersistence headroom
     const estimatedSize =
       overhead +

@@ -1,5 +1,5 @@
 ---
-'tessera-learn': patch
+'tessera-learn': minor
 ---
 
-Compute the graded-page union and average once as a memoized derived.
+Track every gradable page in one progress map, and replace `useProgress().quizScores` with `quizScore(pageIndex)`. Breaking: saved state from earlier versions is discarded on resume.

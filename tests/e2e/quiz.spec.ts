@@ -276,8 +276,9 @@ test.describe('Quiz — Graded Assessment', () => {
       matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
     });
     const stored = await readSavedState(page);
-    expect(Math.max(...Object.values<number>(stored.q))).toBe(100);
-    expect(Math.max(...Object.values<number>(stored.qa))).toBe(2);
+    const units = Object.values<{ s: number; a?: number }>(stored.g);
+    expect(Math.max(...units.map((u) => u.s))).toBe(100);
+    expect(Math.max(...units.map((u) => u.a ?? 1))).toBe(2);
   });
 });
 

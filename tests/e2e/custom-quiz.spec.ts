@@ -145,8 +145,8 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
       return raw ? JSON.parse(raw) : null;
     });
     expect(saved).not.toBeNull();
-    // q is the quiz scores map keyed by page index; the exam page is index 1.
-    expect(saved.q['1']).toBe(100);
+    // g is the graded-unit map keyed by page index; the exam page is index 1.
+    expect(saved.g['1'].s).toBe(100);
   });
 
   test('Retry resets state and bumps attempt count', async ({ page }) => {

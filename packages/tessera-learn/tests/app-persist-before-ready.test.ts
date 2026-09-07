@@ -116,7 +116,6 @@ describe('state changed during adapter init survives', () => {
         b: 0,
         f: structureFingerprint(manifest as never),
         v: [0],
-        q: {},
         d: 0,
         u: { 'other-note': 'from-a-previous-session' },
       });
@@ -138,7 +137,6 @@ describe('state changed during adapter init survives', () => {
       b: 0,
       f: 'stale-fingerprint',
       v: [0],
-      q: {},
       d: 0,
       u: { 'other-note': 'from-a-previous-session' },
     };
