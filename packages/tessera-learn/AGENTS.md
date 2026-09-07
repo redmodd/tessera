@@ -792,7 +792,7 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 function useProgress(): {
   readonly visitedPages: Set<number>;
   readonly quizScores: Map<number, number>; // pageIndex → score 0–100
-  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, exactly what the LMS is sent
+  readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
@@ -807,7 +807,7 @@ function useProgress(): {
 Two rules for displaying it:
 
 - **An unattempted graded page counts as 0.** `average` is the sum over every graded page divided by their count, so a learner who has aced the two quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
-- **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead.
+- **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
 
 ```svelte
 <script>
@@ -818,7 +818,9 @@ Two rules for displaying it:
 
 {#if attempted}
   <p>Course score so far: {Math.round(average)}%</p>
-  <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
+  {#if progress.passingScore > 0}
+    <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
+  {/if}
 {/if}
 ```
 
