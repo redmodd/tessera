@@ -50,6 +50,18 @@ export interface PersistenceAdapter {
   terminate(): void;
 }
 
+/** One page's entry in `SavedState.g`. */
+export interface GradedUnitState {
+  /** Best quiz score across attempts */
+  s?: number;
+  /** Submitted quiz attempts, omitted when 1 */
+  a?: number;
+  /** Standalone question scores — questionId → score 0-100 */
+  q?: Record<string, number>;
+  /** 1 when the page has at least one graded standalone question */
+  g?: 1;
+}
+
 /**
  * Compact serialization format for course state.
  * Single-letter keys to minimize storage footprint (SCORM 1.2 suspend_data is 4KB).
@@ -59,24 +71,18 @@ export interface SavedState {
   b: number;
   /** Visited — array of page indices */
   v: number[];
-  /** Quiz scores — pageIndex (as string key) to score */
-  q: Record<string, number>;
   /**
-   * Quiz attempts — pageIndex (as string key) to submitted attempt count.
-   * A count of 1 is omitted and assumed on restore, so every key in `q` has at
-   * least one attempt. Writing a `q` entry with no attempt breaks that.
+   * Graded units — pageIndex (as string key) to that page's score state.
+   * Every sub-key is omitted when it carries nothing, and an attempt count of
+   * 1 is assumed on restore, so a plain quiz page costs `"3":{"s":80}`.
    */
-  qa?: Record<string, number>;
+  g?: Record<string, GradedUnitState>;
   /** Duration — accumulated seconds */
   d: number;
   /** Chunk progress — pageIndex (as string key) to highest revealed chunk index */
   c?: Record<string, number>;
   /** User-scoped state written via `usePersistence(key)`, keyed by caller. */
   u?: Record<string, unknown>;
-  /** Standalone question scores — pageIndex → (questionId → score 0-100) */
-  s?: Record<string, Record<string, number>>;
-  /** Graded standalone page indices — pages with at least one graded standalone question */
-  gs?: number[];
   /** Manual completion latch. 1 if the learner triggered manual completion. Absent otherwise. */
   m?: 1;
   /** Structure fingerprint (FNV-1a over ordered page slugs) at save time.

@@ -23,7 +23,6 @@ const manifestOf = (...slugs: string[]): Manifest => ({
 const savedWith = (f?: string): SavedState => ({
   b: 1,
   v: [0, 1],
-  q: {},
   d: 5,
   ...(f !== undefined ? { f } : {}),
 });
@@ -75,36 +74,70 @@ describe('shouldRestore', () => {
 
     it.each([
       ['v is not an array', { v: 'nope' }],
-      ['q is null', { q: null }],
-      ['q is an array', { q: [] }],
       ['c is not a record', { c: 3 }],
-      ['s is not a record', { s: [] }],
-      ['a page in s is not a record', { s: { '0': null } }],
-      ['gs is not an array', { gs: {} }],
-      ['qa is not a record', { qa: 'nope' }],
+      ['g is an array', { g: [] }],
+      ['a page in g is not a record', { g: { '0': null } }],
       ['b is not a number', { b: '1' }],
       ['d is not a number', { d: '120' }],
       ['a visited page is not a number', { v: ['0', 1] }],
-      ['a quiz score is not a number', { q: { '0': '80' } }],
-      ['a standalone score is not a number', { s: { '0': { q1: '80' } } }],
-      ['a graded standalone page is not a number', { gs: ['0'] }],
+      ['a quiz score is not a number', { g: { '0': { s: '80' } } }],
+      ['an attempt count is not a number', { g: { '0': { a: '2' } } }],
+      [
+        'a standalone score is not a number',
+        { g: { '0': { q: { q1: '80' } } } },
+      ],
+      ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
+      ['a quiz score is null', { g: { '0': { s: null } } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);
     });
 
+    it.each([
+      ['a number', 42],
+      ['a string', 'nope'],
+    ])('discards a saved document that parsed to %s', (_label, bad) => {
+      expect(shouldRestore(bad as unknown as SavedState, fp, 'auto')).toBe(
+        false,
+      );
+    });
+
     it('warns so a corrupt record is distinguishable from a first launch', () => {
-      const saved = { ...savedWith(fp), q: null } as unknown as SavedState;
+      const saved = { ...savedWith(fp), g: [] } as unknown as SavedState;
       shouldRestore(saved, fp, 'auto');
-      expect(console.warn).toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        'Tessera: discarding malformed resume state',
+      );
+    });
+  });
+
+  describe('outdated format', () => {
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    it('discards a save whose scores live under a top-level q', () => {
+      const saved = {
+        ...savedWith(fp),
+        q: { '0': 80 },
+        qa: { '0': 2 },
+      } as unknown as SavedState;
+      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
+    });
+
+    it('says the format is outdated rather than corrupt', () => {
+      const saved = { ...savedWith(fp), q: {} } as unknown as SavedState;
+      shouldRestore(saved, fp, 'auto');
+      expect(console.warn).toHaveBeenCalledWith(
+        'Tessera: discarding resume state saved in an older format',
+      );
     });
   });
 
   it.each([
     ['c is null', { c: null }],
-    ['s is null', { s: null }],
-    ['gs is null', { gs: null }],
-    ['qa is null', { qa: null }],
+    ['g is null', { g: null }],
+    ['a graded unit carries only a score', { g: { '0': { s: 80 } } }],
   ])('restores a saved document where %s', (_label, nulled) => {
     const saved = { ...savedWith(fp), ...nulled } as unknown as SavedState;
     expect(shouldRestore(saved, fp, 'auto')).toBe(true);

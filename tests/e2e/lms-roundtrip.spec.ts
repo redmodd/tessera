@@ -693,7 +693,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     // No `f` — state saved before fingerprinting is trusted, which keeps this
     // test independent of the fixture's page slugs.
-    const saved = { b: 3, v: [0, 1, 2, 3], q: {}, d: 42 };
+    const saved = { b: 3, v: [0, 1, 2, 3], d: 42 };
     await routeLRSWithState(
       page,
       { status: 200, body: JSON.stringify(saved) },

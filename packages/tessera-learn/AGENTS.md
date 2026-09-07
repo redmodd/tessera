@@ -583,9 +583,7 @@ canAccess: (ctx) => {
   if (!sequentialAccess(ctx)) return false;
   if (ctx.page.slug !== 'lesson-5') return true;
   const i = ctx.manifest.pages.findIndex((p) => p.slug === 'lesson-2-quiz');
-  return (
-    (ctx.progress.quizScores.get(i) ?? 0) >= ctx.config.scoring.passingScore
-  );
+  return (ctx.progress.quizScore(i) ?? 0) >= ctx.config.scoring.passingScore;
 };
 ```
 
@@ -791,7 +789,7 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 ```ts
 function useProgress(): {
   readonly visitedPages: Set<number>;
-  readonly quizScores: Map<number, number>; // pageIndex → score 0–100
+  quizScore(pageIndex: number): number | undefined; // 0–100; undefined until the quiz is submitted
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
@@ -802,7 +800,7 @@ function useProgress(): {
 };
 ```
 
-`gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScores` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
+`gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
 
 Two rules for displaying it:
 

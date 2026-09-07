@@ -58,7 +58,7 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.quizCompleted(2, 85);
-      expect(progress.quizScores.get(2)).toBe(85);
+      expect(progress.quizScore(2)).toBe(85);
     });
 
     it('keeps the best score across attempts', () => {
@@ -71,7 +71,7 @@ describe('ProgressState', () => {
       progress.quizCompleted(2, 50);
       progress.quizCompleted(2, 90);
       progress.quizCompleted(2, 60);
-      expect(progress.quizScores.get(2)).toBe(90);
+      expect(progress.quizScore(2)).toBe(90);
     });
 
     it('counts attempts per page', () => {
@@ -84,8 +84,8 @@ describe('ProgressState', () => {
       progress.quizCompleted(2, 50);
       progress.quizCompleted(2, 90);
       progress.quizCompleted(3, 70);
-      expect(progress.quizAttempts.get(2)).toBe(2);
-      expect(progress.quizAttempts.get(3)).toBe(1);
+      expect(progress.quizAttempts(2)).toBe(2);
+      expect(progress.quizAttempts(3)).toBe(1);
     });
   });
 
@@ -98,8 +98,8 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.restoreQuiz(2, 90, 2);
-      expect(progress.quizScores.get(2)).toBe(90);
-      expect(progress.quizAttempts.get(2)).toBe(2);
+      expect(progress.quizScore(2)).toBe(90);
+      expect(progress.quizAttempts(2)).toBe(2);
     });
 
     it('a later submit continues the restored attempt count', () => {
@@ -111,8 +111,8 @@ describe('ProgressState', () => {
       );
       progress.restoreQuiz(2, 90, 2);
       progress.quizCompleted(2, 40);
-      expect(progress.quizAttempts.get(2)).toBe(3);
-      expect(progress.quizScores.get(2)).toBe(90);
+      expect(progress.quizAttempts(2)).toBe(3);
+      expect(progress.quizScore(2)).toBe(90);
     });
   });
 
@@ -439,10 +439,10 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.markStandaloneQuestion(3, 'q1', 80, false);
-      expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(80);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(80);
     });
 
-    it('adds page to gradedStandalonePages only when graded=true', () => {
+    it('marks the unit graded only when graded=true', () => {
       const progress = new ProgressState(
         new Set(),
         createConfig(),
@@ -450,10 +450,22 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.markStandaloneQuestion(3, 'q1', 80, false);
-      expect(progress.gradedStandalonePages.has(3)).toBe(false);
+      expect(progress.gradedUnits.get(3)?.graded).toBe(false);
 
       progress.markStandaloneQuestion(4, 'q2', 80, true);
-      expect(progress.gradedStandalonePages.has(4)).toBe(true);
+      expect(progress.gradedUnits.get(4)?.graded).toBe(true);
+    });
+
+    it('keeps the unit graded when a later question on the page is not', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 80, true);
+      progress.markStandaloneQuestion(3, 'q2', 80, false);
+      expect(progress.gradedUnits.get(3)?.graded).toBe(true);
     });
 
     it('replaces previous score for the same question id', () => {
@@ -465,8 +477,8 @@ describe('ProgressState', () => {
       );
       progress.markStandaloneQuestion(3, 'q1', 50, true);
       progress.markStandaloneQuestion(3, 'q1', 90, true);
-      expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(90);
-      expect(progress.standaloneQuestionScores.get(3)?.size).toBe(1);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(90);
+      expect(progress.gradedUnits.get(3)?.questions?.size).toBe(1);
     });
 
     it('keeps multiple questions on the same page', () => {
@@ -618,7 +630,7 @@ describe('ProgressState', () => {
         quizPageIndices(manifest),
       );
 
-      expect(progress.gradedScore().attempted).toBe(false);
+      expect(progress.gradedScore.attempted).toBe(false);
     });
 
     it('includes graded standalone questions', () => {
@@ -632,7 +644,7 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);
 
-      expect(progress.gradedScore()).toEqual({ average: 80, attempted: true });
+      expect(progress.gradedScore).toEqual({ average: 80, attempted: true });
     });
 
     it('excludes non-graded standalone questions', () => {
@@ -646,7 +658,7 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(2, 'q1', 100, false);
 
-      expect(progress.gradedScore().attempted).toBe(false);
+      expect(progress.gradedScore.attempted).toBe(false);
     });
 
     it('averages quizzes and graded standalone pages together', () => {
@@ -662,7 +674,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 60, true);
 
       // (100 + 60) / 2 = 80
-      expect(progress.gradedScore().average).toBe(80);
+      expect(progress.gradedScore.average).toBe(80);
     });
 
     it('matches the average recalculateSuccess uses', () => {
@@ -678,7 +690,7 @@ describe('ProgressState', () => {
       progress.quizCompleted(1, 90);
       progress.markStandaloneQuestion(3, 'q1', 70, true);
 
-      const { average } = progress.gradedScore();
+      const { average } = progress.gradedScore;
       expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
     });
   });

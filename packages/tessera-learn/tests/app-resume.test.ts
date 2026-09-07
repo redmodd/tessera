@@ -66,7 +66,6 @@ async function mountApp(
   const savedState = options.saved ?? {
     b: 1,
     v: [0, 1],
-    q: {},
     d: 42,
     f: structureFingerprint(manifest),
   };
@@ -117,7 +116,7 @@ describe('App restore gate honours config.resume', () => {
         saved: {
           b: 1,
           v: [0, 1],
-          q: null,
+          g: [],
           d: 120,
           f: structureFingerprint(manifest),
         },
@@ -135,12 +134,9 @@ describe('App restore gate honours config.resume', () => {
     const saved = {
       b: 1,
       v: [0, 1],
-      q: { '0': 80 },
-      qa: { '0': 3 },
       d: 120,
       c: { '1': 2 },
-      s: { '1': { q1: 100 } },
-      gs: [1],
+      g: { '0': { s: 80, a: 3 }, '1': { q: { q1: 100 }, g: 1 } },
       f: structureFingerprint(manifest),
     };
     const { component, saveState, unmount } = await mountApp('auto', { saved });
@@ -148,12 +144,9 @@ describe('App restore gate honours config.resume', () => {
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
       v: [0, 1],
-      q: { '0': 80 },
-      qa: { '0': 3 },
       d: 120,
       c: { '1': 2 },
-      s: { '1': { q1: 100 } },
-      gs: [1],
+      g: { '0': { s: 80, a: 3 }, '1': { q: { q1: 100 }, g: 1 } },
     });
   });
 

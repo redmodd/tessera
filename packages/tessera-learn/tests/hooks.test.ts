@@ -139,9 +139,9 @@ describe('useQuestion — standalone mode', () => {
     q.submit();
 
     // Score is recorded for the page (so authors can render it),
-    // but the page is NOT in gradedStandalonePages
-    expect(progress.standaloneQuestionScores.get(2)?.get('q1')).toBe(100);
-    expect(progress.gradedStandalonePages.has(2)).toBe(false);
+    // but the unit is NOT marked graded
+    expect(progress.gradedUnits.get(2)?.questions?.get('q1')).toBe(100);
+    expect(progress.gradedUnits.get(2)?.graded).toBe(false);
   });
 
   it('registers a graded score when graded is true', () => {
@@ -158,8 +158,8 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    expect(progress.standaloneQuestionScores.get(3)?.get('q1')).toBe(100);
-    expect(progress.gradedStandalonePages.has(3)).toBe(true);
+    expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(100);
+    expect(progress.gradedUnits.get(3)?.graded).toBe(true);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
   });
@@ -178,7 +178,7 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    expect(progress.standaloneQuestionScores.get(0)?.get('q1')).toBe(42);
+    expect(progress.gradedUnits.get(0)?.questions?.get('q1')).toBe(42);
   });
 
   it('submit is idempotent — calling twice does not double-report', () => {
@@ -522,10 +522,10 @@ describe('useQuestion — inside a <Quiz>', () => {
     q.submit();
 
     expect(adapter.reportInteraction).not.toHaveBeenCalled();
-    expect(progress.standaloneQuestionScores.size).toBe(0);
+    expect(progress.gradedUnits.size).toBe(0);
   });
 
-  it('does not mark standaloneQuestionScores even when graded is true (quiz drives scoring)', () => {
+  it('does not record a graded unit even when graded is true (quiz drives scoring)', () => {
     const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
@@ -539,8 +539,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     });
     q.submit();
 
-    expect(progress.standaloneQuestionScores.size).toBe(0);
-    expect(progress.gradedStandalonePages.has(3)).toBe(false);
+    expect(progress.gradedUnits.size).toBe(0);
   });
 
   it('handle.submitted mirrors quiz.submitted', () => {
@@ -727,7 +726,7 @@ describe('useProgress', () => {
 
     const h = useProgress();
     expect(h.visitedPages.size).toBe(2);
-    expect(h.quizScores.get(2)).toBe(80);
+    expect(h.quizScore(2)).toBe(80);
     expect(h.completionStatus).toBe('incomplete');
     expect(h.successStatus).toBe('unknown');
   });

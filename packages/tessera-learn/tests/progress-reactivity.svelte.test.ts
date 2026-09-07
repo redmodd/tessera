@@ -32,7 +32,7 @@ describe('standalone question rescoring re-derives course status', () => {
 
     progress.markStandaloneQuestion(0, 'q1', 100, true);
     flushSync();
-    expect(progress.gradedScore().average).toBe(100);
+    expect(progress.gradedScore.average).toBe(100);
     expect(progress.successStatus).toBe('passed');
     expect(progress.completionStatus).toBe('complete');
 
@@ -49,7 +49,7 @@ describe('standalone question rescoring re-derives course status', () => {
 
     progress.markStandaloneQuestion(0, 'q2', 0, true);
     flushSync();
-    expect(progress.gradedScore().average).toBe(50);
+    expect(progress.gradedScore.average).toBe(50);
     expect(progress.successStatus).toBe('failed');
     expect(progress.completionStatus).toBe('incomplete');
 
@@ -63,7 +63,7 @@ describe('standalone question rescoring re-derives course status', () => {
     for (const score of [0, 100, 40, 90]) {
       progress.markStandaloneQuestion(0, 'q1', score, true);
       flushSync();
-      const passing = progress.gradedScore().average >= 70;
+      const passing = progress.gradedScore.average >= 70;
       expect(progress.successStatus).toBe(passing ? 'passed' : 'failed');
       expect(progress.completionStatus).toBe(
         passing ? 'complete' : 'incomplete',
