@@ -203,11 +203,6 @@
     retryKey++;
   }
 
-  function handleQuizComplete(e) {
-    const { score } = e.detail;
-    progress.quizCompleted(nav.currentPageIndex, score);
-  }
-
   // ---- Persistence: serialize / restore ----
   function serializeState() {
     const q = {};
@@ -503,8 +498,6 @@
 
     window.addEventListener('pagehide', handleExit);
     window.addEventListener('beforeunload', handleExit);
-    const appEl = document.getElementById('tessera-app');
-    appEl?.addEventListener('tessera-quiz-complete', handleQuizComplete);
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn
@@ -532,8 +525,6 @@
     if (auditMode) delete window.__tesseraAudit;
     window.removeEventListener('pagehide', handleExit);
     window.removeEventListener('beforeunload', handleExit);
-    const appEl = document.getElementById('tessera-app');
-    appEl?.removeEventListener('tessera-quiz-complete', handleQuizComplete);
     if (manualWatchdog !== null) {
       clearTimeout(manualWatchdog);
       manualWatchdog = null;

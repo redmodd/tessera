@@ -10,8 +10,8 @@ import type {
 
 /**
  * Dependencies injected into {@link QuizEngine} so the engine itself stays
- * framework- and DOM-free. The Svelte wrapper (`useQuiz`) provides the two
- * callbacks that bridge to the host element and the LMS adapter.
+ * framework- and DOM-free. The Svelte wrapper (`useQuiz`) provides the
+ * callbacks that bridge to progress tracking and the LMS adapter.
  */
 export interface QuizEngineDeps {
   quizConfig: QuizConfig;
@@ -27,13 +27,10 @@ export interface QuizEngineDeps {
     interaction: Interaction,
     correct: boolean | null,
   ) => void;
-  /**
-   * Whether the host element exists. It carries the LMS bridge listener, so
-   * `false` means nothing this engine reports can ever be scored.
-   */
-  hasHost: () => boolean;
-  /** Wraps the host-element `tessera-quiz-complete` dispatch; a no-op with no host. */
-  dispatch: (name: string, detail?: unknown) => void;
+  /** Records the submitted score against the current page's progress. */
+  onComplete: (score: number) => void;
+  /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
+  notify?: (name: string, detail?: unknown) => void;
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
    * engine starts in the results phase; answers aren't persisted, so it cannot
@@ -55,8 +52,8 @@ interface InternalQuestion {
 /**
  * The quiz engine: all reactive state, scoring, retry/feedback policy and the
  * register/submit/retry lifecycle. Directly instantiable (and unit-testable)
- * because the only two side-effecting touchpoints — DOM events and LMS
- * reporting — are injected.
+ * because the side-effecting touchpoints — progress, LMS reporting and the
+ * author-facing DOM notification — are injected.
  */
 export class QuizEngine implements UseQuizInternalHandle {
   #deps: QuizEngineDeps;
@@ -250,15 +247,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       return;
     }
 
-    if (!this.#deps.hasHost()) {
-      console.warn(
-        '[tessera] useQuiz: submit() ran but the host element was null — no LMS bridge ' +
-          'listener exists, so this score will not be persisted. Make sure your custom ' +
-          'quiz shell binds the element it passes to useQuiz({ element: () => ... }).',
-      );
-      return;
-    }
-
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
@@ -268,7 +256,8 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#restored = false;
     this.#attemptCount++;
 
-    this.#deps.dispatch('tessera-quiz-complete', { score: rounded });
+    this.#deps.onComplete(rounded);
+    this.#deps.notify?.('tessera-quiz-complete', { score: rounded });
   }
 
   startReview(): void {
@@ -318,7 +307,6 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   #commit(index: number): void {
-    if (!this.#deps.hasHost()) return;
     const q = this.#internalQuestions[index];
     if (!q || typeof q.interaction !== 'function') return;
     const interaction = q.interaction();

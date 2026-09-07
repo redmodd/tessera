@@ -1583,8 +1583,8 @@ function validateContractBypass(
 ): void {
   if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
     d.error(
-      `${fileRel}: dispatches "tessera-quiz-complete" directly — submit through ` +
-        `useQuiz().submit() so the result reaches the LMS`,
+      `${fileRel}: dispatches "tessera-quiz-complete" directly. The event is a ` +
+        `notification, not the scoring path; call useQuiz().submit() instead`,
     );
   }
   if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {

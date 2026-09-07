@@ -4,9 +4,7 @@
   import { TESSERA_PAGE } from '../runtime/contexts.js';
 
   let { children } = $props();
-  let quizElement = $state(null);
-
-  const handle = useQuiz({ element: () => quizElement });
+  const handle = useQuiz();
 
   const pageCtx = getContext(TESSERA_PAGE);
   let quizConfig = $derived(pageCtx?.quiz ?? {});
@@ -104,12 +102,7 @@
   </div>
 {/snippet}
 
-<div
-  class="tessera-quiz"
-  bind:this={quizElement}
-  role="region"
-  aria-label="Quiz"
->
+<div class="tessera-quiz" role="region" aria-label="Quiz">
   <div class="tessera-quiz-intro" hidden={handle.state !== 'answering'}>
     {@render children?.()}
   </div>

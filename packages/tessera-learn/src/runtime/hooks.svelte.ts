@@ -442,11 +442,12 @@ export function __warnEmptyQuiz(questionsCount: number): void {
   );
 }
 
-export function useQuiz(opts: {
-  element: () => HTMLElement | null;
-}): UseQuizHandle {
+export function useQuiz(
+  opts: { element?: () => HTMLElement | null } = {},
+): UseQuizHandle {
   const pageCtx = getPageContext();
   const adapterCtx = getAdapterContext();
+  const { nav, progress } = requireNavContext('useQuiz()');
   if (!pageCtx?.quiz) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).',
@@ -468,10 +469,10 @@ export function useQuiz(opts: {
     passingScore: () => pageCtx.passingScore,
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
-    hasHost: () => opts.element() != null,
-    dispatch: (name, detail) => {
+    onComplete: (score) => progress.quizCompleted(nav.currentPageIndex, score),
+    notify: (name, detail) => {
       opts
-        .element()
+        .element?.()
         ?.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
     },
     restore: pageCtx.quizState ?? undefined,
