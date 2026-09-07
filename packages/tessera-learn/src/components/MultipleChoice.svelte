@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
@@ -12,7 +13,7 @@
     correctFeedback = '',
     incorrectFeedback = '',
     optionFeedback = [],
-    maxRetries = Infinity,
+    maxRetries,
     weight = 1,
   } = $props();
 
@@ -25,12 +26,8 @@
     get id() {
       return questionId(id, 'mc', question);
     },
-    get weight() {
-      return weight;
-    },
-    get maxRetries() {
-      return maxRetries;
-    },
+    weight: untrack(() => weight),
+    maxRetries: untrack(() => maxRetries),
     response: () => ({
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],

@@ -5,9 +5,6 @@ import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
-// The harness exposes the engine through the index-keyed internal seam; custom
-// shells/widgets use the slim public UseQuizHandle.
-import type { UseQuizInternalHandle as UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
 // directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
@@ -735,8 +732,8 @@ describe('QuizEngine', () => {
 // ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
 
 interface HarnessRef {
-  handle: UseQuizHandle | null;
-  secondHandle?: UseQuizHandle | null;
+  handle: QuizEngine | null;
+  secondHandle?: QuizEngine | null;
   element: HTMLElement | null;
   events: Array<{ score: number }>;
   thrown: unknown;

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { questionId, shuffle } from './util.js';
@@ -15,7 +15,7 @@
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
-    maxRetries = Infinity,
+    maxRetries,
     weight = 1,
   } = $props();
 
@@ -44,12 +44,8 @@
     get id() {
       return questionId(id, 'sorting', question);
     },
-    get weight() {
-      return weight;
-    },
-    get maxRetries() {
-      return maxRetries;
-    },
+    weight: untrack(() => weight),
+    maxRetries: untrack(() => maxRetries),
     complete: () => placements.size === items.length,
     response: () => ({
       type: 'matching',

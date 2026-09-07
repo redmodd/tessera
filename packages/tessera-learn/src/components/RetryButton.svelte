@@ -2,7 +2,8 @@
   let { onclick, label = 'Try again' } = $props();
 </script>
 
-<button class="tessera-standalone-retry" {onclick}>{label}</button>
+<button type="button" class="tessera-standalone-retry" {onclick}>{label}</button
+>
 
 <style>
   .tessera-standalone-retry {
