@@ -99,12 +99,8 @@ export interface UseQuestionHandle extends Question {
 
 const TESSERA_QUIZ = 'tessera-quiz' as const;
 
-export interface QuestionInternal extends Question {
-  setRender(render: unknown): void;
-}
-
 interface QuizContextValue {
-  registerQuestion(api: UseQuizQuestionApi): QuestionInternal;
+  registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
 }
 
 /**
@@ -119,7 +115,18 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   const adapterCtx = getAdapterContext();
 
   if (quizCtx) {
-    const q = quizCtx.registerQuestion({
+    if (import.meta.env?.DEV) {
+      const ignored = (['graded', 'score', 'maxRetries'] as const).filter(
+        (k) => opts[k] !== undefined,
+      );
+      if (ignored.length > 0) {
+        console.warn(
+          `[tessera] useQuestion("${opts.id}"): ${ignored.join(', ')} ignored ` +
+            'inside a quiz — the quiz owns grading, scoring and retries.',
+        );
+      }
+    }
+    return quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
       checkAnswer: () => isCorrectInteraction(opts.response()) === true,
@@ -127,16 +134,6 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       complete: opts.complete,
       interaction: () => opts.response(),
     });
-    const handle = q as UseQuestionHandle;
-    handle.submit = () => {};
-    handle.reset = () => opts.reset?.();
-    handle.retry = () => {};
-    Object.defineProperties(handle, {
-      canRetry: { value: false },
-      retryCount: { value: 0 },
-      mode: { value: 'quiz' },
-    });
-    return handle;
   }
 
   const maxRetries = opts.maxRetries ?? Infinity;
@@ -403,23 +400,6 @@ export interface UseQuizHandle {
   revealFeedback(q: Question): void;
 }
 
-/**
- * Internal test/component seam. The implementation also exposes index-keyed
- * methods on the returned object so unit tests can drive the engine directly
- * and the built-in `<Quiz>` can iterate by index. NOT part of the public API
- * — authors should use `quiz.questions[].setAnswer(...)` etc.
- */
-export interface UseQuizInternalHandle extends UseQuizHandle {
-  registerQuestion(api: UseQuizQuestionApi): Question;
-  setAnswer(index: number, answer: unknown): void;
-  getAnswer(index: number): unknown;
-  setRender(index: number, render: unknown): void;
-  getRender(index: number): unknown;
-  feedbackVisible(index: number): boolean;
-  revealFeedbackByIndex(index: number): void;
-  isLockedCorrect(index: number): boolean;
-}
-
 export function __warnUnsubmittedQuiz(stats: {
   questionsCount: number;
   answersCount: number;
@@ -438,7 +418,8 @@ export function __warnEmptyQuiz(questionsCount: number): void {
   if (questionsCount > 0) return;
   console.warn(
     '[tessera] useQuiz: quiz mounted with no registered questions. Question widgets ' +
-      'must call useQuestion() to be scored and reported to the LMS.',
+      'must call useQuestion() to be scored and reported to the LMS, and a custom ' +
+      'shell must render its `children` for them to mount at all.',
   );
 }
 

@@ -1,10 +1,10 @@
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
-  UseQuizInternalHandle,
+  UseQuizHandle,
   UseQuizQuestionApi,
-  QuestionInternal,
+  UseQuestionHandle,
   Question,
 } from './hooks.svelte.js';
 
@@ -55,15 +55,14 @@ interface InternalQuestion {
  * because the side-effecting touchpoints — progress, LMS reporting and the
  * author-facing DOM notification — are injected.
  */
-export class QuizEngine implements UseQuizInternalHandle {
+export class QuizEngine implements UseQuizHandle {
   #deps: QuizEngineDeps;
   #maxAttempts: number;
 
   #internalQuestions = $state<InternalQuestion[]>([]);
-  #questionHandles = $state<QuestionInternal[]>([]);
-  #answers = new Map<number, unknown>();
+  #questionHandles = $state.raw<UseQuestionHandle[]>([]);
+  #answers = new SvelteMap<number, unknown>();
   #reportedAnswers = new Map<number, string>();
-  #answersVersion = $state(0);
   #submitted = $state(false);
   #reviewing = $state(false);
   #score = $state(0);
@@ -73,6 +72,8 @@ export class QuizEngine implements UseQuizInternalHandle {
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
+  // Each handle carries its index under this symbol, so a proxied copy resolves too.
+  #indexKey = Symbol('tessera.questionIndex');
   #seenIds = new Set<string>();
   #rewrittenIds = new Set<string>();
 
@@ -96,7 +97,6 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   #answerComplete(i: number): boolean {
-    void this.#answersVersion;
     return (
       this.#answers.has(i) && (this.#internalQuestions[i].complete?.() ?? true)
     );
@@ -162,7 +162,7 @@ export class QuizEngine implements UseQuizInternalHandle {
     };
   }
 
-  registerQuestion(api: UseQuizQuestionApi): QuestionInternal {
+  registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle {
     let id = api.id;
     if (this.#seenIds.has(id)) {
       let n = 2;
@@ -192,17 +192,15 @@ export class QuizEngine implements UseQuizInternalHandle {
     };
     this.#internalQuestions.push(internal);
     const handle = this.#makeQuestionHandle(this.#internalQuestions.length - 1);
-    this.#questionHandles.push(handle);
+    this.#questionHandles = [...this.#questionHandles, handle];
     return handle;
   }
 
   setAnswer(index: number, answer: unknown): void {
     this.#answers.set(index, answer);
-    this.#answersVersion++;
   }
 
   getAnswer(index: number): unknown {
-    void this.#answersVersion;
     return this.#answers.get(index);
   }
 
@@ -232,8 +230,8 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   revealFeedback(q: Question): void {
-    const index = this.#internalQuestions.findIndex((iq) => iq.id === q.id);
-    if (index >= 0) this.revealFeedbackByIndex(index);
+    const index = (q as unknown as Record<symbol, unknown>)[this.#indexKey];
+    if (typeof index === 'number') this.revealFeedbackByIndex(index);
   }
 
   submit(): void {
@@ -298,7 +296,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       if (!newLocked.has(i) && this.#internalQuestions[i].reset)
         this.#internalQuestions[i].reset!();
     }
-    this.#answersVersion++;
     this.#feedbackShown.clear();
     this.#submitted = false;
     this.#restored = false;
@@ -337,9 +334,10 @@ export class QuizEngine implements UseQuizInternalHandle {
     };
   }
 
-  #makeQuestionHandle(i: number): QuestionInternal {
+  #makeQuestionHandle(i: number): UseQuestionHandle {
     const engine = this;
     return {
+      [engine.#indexKey]: i,
       get id() {
         return engine.#internalQuestions[i].id;
       },
@@ -382,6 +380,14 @@ export class QuizEngine implements UseQuizInternalHandle {
       setRender(r: unknown) {
         engine.setRender(i, r);
       },
+      submit() {},
+      retry() {},
+      reset() {
+        engine.#internalQuestions[i].reset?.();
+      },
+      canRetry: false,
+      retryCount: 0,
+      mode: 'quiz',
     };
   }
 }

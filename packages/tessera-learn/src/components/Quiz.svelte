@@ -132,6 +132,7 @@
 
     <div class="tessera-quiz-nav">
       <button
+        type="button"
         class="tessera-quiz-btn tessera-quiz-btn-secondary"
         disabled={currentQuestionIndex === 0}
         onclick={goPrevQuestion}
@@ -140,6 +141,7 @@
       </button>
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
+          type="button"
           class="tessera-quiz-btn tessera-btn-primary"
           disabled={!isAnswered(currentQuestion)}
           onclick={goNextQuestion}
@@ -154,6 +156,7 @@
         </button>
       {:else if needsReveal(currentQuestion)}
         <button
+          type="button"
           class="tessera-quiz-btn tessera-btn-primary"
           onclick={revealCurrent}
         >
@@ -161,6 +164,7 @@
         </button>
       {:else}
         <button
+          type="button"
           class="tessera-quiz-btn tessera-btn-primary tessera-quiz-btn-submit"
           disabled={!handle.canSubmit}
           onclick={handleSubmit}
@@ -188,6 +192,7 @@
 
     <div class="tessera-quiz-nav">
       <button
+        type="button"
         class="tessera-quiz-btn tessera-quiz-btn-secondary"
         disabled={reviewIndex === 0}
         onclick={goPrevReview}
@@ -196,6 +201,7 @@
       </button>
       {#if reviewIndex < totalQuestions - 1}
         <button
+          type="button"
           class="tessera-quiz-btn tessera-btn-primary"
           onclick={goNextReview}
         >
@@ -203,6 +209,7 @@
         </button>
       {:else}
         <button
+          type="button"
           class="tessera-quiz-btn tessera-btn-primary"
           onclick={() => handle.exitReview()}
         >
@@ -259,6 +266,7 @@
       <div class="tessera-quiz-results-actions">
         {#if !feedbackDisabled && !handle.restored}
           <button
+            type="button"
             class="tessera-quiz-btn tessera-quiz-btn-secondary"
             onclick={handleStartReview}
           >
@@ -267,6 +275,7 @@
         {/if}
         {#if handle.canRetry}
           <button
+            type="button"
             class="tessera-quiz-btn tessera-btn-primary"
             onclick={handleRetry}
           >

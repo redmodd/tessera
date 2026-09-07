@@ -380,6 +380,14 @@ function makeQuizCtx(overrides: Record<string, unknown> = {}) {
       render: undefined,
       setAnswer() {},
       setRender() {},
+      submit() {},
+      retry() {},
+      reset() {
+        api.reset?.();
+      },
+      canRetry: false,
+      retryCount: 0,
+      mode: 'quiz',
       _setSubmitted(v: boolean) {
         submitted = v;
         correct = v ? api.checkAnswer() : null;
@@ -570,6 +578,28 @@ describe('useQuestion — inside a <Quiz>', () => {
     q.reset();
 
     expect(userReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns in dev about standalone-only options passed inside a quiz', () => {
+    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const quiz = makeQuizCtx();
+    ctxStore.set('tessera-quiz', quiz);
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      useQuestion({
+        id: 'q1',
+        graded: true,
+        maxRetries: 3,
+        response: () => ({ type: 'true-false', response: true }),
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('retry() is a no-op inside a quiz; canRetry is always false', () => {

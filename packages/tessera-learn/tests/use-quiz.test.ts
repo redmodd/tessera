@@ -5,9 +5,6 @@ import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
-// The harness exposes the engine through the index-keyed internal seam; custom
-// shells/widgets use the slim public UseQuizHandle.
-import type { UseQuizInternalHandle as UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
 // directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
@@ -496,6 +493,23 @@ describe('QuizEngine', () => {
     expect(engine.feedbackVisible(0)).toBe(true);
   });
 
+  it('revealFeedback resolves a proxied copy of a handle', () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const proxied = new Proxy(a, {});
+    engine.revealFeedback(proxied);
+    expect(engine.feedbackVisible(0)).toBe(true);
+  });
+
+  it('revealFeedback ignores a handle from another engine with the same id', () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    const other = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    const foreign = other.engine.registerQuestion(tfQuestion('a', true, true));
+    engine.revealFeedback(foreign);
+    expect(engine.feedbackVisible(0)).toBe(false);
+  });
+
   it('correct is a boolean once feedback is visible, before submit', () => {
     const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
     const a = engine.registerQuestion(tfQuestion('a', true, true));
@@ -735,8 +749,8 @@ describe('QuizEngine', () => {
 // ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
 
 interface HarnessRef {
-  handle: UseQuizHandle | null;
-  secondHandle?: UseQuizHandle | null;
+  handle: QuizEngine | null;
+  secondHandle?: QuizEngine | null;
   element: HTMLElement | null;
   events: Array<{ score: number }>;
   thrown: unknown;
@@ -853,7 +867,6 @@ describe('useQuiz (Svelte wrapper)', () => {
     q.setAnswer(0, true);
     q.submit();
     expect(scored).toEqual([[3, 100]]);
-    // No element means no cosmetic event, but the score still landed.
     expect(m.ref.events).toHaveLength(0);
   });
 
