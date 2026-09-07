@@ -137,6 +137,30 @@ export class ProgressState {
     return sum / pageMap.size;
   }
 
+  #graded = $derived.by<{ count: number; average: number; attempted: boolean }>(
+    () => {
+      const pages = new Set(this.#quizGradedIndices);
+      for (const i of this.gradedStandalonePages) pages.add(i);
+      let sum = 0;
+      let attempted = false;
+      for (const i of pages) {
+        const quizScore = this.quizScores.get(i);
+        if (
+          quizScore !== undefined ||
+          this.standaloneQuestionScores.get(i)?.size
+        ) {
+          attempted = true;
+        }
+        sum += quizScore ?? this.getPageStandaloneAverage(i);
+      }
+      return {
+        count: pages.size,
+        average: pages.size > 0 ? sum / pages.size : 0,
+        attempted,
+      };
+    },
+  );
+
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
     if (this.#manuallyCompleted) return 'complete';
     const mode = this.#config.completion.mode;
@@ -151,9 +175,9 @@ export class ProgressState {
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
-    const { indices } = this.#gradedPages();
-    if (indices.length === 0) return 'incomplete';
-    return this.#gradedAverage(indices) >= this.#config.scoring.passingScore
+    const { count, average } = this.#graded;
+    if (count === 0) return 'incomplete';
+    return average >= this.#config.scoring.passingScore
       ? 'complete'
       : 'incomplete';
   });
@@ -172,11 +196,9 @@ export class ProgressState {
       const want = this.#config.completion.requireSuccessStatus;
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
-    const { indices, attempted } = this.#gradedPages();
-    if (indices.length === 0 || !attempted) return 'unknown';
-    return this.#gradedAverage(indices) >= this.#config.scoring.passingScore
-      ? 'passed'
-      : 'failed';
+    const { count, average, attempted } = this.#graded;
+    if (count === 0 || !attempted) return 'unknown';
+    return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
   /**
@@ -184,30 +206,7 @@ export class ProgressState {
    * successStatus, so score and success status can't disagree.
    */
   gradedScore(): { average: number; attempted: boolean } {
-    const { indices, attempted } = this.#gradedPages();
-    return { average: this.#gradedAverage(indices), attempted };
-  }
-
-  #gradedPages(): { indices: number[]; attempted: boolean } {
-    const merged = new Set(this.#quizGradedIndices);
-    for (const i of this.gradedStandalonePages) merged.add(i);
-    const indices = [...merged];
-    const attempted = indices.some((i) => this.#hasScore(i));
-    return { indices, attempted };
-  }
-
-  #hasScore(pageIndex: number): boolean {
-    if (this.quizScores.has(pageIndex)) return true;
-    const pageMap = this.standaloneQuestionScores.get(pageIndex);
-    return !!pageMap && pageMap.size > 0;
-  }
-
-  #gradedAverage(indices: number[]): number {
-    if (indices.length === 0) return 0;
-    let sum = 0;
-    for (const i of indices) {
-      sum += this.quizScores.get(i) ?? this.getPageStandaloneAverage(i);
-    }
-    return sum / indices.length;
+    const { average, attempted } = this.#graded;
+    return { average, attempted };
   }
 }
