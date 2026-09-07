@@ -574,18 +574,34 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(67); // 2/3 → Math.round(66.67)
   });
 
-  it('fires question-answered, before-submit, complete and retry events in order', () => {
+  it('tessera-quiz-complete is the only event the engine dispatches', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.setAnswer(0, true);
     engine.submit();
     engine.retry();
-    expect(events.map((e) => e.name)).toEqual([
-      'tessera-quiz-question-answered',
-      'tessera-quiz-before-submit',
-      'tessera-quiz-complete',
-      'tessera-quiz-retry',
-    ]);
+    expect(events.map((e) => e.name)).toEqual(['tessera-quiz-complete']);
+  });
+
+  it("feedbackMode 'review' (default) hides feedback until review", () => {
+    const { engine } = makeEngine({ graded: true });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.revealFeedbackByIndex(0);
+    expect(engine.feedbackVisible(0)).toBe(false);
+    engine.submit();
+    engine.startReview();
+    expect(engine.feedbackVisible(0)).toBe(true);
+  });
+
+  it("feedbackMode 'never' keeps feedback hidden even while reviewing", () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'never' });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.revealFeedbackByIndex(0);
+    engine.submit();
+    engine.startReview();
+    expect(engine.feedbackVisible(0)).toBe(false);
   });
 
   it('reports nothing on an immediate-mode commit with a null host element', () => {
