@@ -3,9 +3,8 @@ import type { CourseConfig } from './types.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
 /**
- * Score state for one gradable page. A <Quiz> page fills `quizScore` and
- * `attempts`; standalone `useQuestion` answers fill `questions`. Both can be
- * present on the same page, and `quizScore` wins when they are.
+ * Score state for one gradable page. A page can carry both a <Quiz> and
+ * standalone `useQuestion` answers; `quizScore` wins when it does.
  */
 export interface GradedUnit {
   /** Best score across attempts, or undefined until the quiz is submitted. */
@@ -76,12 +75,10 @@ export class ProgressState {
     this.version++;
   }
 
-  /** Best quiz score on a page, or undefined if the quiz was never submitted. */
   quizScore(pageIndex: number): number | undefined {
     return this.gradedUnits.get(pageIndex)?.quizScore;
   }
 
-  /** Submitted quiz attempts on a page. */
   quizAttempts(pageIndex: number): number {
     return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
   }

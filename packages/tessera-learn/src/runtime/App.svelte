@@ -246,7 +246,6 @@
         progress.markChunk(Number(key), chunkIndex);
       }
     }
-    // Restore quiz scores, attempt counts and standalone question scores
     if (saved.g) {
       for (const [key, unit] of Object.entries(saved.g)) {
         const pageIndex = Number(key);

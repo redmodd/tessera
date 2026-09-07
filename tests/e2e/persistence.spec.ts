@@ -118,7 +118,6 @@ test.describe('Persistence — localStorage', () => {
     });
 
     expect(storageData).not.toBeNull();
-    // Should have compact keys: b, v, d
     expect(storageData).toHaveProperty('b'); // bookmark
     expect(storageData).toHaveProperty('v'); // visited
     expect(storageData).toHaveProperty('d'); // duration

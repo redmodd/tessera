@@ -87,7 +87,7 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: '80' } } } },
       ],
       ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
-      ['it carries pre-0.6 quiz scores under q', { q: { '0': 80 } }],
+      ['it carries quiz scores under a top-level q', { q: { '0': 80 } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);

@@ -37,8 +37,8 @@ const isGradedUnit = (value: unknown): boolean =>
 // through and the mutations already applied get written back over the record.
 // A null optional is fine, restoreState skips it.
 const isMalformed = (saved: SavedState): boolean =>
-  // Pre-0.6 saves split scores across q/qa/s/gs. Nothing migrates them, so
-  // reject the blob rather than resume a course with its scores dropped.
+  // A top-level `q` marks a save whose scores live under q/qa/s/gs. Nothing
+  // reads those keys, so reject the blob rather than resume with no scores.
   'q' in saved ||
   !isNumber(saved.b) ||
   !isNumber(saved.d) ||
