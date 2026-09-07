@@ -738,12 +738,12 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 ### `useQuiz`
 
-Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS, then dispatches `tessera-quiz-complete`. **`submit()` is the only sanctioned dispatcher of `tessera-quiz-complete`** — bypass it and the quiz never marks Completed/Passed/Failed.
+Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS and records the page score. **Only `submit()` marks the quiz Completed/Passed/Failed**; no DOM event can do it. It also dispatches a cosmetic `tessera-quiz-complete` on the optional `element`, for authors who want to observe results, but dispatching that event by hand scores nothing.
 
-**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to fire `tessera-quiz-complete`. Both `commit()` and `submit()` report nothing while the element passed to `useQuiz({ element })` is null, because the score behind those answers could never reach the LMS.
+**Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to score the quiz.
 
 ```ts
-function useQuiz(opts: { element: () => HTMLElement | null }): {
+function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly state: 'answering' | 'submitted' | 'reviewing';
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
@@ -1057,12 +1057,11 @@ Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no 
   import { useQuiz } from 'tessera-learn';
 
   let { children } = $props();
-  let host;
 
-  const quiz = useQuiz({ element: () => host });
+  const quiz = useQuiz();
 </script>
 
-<div bind:this={host} class="my-quiz">
+<div class="my-quiz">
   <p>
     Question {quiz.questions.findIndex((q) => !q.submitted) + 1} of {quiz
       .questions.length}

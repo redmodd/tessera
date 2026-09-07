@@ -10,7 +10,7 @@ import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
 import type { UseQuizInternalHandle as UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
-// directly with `dispatch` / `report` test doubles — no mount, no jsdom, no
+// directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
 // harness. Only the handful of tests whose subject *is* the Svelte wrapper
 // (context wiring, the config throw, lifecycle warnings) still mount.
 
@@ -18,6 +18,8 @@ interface EngineProbe {
   engine: QuizEngine;
   /** Every dispatched host event, in order. */
   events: Array<{ name: string; detail: unknown }>;
+  /** Every score handed to progress, in order. */
+  completed: number[];
   /** Every interaction reported to the (injected) adapter, in order. */
   reports: Array<{
     id: string;
@@ -30,25 +32,25 @@ function makeEngine(
   quizConfig: Partial<QuizConfig> = { graded: true },
   opts: {
     passingScore?: number;
-    hostNull?: boolean;
+    noElement?: boolean;
     restore?: { attempts: number; score: number };
   } = {},
 ): EngineProbe {
   const events: EngineProbe['events'] = [];
   const reports: EngineProbe['reports'] = [];
+  const completed: number[] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct) =>
       reports.push({ id, interaction, correct }),
-    hasHost: () => !opts.hostNull,
-    dispatch: (name, detail) => {
-      if (opts.hostNull) return;
-      events.push({ name, detail });
-    },
+    onComplete: (score) => completed.push(score),
+    notify: opts.noElement
+      ? undefined
+      : (name, detail) => events.push({ name, detail }),
     restore: opts.restore,
   });
-  return { engine, events, reports };
+  return { engine, events, reports, completed };
 }
 
 function completeScore(events: EngineProbe['events']): number | undefined {
@@ -144,8 +146,7 @@ describe('QuizEngine', () => {
       quizConfig: { graded: true } as QuizConfig,
       passingScore: () => passingScore,
       report: () => {},
-      hasHost: () => true,
-      dispatch: () => {},
+      onComplete: () => {},
     });
 
     expect(engine.passingScore).toBe(70);
@@ -604,18 +605,15 @@ describe('QuizEngine', () => {
     expect(engine.feedbackVisible(0)).toBe(false);
   });
 
-  it('reports nothing on an immediate-mode commit with a null host element', () => {
-    // The built-in shell commits a question when immediate feedback reveals it,
-    // which is ahead of any submit. With no host that submit can never land, so
-    // the interaction would sit in the LMS with no score behind it.
+  it('commits on reveal with no element bound', () => {
     const { engine, reports } = makeEngine(
       { graded: true, feedbackMode: 'immediate' },
-      { hostNull: true },
+      { noElement: true },
     );
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.setAnswer(0, true);
     engine.questions[0].commit();
-    expect(reports).toHaveLength(0);
+    expect(reports.map((r) => r.id)).toEqual(['a']);
   });
 
   it('commits on reveal when a host element is present', () => {
@@ -709,32 +707,28 @@ describe('QuizEngine', () => {
     }
   });
 
-  it('warns when submit() runs with a null host element (silent LMS dropout)', () => {
-    // A null host means dispatch() returns false: no LMS bridge listener exists,
-    // so the score would never be persisted. The engine warns instead of failing
-    // silently. (In the wrapper, a null host element produces this same false.)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { engine, events, reports } = makeEngine(
-        { graded: true },
-        { hostNull: true },
-      );
-      engine.registerQuestion(tfQuestion('a', true, true));
-      engine.setAnswer(0, true);
-      engine.submit();
-      expect(completes(events)).toHaveLength(0);
-      // Nothing reaches the LMS: interactions without a score, a success status
-      // or an attempt is a worse record than no record at all.
-      expect(reports).toHaveLength(0);
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) => typeof a === 'string' && /host element was null/i.test(a),
-        ),
-      );
-      expect(matched).toBe(true);
-    } finally {
-      warn.mockRestore();
-    }
+  it('scores and reports with no element bound', () => {
+    const { engine, reports, completed } = makeEngine(
+      { graded: true },
+      { noElement: true },
+    );
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(completed).toEqual([100]);
+    expect(reports.map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('calls onComplete once per attempt', () => {
+    const { engine, completed } = makeEngine({ graded: true, maxAttempts: 2 });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    engine.setAnswer(0, true);
+    engine.submit();
+    engine.submit();
+    engine.retry();
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(completed).toEqual([100, 100]);
   });
 });
 
@@ -755,6 +749,7 @@ function mountHarness(
     nullElement?: boolean;
     adapter?: unknown;
     quizState?: { attempts: number; score: number };
+    navCtx?: unknown;
   } = {},
 ) {
   const ref: HarnessRef = {
@@ -777,6 +772,7 @@ function mountHarness(
       nullElement: opts.nullElement ?? false,
       adapter: opts.adapter ?? null,
       quizState: opts.quizState ?? null,
+      navCtx: opts.navCtx ?? null,
     },
   });
   return { component, target, ref };
@@ -839,6 +835,36 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect(q.state).toBe('submitted');
     expect(q.score).toBe(60);
     expect(q.canRetry).toBe(false);
+  });
+
+  it('records the submitted score against the current page, with no element bound', () => {
+    const scored: Array<[number, number]> = [];
+    const navCtx = {
+      nav: { currentPageIndex: 3 },
+      progress: {
+        quizCompleted: (pageIndex: number, score: number) =>
+          scored.push([pageIndex, score]),
+      },
+    };
+    const m = mountHarness({ graded: true }, { nullElement: true, navCtx });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.submit();
+    expect(scored).toEqual([[3, 100]]);
+    // No element means no cosmetic event, but the score still landed.
+    expect(m.ref.events).toHaveLength(0);
+  });
+
+  it('dispatches tessera-quiz-complete on the element when one is supplied', () => {
+    const m = mountHarness({ graded: true });
+    mountings.push(m);
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    q.submit();
+    expect(m.ref.events).toEqual([{ score: 100 }]);
   });
 
   it('warns in dev when a second useQuiz registers on the same page', () => {

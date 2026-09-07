@@ -16,6 +16,7 @@
     nullElement = false,
     adapter = null,
     quizState = null,
+    navCtx = null,
   } = $props();
 
   const refSnap = untrack(() => ref);
@@ -23,6 +24,12 @@
   const doubleRegister = untrack(() => secondQuiz);
   const forceNullElement = untrack(() => nullElement);
   const adapterSnap = untrack(() => adapter);
+  const navSnap = untrack(() => navCtx) ?? {
+    nav: { currentPageIndex: 0 },
+    progress: { quizCompleted() {} },
+  };
+
+  setContext('tessera-nav', navSnap);
 
   setContext('tessera-page', {
     quiz: untrack(() => quizConfig),
@@ -45,7 +52,7 @@
 
   try {
     const handle = useQuiz({
-      element: () => (forceNullElement ? null : hostSnap),
+      element: forceNullElement ? undefined : () => hostSnap,
     });
     refSnap.handle = handle;
     refSnap.element = hostSnap;
