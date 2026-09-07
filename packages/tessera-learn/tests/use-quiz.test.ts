@@ -493,12 +493,21 @@ describe('QuizEngine', () => {
     expect(engine.feedbackVisible(0)).toBe(true);
   });
 
-  it('revealFeedback matches by id when the handle is not the stored object', () => {
+  it('revealFeedback resolves a proxied copy of a handle', () => {
     const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
     const a = engine.registerQuestion(tfQuestion('a', true, true));
     const proxied = new Proxy(a, {});
     engine.revealFeedback(proxied);
     expect(engine.feedbackVisible(0)).toBe(true);
+  });
+
+  it('revealFeedback ignores a handle from another engine with the same id', () => {
+    const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    const other = makeEngine({ graded: true, feedbackMode: 'immediate' });
+    engine.registerQuestion(tfQuestion('a', true, true));
+    const foreign = other.engine.registerQuestion(tfQuestion('a', true, true));
+    engine.revealFeedback(foreign);
+    expect(engine.feedbackVisible(0)).toBe(false);
   });
 
   it('correct is a boolean once feedback is visible, before submit', () => {

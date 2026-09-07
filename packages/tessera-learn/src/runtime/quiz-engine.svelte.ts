@@ -72,7 +72,10 @@ export class QuizEngine implements UseQuizHandle {
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
-  #indexOf = new WeakMap<Question, number>();
+  // Tags each handle with its index. Symbol-keyed rather than a WeakMap so a
+  // proxied copy (a custom shell storing handles in deep $state) still resolves,
+  // and unique per engine so a handle from another quiz on the page doesn't.
+  #indexKey = Symbol('tessera.questionIndex');
   #seenIds = new Set<string>();
   #rewrittenIds = new Set<string>();
 
@@ -191,7 +194,6 @@ export class QuizEngine implements UseQuizHandle {
     };
     this.#internalQuestions.push(internal);
     const handle = this.#makeQuestionHandle(this.#internalQuestions.length - 1);
-    this.#indexOf.set(handle, this.#internalQuestions.length - 1);
     this.#questionHandles = [...this.#questionHandles, handle];
     return handle;
   }
@@ -230,10 +232,8 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   revealFeedback(q: Question): void {
-    const index =
-      this.#indexOf.get(q) ??
-      this.#internalQuestions.findIndex((iq) => iq.id === q.id);
-    if (index >= 0) this.revealFeedbackByIndex(index);
+    const index = (q as unknown as Record<symbol, unknown>)[this.#indexKey];
+    if (typeof index === 'number') this.revealFeedbackByIndex(index);
   }
 
   submit(): void {
@@ -339,6 +339,7 @@ export class QuizEngine implements UseQuizHandle {
   #makeQuestionHandle(i: number): UseQuestionHandle {
     const engine = this;
     return {
+      [engine.#indexKey]: i,
       get id() {
         return engine.#internalQuestions[i].id;
       },
