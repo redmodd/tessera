@@ -1,13 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity';
 import type { Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
-import {
-  resolveFeedbackMode,
-  resolveRetryStrategy,
-  type QuizQuestionResult,
-  type FeedbackModePredicate,
-  type RetryStrategyPredicate,
-} from './quiz-policy.js';
 import type {
   UseQuizInternalHandle,
   UseQuizQuestionApi,
@@ -39,7 +32,7 @@ export interface QuizEngineDeps {
    * `false` means nothing this engine reports can ever be scored.
    */
   hasHost: () => boolean;
-  /** Wraps the host-element `CustomEvent` dispatch; a no-op with no host. */
+  /** Wraps the host-element `tessera-quiz-complete` dispatch; a no-op with no host. */
   dispatch: (name: string, detail?: unknown) => void;
   /**
    * Saved attempt count and score for this quiz page. With attempts > 0 the
@@ -67,8 +60,6 @@ interface InternalQuestion {
  */
 export class QuizEngine implements UseQuizInternalHandle {
   #deps: QuizEngineDeps;
-  #feedbackPredicate: FeedbackModePredicate;
-  #retryPredicate: RetryStrategyPredicate;
   #maxAttempts: number;
 
   #internalQuestions = $state<InternalQuestion[]>([]);
@@ -91,8 +82,6 @@ export class QuizEngine implements UseQuizInternalHandle {
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
     this.#maxAttempts = deps.quizConfig.maxAttempts ?? Infinity;
-    this.#feedbackPredicate = resolveFeedbackMode(deps.quizConfig);
-    this.#retryPredicate = resolveRetryStrategy(deps.quizConfig);
     if (deps.restore && deps.restore.attempts > 0) {
       this.#attemptCount = deps.restore.attempts;
       this.#score = deps.restore.score;
@@ -213,7 +202,6 @@ export class QuizEngine implements UseQuizInternalHandle {
   setAnswer(index: number, answer: unknown): void {
     this.#answers.set(index, answer);
     this.#answersVersion++;
-    this.#deps.dispatch('tessera-quiz-question-answered', { index });
   }
 
   getAnswer(index: number): unknown {
@@ -231,15 +219,10 @@ export class QuizEngine implements UseQuizInternalHandle {
   }
 
   feedbackVisible(index: number): boolean {
-    if (this.#deps.quizConfig.feedbackMode === 'never') return false;
-    return this.#feedbackPredicate({
-      questionIndex: index,
-      submitted: this.#submitted,
-      reviewing: this.#reviewing,
-      hasAnswered: this.#answers.has(index),
-      revealed: this.#feedbackShown.has(index),
-      attemptCount: this.#attemptCount,
-    });
+    const mode = this.#deps.quizConfig.feedbackMode;
+    if (mode === 'never') return false;
+    if (this.#reviewing) return true;
+    return mode === 'immediate' && this.#feedbackShown.has(index);
   }
 
   revealFeedbackByIndex(index: number): void {
@@ -276,8 +259,6 @@ export class QuizEngine implements UseQuizInternalHandle {
       return;
     }
 
-    this.#deps.dispatch('tessera-quiz-before-submit');
-
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const { rounded } = this.#computeScore();
@@ -309,16 +290,12 @@ export class QuizEngine implements UseQuizInternalHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    const results: QuizQuestionResult[] = [];
-    for (let i = 0; i < this.#internalQuestions.length; i++) {
-      results.push({
-        interaction:
-          this.#internalQuestions[i].interaction?.() ?? ({} as never),
-        correct: this.#internalQuestions[i].checkAnswer(),
-        weight: this.#internalQuestions[i].weight,
+    const newLocked = new Set<number>();
+    if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
+      this.#internalQuestions.forEach((q, i) => {
+        if (q.checkAnswer()) newLocked.add(i);
       });
     }
-    const newLocked = this.#retryPredicate(results);
     const preserved = new Map<number, unknown>();
     for (const i of newLocked) {
       if (this.#answers.has(i)) preserved.set(i, this.#answers.get(i));
@@ -338,7 +315,6 @@ export class QuizEngine implements UseQuizInternalHandle {
     this.#restored = false;
     this.#reviewing = false;
     this.#score = 0;
-    this.#deps.dispatch('tessera-quiz-retry');
   }
 
   #commit(index: number): void {
