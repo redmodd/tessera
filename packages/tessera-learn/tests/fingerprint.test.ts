@@ -93,6 +93,15 @@ describe('shouldRestore', () => {
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);
     });
 
+    it.each([
+      ['a number', 42],
+      ['a string', 'nope'],
+    ])('discards a saved document that parsed to %s', (_label, bad) => {
+      expect(shouldRestore(bad as unknown as SavedState, fp, 'auto')).toBe(
+        false,
+      );
+    });
+
     it('warns so a corrupt record is distinguishable from a first launch', () => {
       const saved = { ...savedWith(fp), g: [] } as unknown as SavedState;
       shouldRestore(saved, fp, 'auto');

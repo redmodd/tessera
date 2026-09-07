@@ -1737,7 +1737,7 @@ function crossValidate(
     const overhead = 60; // top-level JSON overhead with all keys
     const quizBytes = pageResults.totalQuizzes * 22; // g: "NNN":{"s":100,"a":2},
     const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
-    const standaloneBytes = pageResults.totalPages * 30; // g: conservative buffer per page
+    const standaloneBytes = pageResults.totalPages * 38; // g: "NNN":{"q":{"q1":100,"q2":100},"g":1},
     const userStateBuffer = 256; // usePersistence headroom
     const estimatedSize =
       overhead +
