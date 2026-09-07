@@ -738,7 +738,7 @@ See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a
 
 ### `useQuiz`
 
-Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS and records the page score. **Only `submit()` marks the quiz Completed/Passed/Failed**; no DOM event can do it. It also dispatches a cosmetic `tessera-quiz-complete` on the optional `element`, for authors who want to observe results, but dispatching that event by hand scores nothing.
+Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). `submit()` reports every question to the LMS and records the page score. **Only `submit()` marks the quiz Completed/Passed/Failed**; no DOM event can do it. A shell that passes `element` also gets a cosmetic `tessera-quiz-complete` dispatched on it, for authors who want to observe results, but dispatching that event by hand scores nothing. The built-in `<Quiz>` passes no `element` and so dispatches nothing.
 
 **Report when the answer is final, not on click.** Widgets call `setAnswer()` only. The shell decides when an answer is final: the built-in `<Quiz>` commits a question when `feedbackMode: 'immediate'` reveals it (the reveal locks the answer), and `submit()` reports whatever is left. A custom shell with no Submit button calls `q.commit()` itself and still calls `submit()` at the end to score the quiz.
 
@@ -1175,7 +1175,7 @@ Render `children` visibly, never call `q.render()`, and let widgets render their
 
 ```svelte
 <!-- quiz.svelte -->
-<div bind:this={host}>
+<div>
   {@render children?.()}
   <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
     >Submit</button
