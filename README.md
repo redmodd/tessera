@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/github/license/redmodd/tessera)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-Tessera is a toolkit for building interactive online courses that play in any learning management system (LMS). **It's designed for AI-assisted authoring.**
+A framework for building interactive eLearning courses that run in any learning management system (LMS) that supports SCORM 1.2, SCORM 2004, cmi5, xAPI, or static web. **It's designed for AI-assisted authoring.**
 
 📖 **[tesseralearn.dev](https://tesseralearn.dev)** — docs, guides, and demo courses.
 
@@ -55,19 +55,24 @@ This scaffolds a workspace with one seed course (`starter-course`). Open the pri
 
 ## Commands
 
-Every command names the course it works on. The root scripts forward to whichever course you name; a bare `pnpm dev` lists the available courses rather than guessing.
+Every command works on one course. Name it, or `cd` into the course folder and leave the name off. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
 
 ```bash
 pnpm dev <course>       # local dev server, hot-reloads as you edit
-pnpm validate <course>  # structural errors only — no server, no build
+pnpm validate <course>  # structural errors only, no server, no build
 pnpm a11y <course>      # accessibility audit on its own (axe-core, headless browser)
-pnpm check <course>     # validate, then the accessibility audit — run before export
+pnpm check <course>     # validate, then the accessibility audit; run before export
 pnpm export <course>    # build + package for the course's configured standard
-pnpm export <course> --standard scorm2004  # override export.standard for this build
+
+pnpm export <course> --standard scorm2004    # override export.standard for this build
+pnpm validate <course> --standard scorm2004  # check against a standard before switching to it
+pnpm check <course> --threshold moderate     # stricter accessibility gate (default: serious)
 
 pnpm tessera new intro                  # add another course at courses/intro/
 pnpm tessera duplicate intro intro-v2   # copy an existing course
 ```
+
+`pnpm export` puts the finished package in the course folder: `courses/<course>/<title>-<version>.zip` for SCORM, cmi5, and xAPI, replacing the previous zip for that course. The `web` standard skips zipping and leaves the built site in `courses/<course>/dist/`.
 
 Every scaffolded workspace ships with `AGENTS.md` at its root, pointing your agent at the full authoring guide inside the installed framework (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
