@@ -354,7 +354,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### Per-question weighting
 
-Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works identically inside `<Quiz>` and standalone. Page score = `Σ(weight × correct) / Σ(weight) × 100`, rounded. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction).
+Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works identically inside `<Quiz>` and standalone. Page score = `Σ(weight × correct) / Σ(weight) × 100`, rounded. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
 
 ### Question types
 

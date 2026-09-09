@@ -136,6 +136,14 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     });
   }
 
+  if (navCtx) {
+    navCtx.progress.refreshStandaloneWeight(
+      navCtx.nav.currentPageIndex,
+      opts.id,
+      opts.weight,
+    );
+  }
+
   const maxRetries = opts.maxRetries ?? Infinity;
   let submitted = $state(false);
   let correct = $state<boolean | null>(null);

@@ -140,6 +140,26 @@ export class ProgressState {
     this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
   }
 
+  /**
+   * Correct a restored answer's weight from the mounted component, which
+   * outranks the weight the save was written with.
+   * ponytail: only pages the learner reopens are corrected; a full sweep needs
+   * build-time weight extraction, which can't see custom question components.
+   */
+  refreshStandaloneWeight(
+    pageIndex: number,
+    questionId: string,
+    weight?: number,
+  ) {
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    const result = questions?.get(questionId);
+    if (!questions || !result) return;
+    const next = normalizeWeight(weight);
+    if (next === result.weight) return;
+    questions.set(questionId, { ...result, weight: next });
+    this.#write(pageIndex, { questions });
+  }
+
   /** Weighted mean of standalone question scores on a page, or 0 if none. */
   getPageStandaloneAverage(pageIndex: number): number {
     const questions = this.gradedUnits.get(pageIndex)?.questions;

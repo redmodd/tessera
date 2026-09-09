@@ -544,6 +544,59 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('refreshStandaloneWeight', () => {
+    it('reweights a restored answer without changing its score', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
+      progress.refreshStandaloneWeight(3, 'q1', 1);
+
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
+        score: 100,
+        weight: 1,
+      });
+      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+    });
+
+    it('treats a restored bare score as weight 1 until the page is reopened', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
+
+      progress.refreshStandaloneWeight(3, 'q1', 3);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
+    });
+
+    it('normalizes an unusable weight and ignores an unanswered question', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.refreshStandaloneWeight(3, 'q1', -2);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
+
+      progress.refreshStandaloneWeight(3, 'unanswered', 5);
+      progress.refreshStandaloneWeight(9, 'q1', 5);
+      expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
+        false,
+      );
+      expect(progress.gradedUnits.has(9)).toBe(false);
+    });
+  });
+
   describe('recalculateSuccess — standalone graded questions', () => {
     it('includes pages with graded standalone questions', () => {
       const manifest = createManifest(5);

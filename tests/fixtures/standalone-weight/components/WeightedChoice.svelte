@@ -1,13 +1,16 @@
 <script>
+  import { untrack } from 'svelte';
   import { useQuestion } from 'tessera-learn';
 
   let { id, prompt, options, correct, weight } = $props();
   let selected = $state(null);
 
   const q = useQuestion({
-    id,
+    get id() {
+      return id;
+    },
     graded: true,
-    weight,
+    weight: untrack(() => weight),
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
