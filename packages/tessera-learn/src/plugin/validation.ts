@@ -1310,16 +1310,10 @@ function validateQuestionComponents(
       );
     } else {
       const weight = staticNumber(weightProp);
-      if (weight !== null) {
-        if (!Number.isFinite(weight)) {
-          d.error(
-            `${fileRel}: <${name}> weight must be finite — a non-finite weight makes the weighted score NaN, got ${weight}`,
-          );
-        } else if (!(weight > 0)) {
-          d.warn(
-            `${fileRel}: <${name}> weight ${weight} is not positive and is ignored (treated as 1)`,
-          );
-        }
+      if (weight !== null && !(Number.isFinite(weight) && weight > 0)) {
+        d.warn(
+          `${fileRel}: <${name}> weight ${weight} is not a positive finite number and is ignored (treated as 1)`,
+        );
       }
     }
 

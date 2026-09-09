@@ -254,8 +254,8 @@
         if (unit.s !== undefined) {
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
-        for (const [qid, saved] of Object.entries(unit.q ?? {})) {
-          const [score, weight] = Array.isArray(saved) ? saved : [saved, 1];
+        for (const [qid, entry] of Object.entries(unit.q ?? {})) {
+          const [score, weight] = Array.isArray(entry) ? entry : [entry, 1];
           progress.markStandaloneQuestion(
             pageIndex,
             qid,
