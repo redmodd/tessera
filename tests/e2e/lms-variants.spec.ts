@@ -221,10 +221,6 @@ test.describe.serial('completion.mode quiz', () => {
   });
 });
 
-/**
- * Graded standalone questions (`useQuestion`, no quiz shell) with mixed
- * weights. The page rollup is the course score here, so a fixture of its own.
- */
 test.describe.serial('weighted standalone questions', () => {
   const PORT = 5312;
   const BASE = `http://localhost:${PORT}`;

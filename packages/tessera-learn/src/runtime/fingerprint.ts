@@ -26,7 +26,6 @@ const isNumberRecord = (value: unknown): boolean =>
 const isNumberArray = (value: unknown): boolean =>
   Array.isArray(value) && value.every(isNumber);
 
-// A standalone question is a bare score, or [score, weight] once weighted.
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(

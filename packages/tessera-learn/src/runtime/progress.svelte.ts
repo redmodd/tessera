@@ -2,13 +2,11 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { CourseConfig } from './types.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
-/** One answered standalone question: its score and its page-rollup weight. */
 export interface StandaloneResult {
   score: number;
   weight: number;
 }
 
-/** Weights are page-local multipliers; anything unusable rolls up as 1. */
 export function normalizeWeight(weight: unknown): number {
   return typeof weight === 'number' && Number.isFinite(weight) && weight > 0
     ? weight
