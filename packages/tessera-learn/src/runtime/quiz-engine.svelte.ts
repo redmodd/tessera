@@ -1,4 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { normalizeWeight } from './progress.svelte.js';
 import type { Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
@@ -183,7 +184,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#seenIds.add(id);
     const internal: InternalQuestion = {
       id,
-      weight: typeof api.weight === 'number' && api.weight > 0 ? api.weight : 1,
+      weight: normalizeWeight(api.weight),
       checkAnswer: api.checkAnswer,
       reset: api.reset,
       complete: api.complete,

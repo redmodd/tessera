@@ -439,7 +439,7 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.markStandaloneQuestion(3, 'q1', 80, false);
-      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(80);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(80);
     });
 
     it('marks the unit graded only when graded=true', () => {
@@ -477,7 +477,7 @@ describe('ProgressState', () => {
       );
       progress.markStandaloneQuestion(3, 'q1', 50, true);
       progress.markStandaloneQuestion(3, 'q1', 90, true);
-      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(90);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(90);
       expect(progress.gradedUnits.get(3)?.questions?.size).toBe(1);
     });
 
@@ -516,6 +516,84 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q2', 80, true);
       progress.markStandaloneQuestion(3, 'q3', 100, true);
       expect(progress.getPageStandaloneAverage(3)).toBe(80);
+    });
+
+    it('weights each question — Σ(w·score)/Σ(w)', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
+      expect(progress.getPageStandaloneAverage(3)).toBe(75);
+    });
+
+    it('treats a non-positive or non-finite weight as 1', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 0);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, -5);
+      progress.markStandaloneQuestion(3, 'q3', 50, true, Infinity);
+      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+    });
+  });
+
+  describe('refreshStandaloneWeight', () => {
+    it('reweights a restored answer without changing its score', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
+      progress.refreshStandaloneWeight(3, 'q1', 1);
+
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
+        score: 100,
+        weight: 1,
+      });
+      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+    });
+
+    it('treats a restored bare score as weight 1 until the page is reopened', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
+
+      progress.refreshStandaloneWeight(3, 'q1', 3);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
+    });
+
+    it('normalizes an unusable weight and ignores an unanswered question', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.refreshStandaloneWeight(3, 'q1', -2);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
+
+      progress.refreshStandaloneWeight(3, 'unanswered', 5);
+      progress.refreshStandaloneWeight(9, 'q1', 5);
+      expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
+        false,
+      );
+      expect(progress.gradedUnits.has(9)).toBe(false);
     });
   });
 

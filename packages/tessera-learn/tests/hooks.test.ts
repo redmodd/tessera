@@ -140,7 +140,7 @@ describe('useQuestion — standalone mode', () => {
 
     // Score is recorded for the page (so authors can render it),
     // but the unit is NOT marked graded
-    expect(progress.gradedUnits.get(2)?.questions?.get('q1')).toBe(100);
+    expect(progress.gradedUnits.get(2)?.questions?.get('q1')?.score).toBe(100);
     expect(progress.gradedUnits.get(2)?.graded).toBe(false);
   });
 
@@ -158,7 +158,7 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toBe(100);
+    expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(100);
     expect(progress.gradedUnits.get(3)?.graded).toBe(true);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
@@ -178,7 +178,43 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    expect(progress.gradedUnits.get(0)?.questions?.get('q1')).toBe(42);
+    expect(progress.gradedUnits.get(0)?.questions?.get('q1')?.score).toBe(42);
+  });
+
+  it('passes weight through to the recorded result', () => {
+    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
+    ctxStore.set('tessera-adapter', { adapter });
+
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      weight: 3,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    }).submit();
+
+    expect(progress.gradedUnits.get(1)?.questions?.get('q1')?.weight).toBe(3);
+  });
+
+  it('corrects a restored answer whose saved weight is out of date', () => {
+    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const adapter = makeAdapter();
+    ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
+    ctxStore.set('tessera-adapter', { adapter });
+    progress.markStandaloneQuestion(1, 'q1', 100, true, 3);
+
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      weight: 5,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    });
+
+    expect(progress.gradedUnits.get(1)?.questions?.get('q1')).toEqual({
+      score: 100,
+      weight: 5,
+    });
   });
 
   it('submit is idempotent — calling twice does not double-report', () => {

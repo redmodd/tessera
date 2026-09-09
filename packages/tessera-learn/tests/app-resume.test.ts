@@ -150,6 +150,22 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
+  it('round-trips a weighted standalone question as [score, weight]', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '1': { q: { q1: 100, q2: [40, 3] }, g: 1 } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, saveState, unmount } = await mountApp('auto', { saved });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+      g: { '1': { q: { q1: 100, q2: [40, 3] }, g: 1 } },
+    });
+  });
+
   it('ignores saved state when resume is "never"', async () => {
     const { component, seedLifecycle, setCompletionStatus, unmount } =
       await mountApp('never');

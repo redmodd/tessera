@@ -1173,15 +1173,17 @@ let a = {}; let b = {};</script>
     );
   });
 
-  it('errors when a question weight is non-finite', () => {
+  it('warns when a question weight is non-finite', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice question="Q" options={["a", "b"]} correct={0} weight={Infinity} />`,
     );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining('weight must be finite'),
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'weight Infinity is not a positive finite number and is ignored',
+      ),
     );
   });
 
@@ -1193,7 +1195,9 @@ let a = {}; let b = {};</script>
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('weight 0 is not positive and is ignored'),
+      expect.stringContaining(
+        'weight 0 is not a positive finite number and is ignored',
+      ),
     );
   });
 

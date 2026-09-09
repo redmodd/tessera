@@ -26,11 +26,17 @@ const isNumberRecord = (value: unknown): boolean =>
 const isNumberArray = (value: unknown): boolean =>
   Array.isArray(value) && value.every(isNumber);
 
+const isQuestionRecord = (value: unknown): boolean =>
+  isRecord(value) &&
+  Object.values(value).every(
+    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 2),
+  );
+
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   ('s' in value ? isNumber(value.s) : true) &&
   (value.a == null || isNumber(value.a)) &&
-  (value.q == null || isNumberRecord(value.q)) &&
+  (value.q == null || isQuestionRecord(value.q)) &&
   (value.g == null || value.g === 1);
 
 // A top-level `q` marks a save whose scores live under keys nothing reads, so
