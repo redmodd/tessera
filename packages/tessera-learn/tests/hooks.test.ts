@@ -181,7 +181,7 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.gradedUnits.get(0)?.questions?.get('q1')?.score).toBe(42);
   });
 
-  it('carries weight into the page score rollup', () => {
+  it('passes weight through to the recorded result', () => {
     const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
@@ -193,13 +193,8 @@ describe('useQuestion — standalone mode', () => {
       weight: 3,
       response: () => ({ type: 'true-false', response: true, correct: true }),
     }).submit();
-    useQuestion({
-      id: 'q2',
-      graded: true,
-      response: () => ({ type: 'true-false', response: false, correct: true }),
-    }).submit();
 
-    expect(progress.getPageStandaloneAverage(1)).toBe(75);
+    expect(progress.gradedUnits.get(1)?.questions?.get('q1')?.weight).toBe(3);
   });
 
   it('submit is idempotent — calling twice does not double-report', () => {

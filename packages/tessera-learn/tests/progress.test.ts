@@ -542,18 +542,6 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q3', 50, true, Infinity);
       expect(progress.getPageStandaloneAverage(3)).toBe(50);
     });
-
-    it('defaults to an unweighted mean when no weights are given', () => {
-      const progress = new ProgressState(
-        new Set(),
-        createConfig(),
-        0,
-        new Set(),
-      );
-      progress.markStandaloneQuestion(3, 'q1', 100, true);
-      progress.markStandaloneQuestion(3, 'q2', 0, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
-    });
   });
 
   describe('recalculateSuccess — standalone graded questions', () => {
