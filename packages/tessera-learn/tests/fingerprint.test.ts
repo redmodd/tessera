@@ -86,6 +86,10 @@ describe('shouldRestore', () => {
         'a standalone score is not a number',
         { g: { '0': { q: { q1: '80' } } } },
       ],
+      [
+        'a weighted standalone entry is not a [score, weight] pair',
+        { g: { '0': { q: { q1: [80] } } } },
+      ],
       ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
       ['a quiz score is null', { g: { '0': { s: null } } }],
     ])('discards a saved document where %s', (_label, bad) => {
@@ -100,6 +104,14 @@ describe('shouldRestore', () => {
       expect(shouldRestore(bad as unknown as SavedState, fp, 'auto')).toBe(
         false,
       );
+    });
+
+    it('keeps a save whose standalone entries carry weights', () => {
+      const saved = {
+        ...savedWith(fp),
+        g: { '0': { q: { q1: 80, q2: [100, 3] } } },
+      } as unknown as SavedState;
+      expect(shouldRestore(saved, fp, 'auto')).toBe(true);
     });
 
     it('warns so a corrupt record is distinguishable from a first launch', () => {

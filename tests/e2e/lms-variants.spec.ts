@@ -220,3 +220,53 @@ test.describe.serial('completion.mode quiz', () => {
     expect(visited.length).toBeLessThan(totalPages);
   });
 });
+
+/**
+ * Graded standalone questions (`useQuestion`, no quiz shell) with mixed
+ * weights. The page rollup is the course score here, so a fixture of its own.
+ */
+test.describe.serial('weighted standalone questions', () => {
+  const PORT = 5312;
+  const BASE = `http://localhost:${PORT}`;
+  let preview: ChildProcess;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    preview = startPreview('standalone-weight', 'scorm12', PORT);
+    const page = await browser.newPage();
+    try {
+      await waitForServer(page, BASE);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(() => preview?.kill('SIGTERM'));
+  test.beforeEach(async ({ page }) => installScorm12Mock(page));
+
+  test('weight pulls the page score — one right of three counts for 75, not 50', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await page
+      .locator('[data-question-id="q-heavy"] input[type="radio"]')
+      .nth(1)
+      .check();
+    await page
+      .locator('[data-question-id="q-light"] input[type="radio"]')
+      .nth(0)
+      .check();
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => (window as any).__scormDataSnapshot()['cmi.core.score.raw'],
+          ),
+        { timeout: 5000 },
+      )
+      .toBe('75');
+  });
+});

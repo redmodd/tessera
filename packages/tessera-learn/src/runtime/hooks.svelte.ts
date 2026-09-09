@@ -55,9 +55,9 @@ export interface UseQuestionOptions {
   /** Whether this question counts toward course success status. Default false. */
   graded?: boolean;
   /**
-   * Optional weight for quiz scoring — used inside a quiz host that aggregates
-   * with the weighted formula `Σ(w·correct)/Σ(w)·100`. Default 1; ignored in
-   * standalone mode.
+   * How much this question pulls on the page score, in a quiz host and
+   * standalone alike: `Σ(w·score)/Σ(w)`. Default 1; a non-positive or
+   * non-finite weight rolls up as 1.
    */
   weight?: number;
   /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
@@ -173,6 +173,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         opts.id,
         score,
         !!opts.graded,
+        opts.weight,
       );
     }
 

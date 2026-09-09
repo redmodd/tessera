@@ -216,7 +216,9 @@
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
         const questions = {};
-        for (const [qid, score] of unit.questions) questions[qid] = score;
+        for (const [qid, { score, weight }] of unit.questions) {
+          questions[qid] = weight === 1 ? score : [score, weight];
+        }
         entry.q = questions;
       }
       if (unit.graded) entry.g = 1;
@@ -252,8 +254,15 @@
         if (unit.s !== undefined) {
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
-        for (const [qid, score] of Object.entries(unit.q ?? {})) {
-          progress.markStandaloneQuestion(pageIndex, qid, score, !!unit.g);
+        for (const [qid, saved] of Object.entries(unit.q ?? {})) {
+          const [score, weight] = Array.isArray(saved) ? saved : [saved, 1];
+          progress.markStandaloneQuestion(
+            pageIndex,
+            qid,
+            score,
+            !!unit.g,
+            weight,
+          );
         }
       }
     }

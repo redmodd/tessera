@@ -2,6 +2,19 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { CourseConfig } from './types.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
+/** One answered standalone question: its score and its page-rollup weight. */
+export interface StandaloneResult {
+  score: number;
+  weight: number;
+}
+
+/** Weights are page-local multipliers; anything unusable rolls up as 1. */
+export function normalizeWeight(weight: unknown): number {
+  return typeof weight === 'number' && Number.isFinite(weight) && weight > 0
+    ? weight
+    : 1;
+}
+
 /**
  * Score state for one gradable page. A page can carry both a <Quiz> and
  * standalone `useQuestion` answers; `quizScore` wins when it does.
@@ -11,8 +24,8 @@ export interface GradedUnit {
   quizScore?: number;
   /** Submitted quiz attempts. Persisted so `maxAttempts` survives a resume. */
   attempts: number;
-  /** Standalone question scores, questionId → score 0-100. */
-  questions?: Map<string, number>;
+  /** Standalone question results, questionId → score 0-100 + rollup weight. */
+  questions?: Map<string, StandaloneResult>;
   /** The page carries at least one graded standalone question. */
   graded: boolean;
 }
@@ -119,20 +132,25 @@ export class ProgressState {
     questionId: string,
     score: number,
     graded: boolean,
+    weight?: number,
   ) {
     const unit = this.gradedUnits.get(pageIndex);
-    const questions = unit?.questions ?? new Map<string, number>();
-    questions.set(questionId, score);
+    const questions = unit?.questions ?? new Map<string, StandaloneResult>();
+    questions.set(questionId, { score, weight: normalizeWeight(weight) });
     this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
   }
 
-  /** Average of standalone question scores on a page, or 0 if none. */
+  /** Weighted mean of standalone question scores on a page, or 0 if none. */
   getPageStandaloneAverage(pageIndex: number): number {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     if (!questions || questions.size === 0) return 0;
-    let sum = 0;
-    for (const s of questions.values()) sum += s;
-    return sum / questions.size;
+    let weighted = 0;
+    let totalWeight = 0;
+    for (const { score, weight } of questions.values()) {
+      weighted += score * weight;
+      totalWeight += weight;
+    }
+    return weighted / totalWeight;
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it
