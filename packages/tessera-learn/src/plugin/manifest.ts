@@ -348,7 +348,9 @@ export function generateManifest(pagesDir: string): Manifest {
           importPath: `${relDir}/${fileName}`,
           quiz: pageConfig.quiz || null,
           ...(pageConfig.graded === true ? { graded: true } : {}),
-          ...(typeof pageConfig.weight === 'number'
+          ...(typeof pageConfig.weight === 'number' &&
+          Number.isFinite(pageConfig.weight) &&
+          pageConfig.weight > 0
             ? { weight: pageConfig.weight }
             : {}),
           ...(pageConfig.completesOn === 'view'

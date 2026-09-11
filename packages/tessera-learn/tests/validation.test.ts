@@ -807,6 +807,42 @@ export const pageConfig = { title: "Exam", graded: true, weight: 3 };
     expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
   });
 
+  it('stays quiet for a single graded page with a lone weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 10 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('stays quiet for weights that mix fractions and whole ratios', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 0.5 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 3 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
   it('warns when a percentage-style set is skewed by an undeclared graded page', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1547,7 +1583,23 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'quiz page has no question components or useQuestion() calls',
+        'graded page has no question components or useQuestion() calls',
+      ),
+    );
+  });
+
+  it('warns on a graded page with no questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<h1>Empty exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'graded page has no question components or useQuestion() calls',
       ),
     );
   });

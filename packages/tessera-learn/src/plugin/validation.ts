@@ -962,14 +962,14 @@ function validatePageFile(
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
   if (
-    pageConfig?.quiz &&
+    (pageConfig?.quiz || declaresGraded) &&
     !HAS_USE_QUESTION_RE.test(content) &&
     !HAS_QUESTION_TAG_RE.test(content) &&
     !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
   ) {
     d.warn(
-      `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
-        `the quiz will have nothing to score`,
+      `${fileRel}: graded page has no question components or useQuestion() calls — ` +
+        `it will have nothing to score`,
     );
   }
 
@@ -1706,7 +1706,8 @@ function reportEffectiveWeights(
   const declared = graded
     .map((p) => p.weight)
     .filter((w): w is number => w !== undefined);
-  const scale = declared.some((w) => w < 1)
+  if (graded.length < 2) return;
+  const scale = declared.every((w) => w < 1)
     ? 1
     : declared.every((w) => w >= 5)
       ? 100
@@ -1749,7 +1750,7 @@ function crossValidate(
     );
   }
 
-  reportEffectiveWeights(pageResults, d);
+  if (!pageResults.hasParseErrors) reportEffectiveWeights(pageResults, d);
 
   const isManual = config.completion?.mode === 'manual';
   const completesOnPages = pageResults.pages.filter((p) => p.completesOnView);

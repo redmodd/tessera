@@ -375,7 +375,7 @@ Two top-level `pageConfig` fields control a page's share of the **course** score
 </script>
 ```
 
-Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (all >= 5) that miss 100, and fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment.
+Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (all >= 5) that miss 100, and all-fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment.
 
 **A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
 
