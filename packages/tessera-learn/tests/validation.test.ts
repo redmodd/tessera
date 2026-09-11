@@ -731,7 +731,7 @@ export const pageConfig = { title: "Just Prose", weight: 40 };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        "pageConfig.weight is set but the page isn't declared graded",
+        'pageConfig.weight only applies once the page counts toward the course score',
       ),
     );
   });

@@ -385,7 +385,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` on a page that declares neither is inert, and `tessera validate` warns.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
 
 ### Question types
 

@@ -30,7 +30,6 @@ export interface GradedUnit {
 }
 
 export class ProgressState {
-  /** Counted by the rollup whether or not they were attempted. */
   #declaredGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #totalPages: number;

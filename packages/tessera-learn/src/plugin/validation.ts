@@ -39,7 +39,6 @@ import { isVideoEmbed } from '../components/video-embed.js';
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
-  /** Notes about a correct project. Never a reason to fail a build. */
   infos?: string[];
 }
 
@@ -951,8 +950,9 @@ function validatePageFile(
   const weight = validatePageWeight(pageConfig, fileRel, d);
   if (weight !== undefined && !isGradedQuiz && !declaresGraded) {
     d.warn(
-      `${fileRel}: pageConfig.weight is set but the page isn't declared graded, so it has no effect. ` +
-        'Add `graded: true` (or `quiz: { graded: true }`) to make it count toward the course score.',
+      `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
+        'Without `graded: true` (or `quiz: { graded: true }`) the page joins the rollup only after ' +
+        'the learner answers a graded question on it, and counts for nothing if they skip it.',
     );
   }
 

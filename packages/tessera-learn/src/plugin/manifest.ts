@@ -18,13 +18,11 @@ export interface ManifestPage {
   slug: string;
   importPath: string;
   quiz: QuizConfig | null;
-  /** Declared, not inferred: the build can't see `useQuestion` calls inside custom components. */
   graded?: boolean;
   weight?: number;
   completesOn?: 'view';
 }
 
-/** The `pageConfig` object literal a page's module script exports. */
 export interface PageConfig {
   title?: string;
   quiz?: QuizConfig;

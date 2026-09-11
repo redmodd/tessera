@@ -557,9 +557,18 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
 
-      // The unattempted 75% page scores 0 rather than vanishing.
       expect(progress.gradedScore.average).toBe(25);
       expect(progress.successStatus).toBe('failed');
+    });
+
+    it('weights an undeclared page once a graded question is answered on it', () => {
+      const manifest = createManifest(5, {}, new Set(), { 1: 90, 3: 10 });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(90);
     });
 
     it('matches the average recalculateSuccess uses', () => {
