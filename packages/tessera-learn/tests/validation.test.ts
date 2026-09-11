@@ -760,6 +760,85 @@ export const pageConfig = { title: "Exam", graded: true, weight: 75 };
     expect(warnings.filter((w) => w.includes('weight'))).toEqual([]);
   });
 
+  it('warns when fractional weights fall short of 1', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 0.25 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 0.5 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings, infos } = validateProject(testRoot);
+    expect(infos).toContainEqual(expect.stringContaining('33.3%'));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 0.75, not 1'),
+    );
+  });
+
+  it('stays quiet for bare ratio weights', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 2 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 3 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('warns when a percentage-style set is skewed by an undeclared graded page', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 30 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 70 };
+</script>
+<h1>Exam</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/extra.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Extra", graded: true };
+</script>
+<h1>Extra</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 101, not 100'),
+    );
+  });
+
   it('errors on quiz.maxAttempts invalid value', () => {
     createValidProject(testRoot);
     writeFile(
