@@ -27,24 +27,19 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           manifests=$(git diff --name-only "origin/${BASE_REF}...HEAD" | grep '^packages/.*/package\.json$') || exit 0
-          file=".changeset/dependabot-${PR_NUMBER}.md"
-          [ -e "$file" ] && exit 0
-          cat > "$file" <<'EOF'
-          ---
-          'tessera-learn': patch
-          ---
-          EOF
-          printf '\n%s\n' "$PR_TITLE" >> "$file"
           for manifest in $manifests; do
+            name=$(node -p "require('./$manifest').name")
+            file=".changeset/dependabot-${PR_NUMBER}-${name}.md"
+            [ -e "$file" ] && continue
             bumps=$(git diff -U0 "origin/${BASE_REF}...HEAD" -- "$manifest" | awk -F'"' '
               /^-[[:space:]]+"/ { gsub(/^[~^]/, "", $4); old[$2] = $4 }
               /^\+[[:space:]]+"/ { gsub(/^[~^]/, "", $4); new[$2] = $4 }
               END { for (n in new) if (n in old && old[n] != new[n]) print "- `" n "` " old[n] " → " new[n] }
             ' | sort)
-            [ -n "$bumps" ] && printf '\n`%s`:\n\n%s\n' "$(basename "$(dirname "$manifest")")" "$bumps" >> "$file"
+            [ -z "$bumps" ] && continue
+            printf -- '---\n'"'"'%s'"'"': patch\n---\n\n%s\n' "$name" "$bumps" > "$file"
           done
           git config user.name 'dependabot[bot]'
           git config user.email '49699333+dependabot[bot]@users.noreply.github.com'
