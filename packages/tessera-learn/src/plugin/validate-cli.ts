@@ -8,9 +8,10 @@ export function runValidate(
     standardOverride,
   }: { showA11yTip?: boolean; standardOverride?: string } = {},
 ): number {
-  const { errors, warnings } = validateProject(projectRoot, standardOverride);
+  const result = validateProject(projectRoot, standardOverride);
+  const { errors, warnings } = result;
 
-  reportValidationIssues({ errors, warnings });
+  reportValidationIssues(result);
 
   if (errors.length > 0) {
     const summary =

@@ -39,17 +39,23 @@ import { isVideoEmbed } from '../components/video-embed.js';
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
+  /** Notes about a correct project. Never a reason to fail a build. */
+  infos?: string[];
 }
 
-/** Collects errors and warnings so checkers thread one argument, not a pair. */
+/** Collects diagnostics so checkers thread one argument, not three. */
 export class Diagnostics implements ValidationResult {
   errors: string[] = [];
   warnings: string[] = [];
+  infos: string[] = [];
   error(message: string): void {
     this.errors.push(message);
   }
   warn(message: string): void {
     this.warnings.push(message);
+  }
+  info(message: string): void {
+    this.infos.push(message);
   }
 }
 
@@ -142,11 +148,15 @@ function applyA11ySettings(d: Diagnostics, settings: A11ySettings): void {
   }
 }
 
-/** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
+/** Print notes (cyan), then warnings (yellow), then errors (red). Shared by the dev/build plugin and the CLI. */
 export function reportValidationIssues({
   errors,
   warnings,
+  infos = [],
 }: ValidationResult): void {
+  for (const info of infos) {
+    console.log(`\x1b[36m[tessera]\x1b[0m ${info}`);
+  }
   for (const warning of warnings) {
     console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
   }
@@ -872,6 +882,8 @@ interface PageInfo {
   navIndex: number;
   hasGradedQuiz: boolean;
   hasQuiz: boolean;
+  declaresGraded: boolean;
+  weight?: number;
   completesOnView: boolean;
 }
 
@@ -914,6 +926,7 @@ function validatePageFile(
         navIndex,
         hasGradedQuiz: false,
         hasQuiz: false,
+        declaresGraded: false,
         completesOnView: false,
       },
       isQuiz: false,
@@ -934,6 +947,14 @@ function validatePageFile(
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
+  const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
+  const weight = validatePageWeight(pageConfig, fileRel, d);
+  if (weight !== undefined && !isGradedQuiz && !declaresGraded) {
+    d.warn(
+      `${fileRel}: pageConfig.weight is set but the page isn't declared graded, so it has no effect. ` +
+        'Add `graded: true` (or `quiz: { graded: true }`) to make it count toward the course score.',
+    );
+  }
 
   validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
   validateQuestionComponents(content, fileRel, d, exportStandard);
@@ -958,6 +979,8 @@ function validatePageFile(
       navIndex,
       hasGradedQuiz: isGradedQuiz,
       hasQuiz: isQuiz,
+      declaresGraded,
+      ...(weight !== undefined ? { weight } : {}),
       completesOnView,
     },
     isQuiz,
@@ -1122,7 +1145,13 @@ function validatePageConfig(
   content: string,
   fileRel: string,
   d: Diagnostics,
-): { title?: string; quiz?: unknown; completesOn?: unknown } | null {
+): {
+  title?: string;
+  quiz?: unknown;
+  graded?: unknown;
+  weight?: unknown;
+  completesOn?: unknown;
+} | null {
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
@@ -1144,6 +1173,38 @@ function validateCompletesOn(
     `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`,
   );
   return false;
+}
+
+function validatePageGraded(
+  pageConfig: { graded?: unknown } | null,
+  fileRel: string,
+  d: Diagnostics,
+): boolean {
+  const graded = pageConfig?.graded;
+  if (graded === undefined) return false;
+  if (typeof graded !== 'boolean') {
+    d.error(
+      `${fileRel}: pageConfig.graded must be a boolean, got ${JSON.stringify(graded)}`,
+    );
+    return false;
+  }
+  return graded;
+}
+
+function validatePageWeight(
+  pageConfig: { weight?: unknown } | null,
+  fileRel: string,
+  d: Diagnostics,
+): number | undefined {
+  const weight = pageConfig?.weight;
+  if (weight === undefined) return undefined;
+  if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
+    d.warn(
+      `${fileRel}: pageConfig.weight ${JSON.stringify(weight)} is not a positive finite number and is ignored (treated as 1)`,
+    );
+    return undefined;
+  }
+  return weight;
 }
 
 // ---------- Quiz Config Validation ----------
@@ -1628,19 +1689,35 @@ function validateAssetRefs(
 
 // ---------- Cross-Cutting Validations ----------
 
+function reportEffectiveWeights(
+  pageResults: PagesValidationResult,
+  d: Diagnostics,
+): void {
+  const graded = pageResults.pages.filter(
+    (p) => p.hasGradedQuiz || p.declaresGraded,
+  );
+  if (!graded.some((p) => p.weight !== undefined)) return;
+  const total = graded.reduce((sum, p) => sum + (p.weight ?? 1), 0);
+  const shares = graded
+    .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
+    .join(', ');
+  d.info(`course score weighting: ${shares}`);
+}
+
 function crossValidate(
   config: ParsedConfig,
   pageResults: PagesValidationResult,
   d: Diagnostics,
 ): void {
-  // completion.mode "quiz" but no graded quizzes
+  // completion.mode "quiz" but nothing declared graded
   if (
     config.completion?.mode === 'quiz' &&
     !pageResults.hasGradedQuiz &&
+    !pageResults.pages.some((p) => p.declaresGraded) &&
     !pageResults.hasParseErrors
   ) {
     d.error(
-      'completion.mode is "quiz" but no pages have quiz config with graded: true',
+      'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
     );
   }
 
@@ -1654,6 +1731,8 @@ function crossValidate(
       'completion.mode is "quiz" but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.',
     );
   }
+
+  reportEffectiveWeights(pageResults, d);
 
   const isManual = config.completion?.mode === 'manual';
   const completesOnPages = pageResults.pages.filter((p) => p.completesOnView);

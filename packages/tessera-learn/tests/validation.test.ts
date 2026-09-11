@@ -684,6 +684,82 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
     );
   });
 
+  it('warns on a non-positive pageConfig.weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", weight: 0, quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.weight 0 is not a positive finite number',
+      ),
+    );
+  });
+
+  it('errors on a non-boolean pageConfig.graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: "yes" };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig.graded must be a boolean'),
+    );
+  });
+
+  it('warns when weight is set on a page that is not declared graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Just Prose", weight: 40 };
+</script>
+<h1>Just prose</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        "pageConfig.weight is set but the page isn't declared graded",
+      ),
+    );
+  });
+
+  it('reports the effective weighting as a note, not a warning', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 25 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 75 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings, infos } = validateProject(testRoot);
+    expect(infos).toContainEqual(expect.stringContaining('25.0%'));
+    expect(infos).toContainEqual(expect.stringContaining('75.0%'));
+    expect(warnings.filter((w) => w.includes('weight'))).toEqual([]);
+  });
+
   it('errors on quiz.maxAttempts invalid value', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1466,7 +1542,7 @@ describe('cross-cutting validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'completion.mode is "quiz" but no pages have quiz config with graded: true',
+        'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
       ),
     );
   });
@@ -1845,9 +1921,9 @@ describe('parse failures', () => {
     writePage(testRoot, `<MultipleChoice question={ />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'could not parse')).toBe(true);
-    expect(has(errors, 'no pages have quiz config with graded: true')).toBe(
-      false,
-    );
+    expect(
+      has(errors, 'no pages declare quiz: { graded: true } or graded: true'),
+    ).toBe(false);
   });
 });
 

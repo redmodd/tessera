@@ -409,6 +409,27 @@ describe('generateManifest', () => {
     expect(manifest.pages[2].index).toBe(2);
   });
 
+  it('carries pageConfig.graded and weight onto the manifest page', () => {
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["exam", "plain"] };',
+    );
+    createFile(
+      '01-s/01-l/exam.svelte',
+      `<script context="module">
+export const pageConfig = { graded: true, weight: 75 }
+</script>
+<h1>Exam</h1>`,
+    );
+    createFile('01-s/01-l/plain.svelte', '<h1>Plain</h1>');
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].graded).toBe(true);
+    expect(manifest.pages[0].weight).toBe(75);
+    expect(manifest.pages[1].graded).toBeUndefined();
+    expect(manifest.pages[1].weight).toBeUndefined();
+  });
+
   it('uses title-case fallback when _meta.js missing', () => {
     createFile('01-my-section/01-my-lesson/page.svelte', '<h1>Hello</h1>');
     const manifest = generateManifest(TMP);

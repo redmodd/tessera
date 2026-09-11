@@ -1,4 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
@@ -29,21 +30,27 @@ export interface GradedUnit {
 }
 
 export class ProgressState {
-  #quizGradedIndices: ReadonlySet<number>;
+  /** Counted by the rollup whether or not they were attempted. */
+  #declaredGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
+  #pageWeights: ReadonlyMap<number, number>;
 
-  constructor(
-    quizGradedIndices: ReadonlySet<number>,
-    config: CourseConfig,
-    totalPages: number,
-    quizPageIndices: ReadonlySet<number>,
-  ) {
-    this.#quizGradedIndices = quizGradedIndices;
+  constructor(manifest: Manifest, config: CourseConfig) {
+    this.#declaredGradedIndices = new Set(
+      manifest.pages
+        .filter((p) => p.quiz?.graded || p.graded)
+        .map((p) => p.index),
+    );
+    this.#quizPageIndices = new Set(
+      manifest.pages.filter((p) => p.quiz).map((p) => p.index),
+    );
+    this.#pageWeights = new Map(
+      manifest.pages.map((p) => [p.index, normalizeWeight(p.weight)]),
+    );
+    this.#totalPages = manifest.totalPages;
     this.#config = config;
-    this.#totalPages = totalPages;
-    this.#quizPageIndices = quizPageIndices;
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -184,22 +191,26 @@ export class ProgressState {
   }
 
   #graded = $derived.by(() => {
-    const pages = new Set(this.#quizGradedIndices);
+    const pages = new Set(this.#declaredGradedIndices);
     for (const [pageIndex, unit] of this.gradedUnits) {
       if (unit.graded) pages.add(pageIndex);
     }
-    let sum = 0;
+    let weighted = 0;
+    let totalWeight = 0;
     let attempted = false;
     for (const pageIndex of pages) {
       const unit = this.gradedUnits.get(pageIndex);
       if (unit?.quizScore !== undefined || unit?.questions?.size) {
         attempted = true;
       }
-      sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+      const score = unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+      const weight = this.#pageWeights.get(pageIndex) ?? 1;
+      weighted += score * weight;
+      totalWeight += weight;
     }
     return {
       count: pages.size,
-      average: pages.size > 0 ? sum / pages.size : 0,
+      average: totalWeight > 0 ? weighted / totalWeight : 0,
       attempted,
     };
   });

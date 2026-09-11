@@ -163,7 +163,7 @@ A custom widget that calls `useQuestion` and emits an `Interaction` is scored, r
 
 Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is. Import components from `tessera-learn` (`import { Callout, Image } from 'tessera-learn'`).
 
-`pageConfig` sets the title and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse. If `title` is omitted it derives from the filename (`my-page.svelte` → "My Page").
+`pageConfig` sets the title, the page's share of the course score (`graded` / `weight`), and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse. If `title` is omitted it derives from the filename (`my-page.svelte` → "My Page").
 
 ```svelte
 <script module>
@@ -355,6 +355,37 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 ### Per-question weighting
 
 Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded; in a quiz each `score` is 0 or 100, standalone it is whatever `score()` returns. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
+
+### Per-page weighting
+
+Two top-level `pageConfig` fields control a page's share of the **course** score. Both sit beside `quiz`, not inside it.
+
+| Field    | Type      | Default | Effect                                                                    |
+| -------- | --------- | ------- | ------------------------------------------------------------------------- |
+| `graded` | `boolean` | `false` | The page counts toward the course score from the start, answered or not   |
+| `weight` | `number`  | `1`     | How hard the page pulls, relative to other graded pages. Must be positive |
+
+```svelte
+<script module>
+  export const pageConfig = {
+    title: 'Final Exam',
+    weight: 75,
+    quiz: { graded: true },
+  };
+</script>
+```
+
+Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`.
+
+**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
+
+```svelte
+<script module>
+  export const pageConfig = { title: 'Final Exam', graded: true, weight: 75 };
+</script>
+```
+
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` on a page that declares neither is inert, and `tessera validate` warns.
 
 ### Question types
 
