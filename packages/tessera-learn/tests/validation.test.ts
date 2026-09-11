@@ -1588,6 +1588,33 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     );
   });
 
+  it('warns on a graded page under completion.mode "manual"', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test Course",
+  id: "test-course",
+  version: "1.0.0",
+  export: { standard: "scorm12" },
+  completion: { mode: "manual" },
+};`,
+    );
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'the page is graded under completion.mode: "manual"',
+      ),
+    );
+  });
+
   it('warns on a graded page with no questions', () => {
     createValidProject(testRoot);
     writePage(

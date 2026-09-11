@@ -1701,7 +1701,10 @@ function reportEffectiveWeights(
   const shares = graded
     .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
     .join(', ');
-  d.info(`course score weighting: ${shares}`);
+  d.info(
+    `course score weighting: ${shares} ` +
+      '(a page that declares neither joins at weight 1 once a learner answers a graded standalone question on it)',
+  );
 
   const declared = graded
     .map((p) => p.weight)
@@ -1769,9 +1772,9 @@ function crossValidate(
 
   if (isManual) {
     for (const page of pageResults.pages) {
-      if (page.hasGradedQuiz) {
+      if (page.hasGradedQuiz || page.declaresGraded) {
         d.warn(
-          `${page.fileRel}: quiz.graded is true under completion.mode: "manual". ` +
+          `${page.fileRel}: the page is graded under completion.mode: "manual". ` +
             'The score will be reported to the LMS for transcripts, but it will not drive ' +
             "completion or success status — `markComplete()` / completesOn does. If that's " +
             'not what you want, set graded: false or change completion.mode.',

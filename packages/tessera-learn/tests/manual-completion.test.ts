@@ -246,7 +246,7 @@ describe('manual completion — validation', () => {
     expect(errors).toHaveLength(0);
     expect(
       warnings.some((w) =>
-        /quiz\.graded is true under completion\.mode: "manual"/.test(w),
+        /the page is graded under completion\.mode: "manual"/.test(w),
       ),
     ).toBe(true);
   });
