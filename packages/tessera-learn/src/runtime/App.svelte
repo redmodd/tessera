@@ -217,12 +217,12 @@
       if (unit.questions?.size) {
         const questions = {};
         for (const [qid, { score, weight, graded }] of unit.questions) {
-          questions[qid] =
-            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
+          if (!graded) continue;
+          questions[qid] = weight === 1 ? score : [score, weight];
         }
-        entry.q = questions;
+        if (Object.keys(questions).length > 0) entry.q = questions;
       }
-      g[String(pageIndex)] = entry;
+      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
       b: nav.currentPageIndex,
@@ -255,16 +255,8 @@
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          const [score, weight, graded] = Array.isArray(entry)
-            ? entry
-            : [entry, 1, 1];
-          progress.markStandaloneQuestion(
-            pageIndex,
-            qid,
-            score,
-            graded === 1,
-            weight,
-          );
+          const [score, weight] = Array.isArray(entry) ? entry : [entry, 1];
+          progress.markStandaloneQuestion(pageIndex, qid, score, true, weight);
         }
       }
     }

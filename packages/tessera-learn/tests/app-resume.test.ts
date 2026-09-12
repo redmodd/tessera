@@ -61,7 +61,7 @@ function makeAdapter(saved: unknown) {
 
 async function mountApp(
   resume: 'auto' | 'never',
-  options: { saved?: unknown } = {},
+  options: { saved?: unknown; pageModule?: () => Promise<unknown> } = {},
 ) {
   const savedState = options.saved ?? {
     b: 1,
@@ -81,7 +81,8 @@ async function mountApp(
     config: makeConfig(resume),
     manifest,
     pageModules: {
-      [page.importPath]: () => import('./fixtures/app-page.svelte'),
+      [page.importPath]:
+        options.pageModule ?? (() => import('./fixtures/app-page.svelte')),
     },
     adapter,
   };
@@ -150,20 +151,37 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
+  it('round-trips a weighted standalone question as [score, weight]', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
       d: 120,
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3] } } },
       f: structureFingerprint(manifest),
     };
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3] } } },
     });
+  });
+
+  it('drops a restored answer whose question is no longer graded', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '1': { q: { q1: 100 } } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, saveState, unmount } = await mountApp('auto', {
+      saved,
+      pageModule: () => import('./fixtures/app-page-practice.svelte'),
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(saveState.mock.calls.at(-1)[0].g).toBeUndefined();
   });
 
   it('ignores saved state when resume is "never"', async () => {

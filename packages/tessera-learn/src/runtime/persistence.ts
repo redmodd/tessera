@@ -56,9 +56,9 @@ export interface GradedUnitState {
   s?: number;
   /** Submitted quiz attempts, omitted when 1 */
   a?: number;
-  /** Standalone results — questionId → score 0-100 for a graded question of
-   * weight 1, else [score, weight, graded] */
-  q?: Record<string, number | [number, number, 0 | 1]>;
+  /** Graded standalone results — questionId → score 0-100 at weight 1, else
+   * [score, weight]. Ungraded practice answers are not saved. */
+  q?: Record<string, number | [number, number]>;
 }
 
 /**
