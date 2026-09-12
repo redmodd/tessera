@@ -229,14 +229,9 @@ export class ProgressState {
     let sum = 0;
     let attempted = false;
     for (const pageIndex of pages) {
-      const unit = this.gradedUnits.get(pageIndex);
-      if (
-        unit?.quizScore !== undefined ||
-        this.#gradedResults(pageIndex).length > 0
-      ) {
-        attempted = true;
-      }
-      sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+      const score = this.pageScore(pageIndex);
+      if (score !== undefined) attempted = true;
+      sum += score ?? 0;
     }
     return {
       count: pages.size,

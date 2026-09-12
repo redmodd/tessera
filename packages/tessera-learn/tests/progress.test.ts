@@ -626,6 +626,19 @@ describe('ProgressState', () => {
       expect(progress.pageScore(2)).toBe(85);
     });
 
+    it('matches gradedScore when a practice quiz sits beside a graded question', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        5,
+        new Set([2]),
+      );
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      progress.quizCompleted(2, 10);
+      expect(progress.pageScore(2)).toBe(100);
+      expect(progress.gradedScore.average).toBe(100);
+    });
+
     it('ignores the score of an ungraded practice quiz', () => {
       const progress = new ProgressState(
         new Set(),
