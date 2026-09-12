@@ -12,6 +12,8 @@ export function isPageComplete(
   const page = manifest.pages[index];
   if (!page) return false;
 
+  if (page.graded && progress.pageScore(index) === undefined) return false;
+
   if (!page.quiz) {
     return progress.visitedPages.has(index);
   }

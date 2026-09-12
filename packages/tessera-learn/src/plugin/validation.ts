@@ -959,15 +959,27 @@ function validatePageFile(
   validateMediaComponents(content, fileRel, d);
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
+  const hasCustomWidget = HAS_LOCAL_SVELTE_IMPORT_RE.test(content);
   if (
     (pageConfig?.quiz || declaresGraded) &&
     !HAS_USE_QUESTION_RE.test(content) &&
     !HAS_QUESTION_TAG_RE.test(content) &&
-    !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
+    !hasCustomWidget
   ) {
     d.warn(
-      `${fileRel}: graded page has no question components or useQuestion() calls — ` +
-        `it will have nothing to score`,
+      `${fileRel}: ${pageConfig?.quiz ? 'quiz' : 'graded'} page has no question ` +
+        `components or useQuestion() calls — it will have nothing to score`,
+    );
+  } else if (
+    declaresGraded &&
+    !pageConfig?.quiz &&
+    !hasCustomWidget &&
+    !GRADED_USE_QUESTION_RE.test(content)
+  ) {
+    d.warn(
+      `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
+        `the page can never earn a score, so under completion.mode "percentage" it ` +
+        `never completes. Build at least one question with useQuestion({ graded: true }).`,
     );
   }
 
@@ -1608,6 +1620,8 @@ const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
+const GRADED_USE_QUESTION_RE =
+  /\buseQuestion\s*\(\s*\{[\s\S]{0,400}?\bgraded\s*:\s*true/;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );

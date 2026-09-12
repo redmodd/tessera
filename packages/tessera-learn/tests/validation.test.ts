@@ -1648,8 +1648,48 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'graded page has no question components or useQuestion() calls',
+        'quiz page has no question components or useQuestion() calls',
       ),
+    );
+  });
+
+  it('warns when a declared graded page has only practice questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a declared graded page with a graded question', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({
+    id: 'q1',
+    graded: true,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
     );
   });
 
