@@ -792,6 +792,20 @@ describe('useProgress', () => {
     expect(h.gradedScore).toEqual({ average: 80, attempted: true });
   });
 
+  it('pageScore defaults to the current page', () => {
+    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    progress.markStandaloneQuestion(2, 'q1', 40, true);
+    const ctx = makeNavCtx(progress, 2);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useProgress();
+    expect(h.pageScore()).toBe(40);
+
+    ctx.nav.currentPageIndex = 1;
+    expect(h.pageScore()).toBeUndefined();
+    expect(h.pageScore(2)).toBe(40);
+  });
+
   it('markVisited and markChunk delegate to ProgressState', () => {
     const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
     ctxStore.set('tessera-nav', makeNavCtx(progress));

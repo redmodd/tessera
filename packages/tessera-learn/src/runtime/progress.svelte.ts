@@ -165,6 +165,13 @@ export class ProgressState {
     this.#writeQuestions(pageIndex, questions);
   }
 
+  pageScore(pageIndex: number): number | undefined {
+    const unit = this.gradedUnits.get(pageIndex);
+    if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
+      return unit.quizScore;
+    return unit?.graded ? this.getPageStandaloneAverage(pageIndex) : undefined;
+  }
+
   #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
     this.#write(pageIndex, {
       questions,
@@ -212,14 +219,9 @@ export class ProgressState {
     let sum = 0;
     let attempted = false;
     for (const pageIndex of pages) {
-      const unit = this.gradedUnits.get(pageIndex);
-      if (
-        unit?.quizScore !== undefined ||
-        this.#gradedResults(pageIndex).length > 0
-      ) {
-        attempted = true;
-      }
-      sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+      const score = this.pageScore(pageIndex);
+      if (score !== undefined) attempted = true;
+      sum += score ?? 0;
     }
     return {
       count: pages.size,

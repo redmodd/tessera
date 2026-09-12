@@ -790,6 +790,7 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 function useProgress(): {
   readonly visitedPages: Set<number>;
   quizScore(pageIndex: number): number | undefined; // 0–100; undefined until the quiz is submitted
+  pageScore(pageIndex?: number): number | undefined; // 0–100, unrounded; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the current page
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
@@ -799,6 +800,12 @@ function useProgress(): {
   markChunk(pageIndex: number, chunkIndex: number): void;
 };
 ```
+
+A standalone-question page renders no score on its own, so read `pageScore` and print one.
+
+- **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
+- **Round it yourself** for display.
+- **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
 `gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
 

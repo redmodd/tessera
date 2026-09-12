@@ -286,13 +286,16 @@ export function useNavigation() {
 }
 
 export function useProgress() {
-  const { progress } = requireNavContext('useProgress()');
+  const { progress, nav } = requireNavContext('useProgress()');
   return {
     get visitedPages() {
       return progress.visitedPages;
     },
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
+    },
+    pageScore(pageIndex: number = nav.currentPageIndex) {
+      return progress.pageScore(pageIndex);
     },
     get gradedScore() {
       return progress.gradedScore;
