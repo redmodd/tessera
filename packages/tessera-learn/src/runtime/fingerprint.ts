@@ -29,7 +29,9 @@ const isNumberArray = (value: unknown): boolean =>
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
-    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 2),
+    (v) =>
+      isNumber(v) ||
+      (isNumberArray(v) && [2, 3].includes((v as number[]).length)),
   );
 
 const isGradedUnit = (value: unknown): boolean =>

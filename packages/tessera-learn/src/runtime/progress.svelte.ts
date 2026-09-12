@@ -163,8 +163,6 @@ export class ProgressState {
     this.#write(pageIndex, { questions });
   }
 
-  // Ungraded practice answers are stored alongside graded ones, so every score
-  // rollup has to filter them out or they drag the page's score down.
   #gradedResults(pageIndex: number): StandaloneResult[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     return questions

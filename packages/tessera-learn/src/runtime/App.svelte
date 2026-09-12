@@ -256,8 +256,7 @@
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          // A bare score means weight 1; its graded flag comes from the page,
-          // which is also the fallback for saves written before the per-question flag.
+          // Pre-flag saves store a bare score; the page's `g` stands in for it.
           const [score, weight, graded] = Array.isArray(entry)
             ? entry
             : [entry, 1, undefined];
