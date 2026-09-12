@@ -450,11 +450,15 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const restoredScore = progress.gradedScore;
+        const seededScore = restoredScore.attempted
+          ? Math.round(restoredScore.average)
+          : null;
         adapter.seedLifecycle?.(
           progress.completionStatus,
           progress.successStatus,
-          restoredScore.attempted ? Math.round(restoredScore.average) : null,
+          seededScore,
         );
+        prevReportedScore = seededScore;
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);

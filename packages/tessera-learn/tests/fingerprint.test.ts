@@ -55,6 +55,29 @@ describe('shouldRestore', () => {
     expect(shouldRestore(savedWith('stale'), fp, 'auto')).toBe(false);
   });
 
+  it('discards a blob written by a runtime with the older saved-state layout', () => {
+    const legacyFingerprint = (...slugs: string[]) => {
+      const joined = slugs.join('\0');
+      let h = 0x811c9dc5;
+      for (let i = 0; i < joined.length; i++) {
+        h ^= joined.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return (h >>> 0).toString(36);
+    };
+    const legacy = {
+      b: 1,
+      v: [0, 1],
+      d: 5,
+      q: { '1': 80 },
+      qa: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+      f: legacyFingerprint('intro', 'quiz'),
+    } as unknown as SavedState;
+    expect(shouldRestore(legacy, fp, 'auto')).toBe(false);
+  });
+
   it('discards state with no fingerprint', () => {
     expect(shouldRestore(savedWith(undefined), fp, 'auto')).toBe(false);
   });

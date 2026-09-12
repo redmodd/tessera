@@ -1,11 +1,17 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { SavedState } from './persistence.js';
 
+// Bumped when the SavedState layout changes, so blobs written by an older
+// runtime fail the fingerprint gate instead of half-restoring.
+const FORMAT_VERSION = '2';
+
 // FNV-1a over the ordered page slugs. SavedState is keyed by page index, so a
 // structure change must change the fingerprint — else stale state restores onto
 // the wrong pages. Slugs can't contain a NUL, so it's a collision-proof delimiter.
 export function structureFingerprint(manifest: Manifest): string {
-  const slugs = manifest.pages.map((p) => p.slug).join('\0');
+  const slugs = [FORMAT_VERSION, ...manifest.pages.map((p) => p.slug)].join(
+    '\0',
+  );
   let h = 0x811c9dc5;
   for (let i = 0; i < slugs.length; i++) {
     h ^= slugs.charCodeAt(i);

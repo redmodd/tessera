@@ -39,10 +39,12 @@ function makeAdapter(saved: unknown) {
   const seedLifecycle = vi.fn();
   const setCompletionStatus = vi.fn();
   const saveState = vi.fn();
+  const setScore = vi.fn();
   return {
     seedLifecycle,
     setCompletionStatus,
     saveState,
+    setScore,
     adapter: {
       init: async () => {},
       getState: () => saved,
@@ -50,7 +52,7 @@ function makeAdapter(saved: unknown) {
       saveState,
       setDuration: () => {},
       setExit: () => {},
-      setScore: () => {},
+      setScore,
       setCompletionStatus,
       setSuccessStatus: () => {},
       commit: () => {},
@@ -69,7 +71,7 @@ async function mountApp(
     d: 42,
     f: structureFingerprint(manifest),
   };
-  const { adapter, seedLifecycle, setCompletionStatus, saveState } =
+  const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
     makeAdapter(savedState);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
@@ -89,7 +91,14 @@ async function mountApp(
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return { component, seedLifecycle, setCompletionStatus, saveState, unmount };
+  return {
+    component,
+    seedLifecycle,
+    setCompletionStatus,
+    saveState,
+    setScore,
+    unmount,
+  };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
@@ -182,6 +191,22 @@ describe('App restore gate honours config.resume', () => {
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0].g).toBeUndefined();
+  });
+
+  it('reports no score for a resume that only restores what was saved', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '0': { s: 80 } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, saveState, setScore, unmount } = await mountApp('auto', {
+      saved,
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(setScore).not.toHaveBeenCalled();
   });
 
   it('ignores saved state when resume is "never"', async () => {
