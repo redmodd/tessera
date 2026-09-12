@@ -684,6 +684,244 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
     );
   });
 
+  it('warns on a non-positive pageConfig.weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Quiz", weight: 0, quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.weight 0 is not a positive finite number',
+      ),
+    );
+  });
+
+  it('errors on a non-boolean pageConfig.graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: "yes" };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig.graded must be a boolean'),
+    );
+  });
+
+  it('warns when weight is set on a page that is not declared graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Just Prose", weight: 40 };
+</script>
+<h1>Just prose</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.weight only applies once the page counts toward the course score',
+      ),
+    );
+  });
+
+  it('warns about a graded page with no weight beside pages that declare one', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 100 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('graded without a pageConfig.weight'),
+    );
+    expect(warnings).toContainEqual(expect.stringContaining('exam.svelte'));
+  });
+
+  it('reports the effective weighting as a note, not a warning', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 25 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 75 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings, infos } = validateProject(testRoot);
+    expect(infos).toContainEqual(expect.stringContaining('25.0%'));
+    expect(infos).toContainEqual(expect.stringContaining('75.0%'));
+    expect(warnings.filter((w) => w.includes('weight'))).toEqual([]);
+  });
+
+  it('warns when fractional weights fall short of 1', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 0.25 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 0.5 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings, infos } = validateProject(testRoot);
+    expect(infos).toContainEqual(expect.stringContaining('33.3%'));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 0.75, not 1'),
+    );
+  });
+
+  it('stays quiet for bare ratio weights', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 2 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 3 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('stays quiet for a single graded page with a lone weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 10 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('stays quiet for weights that mix fractions and whole ratios', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 0.5 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 3 };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('warns on percentage-style weights with a dropped digit', () => {
+    createValidProject(testRoot);
+    for (const [name, weight] of [
+      ['page', 40],
+      ['exam', 4],
+      ['final', 50],
+    ] as const) {
+      writeFile(
+        testRoot,
+        `pages/01-section/01-lesson/${name}.svelte`,
+        `<script context="module">
+export const pageConfig = { title: "${name}", graded: true, weight: ${weight} };
+</script>
+<h1>${name}</h1>`,
+      );
+    }
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 94, not 100'),
+    );
+  });
+
+  it('warns when a percentage-style set is skewed by an undeclared graded page', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 30 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, weight: 70 };
+</script>
+<h1>Exam</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/extra.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Extra", graded: true };
+</script>
+<h1>Extra</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 101, not 100'),
+    );
+  });
+
   it('errors on quiz.maxAttempts invalid value', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1392,7 +1630,50 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'quiz page has no question components or useQuestion() calls',
+        'graded page has no question components or useQuestion() calls',
+      ),
+    );
+  });
+
+  it('warns on a graded page under completion.mode "manual"', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test Course",
+  id: "test-course",
+  version: "1.0.0",
+  export: { standard: "scorm12" },
+  completion: { mode: "manual" },
+};`,
+    );
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'the page is graded under completion.mode: "manual"',
+      ),
+    );
+  });
+
+  it('warns on a graded page with no questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<h1>Empty exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'graded page has no question components or useQuestion() calls',
       ),
     );
   });
@@ -1466,7 +1747,7 @@ describe('cross-cutting validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'completion.mode is "quiz" but no pages have quiz config with graded: true',
+        'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
       ),
     );
   });
@@ -1845,9 +2126,9 @@ describe('parse failures', () => {
     writePage(testRoot, `<MultipleChoice question={ />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'could not parse')).toBe(true);
-    expect(has(errors, 'no pages have quiz config with graded: true')).toBe(
-      false,
-    );
+    expect(
+      has(errors, 'no pages declare quiz: { graded: true } or graded: true'),
+    ).toBe(false);
   });
 });
 

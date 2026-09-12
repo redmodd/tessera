@@ -4,12 +4,7 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import {
-  createManifest,
-  createConfig,
-  gradedQuizIndices,
-  quizPageIndices,
-} from './helpers.js';
+import { createManifest, createConfig } from './helpers.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
 
@@ -251,7 +246,7 @@ describe('manual completion — validation', () => {
     expect(errors).toHaveLength(0);
     expect(
       warnings.some((w) =>
-        /quiz\.graded is true under completion\.mode: "manual"/.test(w),
+        /the page is graded under completion\.mode: "manual"/.test(w),
       ),
     ).toBe(true);
   });
@@ -477,7 +472,7 @@ function manualConfig(
 
 describe('manual completion — ProgressState', () => {
   it('markCompleteManually flips status once and is idempotent', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     expect(progress.completionStatus).toBe('incomplete');
     expect(progress.manuallyCompleted).toBe(false);
 
@@ -497,12 +492,7 @@ describe('manual completion — ProgressState', () => {
     const config = createConfig({
       completion: { mode: 'percentage', percentageThreshold: 100 },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     progress.markCompleteManually();
     expect(progress.completionStatus).toBe('complete');
@@ -514,12 +504,7 @@ describe('manual completion — ProgressState', () => {
   it('recalculateCompletion under manual mode never sets status', () => {
     const manifest = createManifest(4);
     const config = manualConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     expect(progress.completionStatus).toBe('incomplete');
   });
@@ -527,12 +512,7 @@ describe('manual completion — ProgressState', () => {
   it('recalculateSuccess honors requireSuccessStatus only after manual mark', () => {
     const manifest = createManifest(2);
     const config = manualConfig({ requireSuccessStatus: 'passed' });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     // Before marking complete: stays unknown.
     expect(progress.successStatus).toBe('unknown');
@@ -544,19 +524,14 @@ describe('manual completion — ProgressState', () => {
   it('recalculateSuccess stays unknown when requireSuccessStatus is omitted', () => {
     const manifest = createManifest(2);
     const config = manualConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('unknown');
   });
 
   it('manuallyCompleted getter reflects internal latch', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     expect(progress.manuallyCompleted).toBe(false);
     progress.markCompleteManually();
     expect(progress.manuallyCompleted).toBe(true);
@@ -596,7 +571,7 @@ describe('manual completion — useCompletion hook', () => {
   });
 
   it('markComplete flips progress and reflects completionStatus', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const config = manualConfig();
     ctxStore.set('tessera-nav', makeNavCtx(progress, config));
 
@@ -610,7 +585,7 @@ describe('manual completion — useCompletion hook', () => {
 
   it('markComplete is a no-op outside manual mode and warns once per session', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     // percentage mode (the helper default)
     const config = createConfig();
     ctxStore.set('tessera-nav', makeNavCtx(progress, config));
@@ -634,7 +609,7 @@ describe('manual completion — useCompletion hook', () => {
 
   it('flips successStatus when requireSuccessStatus is set', () => {
     const config = manualConfig({ requireSuccessStatus: 'passed' });
-    const progress = new ProgressState(new Set(), config, 0, new Set());
+    const progress = new ProgressState(createManifest(0), config);
     ctxStore.set('tessera-nav', makeNavCtx(progress, config));
 
     const handle = useCompletion();
@@ -781,7 +756,7 @@ import type { SavedState } from '../src/runtime/persistence.js';
 
 describe('manual completion — persistence', () => {
   it('serializes m: 1 only when manuallyCompleted is true', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     // Mirror App.svelte#serializeState's m-key logic in isolation.
     function serialize(): Pick<SavedState, 'b' | 'v' | 'q' | 'd' | 'm'> {
       return {
@@ -801,12 +776,7 @@ describe('manual completion — persistence', () => {
   it('restoring m: 1 reapplies the latch and survives recalculation', () => {
     const manifest = createManifest(4);
     const config = manualConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     // Restore-side equivalent: progress.markCompleteManually() when saved.m === 1
     const saved: SavedState = { b: 0, v: [], q: {}, d: 0, m: 1 };
@@ -822,12 +792,7 @@ describe('manual completion — persistence', () => {
     const config = createConfig({
       completion: { mode: 'percentage', percentageThreshold: 100 },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     progress.markCompleteManually();
     // No pages visited — percentage would otherwise be incomplete.
@@ -876,7 +841,7 @@ describe('manual completion — page trigger', () => {
       { ...pageWithCompletesOn(0), completesOn: undefined } as ManifestPage,
       pageWithCompletesOn(1),
     ];
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const config = manualConfig();
 
     loadPage(0, pages, progress, config);
@@ -888,7 +853,7 @@ describe('manual completion — page trigger', () => {
 
   it('revisiting a completesOn page is idempotent', () => {
     const pages = [pageWithCompletesOn(0)];
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const config = manualConfig();
 
     loadPage(0, pages, progress, config);
@@ -902,7 +867,7 @@ describe('manual completion — page trigger', () => {
 
   it('completesOn page does not fire under non-manual modes', () => {
     const pages = [pageWithCompletesOn(0)];
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     // percentage mode — completesOn is ignored at runtime
     const config = createConfig({
       completion: { mode: 'percentage', percentageThreshold: 100 },
@@ -950,12 +915,7 @@ describe('manual completion — live success-status push', () => {
   it('pushes setSuccessStatus("passed") to the adapter when markComplete fires under requireSuccessStatus', () => {
     const manifest = createManifest(2);
     const config = manualConfig({ requireSuccessStatus: 'passed' });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
     const adapter = {
       setCompletionStatus: vi.fn(),
       setSuccessStatus: vi.fn(),
@@ -975,12 +935,7 @@ describe('manual completion — live success-status push', () => {
   it('does not push success on markComplete when requireSuccessStatus is omitted', () => {
     const manifest = createManifest(2);
     const config = manualConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
     const adapter = {
       setCompletionStatus: vi.fn(),
       setSuccessStatus: vi.fn(),
@@ -1000,12 +955,7 @@ describe('manual completion — live success-status push', () => {
   it('pushes setSuccessStatus("failed") under requireSuccessStatus: "failed"', () => {
     const manifest = createManifest(2);
     const config = manualConfig({ requireSuccessStatus: 'failed' });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
     const adapter = {
       setCompletionStatus: vi.fn(),
       setSuccessStatus: vi.fn(),

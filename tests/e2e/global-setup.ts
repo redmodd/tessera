@@ -25,6 +25,7 @@ export type FixtureName =
   | 'broken-page'
   | 'quiz-timing'
   | 'standalone-weight'
+  | 'page-weight'
   | 'completion-quiz';
 
 interface FixtureSpec {
@@ -66,6 +67,10 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   },
   'standalone-weight': {
     source: resolve(REPO_ROOT, 'tests/fixtures/standalone-weight'),
+    standards: ['scorm12'],
+  },
+  'page-weight': {
+    source: resolve(REPO_ROOT, 'tests/fixtures/page-weight'),
     standards: ['scorm12'],
   },
 };

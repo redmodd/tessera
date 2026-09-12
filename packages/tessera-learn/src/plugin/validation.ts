@@ -10,6 +10,7 @@ import {
   orderPageFiles,
   walkPages,
   type WalkedLesson,
+  type PageConfig,
 } from './manifest.js';
 import {
   clearParseCache,
@@ -39,17 +40,22 @@ import { isVideoEmbed } from '../components/video-embed.js';
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
+  infos?: string[];
 }
 
-/** Collects errors and warnings so checkers thread one argument, not a pair. */
+/** Collects diagnostics so checkers thread one argument, not three. */
 export class Diagnostics implements ValidationResult {
   errors: string[] = [];
   warnings: string[] = [];
+  infos: string[] = [];
   error(message: string): void {
     this.errors.push(message);
   }
   warn(message: string): void {
     this.warnings.push(message);
+  }
+  info(message: string): void {
+    this.infos.push(message);
   }
 }
 
@@ -142,11 +148,15 @@ function applyA11ySettings(d: Diagnostics, settings: A11ySettings): void {
   }
 }
 
-/** Print validation warnings (yellow) then errors (red). Shared by the dev/build plugin and the CLI. */
+/** Print notes (cyan), then warnings (yellow), then errors (red). Shared by the dev/build plugin and the CLI. */
 export function reportValidationIssues({
   errors,
   warnings,
+  infos = [],
 }: ValidationResult): void {
+  for (const info of infos) {
+    console.log(`\x1b[36m[tessera]\x1b[0m ${info}`);
+  }
   for (const warning of warnings) {
     console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
   }
@@ -870,15 +880,16 @@ function validateSingleXAPIEntry(
 interface PageInfo {
   fileRel: string;
   navIndex: number;
-  hasGradedQuiz: boolean;
+  graded: boolean;
   hasQuiz: boolean;
+  weight?: number;
   completesOnView: boolean;
 }
 
 interface PagesValidationResult {
   totalPages: number;
   totalQuizzes: number;
-  hasGradedQuiz: boolean;
+  hasGraded: boolean;
   hasParseErrors: boolean;
   pages: PageInfo[];
 }
@@ -899,7 +910,6 @@ function validatePageFile(
 ): {
   page: PageInfo;
   isQuiz: boolean;
-  isGradedQuiz: boolean;
   parseError: boolean;
 } {
   const fileRel = relative(projectRoot, filePath);
@@ -912,12 +922,11 @@ function validatePageFile(
       page: {
         fileRel,
         navIndex,
-        hasGradedQuiz: false,
+        graded: false,
         hasQuiz: false,
         completesOnView: false,
       },
       isQuiz: false,
-      isGradedQuiz: false,
       parseError: true,
     };
   }
@@ -934,6 +943,16 @@ function validatePageFile(
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
+  const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
+  const weight = validatePageWeight(pageConfig, fileRel, d);
+  const graded = isGradedQuiz || declaresGraded;
+  if (weight !== undefined && !graded) {
+    d.warn(
+      `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
+        'Without `graded: true` (or `quiz: { graded: true }`) the page joins the rollup only after ' +
+        'the learner answers a graded question on it, and counts for nothing if they skip it.',
+    );
+  }
 
   validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
   validateQuestionComponents(content, fileRel, d, exportStandard);
@@ -941,14 +960,14 @@ function validatePageFile(
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
   if (
-    pageConfig?.quiz &&
+    (pageConfig?.quiz || declaresGraded) &&
     !HAS_USE_QUESTION_RE.test(content) &&
     !HAS_QUESTION_TAG_RE.test(content) &&
     !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
   ) {
     d.warn(
-      `${fileRel}: quiz page has no question components or useQuestion() calls — ` +
-        `the quiz will have nothing to score`,
+      `${fileRel}: graded page has no question components or useQuestion() calls — ` +
+        `it will have nothing to score`,
     );
   }
 
@@ -956,12 +975,12 @@ function validatePageFile(
     page: {
       fileRel,
       navIndex,
-      hasGradedQuiz: isGradedQuiz,
+      graded,
       hasQuiz: isQuiz,
+      ...(weight !== undefined ? { weight } : {}),
       completesOnView,
     },
     isQuiz,
-    isGradedQuiz,
     parseError: false,
   };
 }
@@ -976,7 +995,7 @@ function validatePages(
   const pages: PageInfo[] = [];
   let totalPages = 0;
   let totalQuizzes = 0;
-  let hasGradedQuiz = false;
+  let hasGraded = false;
   let hasParseErrors = false;
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
@@ -985,7 +1004,7 @@ function validatePages(
     d.error(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { totalPages, totalQuizzes, hasGradedQuiz, hasParseErrors, pages };
+    return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
   };
 
   if (!existsSync(pagesDir)) return noPages();
@@ -1041,7 +1060,7 @@ function validatePages(
       );
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
-      if (result.isGradedQuiz) hasGradedQuiz = true;
+      if (result.page.graded) hasGraded = true;
       if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
@@ -1075,7 +1094,7 @@ function validatePages(
 
   if (totalPages === 0) return noPages();
 
-  return { totalPages, totalQuizzes, hasGradedQuiz, hasParseErrors, pages };
+  return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1122,7 +1141,7 @@ function validatePageConfig(
   content: string,
   fileRel: string,
   d: Diagnostics,
-): { title?: string; quiz?: unknown; completesOn?: unknown } | null {
+): Partial<Record<keyof PageConfig, unknown>> | null {
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
@@ -1144,6 +1163,38 @@ function validateCompletesOn(
     `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`,
   );
   return false;
+}
+
+function validatePageGraded(
+  pageConfig: { graded?: unknown } | null,
+  fileRel: string,
+  d: Diagnostics,
+): boolean {
+  const graded = pageConfig?.graded;
+  if (graded === undefined) return false;
+  if (typeof graded !== 'boolean') {
+    d.error(
+      `${fileRel}: pageConfig.graded must be a boolean, got ${JSON.stringify(graded)}`,
+    );
+    return false;
+  }
+  return graded;
+}
+
+function validatePageWeight(
+  pageConfig: { weight?: unknown } | null,
+  fileRel: string,
+  d: Diagnostics,
+): number | undefined {
+  const weight = pageConfig?.weight;
+  if (weight === undefined) return undefined;
+  if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
+    d.warn(
+      `${fileRel}: pageConfig.weight ${JSON.stringify(weight)} is not a positive finite number and is ignored (treated as 1)`,
+    );
+    return undefined;
+  }
+  return weight;
 }
 
 // ---------- Quiz Config Validation ----------
@@ -1628,19 +1679,51 @@ function validateAssetRefs(
 
 // ---------- Cross-Cutting Validations ----------
 
+function reportEffectiveWeights(
+  pageResults: PagesValidationResult,
+  d: Diagnostics,
+): void {
+  const graded = pageResults.pages.filter((p) => p.graded);
+  if (!graded.some((p) => p.weight !== undefined)) return;
+  const total = graded.reduce((sum, p) => sum + (p.weight ?? 1), 0);
+  const shares = graded
+    .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
+    .join(', ');
+  d.info(`course score weighting: ${shares}`);
+
+  const unweighted = graded.filter((p) => p.weight === undefined);
+  if (unweighted.length > 0) {
+    d.warn(
+      `graded without a pageConfig.weight, so each counts as 1 against pages that ` +
+        `declare one: ${unweighted.map((p) => p.fileRel).join(', ')}`,
+    );
+  }
+
+  if (graded.length < 2) return;
+  // Near a round scale but not on it reads as a typo; a bare ratio total like 7 doesn't.
+  const scale = [1, 100].find((s) => total > s / 2 && total < s * 1.5);
+  if (scale !== undefined && Math.abs(total - scale) > scale * 1e-6) {
+    d.warn(
+      `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +
+        `Add up to ${scale} to make each weight the page's percentage of the course score, ` +
+        'or ignore this if the weights are meant as bare ratios.',
+    );
+  }
+}
+
 function crossValidate(
   config: ParsedConfig,
   pageResults: PagesValidationResult,
   d: Diagnostics,
 ): void {
-  // completion.mode "quiz" but no graded quizzes
+  // completion.mode "quiz" but nothing declared graded
   if (
     config.completion?.mode === 'quiz' &&
-    !pageResults.hasGradedQuiz &&
+    !pageResults.hasGraded &&
     !pageResults.hasParseErrors
   ) {
     d.error(
-      'completion.mode is "quiz" but no pages have quiz config with graded: true',
+      'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
     );
   }
 
@@ -1654,6 +1737,8 @@ function crossValidate(
       'completion.mode is "quiz" but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.',
     );
   }
+
+  if (!pageResults.hasParseErrors) reportEffectiveWeights(pageResults, d);
 
   const isManual = config.completion?.mode === 'manual';
   const completesOnPages = pageResults.pages.filter((p) => p.completesOnView);
@@ -1672,9 +1757,9 @@ function crossValidate(
 
   if (isManual) {
     for (const page of pageResults.pages) {
-      if (page.hasGradedQuiz) {
+      if (page.graded) {
         d.warn(
-          `${page.fileRel}: quiz.graded is true under completion.mode: "manual". ` +
+          `${page.fileRel}: the page is graded under completion.mode: "manual". ` +
             'The score will be reported to the LMS for transcripts, but it will not drive ' +
             "completion or success status — `markComplete()` / completesOn does. If that's " +
             'not what you want, set graded: false or change completion.mode.',

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isPageComplete } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
-import { createConfig, gradedQuizIndices, quizPageIndices } from './helpers.js';
+import { createConfig } from './helpers.js';
 
 function createPage(
   index: number,
@@ -36,12 +36,7 @@ describe('isPageComplete', () => {
     const page = createPage(0);
     const manifest = createManifestFromPages([page]);
     const config = createConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -57,12 +52,7 @@ describe('isPageComplete', () => {
     });
     const manifest = createManifestFromPages([page]);
     const config = createConfig();
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -78,12 +68,7 @@ describe('isPageComplete', () => {
     });
     const manifest = createManifestFromPages([page]);
     const config = createConfig({ scoring: { passingScore: 70 } });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
@@ -102,12 +87,7 @@ describe('isPageComplete', () => {
     });
     const manifest = createManifestFromPages([page]);
     const config = createConfig({ scoring: { passingScore: 90 } });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
 
     progress.quizCompleted(0, 85);
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
