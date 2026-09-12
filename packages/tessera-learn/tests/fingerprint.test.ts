@@ -55,8 +55,8 @@ describe('shouldRestore', () => {
     expect(shouldRestore(savedWith('stale'), fp, 'auto')).toBe(false);
   });
 
-  it('restores legacy state with no fingerprint (backward compatible)', () => {
-    expect(shouldRestore(savedWith(undefined), fp, 'auto')).toBe(true);
+  it('discards state with no fingerprint', () => {
+    expect(shouldRestore(savedWith(undefined), fp, 'auto')).toBe(false);
   });
 
   it('never restores when resume is "never"', () => {
@@ -87,14 +87,13 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: '80' } } } },
       ],
       [
-        'a weighted standalone entry is not a [score, weight] pair',
+        'a standalone entry is not a [score, weight, graded] triple',
         { g: { '0': { q: { q1: [80] } } } },
       ],
       [
         'a standalone entry carries more than a graded flag',
         { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
       ],
-      ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
       ['a quiz score is null', { g: { '0': { s: null } } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
@@ -123,29 +122,6 @@ describe('shouldRestore', () => {
       shouldRestore(saved, fp, 'auto');
       expect(console.warn).toHaveBeenCalledWith(
         'Tessera: discarding malformed resume state',
-      );
-    });
-  });
-
-  describe('outdated format', () => {
-    beforeEach(() => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-    });
-
-    it('discards a save whose scores live under a top-level q', () => {
-      const saved = {
-        ...savedWith(fp),
-        q: { '0': 80 },
-        qa: { '0': 2 },
-      } as unknown as SavedState;
-      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
-    });
-
-    it('says the format is outdated rather than corrupt', () => {
-      const saved = { ...savedWith(fp), q: {} } as unknown as SavedState;
-      shouldRestore(saved, fp, 'auto');
-      expect(console.warn).toHaveBeenCalledWith(
-        'Tessera: discarding resume state saved in an older format',
       );
     });
   });

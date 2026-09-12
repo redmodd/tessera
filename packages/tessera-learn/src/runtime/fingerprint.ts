@@ -29,22 +29,14 @@ const isNumberArray = (value: unknown): boolean =>
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
-    (v) =>
-      isNumber(v) ||
-      (isNumberArray(v) && [2, 3].includes((v as number[]).length)),
+    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 3),
   );
 
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   ('s' in value ? isNumber(value.s) : true) &&
   (value.a == null || isNumber(value.a)) &&
-  (value.q == null || isQuestionRecord(value.q)) &&
-  (value.g == null || value.g === 1);
-
-// A top-level `q` marks a save whose scores live under keys nothing reads, so
-// the blob is discarded rather than resumed with every score silently missing.
-const isOutdatedFormat = (saved: SavedState): boolean =>
-  isRecord(saved) && 'q' in saved;
+  (value.q == null || isQuestionRecord(value.q));
 
 // Rejected whole: a shape restoreState() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.
@@ -59,19 +51,14 @@ const isMalformed = (saved: SavedState): boolean =>
     (!isRecord(saved.g) || !Object.values(saved.g).every(isGradedUnit)));
 
 // `never` always starts fresh; otherwise a saved fingerprint that no longer
-// matches the current structure is discarded. State saved before fingerprinting
-// (no `f`) is trusted so upgrading the runtime never wipes an in-progress learner.
+// matches the current structure is discarded.
 export function shouldRestore(
   saved: SavedState,
   currentFingerprint: string,
   resume: 'auto' | 'never' = 'auto',
 ): boolean {
   if (resume === 'never') return false;
-  if (saved.f !== undefined && saved.f !== currentFingerprint) return false;
-  if (isOutdatedFormat(saved)) {
-    console.warn('Tessera: discarding resume state saved in an older format');
-    return false;
-  }
+  if (saved.f !== currentFingerprint) return false;
   if (isMalformed(saved)) {
     console.warn('Tessera: discarding malformed resume state');
     return false;

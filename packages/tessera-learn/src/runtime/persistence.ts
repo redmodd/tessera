@@ -56,14 +56,9 @@ export interface GradedUnitState {
   s?: number;
   /** Submitted quiz attempts, omitted when 1 */
   a?: number;
-  /**
-   * Standalone question results — questionId → score 0-100 for a graded
-   * question of weight 1, else [score, weight, graded]. Saves written before
-   * the per-question graded flag use [score, weight] and fall back to `g`.
-   */
-  q?: Record<string, number | [number, number] | [number, number, 0 | 1]>;
-  /** 1 when the page has at least one graded standalone question */
-  g?: 1;
+  /** Standalone results — questionId → score 0-100 for a graded question of
+   * weight 1, else [score, weight, graded] */
+  q?: Record<string, number | [number, number, 0 | 1]>;
 }
 
 /**
@@ -90,7 +85,6 @@ export interface SavedState {
   /** Manual completion latch. 1 if the learner triggered manual completion. Absent otherwise. */
   m?: 1;
   /** Structure fingerprint (FNV-1a over ordered page slugs) at save time.
-   * On resume, a mismatch discards the blob — the course structure changed.
-   * Absent on state saved before fingerprinting; treated as a match. */
+   * On resume, anything but an exact match discards the blob. */
   f?: string;
 }
