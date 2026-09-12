@@ -1,5 +1,24 @@
 # tessera-learn
 
+## 0.6.0
+
+### Minor Changes
+
+- ca11cb0: Resume state saved by an older runtime is no longer restored; learners mid-course start fresh after upgrading.
+- 312deab: Expose the course-wide `gradedScore` and the effective `passingScore` on `useProgress()`, so a summary page can show the same score the LMS is sent. An LMS masteryScore override now reaches every reader of the pass threshold, including a custom layout.
+- 3553e98: Track every gradable page in one progress map, and replace `useProgress().quizScores` with `quizScore(pageIndex)`. Breaking: saved state from earlier versions is discarded on resume.
+- 153aa7b: Honour per-question `weight` for standalone graded questions, not just inside a quiz
+
+### Patch Changes
+
+- 4f3bcea: - `@types/node` 26.4.0 → 26.4.1
+  - `scorm-again` 3.3.0 → 3.3.2
+  - `tsdown` 0.22.14 → 0.23.0
+- 952d4c3: Inline the quiz feedback and retry policy into the engine and drop three quiz events nothing listened for.
+- b6b29ab: Trim the quiz engine's internals: the index-keyed methods no longer appear in the shipped types, question handles come fully formed from the engine, and `useQuestion` warns when standalone-only options are set inside a quiz.
+- 715a4bb: Quiz scores now reach progress directly instead of riding a DOM event, so `useQuiz()` no longer needs a host element and the built-in `<Quiz>` no longer dispatches `tessera-quiz-complete`.
+- be6bf66: Ungraded practice questions no longer drag down the score of the page they sit on, or the score reported to the LMS.
+
 ## 0.5.2
 
 ### Patch Changes
