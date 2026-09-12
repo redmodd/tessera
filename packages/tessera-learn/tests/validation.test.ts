@@ -1648,8 +1648,336 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'graded page has no question components or useQuestion() calls',
+        'quiz page has no question components or useQuestion() calls',
       ),
+    );
+  });
+
+  it('warns when a declared graded page has only practice questions', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a declared graded page with a graded question', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({
+    id: 'q1',
+    graded: true,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('does not warn when graded is a variable the build cannot read', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  let isFinal = true;
+  const q = useQuestion({
+    id: 'q1',
+    graded: isFinal,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('warns when a graded: true literal sits outside the useQuestion call', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+  const settings = { graded: true };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded question component whose props contain a > sign', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+  let threshold = 1;
+</script>
+<MultipleChoice question={threshold > 0 ? "A" : "B"} options={["a", "b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('warns when the only non-package import is a package subpath', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  import { interactionFormat } from 'tessera-learn/runtime/interaction-format.js';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('errors when a declared graded page carries an ungraded quiz', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, quiz: {} };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
+    );
+  });
+
+  it('accepts a practice quiz page whose standalone question is graded', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false } };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({
+    id: 'q1',
+    graded: true,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Lesson</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).not.toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
+    );
+  });
+
+  it('accepts a graded question built through an aliased useQuestion', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion as ask } from 'tessera-learn';
+  const q = ask({ id: 'q1', graded: true, response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>
+<p>{q.id}</p>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toEqual([]);
+  });
+
+  it('accepts a graded question built in a local helper module', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/questions.svelte.js',
+      `import { useQuestion } from 'tessera-learn';
+export function examQuestion(id) {
+  return useQuestion({ id, graded: true, response: () => ({ response: 'a' }) });
+}`,
+    );
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  import { examQuestion } from './questions.svelte.js';
+  const practice = useQuestion({
+    id: 'p1',
+    response: () => ({ response: 'a' }),
+  });
+  const q = examQuestion('q1');
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded question built through a namespaced useQuestion', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import * as tessera from 'tessera-learn';
+  const q = tessera.useQuestion({ id: 'q1', graded: true, response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toEqual([]);
+  });
+
+  it('does not warn when a computed key hides the graded option', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const key = 'graded';
+  const q = useQuestion({ id: 'q1', [key]: true, response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded widget imported through $shared', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import ExamQuestion from '$shared/ExamQuestion.svelte';
+</script>
+<h1>Exam</h1>
+<ExamQuestion />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toEqual([]);
+  });
+
+  it('still warns when the only relative import cannot hold a question', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/copy.json',
+      '{ "intro": "hi" }',
+    );
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  import copy from './copy.json';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded built-in question component', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+</script>
+<h1>Exam</h1>
+<MultipleChoice graded question="Pick one" options={['a', 'b']} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('warns when a built-in question component is left as practice', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+</script>
+<h1>Exam</h1>
+<MultipleChoice question="Pick one" options={['a', 'b']} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded quiz page that also declares graded', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, quiz: { graded: true } };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).not.toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
     );
   });
 

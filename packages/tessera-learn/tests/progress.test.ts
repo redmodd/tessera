@@ -108,6 +108,49 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('recalculateCompletion — percentage mode with declared graded pages', () => {
+    const setup = () => {
+      const progress = new ProgressState(
+        createManifest(4, {}, { 3: { graded: true } }),
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 100 },
+        }),
+      );
+      for (let i = 0; i < 4; i++) progress.markVisited(i);
+      return progress;
+    };
+
+    it('stays incomplete while a visited graded page is unanswered', () => {
+      expect(setup().completionStatus).toBe('incomplete');
+    });
+
+    it('completes once the graded page is answered, regardless of score', () => {
+      const progress = setup();
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+      expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('ignores a practice answer on the graded page', () => {
+      const progress = setup();
+      progress.markStandaloneQuestion(3, 'q1', 100, false);
+      expect(progress.completionStatus).toBe('incomplete');
+    });
+
+    it('holds a declared graded page carrying a practice quiz', () => {
+      const progress = new ProgressState(
+        createManifest(4, { 3: { graded: false } }, { 3: { graded: true } }),
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 100 },
+        }),
+      );
+      for (let i = 0; i < 4; i++) progress.markVisited(i);
+      progress.quizCompleted(3, 100);
+      expect(progress.completionStatus).toBe('incomplete');
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+      expect(progress.completionStatus).toBe('complete');
+    });
+  });
+
   describe('recalculateCompletion — percentage mode', () => {
     it('incomplete when below threshold', () => {
       const manifest = createManifest(10);

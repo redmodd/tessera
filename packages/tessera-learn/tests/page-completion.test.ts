@@ -7,6 +7,7 @@ import { createConfig } from './helpers.js';
 function createPage(
   index: number,
   quiz: ManifestPage['quiz'] = null,
+  graded = false,
 ): ManifestPage {
   return {
     index,
@@ -14,6 +15,7 @@ function createPage(
     slug: `page-${index}`,
     importPath: `/pages/page-${index}.svelte`,
     quiz,
+    ...(graded ? { graded: true } : {}),
   };
 }
 
@@ -93,6 +95,22 @@ describe('isPageComplete', () => {
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);
 
     progress.quizCompleted(0, 90);
+    expect(isPageComplete(0, manifest, progress, config)).toBe(true);
+  });
+
+  it('declared graded page is complete only once it has a score', () => {
+    const page = createPage(0, null, true);
+    const manifest = createManifestFromPages([page]);
+    const config = createConfig();
+    const progress = new ProgressState(manifest, config);
+
+    progress.markVisited(0);
+    expect(isPageComplete(0, manifest, progress, config)).toBe(false);
+
+    progress.markStandaloneQuestion(0, 'q1', 100, false);
+    expect(isPageComplete(0, manifest, progress, config)).toBe(false);
+
+    progress.markStandaloneQuestion(0, 'q2', 80, true);
     expect(isPageComplete(0, manifest, progress, config)).toBe(true);
   });
 });

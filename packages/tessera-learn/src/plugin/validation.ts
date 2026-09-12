@@ -15,7 +15,9 @@ import {
 import {
   clearParseCache,
   findComponents,
+  type ComponentMatch,
   getParseError,
+  useQuestionGrading,
   type PropValue,
 } from './ast.js';
 import {
@@ -946,6 +948,22 @@ function validatePageFile(
   const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
+  const hasCustomWidget = hasLocalModuleImport(content);
+  const questionComponents =
+    findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
+  const useQuestions = useQuestionGrading(content);
+  const nothingGraded =
+    !hasCustomWidget &&
+    !questionComponents.some(isGradedQuestion) &&
+    (useQuestions === 'absent' || useQuestions === 'none');
+  if (declaresGraded && isQuiz && !isGradedQuiz && nothingGraded) {
+    d.error(
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded, ` +
+        'and no question outside the quiz is graded. Nothing on the page can earn a ' +
+        'score, so it never completes. Use quiz: { graded: true }, mark a question ' +
+        'component `graded`, add a useQuestion({ graded: true }), or drop graded: true.',
+    );
+  }
   if (weight !== undefined && !graded) {
     d.warn(
       `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
@@ -960,14 +978,21 @@ function validatePageFile(
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
   if (
-    (pageConfig?.quiz || declaresGraded) &&
-    !HAS_USE_QUESTION_RE.test(content) &&
-    !HAS_QUESTION_TAG_RE.test(content) &&
-    !HAS_LOCAL_SVELTE_IMPORT_RE.test(content)
+    (isQuiz || declaresGraded) &&
+    useQuestions === 'absent' &&
+    questionComponents.length === 0 &&
+    !hasCustomWidget
   ) {
     d.warn(
-      `${fileRel}: graded page has no question components or useQuestion() calls — ` +
-        `it will have nothing to score`,
+      `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
+        `components or useQuestion() calls — it will have nothing to score`,
+    );
+  } else if (declaresGraded && !isQuiz && nothingGraded) {
+    d.warn(
+      `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
+        `the page can never earn a score, so under completion.mode "percentage" it ` +
+        `never completes. Mark at least one question component \`graded\`, or build one ` +
+        `with useQuestion({ graded: true }).`,
     );
   }
 
@@ -1254,6 +1279,10 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   Sorting: ['question', 'items', 'targets', 'correct'],
 };
 
+const QUESTION_COMPONENT_NAMES = new Set(
+  Object.keys(QUESTION_COMPONENT_REQUIRED),
+);
+
 /** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
 const QUESTION_ID_PREFIX: Record<string, string> = {
   MultipleChoice: 'mc',
@@ -1288,10 +1317,7 @@ function validateQuestionComponents(
   d: Diagnostics,
   exportStandard?: string,
 ): void {
-  const components = findComponents(
-    content,
-    new Set(Object.keys(QUESTION_COMPONENT_REQUIRED)),
-  );
+  const components = findComponents(content, QUESTION_COMPONENT_NAMES);
   if (!components) return;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
@@ -1607,14 +1633,24 @@ function validateHeadingOrder(
 const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
-const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
-const HAS_QUESTION_TAG_RE = new RegExp(
-  `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
-);
-// Custom widget imported from a local `.svelte` file may wrap useQuestion.
-// Treat its presence as enough to suppress the "no questions" warning —
-// false negatives are acceptable for a heuristic that's already advisory.
-const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
+const IMPORT_SOURCE_RE = /from\s+['"]([^'"]+)['"]/g;
+
+// A local import may wrap useQuestion, so its presence suppresses the "no
+// questions" warning: false negatives are fine for an advisory heuristic.
+function hasLocalModuleImport(content: string): boolean {
+  for (const [, source] of content.matchAll(IMPORT_SOURCE_RE)) {
+    if (!/^(?:\.{1,2}\/|\$)/.test(source)) continue;
+    const file = source.slice(source.lastIndexOf('/') + 1);
+    if (!file.includes('.') || /\.(?:svelte|js|ts)$/.test(file)) return true;
+  }
+  return false;
+}
+
+function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
+  if (hasSpread) return true;
+  const graded = props.get('graded');
+  return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
+}
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check
@@ -1694,7 +1730,8 @@ function reportEffectiveWeights(
   const unweighted = graded.filter((p) => p.weight === undefined);
   if (unweighted.length > 0) {
     d.warn(
-      `graded without a pageConfig.weight, so each counts as 1 against pages that ` +
+      `course score weighting: these pages are graded without a pageConfig.weight, ` +
+        `so each counts as 1 against pages that ` +
         `declare one: ${unweighted.map((p) => p.fileRel).join(', ')}`,
     );
   }

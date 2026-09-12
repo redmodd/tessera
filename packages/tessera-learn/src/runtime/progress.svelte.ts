@@ -267,13 +267,23 @@ export class ProgressState {
   completedPages = $derived.by<number>(() => {
     let count = 0;
     for (const i of this.visitedPages) {
-      if (this.#quizPageIndices.has(i) && this.quizScore(i) === undefined) {
-        continue;
-      }
+      if (this.awaitingScore(i)) continue;
       count++;
     }
     return count;
   });
+
+  awaitingScore(pageIndex: number): boolean {
+    if (
+      this.#quizPageIndices.has(pageIndex) &&
+      this.quizScore(pageIndex) === undefined
+    )
+      return true;
+    return (
+      this.#declaredGradedIndices.has(pageIndex) &&
+      this.pageScore(pageIndex) === undefined
+    );
+  }
 
   successStatus = $derived.by<'unknown' | 'passed' | 'failed'>(() => {
     if (this.#config.completion.mode === 'manual') {

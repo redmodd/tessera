@@ -13,6 +13,7 @@
     correctFeedback = '',
     incorrectFeedback = '',
     optionFeedback = [],
+    graded,
     maxRetries,
     weight = 1,
   } = $props();
@@ -26,6 +27,7 @@
     get id() {
       return questionId(id, 'mc', question);
     },
+    graded: untrack(() => graded),
     weight: untrack(() => weight),
     maxRetries: untrack(() => maxRetries),
     response: () => ({

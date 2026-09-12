@@ -13,6 +13,7 @@
     pairs,
     correctFeedback = '',
     incorrectFeedback = '',
+    graded,
     maxRetries,
     weight = 1,
   } = $props();
@@ -55,6 +56,7 @@
     get id() {
       return questionId(id, 'matching', question);
     },
+    graded: untrack(() => graded),
     weight: untrack(() => weight),
     maxRetries: untrack(() => maxRetries),
     complete: () => matches.size === pairs.length,

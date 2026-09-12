@@ -65,8 +65,7 @@ function parseRoot(source: string): CacheEntry {
   return entry;
 }
 
-function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
-  const found: Node[] = [];
+function walkNodes(root: Node, visit: (node: Node) => void): void {
   const seen = new Set<object>();
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
@@ -77,15 +76,22 @@ function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
       return;
     }
     const node = value as Node;
-    if (node.type === 'Component' && names.has(node.name as string)) {
-      found.push(node);
-    }
+    visit(node);
     for (const key of Object.keys(node)) {
       if (key === 'type') continue;
       walk(node[key]);
     }
   };
   walk(root);
+}
+
+function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
+  const found: Node[] = [];
+  walkNodes(root, (node) => {
+    if (node.type === 'Component' && names.has(node.name as string)) {
+      found.push(node);
+    }
+  });
   return found.sort((a, b) => a.start - b.start);
 }
 
@@ -278,4 +284,86 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
     return findPageConfigInProgram(program, svelteSource);
   }
   return pageConfigFromModuleScriptFallback(svelteSource);
+}
+
+/** 'unknown' when a call's options can't be read statically (spread, variable, computed). */
+export function useQuestionGrading(
+  source: string,
+): 'absent' | 'graded' | 'none' | 'unknown' {
+  const { root } = parseRoot(source);
+  if (!root) return 'unknown';
+  const calls = collectUseQuestionCalls(root);
+  if (calls.length === 0) return 'absent';
+  let unknown = false;
+  for (const call of calls) {
+    const state = callGradedState(call);
+    if (state === 'graded') return 'graded';
+    if (state === 'unknown') unknown = true;
+  }
+  return unknown ? 'unknown' : 'none';
+}
+
+function collectUseQuestionCalls(root: Node): Node[] {
+  const calls: Node[] = [];
+  const names = new Set<string>();
+  walkNodes(root, (node) => {
+    if (node.type === 'CallExpression') calls.push(node);
+    if (node.type === 'ImportDeclaration') {
+      for (const name of useQuestionLocalNames(node)) names.add(name);
+    }
+  });
+  if (names.size === 0) names.add('useQuestion');
+  return calls.filter((call) => {
+    const callee = call.callee as Node | undefined;
+    if (callee?.type === 'Identifier') return names.has(callee.name as string);
+    const property = callee?.property as Node | undefined;
+    return (
+      callee?.type === 'MemberExpression' &&
+      !callee.computed &&
+      property?.name === 'useQuestion'
+    );
+  });
+}
+
+function useQuestionLocalNames(node: Node): string[] {
+  const source = node.source as Node | undefined;
+  if (source?.value !== 'tessera-learn') return [];
+  const specifiers = (node.specifiers as Node[]) ?? [];
+  return specifiers
+    .filter((specifier) => {
+      const imported = specifier.imported as Node | undefined;
+      return (
+        specifier.type === 'ImportSpecifier' && imported?.name === 'useQuestion'
+      );
+    })
+    .map((specifier) => (specifier.local as Node).name as string);
+}
+
+function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
+  const options = unwrapTsCast((call.arguments as Node[])?.[0] ?? null);
+  if (!options || options.type !== 'ObjectExpression') return 'unknown';
+  let unknown = false;
+  for (const property of (options.properties as Node[]) ?? []) {
+    if (property.type === 'SpreadElement') {
+      unknown = true;
+      continue;
+    }
+    if (property.computed) {
+      unknown = true;
+      continue;
+    }
+    const key = property.key as Node | undefined;
+    const name =
+      key?.type === 'Identifier'
+        ? (key.name as string)
+        : key?.type === 'Literal'
+          ? String(key.value)
+          : null;
+    if (name !== 'graded') continue;
+    const value = unwrapTsCast(property.value as Node);
+    if (value?.type !== 'Literal') return 'unknown';
+    if (value.value === true) return 'graded';
+    if (value.value !== false) return 'unknown';
+  }
+  return unknown ? 'unknown' : 'none';
 }
