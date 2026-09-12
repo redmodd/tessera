@@ -947,11 +947,19 @@ function validatePageFile(
   const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
-  if (declaresGraded && isQuiz && !isGradedQuiz) {
+  const hasCustomWidget = HAS_LOCAL_IMPORT_RE.test(content);
+  if (
+    declaresGraded &&
+    isQuiz &&
+    !isGradedQuiz &&
+    !hasCustomWidget &&
+    gradedUseQuestions(content) === 'none'
+  ) {
     d.error(
-      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
-        'A quiz page scores through its quiz, so the page can never earn a score ' +
-        'and never completes. Use quiz: { graded: true }, or drop graded: true.',
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded, ` +
+        'and no question outside the quiz is graded. Nothing on the page can earn a ' +
+        'score, so it never completes. Use quiz: { graded: true }, add a ' +
+        'useQuestion({ graded: true }), or drop graded: true.',
     );
   }
   if (weight !== undefined && !graded) {
@@ -967,7 +975,6 @@ function validatePageFile(
   validateMediaComponents(content, fileRel, d);
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
-  const hasCustomWidget = HAS_LOCAL_SVELTE_IMPORT_RE.test(content);
   if (
     (pageConfig?.quiz || declaresGraded) &&
     !HAS_USE_QUESTION_RE.test(content) &&
@@ -1631,10 +1638,10 @@ const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );
-// Custom widget imported from a local `.svelte` file may wrap useQuestion.
-// Treat its presence as enough to suppress the "no questions" warning —
-// false negatives are acceptable for a heuristic that's already advisory.
-const HAS_LOCAL_SVELTE_IMPORT_RE = /from\s+['"][^'"]+\.svelte['"]/;
+// A local module — a `.svelte` widget or a `.svelte.js`/`.ts` helper — may wrap
+// useQuestion. Treat its presence as enough to suppress the "no questions"
+// warning: false negatives are acceptable for a heuristic that's advisory.
+const HAS_LOCAL_IMPORT_RE = /from\s+['"]\.{1,2}\//;
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check

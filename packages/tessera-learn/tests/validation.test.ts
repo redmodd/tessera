@@ -1792,6 +1792,78 @@ export const pageConfig = { title: "Exam", graded: true, quiz: {} };
     );
   });
 
+  it('accepts a practice quiz page whose standalone question is graded', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false } };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({
+    id: 'q1',
+    graded: true,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Lesson</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).not.toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
+    );
+  });
+
+  it('accepts a graded question built through an aliased useQuestion', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion as ask } from 'tessera-learn';
+  const q = ask({ id: 'q1', graded: true, response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>
+<p>{q.id}</p>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('accepts a graded question built in a local helper module', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/questions.svelte.js',
+      `import { useQuestion } from 'tessera-learn';
+export function examQuestion(id) {
+  return useQuestion({ id, graded: true, response: () => ({ response: 'a' }) });
+}`,
+    );
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  import { examQuestion } from './questions.svelte.js';
+  const practice = useQuestion({
+    id: 'p1',
+    response: () => ({ response: 'a' }),
+  });
+  const q = examQuestion('q1');
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
   it('accepts a graded quiz page that also declares graded', () => {
     createValidProject(testRoot);
     writePage(

@@ -301,7 +301,8 @@ export function gradedUseQuestions(
 }
 
 function collectUseQuestionCalls(root: Node): Node[] {
-  const found: Node[] = [];
+  const calls: Node[] = [];
+  const names = new Set<string>();
   const seen = new Set<object>();
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
@@ -312,13 +313,9 @@ function collectUseQuestionCalls(root: Node): Node[] {
       return;
     }
     const node = value as Node;
-    const callee = node.callee as Node | undefined;
-    if (
-      node.type === 'CallExpression' &&
-      callee?.type === 'Identifier' &&
-      callee.name === 'useQuestion'
-    ) {
-      found.push(node);
+    if (node.type === 'CallExpression') calls.push(node);
+    if (node.type === 'ImportDeclaration') {
+      for (const name of useQuestionLocalNames(node)) names.add(name);
     }
     for (const key of Object.keys(node)) {
       if (key === 'type') continue;
@@ -326,7 +323,25 @@ function collectUseQuestionCalls(root: Node): Node[] {
     }
   };
   walk(root);
-  return found;
+  if (names.size === 0) names.add('useQuestion');
+  return calls.filter((call) => {
+    const callee = call.callee as Node | undefined;
+    return callee?.type === 'Identifier' && names.has(callee.name as string);
+  });
+}
+
+function useQuestionLocalNames(node: Node): string[] {
+  const source = node.source as Node | undefined;
+  if (source?.value !== 'tessera-learn') return [];
+  const specifiers = (node.specifiers as Node[]) ?? [];
+  return specifiers
+    .filter((specifier) => {
+      const imported = specifier.imported as Node | undefined;
+      return (
+        specifier.type === 'ImportSpecifier' && imported?.name === 'useQuestion'
+      );
+    })
+    .map((specifier) => (specifier.local as Node).name as string);
 }
 
 function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
