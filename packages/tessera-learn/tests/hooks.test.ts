@@ -209,6 +209,7 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.gradedUnits.get(1)?.questions?.get('q1')).toEqual({
       score: 100,
       weight: 5,
+      graded: true,
     });
   });
 
@@ -777,6 +778,20 @@ describe('useProgress', () => {
 
     progress.quizCompleted(2, 70);
     expect(h.gradedScore).toEqual({ average: 80, attempted: true });
+  });
+
+  it('pageScore defaults to the current page', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    progress.markStandaloneQuestion(2, 'q1', 40, true);
+    const ctx = makeNavCtx(progress, 2);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useProgress();
+    expect(h.pageScore()).toBe(40);
+
+    ctx.nav.currentPageIndex = 1;
+    expect(h.pageScore()).toBeUndefined();
+    expect(h.pageScore(2)).toBe(40);
   });
 
   it('markVisited and markChunk delegate to ProgressState', () => {

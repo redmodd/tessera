@@ -6,6 +6,7 @@ import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 export interface StandaloneResult {
   score: number;
   weight: number;
+  graded: boolean;
 }
 
 export function normalizeWeight(weight: unknown): number {
@@ -138,39 +139,69 @@ export class ProgressState {
     graded: boolean,
     weight?: number,
   ) {
-    const unit = this.gradedUnits.get(pageIndex);
-    const questions = unit?.questions ?? new Map<string, StandaloneResult>();
-    questions.set(questionId, { score, weight: normalizeWeight(weight) });
-    this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
+    const questions =
+      this.gradedUnits.get(pageIndex)?.questions ??
+      new Map<string, StandaloneResult>();
+    questions.set(questionId, {
+      score,
+      weight: normalizeWeight(weight),
+      graded,
+    });
+    this.#writeQuestions(pageIndex, questions);
   }
 
   /**
-   * Correct a restored answer's weight from the mounted component, which
-   * outranks the weight the save was written with.
+   * Correct a restored answer's `graded` flag and weight from the mounted
+   * component, which outranks what the save was written with.
    * ponytail: only pages the learner reopens are corrected; a full sweep needs
-   * build-time weight extraction, which can't see custom question components.
+   * build-time extraction, which can't see custom question components.
    */
-  refreshStandaloneWeight(
+  refreshStandaloneQuestion(
     pageIndex: number,
     questionId: string,
+    graded: boolean,
     weight?: number,
   ) {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
     if (!questions || !result) return;
     const next = normalizeWeight(weight);
-    if (next === result.weight) return;
-    questions.set(questionId, { ...result, weight: next });
-    this.#write(pageIndex, { questions });
+    if (next === result.weight && graded === result.graded) return;
+    questions.set(questionId, { ...result, weight: next, graded });
+    this.#writeQuestions(pageIndex, questions);
   }
 
-  /** Weighted mean of standalone question scores on a page, or 0 if none. */
-  getPageStandaloneAverage(pageIndex: number): number {
+  pageScore(pageIndex: number): number | undefined {
+    const unit = this.gradedUnits.get(pageIndex);
+    if (
+      this.#declaredGradedIndices.has(pageIndex) &&
+      unit?.quizScore !== undefined
+    )
+      return unit.quizScore;
+    return unit?.graded ? this.getPageStandaloneAverage(pageIndex) : undefined;
+  }
+
+  #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
+    this.#write(pageIndex, {
+      questions,
+      graded: [...questions.values()].some((result) => result.graded),
+    });
+  }
+
+  #gradedResults(pageIndex: number): StandaloneResult[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
-    if (!questions || questions.size === 0) return 0;
+    return questions
+      ? [...questions.values()].filter((result) => result.graded)
+      : [];
+  }
+
+  /** Weighted mean of graded standalone scores on a page, or 0 if none. */
+  getPageStandaloneAverage(pageIndex: number): number {
+    const results = this.#gradedResults(pageIndex);
+    if (results.length === 0) return 0;
     let weighted = 0;
     let totalWeight = 0;
-    for (const { score, weight } of questions.values()) {
+    for (const { score, weight } of results) {
       weighted += score * weight;
       totalWeight += weight;
     }
@@ -198,13 +229,10 @@ export class ProgressState {
     let totalWeight = 0;
     let attempted = false;
     for (const pageIndex of pages) {
-      const unit = this.gradedUnits.get(pageIndex);
-      if (unit?.quizScore !== undefined || unit?.questions?.size) {
-        attempted = true;
-      }
-      const score = unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
+      const score = this.pageScore(pageIndex);
+      if (score !== undefined) attempted = true;
       const weight = this.#pageWeights.get(pageIndex) ?? 1;
-      weighted += score * weight;
+      weighted += (score ?? 0) * weight;
       totalWeight += weight;
     }
     return {

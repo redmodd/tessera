@@ -204,13 +204,13 @@
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
         const questions = {};
-        for (const [qid, { score, weight }] of unit.questions) {
-          questions[qid] = weight === 1 ? score : [score, weight];
+        for (const [qid, { score, weight, graded }] of unit.questions) {
+          questions[qid] =
+            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
         }
         entry.q = questions;
       }
-      if (unit.graded) entry.g = 1;
-      g[String(pageIndex)] = entry;
+      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
       b: nav.currentPageIndex,
@@ -243,12 +243,14 @@
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          const [score, weight] = Array.isArray(entry) ? entry : [entry, 1];
+          const [score, weight, graded] = Array.isArray(entry)
+            ? entry
+            : [entry, 1, 1];
           progress.markStandaloneQuestion(
             pageIndex,
             qid,
             score,
-            !!unit.g,
+            graded === 1,
             weight,
           );
         }
@@ -444,11 +446,17 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const restoredScore = progress.gradedScore;
-        adapter.seedLifecycle?.(
-          progress.completionStatus,
-          progress.successStatus,
-          restoredScore.attempted ? Math.round(restoredScore.average) : null,
-        );
+        const seededScore = restoredScore.attempted
+          ? Math.round(restoredScore.average)
+          : null;
+        if (adapter.seedLifecycle) {
+          adapter.seedLifecycle(
+            progress.completionStatus,
+            progress.successStatus,
+            seededScore,
+          );
+          prevReportedScore = seededScore;
+        }
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);
