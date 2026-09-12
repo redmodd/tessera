@@ -736,6 +736,31 @@ export const pageConfig = { title: "Just Prose", weight: 40 };
     );
   });
 
+  it('warns about a graded page with no weight beside pages that declare one', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Check", graded: true, weight: 100 };
+</script>
+<h1>Check</h1>`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('graded without a pageConfig.weight'),
+    );
+    expect(warnings).toContainEqual(expect.stringContaining('exam.svelte'));
+  });
+
   it('reports the effective weighting as a note, not a warning', () => {
     createValidProject(testRoot);
     writeFile(

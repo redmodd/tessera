@@ -1689,10 +1689,15 @@ function reportEffectiveWeights(
   const shares = graded
     .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
     .join(', ');
-  d.info(
-    `course score weighting: ${shares} ` +
-      '(a page that declares neither joins at weight 1 once a learner answers a graded standalone question on it)',
-  );
+  d.info(`course score weighting: ${shares}`);
+
+  const unweighted = graded.filter((p) => p.weight === undefined);
+  if (unweighted.length > 0) {
+    d.warn(
+      `graded without a pageConfig.weight, so each counts as 1 against pages that ` +
+        `declare one: ${unweighted.map((p) => p.fileRel).join(', ')}`,
+    );
+  }
 
   if (graded.length < 2) return;
   // Near a round scale but not on it reads as a typo; a bare ratio total like 7 doesn't.
@@ -1701,8 +1706,7 @@ function reportEffectiveWeights(
     d.warn(
       `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +
         `Add up to ${scale} to make each weight the page's percentage of the course score, ` +
-        'or ignore this if the weights are meant as bare ratios. ' +
-        'Graded pages that declare no weight count as 1.',
+        'or ignore this if the weights are meant as bare ratios.',
     );
   }
 }
