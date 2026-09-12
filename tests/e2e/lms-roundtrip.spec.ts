@@ -703,7 +703,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
       .click();
     await waitForTesseraContent(page);
-    await expect.poll(() => statePuts.length).toBeGreaterThan(0);
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
 
     const saved = statePuts.at(-1)!;
     expect(JSON.parse(saved).f).toBeTruthy();

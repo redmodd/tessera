@@ -220,7 +220,7 @@
           questions[qid] =
             graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
         }
-        if (Object.keys(questions).length > 0) entry.q = questions;
+        entry.q = questions;
       }
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
