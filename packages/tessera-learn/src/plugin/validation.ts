@@ -17,6 +17,7 @@ import {
   findComponents,
   getParseError,
   gradedUseQuestions,
+  hasUseQuestionCall,
   type PropValue,
 } from './ast.js';
 import {
@@ -977,7 +978,7 @@ function validatePageFile(
   validateContractBypass(content, fileRel, d);
   if (
     (pageConfig?.quiz || declaresGraded) &&
-    !HAS_USE_QUESTION_RE.test(content) &&
+    !hasUseQuestionCall(content) &&
     !HAS_QUESTION_TAG_RE.test(content) &&
     !hasCustomWidget
   ) {
@@ -1634,7 +1635,6 @@ function validateHeadingOrder(
 const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
-const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );

@@ -1833,6 +1833,24 @@ export const pageConfig = { title: "Exam", graded: true };
     );
   });
 
+  it('sees an aliased useQuestion as a question on the page', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion as ask } from 'tessera-learn';
+  const q = ask({ id: 'q1', graded: true, response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('has no question components'),
+    );
+  });
+
   it('accepts a graded question built in a local helper module', () => {
     createValidProject(testRoot);
     writeFile(

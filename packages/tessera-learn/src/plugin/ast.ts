@@ -280,6 +280,12 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   return pageConfigFromModuleScriptFallback(svelteSource);
 }
 
+/** Whether a page calls `useQuestion`, under whatever name it imports it. */
+export function hasUseQuestionCall(source: string): boolean {
+  const { root } = parseRoot(source);
+  return root ? collectUseQuestionCalls(root).length > 0 : false;
+}
+
 /**
  * Whether a page builds a graded standalone question: 'graded' if some
  * `useQuestion` call passes `graded: true`, 'unknown' when a call's options
