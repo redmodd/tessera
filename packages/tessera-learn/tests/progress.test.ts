@@ -567,6 +567,90 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('pageScore', () => {
+    it('returns undefined until something is answered on the page', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      expect(progress.pageScore(3)).toBeUndefined();
+    });
+
+    it('returns the weighted standalone mean on a page with no quiz', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
+      expect(progress.pageScore(3)).toBe(75);
+    });
+
+    it('stays undefined on a page of practice questions', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 40, false);
+      progress.markStandaloneQuestion(3, 'q2', 60, false);
+      expect(progress.pageScore(3)).toBeUndefined();
+    });
+
+    it('ignores a practice answer beside a graded one', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(1, 'graded', 100, true);
+      progress.markStandaloneQuestion(1, 'practice', 0, false);
+      expect(progress.pageScore(1)).toBe(100);
+    });
+
+    it('prefers the quiz score when the page has a graded quiz', () => {
+      const progress = new ProgressState(
+        new Set([2]),
+        createConfig(),
+        0,
+        new Set([2]),
+      );
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+      progress.quizCompleted(2, 85);
+      expect(progress.pageScore(2)).toBe(85);
+    });
+
+    it('matches gradedScore when a practice quiz sits beside a graded question', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        5,
+        new Set([2]),
+      );
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      progress.quizCompleted(2, 10);
+      expect(progress.pageScore(2)).toBe(100);
+      expect(progress.gradedScore.average).toBe(100);
+    });
+
+    it('ignores the score of an ungraded practice quiz', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set([2]),
+      );
+      progress.quizCompleted(2, 60);
+      expect(progress.pageScore(2)).toBeUndefined();
+    });
+  });
+
   describe('refreshStandaloneQuestion', () => {
     it('reweights a restored answer without changing its score', () => {
       const progress = new ProgressState(
