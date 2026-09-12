@@ -216,8 +216,9 @@
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
         const questions = {};
-        for (const [qid, { score, weight }] of unit.questions) {
-          questions[qid] = weight === 1 ? score : [score, weight];
+        for (const [qid, { score, weight, graded }] of unit.questions) {
+          questions[qid] =
+            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
         }
         entry.q = questions;
       }
@@ -255,12 +256,15 @@
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          const [score, weight] = Array.isArray(entry) ? entry : [entry, 1];
+          // Pre-flag saves store a bare score; the page's `g` stands in for it.
+          const [score, weight, graded] = Array.isArray(entry)
+            ? entry
+            : [entry, 1, undefined];
           progress.markStandaloneQuestion(
             pageIndex,
             qid,
             score,
-            !!unit.g,
+            graded === undefined ? !!unit.g : graded === 1,
             weight,
           );
         }

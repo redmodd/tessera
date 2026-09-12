@@ -505,7 +505,7 @@ describe('ProgressState', () => {
       expect(progress.getPageStandaloneAverage(3)).toBe(0);
     });
 
-    it('averages all question scores on the page', () => {
+    it('averages the graded question scores on the page', () => {
       const progress = new ProgressState(
         new Set(),
         createConfig(),
@@ -528,6 +528,29 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
       expect(progress.getPageStandaloneAverage(3)).toBe(75);
+    });
+
+    it('skips ungraded practice answers', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'graded', 100, true);
+      progress.markStandaloneQuestion(3, 'practice', 0, false);
+      expect(progress.getPageStandaloneAverage(3)).toBe(100);
+    });
+
+    it('returns 0 on a page of ungraded practice answers', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'practice', 80, false);
+      expect(progress.getPageStandaloneAverage(3)).toBe(0);
     });
 
     it('treats a non-positive or non-finite weight as 1', () => {
@@ -559,6 +582,7 @@ describe('ProgressState', () => {
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
         score: 100,
         weight: 1,
+        graded: true,
       });
       expect(progress.getPageStandaloneAverage(3)).toBe(50);
     });
@@ -737,6 +761,21 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 100, false);
 
       expect(progress.gradedScore.attempted).toBe(false);
+    });
+
+    it('ignores a practice answer sharing a page with a graded question', () => {
+      const manifest = createManifest(5);
+      const progress = new ProgressState(
+        gradedQuizIndices(manifest),
+        createConfig(),
+        manifest.totalPages,
+        quizPageIndices(manifest),
+      );
+
+      progress.markStandaloneQuestion(2, 'graded', 100, true);
+      progress.markStandaloneQuestion(2, 'practice', 0, false);
+
+      expect(progress.gradedScore.average).toBe(100);
     });
 
     it('averages quizzes and graded standalone pages together', () => {

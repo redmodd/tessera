@@ -214,6 +214,7 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.gradedUnits.get(1)?.questions?.get('q1')).toEqual({
       score: 100,
       weight: 5,
+      graded: true,
     });
   });
 

@@ -56,8 +56,12 @@ export interface GradedUnitState {
   s?: number;
   /** Submitted quiz attempts, omitted when 1 */
   a?: number;
-  /** Standalone question results — questionId → score 0-100, or [score, weight] when weighted */
-  q?: Record<string, number | [number, number]>;
+  /**
+   * Standalone question results — questionId → score 0-100 for a graded
+   * question of weight 1, else [score, weight, graded]. Saves written before
+   * the per-question graded flag use [score, weight] and fall back to `g`.
+   */
+  q?: Record<string, number | [number, number] | [number, number, 0 | 1]>;
   /** 1 when the page has at least one graded standalone question */
   g?: 1;
 }

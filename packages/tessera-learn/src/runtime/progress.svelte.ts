@@ -5,6 +5,7 @@ import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 export interface StandaloneResult {
   score: number;
   weight: number;
+  graded: boolean;
 }
 
 export function normalizeWeight(weight: unknown): number {
@@ -134,7 +135,11 @@ export class ProgressState {
   ) {
     const unit = this.gradedUnits.get(pageIndex);
     const questions = unit?.questions ?? new Map<string, StandaloneResult>();
-    questions.set(questionId, { score, weight: normalizeWeight(weight) });
+    questions.set(questionId, {
+      score,
+      weight: normalizeWeight(weight),
+      graded,
+    });
     this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
   }
 
@@ -158,13 +163,20 @@ export class ProgressState {
     this.#write(pageIndex, { questions });
   }
 
-  /** Weighted mean of standalone question scores on a page, or 0 if none. */
-  getPageStandaloneAverage(pageIndex: number): number {
+  #gradedResults(pageIndex: number): StandaloneResult[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
-    if (!questions || questions.size === 0) return 0;
+    return questions
+      ? [...questions.values()].filter((result) => result.graded)
+      : [];
+  }
+
+  /** Weighted mean of graded standalone scores on a page, or 0 if none. */
+  getPageStandaloneAverage(pageIndex: number): number {
+    const results = this.#gradedResults(pageIndex);
+    if (results.length === 0) return 0;
     let weighted = 0;
     let totalWeight = 0;
-    for (const { score, weight } of questions.values()) {
+    for (const { score, weight } of results) {
       weighted += score * weight;
       totalWeight += weight;
     }
@@ -192,7 +204,10 @@ export class ProgressState {
     let attempted = false;
     for (const pageIndex of pages) {
       const unit = this.gradedUnits.get(pageIndex);
-      if (unit?.quizScore !== undefined || unit?.questions?.size) {
+      if (
+        unit?.quizScore !== undefined ||
+        this.#gradedResults(pageIndex).length > 0
+      ) {
         attempted = true;
       }
       sum += unit?.quizScore ?? this.getPageStandaloneAverage(pageIndex);
