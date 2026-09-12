@@ -286,12 +286,7 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   return pageConfigFromModuleScriptFallback(svelteSource);
 }
 
-/**
- * How a page grades its standalone questions: 'absent' when it makes no
- * `useQuestion` call, 'graded' when some call passes `graded: true`, 'unknown'
- * when a call's options can't be read statically (a spread, a variable, a
- * computed value), and 'none' when every call is plainly ungraded.
- */
+/** 'unknown' when a call's options can't be read statically (spread, variable, computed). */
 export function useQuestionGrading(
   source: string,
 ): 'absent' | 'graded' | 'none' | 'unknown' {

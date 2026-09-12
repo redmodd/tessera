@@ -273,7 +273,6 @@ export class ProgressState {
     return count;
   });
 
-  /** A visited page that owes a score isn't finished: reading it isn't doing it. */
   awaitingScore(pageIndex: number): boolean {
     if (
       this.#quizPageIndices.has(pageIndex) &&

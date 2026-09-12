@@ -1635,12 +1635,8 @@ const QUIZ_COMPLETE_DISPATCH_RE =
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 const IMPORT_SOURCE_RE = /from\s+['"]([^'"]+)['"]/g;
 
-/**
- * Whether the page imports a local module — a `.svelte` widget or a
- * `.svelte.js`/`.ts` helper, relative or via an alias like `$shared` — that may
- * wrap useQuestion. Its presence is enough to suppress the "no questions"
- * warning: false negatives are acceptable for a heuristic that's advisory.
- */
+// A local import may wrap useQuestion, so its presence suppresses the "no
+// questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
   for (const [, source] of content.matchAll(IMPORT_SOURCE_RE)) {
     if (!/^(?:\.{1,2}\/|\$)/.test(source)) continue;
@@ -1650,7 +1646,6 @@ function hasLocalModuleImport(content: string): boolean {
   return false;
 }
 
-/** A question component counts as graded unless it plainly opts out. */
 function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
   if (hasSpread) return true;
   const graded = props.get('graded');
