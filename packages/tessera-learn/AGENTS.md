@@ -801,11 +801,11 @@ function useProgress(): {
 };
 ```
 
-`pageScore` is what a page shows about itself: a graded quiz's score once it is submitted, otherwise the weighted mean of the graded standalone questions answered on that page. A page of standalone questions renders no score on its own, so read it and print one. Three things to know:
+`pageScore` is a page's own score: a graded quiz's score once submitted, else the weighted mean of the graded standalone questions answered on that page. A standalone-question page renders no score on its own, so read it and print one.
 
-- **It covers only the questions answered so far**, so a page with three graded questions reads 100% after one correct answer. Print it once the page is done, or label it. This is the opposite of `gradedScore`, where an unattempted graded page counts as 0.
-- **It is unrounded.** Round it yourself for display, the way the LMS gets `Math.round` of `gradedScore.average`.
-- **Only graded work counts.** Practice answers and an ungraded practice quiz are ignored, so a practice page reads `undefined`, never a score. The page reads exactly what it contributes to `gradedScore`, which is built from the same per-page number.
+- **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
+- **Round it yourself** for display.
+- **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
 `gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
 
