@@ -222,8 +222,7 @@
         }
         entry.q = questions;
       }
-      if (unit.graded) entry.g = 1;
-      g[String(pageIndex)] = entry;
+      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
       b: nav.currentPageIndex,
@@ -256,16 +255,14 @@
           progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          // A bare score means weight 1; its graded flag comes from the page,
-          // which is also the fallback for saves written before the per-question flag.
           const [score, weight, graded] = Array.isArray(entry)
             ? entry
-            : [entry, 1, undefined];
+            : [entry, 1, 1];
           progress.markStandaloneQuestion(
             pageIndex,
             qid,
             score,
-            graded === undefined ? !!unit.g : graded === 1,
+            graded === 1,
             weight,
           );
         }
@@ -461,11 +458,17 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const restoredScore = progress.gradedScore;
-        adapter.seedLifecycle?.(
-          progress.completionStatus,
-          progress.successStatus,
-          restoredScore.attempted ? Math.round(restoredScore.average) : null,
-        );
+        const seededScore = restoredScore.attempted
+          ? Math.round(restoredScore.average)
+          : null;
+        if (adapter.seedLifecycle) {
+          adapter.seedLifecycle(
+            progress.completionStatus,
+            progress.successStatus,
+            seededScore,
+          );
+          prevReportedScore = seededScore;
+        }
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);

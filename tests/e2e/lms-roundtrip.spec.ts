@@ -691,14 +691,26 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   test('resumes the bookmarked page from a populated State API', async ({
     page,
   }) => {
-    // No `f` — state saved before fingerprinting is trusted, which keeps this
-    // test independent of the fixture's page slugs.
-    const saved = { b: 3, v: [0, 1, 2, 3], d: 42 };
-    await routeLRSWithState(
-      page,
-      { status: 200, body: JSON.stringify(saved) },
-      [],
-    );
+    // The blob is produced by a real save so it carries the fixture's own
+    // structure fingerprint, which the resume gate now requires.
+    const stateGet = { status: 404, body: '{}' };
+    const statePuts: string[] = [];
+    await routeLRSWithState(page, stateGet, statePuts);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
+      .click();
+    await waitForTesseraContent(page);
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
+
+    const saved = statePuts.at(-1)!;
+    expect(JSON.parse(saved).f).toBeTruthy();
+    stateGet.status = 200;
+    stateGet.body = saved;
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);

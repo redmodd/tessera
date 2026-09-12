@@ -133,34 +133,36 @@ export class ProgressState {
     graded: boolean,
     weight?: number,
   ) {
-    const unit = this.gradedUnits.get(pageIndex);
-    const questions = unit?.questions ?? new Map<string, StandaloneResult>();
+    const questions =
+      this.gradedUnits.get(pageIndex)?.questions ??
+      new Map<string, StandaloneResult>();
     questions.set(questionId, {
       score,
       weight: normalizeWeight(weight),
       graded,
     });
-    this.#write(pageIndex, { questions, graded: graded || !!unit?.graded });
+    this.#writeQuestions(pageIndex, questions);
   }
 
   /**
-   * Correct a restored answer's weight from the mounted component, which
-   * outranks the weight the save was written with.
+   * Correct a restored answer's `graded` flag and weight from the mounted
+   * component, which outranks what the save was written with.
    * ponytail: only pages the learner reopens are corrected; a full sweep needs
-   * build-time weight extraction, which can't see custom question components.
+   * build-time extraction, which can't see custom question components.
    */
-  refreshStandaloneWeight(
+  refreshStandaloneQuestion(
     pageIndex: number,
     questionId: string,
+    graded: boolean,
     weight?: number,
   ) {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
     if (!questions || !result) return;
     const next = normalizeWeight(weight);
-    if (next === result.weight) return;
-    questions.set(questionId, { ...result, weight: next });
-    this.#write(pageIndex, { questions });
+    if (next === result.weight && graded === result.graded) return;
+    questions.set(questionId, { ...result, weight: next, graded });
+    this.#writeQuestions(pageIndex, questions);
   }
 
   /**
@@ -174,6 +176,13 @@ export class ProgressState {
     return this.#gradedResults(pageIndex).length > 0
       ? this.getPageStandaloneAverage(pageIndex)
       : undefined;
+  }
+
+  #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
+    this.#write(pageIndex, {
+      questions,
+      graded: [...questions.values()].some((result) => result.graded),
+    });
   }
 
   // Ungraded practice answers are stored alongside graded ones, so every score

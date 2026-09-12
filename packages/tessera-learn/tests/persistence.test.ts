@@ -26,14 +26,14 @@ describe('SavedState serialization', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      g: { '2': { s: 100, q: { q1: 80 }, g: 1 } },
+      g: { '2': { s: 100, q: { q1: 80 } } },
       d: 500,
     };
     const json = JSON.stringify(state);
     const restored: SavedState = JSON.parse(json);
     expect(restored.b).toBe(3);
     expect(restored.v).toEqual([0, 1, 2, 3]);
-    expect(restored.g?.['2']).toEqual({ s: 100, q: { q1: 80 }, g: 1 });
+    expect(restored.g?.['2']).toEqual({ s: 100, q: { q1: 80 } });
     expect(restored.d).toBe(500);
   });
 

@@ -137,9 +137,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   if (navCtx) {
-    navCtx.progress.refreshStandaloneWeight(
+    navCtx.progress.refreshStandaloneQuestion(
       navCtx.nav.currentPageIndex,
       opts.id,
+      !!opts.graded,
       opts.weight,
     );
   }
