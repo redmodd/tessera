@@ -10,7 +10,6 @@ export function runValidate(
 ): number {
   const result = validateProject(projectRoot, standardOverride);
   const { errors, warnings } = result;
-
   reportValidationIssues(result);
 
   if (errors.length > 0) {

@@ -520,10 +520,11 @@ describe('ProgressState', () => {
     });
 
     it('weights pages by pageConfig.weight', () => {
-      const manifest = createManifest(5, { 1: { graded: true } }, new Set(), {
-        1: 30,
-        3: 70,
-      });
+      const manifest = createManifest(
+        5,
+        { 1: { graded: true } },
+        { 1: { weight: 30 }, 3: { weight: 70 } },
+      );
       const progress = new ProgressState(manifest, createConfig());
 
       progress.quizCompleted(1, 100);
@@ -537,8 +538,7 @@ describe('ProgressState', () => {
       const manifest = createManifest(
         5,
         { 1: { graded: true }, 2: { graded: true } },
-        new Set(),
-        { 1: 0, 2: Number.NaN },
+        { 1: { weight: 0 }, 2: { weight: Number.NaN } },
       );
       const progress = new ProgressState(manifest, createConfig());
 
@@ -549,10 +549,14 @@ describe('ProgressState', () => {
     });
 
     it('weights a declared-graded page in even when it was never attempted', () => {
-      const manifest = createManifest(5, {}, new Set([1, 3]), {
-        1: 25,
-        3: 75,
-      });
+      const manifest = createManifest(
+        5,
+        {},
+        {
+          1: { graded: true, weight: 25 },
+          3: { graded: true, weight: 75 },
+        },
+      );
       const progress = new ProgressState(manifest, createConfig());
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
@@ -562,7 +566,11 @@ describe('ProgressState', () => {
     });
 
     it('weights an undeclared page once a graded question is answered on it', () => {
-      const manifest = createManifest(5, {}, new Set(), { 1: 90, 3: 10 });
+      const manifest = createManifest(
+        5,
+        {},
+        { 1: { weight: 90 }, 3: { weight: 10 } },
+      );
       const progress = new ProgressState(manifest, createConfig());
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);

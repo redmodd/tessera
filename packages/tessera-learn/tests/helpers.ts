@@ -4,8 +4,7 @@ import type { CourseConfig } from '../src/runtime/types.js';
 export function createManifest(
   pageCount: number,
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
-  gradedPages: ReadonlySet<number> = new Set(),
-  weights: Record<number, number> = {},
+  pageOpts: Record<number, { graded?: boolean; weight?: number }> = {},
 ): Manifest {
   const pages = Array.from({ length: pageCount }, (_, i) => ({
     index: i,
@@ -19,8 +18,10 @@ export function createManifest(
           maxAttempts: 3,
         }
       : null,
-    ...(gradedPages.has(i) ? { graded: true } : {}),
-    ...(weights[i] !== undefined ? { weight: weights[i] } : {}),
+    ...(pageOpts[i]?.graded ? { graded: true } : {}),
+    ...(pageOpts[i]?.weight !== undefined
+      ? { weight: pageOpts[i].weight }
+      : {}),
   }));
 
   return {

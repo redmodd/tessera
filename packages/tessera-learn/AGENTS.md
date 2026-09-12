@@ -387,6 +387,8 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 
 Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
 
+A page's own score is the weighted mean of **every** standalone question answered on it, `graded: true` or not. Keep practice questions off a graded page, or they drag its score.
+
 ### Question types
 
 Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
