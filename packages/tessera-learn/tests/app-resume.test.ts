@@ -150,7 +150,7 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('round-trips a weighted standalone question as [score, weight]', async () => {
+  it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
@@ -162,7 +162,7 @@ describe('App restore gate honours config.resume', () => {
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: 100, q2: [40, 3] }, g: 1 } },
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, g: 1 } },
     });
   });
 
