@@ -266,3 +266,66 @@ test.describe.serial('weighted standalone questions', () => {
       .toBe('75');
   });
 });
+
+test.describe.serial('per-page weights in the course rollup', () => {
+  const PORT = 5313;
+  const BASE = `http://localhost:${PORT}`;
+  let preview: ChildProcess;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    preview = startPreview('page-weight', 'scorm12', PORT);
+    const page = await browser.newPage();
+    try {
+      await waitForServer(page, BASE);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(() => preview?.kill('SIGTERM'));
+  test.beforeEach(async ({ page }) => installScorm12Mock(page));
+
+  async function answerCheckQuiz(page: Page, optionIndex: number) {
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(optionIndex)
+      .click();
+    await page.locator('.tessera-quiz-btn-submit').click();
+  }
+
+  async function courseScore(page: Page) {
+    return page.evaluate(
+      () => (window as any).__scormDataSnapshot()['cmi.core.score.raw'],
+    );
+  }
+
+  test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await answerCheckQuiz(page, 0);
+
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(2)
+      .check();
+
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+  });
+
+  test('a skipped graded page still weighs in: acing the 25 scores 25, not 100', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await answerCheckQuiz(page, 1);
+
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
+  });
+});

@@ -12,6 +12,7 @@ import {
   titleCase,
   deriveSlug,
 } from '../src/plugin/manifest.js';
+import { normalizeWeight } from '../src/runtime/progress.svelte.js';
 
 const TMP = resolve(__dirname, '__test_pages__');
 
@@ -407,6 +408,45 @@ describe('generateManifest', () => {
     expect(manifest.pages[2].title).toBe('Overview');
     expect(manifest.pages[2].slug).toBe('overview');
     expect(manifest.pages[2].index).toBe(2);
+  });
+
+  it('carries pageConfig.graded and weight onto the manifest page', () => {
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["exam", "plain"] };',
+    );
+    createFile(
+      '01-s/01-l/exam.svelte',
+      `<script context="module">
+export const pageConfig = { graded: true, weight: 75 }
+</script>
+<h1>Exam</h1>`,
+    );
+    createFile('01-s/01-l/plain.svelte', '<h1>Plain</h1>');
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].graded).toBe(true);
+    expect(manifest.pages[0].weight).toBe(75);
+    expect(manifest.pages[1].graded).toBeUndefined();
+    expect(manifest.pages[1].weight).toBeUndefined();
+  });
+
+  it('carries a non-positive weight through verbatim (the runtime treats it as 1)', () => {
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["a"] };',
+    );
+    createFile(
+      '01-s/01-l/a.svelte',
+      `<script context="module">
+export const pageConfig = { graded: true, weight: 0 }
+</script>
+<h1>A</h1>`,
+    );
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].weight).toBe(0);
+    expect(normalizeWeight(manifest.pages[0].weight)).toBe(1);
   });
 
   it('uses title-case fallback when _meta.js missing', () => {

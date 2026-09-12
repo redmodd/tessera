@@ -22,12 +22,7 @@ import {
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
-import {
-  createManifest,
-  createConfig,
-  gradedQuizIndices,
-  quizPageIndices,
-} from './helpers.js';
+import { createManifest, createConfig } from './helpers.js';
 
 function makeAdapter() {
   return {
@@ -69,7 +64,7 @@ beforeEach(() => {
 
 describe('useQuestion — standalone mode', () => {
   it('reports the interaction through the adapter on submit', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter });
@@ -92,7 +87,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('is not answerComplete until an answer is set, with no complete callback', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
@@ -107,7 +102,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('flags incorrect when response does not match', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter });
@@ -127,7 +122,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('does not register a graded score when graded is false', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 2));
     ctxStore.set('tessera-adapter', { adapter });
@@ -145,7 +140,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('registers a graded score when graded is true', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     const ctx = makeNavCtx(progress, 3);
     ctxStore.set('tessera-nav', ctx);
@@ -165,7 +160,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('uses score override when provided', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 0));
     ctxStore.set('tessera-adapter', { adapter });
@@ -182,7 +177,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('passes weight through to the recorded result', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
     ctxStore.set('tessera-adapter', { adapter });
@@ -198,7 +193,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('corrects a restored answer whose saved weight is out of date', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
     ctxStore.set('tessera-adapter', { adapter });
@@ -219,7 +214,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('submit is idempotent — calling twice does not double-report', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter });
@@ -234,7 +229,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('reset clears submitted/correct and re-enables submit', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     const userReset = vi.fn();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -258,7 +253,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('mode is "standalone" outside a Quiz', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
@@ -270,7 +265,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('reports correct=null when interaction has no correct answer', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter });
@@ -294,7 +289,7 @@ describe('useQuestion — standalone mode', () => {
 
 describe('useQuestion — standalone retry', () => {
   function setupCtx() {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress));
     ctxStore.set('tessera-adapter', { adapter });
@@ -438,7 +433,7 @@ function makeQuizCtx(overrides: Record<string, unknown> = {}) {
 
 describe('useQuestion — inside a <Quiz>', () => {
   it('registers with the parent Quiz exactly once', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -458,7 +453,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('forwards each widget through to a distinct quiz registration', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -478,7 +473,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('interaction() callback returns the latest response value (not memoized)', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -506,7 +501,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('checkAnswer() returns the boolean from isCorrect(response())', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -526,7 +521,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('reset is passed through to the quiz registration', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -544,7 +539,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('handle.submit() is a no-op when nested in a quiz', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     const adapter = makeAdapter();
     ctxStore.set('tessera-quiz', quiz);
@@ -563,7 +558,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('does not record a graded unit even when graded is true (quiz drives scoring)', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress, 3));
@@ -580,7 +575,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('handle.submitted mirrors quiz.submitted', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -599,7 +594,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('handle.reset calls opts.reset but does not reset the whole quiz', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -617,7 +612,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('warns in dev about standalone-only options passed inside a quiz', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -639,7 +634,7 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('retry() is a no-op inside a quiz; canRetry is always false', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -668,7 +663,7 @@ describe('useNavigation', () => {
   });
 
   it('exposes currentPage, currentPageIndex, and pages from nav context', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 2);
     ctxStore.set('tessera-nav', ctx);
 
@@ -679,7 +674,7 @@ describe('useNavigation', () => {
   });
 
   it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
 
@@ -688,7 +683,7 @@ describe('useNavigation', () => {
   });
 
   it('goTo(unknown slug) is a no-op', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
 
@@ -697,7 +692,7 @@ describe('useNavigation', () => {
   });
 
   it('next/prev/canGoNext/canGoPrev delegate to nav', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
 
@@ -711,7 +706,7 @@ describe('useNavigation', () => {
   });
 
   it('canAccess returns false for unknown slug, true when nav.isPageLocked is false', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
 
@@ -731,12 +726,7 @@ describe('useNavigation', () => {
         canAccess: ({ pageIndex }) => pageIndex === 0,
       },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      config,
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, config);
     const nav = new NavigationState(manifest, progress, config);
     ctxStore.set('tessera-nav', { nav, manifest, progress, config });
 
@@ -755,7 +745,7 @@ describe('useProgress', () => {
   });
 
   it('exposes reactive ProgressState fields', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     progress.markVisited(0);
     progress.markVisited(1);
     progress.quizCompleted(2, 80);
@@ -774,10 +764,8 @@ describe('useProgress', () => {
       2: { graded: true },
     });
     const progress = new ProgressState(
-      gradedQuizIndices(manifest),
+      manifest,
       createConfig({ scoring: { passingScore: 80 } }),
-      4,
-      quizPageIndices(manifest),
     );
     ctxStore.set('tessera-nav', makeNavCtx(progress));
 
@@ -793,7 +781,7 @@ describe('useProgress', () => {
   });
 
   it('pageScore defaults to the current page', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     progress.markStandaloneQuestion(2, 'q1', 40, true);
     const ctx = makeNavCtx(progress, 2);
     ctxStore.set('tessera-nav', ctx);
@@ -807,7 +795,7 @@ describe('useProgress', () => {
   });
 
   it('markVisited and markChunk delegate to ProgressState', () => {
-    const progress = new ProgressState(new Set(), createConfig(), 0, new Set());
+    const progress = new ProgressState(createManifest(0), createConfig());
     ctxStore.set('tessera-nav', makeNavCtx(progress));
 
     const h = useProgress();

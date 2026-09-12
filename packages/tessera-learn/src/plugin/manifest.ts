@@ -18,6 +18,16 @@ export interface ManifestPage {
   slug: string;
   importPath: string;
   quiz: QuizConfig | null;
+  graded?: boolean;
+  weight?: number;
+  completesOn?: 'view';
+}
+
+export interface PageConfig {
+  title?: string;
+  quiz?: QuizConfig;
+  graded?: boolean;
+  weight?: number;
   completesOn?: 'view';
 }
 
@@ -169,10 +179,7 @@ export type PageConfigParseResult =
   /** No module script, or no `pageConfig =` export. Treat as "no config". */
   | { kind: 'none' }
   /** Found and successfully parsed. */
-  | {
-      kind: 'ok';
-      value: { title?: string; quiz?: QuizConfig; completesOn?: 'view' };
-    }
+  | { kind: 'ok'; value: PageConfig }
   /** Found but couldn't parse as a static object literal — non-literal RHS or JSON5 failure. */
   | { kind: 'invalid' };
 
@@ -192,11 +199,7 @@ export function parsePageConfigFromSource(
 }
 
 /** Extract pageConfig from a .svelte file. Throws on parse failure. */
-export function extractPageConfig(filePath: string): {
-  title?: string;
-  quiz?: QuizConfig;
-  completesOn?: 'view';
-} {
+export function extractPageConfig(filePath: string): PageConfig {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
@@ -329,11 +332,7 @@ export function generateManifest(pagesDir: string): Manifest {
         const filePath = resolve(walkedLesson.dir, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
-        let pageConfig: {
-          title?: string;
-          quiz?: QuizConfig;
-          completesOn?: 'view';
-        } = {};
+        let pageConfig: PageConfig = {};
         try {
           pageConfig = extractPageConfig(filePath);
         } catch (e) {
@@ -348,6 +347,10 @@ export function generateManifest(pagesDir: string): Manifest {
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz: pageConfig.quiz || null,
+          ...(pageConfig.graded === true ? { graded: true } : {}),
+          ...(pageConfig.weight !== undefined
+            ? { weight: pageConfig.weight }
+            : {}),
           ...(pageConfig.completesOn === 'view'
             ? { completesOn: 'view' as const }
             : {}),

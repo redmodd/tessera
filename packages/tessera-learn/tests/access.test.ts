@@ -6,12 +6,7 @@ import {
   type AccessFn,
 } from '../src/runtime/access.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import {
-  createManifest,
-  createConfig,
-  gradedQuizIndices,
-  quizPageIndices,
-} from './helpers.js';
+import { createManifest, createConfig } from './helpers.js';
 
 function ctx(
   pageIndex: number,
@@ -31,12 +26,7 @@ function ctx(
 describe('freeAccess', () => {
   it('allows any page when no preceding gating quiz exists', () => {
     const manifest = createManifest(5);
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig();
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
   });
@@ -45,12 +35,7 @@ describe('freeAccess', () => {
     const manifest = createManifest(5, {
       2: { graded: true, gatesProgress: true },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig({ scoring: { passingScore: 70 } });
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(false);
   });
@@ -59,12 +44,7 @@ describe('freeAccess', () => {
     const manifest = createManifest(5, {
       2: { graded: true, gatesProgress: true },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     progress.quizCompleted(2, 80);
     const config = createConfig({ scoring: { passingScore: 70 } });
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
@@ -75,12 +55,7 @@ describe('freeAccess', () => {
       1: { graded: true, gatesProgress: true },
       3: { graded: true, gatesProgress: true },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     progress.quizCompleted(3, 90);
     // Page 1 quiz is unattempted but irrelevant — page 3's gate is the nearest.
     const config = createConfig({ scoring: { passingScore: 70 } });
@@ -91,12 +66,7 @@ describe('freeAccess', () => {
     const manifest = createManifest(5, {
       2: { graded: true, gatesProgress: false },
     });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig({ scoring: { passingScore: 70 } });
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
   });
@@ -105,36 +75,21 @@ describe('freeAccess', () => {
 describe('sequentialAccess', () => {
   it('allows page 0 unconditionally', () => {
     const manifest = createManifest(5);
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig();
     expect(sequentialAccess(ctx(0, manifest, progress, config))).toBe(true);
   });
 
   it('locks any page beyond an unvisited preceding page', () => {
     const manifest = createManifest(5);
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig();
     expect(sequentialAccess(ctx(2, manifest, progress, config))).toBe(false);
   });
 
   it('unlocks the next page once the preceding page is visited', () => {
     const manifest = createManifest(5);
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     progress.markVisited(0);
     const config = createConfig();
     expect(sequentialAccess(ctx(1, manifest, progress, config))).toBe(true);
@@ -143,12 +98,7 @@ describe('sequentialAccess', () => {
 
   it('requires preceding quizzes to be scored before unlocking later pages', () => {
     const manifest = createManifest(4, { 1: { graded: true } });
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     progress.markVisited(0);
     const config = createConfig({ scoring: { passingScore: 70 } });
 
@@ -181,12 +131,7 @@ describe('resolveAccess', () => {
 
   it('composes naturally with presets', () => {
     const manifest = createManifest(3);
-    const progress = new ProgressState(
-      gradedQuizIndices(manifest),
-      createConfig(),
-      manifest.totalPages,
-      quizPageIndices(manifest),
-    );
+    const progress = new ProgressState(manifest, createConfig());
     const config = createConfig({ navigation: { mode: 'sequential' } });
 
     const custom: AccessFn = (c) =>

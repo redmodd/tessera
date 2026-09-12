@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { flushSync } from 'svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createConfig } from './helpers.js';
+import { createConfig, createManifest } from './helpers.js';
 
 // Read inside a tracking context before the second mutation: a single read at the end passes even when the inner map never signals.
 function trackStatuses(progress: ProgressState) {
@@ -23,7 +23,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('promotes a page whose only question is retried correctly', () => {
-    const progress = new ProgressState(new Set(), config, 3, new Set());
+    const progress = new ProgressState(createManifest(3), config);
     const { cleanup } = trackStatuses(progress);
 
     progress.markStandaloneQuestion(0, 'q1', 0, true);
@@ -40,7 +40,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('demotes a page when a second question on it fails', () => {
-    const progress = new ProgressState(new Set(), config, 3, new Set());
+    const progress = new ProgressState(createManifest(3), config);
     const { cleanup } = trackStatuses(progress);
 
     progress.markStandaloneQuestion(0, 'q1', 100, true);
@@ -57,7 +57,7 @@ describe('standalone question rescoring re-derives course status', () => {
   });
 
   it('keeps gradedScore and successStatus in agreement across rescores', () => {
-    const progress = new ProgressState(new Set(), config, 3, new Set());
+    const progress = new ProgressState(createManifest(3), config);
     const { cleanup } = trackStatuses(progress);
 
     for (const score of [0, 100, 40, 90]) {
