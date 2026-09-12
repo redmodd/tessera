@@ -1693,6 +1693,76 @@ export const pageConfig = { title: "Exam", graded: true };
     );
   });
 
+  it('does not warn when graded is a variable the build cannot read', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  let isFinal = true;
+  const q = useQuestion({
+    id: 'q1',
+    graded: isFinal,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('warns when a graded: true literal sits outside the useQuestion call', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+  const settings = { graded: true };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('errors when a declared graded page carries an ungraded quiz', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, quiz: {} };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
+    );
+  });
+
+  it('accepts a graded quiz page that also declares graded', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true, quiz: { graded: true } };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).not.toContainEqual(
+      expect.stringContaining('quiz page whose quiz is not graded'),
+    );
+  });
+
   it('warns on a graded page under completion.mode "manual"', () => {
     createValidProject(testRoot);
     writeConfig(

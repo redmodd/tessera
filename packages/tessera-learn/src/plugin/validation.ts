@@ -16,6 +16,7 @@ import {
   clearParseCache,
   findComponents,
   getParseError,
+  gradedUseQuestions,
   type PropValue,
 } from './ast.js';
 import {
@@ -946,6 +947,13 @@ function validatePageFile(
   const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
+  if (declaresGraded && isQuiz && !isGradedQuiz) {
+    d.error(
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+        'A quiz page scores through its quiz, so the page can never earn a score ' +
+        'and never completes. Use quiz: { graded: true }, or drop graded: true.',
+    );
+  }
   if (weight !== undefined && !graded) {
     d.warn(
       `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
@@ -974,7 +982,7 @@ function validatePageFile(
     declaresGraded &&
     !pageConfig?.quiz &&
     !hasCustomWidget &&
-    !GRADED_USE_QUESTION_RE.test(content)
+    gradedUseQuestions(content) === 'none'
   ) {
     d.warn(
       `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
@@ -1620,8 +1628,6 @@ const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 const HAS_USE_QUESTION_RE = /\buseQuestion\s*\(/;
-const GRADED_USE_QUESTION_RE =
-  /\buseQuestion\s*\(\s*\{[\s\S]{0,400}?\bgraded\s*:\s*true/;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );

@@ -279,3 +279,77 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   }
   return pageConfigFromModuleScriptFallback(svelteSource);
 }
+
+/**
+ * Whether a page builds a graded standalone question: 'graded' if some
+ * `useQuestion` call passes `graded: true`, 'unknown' when a call's options
+ * can't be read statically (a spread, a variable, a computed value), and
+ * 'none' when every call is plainly ungraded.
+ */
+export function gradedUseQuestions(
+  source: string,
+): 'graded' | 'none' | 'unknown' {
+  const { root } = parseRoot(source);
+  if (!root) return 'unknown';
+  let unknown = false;
+  for (const call of collectUseQuestionCalls(root)) {
+    const state = callGradedState(call);
+    if (state === 'graded') return 'graded';
+    if (state === 'unknown') unknown = true;
+  }
+  return unknown ? 'unknown' : 'none';
+}
+
+function collectUseQuestionCalls(root: Node): Node[] {
+  const found: Node[] = [];
+  const seen = new Set<object>();
+  const walk = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    const node = value as Node;
+    const callee = node.callee as Node | undefined;
+    if (
+      node.type === 'CallExpression' &&
+      callee?.type === 'Identifier' &&
+      callee.name === 'useQuestion'
+    ) {
+      found.push(node);
+    }
+    for (const key of Object.keys(node)) {
+      if (key === 'type') continue;
+      walk(node[key]);
+    }
+  };
+  walk(root);
+  return found;
+}
+
+function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
+  const options = unwrapTsCast((call.arguments as Node[])?.[0] ?? null);
+  if (!options || options.type !== 'ObjectExpression') return 'unknown';
+  let unknown = false;
+  for (const property of (options.properties as Node[]) ?? []) {
+    if (property.type === 'SpreadElement') {
+      unknown = true;
+      continue;
+    }
+    const key = property.key as Node | undefined;
+    const name =
+      key?.type === 'Identifier'
+        ? (key.name as string)
+        : key?.type === 'Literal'
+          ? String(key.value)
+          : null;
+    if (name !== 'graded') continue;
+    const value = unwrapTsCast(property.value as Node);
+    if (value?.type !== 'Literal') return 'unknown';
+    if (value.value === true) return 'graded';
+    if (value.value !== false) return 'unknown';
+  }
+  return unknown ? 'unknown' : 'none';
+}
