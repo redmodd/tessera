@@ -275,8 +275,11 @@ export class ProgressState {
 
   /** A visited page that owes a score isn't finished: reading it isn't doing it. */
   #awaitingScore(pageIndex: number): boolean {
-    if (this.#quizPageIndices.has(pageIndex))
-      return this.quizScore(pageIndex) === undefined;
+    if (
+      this.#quizPageIndices.has(pageIndex) &&
+      this.quizScore(pageIndex) === undefined
+    )
+      return true;
     return (
       this.#declaredGradedIndices.has(pageIndex) &&
       this.pageScore(pageIndex) === undefined

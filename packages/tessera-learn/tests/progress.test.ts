@@ -136,6 +136,20 @@ describe('ProgressState', () => {
       expect(progress.completionStatus).toBe('incomplete');
     });
 
+    it('holds a declared graded page carrying a practice quiz', () => {
+      const progress = new ProgressState(
+        createManifest(4, { 3: { graded: false } }, { 3: { graded: true } }),
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 100 },
+        }),
+      );
+      for (let i = 0; i < 4; i++) progress.markVisited(i);
+      progress.quizCompleted(3, 100);
+      expect(progress.completionStatus).toBe('incomplete');
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+      expect(progress.completionStatus).toBe('complete');
+    });
+
     it('leaves an undeclared page complete on view', () => {
       const progress = new ProgressState(
         createManifest(2),

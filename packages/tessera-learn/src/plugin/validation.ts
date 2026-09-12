@@ -1694,7 +1694,8 @@ function reportEffectiveWeights(
   const unweighted = graded.filter((p) => p.weight === undefined);
   if (unweighted.length > 0) {
     d.warn(
-      `graded without a pageConfig.weight, so each counts as 1 against pages that ` +
+      `course score weighting: these pages are graded without a pageConfig.weight, ` +
+        `so each counts as 1 against pages that ` +
         `declare one: ${unweighted.map((p) => p.fileRel).join(', ')}`,
     );
   }
