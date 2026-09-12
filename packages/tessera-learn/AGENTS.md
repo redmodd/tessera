@@ -377,7 +377,7 @@ Two top-level `pageConfig` fields control a page's share of the **course** score
 
 Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (any weight >= 5) that miss 100, and all-fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment. A graded page that declares no `weight` beside pages that do also warns: it counts as 1.
 
-**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages, and is the only way to grade one: a quiz page scores through its quiz, so `graded: true` beside `quiz: { graded: false }` is an error. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
+**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages: a quiz page scores through its quiz, so `graded: true` beside `quiz: { graded: false }` is an error unless something else on the page (a `graded` question component, or a `useQuestion({ graded: true })`) can be scored. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
 
 ```svelte
 <script module>
@@ -387,7 +387,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 
 Declared graded pages count as 0 until answered, so a skipped exam sinks the course score, and under `completion.mode: "percentage"` visiting one doesn't complete it. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
 
-A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. A `graded: true` page whose questions are _all_ practice therefore never earns a score: under `completion.mode: "percentage"` it never counts as complete, and in `navigation.mode: "sequential"` it stays locked for the pages after it. `tessera validate` warns when every `useQuestion` call on the page plainly passes no `graded: true` (a spread or a variable makes it hold its fire), so give a declared graded page at least one `graded: true` question.
+A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. A `graded: true` page whose questions are _all_ practice therefore never earns a score: under `completion.mode: "percentage"` it never counts as complete, and in `navigation.mode: "sequential"` it stays locked for the pages after it. `tessera validate` warns when no question component is marked `graded` and every `useQuestion` call on the page plainly passes no `graded: true` (a spread or a variable makes it hold its fire), so give a declared graded page at least one graded question.
 
 ### Question types
 
@@ -422,7 +422,13 @@ Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`). Not graded by default — to grade one, build it with `useQuestion` (see [Recipe 3](#recipe-3-graded-standalone-question)).
+All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+
+```svelte
+<MultipleChoice graded question="..." options={[...]} correct={0} />
+```
+
+Inside `<Quiz>` the quiz owns grading, so `graded` is ignored there. For a custom widget, build it with `useQuestion` (see [Recipe 3](#recipe-3-graded-standalone-question)).
 
 ---
 

@@ -332,7 +332,13 @@ function collectUseQuestionCalls(root: Node): Node[] {
   if (names.size === 0) names.add('useQuestion');
   return calls.filter((call) => {
     const callee = call.callee as Node | undefined;
-    return callee?.type === 'Identifier' && names.has(callee.name as string);
+    if (callee?.type === 'Identifier') return names.has(callee.name as string);
+    const property = callee?.property as Node | undefined;
+    return (
+      callee?.type === 'MemberExpression' &&
+      !callee.computed &&
+      property?.name === 'useQuestion'
+    );
   });
 }
 
@@ -356,6 +362,10 @@ function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
   let unknown = false;
   for (const property of (options.properties as Node[]) ?? []) {
     if (property.type === 'SpreadElement') {
+      unknown = true;
+      continue;
+    }
+    if (property.computed) {
       unknown = true;
       continue;
     }

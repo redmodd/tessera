@@ -954,13 +954,14 @@ function validatePageFile(
     isQuiz &&
     !isGradedQuiz &&
     !hasCustomWidget &&
+    !HAS_GRADED_QUESTION_TAG_RE.test(content) &&
     gradedUseQuestions(content) === 'none'
   ) {
     d.error(
       `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded, ` +
         'and no question outside the quiz is graded. Nothing on the page can earn a ' +
-        'score, so it never completes. Use quiz: { graded: true }, add a ' +
-        'useQuestion({ graded: true }), or drop graded: true.',
+        'score, so it never completes. Use quiz: { graded: true }, mark a question ' +
+        'component `graded`, add a useQuestion({ graded: true }), or drop graded: true.',
     );
   }
   if (weight !== undefined && !graded) {
@@ -990,12 +991,14 @@ function validatePageFile(
     declaresGraded &&
     !pageConfig?.quiz &&
     !hasCustomWidget &&
+    !HAS_GRADED_QUESTION_TAG_RE.test(content) &&
     gradedUseQuestions(content) === 'none'
   ) {
     d.warn(
       `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
         `the page can never earn a score, so under completion.mode "percentage" it ` +
-        `never completes. Build at least one question with useQuestion({ graded: true }).`,
+        `never completes. Mark at least one question component \`graded\`, or build one ` +
+        `with useQuestion({ graded: true }).`,
     );
   }
 
@@ -1638,10 +1641,15 @@ const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 const HAS_QUESTION_TAG_RE = new RegExp(
   `<(${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])`,
 );
-// A local module — a `.svelte` widget or a `.svelte.js`/`.ts` helper — may wrap
-// useQuestion. Treat its presence as enough to suppress the "no questions"
-// warning: false negatives are acceptable for a heuristic that's advisory.
-const HAS_LOCAL_IMPORT_RE = /from\s+['"]\.{1,2}\//;
+// A local module — a `.svelte` widget or a `.svelte.js`/`.ts` helper, relative
+// or via `$shared` — may wrap useQuestion. Treat its presence as enough to
+// suppress the "no questions" warning: false negatives are acceptable for a
+// heuristic that's advisory.
+const HAS_LOCAL_IMPORT_RE = /from\s+['"][^'"]*\.(?:svelte|js|ts)['"]/;
+
+const HAS_GRADED_QUESTION_TAG_RE = new RegExp(
+  `<(?:${Object.keys(QUESTION_COMPONENT_REQUIRED).join('|')})(?=[\\s/>])[^>]*\\sgraded(?![\\w-]|\\s*=\\s*\\{false\\})`,
+);
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check

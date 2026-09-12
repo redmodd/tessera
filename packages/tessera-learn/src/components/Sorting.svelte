@@ -15,6 +15,7 @@
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
+    graded,
     maxRetries,
     weight = 1,
   } = $props();
@@ -44,6 +45,7 @@
     get id() {
       return questionId(id, 'sorting', question);
     },
+    graded: untrack(() => graded),
     weight: untrack(() => weight),
     maxRetries: untrack(() => maxRetries),
     complete: () => placements.size === items.length,
