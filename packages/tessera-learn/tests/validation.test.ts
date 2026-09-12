@@ -1778,6 +1778,43 @@ export const pageConfig = { title: "Exam", graded: true };
     );
   });
 
+  it('accepts a graded question component whose props contain a > sign', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+  let threshold = 1;
+</script>
+<MultipleChoice question={threshold > 0 ? "A" : "B"} options={["a", "b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it('warns when the only non-package import is a package subpath', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  import { interactionFormat } from 'tessera-learn/runtime/interaction-format.js';
+  const q = useQuestion({ id: 'q1', response: () => ({ response: 'a' }) });
+</script>
+<h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
   it('errors when a declared graded page carries an ungraded quiz', () => {
     createValidProject(testRoot);
     writePage(

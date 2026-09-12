@@ -65,8 +65,7 @@ function parseRoot(source: string): CacheEntry {
   return entry;
 }
 
-function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
-  const found: Node[] = [];
+function walkNodes(root: Node, visit: (node: Node) => void): void {
   const seen = new Set<object>();
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
@@ -77,15 +76,22 @@ function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
       return;
     }
     const node = value as Node;
-    if (node.type === 'Component' && names.has(node.name as string)) {
-      found.push(node);
-    }
+    visit(node);
     for (const key of Object.keys(node)) {
       if (key === 'type') continue;
       walk(node[key]);
     }
   };
   walk(root);
+}
+
+function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
+  const found: Node[] = [];
+  walkNodes(root, (node) => {
+    if (node.type === 'Component' && names.has(node.name as string)) {
+      found.push(node);
+    }
+  });
   return found.sort((a, b) => a.start - b.start);
 }
 
@@ -280,25 +286,21 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   return pageConfigFromModuleScriptFallback(svelteSource);
 }
 
-/** Whether a page calls `useQuestion`, under whatever name it imports it. */
-export function hasUseQuestionCall(source: string): boolean {
-  const { root } = parseRoot(source);
-  return root ? collectUseQuestionCalls(root).length > 0 : false;
-}
-
 /**
- * Whether a page builds a graded standalone question: 'graded' if some
- * `useQuestion` call passes `graded: true`, 'unknown' when a call's options
- * can't be read statically (a spread, a variable, a computed value), and
- * 'none' when every call is plainly ungraded.
+ * How a page grades its standalone questions: 'absent' when it makes no
+ * `useQuestion` call, 'graded' when some call passes `graded: true`, 'unknown'
+ * when a call's options can't be read statically (a spread, a variable, a
+ * computed value), and 'none' when every call is plainly ungraded.
  */
-export function gradedUseQuestions(
+export function useQuestionGrading(
   source: string,
-): 'graded' | 'none' | 'unknown' {
+): 'absent' | 'graded' | 'none' | 'unknown' {
   const { root } = parseRoot(source);
   if (!root) return 'unknown';
+  const calls = collectUseQuestionCalls(root);
+  if (calls.length === 0) return 'absent';
   let unknown = false;
-  for (const call of collectUseQuestionCalls(root)) {
+  for (const call of calls) {
     const state = callGradedState(call);
     if (state === 'graded') return 'graded';
     if (state === 'unknown') unknown = true;
@@ -309,26 +311,12 @@ export function gradedUseQuestions(
 function collectUseQuestionCalls(root: Node): Node[] {
   const calls: Node[] = [];
   const names = new Set<string>();
-  const seen = new Set<object>();
-  const walk = (value: unknown): void => {
-    if (!value || typeof value !== 'object') return;
-    if (seen.has(value)) return;
-    seen.add(value);
-    if (Array.isArray(value)) {
-      for (const item of value) walk(item);
-      return;
-    }
-    const node = value as Node;
+  walkNodes(root, (node) => {
     if (node.type === 'CallExpression') calls.push(node);
     if (node.type === 'ImportDeclaration') {
       for (const name of useQuestionLocalNames(node)) names.add(name);
     }
-    for (const key of Object.keys(node)) {
-      if (key === 'type') continue;
-      walk(node[key]);
-    }
-  };
-  walk(root);
+  });
   if (names.size === 0) names.add('useQuestion');
   return calls.filter((call) => {
     const callee = call.callee as Node | undefined;
