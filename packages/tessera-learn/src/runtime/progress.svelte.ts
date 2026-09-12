@@ -267,14 +267,14 @@ export class ProgressState {
   completedPages = $derived.by<number>(() => {
     let count = 0;
     for (const i of this.visitedPages) {
-      if (this.#awaitingScore(i)) continue;
+      if (this.awaitingScore(i)) continue;
       count++;
     }
     return count;
   });
 
   /** A visited page that owes a score isn't finished: reading it isn't doing it. */
-  #awaitingScore(pageIndex: number): boolean {
+  awaitingScore(pageIndex: number): boolean {
     if (
       this.#quizPageIndices.has(pageIndex) &&
       this.quizScore(pageIndex) === undefined

@@ -12,15 +12,13 @@ export function isPageComplete(
   const page = manifest.pages[index];
   if (!page) return false;
 
-  if (page.graded && progress.pageScore(index) === undefined) return false;
+  if (progress.awaitingScore(index)) return false;
 
   if (!page.quiz) {
     return progress.visitedPages.has(index);
   }
 
-  if (!page.quiz.gatesProgress) {
-    return progress.quizScore(index) !== undefined;
-  }
+  if (!page.quiz.gatesProgress) return progress.quizScore(index) !== undefined;
 
   return (progress.quizScore(index) ?? 0) >= config.scoring.passingScore;
 }
