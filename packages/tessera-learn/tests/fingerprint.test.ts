@@ -114,8 +114,8 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: [80] } } } },
       ],
       [
-        'a standalone entry carries more than a score and weight',
-        { g: { '0': { q: { q1: [80, 1, 1] } } } },
+        'a standalone entry carries more than a graded flag',
+        { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
       ],
       ['a quiz score is null', { g: { '0': { s: null } } }],
     ])('discards a saved document where %s', (_label, bad) => {
@@ -135,7 +135,7 @@ describe('shouldRestore', () => {
     it('keeps a save whose standalone entries carry weights', () => {
       const saved = {
         ...savedWith(fp),
-        g: { '0': { q: { q1: 80, q2: [100, 3] } } },
+        g: { '0': { q: { q1: 80, q2: [100, 3, 1] } } },
       } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(true);
     });

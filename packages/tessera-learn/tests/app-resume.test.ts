@@ -160,23 +160,23 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('round-trips a weighted standalone question as [score, weight]', async () => {
+  it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
       d: 120,
-      g: { '1': { q: { q1: 100, q2: [40, 3] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
       f: structureFingerprint(manifest),
     };
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: 100, q2: [40, 3] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
     });
   });
 
-  it('drops a restored answer whose question is no longer graded', async () => {
+  it('saves a restored answer whose question is no longer graded as ungraded', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
@@ -190,7 +190,9 @@ describe('App restore gate honours config.resume', () => {
     });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(saveState.mock.calls.at(-1)[0].g).toBeUndefined();
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+      g: { '1': { q: { q1: [100, 1, 0] } } },
+    });
   });
 
   it('reports no score for a resume that only restores what was saved', async () => {
