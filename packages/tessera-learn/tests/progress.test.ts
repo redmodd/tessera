@@ -567,6 +567,66 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('pageScore', () => {
+    it('returns undefined until something is answered on the page', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      expect(progress.pageScore(3)).toBeUndefined();
+    });
+
+    it('returns the weighted standalone mean on a page with no quiz', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
+      expect(progress.pageScore(3)).toBe(75);
+    });
+
+    it('stays undefined on a page of practice questions', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 40, false);
+      progress.markStandaloneQuestion(3, 'q2', 60, false);
+      expect(progress.pageScore(3)).toBeUndefined();
+    });
+
+    it('ignores a practice answer beside a graded one', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(1, 'graded', 100, true);
+      progress.markStandaloneQuestion(1, 'practice', 0, false);
+      expect(progress.pageScore(1)).toBe(100);
+    });
+
+    it('prefers the quiz score when the page has one', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+      progress.quizCompleted(2, 85);
+      expect(progress.pageScore(2)).toBe(85);
+    });
+  });
+
   describe('refreshStandaloneWeight', () => {
     it('reweights a restored answer without changing its score', () => {
       const progress = new ProgressState(

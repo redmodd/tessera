@@ -163,6 +163,19 @@ export class ProgressState {
     this.#write(pageIndex, { questions });
   }
 
+  /**
+   * The page's score for display: its quiz score, else the weighted mean of
+   * its graded standalone answers, else undefined when nothing graded has
+   * been answered.
+   */
+  pageScore(pageIndex: number): number | undefined {
+    const unit = this.gradedUnits.get(pageIndex);
+    if (unit?.quizScore !== undefined) return unit.quizScore;
+    return this.#gradedResults(pageIndex).length > 0
+      ? this.getPageStandaloneAverage(pageIndex)
+      : undefined;
+  }
+
   // Ungraded practice answers are stored alongside graded ones, so every score
   // rollup has to filter them out or they drag the page's score down.
   #gradedResults(pageIndex: number): StandaloneResult[] {
