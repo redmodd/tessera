@@ -169,9 +169,7 @@ export class ProgressState {
     const unit = this.gradedUnits.get(pageIndex);
     if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
       return unit.quizScore;
-    return this.#gradedResults(pageIndex).length > 0
-      ? this.getPageStandaloneAverage(pageIndex)
-      : undefined;
+    return unit?.graded ? this.getPageStandaloneAverage(pageIndex) : undefined;
   }
 
   #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {

@@ -801,7 +801,7 @@ function useProgress(): {
 };
 ```
 
-`pageScore` is a page's own score: a graded quiz's score once submitted, else the weighted mean of the graded standalone questions answered on that page. A standalone-question page renders no score on its own, so read it and print one.
+A standalone-question page renders no score on its own, so read `pageScore` and print one.
 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Round it yourself** for display.
