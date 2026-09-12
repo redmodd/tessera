@@ -1733,7 +1733,7 @@ function crossValidate(
     // only its own fields.
     const quizBytes = pageResults.totalQuizzes * 14; // g entry: "s":100,"a":2,
     const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
-    const standaloneBytes = pageResults.totalPages * 38; // g: "NNN":{"q":{"q1":100,"q2":100},"g":1},
+    const standaloneBytes = pageResults.totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
     const userStateBuffer = 256; // usePersistence headroom
     const estimatedSize =
       overhead +

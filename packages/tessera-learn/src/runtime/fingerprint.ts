@@ -1,11 +1,17 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { SavedState } from './persistence.js';
 
+// Bumped when the SavedState layout changes, so blobs written by an older
+// runtime fail the fingerprint gate instead of half-restoring.
+const FORMAT_VERSION = '2';
+
 // FNV-1a over the ordered page slugs. SavedState is keyed by page index, so a
 // structure change must change the fingerprint — else stale state restores onto
 // the wrong pages. Slugs can't contain a NUL, so it's a collision-proof delimiter.
 export function structureFingerprint(manifest: Manifest): string {
-  const slugs = manifest.pages.map((p) => p.slug).join('\0');
+  const slugs = [FORMAT_VERSION, ...manifest.pages.map((p) => p.slug)].join(
+    '\0',
+  );
   let h = 0x811c9dc5;
   for (let i = 0; i < slugs.length; i++) {
     h ^= slugs.charCodeAt(i);
@@ -29,22 +35,14 @@ const isNumberArray = (value: unknown): boolean =>
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
-    (v) =>
-      isNumber(v) ||
-      (isNumberArray(v) && [2, 3].includes((v as number[]).length)),
+    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 3),
   );
 
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   ('s' in value ? isNumber(value.s) : true) &&
   (value.a == null || isNumber(value.a)) &&
-  (value.q == null || isQuestionRecord(value.q)) &&
-  (value.g == null || value.g === 1);
-
-// A top-level `q` marks a save whose scores live under keys nothing reads, so
-// the blob is discarded rather than resumed with every score silently missing.
-const isOutdatedFormat = (saved: SavedState): boolean =>
-  isRecord(saved) && 'q' in saved;
+  (value.q == null || isQuestionRecord(value.q));
 
 // Rejected whole: a shape restoreState() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.
@@ -59,17 +57,17 @@ const isMalformed = (saved: SavedState): boolean =>
     (!isRecord(saved.g) || !Object.values(saved.g).every(isGradedUnit)));
 
 // `never` always starts fresh; otherwise a saved fingerprint that no longer
-// matches the current structure is discarded. State saved before fingerprinting
-// (no `f`) is trusted so upgrading the runtime never wipes an in-progress learner.
+// matches the current structure is discarded.
 export function shouldRestore(
   saved: SavedState,
   currentFingerprint: string,
   resume: 'auto' | 'never' = 'auto',
 ): boolean {
   if (resume === 'never') return false;
-  if (saved.f !== undefined && saved.f !== currentFingerprint) return false;
-  if (isOutdatedFormat(saved)) {
-    console.warn('Tessera: discarding resume state saved in an older format');
+  if (saved.f !== currentFingerprint) {
+    console.warn(
+      'Tessera: discarding resume state saved for a different course structure or runtime version',
+    );
     return false;
   }
   if (isMalformed(saved)) {

@@ -55,8 +55,31 @@ describe('shouldRestore', () => {
     expect(shouldRestore(savedWith('stale'), fp, 'auto')).toBe(false);
   });
 
-  it('restores legacy state with no fingerprint (backward compatible)', () => {
-    expect(shouldRestore(savedWith(undefined), fp, 'auto')).toBe(true);
+  it('discards a blob written by a runtime with the older saved-state layout', () => {
+    const legacyFingerprint = (...slugs: string[]) => {
+      const joined = slugs.join('\0');
+      let h = 0x811c9dc5;
+      for (let i = 0; i < joined.length; i++) {
+        h ^= joined.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return (h >>> 0).toString(36);
+    };
+    const legacy = {
+      b: 1,
+      v: [0, 1],
+      d: 5,
+      q: { '1': 80 },
+      qa: { '1': 2 },
+      s: { '1': { q1: 100 } },
+      gs: [1],
+      f: legacyFingerprint('intro', 'quiz'),
+    } as unknown as SavedState;
+    expect(shouldRestore(legacy, fp, 'auto')).toBe(false);
+  });
+
+  it('discards state with no fingerprint', () => {
+    expect(shouldRestore(savedWith(undefined), fp, 'auto')).toBe(false);
   });
 
   it('never restores when resume is "never"', () => {
@@ -87,14 +110,17 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: '80' } } } },
       ],
       [
-        'a weighted standalone entry is not a [score, weight] pair',
+        'a standalone entry is not a [score, weight, graded] triple',
         { g: { '0': { q: { q1: [80] } } } },
+      ],
+      [
+        'a standalone entry omits the graded flag',
+        { g: { '0': { q: { q1: [80, 1] } } } },
       ],
       [
         'a standalone entry carries more than a graded flag',
         { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
       ],
-      ['a graded flag is not 1', { g: { '0': { g: 'yes' } } }],
       ['a quiz score is null', { g: { '0': { s: null } } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
@@ -123,29 +149,6 @@ describe('shouldRestore', () => {
       shouldRestore(saved, fp, 'auto');
       expect(console.warn).toHaveBeenCalledWith(
         'Tessera: discarding malformed resume state',
-      );
-    });
-  });
-
-  describe('outdated format', () => {
-    beforeEach(() => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-    });
-
-    it('discards a save whose scores live under a top-level q', () => {
-      const saved = {
-        ...savedWith(fp),
-        q: { '0': 80 },
-        qa: { '0': 2 },
-      } as unknown as SavedState;
-      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
-    });
-
-    it('says the format is outdated rather than corrupt', () => {
-      const saved = { ...savedWith(fp), q: {} } as unknown as SavedState;
-      shouldRestore(saved, fp, 'auto');
-      expect(console.warn).toHaveBeenCalledWith(
-        'Tessera: discarding resume state saved in an older format',
       );
     });
   });

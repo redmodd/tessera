@@ -567,7 +567,7 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('refreshStandaloneWeight', () => {
+  describe('refreshStandaloneQuestion', () => {
     it('reweights a restored answer without changing its score', () => {
       const progress = new ProgressState(
         new Set(),
@@ -577,7 +577,7 @@ describe('ProgressState', () => {
       );
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      progress.refreshStandaloneWeight(3, 'q1', 1);
+      progress.refreshStandaloneQuestion(3, 'q1', true, 1);
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
         score: 100,
@@ -597,8 +597,25 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneWeight(3, 'q1', 3);
+      progress.refreshStandaloneQuestion(3, 'q1', true, 3);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
+    });
+
+    it('corrects a graded flag that drifted since the answer was saved', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set(),
+      );
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 1);
+      progress.refreshStandaloneQuestion(3, 'q1', false, 1);
+
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.graded).toBe(
+        false,
+      );
+      expect(progress.gradedUnits.get(3)?.graded).toBe(false);
+      expect(progress.getPageStandaloneAverage(3)).toBe(0);
     });
 
     it('normalizes an unusable weight and ignores an unanswered question', () => {
@@ -609,11 +626,11 @@ describe('ProgressState', () => {
         new Set(),
       );
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
-      progress.refreshStandaloneWeight(3, 'q1', -2);
+      progress.refreshStandaloneQuestion(3, 'q1', true, -2);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneWeight(3, 'unanswered', 5);
-      progress.refreshStandaloneWeight(9, 'q1', 5);
+      progress.refreshStandaloneQuestion(3, 'unanswered', true, 5);
+      progress.refreshStandaloneQuestion(9, 'q1', true, 5);
       expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
         false,
       );
