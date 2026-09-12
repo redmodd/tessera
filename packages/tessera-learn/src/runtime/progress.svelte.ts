@@ -166,13 +166,15 @@ export class ProgressState {
   }
 
   /**
-   * The page's score for display: its quiz score, else the weighted mean of
-   * its graded standalone answers, else undefined when nothing graded has
-   * been answered.
+   * The page's score for display: its graded quiz score, else the weighted
+   * mean of its graded standalone answers, else undefined when nothing graded
+   * has been answered. Mirrors what the page contributes to `gradedScore`, so
+   * an ungraded practice quiz reads undefined.
    */
   pageScore(pageIndex: number): number | undefined {
     const unit = this.gradedUnits.get(pageIndex);
-    if (unit?.quizScore !== undefined) return unit.quizScore;
+    if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
+      return unit.quizScore;
     return this.#gradedResults(pageIndex).length > 0
       ? this.getPageStandaloneAverage(pageIndex)
       : undefined;

@@ -614,16 +614,27 @@ describe('ProgressState', () => {
       expect(progress.pageScore(1)).toBe(100);
     });
 
-    it('prefers the quiz score when the page has one', () => {
+    it('prefers the quiz score when the page has a graded quiz', () => {
       const progress = new ProgressState(
-        new Set(),
+        new Set([2]),
         createConfig(),
         0,
-        new Set(),
+        new Set([2]),
       );
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       progress.quizCompleted(2, 85);
       expect(progress.pageScore(2)).toBe(85);
+    });
+
+    it('ignores the score of an ungraded practice quiz', () => {
+      const progress = new ProgressState(
+        new Set(),
+        createConfig(),
+        0,
+        new Set([2]),
+      );
+      progress.quizCompleted(2, 60);
+      expect(progress.pageScore(2)).toBeUndefined();
     });
   });
 
