@@ -110,8 +110,12 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: '80' } } } },
       ],
       [
-        'a standalone entry is not a [score, weight] pair',
+        'a standalone entry is not a [score, weight, graded] triple',
         { g: { '0': { q: { q1: [80] } } } },
+      ],
+      [
+        'a standalone entry omits the graded flag',
+        { g: { '0': { q: { q1: [80, 1] } } } },
       ],
       [
         'a standalone entry carries more than a graded flag',

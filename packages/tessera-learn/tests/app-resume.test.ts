@@ -35,7 +35,7 @@ function makeConfig(resume: 'auto' | 'never') {
   };
 }
 
-function makeAdapter(saved: unknown) {
+function makeAdapter(saved: unknown, withSeedLifecycle = true) {
   const seedLifecycle = vi.fn();
   const setCompletionStatus = vi.fn();
   const saveState = vi.fn();
@@ -48,7 +48,7 @@ function makeAdapter(saved: unknown) {
     adapter: {
       init: async () => {},
       getState: () => saved,
-      seedLifecycle,
+      ...(withSeedLifecycle ? { seedLifecycle } : {}),
       saveState,
       setDuration: () => {},
       setExit: () => {},
@@ -63,7 +63,11 @@ function makeAdapter(saved: unknown) {
 
 async function mountApp(
   resume: 'auto' | 'never',
-  options: { saved?: unknown; pageModule?: () => Promise<unknown> } = {},
+  options: {
+    saved?: unknown;
+    pageModule?: () => Promise<unknown>;
+    withSeedLifecycle?: boolean;
+  } = {},
 ) {
   const savedState = options.saved ?? {
     b: 1,
@@ -72,7 +76,7 @@ async function mountApp(
     f: structureFingerprint(manifest),
   };
   const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(savedState);
+    makeAdapter(savedState, options.withSeedLifecycle ?? true);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -200,7 +204,7 @@ describe('App restore gate honours config.resume', () => {
       b: 1,
       v: [0, 1],
       d: 120,
-      g: { '0': { s: 80 } },
+      g: { '1': { q: { q1: 100 } } },
       f: structureFingerprint(manifest),
     };
     const { component, saveState, setScore, unmount } = await mountApp('auto', {
@@ -209,6 +213,22 @@ describe('App restore gate honours config.resume', () => {
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(setScore).not.toHaveBeenCalled();
+  });
+
+  it('re-reports the restored score to an adapter without seedLifecycle', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '1': { q: { q1: 100 } } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, setScore, unmount } = await mountApp('auto', {
+      saved,
+      withSeedLifecycle: false,
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));
   });
 
   it('ignores saved state when resume is "never"', async () => {

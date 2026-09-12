@@ -35,9 +35,7 @@ const isNumberArray = (value: unknown): boolean =>
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
-    (v) =>
-      isNumber(v) ||
-      (isNumberArray(v) && [2, 3].includes((v as number[]).length)),
+    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 3),
   );
 
 const isGradedUnit = (value: unknown): boolean =>
@@ -66,7 +64,12 @@ export function shouldRestore(
   resume: 'auto' | 'never' = 'auto',
 ): boolean {
   if (resume === 'never') return false;
-  if (saved.f !== currentFingerprint) return false;
+  if (saved.f !== currentFingerprint) {
+    console.warn(
+      'Tessera: discarding resume state saved for a different course structure or runtime version',
+    );
+    return false;
+  }
   if (isMalformed(saved)) {
     console.warn('Tessera: discarding malformed resume state');
     return false;
