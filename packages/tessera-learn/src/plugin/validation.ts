@@ -1700,8 +1700,14 @@ function reportEffectiveWeights(
   }
 
   if (graded.length < 2) return;
-  // Near a round scale but not on it reads as a typo; a bare ratio total like 7 doesn't.
-  const scale = [1, 100].find((s) => total > s / 2 && total < s * 1.5);
+  // Percentage-style or all-fractional weights imply a scale to land on; bare
+  // ratios like 2 and 3 imply none, so their total is never a typo.
+  const weights = graded.map((p) => p.weight ?? 1);
+  const scale = weights.some((w) => w >= 5)
+    ? 100
+    : weights.every((w) => w < 1)
+      ? 1
+      : undefined;
   if (scale !== undefined && Math.abs(total - scale) > scale * 1e-6) {
     d.warn(
       `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +

@@ -32,6 +32,7 @@ export interface GradedUnit {
 
 export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
+  #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
@@ -42,6 +43,9 @@ export class ProgressState {
       manifest.pages
         .filter((p) => p.quiz?.graded || p.graded)
         .map((p) => p.index),
+    );
+    this.#quizGradedIndices = new Set(
+      manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
     );
     this.#quizPageIndices = new Set(
       manifest.pages.filter((p) => p.quiz).map((p) => p.index),
@@ -173,10 +177,7 @@ export class ProgressState {
 
   pageScore(pageIndex: number): number | undefined {
     const unit = this.gradedUnits.get(pageIndex);
-    if (
-      this.#declaredGradedIndices.has(pageIndex) &&
-      unit?.quizScore !== undefined
-    )
+    if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
       return unit.quizScore;
     return unit?.graded ? this.getPageStandaloneAverage(pageIndex) : undefined;
   }

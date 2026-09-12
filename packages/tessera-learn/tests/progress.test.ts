@@ -423,6 +423,16 @@ describe('ProgressState', () => {
       expect(progress.pageScore(2)).toBe(85);
     });
 
+    it('ignores a practice quiz on a page that declares graded: true', () => {
+      const progress = new ProgressState(
+        createManifest(5, { 2: {} }, { 2: { graded: true } }),
+        createConfig(),
+      );
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      progress.quizCompleted(2, 10);
+      expect(progress.pageScore(2)).toBe(100);
+    });
+
     it('matches gradedScore when a practice quiz sits beside a graded question', () => {
       const progress = new ProgressState(
         createManifest(5, { 2: {} }),

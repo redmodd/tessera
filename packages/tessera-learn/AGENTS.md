@@ -375,7 +375,7 @@ Two top-level `pageConfig` fields control a page's share of the **course** score
 </script>
 ```
 
-Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (all >= 5) that miss 100, and all-fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment. A graded page that declares no `weight` beside pages that do also warns: it counts as 1.
+Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (any weight >= 5) that miss 100, and all-fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment. A graded page that declares no `weight` beside pages that do also warns: it counts as 1.
 
 **A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
 
@@ -387,7 +387,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 
 Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
 
-A page's own score is the weighted mean of **every** standalone question answered on it, `graded: true` or not. Keep practice questions off a graded page, or they drag its score.
+A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page.
 
 ### Question types
 
@@ -844,7 +844,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 
 Two rules for displaying it:
 
-- **An unattempted graded page counts as 0.** `average` is the sum over every graded page divided by their count, so a learner who has aced the two quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
+- **An unattempted graded page counts as 0.** `average` is `Σ(weight × pageScore) / Σ(weight)` over every graded page, so a learner who has aced the two equally weighted quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
 - **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
 
 ```svelte

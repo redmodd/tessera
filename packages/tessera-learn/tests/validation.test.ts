@@ -868,6 +868,24 @@ export const pageConfig = { title: "Exam", graded: true, weight: 3 };
     expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
   });
 
+  it('warns when percentage-style weights fall well short of 100', () => {
+    createValidProject(testRoot);
+    for (const name of ['page', 'exam'] as const) {
+      writeFile(
+        testRoot,
+        `pages/01-section/01-lesson/${name}.svelte`,
+        `<script context="module">
+export const pageConfig = { title: "${name}", graded: true, weight: 25 };
+</script>
+<h1>${name}</h1>`,
+      );
+    }
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('weights sum to 50, not 100'),
+    );
+  });
+
   it('warns on percentage-style weights with a dropped digit', () => {
     createValidProject(testRoot);
     for (const [name, weight] of [
