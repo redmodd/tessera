@@ -80,7 +80,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
 
   #readMode(): SCORM2004Mode {
     try {
-      const v = this.api.GetValue('cmi.mode');
+      const v = this.dialect.getValue(this.api, 'cmi.mode');
       if (v === 'browse' || v === 'review' || v === 'normal') return v;
     } catch {}
     return 'normal';
@@ -89,7 +89,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #readScaledThreshold(key: string): number | null {
     let raw: string;
     try {
-      raw = this.api.GetValue(key);
+      raw = this.dialect.getValue(this.api, key);
     } catch {
       return null;
     }
