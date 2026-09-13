@@ -155,8 +155,6 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    // Score is recorded for the page (so authors can render it),
-    // but the page has no graded score
     expect(progress.gradedUnits.get(2)?.questions?.get('q1')?.score).toBe(100);
     expect(progress.pageScore(2)).toBeUndefined();
   });

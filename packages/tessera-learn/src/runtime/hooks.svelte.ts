@@ -52,10 +52,7 @@ export interface Question {
 export interface UseQuestionOptions {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
-  /**
-   * Whether this question counts toward its page score, which reaches course
-   * success only on a page declaring `pageConfig.graded: true`. Default false.
-   */
+  /** Whether this question counts toward its page score. Default false. */
   graded?: boolean;
   /**
    * How much this question pulls on the page score, in a quiz host and

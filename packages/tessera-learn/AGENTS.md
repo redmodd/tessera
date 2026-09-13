@@ -377,7 +377,7 @@ Two top-level `pageConfig` fields control a page's share of the **course** score
 
 Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weight is relative, not a percentage, so weights need not sum to 100; when they do, they read as percentages. `tessera validate` prints the effective percentages it computed, as do `tessera dev` and `tessera export`. Percentage-style weights (any weight >= 5) that miss 100, and all-fractional weights that miss 1, draw a warning, since the shortfall is spread across the declared pages rather than held back; bare ratios like `2` and `3` pass without comment. A graded page that declares no `weight` beside pages that do also warns: it counts as 1.
 
-**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages; `graded: true` beside `quiz: { graded: false }` is an error: every question on a quiz page belongs to the quiz, which ignores a question's own `graded`, so the page can never be scored. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
+**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages; `graded: true` beside `quiz: { graded: false }` is an error. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
 
 ```svelte
 <script module>
@@ -385,7 +385,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every declared graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` still sets that page's `pageScore`, but never reaches the course score or passed/failed: `tessera validate` errors when it can see the question, and the runtime warns in the console when the answer comes from your own component. A course with no declared graded page sends no score and no passed/failed. `weight` on an undeclared page is ignored; `tessera validate` warns.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every declared graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one. With no declared graded page, the LMS gets no score and no passed/failed. `weight` on an undeclared page is ignored.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 
