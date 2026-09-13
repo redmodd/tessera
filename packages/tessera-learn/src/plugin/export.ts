@@ -302,7 +302,7 @@ export async function runExport(
 ): Promise<void> {
   const distDir = resolve(projectRoot, 'dist');
   const standard = config.export.standard;
-  const slug = slugify(config.title || 'tessera-course') || 'tessera-course';
+  const slug = slugify(config.title) || 'tessera-course';
   const version = config.version || '1.0.0';
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
