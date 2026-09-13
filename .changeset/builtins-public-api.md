@@ -2,4 +2,4 @@
 'tessera-learn': minor
 ---
 
-New `useCourse()` hook exposes the course title and logo, alongside `resolveAsset`, `useQuiz().feedbackMode`/`maxAttempts`, `useNavigation().sections`/`prefetch`/`canAccessIndex`, `useProgress().completedPages`, and `$assets/` support in `branding.logo`.
+New `useCourse()` hook and new `useQuiz()`, `useNavigation()`, and `useProgress()` fields let custom layouts and quiz shells do everything the built-ins do.
