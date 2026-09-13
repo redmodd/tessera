@@ -230,7 +230,7 @@ export class ProgressState {
     let weighted = 0;
     let totalWeight = 0;
     let attempted = false;
-    let allScored = pages.size > 0;
+    let allScored = true;
     for (const pageIndex of pages) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
@@ -263,10 +263,8 @@ export class ProgressState {
     );
   }
 
-  restoreGradedScoreFinal(): void {
-    if (this.#gradedScoreDecided) return;
+  restoreGradedScoreDecided(): void {
     this.#gradedScoreDecided = true;
-    this.version++;
   }
 
   #changed() {

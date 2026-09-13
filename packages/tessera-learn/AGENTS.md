@@ -385,7 +385,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every declared graded page has a score or the course is complete; at completion, unscored graded pages count as 0. Under `completion.mode: "percentage"` visiting one doesn't complete it. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every declared graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 

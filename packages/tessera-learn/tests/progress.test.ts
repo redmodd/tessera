@@ -401,17 +401,21 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('failed');
     });
 
-    it('keeps following the score after a changed answer undoes completion', () => {
-      const manifest = createManifest(
-        4,
-        {},
-        { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
+    const threeGradedPages = () =>
+      new ProgressState(
+        createManifest(
+          4,
+          {},
+          { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
+        ),
+        createConfig({
+          completion: { mode: 'quiz' },
+          scoring: { passingScore: 60 },
+        }),
       );
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 60 },
-      });
-      const progress = new ProgressState(manifest, config);
+
+    it('keeps following the score after a changed answer undoes completion', () => {
+      const progress = threeGradedPages();
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
       progress.markStandaloneQuestion(2, 'q1', 100, true);
@@ -426,22 +430,13 @@ describe('ProgressState', () => {
     });
 
     it('restores a final graded score from a previous session', () => {
-      const manifest = createManifest(
-        4,
-        {},
-        { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
-      );
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 60 },
-      });
-      const progress = new ProgressState(manifest, config);
+      const progress = threeGradedPages();
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.restoreGradedScoreFinal();
+      progress.restoreGradedScoreDecided();
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');

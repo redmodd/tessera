@@ -267,7 +267,7 @@
       progress.markCompleteManually();
     }
     if (saved.s === 1) {
-      progress.restoreGradedScoreFinal();
+      progress.restoreGradedScoreDecided();
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
@@ -322,13 +322,11 @@
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
   let prevReportedScore = null;
   $effect(() => {
-    void progress.version;
     if (!persistenceReady) return;
 
     if (!progress.gradedScoreFinal) return;
-    const { average } = progress.gradedScore;
 
-    const rounded = Math.round(average);
+    const rounded = Math.round(progress.gradedScore.average);
     if (rounded === prevReportedScore) return;
     prevReportedScore = rounded;
 
@@ -336,9 +334,7 @@
       adapter.setScore(rounded);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
-        adapter.setSuccessStatus(
-          average >= config.scoring.passingScore ? 'passed' : 'failed',
-        );
+        adapter.setSuccessStatus(progress.successStatus);
       }
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();

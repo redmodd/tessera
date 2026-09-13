@@ -166,8 +166,9 @@ describe('state changed during adapter init survives', () => {
     releaseInit();
 
     await vi.waitFor(() => {
-      expect(saveState).toHaveBeenCalled();
-      expect(saveState.mock.calls.at(-1)![0].s).toBe(1);
+      expect(saveState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ s: 1 }),
+      );
     });
   });
 
