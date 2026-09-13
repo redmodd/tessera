@@ -35,7 +35,7 @@ function setupStandardCourse() {
   );
   createFile(
     '01-introduction/01-welcome/welcome.svelte',
-    `<script context="module">
+    `<script module>
 export const pageConfig = { title: "Welcome to the Course" }
 </script>
 <h1>Welcome</h1>`,
@@ -238,7 +238,7 @@ describe('extractDefaultExportObjectLiteral', () => {
 
 describe('parsePageConfigFromSource', () => {
   it('reads pageConfig from a module script when the template fails to parse', () => {
-    const source = `<script context="module">
+    const source = `<script module>
 export const pageConfig = { title: 'X', quiz: { graded: true } };
 </script>
 <h1>page</h1>
@@ -300,7 +300,7 @@ describe('extractPageConfig', () => {
   it('extracts title from pageConfig', () => {
     const path = createFile(
       'page-test/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "My Page" }
 </script>
 <h1>Hi</h1>`,
@@ -312,7 +312,7 @@ export const pageConfig = { title: "My Page" }
   it('extracts quiz config', () => {
     const path = createFile(
       'page-quiz/quiz.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = {
   title: "Quiz",
   quiz: {
@@ -341,7 +341,7 @@ export const pageConfig = {
   it('returns empty object when no pageConfig export', () => {
     const path = createFile(
       'page-no-config/page.svelte',
-      `<script context="module">
+      `<script module>
 export const something = "else";
 </script>`,
     );
@@ -351,7 +351,7 @@ export const something = "else";
   it('handles Infinity in maxAttempts', () => {
     const path = createFile(
       'page-inf/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = {
   title: "Unlimited",
   quiz: { graded: true, maxAttempts: Infinity }
@@ -365,7 +365,7 @@ export const pageConfig = {
   it('handles single-quoted strings', () => {
     const path = createFile(
       'page-single/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: 'Single Quotes' }
 </script>`,
     );
@@ -417,7 +417,7 @@ describe('generateManifest', () => {
     );
     createFile(
       '01-s/01-l/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { graded: true, weight: 75 }
 </script>
 <h1>Exam</h1>`,
@@ -438,7 +438,7 @@ export const pageConfig = { graded: true, weight: 75 }
     );
     createFile(
       '01-s/01-l/a.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { graded: true, weight: 0 }
 </script>
 <h1>A</h1>`,
@@ -533,7 +533,7 @@ export const pageConfig = { graded: true, weight: 0 }
     );
     createFile(
       '01-s/01-l/quiz.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = {
   title: "Assessment",
   quiz: { graded: true, gatesProgress: true, maxAttempts: 3 }
@@ -600,7 +600,7 @@ export const pageConfig = {
     createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
     createFile(
       '01-intro/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", quiz: { graded: true } }
 </script>`,
     );

@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   export const pageConfig = { title: 'Broken' };
 
   throw new Error('Tessera e2e: deliberate module-load failure');

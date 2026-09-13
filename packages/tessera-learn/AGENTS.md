@@ -163,7 +163,7 @@ A custom widget that calls `useQuestion` and emits an `Interaction` is scored, r
 
 Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is. Import components from `tessera-learn` (`import { Callout, Image } from 'tessera-learn'`).
 
-`pageConfig` sets the title, the page's share of the course score (`graded` / `weight`), and configures quizzes. It must be a **static object literal** in a module script block — no variables, function calls, or computed values. Both `<script module>` (Svelte 5) and `<script context="module">` (legacy) parse. If `title` is omitted it derives from the filename (`my-page.svelte` → "My Page").
+`pageConfig` sets the title, the page's share of the course score (`graded` / `weight`), and configures quizzes. It must be a **static object literal** in a `<script module>` block, with no variables, function calls, or computed values. `<script context="module">` is an error. If `title` is omitted it derives from the filename (`my-page.svelte` → "My Page").
 
 ```svelte
 <script module>

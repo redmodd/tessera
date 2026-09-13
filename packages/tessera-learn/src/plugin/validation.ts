@@ -18,6 +18,7 @@ import {
   type ComponentMatch,
   getParseError,
   useQuestionGrading,
+  usesLegacyModuleContext,
   type PropValue,
 } from './ast.js';
 import {
@@ -1181,6 +1182,11 @@ function validatePageConfig(
   fileRel: string,
   d: Diagnostics,
 ): Partial<Record<keyof PageConfig, unknown>> | null {
+  if (usesLegacyModuleContext(content)) {
+    d.error(
+      `${fileRel}: <script context="module"> is not supported; use <script module>`,
+    );
+  }
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {

@@ -635,12 +635,55 @@ describe('_meta.js validation', () => {
 // ---- pageConfig Validation ----
 
 describe('pageConfig validation', () => {
-  it('errors on non-static pageConfig (function call)', () => {
+  it('errors on a context="module" script', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
       `<script context="module">
+export const pageConfig = { title: "Hello" };
+</script>
+<h1>Hello</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('<script context="module"> is not supported'),
+    );
+  });
+
+  it.each([
+    [
+      'a string literal',
+      `<script>const snippet = '<script context="module">';</script>`,
+    ],
+    ['a markup expression', `<pre>{'<script context="module">'}</pre>`],
+    [
+      'a data-context attribute',
+      `<script data-context="module">let a = 1;</script>`,
+    ],
+  ])('accepts context="module" text in %s', (_label, extra) => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Hello" };
+</script>
+${extra}
+<h1>Hello</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('context="module"'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('errors on non-static pageConfig (function call)', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
 export const pageConfig = getConfig();
 </script>
 <h1>Hello</h1>`,
@@ -656,7 +699,7 @@ export const pageConfig = getConfig();
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 const cfg = { title: "Hello" };
 export const pageConfig = cfg;
 </script>
@@ -673,7 +716,7 @@ export const pageConfig = cfg;
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
 </script>
 <h1>Hello</h1>`,
@@ -689,7 +732,7 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", weight: 0, quiz: { graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -707,7 +750,7 @@ export const pageConfig = { title: "Quiz", weight: 0, quiz: { graded: true } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: "yes" };
 </script>
 <h1>Exam</h1>`,
@@ -723,7 +766,7 @@ export const pageConfig = { title: "Exam", graded: "yes" };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Just Prose", weight: 40 };
 </script>
 <h1>Just prose</h1>`,
@@ -741,7 +784,7 @@ export const pageConfig = { title: "Just Prose", weight: 40 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 100 };
 </script>
 <h1>Check</h1>`,
@@ -749,7 +792,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 100 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <h1>Exam</h1>`,
@@ -766,7 +809,7 @@ export const pageConfig = { title: "Exam", graded: true };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 25 };
 </script>
 <h1>Check</h1>`,
@@ -774,7 +817,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 25 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 75 };
 </script>
 <h1>Exam</h1>`,
@@ -790,7 +833,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 75 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 0.25 };
 </script>
 <h1>Check</h1>`,
@@ -798,7 +841,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 0.25 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 0.5 };
 </script>
 <h1>Exam</h1>`,
@@ -815,7 +858,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 0.5 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 2 };
 </script>
 <h1>Check</h1>`,
@@ -823,7 +866,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 2 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 3 };
 </script>
 <h1>Exam</h1>`,
@@ -837,7 +880,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 3 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 10 };
 </script>
 <h1>Exam</h1>`,
@@ -851,7 +894,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 10 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 0.5 };
 </script>
 <h1>Check</h1>`,
@@ -859,7 +902,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 0.5 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 3 };
 </script>
 <h1>Exam</h1>`,
@@ -874,7 +917,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 3 };
       writeFile(
         testRoot,
         `pages/01-section/01-lesson/${name}.svelte`,
-        `<script context="module">
+        `<script module>
 export const pageConfig = { title: "${name}", graded: true, weight: 25 };
 </script>
 <h1>${name}</h1>`,
@@ -896,7 +939,7 @@ export const pageConfig = { title: "${name}", graded: true, weight: 25 };
       writeFile(
         testRoot,
         `pages/01-section/01-lesson/${name}.svelte`,
-        `<script context="module">
+        `<script module>
 export const pageConfig = { title: "${name}", graded: true, weight: ${weight} };
 </script>
 <h1>${name}</h1>`,
@@ -913,7 +956,7 @@ export const pageConfig = { title: "${name}", graded: true, weight: ${weight} };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check", graded: true, weight: 30 };
 </script>
 <h1>Check</h1>`,
@@ -921,7 +964,7 @@ export const pageConfig = { title: "Check", graded: true, weight: 30 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, weight: 70 };
 </script>
 <h1>Exam</h1>`,
@@ -929,7 +972,7 @@ export const pageConfig = { title: "Exam", graded: true, weight: 70 };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/extra.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Extra", graded: true };
 </script>
 <h1>Extra</h1>`,
@@ -945,7 +988,7 @@ export const pageConfig = { title: "Extra", graded: true };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -963,7 +1006,7 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: 0 } };
 </script>
 <h1>Quiz</h1>`,
@@ -981,7 +1024,7 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: 0 } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { maxAttempts: Infinity, graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -995,7 +1038,7 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: Infinity, graded
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
 </script>
 <h1>Quiz</h1>`,
@@ -1011,7 +1054,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
 </script>
 <h1>Quiz</h1>`,
@@ -1029,7 +1072,7 @@ export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { feedbackMode: "imediate" } };
 </script>
 <h1>Quiz</h1>`,
@@ -1047,7 +1090,7 @@ export const pageConfig = { title: "Quiz", quiz: { feedbackMode: "imediate" } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { retryMode: "partial" } };
 </script>
 <h1>Quiz</h1>`,
@@ -1065,7 +1108,7 @@ export const pageConfig = { title: "Quiz", quiz: { retryMode: "partial" } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { feedbackMode: "immediate", retryMode: "incorrect-only" } };
 </script>
 <h1>Quiz</h1>`,
@@ -1640,7 +1683,7 @@ describe('contract bypass detection', () => {
   it('warns on a quiz page with no questions', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <h1>Empty quiz</h1>`,
@@ -1656,7 +1699,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   it('warns when a declared graded page has only practice questions', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1674,7 +1717,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a declared graded page with a graded question', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1696,7 +1739,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('does not warn when graded is a variable the build cannot read', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1719,7 +1762,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('warns when a graded: true literal sits outside the useQuestion call', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1738,7 +1781,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a graded question component whose props contain a > sign', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1756,7 +1799,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('errors on a graded question component on an undeclared page', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check" };
 </script>
 <script>
@@ -1773,7 +1816,7 @@ export const pageConfig = { title: "Check" };
   it('errors on a graded useQuestion on an undeclared page', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check" };
 </script>
 <script>
@@ -1795,7 +1838,7 @@ export const pageConfig = { title: "Check" };
   it('does not error on an undeclared page whose graded flag is a variable', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Check" };
 </script>
 <script>
@@ -1813,7 +1856,7 @@ export const pageConfig = { title: "Check" };
   it('warns when the only non-package import is a package subpath', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1832,7 +1875,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('errors when a declared graded page carries an ungraded quiz', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, quiz: {} };
 </script>
 <h1>Exam</h1>`,
@@ -1846,7 +1889,7 @@ export const pageConfig = { title: "Exam", graded: true, quiz: {} };
   it('errors on a declared graded practice quiz page even when a question is marked graded', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false } };
 </script>
 <script>
@@ -1868,7 +1911,7 @@ export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false
   it('accepts a graded question built through an aliased useQuestion', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1893,7 +1936,7 @@ export function examQuestion(id) {
 }`,
     );
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1916,7 +1959,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a graded question built through a namespaced useQuestion', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1932,7 +1975,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('does not warn when a computed key hides the graded option', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1951,7 +1994,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a graded widget imported through $shared', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1972,7 +2015,7 @@ export const pageConfig = { title: "Exam", graded: true };
       '{ "intro": "hi" }',
     );
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -1991,7 +2034,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a graded built-in question component', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -2009,7 +2052,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('warns when a built-in question component is left as practice', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>
@@ -2027,7 +2070,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('accepts a graded quiz page that also declares graded', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true, quiz: { graded: true } };
 </script>
 <h1>Exam</h1>`,
@@ -2051,7 +2094,7 @@ export const pageConfig = { title: "Exam", graded: true, quiz: { graded: true } 
 };`,
     );
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <script>import { MultipleChoice } from 'tessera-learn';</script>
@@ -2068,7 +2111,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('warns on a graded page with no questions', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Exam", graded: true };
 </script>
 <h1>Empty exam</h1>`,
@@ -2084,7 +2127,7 @@ export const pageConfig = { title: "Exam", graded: true };
   it('does not warn when a quiz page has a question component', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <script>import { MultipleChoice } from 'tessera-learn';</script>
@@ -2099,7 +2142,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   it('does not warn when a quiz page uses useQuestion directly', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <script>
@@ -2117,7 +2160,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   it('does not warn when a quiz page imports a custom .svelte widget', () => {
     createValidProject(testRoot);
     writePage(
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <script>
@@ -2170,7 +2213,7 @@ describe('cross-cutting validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -2195,7 +2238,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -2223,7 +2266,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <h1>Quiz</h1>`,
@@ -2540,7 +2583,7 @@ describe('pageConfig in a TypeScript module script', () => {
     createValidProject(testRoot);
     writePage(
       testRoot,
-      `<script context="module" lang="ts">
+      `<script module lang="ts">
 import type { PageConfig } from './types';
 export const pageConfig: PageConfig = { title: 'T' };
 </script>
@@ -2556,7 +2599,7 @@ export const pageConfig: PageConfig = { title: 'T' };
     createValidProject(testRoot);
     writePage(
       testRoot,
-      `<script context="module" lang="ts">
+      `<script module lang="ts">
 export const pageConfig = { title: 'T' } as const;
 </script>
 <h1>page</h1>`,
@@ -2571,7 +2614,7 @@ export const pageConfig = { title: 'T' } as const;
     createValidProject(testRoot);
     writePage(
       testRoot,
-      `<script context="module" lang="ts">
+      `<script module lang="ts">
 type PageConfig = { title: string };
 export const pageConfig = { title: 'T' } satisfies PageConfig;
 </script>

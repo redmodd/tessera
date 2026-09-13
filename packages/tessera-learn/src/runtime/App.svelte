@@ -319,7 +319,6 @@
   });
 
   // ---- Persistence: report score/completion/success to adapter ----
-  // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
   let prevReportedScore = null;
   $effect(() => {
     if (!persistenceReady) return;

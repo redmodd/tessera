@@ -46,7 +46,7 @@ describe('manifest virtual module encoding', () => {
     mkdirSync(resolve(projectRoot, 'pages', '01-intro'), { recursive: true });
     writeFileSync(
       resolve(projectRoot, 'pages', '01-intro', 'welcome.svelte'),
-      `<script context="module">
+      `<script module>
 export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 </script>
 <h1>Welcome</h1>`,

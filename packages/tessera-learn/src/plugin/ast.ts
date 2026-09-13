@@ -248,8 +248,7 @@ export function defaultExportObjectLiteral(
   return { kind: 'none' };
 }
 
-const MODULE_SCRIPT_OPEN_RE =
-  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>/;
+const MODULE_SCRIPT_OPEN_RE = /<script\s+module[^>]*>/;
 const SCRIPT_CLOSE = '</script>';
 
 function pageConfigFromModuleScriptFallback(
@@ -284,6 +283,23 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
     return findPageConfigInProgram(program, svelteSource);
   }
   return pageConfigFromModuleScriptFallback(svelteSource);
+}
+
+const LEGACY_MODULE_SCRIPT_RE =
+  /<script\s(?:[^>]*\s)?context\s*=\s*["']module["']/;
+
+export function usesLegacyModuleContext(svelteSource: string): boolean {
+  const { root } = parseRoot(svelteSource);
+  if (!root) return LEGACY_MODULE_SCRIPT_RE.test(svelteSource);
+  const attributes =
+    (root.module as { attributes?: Node[] } | null)?.attributes ?? [];
+  return attributes.some(
+    (attr) =>
+      attr.type === 'Attribute' &&
+      attr.name === 'context' &&
+      Array.isArray(attr.value) &&
+      (attr.value as { data?: string }[])[0]?.data === 'module',
+  );
 }
 
 /** 'unknown' when a call's options can't be read statically (spread, variable, computed). */
