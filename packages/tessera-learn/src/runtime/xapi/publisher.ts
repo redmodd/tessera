@@ -424,8 +424,6 @@ export class XAPIPublisher {
     const batch = [...flushed.flatMap((e) => e.body), final];
     return this.#sendClosing(flushed.length ? batch : final).then(
       async (outcome) => {
-        // A flushed statement may already be stored, and an LRS may answer 409
-        // for the whole batch, rejecting everything else in it.
         if (!flushed.length || !isClientError(outcome.status)) {
           for (const e of flushed) this.#settle(e, outcome);
           return this.#toDestination(outcome);
@@ -440,7 +438,7 @@ export class XAPIPublisher {
 
   /**
    * Chain an arbitrary task on the queue. Used by the launch adapters for
-   * State API writes. Tasks still queued when `sendFinal` runs are skipped.
+   * State API writes.
    *
    * The task is wrapped so a thrown error never breaks the queue's
    * Promise chain — subsequent enqueues still flow.
@@ -469,7 +467,6 @@ export class XAPIPublisher {
 
   // ---- Internal: send with retry policy ----
 
-  /** Resolves null when `sendFinal` took the entry into its batch. */
   #sendQueued(
     entry: UnsentEntry,
     options?: SendStatementOptions,

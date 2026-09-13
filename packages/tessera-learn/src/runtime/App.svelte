@@ -385,8 +385,6 @@
       progress.completionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
-    // Independent destinations send with keepalive so statements still in
-    // flight survive the unload.
     xapiClient?.markUnloading();
     adapter.terminate();
   }
