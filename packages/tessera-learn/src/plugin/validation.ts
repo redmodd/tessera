@@ -1181,6 +1181,11 @@ function validatePageConfig(
   fileRel: string,
   d: Diagnostics,
 ): Partial<Record<keyof PageConfig, unknown>> | null {
+  if (/<script\s[^>]*\bcontext\s*=\s*["']module["']/.test(content)) {
+    d.error(
+      `${fileRel}: <script context="module"> is not supported; use <script module>`,
+    );
+  }
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {

@@ -248,8 +248,7 @@ export function defaultExportObjectLiteral(
   return { kind: 'none' };
 }
 
-const MODULE_SCRIPT_OPEN_RE =
-  /<script\s+(?:context\s*=\s*["']module["']|module)[^>]*>/;
+const MODULE_SCRIPT_OPEN_RE = /<script\s+module[^>]*>/;
 const SCRIPT_CLOSE = '</script>';
 
 function pageConfigFromModuleScriptFallback(

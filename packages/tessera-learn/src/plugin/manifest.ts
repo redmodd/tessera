@@ -336,8 +336,6 @@ export function generateManifest(pagesDir: string): Manifest {
         try {
           pageConfig = extractPageConfig(filePath);
         } catch (e) {
-          // Validation errors will be handled by the validation plugin (Step 11).
-          // For now, log and continue with defaults.
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
 
