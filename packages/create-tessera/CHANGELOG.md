@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.6.0
+
+### Patch Changes
+
+- 4f3bcea: - `@types/node` 26.4.0 → 26.4.1
+  - `tsdown` 0.22.14 → 0.23.0
+
 ## 0.5.2
 
 ### Patch Changes
