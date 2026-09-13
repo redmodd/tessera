@@ -375,15 +375,34 @@ function bindsName(pattern: Node | null, name: string): boolean {
 
 function isReferenced(program: Node, name: string, binding: Node): boolean {
   const nonReferences = new Set<Node>([binding]);
+  const namespaces = new Set<unknown>();
+  for (const node of (program.body as Node[]) ?? []) {
+    if (node.type !== 'ImportDeclaration') continue;
+    for (const specifier of (node.specifiers as Node[]) ?? []) {
+      if (specifier.type !== 'ImportNamespaceSpecifier') continue;
+      const local = specifier.local as Node;
+      namespaces.add(local.name);
+      nonReferences.add(local);
+    }
+  }
   let referenced = false;
   walkNodes(program, (node) => {
     if (node.type === 'MemberExpression' && !node.computed) {
-      nonReferences.add(node.property as Node);
+      const object = node.object as Node;
+      const property = node.property as Node;
+      nonReferences.add(property);
+      if (
+        object.type === 'Identifier' &&
+        namespaces.has(object.name) &&
+        property.name !== name
+      ) {
+        nonReferences.add(object);
+      }
     } else if (node.type === 'Property' && !node.computed && !node.shorthand) {
       nonReferences.add(node.key as Node);
     } else if (
       node.type === 'Identifier' &&
-      node.name === name &&
+      (node.name === name || namespaces.has(node.name)) &&
       !nonReferences.has(node)
     ) {
       referenced = true;

@@ -527,6 +527,18 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
       `export const xapi = { lrs: {} };\nconst lrs = xapi.lrs;\nlrs.auth = () => 'y';`,
     ],
     [
+      'the object is mutated through a namespace import',
+      `import * as self from './course.runtime.js';\nexport const xapi = {};\nself.xapi.lrs = { auth: () => 'y' };`,
+    ],
+    [
+      'a namespace import is aliased',
+      `import * as self from './course.runtime.js';\nexport const xapi = {};\nconst mod = self;\nmod.xapi.lrs = { auth: () => 'y' };`,
+    ],
+    [
+      'a namespace import is read by computed key',
+      `import * as self from './course.runtime.js';\nexport const xapi = {};\nself['xapi'].lrs = { auth: () => 'y' };`,
+    ],
+    [
       'a destination entry is not a literal',
       `const lrs = { auth: () => 'y' };\nexport const xapi = { lrs };`,
     ],
@@ -542,6 +554,18 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
       testRoot,
       'course.runtime.js',
       `import * as mod from './hooks.js';\nexport const { canAccess, xapi: other } = mod;`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) => e.includes('xapi.auth is required')),
+    ).toBeDefined();
+  });
+
+  it('still checks resolver pairing beside a namespace import read by name', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `import * as tokens from './tokens.js';\nexport const xapi = { lrs: { actor: tokens.actor } };`,
     );
     expect(
       xapiErrors(testRoot).find((e) => e.includes('xapi.auth is required')),
