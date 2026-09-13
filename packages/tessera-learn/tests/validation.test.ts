@@ -651,6 +651,33 @@ export const pageConfig = { title: "Hello" };
     );
   });
 
+  it.each([
+    [
+      'a string literal',
+      `<script>const snippet = '<script context="module">';</script>`,
+    ],
+    ['a markup expression', `<pre>{'<script context="module">'}</pre>`],
+    [
+      'a data-context attribute',
+      `<script data-context="module">let a = 1;</script>`,
+    ],
+  ])('accepts context="module" text in %s', (_label, extra) => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Hello" };
+</script>
+${extra}
+<h1>Hello</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('context="module"'))).toHaveLength(
+      0,
+    );
+  });
+
   it('errors on non-static pageConfig (function call)', () => {
     createValidProject(testRoot);
     writeFile(

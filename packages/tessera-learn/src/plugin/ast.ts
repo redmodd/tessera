@@ -285,6 +285,23 @@ export function pageConfigLiteral(svelteSource: string): NamedObjectLiteral {
   return pageConfigFromModuleScriptFallback(svelteSource);
 }
 
+const LEGACY_MODULE_SCRIPT_RE =
+  /<script\s(?:[^>]*\s)?context\s*=\s*["']module["']/;
+
+export function usesLegacyModuleContext(svelteSource: string): boolean {
+  const { root } = parseRoot(svelteSource);
+  if (!root) return LEGACY_MODULE_SCRIPT_RE.test(svelteSource);
+  const attributes =
+    (root.module as { attributes?: Node[] } | null)?.attributes ?? [];
+  return attributes.some(
+    (attr) =>
+      attr.type === 'Attribute' &&
+      attr.name === 'context' &&
+      Array.isArray(attr.value) &&
+      (attr.value as { data?: string }[])[0]?.data === 'module',
+  );
+}
+
 /** 'unknown' when a call's options can't be read statically (spread, variable, computed). */
 export function useQuestionGrading(
   source: string,
