@@ -35,6 +35,7 @@ import { buildCsp } from './csp.js';
 import { runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
+import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
@@ -169,6 +170,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraManifestPlugin(manifestRef),
     tesseraLayoutPlugin(),
     tesseraQuizPlugin(),
+    tesseraCourseRuntimePlugin(),
     tesseraAdapterPlugin(standardOverride),
     tesseraXAPISetupPlugin(standardOverride),
     tesseraFirstPagePreloadPlugin(manifestRef),

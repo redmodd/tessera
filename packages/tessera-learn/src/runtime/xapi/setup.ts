@@ -1,8 +1,15 @@
-import type { CourseConfig, XAPIConfig, XAPIExplicitConfig } from '../types.js';
+import type {
+  CourseConfig,
+  CourseRuntime,
+  XAPIConfig,
+  XAPIDestinationHooks,
+  XAPIExplicitConfig,
+} from '../types.js';
 import type { PersistenceAdapter } from '../persistence.js';
 import type { XAPIAgent } from './types.js';
 import { XAPIPublisher } from './publisher.js';
 import { XAPIClient } from './client.js';
+import { XAPIConfigError } from './validation.js';
 import {
   synthesizeSCORM12Actor,
   synthesizeSCORM2004Actor,
@@ -73,7 +80,8 @@ class XAPISCORMDevFallbackError extends Error {
     super(
       `Tessera xAPI: ${label} learner identity is unavailable in dev (no LMS API found, ` +
         'falling back to localStorage). The runtime cannot synthesize an actor for this xapi ' +
-        'destination. Either supply xapi.actor explicitly in course.config.js, or launch from ' +
+        'destination. Either set xapi.actor in course.config.js, export an actor resolver ' +
+        'for it from course.runtime.js, or launch from ' +
         'a real LMS / SCORM Cloud where ' +
         (standard === 'scorm12' ? 'cmi.core.student_id' : 'cmi.learner_id') +
         ' is populated.',
@@ -101,6 +109,7 @@ function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
   adapter: PersistenceAdapter | null,
+  hooks: CourseRuntime['xapi'],
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
     const standard = config.export?.standard;
@@ -121,7 +130,22 @@ function resolveDestination(
 
   // Explicit endpoint.
   const explicit = entry as XAPIExplicitConfig;
-  const resolution = resolveExplicitActor(explicit, config, adapter);
+  const hook = hooks?.[explicit.id];
+  const auth = hook?.auth ?? explicit.auth;
+  if (auth === undefined) {
+    const id = JSON.stringify(explicit.id);
+    return {
+      kind: 'explicit',
+      publisher: makeRejectingPublisher(
+        () =>
+          new XAPIConfigError(
+            `Tessera xAPI: destination ${id} has no auth. Set its auth in course.config.js, ` +
+              `or export xapi[${id}].auth from course.runtime.js.`,
+          ),
+      ),
+    };
+  }
+  const resolution = resolveExplicitActor(explicit, hook, config, adapter);
   if (resolution === null) return null;
   if (resolution.kind === 'scorm-fallback') {
     return {
@@ -131,7 +155,7 @@ function resolveDestination(
   }
   const publisher = new XAPIPublisher({
     endpoint: explicit.endpoint,
-    auth: explicit.auth,
+    auth,
     actor: resolution.value,
     activityId: explicit.activityId,
     registration: explicit.registration,
@@ -141,18 +165,20 @@ function resolveDestination(
 
 /**
  * Pick an actor (object or resolver function) for an explicit destination,
- * applying the priority order: author-supplied > cmi5 launch actor >
- * SCORM-derived actor > error. Returns null if no actor can be resolved
- * (web export with no `xapi.actor` — build-time validator should have
- * caught this; runtime returns null and the publisher is skipped).
+ * applying the priority order: author-supplied (course.runtime.js resolver,
+ * then `xapi.actor`) > cmi5 launch actor > SCORM-derived actor > error.
+ * Returns null if no actor can be resolved (web export with no actor, which
+ * the build-time validator rejects; the publisher is skipped).
  */
 function resolveExplicitActor(
   explicit: XAPIExplicitConfig,
+  hook: XAPIDestinationHooks | undefined,
   config: CourseConfig,
   adapter: PersistenceAdapter | null,
 ): ActorResolution | null {
-  if (explicit.actor !== undefined) {
-    return { kind: 'actor', value: explicit.actor };
+  const actor = hook?.actor ?? explicit.actor;
+  if (actor !== undefined) {
+    return { kind: 'actor', value: actor };
   }
   const standard = config.export?.standard;
   if (
@@ -200,7 +226,8 @@ function resolveExplicitActor(
 }
 
 /**
- * Construct an `XAPIClient` from a course's `config.xapi`. Returns null
+ * Construct an `XAPIClient` from a course's `config.xapi` and the
+ * `course.runtime.js` resolvers keyed by destination id. Returns null
  * when xapi is unset, or when no destinations could be resolved.
  *
  * The returned client must have `init()` awaited before being registered
@@ -210,13 +237,14 @@ function resolveExplicitActor(
 export async function buildXAPIClient(
   config: CourseConfig,
   adapter: PersistenceAdapter | null,
+  hooks?: CourseRuntime['xapi'],
 ): Promise<XAPIClient | null> {
   const raw = config.xapi;
   if (raw === undefined || raw === null) return null;
   const entries: XAPIConfig[] = Array.isArray(raw) ? raw : [raw];
   const sources: DestinationSource[] = [];
   for (const entry of entries) {
-    const src = resolveDestination(entry, config, adapter);
+    const src = resolveDestination(entry, config, adapter, hooks);
     if (src) sources.push(src);
   }
   if (sources.length === 0) return null;

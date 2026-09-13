@@ -54,7 +54,6 @@ export interface CourseConfig {
   };
   navigation: {
     mode: 'free' | 'sequential';
-    canAccess?: AccessFn;
   };
   completion: ManualCompletion | QuizCompletion | PercentageCompletion;
   /** Optional under "manual"; required under "quiz". */
@@ -119,25 +118,25 @@ export interface XAPILMSConfig {
 }
 
 /**
- * Explicit LRS destination. The author provides every field. `actor` is
- * optional under SCORM (synthesized from `cmi.core.student_id` /
- * `cmi.learner_id`) and required under web.
+ * Explicit LRS destination. `actor` is optional under SCORM (synthesized from
+ * `cmi.core.student_id` / `cmi.learner_id`) and required under web.
  */
 export interface XAPIExplicitConfig {
+  /** Destination id. `course.runtime.js` keys its `xapi` resolvers by it. */
+  id: string;
   /** Absolute http(s) URL of the LRS Statements endpoint base. */
   endpoint: string;
   /**
-   * Basic-auth credential value (the part after "Basic "), or a function
-   * that resolves one. Function form is re-invoked once on 401 to cover
-   * short-lived tokens.
+   * Basic-auth credential value (the part after "Basic "). Omit when
+   * `course.runtime.js` exports an `auth` resolver for this destination.
    */
-  auth: string | (() => string | Promise<string>);
+  auth?: string;
   /**
-   * Identified Agent or a resolver function. Required for web export;
-   * optional under SCORM where it can be synthesized from the LMS data
-   * model. Optional under cmi5 where it can be inherited from the launch.
+   * Identified Agent. Required for web export unless `course.runtime.js`
+   * exports an `actor` resolver; optional under SCORM (synthesized from the
+   * LMS data model) and cmi5 (inherited from the launch).
    */
-  actor?: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>);
+  actor?: XAPIAgent;
   /** xAPI activity IRI scoped to this destination. */
   activityId: string;
   /** Optional UUID v4 — primarily a cmi5 launch concept. */
@@ -151,3 +150,19 @@ export interface XAPIExplicitConfig {
 }
 
 export type XAPIConfig = XAPILMSConfig | XAPIExplicitConfig;
+
+/** Runtime resolvers for one explicit xAPI destination. */
+export interface XAPIDestinationHooks {
+  /** Resolves the Basic-auth credential. Re-invoked once on 401 to cover short-lived tokens. */
+  auth?: () => string | Promise<string>;
+  /** Resolves the Identified Agent once per page load. */
+  actor?: () => XAPIAgent | Promise<XAPIAgent>;
+}
+
+/** Named exports of the optional project-root `course.runtime.js`. */
+export interface CourseRuntime {
+  /** Page-access predicate. Replaces the `navigation.mode` preset. */
+  canAccess?: AccessFn;
+  /** Resolvers keyed by explicit xAPI destination `id`. */
+  xapi?: Record<string, XAPIDestinationHooks>;
+}

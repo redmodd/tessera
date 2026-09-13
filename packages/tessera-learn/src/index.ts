@@ -51,5 +51,7 @@ export type {
   XAPIConfig,
   XAPIExplicitConfig,
   XAPILMSConfig,
+  XAPIDestinationHooks,
   CourseConfig,
+  CourseRuntime,
 } from './runtime/types.js';

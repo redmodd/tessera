@@ -55,12 +55,8 @@ export const sequentialAccess: AccessFn = ({
   return true;
 };
 
-/**
- * Resolve the access predicate for a course. Custom `config.navigation.canAccess`
- * wins; otherwise the preset matching `config.navigation.mode` is returned.
- */
+/** The preset matching `config.navigation.mode`. */
 export function resolveAccess(config: CourseConfig): AccessFn {
-  if (config.navigation.canAccess) return config.navigation.canAccess;
   return config.navigation.mode === 'sequential'
     ? sequentialAccess
     : freeAccess;

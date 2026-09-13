@@ -248,6 +248,172 @@ export function defaultExportObjectLiteral(
   return { kind: 'none' };
 }
 
+/**
+ * Paths (e.g. `xapi[0].auth`) of function values inside the `export default`
+ * object literal. JSON5 can't parse those, so the validator names them.
+ */
+export function defaultExportFunctionPaths(jsSource: string): string[] {
+  const program = parseJsModule(jsSource);
+  if (!program) return [];
+  const exported = ((program.body as Node[]) ?? []).find(
+    (node) => node.type === 'ExportDefaultDeclaration',
+  );
+  const paths: string[] = [];
+  const visit = (node: Node | null, path: string): void => {
+    const value = unwrapTsCast(node);
+    if (!value) return;
+    if (
+      value.type === 'ArrowFunctionExpression' ||
+      value.type === 'FunctionExpression'
+    ) {
+      paths.push(path);
+    } else if (value.type === 'ObjectExpression') {
+      for (const property of value.properties as Node[]) {
+        const key = property.type === 'Property' ? propertyKey(property) : null;
+        if (key === null) continue;
+        visit(property.value as Node, path ? `${path}.${key}` : key);
+      }
+    } else if (value.type === 'ArrayExpression') {
+      (value.elements as (Node | null)[]).forEach((element, i) =>
+        visit(element, `${path}[${i}]`),
+      );
+    }
+  };
+  visit((exported?.declaration as Node | undefined) ?? null, '');
+  return paths;
+}
+
+/** Keys of each `xapi` export entry: `'unknown'` where not statically readable. */
+export type RuntimeXAPIHooks = Map<string, ReadonlySet<string> | 'unknown'>;
+
+export interface CourseRuntimeExports {
+  xapi: RuntimeXAPIHooks | 'none' | 'unknown';
+  hasDefaultExport: boolean;
+}
+
+/**
+ * Statically read the exports of `course.runtime.js`, or null when it doesn't
+ * parse. `xapi` is read only from an `export const xapi = { ... }` literal that
+ * is never reassigned, mutated or passed to a call; any other form is `'unknown'`.
+ */
+export function readCourseRuntimeExports(
+  jsSource: string,
+): CourseRuntimeExports | null {
+  const program = parseJsModule(jsSource);
+  if (!program) return null;
+  let hasDefaultExport = false;
+  let xapiInit: Node | null | undefined;
+  for (const node of (program.body as Node[]) ?? []) {
+    if (node.type === 'ExportDefaultDeclaration') hasDefaultExport = true;
+    if (node.type === 'ExportAllDeclaration') xapiInit ??= null;
+    if (node.type !== 'ExportNamedDeclaration') continue;
+    for (const specifier of (node.specifiers as Node[]) ?? []) {
+      const exported = specifier.exported as Node;
+      const name = exported.name ?? exported.value;
+      if (name === 'default') hasDefaultExport = true;
+      if (name === 'xapi') xapiInit = null;
+    }
+    const declaration = node.declaration as Node | null;
+    if (
+      declaration?.type === 'FunctionDeclaration' &&
+      (declaration.id as Node).name === 'xapi'
+    ) {
+      xapiInit = null;
+    }
+    if (declaration?.type !== 'VariableDeclaration') continue;
+    for (const decl of declaration.declarations as Node[]) {
+      const id = decl.id as Node;
+      if (id.type === 'Identifier') {
+        if (id.name === 'xapi') xapiInit = (decl.init as Node | null) ?? null;
+      } else if (bindsName(id, 'xapi')) {
+        xapiInit = null;
+      }
+    }
+  }
+  if (xapiInit === undefined) return { xapi: 'none', hasDefaultExport };
+
+  const entries = objectLiteralEntries(xapiInit);
+  if (entries === 'unknown' || isMutated(program, 'xapi')) {
+    return { xapi: 'unknown', hasDefaultExport };
+  }
+  const hooks: RuntimeXAPIHooks = new Map();
+  for (const [id, entry] of entries) {
+    const keys = objectLiteralEntries(entry);
+    hooks.set(id, keys === 'unknown' ? 'unknown' : new Set(keys.keys()));
+  }
+  return { xapi: hooks, hasDefaultExport };
+}
+
+function bindsName(pattern: Node | null, name: string): boolean {
+  switch (pattern?.type) {
+    case 'Identifier':
+      return pattern.name === name;
+    case 'ObjectPattern':
+      return (pattern.properties as Node[]).some((p) =>
+        bindsName((p.type === 'RestElement' ? p : p.value) as Node, name),
+      );
+    case 'ArrayPattern':
+      return (pattern.elements as (Node | null)[]).some((e) =>
+        bindsName(e, name),
+      );
+    case 'AssignmentPattern':
+      return bindsName(pattern.left as Node, name);
+    case 'RestElement':
+      return bindsName(pattern.argument as Node, name);
+    default:
+      return false;
+  }
+}
+
+function isMutated(program: Node, name: string): boolean {
+  let mutated = false;
+  const check = (target: Node | null): void => {
+    let node = unwrapTsCast(target);
+    while (node?.type === 'MemberExpression') {
+      node = unwrapTsCast(node.object as Node);
+    }
+    if (node?.type === 'Identifier' && node.name === name) mutated = true;
+  };
+  walkNodes(program, (node) => {
+    if (node.type === 'AssignmentExpression') {
+      check(node.left as Node);
+    } else if (
+      node.type === 'UpdateExpression' ||
+      (node.type === 'UnaryExpression' && node.operator === 'delete')
+    ) {
+      check(node.argument as Node);
+    } else if (
+      node.type === 'CallExpression' ||
+      node.type === 'NewExpression'
+    ) {
+      for (const arg of node.arguments as Node[]) check(arg);
+    }
+  });
+  return mutated;
+}
+
+function objectLiteralEntries(
+  node: Node | null,
+): Map<string, Node> | 'unknown' {
+  const value = unwrapTsCast(node);
+  if (value?.type !== 'ObjectExpression') return 'unknown';
+  const entries = new Map<string, Node>();
+  for (const property of value.properties as Node[]) {
+    const key = property.type === 'Property' ? propertyKey(property) : null;
+    if (key === null) return 'unknown';
+    entries.set(key, property.value as Node);
+  }
+  return entries;
+}
+
+function propertyKey(property: Node): string | null {
+  if (property.computed) return null;
+  const key = property.key as Node | undefined;
+  if (key?.type === 'Identifier') return key.name as string;
+  if (key?.type === 'Literal') return String(key.value);
+  return null;
+}
+
 const MODULE_SCRIPT_OPEN_RE = /<script\s+module[^>]*>/;
 const SCRIPT_CLOSE = '</script>';
 
@@ -368,14 +534,7 @@ function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
       unknown = true;
       continue;
     }
-    const key = property.key as Node | undefined;
-    const name =
-      key?.type === 'Identifier'
-        ? (key.name as string)
-        : key?.type === 'Literal'
-          ? String(key.value)
-          : null;
-    if (name !== 'graded') continue;
+    if (propertyKey(property) !== 'graded') continue;
     const value = unwrapTsCast(property.value as Node);
     if (value?.type !== 'Literal') return 'unknown';
     if (value.value === true) return 'graded';

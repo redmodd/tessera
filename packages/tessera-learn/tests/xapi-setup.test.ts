@@ -113,6 +113,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 
     const config = baseConfig();
     config.xapi = {
+      id: 'analytics',
       endpoint: 'https://analytics.example.com/xapi/',
       auth: 'analytics-token',
       activityId: 'https://example.com/course/analytics',
@@ -126,6 +127,68 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     });
   });
 
+  it('explicit destination takes auth and actor resolvers from course.runtime.js by id', async () => {
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const config = baseConfig();
+    config.xapi = {
+      id: 'analytics',
+      endpoint: 'https://analytics.example.com/xapi/',
+      activityId: 'https://example.com/course/analytics',
+    };
+
+    const client = await buildXAPIClient(config, adapter, {
+      analytics: {
+        auth: async () => 'resolved-token',
+        actor: async () => ({ mbox: 'mailto:resolved@example.com' }),
+      },
+    });
+    expect(client!.getActor()).toEqual({ mbox: 'mailto:resolved@example.com' });
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+    await client!.sendStatement({
+      verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
+    });
+    const send = mockFetch.mock.calls.find(([url]) =>
+      String(url).startsWith('https://analytics.example.com/'),
+    );
+    expect((send![1].headers as Headers).get('Authorization')).toBe(
+      'Basic resolved-token',
+    );
+  });
+
+  it('explicit destination with auth in neither file rejects sends instead of going unauthenticated', async () => {
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const config = baseConfig();
+    config.xapi = {
+      id: 'analytics',
+      endpoint: 'https://analytics.example.com/xapi/',
+      activityId: 'https://example.com/course/analytics',
+    };
+
+    const client = await buildXAPIClient(config, adapter, {
+      other: { auth: async () => 'resolved-token' },
+    });
+    expect(client).not.toBeNull();
+
+    mockFetch.mockClear();
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/xapi\["analytics"\]\.auth/);
+    expect(
+      mockFetch.mock.calls.some(([url]) =>
+        String(url).startsWith('https://analytics.example.com/'),
+      ),
+    ).toBe(false);
+  });
+
   it("mixed destinations: 'lms' + explicit both materialize and fan-out", async () => {
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -134,6 +197,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     config.xapi = [
       { endpoint: 'lms' },
       {
+        id: 'analytics',
         endpoint: 'https://analytics.example.com/xapi/',
         auth: 'analytics-token',
         activityId: 'https://example.com/course/analytics',
