@@ -258,6 +258,34 @@ describe('export packaging gate', () => {
     ).toHaveLength(1);
   });
 
+  it('fails the build and skips packaging on an import that is always undefined', async () => {
+    writeConfig('scorm12');
+    seedStaleDist();
+
+    const { entry, exporter } = buildPlugins();
+    (exporter.writeBundle as any).call(exporter);
+    const ctx = {
+      error(log: { message: string }) {
+        throw new Error(log.message);
+      },
+    };
+    expect(() =>
+      (exporter.onLog as any).call(ctx, 'warn', {
+        code: 'IMPORT_IS_UNDEFINED',
+        message: 'Import `notReal` will always be undefined',
+      }),
+    ).toThrow(/notReal/);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+      false,
+    );
+    expect(readdirSync(projectRoot).filter((f) => f.endsWith('.zip'))).toEqual(
+      [],
+    );
+  });
+
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
     writeConfig('scorm12');
     seedStaleDist();

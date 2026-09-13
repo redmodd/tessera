@@ -549,6 +549,12 @@ function tesseraExportPlugin(
       build.written = true;
     },
 
+    onLog(_level, log) {
+      if (log.code !== 'IMPORT_IS_UNDEFINED') return;
+      build.written = false;
+      this.error(log);
+    },
+
     async closeBundle() {
       const written = build.written;
       build.written = false;
