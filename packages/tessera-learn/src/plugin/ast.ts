@@ -307,8 +307,13 @@ export function courseRuntimeXAPIHooks(
       const id = decl.id as Node;
       if (id.type === 'Identifier') {
         locals.set(id.name as string, decl.init as Node | null);
+      } else {
+        for (const name of patternNames(id)) locals.set(name, null);
       }
     }
+  }
+  for (const name of mutatedNames(program)) {
+    if (locals.has(name)) locals.set(name, null);
   }
 
   let found = false;
@@ -318,8 +323,8 @@ export function courseRuntimeXAPIHooks(
     if (node.type !== 'ExportNamedDeclaration') continue;
     const declaration = node.declaration as Node | null;
     if (declaration?.type === 'VariableDeclaration' && locals.has('xapi')) {
-      const declares = (declaration.declarations as Node[]).some(
-        (decl) => (decl.id as Node).name === 'xapi',
+      const declares = (declaration.declarations as Node[]).some((decl) =>
+        patternNames(decl.id as Node).includes('xapi'),
       );
       if (declares) {
         found = true;
@@ -350,6 +355,68 @@ export function courseRuntimeXAPIHooks(
     hooks.set(id, keys === 'unknown' ? 'unknown' : new Set(keys.keys()));
   }
   return hooks;
+}
+
+export function hasDefaultExport(jsSource: string): boolean {
+  const program = parseJsModule(jsSource);
+  return ((program?.body as Node[]) ?? []).some(
+    (node) =>
+      node.type === 'ExportDefaultDeclaration' ||
+      (node.type === 'ExportNamedDeclaration' &&
+        ((node.specifiers as Node[]) ?? []).some((specifier) => {
+          const exported = specifier.exported as Node;
+          return (exported.name ?? exported.value) === 'default';
+        })),
+  );
+}
+
+function patternNames(pattern: Node): string[] {
+  switch (pattern.type) {
+    case 'Identifier':
+      return [pattern.name as string];
+    case 'ObjectPattern':
+      return (pattern.properties as Node[]).flatMap((property) =>
+        patternNames(
+          property.type === 'Property' ? (property.value as Node) : property,
+        ),
+      );
+    case 'ArrayPattern':
+      return (pattern.elements as (Node | null)[]).flatMap((element) =>
+        element ? patternNames(element) : [],
+      );
+    case 'RestElement':
+      return patternNames(pattern.argument as Node);
+    case 'AssignmentPattern':
+      return patternNames(pattern.left as Node);
+    default:
+      return [];
+  }
+}
+
+function mutatedNames(program: Node): Set<string> {
+  const names = new Set<string>();
+  const addRoot = (target: Node | null): void => {
+    let node = unwrapTsCast(target);
+    while (node?.type === 'MemberExpression') {
+      node = unwrapTsCast(node.object as Node);
+    }
+    if (node?.type === 'Identifier') names.add(node.name as string);
+  };
+  walkNodes(program, (node) => {
+    if (node.type === 'AssignmentExpression') {
+      addRoot(node.left as Node);
+    } else if (node.type === 'UpdateExpression') {
+      addRoot(node.argument as Node);
+    } else if (node.type === 'UnaryExpression' && node.operator === 'delete') {
+      addRoot(node.argument as Node);
+    } else if (
+      node.type === 'CallExpression' ||
+      node.type === 'NewExpression'
+    ) {
+      for (const arg of node.arguments as Node[]) addRoot(arg);
+    }
+  });
+  return names;
 }
 
 function staticObjectEntries(

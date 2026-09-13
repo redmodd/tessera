@@ -159,6 +159,36 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     );
   });
 
+  it('explicit destination with auth in neither file rejects sends instead of going unauthenticated', async () => {
+    adapter = new CMI5Adapter();
+    await adapter.init();
+
+    const config = baseConfig();
+    config.xapi = {
+      id: 'analytics',
+      endpoint: 'https://analytics.example.com/xapi/',
+      activityId: 'https://example.com/course/analytics',
+    };
+
+    const client = await buildXAPIClient(config, adapter, {
+      other: { auth: async () => 'resolved-token' },
+    });
+    expect(client).not.toBeNull();
+
+    mockFetch.mockClear();
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/xapi\["analytics"\]\.auth/);
+    expect(
+      mockFetch.mock.calls.some(([url]) =>
+        String(url).startsWith('https://analytics.example.com/'),
+      ),
+    ).toBe(false);
+  });
+
   it("mixed destinations: 'lms' + explicit both materialize and fan-out", async () => {
     adapter = new CMI5Adapter();
     await adapter.init();

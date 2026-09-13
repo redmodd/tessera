@@ -19,6 +19,7 @@ import {
   findComponents,
   type ComponentMatch,
   getParseError,
+  hasDefaultExport,
   useQuestionGrading,
   usesLegacyModuleContext,
   type PropValue,
@@ -657,10 +658,18 @@ function readRuntimeXAPIHooks(
 ): XAPIHookRead {
   const runtimePath = resolve(projectRoot, 'course.runtime.js');
   if (!existsSync(runtimePath)) return 'none';
-  const hooks = courseRuntimeXAPIHooks(readSourceFileCached(runtimePath));
-  if (hooks !== 'parse-error') return hooks;
-  d.error('course.runtime.js: could not parse, JavaScript syntax error');
-  return 'unknown';
+  const source = readSourceFileCached(runtimePath);
+  const hooks = courseRuntimeXAPIHooks(source);
+  if (hooks === 'parse-error') {
+    d.error('course.runtime.js: could not parse, JavaScript syntax error');
+    return 'unknown';
+  }
+  if (hasDefaultExport(source)) {
+    d.error(
+      'course.runtime.js: export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
+    );
+  }
+  return hooks;
 }
 
 function hookState(

@@ -542,6 +542,50 @@ export { hooks as xapi };`,
     expect(xapiErrors(testRoot)).toEqual([]);
   });
 
+  it('skips the pairing checks when xapi is bound by destructuring', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `import * as mod from './hooks.js';\nexport const { xapi } = mod;`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('skips the pairing checks when the xapi object is mutated after declaration', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = {};\nxapi.lrs = { auth: () => 'y' };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('skips the pairing checks when a destination entry is mutated', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `const lrs = {};\nObject.assign(lrs, { auth: () => 'y' });\nexport const xapi = { lrs };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('errors on a default export in course.runtime.js', () => {
+    testRoot = projectWith(full);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export default { canAccess: () => true };`,
+    );
+    expect(
+      validateProject(testRoot).errors.find((e) =>
+        e.startsWith('course.runtime.js: export default is ignored'),
+      ),
+    ).toBeDefined();
+  });
+
   it('lets a resolved actor satisfy the SCORM account homePage rule', () => {
     testRoot = projectWith(
       `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1" }`,
