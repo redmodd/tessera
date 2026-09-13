@@ -1843,7 +1843,7 @@ export const pageConfig = { title: "Exam", graded: true, quiz: {} };
     );
   });
 
-  it('accepts a practice quiz page whose standalone question is graded', () => {
+  it('errors on a declared graded practice quiz page even when a question is marked graded', () => {
     createValidProject(testRoot);
     writePage(
       `<script context="module">
@@ -1860,7 +1860,7 @@ export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false
 <h1>Lesson</h1>`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).not.toContainEqual(
+    expect(errors).toContainEqual(
       expect.stringContaining('quiz page whose quiz is not graded'),
     );
   });

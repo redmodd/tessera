@@ -956,12 +956,12 @@ function validatePageFile(
     !hasCustomWidget &&
     !questionComponents.some(isGradedQuestion) &&
     (useQuestions === 'absent' || useQuestions === 'none');
-  if (declaresGraded && isQuiz && !isGradedQuiz && nothingGraded) {
+  if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
-      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded, ` +
-        'and no question outside the quiz is graded. Nothing on the page can earn a ' +
-        'score, so it never completes. Use quiz: { graded: true }, mark a question ' +
-        'component `graded`, add a useQuestion({ graded: true }), or drop graded: true.',
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+        "Every question on a quiz page belongs to the quiz, which ignores a question's own " +
+        '`graded`, so nothing on the page can earn a score and it never completes. ' +
+        'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
   if (weight !== undefined && !graded) {
