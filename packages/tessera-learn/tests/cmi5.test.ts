@@ -1258,6 +1258,39 @@ describe('CMI5Adapter', () => {
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
+    it('waits for a statement already sending before Terminated and the redirect', async () => {
+      const returnURL = 'https://lms.example.com/learner/done';
+      setupInitMocks(undefined, { returnURL });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      await new Promise((r) => setTimeout(r, 20));
+
+      const assign = vi.fn();
+      vi.stubGlobal('window', {
+        ...globalThis.window,
+        location: { ...globalThis.window.location, assign },
+      });
+      mockFetch.mockClear();
+      let release!: (v: unknown) => void;
+      mockFetch
+        .mockReturnValueOnce(new Promise((r) => (release = r)))
+        .mockResolvedValue({ ok: true });
+      adapter.setCompletionStatus('complete');
+      await new Promise((r) => setTimeout(r, 0));
+
+      const exiting = adapter.exit();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(assign).not.toHaveBeenCalled();
+
+      release({ ok: true });
+      await exiting;
+      expect(
+        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
+      ).toBeDefined();
+      expect(assign).toHaveBeenCalledWith(returnURL);
+    });
+
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
       setupInitMocks();
       adapter = new CMI5Adapter();

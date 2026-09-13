@@ -561,6 +561,32 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('sendFinal takes a statement waiting to retry into its batch', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 503 })
+        .mockResolvedValue({ ok: true });
+      const pub = new XAPIPublisher(basicOpts());
+      await pub.init();
+      const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
+      await vi.advanceTimersByTimeAsync(0);
+
+      await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+      await vi.advanceTimersByTimeAsync(600_000);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(
+        JSON.parse(mockFetch.mock.calls[1][1].body).map((s: any) => s.verb.id),
+      ).toEqual(['http://verb/retry', 'http://verb/final']);
+      await expect(retrying).resolves.toMatchObject({
+        destinations: [{ ok: true }],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sendFinal with nothing queued posts a single statement', async () => {
     mockFetch.mockResolvedValue({ ok: true });
     const pub = new XAPIPublisher(basicOpts());

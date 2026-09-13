@@ -290,6 +290,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   async exit(): Promise<void> {
+    if (!this.terminated) await this.publisher?.chainTask(async () => {});
     this.terminate();
     await this.#finalSend;
     if (this.returnURL && typeof window !== 'undefined') {

@@ -52,6 +52,12 @@ export interface XAPIPublisherOptions {
   unavailableReason?: () => Error;
 }
 
+interface UnsentEntry {
+  body: Statement | Statement[];
+  settle: (o: DestinationOutcome) => void;
+  sending: boolean;
+}
+
 interface SendOutcome {
   ok: boolean;
   status?: number;
@@ -124,10 +130,7 @@ export class XAPIPublisher {
   #queueDepth = 0;
   #queueWarned = false;
   #unloading = false;
-  #unsent: Array<{
-    body: Statement | Statement[];
-    settle: (o: DestinationOutcome) => void;
-  }> = [];
+  #unsent: UnsentEntry[] = [];
   #closed = false;
 
   constructor(opts: XAPIPublisherOptions) {
@@ -378,16 +381,19 @@ export class XAPIPublisher {
     // path synchronously up to fetch — same timing as the original
     // cmi5.ts queue, which a few tests rely on (e.g., Initialized must
     // POST before mockClear() runs in the test body).
-    const entry = { body: statementOrBatch, settle: resolveOutcome };
+    const entry = {
+      body: statementOrBatch,
+      settle: resolveOutcome,
+      sending: false,
+    };
     this.#unsent.push(entry);
-    this.#queue = this.#queue.then(() => {
-      const i = this.#unsent.indexOf(entry);
-      if (i < 0) return;
-      this.#unsent.splice(i, 1);
-      return this.#sendWithRetry(statementOrBatch, options).then((outcome) =>
-        this.#settle(resolveOutcome, outcome),
-      );
-    });
+    this.#queue = this.#queue.then(() =>
+      this.#sendWithRetry(entry, options).then((outcome) => {
+        if (!outcome) return;
+        this.#unsent.splice(this.#unsent.indexOf(entry), 1);
+        this.#settle(resolveOutcome, outcome);
+      }),
+    );
     return outcomePromise;
   }
 
@@ -395,7 +401,8 @@ export class XAPIPublisher {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
-    const flushed = this.#unsent.splice(0);
+    const flushed = this.#unsent.filter((e) => !e.sending);
+    this.#unsent = this.#unsent.filter((e) => e.sending);
     this.#closed = true;
     const batch = [
       ...flushed.flatMap((e) => e.body),
@@ -457,15 +464,19 @@ export class XAPIPublisher {
 
   // ---- Internal: send with retry policy ----
 
+  /** Resolves null when `sendFinal` took the entry into its batch. */
   #sendWithRetry(
-    statementOrBatch: Statement | Statement[],
+    entry: UnsentEntry,
     options?: SendStatementOptions,
-  ): Promise<SendOutcome> {
+  ): Promise<SendOutcome | null> {
+    const statementOrBatch = entry.body;
     const body = JSON.stringify(statementOrBatch);
     const retry = options?.retry !== false; // default: retry enabled
     const maxAttempts = retry ? RETRY_ATTEMPTS : 1;
 
-    const attempt = (n: number): Promise<SendOutcome> => {
+    const attempt = (n: number): Promise<SendOutcome | null> => {
+      if (!this.#unsent.includes(entry)) return Promise.resolve(null);
+      entry.sending = true;
       const isFinal = n === maxAttempts - 1;
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
@@ -488,6 +499,7 @@ export class XAPIPublisher {
           return outcome;
         }
         if (isFinal) return outcome;
+        entry.sending = false;
         return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
           attempt(n + 1),
         );
