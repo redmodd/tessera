@@ -519,6 +519,14 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
       `export const xapi = { lrs: {} };\nObject.assign(xapi.lrs, { auth: () => 'y' });`,
     ],
     [
+      'the object is mutated through an alias',
+      `export const xapi = {};\nconst hooks = xapi;\nhooks.lrs = { auth: () => 'y' };`,
+    ],
+    [
+      'a destination entry is mutated through an alias',
+      `export const xapi = { lrs: {} };\nconst lrs = xapi.lrs;\nlrs.auth = () => 'y';`,
+    ],
+    [
       'a destination entry is not a literal',
       `const lrs = { auth: () => 'y' };\nexport const xapi = { lrs };`,
     ],
