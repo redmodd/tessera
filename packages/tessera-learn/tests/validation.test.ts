@@ -731,7 +731,7 @@ export const pageConfig = { title: "Just Prose", weight: 40 };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'pageConfig.weight only applies once the page counts toward the course score',
+        'pageConfig.weight only applies to a page that counts toward the course score',
       ),
     );
   });
@@ -1753,6 +1753,63 @@ export const pageConfig = { title: "Exam", graded: true };
     );
   });
 
+  it('errors on a graded question component on an undeclared page', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Check" };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+</script>
+<MultipleChoice question="A" options={["a", "b"]} correct={0} graded />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig does not declare graded: true'),
+    );
+  });
+
+  it('errors on a graded useQuestion on an undeclared page', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Check" };
+</script>
+<script>
+  import { useQuestion } from 'tessera-learn';
+  const q = useQuestion({
+    id: 'q1',
+    graded: true,
+    response: () => ({ response: 'a' }),
+  });
+</script>
+<h1>Check</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig does not declare graded: true'),
+    );
+  });
+
+  it('does not error on an undeclared page whose graded flag is a variable', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script context="module">
+export const pageConfig = { title: "Check" };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+  let isFinal = false;
+</script>
+<MultipleChoice question="A" options={["a", "b"]} correct={0} graded={isFinal} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).not.toContainEqual(
+      expect.stringContaining('pageConfig does not declare graded: true'),
+    );
+  });
+
   it('warns when the only non-package import is a package subpath', () => {
     createValidProject(testRoot);
     writePage(
@@ -1786,7 +1843,7 @@ export const pageConfig = { title: "Exam", graded: true, quiz: {} };
     );
   });
 
-  it('accepts a practice quiz page whose standalone question is graded', () => {
+  it('errors on a declared graded practice quiz page even when a question is marked graded', () => {
     createValidProject(testRoot);
     writePage(
       `<script context="module">
@@ -1803,7 +1860,7 @@ export const pageConfig = { title: "Lesson", graded: true, quiz: { graded: false
 <h1>Lesson</h1>`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).not.toContainEqual(
+    expect(errors).toContainEqual(
       expect.stringContaining('quiz page whose quiz is not graded'),
     );
   });

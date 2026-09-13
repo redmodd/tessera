@@ -27,8 +27,6 @@ export interface GradedUnit {
   attempts: number;
   /** Standalone question results, questionId → score 0-100 + rollup weight. */
   questions?: Map<string, StandaloneResult>;
-  /** The page carries at least one graded standalone question. */
-  graded: boolean;
 }
 
 export class ProgressState {
@@ -38,6 +36,7 @@ export class ProgressState {
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
+  #undeclaredWarned = new Set<number>();
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
@@ -137,6 +136,15 @@ export class ProgressState {
     return this.chunkProgress.get(pageIndex) ?? -1;
   }
 
+  assertDeclaredGraded(pageIndex: number, slug: string) {
+    if (this.#declaredGradedIndices.has(pageIndex)) return;
+    const message = `Tessera: page "${slug}" has a graded question but does not declare pageConfig.graded: true, so it will not count toward the course score or passed/failed. Add graded: true to its pageConfig.`;
+    if (import.meta.env?.DEV) throw new Error(message);
+    if (this.#undeclaredWarned.has(pageIndex)) return;
+    this.#undeclaredWarned.add(pageIndex);
+    console.warn(message);
+  }
+
   markStandaloneQuestion(
     pageIndex: number,
     questionId: string,
@@ -180,14 +188,13 @@ export class ProgressState {
     const unit = this.gradedUnits.get(pageIndex);
     if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
       return unit.quizScore;
-    return unit?.graded ? this.getPageStandaloneAverage(pageIndex) : undefined;
+    return this.#gradedResults(pageIndex).length
+      ? this.getPageStandaloneAverage(pageIndex)
+      : undefined;
   }
 
   #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
-    this.#write(pageIndex, {
-      questions,
-      graded: [...questions.values()].some((result) => result.graded),
-    });
+    this.#write(pageIndex, { questions });
   }
 
   #gradedResults(pageIndex: number): StandaloneResult[] {
@@ -215,7 +222,6 @@ export class ProgressState {
   #write(pageIndex: number, patch: Partial<GradedUnit>) {
     this.gradedUnits.set(pageIndex, {
       attempts: 0,
-      graded: false,
       ...this.gradedUnits.get(pageIndex),
       ...patch,
     });
@@ -223,15 +229,11 @@ export class ProgressState {
   }
 
   #graded = $derived.by(() => {
-    const pages = new Set(this.#declaredGradedIndices);
-    for (const [pageIndex, unit] of this.gradedUnits) {
-      if (unit.graded) pages.add(pageIndex);
-    }
     let weighted = 0;
     let totalWeight = 0;
     let attempted = false;
     let allScored = true;
-    for (const pageIndex of pages) {
+    for (const pageIndex of this.#declaredGradedIndices) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
       else allScored = false;
@@ -240,7 +242,7 @@ export class ProgressState {
       totalWeight += weight;
     }
     return {
-      count: pages.size,
+      count: this.#declaredGradedIndices.size,
       average: totalWeight > 0 ? weighted / totalWeight : 0,
       attempted,
       allScored,

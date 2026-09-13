@@ -952,23 +952,31 @@ function validatePageFile(
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
   const useQuestions = useQuestionGrading(content);
-  const nothingGraded =
-    !hasCustomWidget &&
-    !questionComponents.some(isGradedQuestion) &&
-    (useQuestions === 'absent' || useQuestions === 'none');
-  if (declaresGraded && isQuiz && !isGradedQuiz && nothingGraded) {
+  if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
-      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded, ` +
-        'and no question outside the quiz is graded. Nothing on the page can earn a ' +
-        'score, so it never completes. Use quiz: { graded: true }, mark a question ' +
-        'component `graded`, add a useQuestion({ graded: true }), or drop graded: true.',
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+        "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
+        'and it never completes. ' +
+        'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
   if (weight !== undefined && !graded) {
     d.warn(
-      `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
-        'Without `graded: true` (or `quiz: { graded: true }`) the page joins the rollup only after ' +
-        'the learner answers a graded question on it, and counts for nothing if they skip it.',
+      `${fileRel}: pageConfig.weight only applies to a page that counts toward the course score. ` +
+        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+        'so the weight is ignored.',
+    );
+  }
+  const gradesUndeclared =
+    !declaresGraded &&
+    !isQuiz &&
+    (useQuestions === 'graded' ||
+      questionComponents.some(isLiterallyGradedQuestion));
+  if (gradesUndeclared) {
+    d.error(
+      `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
+        'so its score never reaches the course score or passed/failed. Add graded: true to ' +
+        'pageConfig, or drop graded from the question.',
     );
   }
 
@@ -987,7 +995,13 @@ function validatePageFile(
       `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
         `components or useQuestion() calls — it will have nothing to score`,
     );
-  } else if (declaresGraded && !isQuiz && nothingGraded) {
+  } else if (
+    declaresGraded &&
+    !isQuiz &&
+    !hasCustomWidget &&
+    !questionComponents.some(isGradedQuestion) &&
+    (useQuestions === 'absent' || useQuestions === 'none')
+  ) {
     d.warn(
       `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
         `the page can never earn a score, so under completion.mode "percentage" it ` +
@@ -1650,6 +1664,14 @@ function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
   if (hasSpread) return true;
   const graded = props.get('graded');
   return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
+}
+
+function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
+  const graded = props.get('graded');
+  return (
+    graded?.kind === 'bool' ||
+    (graded?.kind === 'expr' && graded.raw === 'true')
+  );
 }
 
 /**

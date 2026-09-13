@@ -1,5 +1,5 @@
 <script module>
-  export const pageConfig = { title: 'Weighted Questions' };
+  export const pageConfig = { title: 'Weighted Questions', graded: true };
 </script>
 
 <script>

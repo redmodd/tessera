@@ -86,6 +86,68 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('throws in dev when a graded question registers on an undeclared page', () => {
+    const progress = new ProgressState(createManifest(2), createConfig());
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    expect(() =>
+      useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => ({ type: 'true-false', response: true, correct: true }),
+      }),
+    ).toThrow(/page "page-0" has a graded question but does not declare/);
+    expect(() =>
+      useQuestion({
+        id: 'q2',
+        response: () => ({ type: 'true-false', response: true, correct: true }),
+      }),
+    ).not.toThrow();
+  });
+
+  it('warns once in production when a graded question registers on an undeclared page, not on restore', () => {
+    vi.stubEnv('DEV', false);
+    const progress = new ProgressState(createManifest(2), createConfig());
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      progress.markStandaloneQuestion(0, 'q0', 100, true);
+      expect(warn).not.toHaveBeenCalled();
+
+      const response = () =>
+        ({ type: 'true-false', response: true, correct: true }) as Interaction;
+      useQuestion({ id: 'q1', graded: true, response }).submit();
+      useQuestion({ id: 'q2', graded: true, response }).submit();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('page "page-0"');
+      expect(warn.mock.calls[0][0]).toContain('does not declare');
+      expect(progress.pageScore(0)).toBe(100);
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('does not throw for a graded question on a declared page', () => {
+    const progress = new ProgressState(
+      createManifest(2, {}, { 0: { graded: true } }),
+      createConfig(),
+    );
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    expect(() =>
+      useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => ({ type: 'true-false', response: true, correct: true }),
+      }),
+    ).not.toThrow();
+  });
+
   it('is not answerComplete until an answer is set, with no complete callback', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     ctxStore.set('tessera-nav', makeNavCtx(progress));
@@ -133,14 +195,15 @@ describe('useQuestion — standalone mode', () => {
     });
     q.submit();
 
-    // Score is recorded for the page (so authors can render it),
-    // but the unit is NOT marked graded
     expect(progress.gradedUnits.get(2)?.questions?.get('q1')?.score).toBe(100);
-    expect(progress.gradedUnits.get(2)?.graded).toBe(false);
+    expect(progress.pageScore(2)).toBeUndefined();
   });
 
   it('registers a graded score when graded is true', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const progress = new ProgressState(
+      createManifest(4, {}, { 3: { graded: true } }),
+      createConfig(),
+    );
     const adapter = makeAdapter();
     const ctx = makeNavCtx(progress, 3);
     ctxStore.set('tessera-nav', ctx);
@@ -154,13 +217,16 @@ describe('useQuestion — standalone mode', () => {
     q.submit();
 
     expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(100);
-    expect(progress.gradedUnits.get(3)?.graded).toBe(true);
+    expect(progress.pageScore(3)).toBe(100);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
   });
 
   it('uses score override when provided', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const progress = new ProgressState(
+      createManifest(2, {}, { 0: { graded: true } }),
+      createConfig(),
+    );
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 0));
     ctxStore.set('tessera-adapter', { adapter });
@@ -177,7 +243,10 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('passes weight through to the recorded result', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const progress = new ProgressState(
+      createManifest(2, {}, { 1: { graded: true } }),
+      createConfig(),
+    );
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
     ctxStore.set('tessera-adapter', { adapter });
@@ -193,7 +262,10 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('corrects a restored answer whose saved weight is out of date', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const progress = new ProgressState(
+      createManifest(2, {}, { 1: { graded: true } }),
+      createConfig(),
+    );
     const adapter = makeAdapter();
     ctxStore.set('tessera-nav', makeNavCtx(progress, 1));
     ctxStore.set('tessera-adapter', { adapter });

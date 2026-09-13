@@ -52,7 +52,7 @@ export interface Question {
 export interface UseQuestionOptions {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
-  /** Whether this question counts toward course success status. Default false. */
+  /** Whether this question counts toward its page score. Default false. */
   graded?: boolean;
   /**
    * How much this question pulls on the page score, in a quiz host and
@@ -137,6 +137,12 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   if (navCtx) {
+    if (opts.graded) {
+      navCtx.progress.assertDeclaredGraded(
+        navCtx.nav.currentPageIndex,
+        navCtx.manifest.pages[navCtx.nav.currentPageIndex].slug,
+      );
+    }
     navCtx.progress.refreshStandaloneQuestion(
       navCtx.nav.currentPageIndex,
       opts.id,
@@ -176,9 +182,8 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       committed = true;
     }
     if (navCtx) {
-      const pageIndex = navCtx.nav.currentPageIndex;
       navCtx.progress.markStandaloneQuestion(
-        pageIndex,
+        navCtx.nav.currentPageIndex,
         opts.id,
         score,
         !!opts.graded,
