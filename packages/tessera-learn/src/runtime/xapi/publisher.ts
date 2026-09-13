@@ -124,6 +124,11 @@ export class XAPIPublisher {
   #queueDepth = 0;
   #queueWarned = false;
   #unloading = false;
+  #unsent: Array<{
+    body: Statement | Statement[];
+    settle: (o: DestinationOutcome) => void;
+  }> = [];
+  #closed = false;
 
   constructor(opts: XAPIPublisherOptions) {
     if (!opts.endpoint || typeof opts.endpoint !== 'string') {
@@ -373,23 +378,45 @@ export class XAPIPublisher {
     // path synchronously up to fetch — same timing as the original
     // cmi5.ts queue, which a few tests rely on (e.g., Initialized must
     // POST before mockClear() runs in the test body).
-    this.#queue = this.#queue.then(() =>
-      this.#sendWithRetry(statementOrBatch, options).then((outcome) => {
-        this.#queueDepth--;
-        resolveOutcome({
-          endpoint: this.#endpoint,
-          ok: outcome.ok,
-          status: outcome.status,
-          error: outcome.error,
-        });
-      }),
-    );
+    const entry = { body: statementOrBatch, settle: resolveOutcome };
+    this.#unsent.push(entry);
+    this.#queue = this.#queue.then(() => {
+      const i = this.#unsent.indexOf(entry);
+      if (i < 0) return;
+      this.#unsent.splice(i, 1);
+      return this.#sendWithRetry(statementOrBatch, options).then((outcome) =>
+        this.#settle(resolveOutcome, outcome),
+      );
+    });
     return outcomePromise;
   }
 
+  sendFinal(partial: PartialStatement): Promise<DestinationOutcome> {
+    if (this.#unavailableReason) {
+      return Promise.reject(this.#unavailableReason());
+    }
+    const flushed = this.#unsent.splice(0);
+    this.#closed = true;
+    const batch = [
+      ...flushed.flatMap((e) => e.body),
+      this.buildStatement(partial),
+    ];
+    const body = JSON.stringify(batch.length === 1 ? batch[0] : batch);
+    this.#warnOverKeepaliveCap(body, batch.length);
+    return this.#sendOnce(body, true).then((outcome) => {
+      for (const e of flushed) this.#settle(e.settle, outcome);
+      return {
+        endpoint: this.#endpoint,
+        ok: outcome.ok,
+        status: outcome.status,
+        error: outcome.error,
+      };
+    });
+  }
+
   /**
-   * Chain an arbitrary task on the queue. Used by the cmi5 adapter for
-   * State API writes that need to land before Terminated.
+   * Chain an arbitrary task on the queue. Used by the launch adapters for
+   * State API writes. Tasks still queued when `sendFinal` runs are skipped.
    *
    * The task is wrapped so a thrown error never breaks the queue's
    * Promise chain — subsequent enqueues still flow.
@@ -400,17 +427,19 @@ export class XAPIPublisher {
       resolveTask = r;
     });
     this.#queue = this.#queue.then(() =>
-      fn()
-        .catch(() => {})
-        .then(() => resolveTask()),
+      this.#closed
+        ? resolveTask()
+        : fn()
+            .catch(() => {})
+            .then(() => resolveTask()),
     );
     return taskPromise;
   }
 
   /**
    * Switch the publisher to "page is unloading" mode. Subsequent fetches
-   * use `keepalive: true` so they survive the unload. The cmi5 adapter
-   * calls this before enqueuing the final Terminated statement.
+   * use `keepalive: true` so they survive the unload. The launch adapters
+   * call this before `sendFinal`.
    */
   markUnloading(): void {
     this.#unloading = true;
@@ -441,15 +470,10 @@ export class XAPIPublisher {
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
       const keepalive = isFinal || this.#unloading;
-      if (keepalive && body.length > KEEPALIVE_BODY_LIMIT_BYTES) {
-        const count = Array.isArray(statementOrBatch)
-          ? statementOrBatch.length
-          : 1;
-        console.warn(
-          `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
-            `over the 64 KiB keepalive cap. The browser may silently drop this ` +
-            `request during unload. Reduce per-statement size or split sends ` +
-            `before terminate.`,
+      if (keepalive) {
+        this.#warnOverKeepaliveCap(
+          body,
+          Array.isArray(statementOrBatch) ? statementOrBatch.length : 1,
         );
       }
       return this.#sendOnce(body, keepalive).then((outcome) => {
@@ -471,6 +495,29 @@ export class XAPIPublisher {
     };
 
     return attempt(0);
+  }
+
+  #warnOverKeepaliveCap(body: string, count: number): void {
+    if (body.length <= KEEPALIVE_BODY_LIMIT_BYTES) return;
+    console.warn(
+      `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
+        `over the 64 KiB keepalive cap. The browser may silently drop this ` +
+        `request during unload. Reduce per-statement size or split sends ` +
+        `before terminate.`,
+    );
+  }
+
+  #settle(
+    resolve: (o: DestinationOutcome) => void,
+    outcome: SendOutcome,
+  ): void {
+    this.#queueDepth--;
+    resolve({
+      endpoint: this.#endpoint,
+      ok: outcome.ok,
+      status: outcome.status,
+      error: outcome.error,
+    });
   }
 
   #sendOnce(body: string, keepalive: boolean): Promise<SendOutcome> {

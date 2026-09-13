@@ -94,6 +94,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected lastScoreEmitted: number | null = null;
   protected terminated = false;
   protected returnURL: string | undefined;
+  #finalSend: Promise<void> | null = null;
 
   abstract init(): Promise<void>;
 
@@ -129,22 +130,24 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     if (this.stateLoadFailed) return;
     this.state = state;
     if (!this.publisher) return;
-    void this.publisher.chainTask(async () => {
-      try {
-        const resp = await this.xapiFetch(this.buildStateUrl(), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state),
-        });
-        if (!resp.ok) {
-          console.warn(
-            `Tessera ${this.logName}: State API PUT returned ${resp.status}; learner progress did not persist.`,
-          );
-        }
-      } catch (err) {
-        console.warn(`Tessera ${this.logName}: Failed to save state`, err);
+    void this.publisher.chainTask(() => this.#putState(state));
+  }
+
+  async #putState(state: SavedState): Promise<void> {
+    try {
+      const resp = await this.xapiFetch(this.buildStateUrl(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state),
+      });
+      if (!resp.ok) {
+        console.warn(
+          `Tessera ${this.logName}: State API PUT returned ${resp.status}; learner progress did not persist.`,
+        );
       }
-    });
+    } catch (err) {
+      console.warn(`Tessera ${this.logName}: Failed to save state`, err);
+    }
   }
 
   setScore(score: number): void {
@@ -267,23 +270,28 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     this.terminated = true;
     if (!this.publisher) return;
     this.publisher.markUnloading();
+    if (this.state) void this.#putState(this.state);
     const duration = formatISO8601Duration(this.durationSeconds);
-    this.dispatch('Terminated', {
-      verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-      result: { duration },
-      context: this.buildContext(),
-    });
+    this.#finalSend = this.publisher
+      .sendFinal({
+        verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
+        result: { duration },
+        context: this.buildContext(),
+      })
+      .then((outcome) =>
+        this.warnOnLRSReject('Terminated')({ destinations: [outcome] }),
+      )
+      .catch((err) => {
+        console.warn(
+          `Tessera ${this.logName}: failed to send Terminated statement`,
+          err,
+        );
+      });
   }
 
   async exit(): Promise<void> {
     this.terminate();
-    if (this.publisher) {
-      try {
-        await this.publisher.chainTask(async () => {});
-      } catch {
-        // never rejects today; don't block redirect.
-      }
-    }
+    await this.#finalSend;
     if (this.returnURL && typeof window !== 'undefined') {
       window.location.assign(this.returnURL);
     }

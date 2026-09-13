@@ -777,6 +777,35 @@ describe('CMI5Adapter', () => {
     expect(statementCalls.length).toBe(1);
   });
 
+  it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    await new Promise((r) => setTimeout(r, 20));
+
+    mockFetch.mockClear();
+    mockFetch
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValue({ ok: true });
+    adapter.saveState({ b: 1 } as never);
+    await new Promise((r) => setTimeout(r, 0));
+    adapter.setCompletionStatus('complete');
+
+    adapter.terminate();
+
+    const sent = mockFetch.mock.calls.slice(1);
+    expect(
+      sent.map(
+        ([url, init]: any[]) => `${init.method} ${new URL(url).pathname}`,
+      ),
+    ).toEqual(['PUT /xapi/activities/state', 'POST /xapi/statements']);
+    expect(sent.every(([, init]: any[]) => init.keepalive)).toBe(true);
+    expect(JSON.parse(sent[1][1].body).map((s: any) => s.verb.id)).toEqual([
+      'http://adlnet.gov/expapi/verbs/completed',
+      'http://adlnet.gov/expapi/verbs/terminated',
+    ]);
+  });
+
   describe('LMS launch params: masteryScore + moveOn (cmi5 §8, §9.5.3)', () => {
     it('parses masteryScore and exposes it via getMasteryScore()', async () => {
       setSearchParams({ ...baseLaunchParams, masteryScore: '0.8' });

@@ -53,10 +53,10 @@ interface CMI5LaunchData {
  *
  * Lifecycle statements (Initialized, Completed, Passed/Failed, Terminated)
  * and per-interaction Answered statements all flow through a single
- * `XAPIPublisher` configured with `cmi5Mode: true`. The publisher's
- * sequential queue is what guarantees Terminated lands last (cmi5 §9.3.6),
- * and `cmi5Mode` injects the required `sessionid` context extension on
- * every statement (cmi5 §9.6.1.1).
+ * `XAPIPublisher` configured with `cmi5Mode: true`. Terminated goes out in
+ * one batch after every statement still queued, which keeps it last
+ * (cmi5 §9.3.6), and `cmi5Mode` injects the required `sessionid` context
+ * extension on every statement (cmi5 §9.6.1.1).
  *
  * The version-neutral launch lifecycle lives in BaseXAPILaunchAdapter; this
  * class layers cmi5 specifics on top: fetch-token auth, LMS.LaunchData, the

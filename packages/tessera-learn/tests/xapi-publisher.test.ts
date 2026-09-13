@@ -534,6 +534,53 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
   });
+
+  it('sendFinal posts unstarted statements and the final one as one keepalive batch before returning', async () => {
+    mockFetch
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    void pub.sendStatement({ verb: { id: 'http://verb/in-flight' } });
+    await new Promise((r) => setTimeout(r, 0));
+    const queued = pub.sendStatement({ verb: { id: 'http://verb/queued' } });
+
+    const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, init] = mockFetch.mock.calls[1];
+    expect(init.keepalive).toBe(true);
+    expect(JSON.parse(init.body).map((s: any) => s.verb.id)).toEqual([
+      'http://verb/queued',
+      'http://verb/final',
+    ]);
+    await expect(final).resolves.toMatchObject({ ok: true });
+    await expect(queued).resolves.toMatchObject({
+      destinations: [{ ok: true }],
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sendFinal with nothing queued posts a single statement', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body).verb.id).toBe(
+      'http://verb/final',
+    );
+  });
+
+  it('skips tasks still queued when sendFinal runs', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const task = vi.fn(async () => {});
+    const chained = pub.chainTask(task);
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    await chained;
+    expect(task).not.toHaveBeenCalled();
+  });
 });
 
 describe('XAPIClient — fan-out', () => {
