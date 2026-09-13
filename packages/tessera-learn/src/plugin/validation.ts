@@ -952,10 +952,6 @@ function validatePageFile(
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
   const useQuestions = useQuestionGrading(content);
-  const nothingGraded =
-    !hasCustomWidget &&
-    !questionComponents.some(isGradedQuestion) &&
-    (useQuestions === 'absent' || useQuestions === 'none');
   if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
       `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
@@ -972,16 +968,10 @@ function validatePageFile(
     );
   }
   const gradesUndeclared =
-    !graded &&
+    !declaresGraded &&
     !isQuiz &&
     (useQuestions === 'graded' ||
-      questionComponents.some(({ props }) => {
-        const prop = props.get('graded');
-        return (
-          prop?.kind === 'bool' ||
-          (prop?.kind === 'expr' && prop.raw === 'true')
-        );
-      }));
+      questionComponents.some(isLiterallyGradedQuestion));
   if (gradesUndeclared) {
     d.error(
       `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
@@ -1005,7 +995,13 @@ function validatePageFile(
       `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
         `components or useQuestion() calls — it will have nothing to score`,
     );
-  } else if (declaresGraded && !isQuiz && nothingGraded) {
+  } else if (
+    declaresGraded &&
+    !isQuiz &&
+    !hasCustomWidget &&
+    !questionComponents.some(isGradedQuestion) &&
+    (useQuestions === 'absent' || useQuestions === 'none')
+  ) {
     d.warn(
       `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
         `the page can never earn a score, so under completion.mode "percentage" it ` +
@@ -1668,6 +1664,14 @@ function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
   if (hasSpread) return true;
   const graded = props.get('graded');
   return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
+}
+
+function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
+  const graded = props.get('graded');
+  return (
+    graded?.kind === 'bool' ||
+    (graded?.kind === 'expr' && graded.raw === 'true')
+  );
 }
 
 /**

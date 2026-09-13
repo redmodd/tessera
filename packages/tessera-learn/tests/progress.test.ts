@@ -450,22 +450,6 @@ describe('ProgressState', () => {
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(80);
     });
 
-    it('marks the unit graded only when graded=true', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'q1', 80, false);
-      expect(progress.gradedUnits.get(3)?.graded).toBe(false);
-
-      progress.markStandaloneQuestion(4, 'q2', 80, true);
-      expect(progress.gradedUnits.get(4)?.graded).toBe(true);
-    });
-
-    it('keeps the unit graded when a later question on the page is not', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'q1', 80, true);
-      progress.markStandaloneQuestion(3, 'q2', 80, false);
-      expect(progress.gradedUnits.get(3)?.graded).toBe(true);
-    });
-
     it('replaces previous score for the same question id', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 50, true);
@@ -625,8 +609,7 @@ describe('ProgressState', () => {
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.graded).toBe(
         false,
       );
-      expect(progress.gradedUnits.get(3)?.graded).toBe(false);
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+      expect(progress.pageScore(3)).toBeUndefined();
     });
 
     it('normalizes an unusable weight and ignores an unanswered question', () => {

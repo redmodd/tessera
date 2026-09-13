@@ -101,6 +101,7 @@ describe('useQuestion — standalone mode', () => {
       useQuestion({ id: 'q1', graded: true, response }).submit();
       useQuestion({ id: 'q2', graded: true, response }).submit();
       expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('page "page-0"');
       expect(warn.mock.calls[0][0]).toContain('does not declare');
     } finally {
       warn.mockRestore();
@@ -155,9 +156,9 @@ describe('useQuestion — standalone mode', () => {
     q.submit();
 
     // Score is recorded for the page (so authors can render it),
-    // but the unit is NOT marked graded
+    // but the page has no graded score
     expect(progress.gradedUnits.get(2)?.questions?.get('q1')?.score).toBe(100);
-    expect(progress.gradedUnits.get(2)?.graded).toBe(false);
+    expect(progress.pageScore(2)).toBeUndefined();
   });
 
   it('registers a graded score when graded is true', () => {
@@ -178,7 +179,7 @@ describe('useQuestion — standalone mode', () => {
     q.submit();
 
     expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(100);
-    expect(progress.gradedUnits.get(3)?.graded).toBe(true);
+    expect(progress.pageScore(3)).toBe(100);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
   });

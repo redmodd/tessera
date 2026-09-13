@@ -52,7 +52,10 @@ export interface Question {
 export interface UseQuestionOptions {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
-  /** Whether this question counts toward its page score, which reaches course success only on a page declaring `pageConfig.graded: true`. Default false. */
+  /**
+   * Whether this question counts toward its page score, which reaches course
+   * success only on a page declaring `pageConfig.graded: true`. Default false.
+   */
   graded?: boolean;
   /**
    * How much this question pulls on the page score, in a quiz host and
@@ -177,7 +180,12 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     }
     if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
-      if (opts.graded) navCtx.progress.warnIfUndeclaredGraded(pageIndex);
+      if (opts.graded) {
+        navCtx.progress.warnIfUndeclaredGraded(
+          pageIndex,
+          navCtx.manifest.pages[pageIndex].slug,
+        );
+      }
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,
