@@ -219,6 +219,14 @@ describe('export packaging gate', () => {
     writeFileSync(resolve(projectRoot, 'assets', 'logo.txt'), 'logo');
   }
 
+  function writeBundle(exporter: Plugin) {
+    (exporter.writeBundle as any).call(
+      exporter,
+      { dir: resolve(projectRoot, 'dist') },
+      { 'index.html': {} },
+    );
+  }
+
   it('skips packaging and the asset copy when the build failed', async () => {
     writeConfig('scorm12');
     seedStaleDist();
@@ -243,7 +251,7 @@ describe('export packaging gate', () => {
     seedStaleDist();
 
     const { entry, exporter } = buildPlugins();
-    (exporter.writeBundle as any).call(exporter);
+    writeBundle(exporter);
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
 
@@ -258,12 +266,75 @@ describe('export packaging gate', () => {
     ).toHaveLength(1);
   });
 
+  function undefinedImportLog(id: string) {
+    return {
+      code: 'IMPORT_IS_UNDEFINED',
+      id,
+      message: 'Import `notReal` will always be undefined',
+    };
+  }
+
+  const throwingCtx = {
+    error(log: { message: string }) {
+      throw new Error(log.message);
+    },
+  };
+
+  it('fails the build, removes the written bundle, and skips packaging on an undefined import in course code', async () => {
+    writeConfig('scorm12');
+    seedStaleDist();
+
+    const { entry, exporter } = buildPlugins();
+    writeBundle(exporter);
+    expect(() =>
+      (exporter.onLog as any).call(
+        throwingCtx,
+        'warn',
+        undefinedImportLog(resolve(projectRoot, 'pages', 'welcome.svelte')),
+      ),
+    ).toThrow(/notReal/);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    expect(existsSync(resolve(projectRoot, 'dist', 'index.html'))).toBe(false);
+    expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+      false,
+    );
+    expect(readdirSync(projectRoot).filter((f) => f.endsWith('.zip'))).toEqual(
+      [],
+    );
+  });
+
+  it('lets an undefined import inside node_modules through as a warning', async () => {
+    writeConfig('scorm12');
+    seedStaleDist();
+
+    const { entry, exporter } = buildPlugins();
+    writeBundle(exporter);
+    expect(() =>
+      (exporter.onLog as any).call(
+        throwingCtx,
+        'warn',
+        undefinedImportLog(
+          resolve(projectRoot, 'node_modules', 'lib', 'index.js'),
+        ),
+      ),
+    ).not.toThrow();
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    expect(existsSync(resolve(projectRoot, 'dist', 'index.html'))).toBe(true);
+    expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+      true,
+    );
+  });
+
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
     writeConfig('scorm12');
     seedStaleDist();
 
     const { entry, exporter, validation } = buildPlugins();
-    (exporter.writeBundle as any).call(exporter);
+    writeBundle(exporter);
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
     rmSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'));

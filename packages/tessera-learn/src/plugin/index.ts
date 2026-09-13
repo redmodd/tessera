@@ -9,6 +9,7 @@ import {
   unlinkSync,
   cpSync,
   mkdirSync,
+  rmSync,
 } from 'node:fs';
 import {
   generateManifest,
@@ -535,6 +536,7 @@ function tesseraExportPlugin(
 ): Plugin {
   let projectRoot: string;
   let isBuild = false;
+  let emitted: string[] = [];
 
   return {
     name: 'tessera:export',
@@ -545,8 +547,18 @@ function tesseraExportPlugin(
       isBuild = config.command === 'build';
     },
 
-    writeBundle() {
+    writeBundle(options, bundle) {
       build.written = true;
+      emitted = Object.keys(bundle).map((file) => resolve(options.dir!, file));
+    },
+
+    onLog(_level, log) {
+      if (!isBuild || log.code !== 'IMPORT_IS_UNDEFINED') return;
+      if (!projectFileRel(log.id, projectRoot)) return;
+      build.written = false;
+      for (const file of emitted) rmSync(file, { force: true });
+      emitted = [];
+      this.error(log);
     },
 
     async closeBundle() {
