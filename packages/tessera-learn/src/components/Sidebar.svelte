@@ -1,7 +1,6 @@
 <script>
   import { SvelteSet } from 'svelte/reactivity';
   import { useCourse, useNavigation } from '../runtime/hooks.svelte.js';
-  import { resolveAsset } from './util.js';
 
   let { onclose } = $props();
   const course = useCourse();
@@ -26,11 +25,7 @@
 
 <div class="tessera-sidebar-header">
   {#if course.logo}
-    <img
-      src={resolveAsset(course.logo)}
-      alt={course.title}
-      class="tessera-sidebar-logo"
-    />
+    <img src={course.logo} alt={course.title} class="tessera-sidebar-logo" />
   {/if}
   <h1 class="tessera-sidebar-title">{course.title || '(no title)'}</h1>
 </div>
@@ -72,8 +67,8 @@
                 : undefined}
               aria-disabled={locked ? 'true' : undefined}
               onclick={() => handlePageClick(page.index)}
-              onpointerenter={() => !locked && nav.prefetch(page.index)}
-              onfocusin={() => !locked && nav.prefetch(page.index)}
+              onpointerenter={() => nav.prefetch(page.index)}
+              onfocusin={() => nav.prefetch(page.index)}
             >
               {#if locked}
                 <svg

@@ -10,6 +10,7 @@ import {
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
+import { resolveAsset } from '../components/util.js';
 
 /**
  * Per-question handle exposed to both the quiz shell (via `useQuiz().questions`)
@@ -255,6 +256,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
 
 export function useNavigation() {
   const { nav, manifest } = requireNavContext('useNavigation()');
+  const indexOf = (slug: string) =>
+    manifest.pages.findIndex((p) => p.slug === slug);
+  const canAccessIndex = (index: number) =>
+    index >= 0 && index < manifest.pages.length && !nav.isPageLocked(index);
   return {
     get currentPage() {
       return manifest.pages[nav.currentPageIndex];
@@ -266,7 +271,7 @@ export function useNavigation() {
       return manifest.pages;
     },
     goTo(slug: string) {
-      const index = manifest.pages.findIndex((p) => p.slug === slug);
+      const index = indexOf(slug);
       if (index >= 0) nav.goToPage(index);
     },
     goToIndex(index: number) {
@@ -285,14 +290,9 @@ export function useNavigation() {
       return nav.canGoPrev;
     },
     canAccess(slug: string) {
-      const index = manifest.pages.findIndex((p) => p.slug === slug);
-      return index >= 0 && !nav.isPageLocked(index);
+      return canAccessIndex(indexOf(slug));
     },
-    canAccessIndex(index: number) {
-      return (
-        index >= 0 && index < manifest.pages.length && !nav.isPageLocked(index)
-      );
-    },
+    canAccessIndex,
     get sections() {
       return manifest.sections;
     },
@@ -399,7 +399,7 @@ export function useCourse(): {
       return config.title;
     },
     get logo() {
-      return config.branding?.logo || undefined;
+      return resolveAsset(config.branding?.logo ?? '') || undefined;
     },
   };
 }

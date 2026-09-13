@@ -918,7 +918,7 @@ Course identity from `course.config.js`, for layouts and headers. Use it instead
 ```ts
 function useCourse(): {
   readonly title: string;
-  readonly logo: string | undefined; // branding.logo; undefined when unset or empty
+  readonly logo: string | undefined; // branding.logo with $assets/ resolved, ready for <img src>; undefined when unset or empty
 };
 ```
 

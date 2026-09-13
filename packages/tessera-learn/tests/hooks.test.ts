@@ -906,7 +906,7 @@ describe('useCourse', () => {
     expect(() => useCourse()).toThrow(/inside a Tessera course/);
   });
 
-  it('exposes the course title and logo, treating an empty logo as absent', () => {
+  it('exposes the course title and a resolved logo, treating an empty logo as absent', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress);
     ctxStore.set('tessera-nav', ctx);
@@ -915,7 +915,13 @@ describe('useCourse', () => {
     expect(h.title).toBe('Test');
     expect(h.logo).toBeUndefined();
 
-    ctx.config.branding = { logo: './assets/logo.svg' };
+    ctx.config.branding = { logo: '' };
+    expect(h.logo).toBeUndefined();
+
+    ctx.config.branding = { logo: 'https://example.com/logo.svg' };
+    expect(h.logo).toBe('https://example.com/logo.svg');
+
+    ctx.config.branding = { logo: '$assets/logo.svg' };
     expect(h.logo).toBe('./assets/logo.svg');
   });
 });

@@ -28,7 +28,6 @@ function mountSidebar({
       },
     ],
     pages,
-    totalPages: pages.length,
   };
   const nav = {
     currentPageIndex: 0,
@@ -41,9 +40,7 @@ function mountSidebar({
   component = mount(Sidebar, {
     target,
     props: {},
-    context: new Map([
-      ['tessera-nav', { nav, manifest, progress: {}, config }],
-    ]),
+    context: new Map([['tessera-nav', { nav, manifest, config }]]),
   });
   return target;
 }

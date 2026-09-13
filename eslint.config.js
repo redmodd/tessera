@@ -88,6 +88,29 @@ export default tseslint.config(
     },
   },
 
+  {
+    files: ['packages/tessera-learn/src/components/**/*.{ts,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\./(?!runtime/hooks\\.svelte\\.js$)',
+              message:
+                'Built-in components use only the public tessera-learn API.',
+            },
+            {
+              regex: '^\\.\\./runtime/hooks\\.svelte\\.js$',
+              importNamePattern: '^__',
+              message: 'Internal hook helpers are not public API.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // The plugin/CLI is build-time Node tooling; stdout is its output channel.
   {
     files: ['packages/tessera-learn/src/plugin/**/*.ts'],
