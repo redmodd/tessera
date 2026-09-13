@@ -1,17 +1,17 @@
 <script>
   import { onMount } from 'svelte';
-  import Sidebar from '../runtime/Sidebar.svelte';
-  import { requireNavContext } from '../runtime/contexts.js';
+  import { useNavigation, useProgress } from '../runtime/hooks.svelte.js';
+  import Sidebar from './Sidebar.svelte';
 
   let { page } = $props();
-  const { nav, manifest, config, progress } =
-    requireNavContext('DefaultLayout');
+  const nav = useNavigation();
+  const progress = useProgress();
 
   let sidebarOpen = $state(false);
 
   let progressPercent = $derived(
-    manifest.totalPages > 0
-      ? Math.round((progress.completedPages / manifest.totalPages) * 100)
+    nav.pages.length > 0
+      ? Math.round((progress.completedPages / nav.pages.length) * 100)
       : 0,
   );
 
@@ -34,11 +34,11 @@
       return;
 
     if (e.key === 'ArrowLeft') {
-      nav.goPrev();
+      nav.prev();
       e.preventDefault();
     }
     if (e.key === 'ArrowRight') {
-      nav.goNext();
+      nav.next();
       e.preventDefault();
     }
     if (e.key === 'Escape' && sidebarOpen) {
@@ -80,14 +80,7 @@
     class:open={sidebarOpen}
     aria-label="Course sidebar"
   >
-    <Sidebar
-      {manifest}
-      {config}
-      currentPageIndex={nav.currentPageIndex}
-      {nav}
-      onnavigate={(index) => nav.goToPage(index)}
-      onclose={closeSidebar}
-    />
+    <Sidebar onclose={closeSidebar} />
   </aside>
 
   <main class="tessera-main">
@@ -99,14 +92,14 @@
       <button
         class="tessera-page-nav-btn"
         disabled={!nav.canGoPrev}
-        onclick={() => nav.goPrev()}
+        onclick={() => nav.prev()}
       >
         ← Previous
       </button>
       <button
         class="tessera-page-nav-btn"
         disabled={!nav.canGoNext}
-        onclick={() => nav.goNext()}
+        onclick={() => nav.next()}
         onpointerenter={() => nav.prefetch(nav.currentPageIndex + 1)}
         onfocusin={() => nav.prefetch(nav.currentPageIndex + 1)}
       >
@@ -130,7 +123,7 @@
       ></div>
     </div>
     <div class="tessera-progress-label">
-      {progress.completedPages} of {manifest.totalPages} pages
+      {progress.completedPages} of {nav.pages.length} pages
     </div>
   </footer>
 </div>

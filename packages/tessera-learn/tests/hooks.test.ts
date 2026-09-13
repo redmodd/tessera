@@ -18,6 +18,7 @@ import {
   useNavigation,
   useProgress,
   usePersistence,
+  useCourse,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
@@ -52,6 +53,7 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     goNext: vi.fn(),
     goPrev: vi.fn(),
     isPageLocked: vi.fn(() => false),
+    prefetch: vi.fn(),
   };
   return { nav, manifest, progress, config };
 }
@@ -743,6 +745,16 @@ describe('useNavigation', () => {
     expect(navHook.currentPageIndex).toBe(2);
     expect(navHook.currentPage).toEqual(ctx.manifest.pages[2]);
     expect(navHook.pages).toBe(ctx.manifest.pages);
+    expect(navHook.sections).toBe(ctx.manifest.sections);
+  });
+
+  it('prefetch delegates to nav', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    useNavigation().prefetch(2);
+    expect(ctx.nav.prefetch).toHaveBeenCalledWith(2);
   });
 
   it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
@@ -825,6 +837,7 @@ describe('useProgress', () => {
 
     const h = useProgress();
     expect(h.visitedPages.size).toBe(2);
+    expect(h.completedPages).toBe(progress.completedPages);
     expect(h.quizScore(2)).toBe(80);
     expect(h.completionStatus).toBe('incomplete');
     expect(h.successStatus).toBe('unknown');
@@ -876,6 +889,27 @@ describe('useProgress', () => {
 
     expect(progress.visitedPages.has(3)).toBe(true);
     expect(progress.getChunk(3)).toBe(1);
+  });
+});
+
+// ============ useCourse ============
+
+describe('useCourse', () => {
+  it('throws when no nav context exists', () => {
+    expect(() => useCourse()).toThrow(/inside a Tessera course/);
+  });
+
+  it('exposes the course title and logo, treating an empty logo as absent', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    const ctx = makeNavCtx(progress);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useCourse();
+    expect(h.title).toBe('Test');
+    expect(h.logo).toBeUndefined();
+
+    ctx.config.branding = { logo: './assets/logo.svg' };
+    expect(h.logo).toBe('./assets/logo.svg');
   });
 });
 

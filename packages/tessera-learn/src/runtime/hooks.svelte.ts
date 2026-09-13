@@ -1,6 +1,7 @@
 import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
+import type { QuizConfig } from './types.js';
 import {
   requireNavContext,
   getNavContext,
@@ -287,6 +288,12 @@ export function useNavigation() {
       const index = manifest.pages.findIndex((p) => p.slug === slug);
       return index >= 0 && !nav.isPageLocked(index);
     },
+    get sections() {
+      return manifest.sections;
+    },
+    prefetch(index: number) {
+      nav.prefetch(index);
+    },
   };
 }
 
@@ -295,6 +302,9 @@ export function useProgress() {
   return {
     get visitedPages() {
       return progress.visitedPages;
+    },
+    get completedPages() {
+      return progress.completedPages;
     },
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
@@ -374,6 +384,21 @@ export function usePersistence<T = unknown>(
   };
 }
 
+export function useCourse(): {
+  readonly title: string;
+  readonly logo: string | undefined;
+} {
+  const { config } = requireNavContext('useCourse()');
+  return {
+    get title() {
+      return config.title;
+    },
+    get logo() {
+      return config.branding?.logo || undefined;
+    },
+  };
+}
+
 /**
  * Internal registration shape — `useQuestion` builds this and hands it to the
  * quiz's `registerQuestion`. Not part of the public authoring API.
@@ -410,6 +435,10 @@ export interface UseQuizHandle {
    * unavailable until the learner retries.
    */
   readonly restored: boolean;
+  /** `pageConfig.quiz.feedbackMode`, defaulting to `'review'`. */
+  readonly feedbackMode: NonNullable<QuizConfig['feedbackMode']>;
+  /** `pageConfig.quiz.maxAttempts`, defaulting to `Infinity`. */
+  readonly maxAttempts: number;
   submit(): void;
   startReview(): void;
   exitReview(): void;

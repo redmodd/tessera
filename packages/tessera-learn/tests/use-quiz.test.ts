@@ -316,6 +316,16 @@ describe('QuizEngine', () => {
     expect(engine.canRetry).toBe(false);
   });
 
+  it('exposes feedbackMode and maxAttempts with their config defaults', () => {
+    const defaults = makeEngine({ graded: true }).engine;
+    expect(defaults.feedbackMode).toBe('review');
+    expect(defaults.maxAttempts).toBe(Infinity);
+
+    const set = makeEngine({ feedbackMode: 'never', maxAttempts: 2 }).engine;
+    expect(set.feedbackMode).toBe('never');
+    expect(set.maxAttempts).toBe(2);
+  });
+
   it('keeps the best score across attempts while score follows the last one', () => {
     let correct = true;
     const swingQuestion = {

@@ -150,6 +150,14 @@ export class QuizEngine implements UseQuizHandle {
     return this.#restored;
   }
 
+  get feedbackMode(): NonNullable<QuizConfig['feedbackMode']> {
+    return this.#deps.quizConfig.feedbackMode ?? 'review';
+  }
+
+  get maxAttempts(): number {
+    return this.#maxAttempts;
+  }
+
   /** Dev-warning inputs the wrapper reads in onDestroy. */
   get stats(): {
     questionsCount: number;

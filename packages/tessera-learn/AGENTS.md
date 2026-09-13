@@ -509,6 +509,17 @@ const signs = import.meta.glob('$assets/signs/*.svg', {
 const url = signs[`/assets/signs/${filename}`]; // look up by full key
 ```
 
+**A `src` prop that accepts `$assets/` like the built-ins: `resolveAsset(src)`.** Rewrites a leading `$assets/` to `./assets/` and passes other URLs through. No build-time guarantees.
+
+```svelte
+<script>
+  import { resolveAsset } from 'tessera-learn';
+  let { src, alt } = $props();
+</script>
+
+<img src={resolveAsset(src)} {alt} />
+```
+
 **Pure runtime string (last resort).** No build-time guarantees; only when the filename comes from server data: `` const src = `./assets/signs/${filename}` ``.
 
 ---
@@ -682,7 +693,7 @@ Ruleset/severity come from the `a11y` block (`standard`, `ignore`). Hard errors 
 
 ## Hooks Reference
 
-Six hooks plus one helper. Each is synchronous, must be called during component setup inside a Tessera course, and throws if called outside the runtime.
+Seven hooks plus two helpers. Each hook is synchronous, must be called during component setup inside a Tessera course, and throws if called outside the runtime. The built-in components use only these exports, so anything a built-in does, a custom component can do too.
 
 ```js
 import {
@@ -692,7 +703,9 @@ import {
   useProgress,
   useCompletion,
   usePersistence,
+  useCourse,
   isCorrect,
+  resolveAsset,
 } from 'tessera-learn';
 import type { Interaction } from 'tessera-learn';
 ```
@@ -790,6 +803,8 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
   readonly restored: boolean; // results came from saved progress, not this session
+  readonly feedbackMode: 'review' | 'immediate' | 'never'; // pageConfig.quiz value, default 'review'
+  readonly maxAttempts: number; // pageConfig.quiz value, default Infinity
   submit(): void;
   retry(): void;
   startReview(): void;
@@ -818,6 +833,8 @@ function useNavigation(): {
   readonly canGoNext: boolean;
   readonly canGoPrev: boolean;
   canAccess(slug: string): boolean;
+  readonly sections: ManifestSection[]; // course tree: { title, slug, lessons: [{ title, slug, pages }] }
+  prefetch(index: number): void; // start loading a page's module, e.g. on hover; no-op for locked pages
 };
 ```
 
@@ -828,6 +845,7 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 ```ts
 function useProgress(): {
   readonly visitedPages: Set<number>;
+  readonly completedPages: number; // visited pages, minus graded pages still awaiting a score
   quizScore(pageIndex: number): number | undefined; // 0–100; undefined until the quiz is submitted
   pageScore(pageIndex?: number): number | undefined; // 0–100, unrounded; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the current page
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
@@ -891,6 +909,17 @@ function usePersistence<T>(key: string): {
 ```
 
 Usage in [Recipe 1](#recipe-1-custom-draw-a-line-question) (persists partial progress).
+
+### `useCourse`
+
+Course identity from `course.config.js`, for layouts and headers. Use it instead of importing the config file.
+
+```ts
+function useCourse(): {
+  readonly title: string;
+  readonly logo: string | undefined; // branding.logo; undefined when unset or empty
+};
+```
 
 ### `isCorrect(interaction)`
 
