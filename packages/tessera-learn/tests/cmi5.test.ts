@@ -167,6 +167,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (
         url.includes('activities/state') &&
+        !url.includes('tessera-state-exit') &&
         (!options || options.method === 'GET')
       ) {
         resumeGets++;
@@ -201,6 +202,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (
         url.includes('activities/state') &&
+        !url.includes('tessera-state-exit') &&
         (!options || options.method === 'GET')
       ) {
         resumeGets++;
@@ -221,6 +223,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (
         url.includes('activities/state') &&
+        !url.includes('tessera-state-exit') &&
         (!options || options.method === 'GET')
       ) {
         resumeGets++;
@@ -252,6 +255,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (
         url.includes('activities/state') &&
+        !url.includes('tessera-state-exit') &&
         (!options || options.method === 'GET')
       ) {
         resumeGets++;
@@ -298,6 +302,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (
         url.includes('activities/state') &&
+        !url.includes('tessera-state-exit') &&
         (!options || options.method === 'GET')
       ) {
         resumeGets++;
@@ -359,7 +364,7 @@ describe('CMI5Adapter', () => {
     );
     expect(putCalls.length).toBe(1);
     expect(putCalls[0][0]).toContain('activities/state');
-    expect(JSON.parse(putCalls[0][1].body)).toEqual(state);
+    expect(JSON.parse(putCalls[0][1].body)).toEqual({ ...state, n: 1 });
   });
 
   it('sends Completed statement when completion is set to complete', async () => {
@@ -804,6 +809,77 @@ describe('CMI5Adapter', () => {
       'http://adlnet.gov/expapi/verbs/completed',
       'http://adlnet.gov/expapi/verbs/terminated',
     ]);
+  });
+
+  it('writes the final state to the exit document and keeps saving after terminate', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    await adapter.loadState();
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+    adapter.saveState({ b: 1 } as never);
+    adapter.terminate();
+    adapter.saveState({ b: 2 } as never);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const puts = mockFetch.mock.calls
+      .filter(([, init]: any[]) => init?.method === 'PUT')
+      .map(([url, init]: any[]) => [
+        new URL(url).searchParams.get('stateId'),
+        JSON.parse(init.body),
+      ]);
+    expect(puts).toEqual([
+      ['tessera-state-exit', { b: 1, n: 1 }],
+      ['tessera-state', { b: 2, n: 2 }],
+    ]);
+  });
+
+  it('resumes from the state document with the higher write sequence', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.includes('activities/state') && options?.method === 'GET') {
+        const doc = url.includes('tessera-state-exit')
+          ? { b: 2, n: 5 }
+          : { b: 1, n: 4 };
+        return { ok: true, text: async () => JSON.stringify(doc) };
+      }
+      return { ok: true };
+    });
+    await adapter.loadState();
+    expect(adapter.getState()).toEqual({ b: 2 });
+
+    mockFetch.mockClear();
+    adapter.saveState({ b: 3 } as never);
+    await new Promise((r) => setTimeout(r, 0));
+    const put = mockFetch.mock.calls.find(
+      ([, init]: any[]) => init?.method === 'PUT',
+    );
+    expect(JSON.parse(put[1].body)).toEqual({ b: 3, n: 6 });
+  });
+
+  it('sends no statements after terminate', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    await new Promise((r) => setTimeout(r, 20));
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+    adapter.terminate();
+    adapter.setCompletionStatus('complete');
+    await new Promise((r) => setTimeout(r, 20));
+
+    const verbs = mockFetch.mock.calls
+      .filter(([url]: any[]) => String(url).includes('statements'))
+      .flatMap(([, init]: any[]) => {
+        const body = JSON.parse(init.body);
+        return (Array.isArray(body) ? body : [body]).map((s: any) => s.verb.id);
+      });
+    expect(verbs).toEqual(['http://adlnet.gov/expapi/verbs/terminated']);
   });
 
   describe('LMS launch params: masteryScore + moveOn (cmi5 §8, §9.5.3)', () => {

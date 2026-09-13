@@ -121,7 +121,7 @@ export class XAPIClient {
 
   /**
    * Propagate "page is unloading" to every publisher. App.svelte's
-   * pagehide / beforeunload handler calls this before
+   * pagehide handler calls this before
    * `adapter.terminate()` so independent (explicit-endpoint) publishers
    * also stop accepting author sends during the close path. Idempotent;
    * the cmi5 adapter calls `markUnloading()` on its own publisher

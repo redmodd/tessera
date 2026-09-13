@@ -68,6 +68,8 @@ const CMI_INTERACTION_TYPE =
  */
 const STATE_LOAD_TIMEOUT_MS = 10_000;
 
+const EXIT_STATE_ID = 'tessera-state-exit';
+
 /**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
  * adapters. Subclasses set the protected fields in init() and may override
@@ -95,6 +97,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected terminated = false;
   protected returnURL: string | undefined;
   #finalSend: Promise<void> | null = null;
+  #stateSeq = 0;
 
   abstract init(): Promise<void>;
 
@@ -133,12 +136,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     void this.publisher.chainTask(() => this.#putState(state));
   }
 
-  async #putState(state: SavedState): Promise<void> {
+  async #putState(state: SavedState, stateId?: string): Promise<void> {
     try {
-      const resp = await this.xapiFetch(this.buildStateUrl(), {
+      const resp = await this.xapiFetch(this.buildStateUrl(stateId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
+        body: JSON.stringify({ ...state, n: ++this.#stateSeq }),
       });
       if (!resp.ok) {
         console.warn(
@@ -270,7 +273,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     this.terminated = true;
     if (!this.publisher) return;
     this.publisher.markUnloading();
-    if (this.state) void this.#putState(this.state);
+    if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
     const duration = formatISO8601Duration(this.durationSeconds);
     this.#finalSend = this.publisher
       .sendFinal({
@@ -355,7 +358,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   /** Enqueue a lifecycle statement fire-and-forget. `label` names it in both the LRS-reject and send-failure warnings. */
   protected dispatch(label: string, partial: PartialStatement): void {
-    if (!this.publisher) return;
+    if (!this.publisher || this.terminated) return;
     this.publisher
       .sendStatement(partial)
       .then(this.warnOnLRSReject(label))
@@ -413,10 +416,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   }
 
   /**
-   * Resume GET, retried on the shared LMS backoff schedule. A 404, an empty
-   * body, or an unparseable one is a definitive answer and returns with saving
-   * enabled. Exhausting the attempts or the deadline leaves the stored state
-   * unread, so `stateLoadFailed` withholds every later write.
+   * Resume GET of the running and exit state documents, retried on the shared
+   * LMS backoff schedule; the one with the higher write sequence wins. A 404,
+   * an empty body, or an unparseable one is a definitive answer and returns
+   * with saving enabled. Exhausting the attempts or the deadline leaves the
+   * stored state unread, so `stateLoadFailed` withholds every later write.
    */
   async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
@@ -427,24 +431,20 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
         if (deadline.aborted) break;
       }
       try {
-        const resp = await this.xapiFetch(this.buildStateUrl(), {
-          method: 'GET',
-          signal: deadline,
-        });
-        if (resp.ok) {
-          const body = (await resp.text()).trim();
-          try {
-            this.state = body ? JSON.parse(body) : null;
-          } catch {
-            this.state = null;
-            console.warn(
-              `Tessera ${this.logName}: State API returned an unparseable document; starting fresh and overwriting it.`,
-            );
-          }
-          return;
+        const [running, exit] = await Promise.all([
+          this.#getStateDoc(this.buildStateUrl(), deadline),
+          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), deadline),
+        ]);
+        const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
+        this.#stateSeq = Math.max(running?.n ?? 0, exit?.n ?? 0);
+        if (latest) {
+          const state = { ...latest };
+          delete state.n;
+          this.state = state;
+        } else {
+          this.state = null;
         }
-        if (resp.status === 404) return;
-        lastDetail = `returned ${resp.status}`;
+        return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
         if (deadline.aborted) break;
@@ -455,5 +455,24 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     console.warn(
       `Tessera ${this.logName}: State API GET failed after ${RETRY_ATTEMPTS} attempts (${lastDetail}); resume disabled, and progress will not be saved this launch so the unread state is left intact.`,
     );
+  }
+
+  async #getStateDoc(
+    url: string,
+    signal: AbortSignal,
+  ): Promise<(SavedState & { n?: number }) | null> {
+    const resp = await this.xapiFetch(url, { method: 'GET', signal });
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error(`returned ${resp.status}`);
+    const body = (await resp.text()).trim();
+    if (!body) return null;
+    try {
+      return JSON.parse(body);
+    } catch {
+      console.warn(
+        `Tessera ${this.logName}: State API returned an unparseable document; starting fresh and overwriting it.`,
+      );
+      return null;
+    }
   }
 }

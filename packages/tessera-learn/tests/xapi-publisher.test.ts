@@ -607,6 +607,111 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     await chained;
     expect(task).not.toHaveBeenCalled();
   });
+
+  it('runs tasks chained after sendFinal', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    const task = vi.fn(async () => {});
+    await pub.chainTask(task);
+    expect(task).toHaveBeenCalledOnce();
+  });
+
+  it('drops statements enqueued after sendFinal', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    const late = await pub.sendStatement({ verb: { id: 'http://verb/late' } });
+    expect(late.destinations[0].ok).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a statement that fails after sendFinal', async () => {
+    vi.useFakeTimers();
+    try {
+      let fail!: (v: unknown) => void;
+      mockFetch
+        .mockReturnValueOnce(new Promise((r) => (fail = r)))
+        .mockResolvedValue({ ok: true });
+      const pub = new XAPIPublisher(basicOpts());
+      await pub.init();
+      const inflight = pub.sendStatement({
+        verb: { id: 'http://verb/in-flight' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+      fail({ ok: false, status: 503, text: async () => '' });
+      await vi.advanceTimersByTimeAsync(600_000);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await expect(inflight).resolves.toMatchObject({
+        destinations: [{ ok: false, status: 503 }],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sendFinal retries a 5xx', async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
+        .mockResolvedValue({ ok: true });
+      const pub = new XAPIPublisher(basicOpts());
+      await pub.init();
+      const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
+      await vi.advanceTimersByTimeAsync(600_000);
+
+      await expect(final).resolves.toMatchObject({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sendFinal resends each statement, then the final one alone, when the batch is rejected', async () => {
+    let calls = 0;
+    mockFetch.mockImplementation((_url: string, init: RequestInit) => {
+      if (++calls === 1) return new Promise(() => {});
+      const body = JSON.parse(init.body as string);
+      const ids = (Array.isArray(body) ? body : [body]).map(
+        (s: any) => s.verb.id,
+      );
+      return Promise.resolve(
+        ids.includes('http://verb/bad')
+          ? { ok: false, status: 400, text: async () => '' }
+          : { ok: true },
+      );
+    });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    void pub.sendStatement({ verb: { id: 'http://verb/head' } });
+    await new Promise((r) => setTimeout(r, 0));
+    const good = pub.sendStatement({ verb: { id: 'http://verb/good' } });
+    const bad = pub.sendStatement({ verb: { id: 'http://verb/bad' } });
+
+    const final = await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+    expect(final.ok).toBe(true);
+    expect(
+      mockFetch.mock.calls.slice(1).map(([, init]: any[]) => {
+        const body = JSON.parse(init.body);
+        return (Array.isArray(body) ? body : [body]).map((s: any) => s.verb.id);
+      }),
+    ).toEqual([
+      ['http://verb/good', 'http://verb/bad', 'http://verb/final'],
+      ['http://verb/good'],
+      ['http://verb/bad'],
+      ['http://verb/final'],
+    ]);
+    await expect(good).resolves.toMatchObject({ destinations: [{ ok: true }] });
+    await expect(bad).resolves.toMatchObject({
+      destinations: [{ ok: false, status: 400 }],
+    });
+  });
 });
 
 describe('XAPIClient — fan-out', () => {

@@ -85,6 +85,10 @@ const QUEUE_DEPTH_SATURATED = 1000;
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 
+function isClientError(status: number | undefined): boolean {
+  return status !== undefined && status >= 400 && status < 500;
+}
+
 /**
  * Single-destination xAPI publisher. Builds and sends statements with
  * sequential queue ordering, retry on 5xx/network errors, and 401-driven
@@ -132,6 +136,7 @@ export class XAPIPublisher {
   #unloading = false;
   #unsent: UnsentEntry[] = [];
   #closed = false;
+  #closeEpoch = 0;
 
   constructor(opts: XAPIPublisherOptions) {
     if (!opts.endpoint || typeof opts.endpoint !== 'string') {
@@ -354,6 +359,15 @@ export class XAPIPublisher {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
+    if (this.#closed) {
+      return Promise.resolve<DestinationOutcome>({
+        endpoint: this.#endpoint,
+        ok: false,
+        error: new XAPIConfigError(
+          'XAPIPublisher: Terminated was already sent; statement dropped.',
+        ),
+      });
+    }
     if (this.#queueDepth >= QUEUE_DEPTH_SATURATED) {
       return Promise.resolve<DestinationOutcome>({
         endpoint: this.#endpoint,
@@ -404,21 +418,25 @@ export class XAPIPublisher {
     const flushed = this.#unsent.filter((e) => !e.sending);
     this.#unsent = this.#unsent.filter((e) => e.sending);
     this.#closed = true;
-    const batch = [
-      ...flushed.flatMap((e) => e.body),
-      this.buildStatement(partial),
-    ];
-    const body = JSON.stringify(batch.length === 1 ? batch[0] : batch);
-    this.#warnOverKeepaliveCap(body, batch.length);
-    return this.#sendOnce(body, true).then((outcome) => {
-      for (const e of flushed) this.#settle(e.settle, outcome);
-      return {
-        endpoint: this.#endpoint,
-        ok: outcome.ok,
-        status: outcome.status,
-        error: outcome.error,
-      };
-    });
+    this.#closeEpoch++;
+    const final = this.buildStatement(partial);
+    const batch = [...flushed.flatMap((e) => e.body), final];
+    return this.#sendClosing(batch.length === 1 ? final : batch).then(
+      async (outcome) => {
+        if (
+          outcome.ok ||
+          flushed.length === 0 ||
+          !isClientError(outcome.status)
+        ) {
+          for (const e of flushed) this.#settle(e.settle, outcome);
+          return this.#toDestination(outcome);
+        }
+        for (const e of flushed) {
+          this.#settle(e.settle, await this.#sendClosing(e.body));
+        }
+        return this.#toDestination(await this.#sendClosing(final));
+      },
+    );
   }
 
   /**
@@ -429,12 +447,13 @@ export class XAPIPublisher {
    * Promise chain — subsequent enqueues still flow.
    */
   chainTask(fn: () => Promise<void>): Promise<void> {
+    const epoch = this.#closeEpoch;
     let resolveTask!: () => void;
     const taskPromise = new Promise<void>((r) => {
       resolveTask = r;
     });
     this.#queue = this.#queue.then(() =>
-      this.#closed
+      epoch !== this.#closeEpoch
         ? resolveTask()
         : fn()
             .catch(() => {})
@@ -491,14 +510,8 @@ export class XAPIPublisher {
         if (outcome.ok) return outcome;
         // 4xx (other than the 401 path which #sendOnce already retried) won't
         // recover — short-circuit.
-        if (
-          outcome.status !== undefined &&
-          outcome.status >= 400 &&
-          outcome.status < 500
-        ) {
-          return outcome;
-        }
-        if (isFinal) return outcome;
+        if (isClientError(outcome.status)) return outcome;
+        if (isFinal || this.#closed) return outcome;
         entry.sending = false;
         return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
           attempt(n + 1),
@@ -524,12 +537,36 @@ export class XAPIPublisher {
     outcome: SendOutcome,
   ): void {
     this.#queueDepth--;
-    resolve({
+    resolve(this.#toDestination(outcome));
+  }
+
+  #toDestination(outcome: SendOutcome): DestinationOutcome {
+    return {
       endpoint: this.#endpoint,
       ok: outcome.ok,
       status: outcome.status,
       error: outcome.error,
-    });
+    };
+  }
+
+  async #sendClosing(
+    statementOrBatch: Statement | Statement[],
+  ): Promise<SendOutcome> {
+    const body = JSON.stringify(statementOrBatch);
+    this.#warnOverKeepaliveCap(
+      body,
+      Array.isArray(statementOrBatch) ? statementOrBatch.length : 1,
+    );
+    let outcome = await this.#sendOnce(body, true);
+    for (
+      let n = 0;
+      n < RETRY_ATTEMPTS - 1 && !outcome.ok && !isClientError(outcome.status);
+      n++
+    ) {
+      await new Promise((r) => setTimeout(r, backoffMs(n)));
+      outcome = await this.#sendOnce(body, true);
+    }
+    return outcome;
   }
 
   #sendOnce(body: string, keepalive: boolean): Promise<SendOutcome> {
