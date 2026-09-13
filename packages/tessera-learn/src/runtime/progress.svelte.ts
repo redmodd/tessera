@@ -136,16 +136,13 @@ export class ProgressState {
     return this.chunkProgress.get(pageIndex) ?? -1;
   }
 
-  warnIfUndeclaredGraded(pageIndex: number, slug: string) {
-    if (
-      this.#declaredGradedIndices.has(pageIndex) ||
-      this.#undeclaredWarned.has(pageIndex)
-    )
-      return;
+  assertDeclaredGraded(pageIndex: number, slug: string) {
+    if (this.#declaredGradedIndices.has(pageIndex)) return;
+    const message = `Tessera: page "${slug}" has a graded question but does not declare pageConfig.graded: true, so it will not count toward the course score or passed/failed. Add graded: true to its pageConfig.`;
+    if (import.meta.env?.DEV) throw new Error(message);
+    if (this.#undeclaredWarned.has(pageIndex)) return;
     this.#undeclaredWarned.add(pageIndex);
-    console.warn(
-      `Tessera: a graded question on page "${slug}" was answered, but the page does not declare pageConfig.graded: true, so it will not count toward the course score or passed/failed.`,
-    );
+    console.warn(message);
   }
 
   markStandaloneQuestion(

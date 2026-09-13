@@ -137,6 +137,12 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   if (navCtx) {
+    if (opts.graded) {
+      navCtx.progress.assertDeclaredGraded(
+        navCtx.nav.currentPageIndex,
+        navCtx.manifest.pages[navCtx.nav.currentPageIndex].slug,
+      );
+    }
     navCtx.progress.refreshStandaloneQuestion(
       navCtx.nav.currentPageIndex,
       opts.id,
@@ -176,15 +182,8 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       committed = true;
     }
     if (navCtx) {
-      const pageIndex = navCtx.nav.currentPageIndex;
-      if (opts.graded) {
-        navCtx.progress.warnIfUndeclaredGraded(
-          pageIndex,
-          navCtx.manifest.pages[pageIndex].slug,
-        );
-      }
       navCtx.progress.markStandaloneQuestion(
-        pageIndex,
+        navCtx.nav.currentPageIndex,
         opts.id,
         score,
         !!opts.graded,
