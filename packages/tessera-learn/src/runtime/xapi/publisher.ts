@@ -488,37 +488,49 @@ export class XAPIPublisher {
     entry: UnsentEntry,
     options?: SendStatementOptions,
   ): Promise<SendOutcome | null> {
-    const statementOrBatch = entry.body;
-    const body = JSON.stringify(statementOrBatch);
-    const retry = options?.retry !== false; // default: retry enabled
-    const maxAttempts = retry ? RETRY_ATTEMPTS : 1;
+    const taken = () => !this.#unsent.includes(entry);
+    return this.#sendRetrying(entry.body, {
+      attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
+      stop: taken,
+    }).then((outcome) => (taken() ? null : outcome));
+  }
 
-    const attempt = (n: number): Promise<SendOutcome | null> => {
-      if (!this.#unsent.includes(entry)) return Promise.resolve(null);
-      const isFinal = n === maxAttempts - 1;
+  #sendClosing(
+    statementOrBatch: Statement | Statement[],
+  ): Promise<SendOutcome> {
+    return this.#sendRetrying(statementOrBatch, {
+      attempts: RETRY_ATTEMPTS,
+      keepalive: true,
+    });
+  }
+
+  #sendRetrying(
+    statementOrBatch: Statement | Statement[],
+    opts: { attempts: number; keepalive?: boolean; stop?: () => boolean },
+  ): Promise<SendOutcome> {
+    const body = JSON.stringify(statementOrBatch);
+    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
+    const stop = opts.stop ?? (() => false);
+
+    const attempt = (n: number): Promise<SendOutcome> => {
+      const isFinal = n === opts.attempts - 1;
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
-      const keepalive = isFinal || this.#unloading;
-      if (keepalive) {
-        this.#warnOverKeepaliveCap(
-          body,
-          Array.isArray(statementOrBatch) ? statementOrBatch.length : 1,
-        );
-      }
+      const keepalive = opts.keepalive || isFinal || this.#unloading;
+      if (keepalive) this.#warnOverKeepaliveCap(body, count);
       return this.#sendOnce(body, keepalive).then((outcome) => {
-        if (!this.#unsent.includes(entry)) return null;
-        if (outcome.ok) return outcome;
         // 4xx (other than the 401 path which #sendOnce already retried) won't
-        // recover — short-circuit.
-        if (isClientError(outcome.status)) return outcome;
-        if (isFinal) return outcome;
+        // recover, so short-circuit.
+        if (outcome.ok || isClientError(outcome.status) || isFinal || stop()) {
+          return outcome;
+        }
         return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
-          attempt(n + 1),
+          stop() ? outcome : attempt(n + 1),
         );
       });
     };
 
-    return attempt(0);
+    return stop() ? Promise.resolve<SendOutcome>({ ok: false }) : attempt(0);
   }
 
   #warnOverKeepaliveCap(body: string, count: number): void {
@@ -546,26 +558,6 @@ export class XAPIPublisher {
       status: outcome.status,
       error: outcome.error,
     };
-  }
-
-  async #sendClosing(
-    statementOrBatch: Statement | Statement[],
-  ): Promise<SendOutcome> {
-    const body = JSON.stringify(statementOrBatch);
-    this.#warnOverKeepaliveCap(
-      body,
-      Array.isArray(statementOrBatch) ? statementOrBatch.length : 1,
-    );
-    let outcome = await this.#sendOnce(body, true);
-    for (
-      let n = 0;
-      n < RETRY_ATTEMPTS - 1 && !outcome.ok && !isClientError(outcome.status);
-      n++
-    ) {
-      await new Promise((r) => setTimeout(r, backoffMs(n)));
-      outcome = await this.#sendOnce(body, true);
-    }
-    return outcome;
   }
 
   #sendOnce(body: string, keepalive: boolean): Promise<SendOutcome> {
