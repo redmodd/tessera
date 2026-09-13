@@ -20,6 +20,7 @@ export interface InteractionFormat {
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
+  encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
    * `fill-in` and 1 for `long-fill-in`; xAPI has no such limit.
@@ -36,6 +37,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: ':',
   supportsNumericRange: false,
   supportsCasePrefix: false,
+  encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
   formatBoolean: (v) => (v ? 't' : 'f'),
@@ -52,6 +54,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsNumericRange: true,
   supportsCasePrefix: true,
+  encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
   formatBoolean: (v) => (v ? 'true' : 'false'),
@@ -91,7 +94,7 @@ function encodeListItem(
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  if (fmt === SCORM12_INTERACTION_FORMAT) {
+  if (fmt.encodesOptionIndex) {
     const idx = indexLookup(options, value);
     if (idx !== null) return idx;
   }
