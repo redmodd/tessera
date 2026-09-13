@@ -329,7 +329,7 @@ function parseConfig(
 
   // Validate branding
   if (config.branding !== undefined) {
-    validateBranding(config.branding, d);
+    validateBranding(config.branding, projectRoot, d);
   }
 
   // Rule 1.8: language present and well-formed (BCP-47)
@@ -518,7 +518,11 @@ function describeType(raw: unknown): string {
   return raw === null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw;
 }
 
-function validateBranding(raw: unknown, d: Diagnostics): void {
+function validateBranding(
+  raw: unknown,
+  projectRoot: string,
+  d: Diagnostics,
+): void {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     d.warn(
       `course.config.js: "branding" must be an object, got ${describeType(raw)} — will be ignored`,
@@ -533,9 +537,13 @@ function validateBranding(raw: unknown, d: Diagnostics): void {
       d.warn(
         `course.config.js: "branding.logo" must be a string, got ${typeof logo}`,
       );
-    } else if (logo.startsWith('$assets/')) {
-      d.warn(
-        'course.config.js: "branding.logo" starts with "$assets/", but branding paths are not asset-resolved — it will ship as a literal, broken src. Use a URL or a path relative to the deployed root.',
+    } else {
+      validateAssetRefs(
+        logo,
+        'course.config.js "branding.logo"',
+        resolve(projectRoot, 'assets'),
+        d,
+        new Map(),
       );
     }
   }

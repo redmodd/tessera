@@ -2,4 +2,4 @@
 'tessera-learn': minor
 ---
 
-Built-in components use only the public API, which adds `useCourse()`, `resolveAsset`, `useQuiz().feedbackMode`/`maxAttempts`, `useNavigation().sections`/`prefetch`/`canAccessIndex`, and `useProgress().completedPages`.
+New `useCourse()` hook exposes the course title and logo, and `branding.logo` now accepts `$assets/` paths.

@@ -65,6 +65,19 @@ describe('Sidebar section collapse', () => {
     expect(target.querySelector('.tessera-nav-page')).not.toBeNull();
   });
 
+  it('resolves a $assets logo to the deployed assets path', () => {
+    const context = makeContext();
+    const navCtx = context.get('tessera-nav') as { config: object };
+    navCtx.config = { title: 'Demo', branding: { logo: '$assets/logo.png' } };
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    component = mount(Sidebar, { target, props: {}, context });
+
+    expect(
+      target.querySelector('.tessera-sidebar-logo')!.getAttribute('src'),
+    ).toBe('./assets/logo.png');
+  });
+
   it('locks pages by index when two lessons share a page slug', () => {
     const pages = [0, 1].map((index) => ({
       index,
