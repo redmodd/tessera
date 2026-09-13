@@ -955,8 +955,8 @@ function validatePageFile(
   if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
       `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
-        "Every question on a quiz page belongs to the quiz, which ignores a question's own " +
-        '`graded`, so nothing on the page can earn a score and it never completes. ' +
+        "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
+        'and it never completes. ' +
         'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
