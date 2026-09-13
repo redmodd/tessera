@@ -323,9 +323,11 @@ export function readCourseRuntimeExports(
     if (declaration?.type !== 'VariableDeclaration') continue;
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
-      if (id.type !== 'Identifier') xapiInit ??= null;
-      else if (id.name === 'xapi')
-        xapiInit = (decl.init as Node | null) ?? null;
+      if (id.type === 'Identifier') {
+        if (id.name === 'xapi') xapiInit = (decl.init as Node | null) ?? null;
+      } else if (bindsName(id, 'xapi')) {
+        xapiInit = null;
+      }
     }
   }
   if (xapiInit === undefined) return { xapi: 'none', hasDefaultExport };
@@ -340,6 +342,27 @@ export function readCourseRuntimeExports(
     hooks.set(id, keys === 'unknown' ? 'unknown' : new Set(keys.keys()));
   }
   return { xapi: hooks, hasDefaultExport };
+}
+
+function bindsName(pattern: Node | null, name: string): boolean {
+  switch (pattern?.type) {
+    case 'Identifier':
+      return pattern.name === name;
+    case 'ObjectPattern':
+      return (pattern.properties as Node[]).some((p) =>
+        bindsName((p.type === 'RestElement' ? p : p.value) as Node, name),
+      );
+    case 'ArrayPattern':
+      return (pattern.elements as (Node | null)[]).some((e) =>
+        bindsName(e, name),
+      );
+    case 'AssignmentPattern':
+      return bindsName(pattern.left as Node, name);
+    case 'RestElement':
+      return bindsName(pattern.argument as Node, name);
+    default:
+      return false;
+  }
 }
 
 function isMutated(program: Node, name: string): boolean {

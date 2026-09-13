@@ -477,6 +477,18 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
     ]);
   });
 
+  it('does not report resolver keys as unmatched when the destination endpoint is missing', () => {
+    testRoot = projectWith(destination({ endpoint: undefined }));
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => 'y' } };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([
+      'course.config.js: xapi.endpoint is required',
+    ]);
+  });
+
   it('errors on resolver keys when course.config.js declares no destinations', () => {
     testRoot = projectWith('null');
     writeFile(
@@ -517,6 +529,18 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
       `import * as mod from './hooks.js';\nexport const { xapi } = mod;`,
     );
     expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('still checks resolver pairing beside a destructured export that does not bind xapi', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `import * as mod from './hooks.js';\nexport const { canAccess, xapi: other } = mod;`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) => e.includes('xapi.auth is required')),
+    ).toBeDefined();
   });
 
   it('skips the pairing checks when the xapi object is mutated after declaration', () => {

@@ -783,6 +783,15 @@ function validateSingleXAPIEntry(
   d: Diagnostics,
 ): void {
   const endpoint = entry.endpoint;
+  const id = entry.id;
+  if (endpoint !== 'lms' && typeof id === 'string' && id) {
+    if (ids.has(id)) {
+      d.error(
+        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
+      );
+    }
+    ids.add(id);
+  }
   if (endpoint === undefined) {
     d.error(`course.config.js: ${label}.endpoint is required`);
     return;
@@ -821,20 +830,12 @@ function validateSingleXAPIEntry(
     return;
   }
 
-  const id = entry.id;
   if (id === undefined) {
     d.error(
       `course.config.js: ${label}.id is required. course.runtime.js keys its xapi resolvers by it.`,
     );
   } else if (typeof id !== 'string' || id === '') {
     d.error(`course.config.js: ${label}.id must be a non-empty string`);
-  } else {
-    if (ids.has(id)) {
-      d.error(
-        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
-      );
-    }
-    ids.add(id);
   }
   const hookRef =
     typeof id === 'string' && id
