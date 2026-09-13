@@ -802,6 +802,20 @@ describe('useNavigation', () => {
     expect(h.canAccess('page-1')).toBe(false);
   });
 
+  it('canAccessIndex checks bounds and nav.isPageLocked', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useNavigation();
+    expect(h.canAccessIndex(1)).toBe(true);
+    expect(h.canAccessIndex(-1)).toBe(false);
+    expect(h.canAccessIndex(ctx.manifest.pages.length)).toBe(false);
+
+    ctx.nav.isPageLocked = vi.fn(() => true);
+    expect(h.canAccessIndex(1)).toBe(false);
+  });
+
   it('canAccess honors a custom config.navigation.canAccess', () => {
     const manifest = createManifest(3);
     const config = createConfig({

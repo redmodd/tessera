@@ -832,7 +832,8 @@ function useNavigation(): {
   prev(): void;
   readonly canGoNext: boolean;
   readonly canGoPrev: boolean;
-  canAccess(slug: string): boolean;
+  canAccess(slug: string): boolean; // first page with that slug; slugs repeat across lessons
+  canAccessIndex(index: number): boolean; // use this when iterating pages or sections
   readonly sections: ManifestSection[]; // course tree: { title, slug, lessons: [{ title, slug, pages }] }
   prefetch(index: number): void; // start loading a page's module, e.g. on hover; no-op for locked pages
 };

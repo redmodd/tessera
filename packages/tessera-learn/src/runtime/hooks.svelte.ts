@@ -288,6 +288,11 @@ export function useNavigation() {
       const index = manifest.pages.findIndex((p) => p.slug === slug);
       return index >= 0 && !nav.isPageLocked(index);
     },
+    canAccessIndex(index: number) {
+      return (
+        index >= 0 && index < manifest.pages.length && !nav.isPageLocked(index)
+      );
+    },
     get sections() {
       return manifest.sections;
     },

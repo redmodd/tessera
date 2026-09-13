@@ -16,9 +16,9 @@
     }
   }
 
-  function handlePageClick(page) {
-    if (!nav.canAccess(page.slug)) return;
-    nav.goToIndex(page.index);
+  function handlePageClick(index) {
+    if (!nav.canAccessIndex(index)) return;
+    nav.goToIndex(index);
     if (onclose) onclose();
   }
 </script>
@@ -58,7 +58,7 @@
             <div class="tessera-nav-lesson-title">{lesson.title}</div>
           {/if}
           {#each lesson.pages as page (page.index)}
-            {@const locked = !nav.canAccess(page.slug)}
+            {@const locked = !nav.canAccessIndex(page.index)}
             <button
               class="tessera-nav-page"
               class:locked
@@ -66,7 +66,7 @@
                 ? 'page'
                 : undefined}
               aria-disabled={locked ? 'true' : undefined}
-              onclick={() => handlePageClick(page)}
+              onclick={() => handlePageClick(page.index)}
               onpointerenter={() => !locked && nav.prefetch(page.index)}
               onfocusin={() => !locked && nav.prefetch(page.index)}
             >
