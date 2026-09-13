@@ -221,6 +221,7 @@
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
+      ...(progress.gradedScoreDecided ? { s: 1 } : {}),
     };
   }
 
@@ -264,6 +265,9 @@
     duration = new DurationTracker(saved.d);
     if (saved.m === 1) {
       progress.markCompleteManually();
+    }
+    if (saved.s === 1) {
+      progress.restoreGradedScoreDecided();
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
@@ -318,13 +322,11 @@
   // These are no-ops for WebAdapter but used by LMS adapters (Step 10)
   let prevReportedScore = null;
   $effect(() => {
-    void progress.version;
     if (!persistenceReady) return;
 
-    const { average, attempted } = progress.gradedScore;
-    if (!attempted) return;
+    if (!progress.gradedScoreFinal) return;
 
-    const rounded = Math.round(average);
+    const rounded = Math.round(progress.gradedScore.average);
     if (rounded === prevReportedScore) return;
     prevReportedScore = rounded;
 
@@ -332,9 +334,7 @@
       adapter.setScore(rounded);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
-        adapter.setSuccessStatus(
-          average >= config.scoring.passingScore ? 'passed' : 'failed',
-        );
+        adapter.setSuccessStatus(progress.successStatus);
       }
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
@@ -445,9 +445,8 @@
         restoreState(saved);
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
-        const restoredScore = progress.gradedScore;
-        const seededScore = restoredScore.attempted
-          ? Math.round(restoredScore.average)
+        const seededScore = progress.gradedScoreFinal
+          ? Math.round(progress.gradedScore.average)
           : null;
         if (adapter.seedLifecycle) {
           adapter.seedLifecycle(

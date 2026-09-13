@@ -318,13 +318,22 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
   });
 
-  test('a skipped graded page still weighs in: acing the 25 scores 25, not 100', async ({
+  test('no score reaches the LMS until every graded page is scored', async ({
     page,
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await answerCheckQuiz(page, 1);
+    await page.waitForSelector('.tessera-quiz-results');
+    expect(await courseScore(page)).toBeFalsy();
+
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(0)
+      .check();
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
   });
