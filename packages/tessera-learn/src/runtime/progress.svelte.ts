@@ -37,6 +37,7 @@ export class ProgressState {
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
+  #undeclaredWarned = new Set<number>();
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
@@ -143,6 +144,16 @@ export class ProgressState {
     graded: boolean,
     weight?: number,
   ) {
+    if (
+      graded &&
+      !this.#declaredGradedIndices.has(pageIndex) &&
+      !this.#undeclaredWarned.has(pageIndex)
+    ) {
+      this.#undeclaredWarned.add(pageIndex);
+      console.warn(
+        `Tessera: a graded question on page ${pageIndex} was answered, but the page does not declare pageConfig.graded: true, so it will not count toward the course score or passed/failed.`,
+      );
+    }
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
@@ -222,10 +233,7 @@ export class ProgressState {
   }
 
   #graded = $derived.by(() => {
-    const pages = new Set(this.#declaredGradedIndices);
-    for (const [pageIndex, unit] of this.gradedUnits) {
-      if (unit.graded) pages.add(pageIndex);
-    }
+    const pages = this.#declaredGradedIndices;
     let weighted = 0;
     let totalWeight = 0;
     let attempted = false;

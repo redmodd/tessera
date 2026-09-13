@@ -385,7 +385,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score, and under `completion.mode: "percentage"` visiting one doesn't complete it. Without `graded: true`, a standalone page joins the rollup only once the learner answers something on it, and skipping it costs nothing. `weight` applies either way, but on a page that declares neither it only bites once the learner answers; `tessera validate` warns.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score, and under `completion.mode: "percentage"` visiting one doesn't complete it. Only declared pages count. A graded question on a page without `graded: true` still sets that page's `pageScore`, but never reaches the course score or passed/failed: `tessera validate` errors when it can see the question, and the runtime warns in the console when the answer comes from your own component. A course with no declared graded page sends no score and no passed/failed. `weight` on an undeclared page is ignored; `tessera validate` warns.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 
@@ -748,7 +748,7 @@ response: () => ({
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
 - **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
-- **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward course success.
+- **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
@@ -846,7 +846,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Round it yourself** for display.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every graded quiz page and every page with graded standalone questions, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
+`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
 
 Two rules for displaying it:
 
@@ -1249,7 +1249,7 @@ Built-in widgets render nothing in this layout (`QuestionShell` renders inline o
 
 ### Recipe 3: Graded standalone question
 
-A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100; omit `correct` to accept any answer. Course success rolls up across all graded items, quizzes and standalones alike.
+A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`; omit `correct` to accept any answer. Course success rolls up across every declared graded page, quiz and standalone pages alike.
 
 ```js
 const q = useQuestion({

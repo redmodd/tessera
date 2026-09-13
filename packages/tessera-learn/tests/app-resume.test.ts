@@ -9,7 +9,13 @@ const page = {
   importPath: '/pages/01-intro/01-lesson/welcome.svelte',
   quiz: null,
 };
-const secondPage = { ...page, index: 1, title: 'Next', slug: 'next' };
+const secondPage = {
+  ...page,
+  index: 1,
+  title: 'Next',
+  slug: 'next',
+  graded: true,
+};
 
 const manifest = {
   sections: [

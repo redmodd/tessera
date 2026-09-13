@@ -140,7 +140,10 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('registers a graded score when graded is true', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const progress = new ProgressState(
+      createManifest(4, {}, { 3: { graded: true } }),
+      createConfig(),
+    );
     const adapter = makeAdapter();
     const ctx = makeNavCtx(progress, 3);
     ctxStore.set('tessera-nav', ctx);

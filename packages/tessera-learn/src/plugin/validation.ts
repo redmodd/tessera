@@ -966,9 +966,27 @@ function validatePageFile(
   }
   if (weight !== undefined && !graded) {
     d.warn(
-      `${fileRel}: pageConfig.weight only applies once the page counts toward the course score. ` +
-        'Without `graded: true` (or `quiz: { graded: true }`) the page joins the rollup only after ' +
-        'the learner answers a graded question on it, and counts for nothing if they skip it.',
+      `${fileRel}: pageConfig.weight only applies to a page that counts toward the course score. ` +
+        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+        'so the weight is ignored.',
+    );
+  }
+  const gradesUndeclared =
+    !graded &&
+    !isQuiz &&
+    (useQuestions === 'graded' ||
+      questionComponents.some(({ props }) => {
+        const prop = props.get('graded');
+        return (
+          prop?.kind === 'bool' ||
+          (prop?.kind === 'expr' && prop.raw === 'true')
+        );
+      }));
+  if (gradesUndeclared) {
+    d.error(
+      `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
+        'so its score never reaches the course score or passed/failed. Add graded: true to ' +
+        'pageConfig, or drop graded from the question.',
     );
   }
 
