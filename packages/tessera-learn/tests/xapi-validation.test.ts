@@ -25,8 +25,7 @@ function writeFile(root: string, relPath: string, content: string): void {
 
 /**
  * Build a minimal valid project with the given xapi config inlined into
- * `course.config.js`. Configs use JSON5 syntax — function-form auth/actor
- * are out of scope for build-time validation (deferred to runtime).
+ * `course.config.js`. Configs use JSON5 syntax; function values belong in course.runtime.js.
  */
 function projectWith(xapiLiteral: string, standard = 'web'): string {
   const root = createTestDir();
@@ -131,6 +130,7 @@ describe('xapi config validation — endpoint: lms', () => {
 describe('xapi config validation — explicit endpoint', () => {
   function explicit(extra = ''): string {
     return `{
+      id: "lrs",
       endpoint: "https://lrs.example.com/xapi/",
       auth: "tok",
       activityId: "https://example.com/course/1",
@@ -146,7 +146,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when endpoint is not a URL', () => {
     testRoot = projectWith(
-      `{ endpoint: "not-a-url", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "not-a-url", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -157,7 +157,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when endpoint uses a non-http(s) scheme', () => {
     testRoot = projectWith(
-      `{ endpoint: "ftp://lrs.example.com/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "ftp://lrs.example.com/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -166,7 +166,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('warns when endpoint has no trailing slash', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { warnings } = validateProject(testRoot);
@@ -175,7 +175,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when auth is omitted', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -186,7 +186,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when auth string includes the "Basic " prefix', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "Basic abc", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "Basic abc", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -195,7 +195,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on Bearer auth (non-goal in v1)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "Bearer xyz", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "Bearer xyz", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -212,7 +212,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when activityId is missing', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -221,7 +221,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors when actor is omitted under web', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -232,7 +232,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('accepts actor omission under cmi5 (runtime uses launch actor)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
       'cmi5',
     );
     const { errors } = validateProject(testRoot);
@@ -241,7 +241,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('accepts actor omission under scorm12 (runtime synthesizes)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a" }`,
       'scorm12',
     );
     const { errors } = validateProject(testRoot);
@@ -250,7 +250,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on actor with zero IFIs', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { name: "anon" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { name: "anon" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -259,7 +259,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on actor with two IFIs', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c", openid: "https://example.com/u" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c", openid: "https://example.com/u" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -268,7 +268,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on malformed mbox (missing mailto:)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "test@example.com" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "test@example.com" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -277,7 +277,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on malformed mbox_sha1sum (not 40-char hex)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox_sha1sum: "abc" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox_sha1sum: "abc" } }`,
       'web',
     );
     const { errors } = validateProject(testRoot);
@@ -286,7 +286,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('errors on registration that is not a UUID', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "not-a-uuid" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "not-a-uuid" }`,
       'cmi5',
     );
     const { errors } = validateProject(testRoot);
@@ -297,7 +297,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('warns on registration under non-cmi5', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "550e8400-e29b-41d4-a716-446655440000" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "550e8400-e29b-41d4-a716-446655440000" }`,
       'web',
     );
     const { warnings } = validateProject(testRoot);
@@ -308,7 +308,7 @@ describe('xapi config validation — explicit endpoint', () => {
 
   it('does not warn that registration is cmi5-only under xapi', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "550e8400-e29b-41d4-a716-446655440000" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, registration: "550e8400-e29b-41d4-a716-446655440000" }`,
       'xapi',
     );
     const { warnings } = validateProject(testRoot);
@@ -321,7 +321,7 @@ describe('xapi config validation — explicit endpoint', () => {
 describe('xapi config validation — actorAccountHomePage', () => {
   it('errors when activityId is non-http(s) under SCORM with no actor and no actorAccountHomePage', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1" }`,
       'scorm12',
     );
     const { errors } = validateProject(testRoot);
@@ -335,7 +335,7 @@ describe('xapi config validation — actorAccountHomePage', () => {
 
   it('accepts non-http(s) activityId under SCORM when actorAccountHomePage is provided', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1", actorAccountHomePage: "https://lms.example.com" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1", actorAccountHomePage: "https://lms.example.com" }`,
       'scorm12',
     );
     const { errors } = validateProject(testRoot);
@@ -344,7 +344,7 @@ describe('xapi config validation — actorAccountHomePage', () => {
 
   it('warns when actorAccountHomePage is provided alongside an explicit actor', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, actorAccountHomePage: "https://lms.example.com" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" }, actorAccountHomePage: "https://lms.example.com" }`,
       'scorm12',
     );
     const { warnings } = validateProject(testRoot);
@@ -355,7 +355,7 @@ describe('xapi config validation — actorAccountHomePage', () => {
 
   it('warns when actorAccountHomePage is provided under cmi5', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actorAccountHomePage: "https://lms.example.com" }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actorAccountHomePage: "https://lms.example.com" }`,
       'cmi5',
     );
     const { warnings } = validateProject(testRoot);
@@ -370,7 +370,7 @@ describe('xapi config validation — array form (fan-out)', () => {
     testRoot = projectWith(
       `[
         { endpoint: "lms" },
-        { endpoint: "https://analytics.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }
+        { id: "lrs", endpoint: "https://analytics.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }
       ]`,
       'cmi5',
     );
@@ -403,8 +403,8 @@ describe('xapi config validation — array form (fan-out)', () => {
   it('warns on duplicate explicit endpoint URLs', () => {
     testRoot = projectWith(
       `[
-        { endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } },
-        { endpoint: "https://lrs.example.com/xapi/", auth: "y", activityId: "https://example.com/b", actor: { mbox: "mailto:c@d.e" } }
+        { id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } },
+        { id: "lrs2", endpoint: "https://lrs.example.com/xapi/", auth: "y", activityId: "https://example.com/b", actor: { mbox: "mailto:c@d.e" } }
       ]`,
       'web',
     );
@@ -418,12 +418,159 @@ describe('xapi config validation — array form (fan-out)', () => {
 describe('xapi config — unknown-field warning', () => {
   it('does NOT warn on the xapi field (it was added to KNOWN_CONFIG_FIELDS)', () => {
     testRoot = projectWith(
-      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
       'web',
     );
     const { warnings } = validateProject(testRoot);
     expect(
       warnings.find((w) => w.includes('unknown field "xapi"')),
     ).toBeUndefined();
+  });
+});
+
+describe('xapi config validation — course.runtime.js resolvers', () => {
+  const noAuth = `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", activityId: "https://example.com/a" }`;
+  const full = `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`;
+  const xapiErrors = (root: string) =>
+    validateProject(root).errors.filter((e) => e.includes('xapi'));
+
+  it('errors when an explicit destination has no id', () => {
+    testRoot = projectWith(
+      `{ endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "https://example.com/a", actor: { mbox: "mailto:a@b.c" } }`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) => e.includes('xapi.id is required')),
+    ).toBeDefined();
+  });
+
+  it('errors on duplicate destination ids', () => {
+    testRoot = projectWith(
+      `[${full}, ${full.replace('lrs.example', 'lrs2.example')}]`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) =>
+        e.includes('more than one destination with id "lrs"'),
+      ),
+    ).toBeDefined();
+  });
+
+  it('accepts auth and actor resolvers exported for the destination id', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => fetch('/token').then((r) => r.text()), actor() { return { mbox: 'mailto:a@b.c' }; } } };`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
+    expect(warnings.find((w) => w.includes('static string'))).toBeUndefined();
+  });
+
+  it('reads resolvers through local bindings and an export specifier', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `const auth = async () => 'x';
+const lrs = { auth, actor: async () => ({ mbox: 'mailto:a@b.c' }) };
+const hooks = { lrs };
+export { hooks as xapi };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('errors when auth is in neither file', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { actor: () => ({ mbox: 'mailto:a@b.c' }) } };`,
+    );
+    expect(
+      xapiErrors(testRoot).find(
+        (e) =>
+          e.includes('xapi.auth is required') && e.includes('xapi["lrs"].auth'),
+      ),
+    ).toBeDefined();
+  });
+
+  it('errors when auth is set in both files', () => {
+    testRoot = projectWith(full);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => 'y' } };`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) =>
+        e.includes('xapi.auth is also resolved'),
+      ),
+    ).toBeDefined();
+  });
+
+  it('errors when a resolver key matches no destination id', () => {
+    testRoot = projectWith(full);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lsr: { auth: () => 'y' } };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([
+      'course.runtime.js: xapi["lsr"] matches no explicit xapi destination id in course.config.js',
+    ]);
+  });
+
+  it('errors on resolver keys when course.config.js declares no destinations', () => {
+    testRoot = projectWith('null');
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => 'y' } };`,
+    );
+    expect(
+      xapiErrors(testRoot).find((e) => e.includes('xapi["lrs"] matches no')),
+    ).toBeDefined();
+  });
+
+  it('skips the pairing checks when the xapi export is not a literal', () => {
+    testRoot = projectWith(noAuth);
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `import { makeHooks } from './hooks.js';\nexport const xapi = makeHooks();`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('lets a resolved actor satisfy the SCORM account homePage rule', () => {
+    testRoot = projectWith(
+      `{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: "x", activityId: "urn:example:course:1" }`,
+      'scorm12',
+    );
+    writeFile(
+      testRoot,
+      'course.runtime.js',
+      `export const xapi = { lrs: { actor: () => ({ mbox: 'mailto:a@b.c' }) } };`,
+    );
+    expect(xapiErrors(testRoot)).toEqual([]);
+  });
+
+  it('errors when course.runtime.js does not parse', () => {
+    testRoot = projectWith(full);
+    writeFile(testRoot, 'course.runtime.js', 'export const xapi = {');
+    expect(validateProject(testRoot).errors).toContain(
+      'course.runtime.js: could not parse, JavaScript syntax error',
+    );
+  });
+
+  it('names function values in course.config.js and points at course.runtime.js', () => {
+    testRoot = projectWith(
+      `[{ id: "lrs", endpoint: "https://lrs.example.com/xapi/", auth: () => "x", activityId: "https://example.com/a", actor: function () { return {}; } }]`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain('"xapi[0].auth" is a function');
+    expect(errors[0]).toContain('course.runtime.js');
+    expect(errors[1]).toContain('"xapi[0].actor" is a function');
   });
 });

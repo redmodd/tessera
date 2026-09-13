@@ -4,6 +4,7 @@
   import pageModules from 'virtual:tessera-pages';
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
+  import courseRuntime from 'virtual:tessera-course-runtime';
   import { onMount, onDestroy, setContext, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
@@ -46,7 +47,10 @@
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('__tessera_audit');
   const progress = new ProgressState(manifest, config);
-  const nav = new NavigationState(manifest, progress, config, auditMode);
+  const nav = new NavigationState(manifest, progress, config, {
+    auditMode,
+    canAccess: courseRuntime?.canAccess,
+  });
   nav.setPageModules(pageModules);
 
   // Layout-independent navigation seam the Tier-2 auditor walks pages through.
@@ -471,7 +475,7 @@
     // here is non-fatal — courses with no `xapi:` config get null, which
     // is what `useXAPI()` is documented to return when nothing is wired.
     try {
-      xapiClient = await buildXAPIClient(config, adapter);
+      xapiClient = await buildXAPIClient(config, adapter, courseRuntime?.xapi);
     } catch (err) {
       console.warn('Tessera: xAPI client setup failed', err);
       xapiClient = null;

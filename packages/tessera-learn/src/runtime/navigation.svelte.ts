@@ -1,7 +1,7 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
 import { ProgressState } from './progress.svelte.js';
-import { resolveAccess } from './access.js';
+import { resolveAccess, type AccessFn } from './access.js';
 
 export function isPageComplete(
   index: number,
@@ -34,6 +34,7 @@ export class NavigationState {
   // each one's DOM. Safe because gating is a runtime-only UX affordance — the
   // whole course already ships client-side (see access.ts).
   #auditMode: boolean;
+  #canAccess: AccessFn | undefined;
   currentPageIndex = $state(0);
 
   canGoPrev = $derived(this.currentPageIndex > 0);
@@ -70,12 +71,16 @@ export class NavigationState {
     manifest: Manifest,
     progress: ProgressState,
     config: CourseConfig,
-    auditMode = false,
+    {
+      auditMode = false,
+      canAccess,
+    }: { auditMode?: boolean; canAccess?: AccessFn } = {},
   ) {
     this.manifest = manifest;
     this.#progress = progress;
     this.#config = config;
     this.#auditMode = auditMode;
+    this.#canAccess = canAccess;
   }
 
   setPageModules(modules: PageModuleMap) {
@@ -114,13 +119,13 @@ export class NavigationState {
     return this.#lockedSet.has(index);
   }
 
-  // Resolve the access predicate once (custom canAccess, or the free /
-  // sequential preset) and evaluate it per page. Runs once per state change
-  // — the presets are the single source of truth for the gating rules.
+  // Resolve the access predicate once (course.runtime.js canAccess, or the
+  // free / sequential preset) and evaluate it per page. Runs once per state
+  // change; the presets are the single source of truth for the gating rules.
   #computeLockedSet(): Set<number> {
     const total = this.manifest.totalPages;
     const locked = new Set<number>();
-    const access = resolveAccess(this.#config);
+    const access = this.#canAccess ?? resolveAccess(this.#config);
     for (let i = 0; i < total; i++) {
       if (
         !access({

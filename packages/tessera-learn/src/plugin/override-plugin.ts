@@ -9,18 +9,21 @@ export interface OverridePluginOptions {
   projectFile: string;
   /** Built-in re-exported when the project file is absent; null export otherwise. */
   builtinFile?: string;
+  /** Default-export the project file's module namespace, for files with named exports. */
+  namespace?: boolean;
 }
 
 /**
  * A virtual module that resolves to a project-root override file when present,
- * and to the built-in (or a null export) otherwise. Shared by the layout and
- * quiz plugins — they differ only in the virtual id, file name, and built-in.
+ * and to the built-in (or a null export) otherwise. Shared by the layout, quiz
+ * and course-runtime plugins.
  */
 export function createOverridePlugin({
   name,
   virtualId,
   projectFile,
   builtinFile,
+  namespace = false,
 }: OverridePluginOptions): Plugin {
   const resolvedId = '\0' + virtualId;
   const fallback = builtinFile
@@ -47,7 +50,10 @@ export function createOverridePlugin({
         // Only watch when it exists — addWatchFile on a missing path makes
         // Vite's importAnalysis try to resolve it as a real import.
         this.addWatchFile(filePath);
-        return `export { default } from '${normalizePath(filePath)}';`;
+        const path = normalizePath(filePath);
+        return namespace
+          ? `import * as mod from '${path}';\nexport default mod;`
+          : `export { default } from '${path}';`;
       }
       return fallback;
     },

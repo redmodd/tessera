@@ -4,6 +4,12 @@ declare module 'virtual:tessera-layout' {
   export default layout;
 }
 
+declare module 'virtual:tessera-course-runtime' {
+  import type { CourseRuntime } from 'tessera-learn/runtime/types.js';
+  const runtime: CourseRuntime | null;
+  export default runtime;
+}
+
 declare module 'virtual:tessera-adapter' {
   import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
   import type { CourseConfig } from 'tessera-learn/runtime/types.js';
@@ -14,12 +20,16 @@ declare module 'virtual:tessera-adapter' {
 }
 
 declare module 'virtual:tessera-xapi-setup' {
-  import type { CourseConfig } from 'tessera-learn/runtime/types.js';
+  import type {
+    CourseConfig,
+    CourseRuntime,
+  } from 'tessera-learn/runtime/types.js';
   import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
   import type { XAPIClient } from 'tessera-learn/runtime/xapi/client.js';
   export function buildXAPIClient(
     config: CourseConfig,
     adapter: PersistenceAdapter,
+    hooks?: CourseRuntime['xapi'],
   ): Promise<XAPIClient | null>;
 }
 

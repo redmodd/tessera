@@ -809,16 +809,13 @@ describe('useNavigation', () => {
     expect(h.canAccessIndex(1)).toBe(false);
   });
 
-  it('canAccess honors a custom config.navigation.canAccess', () => {
+  it('canAccess honors a course.runtime.js canAccess', () => {
     const manifest = createManifest(3);
-    const config = createConfig({
-      navigation: {
-        mode: 'free',
-        canAccess: ({ pageIndex }) => pageIndex === 0,
-      },
-    });
+    const config = createConfig({ navigation: { mode: 'free' } });
     const progress = new ProgressState(manifest, config);
-    const nav = new NavigationState(manifest, progress, config);
+    const nav = new NavigationState(manifest, progress, config, {
+      canAccess: ({ pageIndex }) => pageIndex === 0,
+    });
     ctxStore.set('tessera-nav', { nav, manifest, progress, config });
 
     const h = useNavigation();

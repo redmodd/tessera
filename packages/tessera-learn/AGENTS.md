@@ -104,6 +104,7 @@ my-course/
 my-course/
 ├── layout.svelte              # Custom chrome (replaces default sidebar/topbar)
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
+├── course.runtime.js          # Runtime hooks: canAccess, xAPI auth/actor resolvers
 ├── assets/                    # Images, audio, video (referenced via $assets/)
 ├── styles/                    # Custom CSS overrides
 └── pages/
@@ -117,7 +118,7 @@ my-course/
 
 ### Editing rules
 
-- **Edit freely:** `pages/`, `course.config.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, `styles/`.
+- **Edit freely:** `pages/`, `course.config.js`, `course.runtime.js`, `layout.svelte`, `quiz.svelte`, custom components, `assets/`, `styles/`.
 - **Never edit `node_modules/`.** Edits there are git-ignored and wiped on the next install/update. There is no `vite.config.js` to edit.
 - To change framework behaviour, use an extension point instead of patching `node_modules/`:
 
@@ -128,6 +129,7 @@ my-course/
 | Different quiz UI                              | `quiz.svelte` with the `useQuiz` hook        |
 | Styling                                        | `styles/`                                    |
 | Navigation, completion, scoring, export target | `course.config.js`                           |
+| Custom page access, runtime LRS auth/actor     | `course.runtime.js`                          |
 
 If none fit, surface the limitation — don't patch around it in `node_modules/`.
 
@@ -154,6 +156,7 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 3. **Custom layout** — `layout.svelte` at the project root replaces the default chrome.
 4. **Custom quiz shell** — `quiz.svelte` at the project root replaces the quiz UI for every page with `pageConfig.quiz`.
 5. **Custom xAPI** — `useXAPI()` emits your own verbs. See [Custom xAPI](#custom-xapi-statements).
+6. **Runtime hooks**: `course.runtime.js` at the project root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
 
 A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`.
 
@@ -622,22 +625,34 @@ export default {
 
 Every field except `title` has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`.
 
+### Runtime hooks: `course.runtime.js`
+
+`course.config.js` is data only: a function value in it fails the build. Functions go in an optional `course.runtime.js` at the project root, as named exports:
+
+| Export      | Type                                     | Purpose                                                                                                                     |
+| ----------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `canAccess` | `(ctx: AccessContext) => boolean`        | Custom page access. Replaces the `navigation.mode` preset. See [Custom access rules](#custom-access-rules).                 |
+| `xapi`      | `{ [destinationId]: { auth?, actor? } }` | Resolvers for explicit xAPI destinations, keyed by their `id`. See [Configure the destination](#configure-the-destination). |
+
+Both exports are optional. The file ships in the client bundle: no secrets.
+
 ### Custom access rules
 
-For anything beyond the two presets (prereqs, instructor approval, time gating), supply `navigation.canAccess` (with `mode`). It runs synchronously on every navigation evaluation — keep it cheap. Here, gate `lesson-5` on a prior quiz score:
+For anything beyond the two presets (prereqs, instructor approval, time gating), export `canAccess` from `course.runtime.js`. It runs synchronously on every navigation evaluation, so keep it cheap. Here, gate `lesson-5` on a prior quiz score:
 
 ```js
-import { sequentialAccess } from 'tessera-learn';
+// course.runtime.js
+import { resolveAccess } from 'tessera-learn';
 
-canAccess: (ctx) => {
-  if (!sequentialAccess(ctx)) return false;
+export function canAccess(ctx) {
+  if (!resolveAccess(ctx.config)(ctx)) return false;
   if (ctx.page.slug !== 'lesson-5') return true;
   const i = ctx.manifest.pages.findIndex((p) => p.slug === 'lesson-2-quiz');
   return (ctx.progress.quizScore(i) ?? 0) >= ctx.config.scoring.passingScore;
-};
+}
 ```
 
-`AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. Presets `freeAccess` / `sequentialAccess` are re-exported for composition; `resolveAccess(config)` returns the predicate the runtime would use (custom `canAccess` if set, else the matching preset) — use it to wrap rather than replace.
+`AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. `canAccess` replaces the preset, so compose with it: `resolveAccess(config)` returns the preset for `navigation.mode`, and `freeAccess` / `sequentialAccess` are re-exported.
 
 ### Build output
 
@@ -950,15 +965,23 @@ xapi?.sendStatement({
 
 ### Configure the destination
 
-`config.xapi` is one destination or an array, always explicit (no implicit default):
+`config.xapi` is one destination or an array, always explicit (no implicit default). Every explicit destination needs a unique `id`:
 
 ```js
+// course.config.js
 xapi: {
+  id: 'lrs',
   endpoint: 'https://lrs.example.com/xapi/',
-  auth: () => fetch('/api/lrs-token').then(r => r.text()),
-  actor: () => getCurrentUser(),     // or a static Agent object
   activityId: 'https://example.com/courses/intro-to-x',
 }
+
+// course.runtime.js: resolvers for destination "lrs"
+export const xapi = {
+  lrs: {
+    auth: () => fetch('/api/lrs-token').then((r) => r.text()),
+    actor: () => getCurrentUser(),
+  },
+};
 
 // Inherit the LMS launch LRS (cmi5 / xapi; ignored under other standards):
 xapi: { endpoint: 'lms' }
@@ -966,9 +989,17 @@ xapi: { endpoint: 'lms' }
 // Fan out (at most one 'lms' entry):
 xapi: [
   { endpoint: 'lms' },
-  { endpoint: 'https://analytics.example.com/xapi/', auth, actor, activityId },
+  { id: 'analytics', endpoint: 'https://analytics.example.com/xapi/', activityId },
 ]
 ```
+
+| Field   | In `course.config.js`                   | In `course.runtime.js` `xapi[id]`                            |
+| ------- | --------------------------------------- | ------------------------------------------------------------ |
+| `auth`  | credential string (ships in the bundle) | `() => string \| Promise<string>`, re-invoked once on 401    |
+| `actor` | static Agent object                     | `() => Agent \| Promise<Agent>`, resolved once per page load |
+
+- Set each field in one file, not both. `auth` is required in one of them.
+- Every `xapi` export key must match an explicit destination `id`. Write the export as an object literal so the build can check the pairing.
 
 Each destination has its own queue, auth resolver, and retry loop. One UUID per `sendStatement` is reused across destinations (idempotent dedupe).
 
@@ -980,13 +1011,13 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 | **xapi**      | `useXAPI()` → null | Inherits launch LRS     | Independent publisher; `actor` defaults to launch actor |
 | **scorm12**   | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.core.student_id` |
 | **scorm2004** | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.learner_id`      |
-| **web**       | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` **required** in config             |
+| **web**       | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` **required** (config or resolver)  |
 
 ### Gotchas
 
-- **Actor priority:** author-supplied `xapi.actor` always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
-- **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` function or run a proxy.
-- **`course.config.js` is serialized verbatim into the client bundle** — every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in it; use a function that fetches a server-brokered short-lived token. CORS must allow the served origin.
+- **Actor priority:** an author-supplied actor (`xapi.actor` or a `course.runtime.js` resolver) always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
+- **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` resolver or run a proxy.
+- **`course.config.js` and `course.runtime.js` ship in the client bundle.** Every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in either; export an `auth` resolver that fetches a server-brokered short-lived token. CORS must allow the served origin.
 - **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).
 - **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
 - **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.

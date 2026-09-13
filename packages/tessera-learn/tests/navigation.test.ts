@@ -283,14 +283,11 @@ describe('NavigationState', () => {
     it('delegates to the resolved access function (rules covered in access.test.ts)', () => {
       const manifest = createManifest(3);
       const progress = new ProgressState(manifest, createConfig());
-      const config = createConfig({
-        navigation: {
-          mode: 'free',
-          canAccess: ({ pageIndex, progress }) =>
-            pageIndex === 0 || progress.visitedPages.has(0),
-        },
+      const config = createConfig({ navigation: { mode: 'free' } });
+      const nav = new NavigationState(manifest, progress, config, {
+        canAccess: ({ pageIndex, progress }) =>
+          pageIndex === 0 || progress.visitedPages.has(0),
       });
-      const nav = new NavigationState(manifest, progress, config);
 
       expect(nav.isPageLocked(1)).toBe(true);
       progress.markVisited(0);

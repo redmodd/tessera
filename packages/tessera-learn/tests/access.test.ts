@@ -121,14 +121,6 @@ describe('resolveAccess', () => {
     ).toBe(sequentialAccess);
   });
 
-  it('honors a custom canAccess over the preset', () => {
-    const custom: AccessFn = () => false;
-    const config = createConfig({
-      navigation: { mode: 'free', canAccess: custom },
-    });
-    expect(resolveAccess(config)).toBe(custom);
-  });
-
   it('composes naturally with presets', () => {
     const manifest = createManifest(3);
     const progress = new ProgressState(manifest, createConfig());

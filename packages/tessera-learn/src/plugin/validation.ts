@@ -14,12 +14,15 @@ import {
 } from './manifest.js';
 import {
   clearParseCache,
+  courseRuntimeXAPIHooks,
+  defaultExportFunctionPaths,
   findComponents,
   type ComponentMatch,
   getParseError,
   useQuestionGrading,
   usesLegacyModuleContext,
   type PropValue,
+  type RuntimeXAPIHooks,
 } from './ast.js';
 import {
   validateAgent,
@@ -236,7 +239,8 @@ export function validateProject(
   }
 
   // 2. Parse and validate config
-  const config = parseConfig(projectRoot, d, standardOverride);
+  const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
+  const config = parseConfig(projectRoot, d, runtimeHooks, standardOverride);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -287,6 +291,7 @@ interface ParsedConfig {
 function parseConfig(
   projectRoot: string,
   d: Diagnostics,
+  runtimeHooks: XAPIHookRead,
   standardOverride?: string,
 ): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
@@ -295,7 +300,7 @@ function parseConfig(
     if (read.reason === 'no-export') {
       d.error('course.config.js: must use `export default { ... }` syntax');
     } else if (read.reason === 'parse-error') {
-      d.error('course.config.js: could not parse — JavaScript syntax error');
+      reportConfigParseError(projectRoot, d);
     }
     return null;
   }
@@ -481,12 +486,29 @@ function parseConfig(
     }
   }
 
-  // Validate xapi (publisher destinations)
-  if (config.xapi !== undefined) {
-    validateXAPIConfig(config.xapi, config.export?.standard ?? 'web', d);
-  }
+  validateXAPIConfig(
+    config.xapi,
+    config.export?.standard ?? 'web',
+    runtimeHooks,
+    d,
+  );
 
   return config;
+}
+
+function reportConfigParseError(projectRoot: string, d: Diagnostics): void {
+  const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
+  const paths = defaultExportFunctionPaths(source);
+  if (paths.length === 0) {
+    d.error('course.config.js: could not parse — JavaScript syntax error');
+    return;
+  }
+  for (const path of paths) {
+    d.error(
+      `course.config.js: "${path}" is a function, but course.config.js is data only. ` +
+        'Export it from course.runtime.js instead (see "Runtime hooks" in the authoring guide).',
+    );
+  }
 }
 
 // ---------- Branding Validation ----------
@@ -627,12 +649,76 @@ function validateA11yConfig(raw: unknown, d: Diagnostics): void {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type XAPIHookRead = RuntimeXAPIHooks | 'none' | 'unknown';
+
+function readRuntimeXAPIHooks(
+  projectRoot: string,
+  d: Diagnostics,
+): XAPIHookRead {
+  const runtimePath = resolve(projectRoot, 'course.runtime.js');
+  if (!existsSync(runtimePath)) return 'none';
+  const hooks = courseRuntimeXAPIHooks(readSourceFileCached(runtimePath));
+  if (hooks !== 'parse-error') return hooks;
+  d.error('course.runtime.js: could not parse, JavaScript syntax error');
+  return 'unknown';
+}
+
+function hookState(
+  hooks: XAPIHookRead,
+  id: unknown,
+  key: 'auth' | 'actor',
+): 'yes' | 'no' | 'unknown' {
+  if (hooks === 'unknown') return 'unknown';
+  if (hooks === 'none' || typeof id !== 'string') return 'no';
+  const keys = hooks.get(id);
+  if (keys === 'unknown') return 'unknown';
+  return keys?.has(key) ? 'yes' : 'no';
+}
+
+function explicitDestinationIds(
+  entries: unknown[],
+  d: Diagnostics,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { endpoint, id } = entry as { endpoint?: unknown; id?: unknown };
+    if (endpoint === 'lms' || typeof id !== 'string' || id === '') continue;
+    if (ids.has(id)) {
+      d.error(
+        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
+      );
+    }
+    ids.add(id);
+  }
+  return ids;
+}
+
+function validateHookIds(
+  hooks: XAPIHookRead,
+  ids: ReadonlySet<string>,
+  d: Diagnostics,
+): void {
+  if (!(hooks instanceof Map)) return;
+  for (const id of hooks.keys()) {
+    if (!ids.has(id)) {
+      d.error(
+        `course.runtime.js: xapi[${JSON.stringify(id)}] matches no explicit xapi destination id in course.config.js`,
+      );
+    }
+  }
+}
+
 function validateXAPIConfig(
   raw: unknown,
   standard: string,
+  hooks: XAPIHookRead,
   d: Diagnostics,
 ): void {
-  if (raw === undefined || raw === null) return;
+  if (raw === undefined || raw === null) {
+    validateHookIds(hooks, new Set(), d);
+    return;
+  }
 
   // Normalize to array form. The single-object case is shorthand for a
   // one-element array — same machinery, no special case in the runtime.
@@ -680,6 +766,8 @@ function validateXAPIConfig(
     return;
   }
 
+  validateHookIds(hooks, explicitDestinationIds(entries, d), d);
+
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const label = Array.isArray(raw) ? `xapi[${i}]` : 'xapi';
@@ -691,6 +779,7 @@ function validateXAPIConfig(
       entry as Record<string, unknown>,
       label,
       standard,
+      hooks,
       d,
     );
   }
@@ -700,6 +789,7 @@ function validateSingleXAPIEntry(
   entry: Record<string, unknown>,
   label: string,
   standard: string,
+  hooks: XAPIHookRead,
   d: Diagnostics,
 ): void {
   const endpoint = entry.endpoint;
@@ -741,6 +831,19 @@ function validateSingleXAPIEntry(
     return;
   }
 
+  const id = entry.id;
+  if (id === undefined) {
+    d.error(
+      `course.config.js: ${label}.id is required. course.runtime.js keys its xapi resolvers by it.`,
+    );
+  } else if (typeof id !== 'string' || id === '') {
+    d.error(`course.config.js: ${label}.id must be a non-empty string`);
+  }
+  const hookRef =
+    typeof id === 'string' && id
+      ? `xapi[${JSON.stringify(id)}]`
+      : `xapi[<${label}.id>]`;
+
   // Explicit endpoint — must be an absolute http(s) URL.
   let url: URL;
   try {
@@ -769,24 +872,33 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // auth — required for explicit endpoints.
+  // auth — required for explicit endpoints, from the config or a resolver.
   const auth = entry.auth;
+  const authHook = hookState(hooks, id, 'auth');
   if (auth === undefined) {
-    d.error(`course.config.js: ${label}.auth is required`);
-  } else if (typeof auth === 'string') {
+    if (authHook === 'no') {
+      d.error(
+        `course.config.js: ${label}.auth is required. Set a credential string, or export ${hookRef}.auth from course.runtime.js.`,
+      );
+    }
+  } else if (typeof auth !== 'string') {
+    d.error(
+      `course.config.js: ${label}.auth must be a string, got ${describeType(auth)}`,
+    );
+  } else if (authHook === 'yes') {
+    d.error(
+      `course.config.js: ${label}.auth is also resolved by ${hookRef}.auth in course.runtime.js. Keep one.`,
+    );
+  } else {
     const authErr = validateAuthCredential(auth);
     if (authErr) {
       d.error(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
     } else {
       d.warn(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
-          'For production, pass a function that fetches a short-lived token from a server endpoint.',
+          `For production, export a ${hookRef}.auth resolver from course.runtime.js that fetches a short-lived token from a server endpoint.`,
       );
     }
-  } else if (typeof auth !== 'function') {
-    d.error(
-      `course.config.js: ${label}.auth must be a string or a function, got ${typeof auth}`,
-    );
   }
 
   // activityId — required IRI.
@@ -808,22 +920,27 @@ function validateSingleXAPIEntry(
 
   // actor — required under web; optional otherwise.
   const actor = entry.actor;
+  const actorHook = hookState(hooks, id, 'actor');
   if (actor === undefined) {
-    if (standard === 'web') {
+    if (standard === 'web' && actorHook === 'no') {
       d.error(
-        `course.config.js: ${label}.actor is required for web export — there is no LMS to derive a learner identity from. ` +
-          'Provide either a static actor object or a function that resolves one (e.g. from your auth system).',
+        `course.config.js: ${label}.actor is required for web export: there is no LMS to derive a learner identity from. ` +
+          `Set a static Agent object, or export ${hookRef}.actor from course.runtime.js to resolve one (e.g. from your auth system).`,
       );
     }
-  } else if (typeof actor === 'object' && actor !== null) {
+  } else if (typeof actor !== 'object' || actor === null) {
+    d.error(
+      `course.config.js: ${label}.actor must be an Agent object, got ${describeType(actor)}`,
+    );
+  } else if (actorHook === 'yes') {
+    d.error(
+      `course.config.js: ${label}.actor is also resolved by ${hookRef}.actor in course.runtime.js. Keep one.`,
+    );
+  } else {
     const err = validateAgent(actor);
     if (err) {
       d.error(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
     }
-  } else if (typeof actor !== 'function') {
-    d.error(
-      `course.config.js: ${label}.actor must be an object or function, got ${typeof actor}`,
-    );
   }
 
   // actorAccountHomePage — optional, only meaningful under SCORM with no
@@ -843,7 +960,7 @@ function validateSingleXAPIEntry(
         );
       }
     }
-    if (actor !== undefined) {
+    if (actor !== undefined || actorHook === 'yes') {
       d.warn(
         `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
@@ -859,6 +976,7 @@ function validateSingleXAPIEntry(
   // actorAccountHomePage becomes required.
   if (
     actor === undefined &&
+    actorHook === 'no' &&
     (standard === 'scorm12' || standard === 'scorm2004') &&
     typeof activityId === 'string' &&
     httpOrigin(activityId) === null &&
