@@ -588,10 +588,7 @@ function tesseraExportPlugin(
         );
       }
 
-      await runExport(
-        projectRoot,
-        read.config as Parameters<typeof runExport>[1],
-      );
+      await runExport(projectRoot, mergeCourseConfig(read.config));
     },
   };
 }

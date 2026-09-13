@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
-import { courseIdentity } from '../runtime/types.js';
+import { courseIdentity, type CourseConfig } from '../runtime/types.js';
 
 function slugify(text: string): string {
   return text
@@ -28,14 +28,12 @@ interface ExportConfig {
   id?: string;
   description?: string;
   version?: string;
-  scoring?: { passingScore?: number };
-  completion?: { mode?: 'quiz' | 'percentage' };
-  export?: { standard?: string };
+  scoring: { passingScore: number };
+  completion?: { mode?: CourseConfig['completion']['mode'] };
+  export: { standard: string };
 }
 
 // ---------- Helpers ----------
-
-const UNTITLED_TITLE = 'Untitled Course';
 
 function escapeXml(str: string): string {
   return str
@@ -138,7 +136,7 @@ export function generateScormManifest(
   distDir: string,
 ): string {
   const dialect = SCORM_DIALECTS[version];
-  const title = escapeXml(config.title || UNTITLED_TITLE);
+  const title = escapeXml(config.title);
   const files = collectFiles(distDir);
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
@@ -171,7 +169,7 @@ ${fileElements}
 }
 
 export function generateCMI5Xml(config: ExportConfig): string {
-  const title = escapeXml(config.title || UNTITLED_TITLE);
+  const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course id so they survive rebuilds without
   // orphaning existing learner records in the LRS.
@@ -181,9 +179,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
   );
   const auId = auIdFor(config);
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
-  const masteryScore = Number(
-    ((config.scoring?.passingScore ?? 70) / 100).toFixed(4),
-  );
+  const masteryScore = Number((config.scoring.passingScore / 100).toFixed(4));
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
@@ -208,7 +204,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
 }
 
 export function generateTincanXml(config: ExportConfig): string {
-  const title = escapeXml(config.title || UNTITLED_TITLE);
+  const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
   const auId = auIdFor(config);
@@ -305,8 +301,8 @@ export async function runExport(
   config: ExportConfig,
 ): Promise<void> {
   const distDir = resolve(projectRoot, 'dist');
-  const standard = config.export?.standard || 'web';
-  const slug = slugify(config.title || 'tessera-course') || 'tessera-course';
+  const standard = config.export.standard;
+  const slug = slugify(config.title) || 'tessera-course';
   const version = config.version || '1.0.0';
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);

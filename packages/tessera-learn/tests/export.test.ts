@@ -16,6 +16,7 @@ import {
   createZip,
   runExport,
 } from '../src/plugin/export.js';
+import { mergeCourseConfig } from '../src/plugin/index.js';
 
 let testRoot: string;
 let counter = 0;
@@ -87,7 +88,11 @@ describe('generateScormManifest 1.2', () => {
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: '' }, distDir);
+    const xml = generateScormManifest(
+      '1.2',
+      mergeCourseConfig({ title: '' }),
+      distDir,
+    );
     expect(xml).toContain('<title>Untitled Course</title>');
   });
 
@@ -164,8 +169,11 @@ describe('generateScormManifest 2004', () => {
 // ---- CMI5 XML ----
 
 describe('generateCMI5Xml', () => {
+  const cmi5Xml = (config: Parameters<typeof mergeCourseConfig>[0]) =>
+    generateCMI5Xml(mergeCourseConfig(config));
+
   it('generates valid XML with course structure', () => {
-    const xml = generateCMI5Xml({
+    const xml = cmi5Xml({
       title: 'My Course',
       description: 'A great course',
       scoring: { passingScore: 80 },
@@ -182,7 +190,7 @@ describe('generateCMI5Xml', () => {
   });
 
   it('sets masteryScore from passingScore', () => {
-    const xml = generateCMI5Xml({
+    const xml = cmi5Xml({
       title: 'Test',
       scoring: { passingScore: 80 },
     });
@@ -190,19 +198,24 @@ describe('generateCMI5Xml', () => {
   });
 
   it('defaults masteryScore to 0.7', () => {
-    const xml = generateCMI5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test' });
     expect(xml).toContain('masteryScore="0.7"');
   });
 
+  it('defaults masteryScore to 0 in manual mode', () => {
+    const xml = cmi5Xml({ title: 'Test', completion: { mode: 'manual' } });
+    expect(xml).toContain('masteryScore="0"');
+  });
+
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
-    const xml = generateCMI5Xml({ title: '' });
+    const xml = cmi5Xml({ title: '' });
     expect(xml).toContain(
       '<langstring lang="en-US">Untitled Course</langstring>',
     );
   });
 
   it('includes URN IRIs for course and AU ids', () => {
-    const xml = generateCMI5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test' });
     // cmi5 / xs:anyURI requires course/AU ids to be valid IRIs. We emit
     // `urn:tessera:course:<hex>` and `urn:tessera:au:<hex>` — matching the
     // RFC 8141 URN syntax with a stable hash so re-exports keep the same ids.
@@ -219,8 +232,8 @@ describe('generateCMI5Xml', () => {
   });
 
   it('derives distinct ids from the course id, not the title', () => {
-    const idOf = (config: Parameters<typeof generateCMI5Xml>[0]) =>
-      generateCMI5Xml(config).match(/urn:tessera:course:[0-9a-f]{32}/)![0];
+    const idOf = (config: Parameters<typeof cmi5Xml>[0]) =>
+      cmi5Xml(config).match(/urn:tessera:course:[0-9a-f]{32}/)![0];
     // Same title, different id → different activity id (no LRS record clash).
     expect(idOf({ title: 'Onboarding', id: 'urn:uuid:a' })).not.toBe(
       idOf({ title: 'Onboarding', id: 'urn:uuid:b' }),
@@ -236,7 +249,7 @@ describe('generateCMI5Xml', () => {
   });
 
   it('defaults moveOn to Completed when completion mode is percentage', () => {
-    const xml = generateCMI5Xml({
+    const xml = cmi5Xml({
       title: 'Test',
       completion: { mode: 'percentage' },
     });
@@ -247,7 +260,7 @@ describe('generateCMI5Xml', () => {
     // A learner who finishes a graded course without passing the quiz
     // should NOT be granted satisfaction. cmi5 §13.1.4 — CompletedAndPassed
     // requires both Completed AND Passed before the LMS rolls up.
-    const xml = generateCMI5Xml({
+    const xml = cmi5Xml({
       title: 'Test',
       completion: { mode: 'quiz' },
     });
@@ -255,7 +268,7 @@ describe('generateCMI5Xml', () => {
   });
 
   it('defaults moveOn to Completed when no completion config supplied', () => {
-    const xml = generateCMI5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test' });
     expect(xml).toContain('moveOn="Completed"');
   });
 
@@ -263,7 +276,7 @@ describe('generateCMI5Xml', () => {
     // The cmi5 CourseStructure XSD requires `launchMethod` on every
     // <au>; importers that validate against the schema reject the
     // manifest without it.
-    const xml = generateCMI5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test' });
     expect(xml).toMatch(/<au\b[^>]*\blaunchMethod="AnyWindow"/);
   });
 
@@ -272,13 +285,13 @@ describe('generateCMI5Xml', () => {
     // element (between <description> and any <objectives>). Emitting
     // `url="index.html"` as an attribute makes the manifest fail XSD
     // validation in conformant LMS importers (e.g., SCORM Cloud).
-    const xml = generateCMI5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test' });
     expect(xml).toContain('<url>index.html</url>');
     expect(xml).not.toMatch(/<au\b[^>]*\burl=/);
   });
 
   it('escapes XML special characters', () => {
-    const xml = generateCMI5Xml({
+    const xml = cmi5Xml({
       title: 'A & B',
       description: '<script>alert("xss")</script>',
     });
