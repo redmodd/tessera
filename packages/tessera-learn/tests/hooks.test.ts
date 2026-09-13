@@ -748,15 +748,6 @@ describe('useNavigation', () => {
     expect(navHook.sections).toBe(ctx.manifest.sections);
   });
 
-  it('prefetch delegates to nav', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = makeNavCtx(progress, 0);
-    ctxStore.set('tessera-nav', ctx);
-
-    useNavigation().prefetch(2);
-    expect(ctx.nav.prefetch).toHaveBeenCalledWith(2);
-  });
-
   it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
@@ -775,7 +766,7 @@ describe('useNavigation', () => {
     expect(ctx.nav.goToPage).not.toHaveBeenCalled();
   });
 
-  it('next/prev/canGoNext/canGoPrev delegate to nav', () => {
+  it('next/prev/prefetch/canGoNext/canGoPrev delegate to nav', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
@@ -783,8 +774,10 @@ describe('useNavigation', () => {
     const h = useNavigation();
     h.next();
     h.prev();
+    h.prefetch(2);
     expect(ctx.nav.goNext).toHaveBeenCalled();
     expect(ctx.nav.goPrev).toHaveBeenCalled();
+    expect(ctx.nav.prefetch).toHaveBeenCalledWith(2);
     expect(h.canGoNext).toBe(true);
     expect(h.canGoPrev).toBe(false);
   });
