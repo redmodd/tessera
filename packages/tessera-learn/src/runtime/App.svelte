@@ -221,6 +221,7 @@
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
+      ...(progress.gradedScoreFinal ? { s: 1 } : {}),
     };
   }
 
@@ -264,6 +265,9 @@
     duration = new DurationTracker(saved.d);
     if (saved.m === 1) {
       progress.markCompleteManually();
+    }
+    if (saved.s === 1) {
+      progress.restoreGradedScoreFinal();
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {

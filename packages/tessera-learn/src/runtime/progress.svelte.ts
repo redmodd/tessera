@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
@@ -88,13 +89,13 @@ export class ProgressState {
   markCompleteManually(): void {
     if (this.#manuallyCompleted) return;
     this.#manuallyCompleted = true;
-    this.version++;
+    this.#changed();
   }
 
   markVisited(pageIndex: number) {
     if (this.visitedPages.has(pageIndex)) return;
     this.visitedPages.add(pageIndex);
-    this.version++;
+    this.#changed();
   }
 
   quizScore(pageIndex: number): number | undefined {
@@ -128,7 +129,7 @@ export class ProgressState {
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
     this.chunkProgress.set(pageIndex, chunkIndex);
-    this.version++;
+    this.#changed();
   }
 
   /** Highest chunk revealed on a page, or -1 if none. */
@@ -218,7 +219,7 @@ export class ProgressState {
       ...this.gradedUnits.get(pageIndex),
       ...patch,
     });
-    this.version++;
+    this.#changed();
   }
 
   #graded = $derived.by(() => {
@@ -246,9 +247,24 @@ export class ProgressState {
     };
   });
 
+  #gradedScoreDecided = $state(false);
+
   get gradedScoreFinal(): boolean {
+    if (this.#gradedScoreDecided) return true;
     const { count, allScored } = this.#graded;
     return count > 0 && (allScored || this.completionStatus === 'complete');
+  }
+
+  restoreGradedScoreFinal(): void {
+    if (this.#gradedScoreDecided) return;
+    this.#gradedScoreDecided = true;
+    this.version++;
+  }
+
+  #changed() {
+    this.version++;
+    if (!this.#gradedScoreDecided && untrack(() => this.gradedScoreFinal))
+      this.#gradedScoreDecided = true;
   }
 
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {

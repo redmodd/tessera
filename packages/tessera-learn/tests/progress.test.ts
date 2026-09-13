@@ -400,6 +400,52 @@ describe('ProgressState', () => {
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
     });
+
+    it('keeps following the score after a changed answer undoes completion', () => {
+      const manifest = createManifest(
+        4,
+        {},
+        { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
+      );
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 60 },
+      });
+      const progress = new ProgressState(manifest, config);
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.successStatus).toBe('passed');
+
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('restores a final graded score from a previous session', () => {
+      const manifest = createManifest(
+        4,
+        {},
+        { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
+      );
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 60 },
+      });
+      const progress = new ProgressState(manifest, config);
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+      expect(progress.gradedScoreFinal).toBe(false);
+
+      progress.restoreGradedScoreFinal();
+
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
   });
 
   describe('markStandaloneQuestion', () => {

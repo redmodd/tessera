@@ -86,6 +86,8 @@ export interface SavedState {
   u?: Record<string, unknown>;
   /** Manual completion latch. 1 if the learner triggered manual completion. Absent otherwise. */
   m?: 1;
+  /** Graded score latch. 1 once the course score and verdict were first reported. Absent otherwise. */
+  s?: 1;
   /** Structure fingerprint (FNV-1a over ordered page slugs) at save time.
    * On resume, anything but an exact match discards the blob. */
   f?: string;

@@ -152,6 +152,25 @@ describe('state changed during adapter init survives', () => {
     expect(saveState).not.toHaveBeenCalled();
   });
 
+  it('carries a final graded score through a resume', async () => {
+    const { component, saveState, releaseInit, unmount } =
+      await mountWithSlowInit({
+        b: 0,
+        f: structureFingerprint(manifest as never),
+        v: [0],
+        d: 0,
+        s: 1,
+      });
+    cleanup = () => unmount(component);
+
+    releaseInit();
+
+    await vi.waitFor(() => {
+      expect(saveState).toHaveBeenCalled();
+      expect(saveState.mock.calls.at(-1)![0].s).toBe(1);
+    });
+  });
+
   it('persists a completion marked before the adapter is ready', async () => {
     const { component, saveState, releaseInit, unmount } =
       await mountWithSlowInit(null, {
