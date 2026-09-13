@@ -321,8 +321,8 @@
     void progress.version;
     if (!persistenceReady) return;
 
-    const { average, attempted } = progress.gradedScore;
-    if (!attempted) return;
+    if (!progress.allGradedPagesScored) return;
+    const { average } = progress.gradedScore;
 
     const rounded = Math.round(average);
     if (rounded === prevReportedScore) return;
@@ -445,9 +445,8 @@
         restoreState(saved);
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
-        const restoredScore = progress.gradedScore;
-        const seededScore = restoredScore.attempted
-          ? Math.round(restoredScore.average)
+        const seededScore = progress.allGradedPagesScored
+          ? Math.round(progress.gradedScore.average)
           : null;
         if (adapter.seedLifecycle) {
           adapter.seedLifecycle(

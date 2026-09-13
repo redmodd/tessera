@@ -229,9 +229,11 @@ export class ProgressState {
     let weighted = 0;
     let totalWeight = 0;
     let attempted = false;
+    let allScored = pages.size > 0;
     for (const pageIndex of pages) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
+      else allScored = false;
       const weight = this.#pageWeights.get(pageIndex) ?? 1;
       weighted += (score ?? 0) * weight;
       totalWeight += weight;
@@ -240,8 +242,13 @@ export class ProgressState {
       count: pages.size,
       average: totalWeight > 0 ? weighted / totalWeight : 0,
       attempted,
+      allScored,
     };
   });
+
+  get allGradedPagesScored(): boolean {
+    return this.#graded.allScored;
+  }
 
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
     if (this.#manuallyCompleted) return 'complete';
@@ -290,8 +297,8 @@ export class ProgressState {
       const want = this.#config.completion.requireSuccessStatus;
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
-    const { count, average, attempted } = this.#graded;
-    if (count === 0 || !attempted) return 'unknown';
+    const { average, allScored } = this.#graded;
+    if (!allScored) return 'unknown';
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
