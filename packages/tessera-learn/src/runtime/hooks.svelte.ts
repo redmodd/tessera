@@ -177,6 +177,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     }
     if (navCtx) {
       const pageIndex = navCtx.nav.currentPageIndex;
+      if (opts.graded) navCtx.progress.warnIfUndeclaredGraded(pageIndex);
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,

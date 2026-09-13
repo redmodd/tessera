@@ -86,6 +86,27 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('warns once when a graded question is submitted on an undeclared page, not on restore', () => {
+    const progress = new ProgressState(createManifest(2), createConfig());
+    ctxStore.set('tessera-nav', makeNavCtx(progress));
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      progress.markStandaloneQuestion(0, 'q0', 100, true);
+      expect(warn).not.toHaveBeenCalled();
+
+      const response = () =>
+        ({ type: 'true-false', response: true, correct: true }) as Interaction;
+      useQuestion({ id: 'q1', graded: true, response }).submit();
+      useQuestion({ id: 'q2', graded: true, response }).submit();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('does not declare');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('is not answerComplete until an answer is set, with no complete callback', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     ctxStore.set('tessera-nav', makeNavCtx(progress));
