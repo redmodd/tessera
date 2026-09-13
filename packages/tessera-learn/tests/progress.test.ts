@@ -317,8 +317,44 @@ describe('ProgressState', () => {
       progress.quizCompleted(2, 80);
 
       expect(progress.successStatus).toBe('unknown');
-      expect(progress.allGradedPagesScored).toBe(false);
+      expect(progress.gradedScoreFinal).toBe(false);
       expect(progress.gradedScore).toEqual({ average: 40, attempted: true });
+    });
+
+    it('decides once completion is reached, counting unscored graded pages as 0', () => {
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 80 },
+        scoring: { passingScore: 70 },
+      });
+      const progress = new ProgressState(manifest, config);
+
+      progress.quizCompleted(2, 80);
+      for (const i of [0, 1, 2]) progress.markVisited(i);
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.markVisited(3);
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('stays unknown on completion when the course has no graded pages', () => {
+      const progress = new ProgressState(
+        createManifest(2),
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 50 },
+        }),
+      );
+
+      progress.markVisited(0);
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
     });
 
     it('runs independently of completion mode', () => {
@@ -361,7 +397,7 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
 
       progress.quizCompleted(5, 0);
-      expect(progress.allGradedPagesScored).toBe(true);
+      expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
     });
   });

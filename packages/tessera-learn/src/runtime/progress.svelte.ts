@@ -246,8 +246,9 @@ export class ProgressState {
     };
   });
 
-  get allGradedPagesScored(): boolean {
-    return this.#graded.allScored;
+  get gradedScoreFinal(): boolean {
+    const { count, allScored } = this.#graded;
+    return count > 0 && (allScored || this.completionStatus === 'complete');
   }
 
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
@@ -297,8 +298,8 @@ export class ProgressState {
       const want = this.#config.completion.requireSuccessStatus;
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
-    const { average, allScored } = this.#graded;
-    if (!allScored) return 'unknown';
+    if (!this.gradedScoreFinal) return 'unknown';
+    const { average } = this.#graded;
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
