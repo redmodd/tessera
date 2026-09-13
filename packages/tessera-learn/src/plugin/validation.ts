@@ -14,12 +14,11 @@ import {
 } from './manifest.js';
 import {
   clearParseCache,
-  courseRuntimeXAPIHooks,
   defaultExportFunctionPaths,
   findComponents,
   type ComponentMatch,
   getParseError,
-  hasDefaultExport,
+  readCourseRuntimeExports,
   useQuestionGrading,
   usesLegacyModuleContext,
   type PropValue,
@@ -658,18 +657,17 @@ function readRuntimeXAPIHooks(
 ): XAPIHookRead {
   const runtimePath = resolve(projectRoot, 'course.runtime.js');
   if (!existsSync(runtimePath)) return 'none';
-  const source = readSourceFileCached(runtimePath);
-  const hooks = courseRuntimeXAPIHooks(source);
-  if (hooks === 'parse-error') {
+  const runtime = readCourseRuntimeExports(readSourceFileCached(runtimePath));
+  if (!runtime) {
     d.error('course.runtime.js: could not parse, JavaScript syntax error');
     return 'unknown';
   }
-  if (hasDefaultExport(source)) {
+  if (runtime.hasDefaultExport) {
     d.error(
       'course.runtime.js: export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
     );
   }
-  return hooks;
+  return runtime.xapi;
 }
 
 function hookState(
@@ -682,25 +680,6 @@ function hookState(
   const keys = hooks.get(id);
   if (keys === 'unknown') return 'unknown';
   return keys?.has(key) ? 'yes' : 'no';
-}
-
-function explicitDestinationIds(
-  entries: unknown[],
-  d: Diagnostics,
-): Set<string> {
-  const ids = new Set<string>();
-  for (const entry of entries) {
-    if (!entry || typeof entry !== 'object') continue;
-    const { endpoint, id } = entry as { endpoint?: unknown; id?: unknown };
-    if (endpoint === 'lms' || typeof id !== 'string' || id === '') continue;
-    if (ids.has(id)) {
-      d.error(
-        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
-      );
-    }
-    ids.add(id);
-  }
-  return ids;
 }
 
 function validateHookIds(
@@ -775,8 +754,7 @@ function validateXAPIConfig(
     return;
   }
 
-  validateHookIds(hooks, explicitDestinationIds(entries, d), d);
-
+  const ids = new Set<string>();
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const label = Array.isArray(raw) ? `xapi[${i}]` : 'xapi';
@@ -789,9 +767,11 @@ function validateXAPIConfig(
       label,
       standard,
       hooks,
+      ids,
       d,
     );
   }
+  validateHookIds(hooks, ids, d);
 }
 
 function validateSingleXAPIEntry(
@@ -799,6 +779,7 @@ function validateSingleXAPIEntry(
   label: string,
   standard: string,
   hooks: XAPIHookRead,
+  ids: Set<string>,
   d: Diagnostics,
 ): void {
   const endpoint = entry.endpoint;
@@ -847,6 +828,13 @@ function validateSingleXAPIEntry(
     );
   } else if (typeof id !== 'string' || id === '') {
     d.error(`course.config.js: ${label}.id must be a non-empty string`);
+  } else {
+    if (ids.has(id)) {
+      d.error(
+        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
+      );
+    }
+    ids.add(id);
   }
   const hookRef =
     typeof id === 'string' && id

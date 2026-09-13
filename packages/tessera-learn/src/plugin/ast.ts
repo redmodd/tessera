@@ -286,147 +286,93 @@ export function defaultExportFunctionPaths(jsSource: string): string[] {
 /** Keys of each `xapi` export entry: `'unknown'` where not statically readable. */
 export type RuntimeXAPIHooks = Map<string, ReadonlySet<string> | 'unknown'>;
 
-/**
- * Statically read the `xapi` named export of `course.runtime.js`. `'none'` when
- * it isn't exported; `'unknown'` when its value can't be read from the source.
- */
-export function courseRuntimeXAPIHooks(
-  jsSource: string,
-): RuntimeXAPIHooks | 'none' | 'unknown' | 'parse-error' {
-  const program = parseJsModule(jsSource);
-  if (!program) return 'parse-error';
-  const body = (program.body as Node[]) ?? [];
-  const locals = new Map<string, Node | null>();
-  for (const node of body) {
-    const declaration =
-      node.type === 'ExportNamedDeclaration'
-        ? (node.declaration as Node | null)
-        : node;
-    if (declaration?.type !== 'VariableDeclaration') continue;
-    for (const decl of declaration.declarations as Node[]) {
-      const id = decl.id as Node;
-      if (id.type === 'Identifier') {
-        locals.set(id.name as string, decl.init as Node | null);
-      } else {
-        for (const name of patternNames(id)) locals.set(name, null);
-      }
-    }
-  }
-  for (const name of mutatedNames(program)) {
-    if (locals.has(name)) locals.set(name, null);
-  }
+export interface CourseRuntimeExports {
+  xapi: RuntimeXAPIHooks | 'none' | 'unknown';
+  hasDefaultExport: boolean;
+}
 
-  let found = false;
-  let value: Node | null = null;
-  for (const node of body) {
-    if (node.type === 'ExportAllDeclaration') return 'unknown';
+/**
+ * Statically read the exports of `course.runtime.js`, or null when it doesn't
+ * parse. `xapi` is read only from an `export const xapi = { ... }` literal that
+ * is never reassigned, mutated or passed to a call; any other form is `'unknown'`.
+ */
+export function readCourseRuntimeExports(
+  jsSource: string,
+): CourseRuntimeExports | null {
+  const program = parseJsModule(jsSource);
+  if (!program) return null;
+  let hasDefaultExport = false;
+  let xapiInit: Node | null | undefined;
+  for (const node of (program.body as Node[]) ?? []) {
+    if (node.type === 'ExportDefaultDeclaration') hasDefaultExport = true;
+    if (node.type === 'ExportAllDeclaration') xapiInit ??= null;
     if (node.type !== 'ExportNamedDeclaration') continue;
+    for (const specifier of (node.specifiers as Node[]) ?? []) {
+      const exported = specifier.exported as Node;
+      const name = exported.name ?? exported.value;
+      if (name === 'default') hasDefaultExport = true;
+      if (name === 'xapi') xapiInit = null;
+    }
     const declaration = node.declaration as Node | null;
-    if (declaration?.type === 'VariableDeclaration' && locals.has('xapi')) {
-      const declares = (declaration.declarations as Node[]).some((decl) =>
-        patternNames(decl.id as Node).includes('xapi'),
-      );
-      if (declares) {
-        found = true;
-        value = locals.get('xapi') ?? null;
-      }
-    } else if (
+    if (
       declaration?.type === 'FunctionDeclaration' &&
       (declaration.id as Node).name === 'xapi'
     ) {
-      found = true;
+      xapiInit = null;
     }
-    for (const specifier of (node.specifiers as Node[]) ?? []) {
-      const exported = specifier.exported as Node;
-      if ((exported.name ?? exported.value) !== 'xapi') continue;
-      found = true;
-      value = node.source
-        ? null
-        : (locals.get((specifier.local as Node).name as string) ?? null);
+    if (declaration?.type !== 'VariableDeclaration') continue;
+    for (const decl of declaration.declarations as Node[]) {
+      const id = decl.id as Node;
+      if (id.type !== 'Identifier') xapiInit ??= null;
+      else if (id.name === 'xapi')
+        xapiInit = (decl.init as Node | null) ?? null;
     }
   }
-  if (!found) return 'none';
+  if (xapiInit === undefined) return { xapi: 'none', hasDefaultExport };
 
-  const entries = staticObjectEntries(value, locals);
-  if (entries === 'unknown') return 'unknown';
+  const entries = objectLiteralEntries(xapiInit);
+  if (entries === 'unknown' || isMutated(program, 'xapi')) {
+    return { xapi: 'unknown', hasDefaultExport };
+  }
   const hooks: RuntimeXAPIHooks = new Map();
   for (const [id, entry] of entries) {
-    const keys = staticObjectEntries(entry, locals);
+    const keys = objectLiteralEntries(entry);
     hooks.set(id, keys === 'unknown' ? 'unknown' : new Set(keys.keys()));
   }
-  return hooks;
+  return { xapi: hooks, hasDefaultExport };
 }
 
-export function hasDefaultExport(jsSource: string): boolean {
-  const program = parseJsModule(jsSource);
-  return ((program?.body as Node[]) ?? []).some(
-    (node) =>
-      node.type === 'ExportDefaultDeclaration' ||
-      (node.type === 'ExportNamedDeclaration' &&
-        ((node.specifiers as Node[]) ?? []).some((specifier) => {
-          const exported = specifier.exported as Node;
-          return (exported.name ?? exported.value) === 'default';
-        })),
-  );
-}
-
-function patternNames(pattern: Node): string[] {
-  switch (pattern.type) {
-    case 'Identifier':
-      return [pattern.name as string];
-    case 'ObjectPattern':
-      return (pattern.properties as Node[]).flatMap((property) =>
-        patternNames(
-          property.type === 'Property' ? (property.value as Node) : property,
-        ),
-      );
-    case 'ArrayPattern':
-      return (pattern.elements as (Node | null)[]).flatMap((element) =>
-        element ? patternNames(element) : [],
-      );
-    case 'RestElement':
-      return patternNames(pattern.argument as Node);
-    case 'AssignmentPattern':
-      return patternNames(pattern.left as Node);
-    default:
-      return [];
-  }
-}
-
-function mutatedNames(program: Node): Set<string> {
-  const names = new Set<string>();
-  const addRoot = (target: Node | null): void => {
+function isMutated(program: Node, name: string): boolean {
+  let mutated = false;
+  const check = (target: Node | null): void => {
     let node = unwrapTsCast(target);
     while (node?.type === 'MemberExpression') {
       node = unwrapTsCast(node.object as Node);
     }
-    if (node?.type === 'Identifier') names.add(node.name as string);
+    if (node?.type === 'Identifier' && node.name === name) mutated = true;
   };
   walkNodes(program, (node) => {
     if (node.type === 'AssignmentExpression') {
-      addRoot(node.left as Node);
-    } else if (node.type === 'UpdateExpression') {
-      addRoot(node.argument as Node);
-    } else if (node.type === 'UnaryExpression' && node.operator === 'delete') {
-      addRoot(node.argument as Node);
+      check(node.left as Node);
+    } else if (
+      node.type === 'UpdateExpression' ||
+      (node.type === 'UnaryExpression' && node.operator === 'delete')
+    ) {
+      check(node.argument as Node);
     } else if (
       node.type === 'CallExpression' ||
       node.type === 'NewExpression'
     ) {
-      for (const arg of node.arguments as Node[]) addRoot(arg);
+      for (const arg of node.arguments as Node[]) check(arg);
     }
   });
-  return names;
+  return mutated;
 }
 
-function staticObjectEntries(
+function objectLiteralEntries(
   node: Node | null,
-  locals: Map<string, Node | null>,
 ): Map<string, Node> | 'unknown' {
-  let value = unwrapTsCast(node);
-  if (value?.type === 'Identifier') {
-    value = unwrapTsCast(locals.get(value.name as string) ?? null);
-  }
+  const value = unwrapTsCast(node);
   if (value?.type !== 'ObjectExpression') return 'unknown';
   const entries = new Map<string, Node>();
   for (const property of value.properties as Node[]) {
