@@ -9,7 +9,11 @@ import { formatISO8601Duration } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
-import type { XAPIAgent, PartialStatement } from '../xapi/types.js';
+import type {
+  XAPIAgent,
+  PartialStatement,
+  DestinationOutcome,
+} from '../xapi/types.js';
 
 export const VERBS = {
   initialized: 'http://adlnet.gov/expapi/verbs/initialized',
@@ -275,21 +279,14 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     this.publisher.markUnloading();
     if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
     const duration = formatISO8601Duration(this.durationSeconds);
-    this.#finalSend = this.publisher
-      .sendFinal({
+    this.#finalSend = this.#report(
+      'Terminated',
+      this.publisher.sendFinal({
         verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
         result: { duration },
         context: this.buildContext(),
-      })
-      .then((outcome) =>
-        this.warnOnLRSReject('Terminated')({ destinations: [outcome] }),
-      )
-      .catch((err) => {
-        console.warn(
-          `Tessera ${this.logName}: failed to send Terminated statement`,
-          err,
-        );
-      });
+      }),
+    );
   }
 
   async exit(): Promise<void> {
@@ -359,33 +356,30 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   /** Enqueue a lifecycle statement fire-and-forget. `label` names it in both the LRS-reject and send-failure warnings. */
   protected dispatch(label: string, partial: PartialStatement): void {
     if (!this.publisher || this.terminated) return;
-    this.publisher
-      .sendStatement(partial)
-      .then(this.warnOnLRSReject(label))
-      .catch((err) => {
+    void this.#report(
+      label,
+      this.publisher.sendStatement(partial).then((r) => r.destinations[0]),
+    );
+  }
+
+  /** Warns on LRS non-2xx as well as send failures. The publisher resolves successfully on 4xx/5xx (failure is in the destination outcome), so `.catch` alone misses them. */
+  #report(label: string, send: Promise<DestinationOutcome>): Promise<void> {
+    return send.then(
+      (dest) => {
+        if (!dest.ok) {
+          console.warn(
+            `Tessera ${this.logName}: ${label} statement rejected by LRS (${dest.status ?? 'network error'})`,
+            dest.error,
+          );
+        }
+      },
+      (err) => {
         console.warn(
           `Tessera ${this.logName}: failed to send ${label} statement`,
           err,
         );
-      });
-  }
-
-  /** `.then` handler that warns on LRS non-2xx. The publisher resolves successfully on 4xx/5xx (failure is in the destination outcome), so `.catch` alone misses them. */
-  protected warnOnLRSReject(
-    label: string,
-  ): (res: {
-    destinations?: Array<{ ok?: boolean; status?: number; error?: Error }>;
-  }) => void {
-    const logName = this.logName;
-    return (res) => {
-      const dest = res.destinations?.[0];
-      if (dest && !dest.ok) {
-        console.warn(
-          `Tessera ${logName}: ${label} statement rejected by LRS (${dest.status ?? 'network error'})`,
-          dest.error,
-        );
-      }
-    };
+      },
+    );
   }
 
   protected buildStateUrl(stateId: string = 'tessera-state'): string {
@@ -436,10 +430,9 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
           this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), deadline),
         ]);
         const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
-        this.#stateSeq = Math.max(running?.n ?? 0, exit?.n ?? 0);
+        this.#stateSeq = latest?.n ?? 0;
         if (latest) {
-          const state = { ...latest };
-          delete state.n;
+          const { n: _n, ...state } = latest;
           this.state = state;
         } else {
           this.state = null;

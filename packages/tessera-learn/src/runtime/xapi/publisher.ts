@@ -55,6 +55,7 @@ export interface XAPIPublisherOptions {
 interface UnsentEntry {
   body: Statement | Statement[];
   settle: (o: DestinationOutcome) => void;
+  taken: boolean;
 }
 
 interface SendOutcome {
@@ -135,7 +136,6 @@ export class XAPIPublisher {
   #unloading = false;
   #unsent: UnsentEntry[] = [];
   #closed = false;
-  #closeEpoch = 0;
 
   constructor(opts: XAPIPublisherOptions) {
     if (!opts.endpoint || typeof opts.endpoint !== 'string') {
@@ -359,22 +359,24 @@ export class XAPIPublisher {
       return Promise.reject(this.#unavailableReason());
     }
     if (this.#closed) {
-      return Promise.resolve<DestinationOutcome>({
-        endpoint: this.#endpoint,
-        ok: false,
-        error: new XAPIConfigError(
-          'XAPIPublisher: Terminated was already sent; statement dropped.',
-        ),
-      });
+      return Promise.resolve(
+        this.#toDestination({
+          ok: false,
+          error: new XAPIConfigError(
+            'XAPIPublisher: Terminated was already sent; statement dropped.',
+          ),
+        }),
+      );
     }
     if (this.#queueDepth >= QUEUE_DEPTH_SATURATED) {
-      return Promise.resolve<DestinationOutcome>({
-        endpoint: this.#endpoint,
-        ok: false,
-        error: new XAPIConfigError(
-          `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`,
-        ),
-      });
+      return Promise.resolve(
+        this.#toDestination({
+          ok: false,
+          error: new XAPIConfigError(
+            `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`,
+          ),
+        }),
+      );
     }
     if (!this.#queueWarned && this.#queueDepth >= QUEUE_DEPTH_WARN) {
       this.#queueWarned = true;
@@ -394,16 +396,17 @@ export class XAPIPublisher {
     // path synchronously up to fetch — same timing as the original
     // cmi5.ts queue, which a few tests rely on (e.g., Initialized must
     // POST before mockClear() runs in the test body).
-    const entry = {
+    const entry: UnsentEntry = {
       body: statementOrBatch,
       settle: resolveOutcome,
+      taken: false,
     };
     this.#unsent.push(entry);
     this.#queue = this.#queue.then(() =>
-      this.#sendWithRetry(entry, options).then((outcome) => {
+      this.#sendQueued(entry, options).then((outcome) => {
         if (!outcome) return;
-        this.#unsent.splice(this.#unsent.indexOf(entry), 1);
-        this.#settle(resolveOutcome, outcome);
+        this.#unsent.shift();
+        this.#settle(entry, outcome);
       }),
     );
     return outcomePromise;
@@ -416,23 +419,19 @@ export class XAPIPublisher {
     const flushed = this.#unsent;
     this.#unsent = [];
     this.#closed = true;
-    this.#closeEpoch++;
+    for (const e of flushed) e.taken = true;
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
-    return this.#sendClosing(batch.length === 1 ? final : batch).then(
+    return this.#sendClosing(flushed.length ? batch : final).then(
       async (outcome) => {
         // A flushed statement may already be stored, and an LRS may answer 409
         // for the whole batch, rejecting everything else in it.
-        if (
-          (outcome.ok && outcome.status !== 409) ||
-          flushed.length === 0 ||
-          !isClientError(outcome.status)
-        ) {
-          for (const e of flushed) this.#settle(e.settle, outcome);
+        if (!flushed.length || !isClientError(outcome.status)) {
+          for (const e of flushed) this.#settle(e, outcome);
           return this.#toDestination(outcome);
         }
         for (const e of flushed) {
-          this.#settle(e.settle, await this.#sendClosing(e.body));
+          this.#settle(e, await this.#sendClosing(e.body));
         }
         return this.#toDestination(await this.#sendClosing(final));
       },
@@ -447,19 +446,11 @@ export class XAPIPublisher {
    * Promise chain — subsequent enqueues still flow.
    */
   chainTask(fn: () => Promise<void>): Promise<void> {
-    const epoch = this.#closeEpoch;
-    let resolveTask!: () => void;
-    const taskPromise = new Promise<void>((r) => {
-      resolveTask = r;
-    });
+    const closedAtEnqueue = this.#closed;
     this.#queue = this.#queue.then(() =>
-      epoch !== this.#closeEpoch
-        ? resolveTask()
-        : fn()
-            .catch(() => {})
-            .then(() => resolveTask()),
+      this.#closed !== closedAtEnqueue ? undefined : fn().catch(() => {}),
     );
-    return taskPromise;
+    return this.#queue;
   }
 
   /**
@@ -476,19 +467,14 @@ export class XAPIPublisher {
     return this.#unloading;
   }
 
-  /** Whether this publisher participates in cmi5 ordering (Terminated must be last). */
-  isCmi5Mode(): boolean {
-    return this.#cmi5Mode;
-  }
-
   // ---- Internal: send with retry policy ----
 
   /** Resolves null when `sendFinal` took the entry into its batch. */
-  #sendWithRetry(
+  #sendQueued(
     entry: UnsentEntry,
     options?: SendStatementOptions,
   ): Promise<SendOutcome | null> {
-    const taken = () => !this.#unsent.includes(entry);
+    const taken = () => entry.taken;
     return this.#sendRetrying(entry.body, {
       attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
       stop: taken,
@@ -509,7 +495,6 @@ export class XAPIPublisher {
     opts: { attempts: number; keepalive?: boolean; stop?: () => boolean },
   ): Promise<SendOutcome> {
     const body = JSON.stringify(statementOrBatch);
-    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
     const stop = opts.stop ?? (() => false);
 
     const attempt = (n: number): Promise<SendOutcome> => {
@@ -517,7 +502,7 @@ export class XAPIPublisher {
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
       const keepalive = opts.keepalive || isFinal || this.#unloading;
-      if (keepalive) this.#warnOverKeepaliveCap(body, count);
+      if (keepalive) this.#warnOverKeepaliveCap(body, statementOrBatch);
       return this.#sendOnce(body, keepalive).then((outcome) => {
         // 4xx (other than the 401 path which #sendOnce already retried) won't
         // recover, so short-circuit.
@@ -533,8 +518,12 @@ export class XAPIPublisher {
     return stop() ? Promise.resolve<SendOutcome>({ ok: false }) : attempt(0);
   }
 
-  #warnOverKeepaliveCap(body: string, count: number): void {
+  #warnOverKeepaliveCap(
+    body: string,
+    statementOrBatch: Statement | Statement[],
+  ): void {
     if (body.length <= KEEPALIVE_BODY_LIMIT_BYTES) return;
+    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
     console.warn(
       `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
         `over the 64 KiB keepalive cap. The browser may silently drop this ` +
@@ -543,21 +532,13 @@ export class XAPIPublisher {
     );
   }
 
-  #settle(
-    resolve: (o: DestinationOutcome) => void,
-    outcome: SendOutcome,
-  ): void {
+  #settle(entry: UnsentEntry, outcome: SendOutcome): void {
     this.#queueDepth--;
-    resolve(this.#toDestination(outcome));
+    entry.settle(this.#toDestination(outcome));
   }
 
   #toDestination(outcome: SendOutcome): DestinationOutcome {
-    return {
-      endpoint: this.#endpoint,
-      ok: outcome.ok,
-      status: outcome.status,
-      error: outcome.error,
-    };
+    return { endpoint: this.#endpoint, ...outcome };
   }
 
   #sendOnce(body: string, keepalive: boolean): Promise<SendOutcome> {

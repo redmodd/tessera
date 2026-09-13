@@ -385,9 +385,8 @@
       progress.completionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
-    // Stop accepting author-issued statements on independent destinations
-    // before terminate() so a late `useXAPI().sendStatement(...)` from another
-    // pagehide listener can't slip in after Terminated.
+    // Independent destinations send with keepalive so statements still in
+    // flight survive the unload.
     xapiClient?.markUnloading();
     adapter.terminate();
   }

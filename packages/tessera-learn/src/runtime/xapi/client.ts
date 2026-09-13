@@ -7,7 +7,7 @@ import type {
   DestinationOutcome,
 } from './types.js';
 import { XAPIPublisher } from './publisher.js';
-import { validatePartialStatement, XAPIConfigError } from './validation.js';
+import { validatePartialStatement } from './validation.js';
 import { uuidv4 } from './uuid.js';
 
 /**
@@ -50,19 +50,6 @@ export class XAPIClient {
     } catch (err) {
       return Promise.reject(err);
     }
-    // cmi5 §9.3.6 — Terminated must be the last statement of the session.
-    // The constraint is per-destination: only cmi5-mode publishers (the
-    // shared-queue cmi5 adapter case) need to block author sends during
-    // unload. Independent explicit-LRS destinations have no such ordering
-    // requirement and stay healthy until the browser tears them down.
-    const blocked = (p: XAPIPublisher) => p.isUnloading() && p.isCmi5Mode();
-    if (this.#publishers.every(blocked)) {
-      return Promise.reject(
-        new XAPIConfigError(
-          'XAPIClient.sendStatement: page is unloading; author statements queued during unload are dropped to keep Terminated last (cmi5 §9.3.6).',
-        ),
-      );
-    }
     const id = uuidv4();
     // The first publisher's built statement is what we return as the
     // canonical `statement` in the result. Other destinations may have
@@ -74,18 +61,6 @@ export class XAPIClient {
       const pub = this.#publishers[i];
       const built = pub.buildStatement(partial, { id });
       if (i === 0) primary = built;
-      if (blocked(pub)) {
-        destinationPromises.push(
-          Promise.resolve<DestinationOutcome>({
-            endpoint: pub.getEndpoint(),
-            ok: false,
-            error: new XAPIConfigError(
-              'destination skipped: cmi5 publisher is unloading; statement dropped to keep Terminated last (cmi5 §9.3.6).',
-            ),
-          }),
-        );
-        continue;
-      }
       destinationPromises.push(pub.enqueueBuilt(built, options));
     }
     return Promise.all(destinationPromises).then((destinations) => ({
@@ -120,12 +95,10 @@ export class XAPIClient {
   }
 
   /**
-   * Propagate "page is unloading" to every publisher. App.svelte's
-   * pagehide handler calls this before
-   * `adapter.terminate()` so independent (explicit-endpoint) publishers
-   * also stop accepting author sends during the close path. Idempotent;
-   * the cmi5 adapter calls `markUnloading()` on its own publisher
-   * separately and either order is fine.
+   * Propagate "page is unloading" to every publisher so independent
+   * (explicit-endpoint) destinations send with `keepalive` during the close
+   * path. Idempotent; the launch adapters call `markUnloading()` on their
+   * own publisher separately and either order is fine.
    */
   markUnloading(): void {
     for (const p of this.#publishers) p.markUnloading();

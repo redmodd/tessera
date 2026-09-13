@@ -7,6 +7,16 @@ import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
 
 const mockFetch = vi.fn();
 
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+function isRunningStateGet(url: string, options?: RequestInit): boolean {
+  return (
+    url.includes('activities/state') &&
+    !url.includes('tessera-state-exit') &&
+    (!options || options.method === 'GET')
+  );
+}
+
 function setSearchParams(params: Record<string, string>) {
   const searchString = new URLSearchParams(params).toString();
   const url = `http://localhost/?${searchString}`;
@@ -165,11 +175,7 @@ describe('CMI5Adapter', () => {
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (
-        url.includes('activities/state') &&
-        !url.includes('tessera-state-exit') &&
-        (!options || options.method === 'GET')
-      ) {
+      if (isRunningStateGet(url, options)) {
         resumeGets++;
         if (resumeGets === 1) throw new Error('transient');
         if (resumeGets === 2) return { ok: false, status: 503 };
@@ -184,7 +190,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 9 });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     expect(
       mockFetch.mock.calls.filter(
         ([url, options]: any[]) =>
@@ -200,11 +206,7 @@ describe('CMI5Adapter', () => {
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (
-        url.includes('activities/state') &&
-        !url.includes('tessera-state-exit') &&
-        (!options || options.method === 'GET')
-      ) {
+      if (isRunningStateGet(url, options)) {
         resumeGets++;
         return { ok: false, status: 404 };
       }
@@ -221,11 +223,7 @@ describe('CMI5Adapter', () => {
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (
-        url.includes('activities/state') &&
-        !url.includes('tessera-state-exit') &&
-        (!options || options.method === 'GET')
-      ) {
+      if (isRunningStateGet(url, options)) {
         resumeGets++;
         return { ok: true, status: 204, text: async () => '' };
       }
@@ -238,7 +236,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 1, v: [0, 1], q: {}, d: 4 });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     expect(
       mockFetch.mock.calls.filter(
         ([url, options]: any[]) =>
@@ -253,11 +251,7 @@ describe('CMI5Adapter', () => {
     await adapter.init();
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (
-        url.includes('activities/state') &&
-        !url.includes('tessera-state-exit') &&
-        (!options || options.method === 'GET')
-      ) {
+      if (isRunningStateGet(url, options)) {
         resumeGets++;
         throw new Error('network down');
       }
@@ -269,7 +263,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const puts = mockFetch.mock.calls.filter(
       ([url, options]: any[]) =>
         String(url).includes('activities/state') && options?.method === 'PUT',
@@ -286,7 +280,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const puts = mockFetch.mock.calls.filter(
       ([url, options]: any[]) =>
         String(url).includes('activities/state') && options?.method === 'PUT',
@@ -300,11 +294,7 @@ describe('CMI5Adapter', () => {
     await adapter.init();
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (
-        url.includes('activities/state') &&
-        !url.includes('tessera-state-exit') &&
-        (!options || options.method === 'GET')
-      ) {
+      if (isRunningStateGet(url, options)) {
         resumeGets++;
         return { ok: true, text: async () => 'not json{{{' };
       }
@@ -320,7 +310,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const puts = mockFetch.mock.calls.filter(
       ([url, options]: any[]) =>
         String(url).includes('activities/state') && options?.method === 'PUT',
@@ -705,7 +695,7 @@ describe('CMI5Adapter', () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -794,7 +784,7 @@ describe('CMI5Adapter', () => {
       .mockReturnValueOnce(new Promise(() => {}))
       .mockResolvedValue({ ok: true });
     adapter.saveState({ b: 1 } as never);
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     adapter.setCompletionStatus('complete');
 
     adapter.terminate();
@@ -855,7 +845,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
     adapter.saveState({ b: 3 } as never);
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const put = mockFetch.mock.calls.find(
       ([, init]: any[]) => init?.method === 'PUT',
     );
@@ -1123,7 +1113,7 @@ describe('CMI5Adapter', () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
-      await new Promise((r) => setTimeout(r, 0));
+      await tick();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
@@ -1354,10 +1344,10 @@ describe('CMI5Adapter', () => {
         .mockReturnValueOnce(new Promise((r) => (release = r)))
         .mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 0));
+      await tick();
 
       const exiting = adapter.exit();
-      await new Promise((r) => setTimeout(r, 0));
+      await tick();
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(assign).not.toHaveBeenCalled();
 
@@ -1470,7 +1460,7 @@ describe('CMI5Adapter', () => {
       setupInitMocks(undefined, { launchMode: 'Browse' });
       adapter = new CMI5Adapter();
       await adapter.init();
-      await new Promise((r) => setTimeout(r, 0));
+      await tick();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
