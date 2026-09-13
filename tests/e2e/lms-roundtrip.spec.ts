@@ -631,7 +631,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
         headers.push(req.headers());
         if (req.method() === 'POST' || req.method() === 'PUT') {
           try {
-            statements.push(JSON.parse(req.postData() ?? '{}'));
+            statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
           } catch {}
         }
         await route.fulfill({

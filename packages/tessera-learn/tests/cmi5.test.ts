@@ -705,6 +705,7 @@ describe('CMI5Adapter', () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
+    await new Promise((r) => setTimeout(r, 0));
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -1122,6 +1123,7 @@ describe('CMI5Adapter', () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
+      await new Promise((r) => setTimeout(r, 0));
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
@@ -1468,6 +1470,7 @@ describe('CMI5Adapter', () => {
       setupInitMocks(undefined, { launchMode: 'Browse' });
       adapter = new CMI5Adapter();
       await adapter.init();
+      await new Promise((r) => setTimeout(r, 0));
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();

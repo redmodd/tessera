@@ -55,7 +55,6 @@ export interface XAPIPublisherOptions {
 interface UnsentEntry {
   body: Statement | Statement[];
   settle: (o: DestinationOutcome) => void;
-  sending: boolean;
 }
 
 interface SendOutcome {
@@ -398,7 +397,6 @@ export class XAPIPublisher {
     const entry = {
       body: statementOrBatch,
       settle: resolveOutcome,
-      sending: false,
     };
     this.#unsent.push(entry);
     this.#queue = this.#queue.then(() =>
@@ -415,16 +413,18 @@ export class XAPIPublisher {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
-    const flushed = this.#unsent.filter((e) => !e.sending);
-    this.#unsent = this.#unsent.filter((e) => e.sending);
+    const flushed = this.#unsent;
+    this.#unsent = [];
     this.#closed = true;
     this.#closeEpoch++;
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
     return this.#sendClosing(batch.length === 1 ? final : batch).then(
       async (outcome) => {
+        // A flushed statement may already be stored, and an LRS may answer 409
+        // for the whole batch, rejecting everything else in it.
         if (
-          outcome.ok ||
+          (outcome.ok && outcome.status !== 409) ||
           flushed.length === 0 ||
           !isClientError(outcome.status)
         ) {
@@ -495,7 +495,6 @@ export class XAPIPublisher {
 
     const attempt = (n: number): Promise<SendOutcome | null> => {
       if (!this.#unsent.includes(entry)) return Promise.resolve(null);
-      entry.sending = true;
       const isFinal = n === maxAttempts - 1;
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
@@ -507,12 +506,12 @@ export class XAPIPublisher {
         );
       }
       return this.#sendOnce(body, keepalive).then((outcome) => {
+        if (!this.#unsent.includes(entry)) return null;
         if (outcome.ok) return outcome;
         // 4xx (other than the 401 path which #sendOnce already retried) won't
         // recover — short-circuit.
         if (isClientError(outcome.status)) return outcome;
-        if (isFinal || this.#closed) return outcome;
-        entry.sending = false;
+        if (isFinal) return outcome;
         return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
           attempt(n + 1),
         );

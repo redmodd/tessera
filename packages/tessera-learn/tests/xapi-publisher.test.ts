@@ -535,13 +535,15 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
   });
 
-  it('sendFinal posts unstarted statements and the final one as one keepalive batch before returning', async () => {
+  it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
     mockFetch
       .mockReturnValueOnce(new Promise(() => {}))
       .mockResolvedValue({ ok: true });
     const pub = new XAPIPublisher(basicOpts());
     await pub.init();
-    void pub.sendStatement({ verb: { id: 'http://verb/in-flight' } });
+    const inflight = pub.sendStatement({
+      verb: { id: 'http://verb/in-flight' },
+    });
     await new Promise((r) => setTimeout(r, 0));
     const queued = pub.sendStatement({ verb: { id: 'http://verb/queued' } });
 
@@ -551,10 +553,14 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const [, init] = mockFetch.mock.calls[1];
     expect(init.keepalive).toBe(true);
     expect(JSON.parse(init.body).map((s: any) => s.verb.id)).toEqual([
+      'http://verb/in-flight',
       'http://verb/queued',
       'http://verb/final',
     ]);
     await expect(final).resolves.toMatchObject({ ok: true });
+    await expect(inflight).resolves.toMatchObject({
+      destinations: [{ ok: true }],
+    });
     await expect(queued).resolves.toMatchObject({
       destinations: [{ ok: true }],
     });
@@ -628,7 +634,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not retry a statement that fails after sendFinal', async () => {
+  it('ignores the late response of a statement sendFinal took into its batch', async () => {
     vi.useFakeTimers();
     try {
       let fail!: (v: unknown) => void;
@@ -646,8 +652,11 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
       await vi.advanceTimersByTimeAsync(600_000);
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(
+        JSON.parse(mockFetch.mock.calls[1][1].body).map((s: any) => s.verb.id),
+      ).toEqual(['http://verb/in-flight', 'http://verb/final']);
       await expect(inflight).resolves.toMatchObject({
-        destinations: [{ ok: false, status: 503 }],
+        destinations: [{ ok: true }],
       });
     } finally {
       vi.useRealTimers();
@@ -702,7 +711,13 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
         return (Array.isArray(body) ? body : [body]).map((s: any) => s.verb.id);
       }),
     ).toEqual([
-      ['http://verb/good', 'http://verb/bad', 'http://verb/final'],
+      [
+        'http://verb/head',
+        'http://verb/good',
+        'http://verb/bad',
+        'http://verb/final',
+      ],
+      ['http://verb/head'],
       ['http://verb/good'],
       ['http://verb/bad'],
       ['http://verb/final'],
@@ -711,6 +726,50 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     await expect(bad).resolves.toMatchObject({
       destinations: [{ ok: false, status: 400 }],
     });
+  });
+
+  it('sendFinal resends each statement, then the final one alone, when a batch carrying an earlier statement gets a 409', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      mockFetch.mockImplementation((_url: string, init: RequestInit) => {
+        if (++calls === 1) return Promise.reject(new TypeError('reset'));
+        const body = JSON.parse(init.body as string);
+        const ids = (Array.isArray(body) ? body : [body]).map(
+          (s: any) => s.verb.id,
+        );
+        return Promise.resolve(
+          ids.includes('http://verb/retry')
+            ? { ok: false, status: 409, text: async () => '' }
+            : { ok: true },
+        );
+      });
+      const pub = new XAPIPublisher(basicOpts());
+      await pub.init();
+      const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const final = await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+      expect(final).toMatchObject({ ok: true });
+      expect(
+        mockFetch.mock.calls.slice(1).map(([, init]: any[]) => {
+          const body = JSON.parse(init.body);
+          return (Array.isArray(body) ? body : [body]).map(
+            (s: any) => s.verb.id,
+          );
+        }),
+      ).toEqual([
+        ['http://verb/retry', 'http://verb/final'],
+        ['http://verb/retry'],
+        ['http://verb/final'],
+      ]);
+      await expect(retrying).resolves.toMatchObject({
+        destinations: [{ ok: true, status: 409 }],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
