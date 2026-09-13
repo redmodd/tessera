@@ -501,33 +501,30 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
     ).toBeDefined();
   });
 
-  it('skips the pairing checks when the xapi export is not a literal', () => {
-    testRoot = projectWith(noAuth);
-    writeFile(
-      testRoot,
-      'course.runtime.js',
+  it.each([
+    [
+      'the export is not a literal',
       `import { makeHooks } from './hooks.js';\nexport const xapi = makeHooks();`,
-    );
-    expect(xapiErrors(testRoot)).toEqual([]);
-  });
-
-  it('skips the pairing checks when xapi is exported through a specifier', () => {
-    testRoot = projectWith(noAuth);
-    writeFile(
-      testRoot,
-      'course.runtime.js',
+    ],
+    [
+      'xapi is exported through a specifier',
       `const hooks = { lrs: { auth: async () => 'x' } };\nexport { hooks as xapi };`,
-    );
-    expect(xapiErrors(testRoot)).toEqual([]);
-  });
-
-  it('skips the pairing checks when xapi is bound by destructuring', () => {
-    testRoot = projectWith(noAuth);
-    writeFile(
-      testRoot,
-      'course.runtime.js',
+    ],
+    [
+      'xapi is bound by destructuring',
       `import * as mod from './hooks.js';\nexport const { xapi } = mod;`,
-    );
+    ],
+    [
+      'the object is mutated after declaration',
+      `export const xapi = { lrs: {} };\nObject.assign(xapi.lrs, { auth: () => 'y' });`,
+    ],
+    [
+      'a destination entry is not a literal',
+      `const lrs = { auth: () => 'y' };\nexport const xapi = { lrs };`,
+    ],
+  ])('skips the pairing checks when %s', (_, source) => {
+    testRoot = projectWith(noAuth);
+    writeFile(testRoot, 'course.runtime.js', source);
     expect(xapiErrors(testRoot)).toEqual([]);
   });
 
@@ -541,26 +538,6 @@ describe('xapi config validation — course.runtime.js resolvers', () => {
     expect(
       xapiErrors(testRoot).find((e) => e.includes('xapi.auth is required')),
     ).toBeDefined();
-  });
-
-  it('skips the pairing checks when the xapi object is mutated after declaration', () => {
-    testRoot = projectWith(noAuth);
-    writeFile(
-      testRoot,
-      'course.runtime.js',
-      `export const xapi = { lrs: {} };\nObject.assign(xapi.lrs, { auth: () => 'y' });`,
-    );
-    expect(xapiErrors(testRoot)).toEqual([]);
-  });
-
-  it('skips the pairing checks for a destination entry that is not a literal', () => {
-    testRoot = projectWith(noAuth);
-    writeFile(
-      testRoot,
-      'course.runtime.js',
-      `const lrs = { auth: () => 'y' };\nexport const xapi = { lrs };`,
-    );
-    expect(xapiErrors(testRoot)).toEqual([]);
   });
 
   it('errors on a default export in course.runtime.js', () => {

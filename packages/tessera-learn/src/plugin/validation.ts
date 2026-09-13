@@ -870,7 +870,7 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // auth — required for explicit endpoints, from the config or a resolver.
+  // auth: required for explicit endpoints, from the config or a resolver.
   const auth = entry.auth;
   const authHook = hookState(hooks, id, 'auth');
   if (auth === undefined) {

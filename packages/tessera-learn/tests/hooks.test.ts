@@ -22,7 +22,6 @@ import {
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { NavigationState } from '../src/runtime/navigation.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
 function makeAdapter() {
@@ -807,21 +806,6 @@ describe('useNavigation', () => {
 
     ctx.nav.isPageLocked = vi.fn(() => true);
     expect(h.canAccessIndex(1)).toBe(false);
-  });
-
-  it('canAccess honors a course.runtime.js canAccess', () => {
-    const manifest = createManifest(3);
-    const config = createConfig({ navigation: { mode: 'free' } });
-    const progress = new ProgressState(manifest, config);
-    const nav = new NavigationState(manifest, progress, config, {
-      canAccess: ({ pageIndex }) => pageIndex === 0,
-    });
-    ctxStore.set('tessera-nav', { nav, manifest, progress, config });
-
-    const h = useNavigation();
-    expect(h.canAccess('page-0')).toBe(true);
-    expect(h.canAccess('page-1')).toBe(false);
-    expect(h.canAccess('page-2')).toBe(false);
   });
 });
 

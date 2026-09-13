@@ -280,7 +280,7 @@ describe('NavigationState', () => {
   });
 
   describe('isPageLocked', () => {
-    it('delegates to the resolved access function (rules covered in access.test.ts)', () => {
+    it('uses the canAccess option over the navigation.mode preset', () => {
       const manifest = createManifest(3);
       const progress = new ProgressState(manifest, createConfig());
       const config = createConfig({ navigation: { mode: 'free' } });

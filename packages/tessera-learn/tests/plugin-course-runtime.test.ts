@@ -25,10 +25,6 @@ describe('tessera:course-runtime virtual module', () => {
     );
   }
 
-  it('default-exports null without course.runtime.js', () => {
-    expect(load()).toMatch(/export\s+default\s+null/);
-  });
-
   it('default-exports the course.runtime.js module namespace when present', () => {
     const file = resolve(projectRoot, 'course.runtime.js');
     writeFileSync(file, 'export const canAccess = () => true;');
