@@ -294,7 +294,7 @@ export interface CourseRuntimeExports {
 /**
  * Statically read the exports of `course.runtime.js`, or null when it doesn't
  * parse. `xapi` is read only from an `export const xapi = { ... }` literal that
- * is never reassigned, mutated or passed to a call; any other form is `'unknown'`.
+ * that nothing else in the module references; any other form is `'unknown'`.
  */
 export function readCourseRuntimeExports(
   jsSource: string,
@@ -303,6 +303,7 @@ export function readCourseRuntimeExports(
   if (!program) return null;
   let hasDefaultExport = false;
   let xapiInit: Node | null | undefined;
+  let xapiBinding: Node | null = null;
   for (const node of (program.body as Node[]) ?? []) {
     if (node.type === 'ExportDefaultDeclaration') hasDefaultExport = true;
     if (node.type === 'ExportAllDeclaration') xapiInit ??= null;
@@ -324,7 +325,10 @@ export function readCourseRuntimeExports(
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
       if (id.type === 'Identifier') {
-        if (id.name === 'xapi') xapiInit = (decl.init as Node | null) ?? null;
+        if (id.name === 'xapi') {
+          xapiInit = (decl.init as Node | null) ?? null;
+          xapiBinding = id;
+        }
       } else if (bindsName(id, 'xapi')) {
         xapiInit = null;
       }
@@ -333,7 +337,11 @@ export function readCourseRuntimeExports(
   if (xapiInit === undefined) return { xapi: 'none', hasDefaultExport };
 
   const entries = objectLiteralEntries(xapiInit);
-  if (entries === 'unknown' || isMutated(program, 'xapi')) {
+  if (
+    entries === 'unknown' ||
+    !xapiBinding ||
+    isReferenced(program, 'xapi', xapiBinding)
+  ) {
     return { xapi: 'unknown', hasDefaultExport };
   }
   const hooks: RuntimeXAPIHooks = new Map();
@@ -365,31 +373,42 @@ function bindsName(pattern: Node | null, name: string): boolean {
   }
 }
 
-function isMutated(program: Node, name: string): boolean {
-  let mutated = false;
-  const check = (target: Node | null): void => {
-    let node = unwrapTsCast(target);
-    while (node?.type === 'MemberExpression') {
-      node = unwrapTsCast(node.object as Node);
+function isReferenced(program: Node, name: string, binding: Node): boolean {
+  const nonReferences = new Set<Node>([binding]);
+  const namespaces = new Set<unknown>();
+  for (const node of (program.body as Node[]) ?? []) {
+    if (node.type !== 'ImportDeclaration') continue;
+    for (const specifier of (node.specifiers as Node[]) ?? []) {
+      if (specifier.type !== 'ImportNamespaceSpecifier') continue;
+      const local = specifier.local as Node;
+      namespaces.add(local.name);
+      nonReferences.add(local);
     }
-    if (node?.type === 'Identifier' && node.name === name) mutated = true;
-  };
+  }
+  let referenced = false;
   walkNodes(program, (node) => {
-    if (node.type === 'AssignmentExpression') {
-      check(node.left as Node);
+    if (node.type === 'MemberExpression' && !node.computed) {
+      const object = node.object as Node;
+      const property = node.property as Node;
+      nonReferences.add(property);
+      if (
+        object.type === 'Identifier' &&
+        namespaces.has(object.name) &&
+        property.name !== name
+      ) {
+        nonReferences.add(object);
+      }
+    } else if (node.type === 'Property' && !node.computed && !node.shorthand) {
+      nonReferences.add(node.key as Node);
     } else if (
-      node.type === 'UpdateExpression' ||
-      (node.type === 'UnaryExpression' && node.operator === 'delete')
+      node.type === 'Identifier' &&
+      (node.name === name || namespaces.has(node.name)) &&
+      !nonReferences.has(node)
     ) {
-      check(node.argument as Node);
-    } else if (
-      node.type === 'CallExpression' ||
-      node.type === 'NewExpression'
-    ) {
-      for (const arg of node.arguments as Node[]) check(arg);
+      referenced = true;
     }
   });
-  return mutated;
+  return referenced;
 }
 
 function objectLiteralEntries(
