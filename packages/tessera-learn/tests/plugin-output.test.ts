@@ -266,6 +266,24 @@ describe('export packaging gate', () => {
     ).toHaveLength(1);
   });
 
+  it('packages a manual-mode cmi5 course with the runtime passing score', async () => {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default { title: "Course", completion: { mode: "manual" }, export: { standard: "cmi5" } };',
+      'utf-8',
+    );
+    seedStaleDist();
+
+    const { entry, exporter } = buildPlugins();
+    writeBundle(exporter);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    const xml = readFileSync(resolve(projectRoot, 'dist', 'cmi5.xml'), 'utf-8');
+    expect(xml).toContain('masteryScore="0"');
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
   function undefinedImportLog(id: string) {
     return {
       code: 'IMPORT_IS_UNDEFINED',
