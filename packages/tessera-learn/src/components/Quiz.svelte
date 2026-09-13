@@ -1,18 +1,11 @@
 <script>
-  import { getContext } from 'svelte';
   import { useQuiz } from '../runtime/hooks.svelte.js';
-  import { TESSERA_PAGE } from '../runtime/contexts.js';
 
   let { children } = $props();
   const handle = useQuiz();
 
-  const pageCtx = getContext(TESSERA_PAGE);
-  let quizConfig = $derived(pageCtx?.quiz ?? {});
-  let feedbackDisabled = $derived(quizConfig.feedbackMode === 'never');
-  let maxAttempts = $derived(quizConfig.maxAttempts ?? Infinity);
-  let isImmediateMode = $derived(
-    !feedbackDisabled && quizConfig.feedbackMode === 'immediate',
-  );
+  const feedbackDisabled = handle.feedbackMode === 'never';
+  const isImmediateMode = handle.feedbackMode === 'immediate';
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
@@ -282,9 +275,9 @@
             Retry Quiz
           </button>
         {/if}
-        {#if maxAttempts !== Infinity && handle.attemptCount >= maxAttempts}
+        {#if handle.attemptCount >= handle.maxAttempts}
           <p class="tessera-quiz-attempts-exhausted">
-            All attempts used ({handle.attemptCount}/{maxAttempts})
+            All attempts used ({handle.attemptCount}/{handle.maxAttempts})
           </p>
         {/if}
       </div>

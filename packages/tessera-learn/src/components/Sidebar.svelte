@@ -1,10 +1,11 @@
 <script>
   import { SvelteSet } from 'svelte/reactivity';
+  import { useCourse, useNavigation } from '../runtime/hooks.svelte.js';
 
-  let { manifest, config, currentPageIndex, nav, onnavigate, onclose } =
-    $props();
+  let { onclose } = $props();
+  const course = useCourse();
+  const nav = useNavigation();
 
-  // Track which sections are collapsed. All expanded by default.
   const collapsedSections = new SvelteSet();
 
   function toggleSection(slug) {
@@ -15,27 +16,22 @@
     }
   }
 
-  function handlePageClick(pageIndex) {
-    if (nav.isPageLocked(pageIndex)) return;
-    onnavigate(pageIndex);
-    // Close sidebar on mobile
+  function handlePageClick(index) {
+    if (!nav.canAccessIndex(index)) return;
+    nav.goToIndex(index);
     if (onclose) onclose();
   }
 </script>
 
 <div class="tessera-sidebar-header">
-  {#if config.branding?.logo}
-    <img
-      src={config.branding.logo}
-      alt={config.title}
-      class="tessera-sidebar-logo"
-    />
+  {#if course.logo}
+    <img src={course.logo} alt={course.title} class="tessera-sidebar-logo" />
   {/if}
-  <h1 class="tessera-sidebar-title">{config.title || '(no title)'}</h1>
+  <h1 class="tessera-sidebar-title">{course.title || '(no title)'}</h1>
 </div>
 
 <nav class="tessera-sidebar-nav" aria-label="Course navigation">
-  {#each manifest.sections as section (section.slug)}
+  {#each nav.sections as section (section.slug)}
     <div class="tessera-nav-section">
       <button
         class="tessera-nav-section-title"
@@ -62,17 +58,17 @@
             <div class="tessera-nav-lesson-title">{lesson.title}</div>
           {/if}
           {#each lesson.pages as page (page.index)}
-            {@const locked = nav.isPageLocked(page.index)}
+            {@const locked = !nav.canAccessIndex(page.index)}
             <button
               class="tessera-nav-page"
               class:locked
-              aria-current={page.index === currentPageIndex
+              aria-current={page.index === nav.currentPageIndex
                 ? 'page'
                 : undefined}
               aria-disabled={locked ? 'true' : undefined}
               onclick={() => handlePageClick(page.index)}
-              onpointerenter={() => !locked && nav.prefetch(page.index)}
-              onfocusin={() => !locked && nav.prefetch(page.index)}
+              onpointerenter={() => nav.prefetch(page.index)}
+              onfocusin={() => nav.prefetch(page.index)}
             >
               {#if locked}
                 <svg

@@ -1,6 +1,7 @@
 import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
+import type { QuizConfig } from './types.js';
 import {
   requireNavContext,
   getNavContext,
@@ -9,6 +10,7 @@ import {
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
+import { resolveAsset } from '../components/util.js';
 
 /**
  * Per-question handle exposed to both the quiz shell (via `useQuiz().questions`)
@@ -254,6 +256,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
 
 export function useNavigation() {
   const { nav, manifest } = requireNavContext('useNavigation()');
+  const indexOf = (slug: string) =>
+    manifest.pages.findIndex((p) => p.slug === slug);
+  const canAccessIndex = (index: number) =>
+    index >= 0 && index < manifest.pages.length && !nav.isPageLocked(index);
   return {
     get currentPage() {
       return manifest.pages[nav.currentPageIndex];
@@ -265,7 +271,7 @@ export function useNavigation() {
       return manifest.pages;
     },
     goTo(slug: string) {
-      const index = manifest.pages.findIndex((p) => p.slug === slug);
+      const index = indexOf(slug);
       if (index >= 0) nav.goToPage(index);
     },
     goToIndex(index: number) {
@@ -284,8 +290,14 @@ export function useNavigation() {
       return nav.canGoPrev;
     },
     canAccess(slug: string) {
-      const index = manifest.pages.findIndex((p) => p.slug === slug);
-      return index >= 0 && !nav.isPageLocked(index);
+      return canAccessIndex(indexOf(slug));
+    },
+    canAccessIndex,
+    get sections() {
+      return manifest.sections;
+    },
+    prefetch(index: number) {
+      nav.prefetch(index);
     },
   };
 }
@@ -295,6 +307,9 @@ export function useProgress() {
   return {
     get visitedPages() {
       return progress.visitedPages;
+    },
+    get completedPages() {
+      return progress.completedPages;
     },
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
@@ -374,6 +389,21 @@ export function usePersistence<T = unknown>(
   };
 }
 
+export function useCourse(): {
+  readonly title: string;
+  readonly logo: string | undefined;
+} {
+  const { config } = requireNavContext('useCourse()');
+  return {
+    get title() {
+      return config.title;
+    },
+    get logo() {
+      return resolveAsset(config.branding?.logo ?? '') || undefined;
+    },
+  };
+}
+
 /**
  * Internal registration shape — `useQuestion` builds this and hands it to the
  * quiz's `registerQuestion`. Not part of the public authoring API.
@@ -410,6 +440,10 @@ export interface UseQuizHandle {
    * unavailable until the learner retries.
    */
   readonly restored: boolean;
+  /** `pageConfig.quiz.feedbackMode`, defaulting to `'review'`. */
+  readonly feedbackMode: NonNullable<QuizConfig['feedbackMode']>;
+  /** `pageConfig.quiz.maxAttempts`, defaulting to `Infinity`. */
+  readonly maxAttempts: number;
   submit(): void;
   startReview(): void;
   exitReview(): void;

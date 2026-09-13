@@ -444,7 +444,7 @@ describe('config validation', () => {
     );
   });
 
-  it('warns when branding.logo uses the $assets alias', () => {
+  it('warns only when a $assets branding.logo is missing from assets/', () => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
@@ -457,10 +457,14 @@ describe('config validation', () => {
   export: { standard: "web" },
 };`,
     );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"branding.logo" starts with "$assets/"'),
-    );
+    const logoWarning = (warnings: string[]) =>
+      warnings.filter(
+        (w) => w.includes('branding.logo') && w.includes('$assets/logo.png'),
+      );
+    expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(1);
+
+    writeFile(testRoot, 'assets/logo.png', 'fake-image');
+    expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(0);
   });
 
   it('warns on an unparseable branding.primaryColor', () => {

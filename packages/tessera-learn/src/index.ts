@@ -10,7 +10,9 @@ export {
   useProgress,
   useCompletion,
   usePersistence,
+  useCourse,
 } from './runtime/hooks.svelte.js';
+export { resolveAsset } from './components/util.js';
 
 // ---- Access ----
 export {

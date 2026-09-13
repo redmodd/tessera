@@ -150,6 +150,14 @@ export class QuizEngine implements UseQuizHandle {
     return this.#restored;
   }
 
+  get feedbackMode(): NonNullable<QuizConfig['feedbackMode']> {
+    return this.#deps.quizConfig.feedbackMode ?? 'review';
+  }
+
+  get maxAttempts(): number {
+    return this.#maxAttempts;
+  }
+
   /** Dev-warning inputs the wrapper reads in onDestroy. */
   get stats(): {
     questionsCount: number;
@@ -215,14 +223,14 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   feedbackVisible(index: number): boolean {
-    const mode = this.#deps.quizConfig.feedbackMode;
+    const mode = this.feedbackMode;
     if (mode === 'never') return false;
     if (this.#reviewing) return true;
     return mode === 'immediate' && this.#feedbackShown.has(index);
   }
 
   revealFeedbackByIndex(index: number): void {
-    if (this.#deps.quizConfig.feedbackMode === 'never') return;
+    if (this.feedbackMode === 'never') return;
     this.#feedbackShown.add(index);
   }
 

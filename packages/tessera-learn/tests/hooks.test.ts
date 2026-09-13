@@ -18,6 +18,7 @@ import {
   useNavigation,
   useProgress,
   usePersistence,
+  useCourse,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
@@ -52,6 +53,7 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     goNext: vi.fn(),
     goPrev: vi.fn(),
     isPageLocked: vi.fn(() => false),
+    prefetch: vi.fn(),
   };
   return { nav, manifest, progress, config };
 }
@@ -743,6 +745,7 @@ describe('useNavigation', () => {
     expect(navHook.currentPageIndex).toBe(2);
     expect(navHook.currentPage).toEqual(ctx.manifest.pages[2]);
     expect(navHook.pages).toBe(ctx.manifest.pages);
+    expect(navHook.sections).toBe(ctx.manifest.sections);
   });
 
   it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
@@ -763,7 +766,7 @@ describe('useNavigation', () => {
     expect(ctx.nav.goToPage).not.toHaveBeenCalled();
   });
 
-  it('next/prev/canGoNext/canGoPrev delegate to nav', () => {
+  it('next/prev/prefetch/canGoNext/canGoPrev delegate to nav', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     const ctx = makeNavCtx(progress, 0);
     ctxStore.set('tessera-nav', ctx);
@@ -771,8 +774,10 @@ describe('useNavigation', () => {
     const h = useNavigation();
     h.next();
     h.prev();
+    h.prefetch(2);
     expect(ctx.nav.goNext).toHaveBeenCalled();
     expect(ctx.nav.goPrev).toHaveBeenCalled();
+    expect(ctx.nav.prefetch).toHaveBeenCalledWith(2);
     expect(h.canGoNext).toBe(true);
     expect(h.canGoPrev).toBe(false);
   });
@@ -788,6 +793,20 @@ describe('useNavigation', () => {
 
     ctx.nav.isPageLocked = vi.fn(() => true);
     expect(h.canAccess('page-1')).toBe(false);
+  });
+
+  it('canAccessIndex checks bounds and nav.isPageLocked', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    const ctx = makeNavCtx(progress, 0);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useNavigation();
+    expect(h.canAccessIndex(1)).toBe(true);
+    expect(h.canAccessIndex(-1)).toBe(false);
+    expect(h.canAccessIndex(ctx.manifest.pages.length)).toBe(false);
+
+    ctx.nav.isPageLocked = vi.fn(() => true);
+    expect(h.canAccessIndex(1)).toBe(false);
   });
 
   it('canAccess honors a custom config.navigation.canAccess', () => {
@@ -825,6 +844,7 @@ describe('useProgress', () => {
 
     const h = useProgress();
     expect(h.visitedPages.size).toBe(2);
+    expect(h.completedPages).toBe(progress.completedPages);
     expect(h.quizScore(2)).toBe(80);
     expect(h.completionStatus).toBe('incomplete');
     expect(h.successStatus).toBe('unknown');
@@ -876,6 +896,33 @@ describe('useProgress', () => {
 
     expect(progress.visitedPages.has(3)).toBe(true);
     expect(progress.getChunk(3)).toBe(1);
+  });
+});
+
+// ============ useCourse ============
+
+describe('useCourse', () => {
+  it('throws when no nav context exists', () => {
+    expect(() => useCourse()).toThrow(/inside a Tessera course/);
+  });
+
+  it('exposes the course title and a resolved logo, treating an empty logo as absent', () => {
+    const progress = new ProgressState(createManifest(0), createConfig());
+    const ctx = makeNavCtx(progress);
+    ctxStore.set('tessera-nav', ctx);
+
+    const h = useCourse();
+    expect(h.title).toBe('Test');
+    expect(h.logo).toBeUndefined();
+
+    ctx.config.branding = { logo: '' };
+    expect(h.logo).toBeUndefined();
+
+    ctx.config.branding = { logo: 'https://example.com/logo.svg' };
+    expect(h.logo).toBe('https://example.com/logo.svg');
+
+    ctx.config.branding = { logo: '$assets/logo.svg' };
+    expect(h.logo).toBe('./assets/logo.svg');
   });
 });
 
