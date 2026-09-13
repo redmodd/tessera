@@ -446,6 +446,22 @@ describe('ProgressState', () => {
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
     });
+
+    it('returns to unknown when a decided course loses its last graded page', () => {
+      const progress = new ProgressState(
+        createManifest(2),
+        createConfig({ scoring: { passingScore: 60 } }),
+      );
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      expect(progress.successStatus).toBe('passed');
+
+      progress.refreshStandaloneQuestion(1, 'q1', false);
+
+      expect(progress.gradedScoreDecided).toBe(true);
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
+    });
   });
 
   describe('markStandaloneQuestion', () => {

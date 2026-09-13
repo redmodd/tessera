@@ -221,7 +221,7 @@
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
-      ...(progress.gradedScoreFinal ? { s: 1 } : {}),
+      ...(progress.gradedScoreDecided ? { s: 1 } : {}),
     };
   }
 

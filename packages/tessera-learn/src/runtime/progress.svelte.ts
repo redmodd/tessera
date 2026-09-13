@@ -249,10 +249,18 @@ export class ProgressState {
 
   #gradedScoreDecided = $state(false);
 
+  get gradedScoreDecided(): boolean {
+    return this.#gradedScoreDecided;
+  }
+
   get gradedScoreFinal(): boolean {
-    if (this.#gradedScoreDecided) return true;
     const { count, allScored } = this.#graded;
-    return count > 0 && (allScored || this.completionStatus === 'complete');
+    return (
+      count > 0 &&
+      (this.#gradedScoreDecided ||
+        allScored ||
+        this.completionStatus === 'complete')
+    );
   }
 
   restoreGradedScoreFinal(): void {
