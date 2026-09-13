@@ -301,8 +301,60 @@ describe('ProgressState', () => {
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
+      progress.quizCompleted(4, 50);
 
       expect(progress.successStatus).toBe('failed');
+    });
+
+    it('stays unknown while a graded page is unscored', () => {
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({ scoring: { passingScore: 70 } });
+      const progress = new ProgressState(manifest, config);
+
+      progress.quizCompleted(2, 80);
+
+      expect(progress.successStatus).toBe('unknown');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.gradedScore).toEqual({ average: 40, attempted: true });
+    });
+
+    it('decides once completion is reached, counting unscored graded pages as 0', () => {
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 80 },
+        scoring: { passingScore: 70 },
+      });
+      const progress = new ProgressState(manifest, config);
+
+      progress.quizCompleted(2, 80);
+      for (const i of [0, 1, 2]) progress.markVisited(i);
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.markVisited(3);
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('stays unknown on completion when the course has no graded pages', () => {
+      const progress = new ProgressState(
+        createManifest(2),
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 50 },
+        }),
+      );
+
+      progress.markVisited(0);
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
     });
 
     it('runs independently of completion mode', () => {
@@ -331,7 +383,7 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('passed');
     });
 
-    it('unattempted graded quizzes count as 0 in denominator', () => {
+    it('decides once the last graded quiz is scored', () => {
       const manifest = createManifest(10, {
         2: { graded: true },
         5: { graded: true },
@@ -342,7 +394,51 @@ describe('ProgressState', () => {
 
       progress.quizCompleted(2, 95);
       progress.quizCompleted(8, 80);
+      expect(progress.successStatus).toBe('unknown');
 
+      progress.quizCompleted(5, 0);
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    const threeGradedPages = () =>
+      new ProgressState(
+        createManifest(
+          4,
+          {},
+          { 1: { graded: true }, 2: { graded: true }, 3: { graded: true } },
+        ),
+        createConfig({
+          completion: { mode: 'quiz' },
+          scoring: { passingScore: 60 },
+        }),
+      );
+
+    it('keeps following the score after a changed answer undoes completion', () => {
+      const progress = threeGradedPages();
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.successStatus).toBe('passed');
+
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('restores a final graded score from a previous session', () => {
+      const progress = threeGradedPages();
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(2, 'q1', 0, true);
+      expect(progress.gradedScoreFinal).toBe(false);
+
+      progress.restoreGradedScoreDecided();
+
+      expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
     });
   });
@@ -717,7 +813,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(1, 'q1', 100, true);
 
       expect(progress.gradedScore.average).toBe(25);
-      expect(progress.successStatus).toBe('failed');
+      expect(progress.successStatus).toBe('unknown');
     });
 
     it('ignores an undeclared page even once a graded question is answered on it', () => {

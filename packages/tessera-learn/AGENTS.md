@@ -385,7 +385,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score, and under `completion.mode: "percentage"` visiting one doesn't complete it. Only declared pages count. A graded question on a page without `graded: true` still sets that page's `pageScore`, but never reaches the course score or passed/failed: `tessera validate` errors when it can see the question, and the runtime warns in the console when the answer comes from your own component. A course with no declared graded page sends no score and no passed/failed. `weight` on an undeclared page is ignored; `tessera validate` warns.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every declared graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. Only declared pages count. A graded question on a page without `graded: true` still sets that page's `pageScore`, but never reaches the course score or passed/failed: `tessera validate` errors when it can see the question, and the runtime warns in the console when the answer comes from your own component. A course with no declared graded page sends no score and no passed/failed. `weight` on an undeclared page is ignored; `tessera validate` warns.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 
@@ -846,7 +846,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Round it yourself** for display.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score.
+`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `completion.mode: "manual"`, where `requireSuccessStatus` sets it on `markComplete()`.
 
 Two rules for displaying it:
 

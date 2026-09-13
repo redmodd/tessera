@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
@@ -89,13 +90,13 @@ export class ProgressState {
   markCompleteManually(): void {
     if (this.#manuallyCompleted) return;
     this.#manuallyCompleted = true;
-    this.version++;
+    this.#changed();
   }
 
   markVisited(pageIndex: number) {
     if (this.visitedPages.has(pageIndex)) return;
     this.visitedPages.add(pageIndex);
-    this.version++;
+    this.#changed();
   }
 
   quizScore(pageIndex: number): number | undefined {
@@ -129,7 +130,7 @@ export class ProgressState {
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
     this.chunkProgress.set(pageIndex, chunkIndex);
-    this.version++;
+    this.#changed();
   }
 
   /** Highest chunk revealed on a page, or -1 if none. */
@@ -229,7 +230,7 @@ export class ProgressState {
       ...this.gradedUnits.get(pageIndex),
       ...patch,
     });
-    this.version++;
+    this.#changed();
   }
 
   #graded = $derived.by(() => {
@@ -237,9 +238,11 @@ export class ProgressState {
     let weighted = 0;
     let totalWeight = 0;
     let attempted = false;
+    let allScored = true;
     for (const pageIndex of pages) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
+      else allScored = false;
       const weight = this.#pageWeights.get(pageIndex) ?? 1;
       weighted += (score ?? 0) * weight;
       totalWeight += weight;
@@ -248,8 +251,35 @@ export class ProgressState {
       count: pages.size,
       average: totalWeight > 0 ? weighted / totalWeight : 0,
       attempted,
+      allScored,
     };
   });
+
+  #gradedScoreDecided = $state(false);
+
+  get gradedScoreDecided(): boolean {
+    return this.#gradedScoreDecided;
+  }
+
+  get gradedScoreFinal(): boolean {
+    const { count, allScored } = this.#graded;
+    return (
+      count > 0 &&
+      (this.#gradedScoreDecided ||
+        allScored ||
+        this.completionStatus === 'complete')
+    );
+  }
+
+  restoreGradedScoreDecided(): void {
+    this.#gradedScoreDecided = true;
+  }
+
+  #changed() {
+    this.version++;
+    if (!this.#gradedScoreDecided && untrack(() => this.gradedScoreFinal))
+      this.#gradedScoreDecided = true;
+  }
 
   completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
     if (this.#manuallyCompleted) return 'complete';
@@ -298,8 +328,8 @@ export class ProgressState {
       const want = this.#config.completion.requireSuccessStatus;
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
-    const { count, average, attempted } = this.#graded;
-    if (count === 0 || !attempted) return 'unknown';
+    if (!this.gradedScoreFinal) return 'unknown';
+    const { average } = this.#graded;
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
