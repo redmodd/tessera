@@ -207,10 +207,7 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
-export const VALID_EXPORT_STANDARDS: readonly string[] = STANDARD_IDS;
-const EXPORT_STANDARD_LIST = VALID_EXPORT_STANDARDS.map((s) => `"${s}"`).join(
-  ', ',
-);
+const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
@@ -356,7 +353,7 @@ function parseConfig(
 
   // Validate export.standard
   if (config.export?.standard !== undefined) {
-    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
+    if (!standardProfile(config.export.standard)) {
       d.error(
         `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
       );
@@ -367,7 +364,7 @@ function parseConfig(
   // standard-dependent check below (identity, csp, xapi, crossValidate) sees
   // what actually ships.
   if (standardOverride) {
-    if (!VALID_EXPORT_STANDARDS.includes(standardOverride)) {
+    if (!standardProfile(standardOverride)) {
       d.error(
         `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
       );
@@ -380,7 +377,7 @@ function parseConfig(
   // SCORM identity is owned by the LMS, so only nudge for the others.
   const standard = config.export?.standard ?? DEFAULT_STANDARD;
   const profile = standardProfile(standard);
-  if (profile?.needsCourseIdentity && !courseIdentity(config)) {
+  if (profile && !profile.derivesLearnerActor && !courseIdentity(config)) {
     d.warn(
       `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
@@ -795,10 +792,9 @@ function validateSingleXAPIEntry(
 
   if (endpoint === 'lms') {
     // 'lms' inherits the LRS from the launch — only the launch-based
-    // standards (cmi5, plain xAPI) carry one.
+    // standards (cmi5, plain xAPI) carry one. The runtime drops the entry, so
+    // one config can still export to every standard.
     if (profile && !profile.hasLaunchLRS) {
-      // Only cmi5/xAPI launches carry an LRS to inherit. The runtime drops the
-      // entry, so one config can still export to every standard.
       d.warn(
         `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${standard}" — ` +
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
@@ -912,12 +908,7 @@ function validateSingleXAPIEntry(
   const actor = entry.actor;
   const actorHook = hookState(hooks, id, 'actor');
   if (actor === undefined) {
-    if (
-      profile &&
-      !profile.hasLaunchLRS &&
-      !profile.derivesLearnerActor &&
-      actorHook === 'no'
-    ) {
+    if (profile?.packaged === false && actorHook === 'no') {
       d.error(
         `course.config.js: ${label}.actor is required for web export: there is no LMS to derive a learner identity from. ` +
           `Set a static Agent object, or export ${hookRef}.actor from course.runtime.js to resolve one (e.g. from your auth system).`,
@@ -1460,6 +1451,7 @@ function validateQuestionComponents(
 ): void {
   const components = findComponents(content, QUESTION_COMPONENT_NAMES);
   if (!components) return;
+  const profile = standardProfile(exportStandard);
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
   for (const { name, props, hasSpread } of components) {
@@ -1501,19 +1493,19 @@ function validateQuestionComponents(
             ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
             : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
-      } else if (standardProfile(exportStandard)?.sanitizesInteractionIds) {
+      } else if (profile?.sanitizesInteractionIds) {
         // shortIdentifier strips non-alphanumerics, so distinct
         // raw ids can collide after sanitization. Skip raw duplicates (already
         // flagged above) to avoid double-reporting the same id.
         const sane = shortIdentifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${profile.name} — use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${resolvedId}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
+            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${profile.name} sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);

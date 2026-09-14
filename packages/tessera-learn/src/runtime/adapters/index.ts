@@ -28,7 +28,7 @@ export interface CreateAdapterOptions {
   manifest?: Manifest;
 }
 
-/** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. Labels live in `../standards.js`, the fail-loud error in `./lms-error.js`. */
+/** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. */
 const LMS_ADAPTERS: Record<LMSStandard, () => PersistenceAdapter | null> = {
   scorm12: () => {
     const api = findSCORM12API();

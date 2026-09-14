@@ -10,7 +10,7 @@ import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity, type CourseConfig } from '../runtime/types.js';
-import { standardProfile } from '../runtime/standards.js';
+import { standardProfile, type LMSStandard } from '../runtime/standards.js';
 
 function slugify(text: string): string {
   return text
@@ -266,33 +266,28 @@ function cleanOldZips(projectRoot: string, slug: string): void {
 
 /** Packaged (zipped) export targets: which manifest file to write and how. */
 const PACKAGED_EXPORTS: Record<
-  'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
+  LMSStandard,
   {
     manifestFile: string;
-    label: string;
     generate: (config: ExportConfig, distDir: string) => string;
   }
 > = {
   scorm12: {
     manifestFile: 'imsmanifest.xml',
-    label: 'SCORM 1.2',
     generate: (config, distDir) =>
       generateScormManifest('1.2', config, distDir),
   },
   scorm2004: {
     manifestFile: 'imsmanifest.xml',
-    label: 'SCORM 2004',
     generate: (config, distDir) =>
       generateScormManifest('2004', config, distDir),
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
-    label: 'CMI5',
     generate: (config) => generateCMI5Xml(config),
   },
   xapi: {
     manifestFile: 'tincan.xml',
-    label: 'xAPI 1.0.3',
     generate: (config) => generateTincanXml(config),
   },
 };
@@ -308,16 +303,17 @@ export async function runExport(
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
 
-  if (standardProfile(standard)?.packaged === false) {
+  const profile = standardProfile(standard);
+  if (profile?.packaged === false) {
     const files = collectFiles(distDir);
     let totalSize = 0;
     for (const f of files) totalSize += statSync(resolve(distDir, f)).size;
     console.log(`✓ Web export: dist/ (${formatSize(totalSize)})`);
     return;
   }
+  if (!profile) return; // unknown standard — the validator rejects these upstream
 
-  const spec = PACKAGED_EXPORTS[standard as keyof typeof PACKAGED_EXPORTS];
-  if (!spec) return; // unknown standard — the validator rejects these upstream
+  const spec = PACKAGED_EXPORTS[profile.id];
 
   writeFileSync(
     resolve(distDir, spec.manifestFile),
@@ -326,5 +322,5 @@ export async function runExport(
   );
   cleanOldZips(projectRoot, slug);
   const zipSize = await createZip(distDir, zipPath);
-  console.log(`✓ ${spec.label} export: ${zipName} (${formatSize(zipSize)})`);
+  console.log(`✓ ${profile.name} export: ${zipName} (${formatSize(zipSize)})`);
 }

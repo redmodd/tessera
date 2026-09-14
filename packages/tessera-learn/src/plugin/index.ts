@@ -23,7 +23,11 @@ import {
   DEFAULT_PASSING_SCORE,
   DEFAULT_PERCENTAGE_THRESHOLD,
 } from '../runtime/defaults.js';
-import { DEFAULT_STANDARD, standardProfile } from '../runtime/standards.js';
+import {
+  DEFAULT_STANDARD,
+  standardProfile,
+  type LMSStandard,
+} from '../runtime/standards.js';
 import {
   validateProject,
   reportValidationIssues,
@@ -692,7 +696,7 @@ const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 // `takesApi`: SCORM detectors return the API object the constructor needs;
 // cmi5/xAPI ones return a boolean.
 const LMS_ADAPTER_GEN: Record<
-  'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
+  LMSStandard,
   { adapter: string; module: string; detect: string; takesApi: boolean }
 > = {
   scorm12: {
@@ -721,9 +725,7 @@ const LMS_ADAPTER_GEN: Record<
   },
 };
 
-function generateLmsAdapterModule(
-  standard: keyof typeof LMS_ADAPTER_GEN,
-): string {
+function generateLmsAdapterModule(standard: LMSStandard): string {
   const { adapter, module, detect, takesApi } = LMS_ADAPTER_GEN[standard];
   const guard = takesApi
     ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
@@ -755,11 +757,8 @@ function tesseraAdapterPlugin(standardOverride?: string): Plugin {
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
       if (isAuditBuild()) standard = DEFAULT_STANDARD;
 
-      if (standard in LMS_ADAPTER_GEN) {
-        return generateLmsAdapterModule(
-          standard as keyof typeof LMS_ADAPTER_GEN,
-        );
-      }
+      const profile = standardProfile(standard);
+      if (profile?.packaged) return generateLmsAdapterModule(profile.id);
       return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
 export function createAdapter(config, options) {

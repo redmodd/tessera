@@ -16,20 +16,12 @@ interface ProfileShape {
   packaged: boolean;
   hasLaunchLRS: boolean;
   derivesLearnerActor: boolean;
-  needsCourseIdentity: boolean;
   sanitizesInteractionIds: boolean;
   warnLabel?: string;
   missingDetail?: string;
   learnerIdField?: string;
   suspendDataLimit?: number;
 }
-
-type ProfileFlag =
-  | 'packaged'
-  | 'hasLaunchLRS'
-  | 'derivesLearnerActor'
-  | 'needsCourseIdentity'
-  | 'sanitizesInteractionIds';
 
 export const STANDARDS = {
   web: {
@@ -38,7 +30,6 @@ export const STANDARDS = {
     packaged: false,
     hasLaunchLRS: false,
     derivesLearnerActor: false,
-    needsCourseIdentity: true,
     sanitizesInteractionIds: false,
   },
   scorm12: {
@@ -47,7 +38,6 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: false,
     derivesLearnerActor: true,
-    needsCourseIdentity: false,
     sanitizesInteractionIds: true,
     warnLabel: 'SCORM 1.2 API',
     missingDetail:
@@ -61,7 +51,6 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: false,
     derivesLearnerActor: true,
-    needsCourseIdentity: false,
     sanitizesInteractionIds: false,
     warnLabel: 'SCORM 2004 API',
     missingDetail:
@@ -75,7 +64,6 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: true,
     derivesLearnerActor: false,
-    needsCourseIdentity: true,
     sanitizesInteractionIds: false,
     warnLabel: 'cmi5 launch parameters',
     missingDetail:
@@ -87,7 +75,6 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: true,
     derivesLearnerActor: false,
-    needsCourseIdentity: true,
     sanitizesInteractionIds: false,
     warnLabel: 'xAPI launch parameters',
     missingDetail:
@@ -97,7 +84,7 @@ export const STANDARDS = {
 
 export type StandardProfile = (typeof STANDARDS)[StandardId];
 
-type StandardsWhere<F extends ProfileFlag> = {
+type StandardsWhere<F extends keyof StandardProfile> = {
   [K in StandardId]: (typeof STANDARDS)[K][F] extends true ? K : never;
 }[StandardId];
 
