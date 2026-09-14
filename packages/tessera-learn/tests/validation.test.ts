@@ -2281,7 +2281,10 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     ).toHaveLength(0);
   });
 
-  it('warns on SCORM 1.2 with high page count', () => {
+  it.each([
+    ['scorm12', 4096],
+    ['scorm2004', 64000],
+  ])('warns on %s with high page count', (standard, limit) => {
     // Create a project with many pages
     writeConfig(
       testRoot,
@@ -2290,7 +2293,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
   navigation: { mode: "free" },
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
+  export: { standard: "${standard}" },
 };`,
     );
     mkdirp(testRoot, 'assets');
@@ -2317,7 +2320,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('may exceed the 4096-byte limit'),
+      expect.stringContaining(`may exceed the ${limit}-byte limit`),
     );
   });
 

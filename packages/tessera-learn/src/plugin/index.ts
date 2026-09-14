@@ -24,6 +24,11 @@ import {
   DEFAULT_PERCENTAGE_THRESHOLD,
 } from '../runtime/defaults.js';
 import {
+  DEFAULT_STANDARD,
+  standardProfile,
+  type LMSStandard,
+} from '../runtime/standards.js';
+import {
   validateProject,
   reportValidationIssues,
   normalizeA11y,
@@ -288,7 +293,8 @@ function readLanguage(read: CourseConfigRead): string {
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
 function cspMeta(read: CourseConfigRead & { standard: string }): string {
-  if (read.standard !== 'web') return '';
+  const profile = standardProfile(read.standard);
+  if (!profile || profile.packaged) return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -407,7 +413,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     navigation: { mode: 'free', ...userConfig.navigation },
     completion: { ...completion, ...userConfig.completion },
     scoring: { passingScore, ...userConfig.scoring },
-    export: { standard: 'web', ...userConfig.export },
+    export: { standard: DEFAULT_STANDARD, ...userConfig.export },
   };
 }
 
@@ -691,44 +697,38 @@ const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 // `takesApi`: SCORM detectors return the API object the constructor needs;
 // cmi5/xAPI ones return a boolean.
 const LMS_ADAPTER_GEN: Record<
-  'scorm12' | 'scorm2004' | 'cmi5' | 'xapi',
-  { adapter: string; module: string; detect: string; takesApi: boolean }
+  LMSStandard,
+  { adapter: string; detect: string; takesApi: boolean }
 > = {
   scorm12: {
     adapter: 'SCORM12Adapter',
-    module: 'scorm12',
     detect: 'findSCORM12API',
     takesApi: true,
   },
   scorm2004: {
     adapter: 'SCORM2004Adapter',
-    module: 'scorm2004',
     detect: 'findSCORM2004API',
     takesApi: true,
   },
   cmi5: {
     adapter: 'CMI5Adapter',
-    module: 'cmi5',
     detect: 'hasCMI5LaunchParams',
     takesApi: false,
   },
   xapi: {
     adapter: 'XAPIAdapter',
-    module: 'xapi',
     detect: 'hasXAPILaunchParams',
     takesApi: false,
   },
 };
 
-function generateLmsAdapterModule(
-  standard: keyof typeof LMS_ADAPTER_GEN,
-): string {
-  const { adapter, module, detect, takesApi } = LMS_ADAPTER_GEN[standard];
+function generateLmsAdapterModule(standard: LMSStandard): string {
+  const { adapter, detect, takesApi } = LMS_ADAPTER_GEN[standard];
   const guard = takesApi
     ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
     : `if (!${detect}()) throw missingApiError('${standard}');\n  return new ${adapter}();`;
   return `
-import { ${adapter} } from 'tessera-learn/runtime/adapters/${module}.js';
+import { ${adapter} } from 'tessera-learn/runtime/adapters/${standard}.js';
 import { ${detect} } from 'tessera-learn/runtime/adapters/discovery.js';
 import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
 export function createAdapter() {
@@ -752,13 +752,10 @@ function tesseraAdapterPlugin(standardOverride?: string): Plugin {
 
       // The audit renders headless with no LMS in the frame chain; the SCORM/
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
-      if (isAuditBuild()) standard = 'web';
+      if (isAuditBuild()) standard = DEFAULT_STANDARD;
 
-      if (standard in LMS_ADAPTER_GEN) {
-        return generateLmsAdapterModule(
-          standard as keyof typeof LMS_ADAPTER_GEN,
-        );
-      }
+      const profile = standardProfile(standard);
+      if (profile?.packaged) return generateLmsAdapterModule(profile.id);
       return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
 export function createAdapter(config, options) {
@@ -794,7 +791,7 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of
       // explicit xapi config.
-      if (hasExplicit || standard === 'cmi5' || standard === 'xapi') {
+      if (hasExplicit || standardProfile(standard)?.hasLaunchLRS) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 

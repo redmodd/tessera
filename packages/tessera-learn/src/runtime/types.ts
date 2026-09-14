@@ -1,5 +1,6 @@
 import type { AccessFn } from './access.js';
 import type { XAPIAgent } from './xapi/types.js';
+import type { StandardId } from './standards.js';
 
 /**
  * Quiz enum domains as runtime tuples. The unions below derive from these, and
@@ -61,7 +62,7 @@ export interface CourseConfig {
     passingScore: number;
   };
   export: {
-    standard: 'web' | 'scorm12' | 'scorm2004' | 'cmi5' | 'xapi';
+    standard: StandardId;
     /** Web export only: extend the baseline Content-Security-Policy. Each key is
      * a directive; its sources are appended (unioned) onto the baseline. `false`
      * drops the CSP meta entirely (for deployments that set a CSP header).
@@ -70,9 +71,9 @@ export interface CourseConfig {
   };
   /**
    * Optional xAPI destination(s) for custom statement publishing via
-   * `useXAPI()`. A single object or an array of destinations. Under cmi5
-   * export, the sentinel `endpoint: 'lms'` re-uses the LMS launch's
-   * credentials and shares the cmi5 adapter's queue.
+   * `useXAPI()`. A single object or an array of destinations. Under cmi5 or
+   * plain xAPI export, the sentinel `endpoint: 'lms'` re-uses the launch's
+   * credentials and shares the launch adapter's queue.
    */
   xapi?: XAPIConfig | XAPIConfig[];
 }
@@ -109,8 +110,8 @@ export interface PercentageCompletion {
 }
 
 /**
- * cmi5 launch-inherited destination. Only valid under `export.standard:
- * 'cmi5'`. Auth, actor, activityId, and registration are taken from the
+ * Launch-inherited destination. Only used under `export.standard: 'cmi5'`
+ * or `'xapi'`. Auth, actor, activityId, and registration are taken from the
  * launch URL, so no other fields are accepted.
  */
 export interface XAPILMSConfig {

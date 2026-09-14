@@ -4,7 +4,7 @@ import { runA11y } from './a11y-cli.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
-import { VALID_EXPORT_STANDARDS } from './validation.js';
+import { STANDARD_IDS, standardProfile } from '../runtime/standards.js';
 
 const USAGE = `Usage: tessera <command> [course] [options]
 
@@ -20,12 +20,12 @@ Commands:
 Run a command from inside a course folder, or name the course explicitly.
 
 export/validate options:
-  --standard <web|scorm12|scorm2004|cmi5|xapi>    Override course.config.js export.standard
+  --standard <${STANDARD_IDS.join('|')}>    Override course.config.js export.standard
 
 a11y/check options:
   --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
 
-// Validate here, against the config validator's list, so an unknown standard
+// Validate here, against the standards table, so an unknown standard
 // fails before Vite spins up.
 export function parseExportFlags(flags: string[]): {
   standardOverride?: string;
@@ -45,9 +45,9 @@ export function parseExportFlags(flags: string[]): {
     if (value === undefined || value.startsWith('-')) {
       return { error: '--standard requires a value' };
     }
-    if (!VALID_EXPORT_STANDARDS.includes(value)) {
+    if (!standardProfile(value)) {
       return {
-        error: `--standard must be one of ${VALID_EXPORT_STANDARDS.join(', ')}, got "${value}"`,
+        error: `--standard must be one of ${STANDARD_IDS.join(', ')}, got "${value}"`,
       };
     }
     standardOverride = value;

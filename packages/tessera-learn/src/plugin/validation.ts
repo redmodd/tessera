@@ -30,7 +30,13 @@ import {
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
 import { httpOrigin } from '../runtime/xapi/derive-actor.js';
-import { shortIdentifier } from '../runtime/interaction-format.js';
+import {
+  DEFAULT_STANDARD,
+  STANDARDS,
+  STANDARD_IDS,
+  largerSuspendDataStandards,
+  standardProfile,
+} from '../runtime/standards.js';
 import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
@@ -201,16 +207,7 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
 
 const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
-export const VALID_EXPORT_STANDARDS = [
-  'web',
-  'scorm12',
-  'scorm2004',
-  'cmi5',
-  'xapi',
-];
-const EXPORT_STANDARD_LIST = VALID_EXPORT_STANDARDS.map((s) => `"${s}"`).join(
-  ', ',
-);
+const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
@@ -356,7 +353,7 @@ function parseConfig(
 
   // Validate export.standard
   if (config.export?.standard !== undefined) {
-    if (!VALID_EXPORT_STANDARDS.includes(config.export.standard)) {
+    if (!standardProfile(config.export.standard)) {
       d.error(
         `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
       );
@@ -367,7 +364,7 @@ function parseConfig(
   // standard-dependent check below (identity, csp, xapi, crossValidate) sees
   // what actually ships.
   if (standardOverride) {
-    if (!VALID_EXPORT_STANDARDS.includes(standardOverride)) {
+    if (!standardProfile(standardOverride)) {
       d.error(
         `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
       );
@@ -378,15 +375,11 @@ function parseConfig(
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
   // SCORM identity is owned by the LMS, so only nudge for the others.
-  const standard = config.export?.standard;
-  const identityStandard =
-    standard === undefined ||
-    standard === 'web' ||
-    standard === 'cmi5' ||
-    standard === 'xapi';
-  if (identityStandard && !courseIdentity(config)) {
+  const standard = config.export?.standard ?? DEFAULT_STANDARD;
+  const profile = standardProfile(standard);
+  if (profile && !profile.derivesLearnerActor && !courseIdentity(config)) {
     d.warn(
-      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
+      `course.config.js: no "id" set, so the ${profile.packaged ? `${profile.name} activity id` : 'web storage key'} falls back to a fixed value that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 
@@ -459,7 +452,7 @@ function parseConfig(
       d.warn(
         'course.config.js: "export.csp" must be false or an object of directive → string[]; ignoring it and using the baseline CSP',
       );
-    } else if ((config.export.standard ?? 'web') !== 'web') {
+    } else if (profile?.packaged) {
       d.warn(
         `course.config.js: "export.csp" is ignored when "export.standard" is "${config.export.standard}" (the CSP meta is web-export only)`,
       );
@@ -486,12 +479,7 @@ function parseConfig(
     }
   }
 
-  validateXAPIConfig(
-    config.xapi,
-    config.export?.standard ?? 'web',
-    runtimeHooks,
-    d,
-  );
+  validateXAPIConfig(config.xapi, standard, runtimeHooks, d);
 
   return config;
 }
@@ -784,6 +772,7 @@ function validateSingleXAPIEntry(
 ): void {
   const endpoint = entry.endpoint;
   const id = entry.id;
+  const profile = standardProfile(standard);
   if (endpoint !== 'lms' && typeof id === 'string' && id) {
     if (ids.has(id)) {
       d.error(
@@ -803,10 +792,9 @@ function validateSingleXAPIEntry(
 
   if (endpoint === 'lms') {
     // 'lms' inherits the LRS from the launch — only the launch-based
-    // standards (cmi5, plain xAPI) carry one.
-    if (standard !== 'cmi5' && standard !== 'xapi') {
-      // Only cmi5/xAPI launches carry an LRS to inherit. The runtime drops the
-      // entry, so one config can still export to every standard.
+    // standards (cmi5, plain xAPI) carry one. The runtime drops the entry, so
+    // one config can still export to every standard.
+    if (profile && !profile.hasLaunchLRS) {
       d.warn(
         `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${standard}" — ` +
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
@@ -920,7 +908,7 @@ function validateSingleXAPIEntry(
   const actor = entry.actor;
   const actorHook = hookState(hooks, id, 'actor');
   if (actor === undefined) {
-    if (standard === 'web' && actorHook === 'no') {
+    if (profile?.packaged === false && actorHook === 'no') {
       d.error(
         `course.config.js: ${label}.actor is required for web export: there is no LMS to derive a learner identity from. ` +
           `Set a static Agent object, or export ${hookRef}.actor from course.runtime.js to resolve one (e.g. from your auth system).`,
@@ -963,9 +951,9 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
-    if (standard === 'cmi5' || standard === 'xapi' || standard === 'web') {
+    if (profile && !profile.derivesLearnerActor) {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
+        `course.config.js: ${label}.actorAccountHomePage is only used under ${STANDARD_IDS.filter((id) => STANDARDS[id].derivesLearnerActor).join('/')} actor synthesis; ignored under "${standard}".`,
       );
     }
   }
@@ -975,7 +963,7 @@ function validateSingleXAPIEntry(
   if (
     actor === undefined &&
     actorHook === 'no' &&
-    (standard === 'scorm12' || standard === 'scorm2004') &&
+    profile?.derivesLearnerActor &&
     typeof activityId === 'string' &&
     httpOrigin(activityId) === null &&
     aahp === undefined
@@ -994,7 +982,7 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
       );
     }
-    if (standard !== 'cmi5' && standard !== 'xapi') {
+    if (profile && !profile.hasLaunchLRS) {
       d.warn(
         `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
       );
@@ -1463,6 +1451,11 @@ function validateQuestionComponents(
 ): void {
   const components = findComponents(content, QUESTION_COMPONENT_NAMES);
   if (!components) return;
+  const profile = standardProfile(exportStandard);
+  const format =
+    profile && 'interactionFormat' in profile
+      ? profile.interactionFormat
+      : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
   for (const { name, props, hasSpread } of components) {
@@ -1504,19 +1497,19 @@ function validateQuestionComponents(
             ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
             : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
-      } else if (exportStandard === 'scorm12') {
-        // scorm12-only: shortIdentifier strips non-alphanumerics, so distinct
-        // raw ids can collide after sanitization. Skip raw duplicates (already
-        // flagged above) to avoid double-reporting the same id.
-        const sane = shortIdentifier(resolvedId);
+      } else if (profile && format) {
+        // The standard's identifier rules can rewrite ids, so distinct raw ids
+        // can collide after sanitization. Skip raw duplicates (already flagged
+        // above) to avoid double-reporting the same id.
+        const sane = format.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for SCORM 1.2 — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${profile.name} — use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${resolvedId}" collides with a prior id after SCORM 1.2 sanitization ("${sane}")`,
+            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${profile.name} sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);
@@ -1992,8 +1985,8 @@ function crossValidate(
     }
   }
 
-  // SCORM 1.2 + high page count warning
-  if (config.export?.standard === 'scorm12') {
+  const profile = standardProfile(config.export?.standard);
+  if (profile && 'suspendDataLimit' in profile) {
     // Estimate worst-case suspend_data size when all pages are visited, all
     // quizzes completed, all chunks revealed, and a modest amount of
     // usePersistence / standalone-question state has accumulated.
@@ -2023,9 +2016,13 @@ function crossValidate(
       standaloneBytes +
       userStateBuffer;
 
-    if (estimatedSize > 3200) {
+    const limit = profile.suspendDataLimit;
+    if (estimatedSize > limit * 0.8) {
+      const alternatives = largerSuspendDataStandards(limit)
+        .map((id) => `"${id}"`)
+        .join(', ');
       d.warn(
-        `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated SCORM 1.2 suspend_data ~${estimatedSize} bytes may exceed the 4096-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider using "scorm2004" or "cmi5".`,
+        `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider one of ${alternatives}.`,
       );
     }
   }

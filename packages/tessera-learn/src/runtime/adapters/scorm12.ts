@@ -1,10 +1,8 @@
-import {
-  SCORM12_INTERACTION_FORMAT,
-  scorm12Type,
-} from '../interaction-format.js';
+import { scorm12Type } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
+import { STANDARDS } from '../standards.js';
 
 /**
  * SCORM 1.2 API interface.
@@ -21,17 +19,15 @@ export interface SCORM12API {
 }
 
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
+  profile: STANDARDS.scorm12,
   sessionTimeKey: 'cmi.core.session_time',
   formatDuration: formatHHMMSS,
-  suspendDataLimit: 4096,
-  suspendDataLimitLabel: 'SCORM 1.2 cmi.suspend_data 4096-char',
   interactionFields: {
     responseField: 'student_response',
     timestampField: 'time',
     timestamp: () => new Date().toTimeString().slice(0, 8),
     typeValue: scorm12Type,
     resultLabels: { correct: 'correct', incorrect: 'wrong' },
-    format: SCORM12_INTERACTION_FORMAT,
   },
   initialize: (api) => api.LMSInitialize(''),
   terminate: (api) => api.LMSFinish(''),

@@ -291,6 +291,23 @@ describe('xapi config validation — explicit endpoint', () => {
       warnings.filter((w) => w.includes('registration is a cmi5')),
     ).toHaveLength(0);
   });
+
+  it('withholds standard-specific warnings under an unknown standard', () => {
+    testRoot = projectWith(
+      `[{ endpoint: "lms" }, ${destination({ registration: '550e8400-e29b-41d4-a716-446655440000' })}]`,
+      'bogus',
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(
+      errors.find((e) => e.includes('"export.standard" must be one of')),
+    ).toBeDefined();
+    expect(
+      warnings.filter(
+        (w) =>
+          w.includes('registration is a cmi5') || w.includes('no launch LRS'),
+      ),
+    ).toHaveLength(0);
+  });
 });
 
 describe('xapi config validation — actorAccountHomePage', () => {

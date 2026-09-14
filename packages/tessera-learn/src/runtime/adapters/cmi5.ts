@@ -1,5 +1,6 @@
 import { parseScaled01 } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import { STANDARDS } from '../standards.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -77,6 +78,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   async init(): Promise<void> {
     this.version = '1.0.3';
     this.logName = 'cmi5';
+    this.profile = STANDARDS.cmi5;
     const params = new URLSearchParams(window.location.search);
     const fetchUrl = params.get('fetch');
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');

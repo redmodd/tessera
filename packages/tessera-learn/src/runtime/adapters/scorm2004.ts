@@ -1,4 +1,3 @@
-import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
@@ -7,6 +6,7 @@ import {
   formatReal107,
   parseScaled01,
 } from './format.js';
+import { STANDARDS } from '../standards.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -20,10 +20,9 @@ export interface SCORM2004API {
 }
 
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
+  profile: STANDARDS.scorm2004,
   sessionTimeKey: 'cmi.session_time',
   formatDuration: formatISO8601Duration,
-  suspendDataLimit: 64000,
-  suspendDataLimitLabel: 'SCORM 2004 4E cmi.suspend_data 64000-char',
   interactionFields: {
     responseField: 'learner_response',
     timestampField: 'timestamp',
@@ -31,7 +30,6 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-    format: SCORM2004_INTERACTION_FORMAT,
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),

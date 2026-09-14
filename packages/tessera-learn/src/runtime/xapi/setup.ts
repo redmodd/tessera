@@ -17,6 +17,12 @@ import {
 import { BaseXAPILaunchAdapter } from '../adapters/xapi-launch-base.js';
 import { SCORM12Adapter } from '../adapters/scorm12.js';
 import { SCORM2004Adapter } from '../adapters/scorm2004.js';
+import {
+  STANDARDS,
+  standardProfile,
+  type ActorDerivingStandard,
+  type LaunchLRSStandard,
+} from '../standards.js';
 
 /**
  * Wraps a value that the runtime knows how to materialize into an
@@ -30,20 +36,16 @@ type DestinationSource =
   | { kind: 'explicit'; publisher: XAPIPublisher };
 
 /**
- * Throws synchronously when `endpoint: 'lms'` appears under cmi5 export
- * but the runtime was constructed without cmi5 launch parameters (i.e.,
- * running locally outside an LMS). Surfaced through every
+ * Throws synchronously when `endpoint: 'lms'` appears under cmi5 or plain
+ * xAPI export but the runtime was constructed without launch parameters
+ * (i.e., running locally outside an LMS). Surfaced through every
  * `sendStatement` call rather than silently no-oping — the alternative
  * produces the "works in dev, silently broken in prod" footgun.
  */
 class XAPIDevFallbackError extends Error {
-  constructor(standard: 'cmi5' | 'xapi') {
-    const missing =
-      standard === 'cmi5'
-        ? 'cmi5 launch parameters (fetch / endpoint / activityId / actor)'
-        : 'xAPI launch parameters (endpoint / auth / actor / activity_id)';
+  constructor(standard: LaunchLRSStandard) {
     super(
-      `Tessera xAPI: xapi.endpoint is 'lms' but no ${missing} were present on the URL. ` +
+      `Tessera xAPI: xapi.endpoint is 'lms' but ${STANDARDS[standard].missingDetail} ` +
         'Either launch this course from a real LMS / SCORM Cloud, or ' +
         'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
         'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
@@ -54,7 +56,7 @@ class XAPIDevFallbackError extends Error {
 
 /**
  * Build a stub publisher whose sends reject with the supplied error. Used for
- * both dev-fallback paths: cmi5 `endpoint: 'lms'` with no launch params, and
+ * both dev-fallback paths: cmi5/xAPI `endpoint: 'lms'` with no launch params, and
  * SCORM explicit endpoints that depend on a learner identity the dev fallback
  * can't synthesize. The placeholder carries a static actor so the constructor
  * invariants hold and `XAPIClient.buildStatement` can run without throwing —
@@ -70,35 +72,33 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-function makeDevFallbackPublisher(standard: 'cmi5' | 'xapi'): XAPIPublisher {
+function makeDevFallbackPublisher(standard: LaunchLRSStandard): XAPIPublisher {
   return makeRejectingPublisher(() => new XAPIDevFallbackError(standard));
 }
 
 class XAPISCORMDevFallbackError extends Error {
-  constructor(standard: 'scorm12' | 'scorm2004') {
-    const label = standard === 'scorm12' ? 'SCORM 1.2' : 'SCORM 2004';
+  constructor(standard: ActorDerivingStandard) {
+    const { name, learnerIdField } = STANDARDS[standard];
     super(
-      `Tessera xAPI: ${label} learner identity is unavailable in dev (no LMS API found, ` +
+      `Tessera xAPI: ${name} learner identity is unavailable in dev (no LMS API found, ` +
         'falling back to localStorage). The runtime cannot synthesize an actor for this xapi ' +
         'destination. Either set xapi.actor in course.config.js, export an actor resolver ' +
         'for it from course.runtime.js, or launch from ' +
-        'a real LMS / SCORM Cloud where ' +
-        (standard === 'scorm12' ? 'cmi.core.student_id' : 'cmi.learner_id') +
-        ' is populated.',
+        `a real LMS / SCORM Cloud where ${learnerIdField} is populated.`,
     );
     this.name = 'XAPISCORMDevFallbackError';
   }
 }
 
 function makeSCORMDevFallbackPublisher(
-  standard: 'scorm12' | 'scorm2004',
+  standard: ActorDerivingStandard,
 ): XAPIPublisher {
   return makeRejectingPublisher(() => new XAPISCORMDevFallbackError(standard));
 }
 
 type ActorResolution =
   | { kind: 'actor'; value: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>) }
-  | { kind: 'scorm-fallback'; standard: 'scorm12' | 'scorm2004' };
+  | { kind: 'scorm-fallback'; standard: ActorDerivingStandard };
 
 /**
  * Resolve a single `XAPIConfig` entry into a destination source. Returns null
@@ -112,8 +112,8 @@ function resolveDestination(
   hooks: CourseRuntime['xapi'],
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
-    const standard = config.export?.standard;
-    if (standard !== 'cmi5' && standard !== 'xapi') {
+    const profile = standardProfile(config.export?.standard);
+    if (!profile?.hasLaunchLRS) {
       console.warn(
         "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under a non-launch export.",
       );
@@ -125,7 +125,10 @@ function resolveDestination(
     // Dev fallback — launch params absent, adapter is the WebAdapter
     // fallback. Materialize a publisher whose sends reject with an
     // explicit error so author code surfaces the dev/prod gap.
-    return { kind: 'explicit', publisher: makeDevFallbackPublisher(standard) };
+    return {
+      kind: 'explicit',
+      publisher: makeDevFallbackPublisher(profile.id),
+    };
   }
 
   // Explicit endpoint.
@@ -180,11 +183,8 @@ function resolveExplicitActor(
   if (actor !== undefined) {
     return { kind: 'actor', value: actor };
   }
-  const standard = config.export?.standard;
-  if (
-    (standard === 'cmi5' || standard === 'xapi') &&
-    adapter instanceof BaseXAPILaunchAdapter
-  ) {
+  const profile = standardProfile(config.export?.standard);
+  if (profile?.hasLaunchLRS && adapter instanceof BaseXAPILaunchAdapter) {
     const inner = adapter.getPublisher();
     if (!inner) return null;
     try {
@@ -193,7 +193,7 @@ function resolveExplicitActor(
       return null;
     }
   }
-  if (config.export?.standard === 'scorm12') {
+  if (profile?.derivesLearnerActor) {
     if (adapter instanceof SCORM12Adapter) {
       return {
         kind: 'actor',
@@ -204,9 +204,6 @@ function resolveExplicitActor(
         ) as XAPIAgent,
       };
     }
-    return { kind: 'scorm-fallback', standard: 'scorm12' };
-  }
-  if (config.export?.standard === 'scorm2004') {
     if (adapter instanceof SCORM2004Adapter) {
       return {
         kind: 'actor',
@@ -217,7 +214,7 @@ function resolveExplicitActor(
         ) as XAPIAgent,
       };
     }
-    return { kind: 'scorm-fallback', standard: 'scorm2004' };
+    return { kind: 'scorm-fallback', standard: profile.id };
   }
   console.warn(
     'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
