@@ -109,34 +109,11 @@ interface ScormManifestDialect {
   schemaLocation: string;
 }
 
-const SCORM_DIALECTS: Record<'1.2' | '2004', ScormManifestDialect> = {
-  '1.2': {
-    rootNs: 'http://www.imsproject.org/xsd/imscp_rootv1p1p2',
-    adlcpNs: 'http://www.adlnet.org/xsd/adlcp_rootv1p2',
-    schemaversion: '1.2',
-    scormTypeAttr: 'scormtype',
-    schemaLocation:
-      'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
-      'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
-      'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
-  },
-  '2004': {
-    rootNs: 'http://www.imsglobal.org/xsd/imscp_v1p1',
-    adlcpNs: 'http://www.adlnet.org/xsd/adlcp_v1p3',
-    schemaversion: '2004 4th Edition',
-    scormTypeAttr: 'scormType',
-    schemaLocation:
-      'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd ' +
-      'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
-  },
-};
-
-export function generateScormManifest(
-  version: '1.2' | '2004',
+function generateScormManifest(
+  dialect: ScormManifestDialect,
   config: ExportConfig,
   distDir: string,
 ): string {
-  const dialect = SCORM_DIALECTS[version];
   const title = escapeXml(config.title);
   const files = collectFiles(distDir);
   const fileElements = files
@@ -264,31 +241,69 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   } catch {}
 }
 
-/** Packaged (zipped) export targets: which manifest file to write and how. */
-const PACKAGED_EXPORTS: Record<
+type ManifestGenerator = (config: ExportConfig, distDir: string) => string;
+
+const scormManifest =
+  (dialect: ScormManifestDialect): ManifestGenerator =>
+  (config, distDir) =>
+    generateScormManifest(dialect, config, distDir);
+
+/** Build-side half of each packaged standard: manifest generation and adapter codegen. */
+export const LMS_BUILD: Record<
   LMSStandard,
   {
     manifestFile: string;
-    generate: (config: ExportConfig, distDir: string) => string;
+    generate: ManifestGenerator;
+    adapter: string;
+    detect: string;
+    /** SCORM detectors return the API object the constructor needs; cmi5/xAPI ones return a boolean. */
+    takesApi: boolean;
   }
 > = {
   scorm12: {
     manifestFile: 'imsmanifest.xml',
-    generate: (config, distDir) =>
-      generateScormManifest('1.2', config, distDir),
+    generate: scormManifest({
+      rootNs: 'http://www.imsproject.org/xsd/imscp_rootv1p1p2',
+      adlcpNs: 'http://www.adlnet.org/xsd/adlcp_rootv1p2',
+      schemaversion: '1.2',
+      scormTypeAttr: 'scormtype',
+      schemaLocation:
+        'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
+        'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
+        'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
+    }),
+    adapter: 'SCORM12Adapter',
+    detect: 'findSCORM12API',
+    takesApi: true,
   },
   scorm2004: {
     manifestFile: 'imsmanifest.xml',
-    generate: (config, distDir) =>
-      generateScormManifest('2004', config, distDir),
+    generate: scormManifest({
+      rootNs: 'http://www.imsglobal.org/xsd/imscp_v1p1',
+      adlcpNs: 'http://www.adlnet.org/xsd/adlcp_v1p3',
+      schemaversion: '2004 4th Edition',
+      scormTypeAttr: 'scormType',
+      schemaLocation:
+        'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd ' +
+        'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
+    }),
+    adapter: 'SCORM2004Adapter',
+    detect: 'findSCORM2004API',
+    takesApi: true,
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
     generate: (config) => generateCMI5Xml(config),
+    adapter: 'CMI5Adapter',
+    detect: 'hasCMI5LaunchParams',
+    takesApi: false,
   },
   xapi: {
     manifestFile: 'tincan.xml',
     generate: (config) => generateTincanXml(config),
+    adapter: 'XAPIAdapter',
+    detect: 'hasXAPILaunchParams',
+    takesApi: false,
   },
 };
 
@@ -313,7 +328,7 @@ export async function runExport(
     return;
   }
 
-  const spec = PACKAGED_EXPORTS[profile.id];
+  const spec = LMS_BUILD[profile.id];
 
   writeFileSync(
     resolve(distDir, spec.manifestFile),

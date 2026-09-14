@@ -37,7 +37,7 @@ import {
   type A11ySettings,
 } from './validation.js';
 import { buildCsp } from './csp.js';
-import { runExport } from './export.js';
+import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
@@ -694,36 +694,8 @@ function tesseraManifestPlugin(manifestRef: {
 
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 
-// `takesApi`: SCORM detectors return the API object the constructor needs;
-// cmi5/xAPI ones return a boolean.
-const LMS_ADAPTER_GEN: Record<
-  LMSStandard,
-  { adapter: string; detect: string; takesApi: boolean }
-> = {
-  scorm12: {
-    adapter: 'SCORM12Adapter',
-    detect: 'findSCORM12API',
-    takesApi: true,
-  },
-  scorm2004: {
-    adapter: 'SCORM2004Adapter',
-    detect: 'findSCORM2004API',
-    takesApi: true,
-  },
-  cmi5: {
-    adapter: 'CMI5Adapter',
-    detect: 'hasCMI5LaunchParams',
-    takesApi: false,
-  },
-  xapi: {
-    adapter: 'XAPIAdapter',
-    detect: 'hasXAPILaunchParams',
-    takesApi: false,
-  },
-};
-
 function generateLmsAdapterModule(standard: LMSStandard): string {
-  const { adapter, detect, takesApi } = LMS_ADAPTER_GEN[standard];
+  const { adapter, detect, takesApi } = LMS_BUILD[standard];
   const guard = takesApi
     ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
     : `if (!${detect}()) throw missingApiError('${standard}');\n  return new ${adapter}();`;
