@@ -20,7 +20,7 @@ Commands:
 Run a command from inside a course folder, or name the course explicitly.
 
 export/validate options:
-  --standard <web|scorm12|scorm2004|cmi5|xapi>    Override course.config.js export.standard
+  --standard <${STANDARD_IDS.join('|')}>    Override course.config.js export.standard
 
 a11y/check options:
   --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;

@@ -45,10 +45,10 @@ const LMS_ADAPTERS: Record<LMSStandard, () => PersistenceAdapter | null> = {
 /**
  * Select the appropriate persistence adapter based on course config.
  *
- * In production builds, an LMS-configured course (scorm12/scorm2004/cmi5)
- * will throw `LMSAdapterError` if the matching LMS API isn't reachable —
- * we fail loud so a misconfigured launch is visible immediately rather
- * than silently losing tracking to localStorage.
+ * In production builds, a course exported to any packaged standard throws
+ * `LMSAdapterError` if the matching LMS runtime isn't reachable. We fail
+ * loud so a misconfigured launch is visible immediately rather than
+ * silently losing tracking to localStorage.
  *
  * In dev mode, missing APIs warn and fall back to `WebAdapter` so authors
  * can still iterate locally.

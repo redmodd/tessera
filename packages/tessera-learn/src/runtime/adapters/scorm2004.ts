@@ -1,4 +1,3 @@
-import { SCORM2004_INTERACTION_FORMAT } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
@@ -31,7 +30,6 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-    format: SCORM2004_INTERACTION_FORMAT,
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),

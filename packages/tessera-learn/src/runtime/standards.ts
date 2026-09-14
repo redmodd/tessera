@@ -1,3 +1,10 @@
+import {
+  SCORM12_INTERACTION_FORMAT,
+  SCORM2004_INTERACTION_FORMAT,
+  XAPI_INTERACTION_FORMAT,
+  type InteractionFormat,
+} from './interaction-format.js';
+
 export const STANDARD_IDS = [
   'web',
   'scorm12',
@@ -16,11 +23,11 @@ interface ProfileShape {
   packaged: boolean;
   hasLaunchLRS: boolean;
   derivesLearnerActor: boolean;
-  sanitizesInteractionIds: boolean;
   warnLabel?: string;
   missingDetail?: string;
   learnerIdField?: string;
   suspendDataLimit?: number;
+  interactionFormat?: InteractionFormat;
 }
 
 export const STANDARDS = {
@@ -30,7 +37,6 @@ export const STANDARDS = {
     packaged: false,
     hasLaunchLRS: false,
     derivesLearnerActor: false,
-    sanitizesInteractionIds: false,
   },
   scorm12: {
     id: 'scorm12',
@@ -38,12 +44,12 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: false,
     derivesLearnerActor: true,
-    sanitizesInteractionIds: true,
     warnLabel: 'SCORM 1.2 API',
     missingDetail:
       'no SCORM 1.2 API object found in the window.parent or window.opener chain.',
     learnerIdField: 'cmi.core.student_id',
     suspendDataLimit: 4096,
+    interactionFormat: SCORM12_INTERACTION_FORMAT,
   },
   scorm2004: {
     id: 'scorm2004',
@@ -51,12 +57,12 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: false,
     derivesLearnerActor: true,
-    sanitizesInteractionIds: false,
     warnLabel: 'SCORM 2004 API',
     missingDetail:
       'no SCORM 2004 API object found in the window.parent or window.opener chain.',
     learnerIdField: 'cmi.learner_id',
     suspendDataLimit: 64000,
+    interactionFormat: SCORM2004_INTERACTION_FORMAT,
   },
   cmi5: {
     id: 'cmi5',
@@ -64,10 +70,10 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: true,
     derivesLearnerActor: false,
-    sanitizesInteractionIds: false,
     warnLabel: 'cmi5 launch parameters',
     missingDetail:
       'no cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
+    interactionFormat: XAPI_INTERACTION_FORMAT,
   },
   xapi: {
     id: 'xapi',
@@ -75,10 +81,10 @@ export const STANDARDS = {
     packaged: true,
     hasLaunchLRS: true,
     derivesLearnerActor: false,
-    sanitizesInteractionIds: false,
     warnLabel: 'xAPI launch parameters',
     missingDetail:
       'no xAPI launch parameters (endpoint / auth / actor / activity_id) on the URL.',
+    interactionFormat: XAPI_INTERACTION_FORMAT,
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };
 

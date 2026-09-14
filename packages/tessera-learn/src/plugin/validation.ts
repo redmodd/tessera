@@ -30,9 +30,9 @@ import {
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
 import { httpOrigin } from '../runtime/xapi/derive-actor.js';
-import { shortIdentifier } from '../runtime/interaction-format.js';
 import {
   DEFAULT_STANDARD,
+  STANDARDS,
   STANDARD_IDS,
   largerSuspendDataStandards,
   standardProfile,
@@ -379,7 +379,7 @@ function parseConfig(
   const profile = standardProfile(standard);
   if (profile && !profile.derivesLearnerActor && !courseIdentity(config)) {
     d.warn(
-      `course.config.js: no "id" set — the web storage key and cmi5/xAPI activity id then share a fixed fallback that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
+      `course.config.js: no "id" set, so the ${profile.packaged ? `${profile.name} activity id` : 'web storage key'} falls back to a fixed value that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 
@@ -953,7 +953,7 @@ function validateSingleXAPIEntry(
     }
     if (profile && !profile.derivesLearnerActor) {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is only used under scorm12/scorm2004 actor synthesis; ignored under "${standard}".`,
+        `course.config.js: ${label}.actorAccountHomePage is only used under ${STANDARD_IDS.filter((id) => STANDARDS[id].derivesLearnerActor).join('/')} actor synthesis; ignored under "${standard}".`,
       );
     }
   }
@@ -1452,6 +1452,10 @@ function validateQuestionComponents(
   const components = findComponents(content, QUESTION_COMPONENT_NAMES);
   if (!components) return;
   const profile = standardProfile(exportStandard);
+  const format =
+    profile && 'interactionFormat' in profile
+      ? profile.interactionFormat
+      : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
   for (const { name, props, hasSpread } of components) {
@@ -1493,11 +1497,11 @@ function validateQuestionComponents(
             ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
             : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
-      } else if (profile?.sanitizesInteractionIds) {
-        // shortIdentifier strips non-alphanumerics, so distinct
-        // raw ids can collide after sanitization. Skip raw duplicates (already
-        // flagged above) to avoid double-reporting the same id.
-        const sane = shortIdentifier(resolvedId);
+      } else if (profile && format) {
+        // The standard's identifier rules can rewrite ids, so distinct raw ids
+        // can collide after sanitization. Skip raw duplicates (already flagged
+        // above) to avoid double-reporting the same id.
+        const sane = format.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
             `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${profile.name} — use only letters and digits (underscores only between them)`,

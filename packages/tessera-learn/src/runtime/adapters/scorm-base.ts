@@ -1,9 +1,6 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import {
-  buildScormInteractionFields,
-  type InteractionFormat,
-} from '../interaction-format.js';
+import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
@@ -24,7 +21,6 @@ export interface ScormDialect<TApi> {
     timestamp(): string;
     typeValue(type: Interaction['type']): string;
     resultLabels: { correct: string; incorrect: string };
-    format: InteractionFormat;
   };
   initialize(api: TApi): string;
   terminate(api: TApi): string;
@@ -176,7 +172,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
         timestamp: this.dialect.interactionFields.timestamp(),
         typeValue: this.dialect.interactionFields.typeValue(interaction.type),
         resultLabels: this.dialect.interactionFields.resultLabels,
-        format: this.dialect.interactionFields.format,
+        format: this.dialect.profile.interactionFormat,
       },
     );
     for (const [key, value] of fields) {

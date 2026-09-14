@@ -1,7 +1,4 @@
-import {
-  SCORM12_INTERACTION_FORMAT,
-  scorm12Type,
-} from '../interaction-format.js';
+import { scorm12Type } from '../interaction-format.js';
 import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
@@ -31,7 +28,6 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
     timestamp: () => new Date().toTimeString().slice(0, 8),
     typeValue: scorm12Type,
     resultLabels: { correct: 'correct', incorrect: 'wrong' },
-    format: SCORM12_INTERACTION_FORMAT,
   },
   initialize: (api) => api.LMSInitialize(''),
   terminate: (api) => api.LMSFinish(''),

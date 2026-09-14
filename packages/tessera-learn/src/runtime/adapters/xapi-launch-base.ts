@@ -1,10 +1,7 @@
 import type { PersistenceAdapter, SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import {
-  formatResponse,
-  formatCorrectPattern,
-  XAPI_INTERACTION_FORMAT,
-} from '../interaction-format.js';
+import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
+import { STANDARDS } from '../standards.js';
 import { formatISO8601Duration } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
@@ -90,6 +87,8 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
   protected version = '1.0.3';
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected logName = 'xAPI';
+  protected profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
+    STANDARDS.xapi;
 
   protected score: number | null = null;
   protected durationSeconds = 0;
@@ -248,8 +247,9 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     correct: boolean | null,
   ): void {
     if (!this.publisher) return;
-    const response = formatResponse(interaction, XAPI_INTERACTION_FORMAT);
-    const patterns = formatCorrectPattern(interaction, XAPI_INTERACTION_FORMAT);
+    const { interactionFormat } = this.profile;
+    const response = formatResponse(interaction, interactionFormat);
+    const patterns = formatCorrectPattern(interaction, interactionFormat);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
