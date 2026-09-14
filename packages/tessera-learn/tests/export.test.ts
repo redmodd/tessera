@@ -10,7 +10,7 @@ import {
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  generateScormManifest,
+  LMS_BUILD,
   generateCMI5Xml,
   generateTincanXml,
   createZip,
@@ -54,10 +54,10 @@ afterEach(() => {
 
 // ---- SCORM 1.2 Manifest ----
 
-describe('generateScormManifest 1.2', () => {
+describe('SCORM 1.2 manifest', () => {
   it('generates valid XML with correct schema', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: 'My Course' }, distDir);
+    const xml = LMS_BUILD.scorm12.generate({ title: 'My Course' }, distDir);
 
     expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain(
@@ -72,14 +72,13 @@ describe('generateScormManifest 1.2', () => {
 
   it('includes course title', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: 'My Course' }, distDir);
+    const xml = LMS_BUILD.scorm12.generate({ title: 'My Course' }, distDir);
     expect(xml).toContain('<title>My Course</title>');
   });
 
   it('escapes XML special characters in title', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest(
-      '1.2',
+    const xml = LMS_BUILD.scorm12.generate(
       { title: 'A & B <Course>' },
       distDir,
     );
@@ -88,8 +87,7 @@ describe('generateScormManifest 1.2', () => {
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest(
-      '1.2',
+    const xml = LMS_BUILD.scorm12.generate(
       mergeCourseConfig({ title: '' }),
       distDir,
     );
@@ -98,7 +96,7 @@ describe('generateScormManifest 1.2', () => {
 
   it('lists all files in dist/', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
 
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
@@ -107,13 +105,13 @@ describe('generateScormManifest 1.2', () => {
 
   it('references index.html as resource href', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
     expect(xml).toMatch(/href="index.html">/);
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('1.2', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
@@ -128,10 +126,10 @@ describe('generateScormManifest 1.2', () => {
 
 // ---- SCORM 2004 Manifest ----
 
-describe('generateScormManifest 2004', () => {
+describe('SCORM 2004 manifest', () => {
   it('generates valid XML with correct schema', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('2004', { title: 'My Course' }, distDir);
+    const xml = LMS_BUILD.scorm2004.generate({ title: 'My Course' }, distDir);
 
     expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"');
     expect(xml).toContain('xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"');
@@ -140,20 +138,20 @@ describe('generateScormManifest 2004', () => {
 
   it('uses capital T in scormType', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('2004', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
     expect(xml).toContain('adlcp:scormType="sco"');
   });
 
   it('lists all files', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('2004', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
     const distDir = createDistDir(testRoot);
-    const xml = generateScormManifest('2004', { title: 'Test' }, distDir);
+    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
