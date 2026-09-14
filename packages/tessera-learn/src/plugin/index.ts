@@ -1,4 +1,4 @@
-import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
+import type { Plugin, ResolvedConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve, relative, isAbsolute } from 'node:path';
 import {
@@ -206,7 +206,7 @@ function tesseraEntryPlugin(
         },
 
         // Serve index.html for the dev server
-        configureServer(server: ViteDevServer) {
+        configureServer(server) {
           return () => {
             server.middlewares.use(async (req, res, next) => {
               if (req.url === '/' || req.url === '/index.html') {
@@ -558,6 +558,12 @@ function tesseraManifestPlugin(manifestRef: {
   current: Manifest | null;
   root: string;
 }): Plugin {
+  function buildManifest(ctx: VirtualModuleContext): Manifest {
+    manifestRef.root = ctx.projectRoot;
+    manifestRef.current = generateManifest(resolve(ctx.projectRoot, 'pages'));
+    return manifestRef.current;
+  }
+
   return virtualModule(
     'tessera:manifest',
     'virtual:tessera-manifest',
@@ -584,7 +590,7 @@ function tesseraManifestPlugin(manifestRef: {
           buildManifest(ctx);
         },
 
-        configureServer(devServer: ViteDevServer) {
+        configureServer(devServer) {
           const pagesDir = resolve(ctx.projectRoot, 'pages');
           devServer.watcher.on('all', (event, filePath) => {
             if (!filePath.startsWith(pagesDir)) return;
@@ -607,12 +613,6 @@ function tesseraManifestPlugin(manifestRef: {
       }),
     },
   );
-
-  function buildManifest(ctx: VirtualModuleContext): Manifest {
-    manifestRef.root = ctx.projectRoot;
-    manifestRef.current = generateManifest(resolve(ctx.projectRoot, 'pages'));
-    return manifestRef.current;
-  }
 }
 
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';

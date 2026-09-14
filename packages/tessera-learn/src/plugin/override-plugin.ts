@@ -47,12 +47,13 @@ export function createOverridePlugin({
     {
       hooks: (ctx) => ({
         configureServer(server) {
+          const filePath = resolve(ctx.projectRoot, projectFile);
           // Only add/unlink flips load()'s output between the override and the
           // fallback; a `change` leaves it identical and Svelte's own HMR handles
           // the underlying file.
           server.watcher.on('all', (event, changed) => {
             if (event !== 'add' && event !== 'unlink') return;
-            if (changed !== resolve(ctx.projectRoot, projectFile)) return;
+            if (changed !== filePath) return;
             ctx.reload(server);
           });
         },
