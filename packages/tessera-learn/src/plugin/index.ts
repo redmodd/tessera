@@ -42,6 +42,7 @@ import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
+import { virtualModule, type VirtualModuleContext } from './virtual-module.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -103,37 +104,6 @@ function projectFileRel(
   return rel;
 }
 
-type VirtualLoadCtx = { projectRoot: string; isBuild: boolean };
-
-function virtualModule(
-  name: string,
-  virtualId: string,
-  load: (
-    this: import('vite').Rollup.PluginContext,
-    ctx: VirtualLoadCtx,
-  ) => string | null,
-): Plugin {
-  const resolvedId = '\0' + virtualId;
-  let projectRoot = '';
-  let isBuild = false;
-  return {
-    name,
-    enforce: 'pre',
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
-    },
-    resolveId(id) {
-      return id === virtualId ? resolvedId : null;
-    },
-    load(id) {
-      return id === resolvedId
-        ? load.call(this, { projectRoot, isBuild })
-        : null;
-    },
-  };
-}
-
 export function tesseraPlugin(options: { standardOverride?: string } = {}) {
   const { standardOverride } = options;
   const manifestRef: { current: Manifest | null; root: string } = {
@@ -185,11 +155,6 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
 
 // ---------- Entry Plugin ----------
 
-const VIRTUAL_ENTRY_ID = 'virtual:tessera-entry';
-const RESOLVED_ENTRY_ID = '\0' + VIRTUAL_ENTRY_ID;
-const VIRTUAL_MAIN_ID = '/virtual:tessera-main';
-const RESOLVED_MAIN_ID = '\0virtual:tessera-main';
-
 function tesseraEntryPlugin(
   standardOverride: string | undefined,
   build: BuildState,
@@ -197,87 +162,73 @@ function tesseraEntryPlugin(
   const runtimeDir = resolveRuntimeDir();
   const stylesDir = resolveStylesDir();
   const appSveltePath = resolve(runtimeDir, 'App.svelte');
-  let projectRoot: string;
-  let outDir: string;
-  let isBuild = false;
 
-  return {
-    name: 'tessera:entry',
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      outDir = resolve(config.root, config.build.outDir);
-      isBuild = config.command === 'build';
-    },
-
-    // For build mode: write index.html so Rollup can find it
-    buildStart() {
-      if (isBuild) {
-        const read = readResolvedConfig(projectRoot, standardOverride);
-        writeFileSync(
-          resolve(projectRoot, 'index.html'),
-          generateIndexHtml(readLanguage(read), cspMeta(read)),
-          'utf-8',
-        );
-      }
-    },
-
-    // For build mode: clean up temporary index.html and copy assets
-    closeBundle() {
-      if (isBuild) {
-        const htmlPath = resolve(projectRoot, 'index.html');
-        if (existsSync(htmlPath)) {
-          try {
-            unlinkSync(htmlPath);
-          } catch {}
-        }
-
-        if (!build.written) return;
-
-        // Copy assets/ into the build's assets/ so $assets/ references resolve
-        const assetsDir = resolve(projectRoot, 'assets');
-        const distAssetsDir = resolve(outDir, 'assets');
-        if (existsSync(assetsDir)) {
-          mkdirSync(distAssetsDir, { recursive: true });
-          cpSync(assetsDir, distAssetsDir, { recursive: true });
-        }
-      }
-    },
-
-    // Serve index.html for the dev server
-    configureServer(server: ViteDevServer) {
-      return () => {
-        server.middlewares.use(async (req, res, next) => {
-          if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(
-              readLanguage(readCourseConfig(projectRoot)),
+  return virtualModule(
+    'tessera:entry',
+    'virtual:tessera-main',
+    ({ projectRoot }) =>
+      generateEntryScript(appSveltePath, stylesDir, projectRoot),
+    {
+      aliases: ['/virtual:tessera-main'],
+      hooks: (ctx) => ({
+        // For build mode: write index.html so Rollup can find it
+        buildStart() {
+          if (ctx.isBuild) {
+            const read = readResolvedConfig(ctx.projectRoot, standardOverride);
+            writeFileSync(
+              resolve(ctx.projectRoot, 'index.html'),
+              generateIndexHtml(readLanguage(read), cspMeta(read)),
+              'utf-8',
             );
-            const transformed = await server.transformIndexHtml(req.url, html);
-            res.setHeader('Content-Type', 'text/html');
-            res.statusCode = 200;
-            res.end(transformed);
-            return;
           }
-          next();
-        });
-      };
-    },
+        },
 
-    resolveId(id) {
-      if (id === VIRTUAL_ENTRY_ID) return RESOLVED_ENTRY_ID;
-      if (id === VIRTUAL_MAIN_ID || id === 'virtual:tessera-main')
-        return RESOLVED_MAIN_ID;
-      return null;
-    },
+        // For build mode: clean up temporary index.html and copy assets
+        closeBundle() {
+          if (ctx.isBuild) {
+            const htmlPath = resolve(ctx.projectRoot, 'index.html');
+            if (existsSync(htmlPath)) {
+              try {
+                unlinkSync(htmlPath);
+              } catch {}
+            }
 
-    load(id) {
-      if (id === RESOLVED_ENTRY_ID || id === RESOLVED_MAIN_ID) {
-        return generateEntryScript(appSveltePath, stylesDir, projectRoot);
-      }
-      return null;
+            if (!build.written) return;
+
+            // Copy assets/ into the build's assets/ so $assets/ references resolve
+            const assetsDir = resolve(ctx.projectRoot, 'assets');
+            const distAssetsDir = resolve(ctx.outDir, 'assets');
+            if (existsSync(assetsDir)) {
+              mkdirSync(distAssetsDir, { recursive: true });
+              cpSync(assetsDir, distAssetsDir, { recursive: true });
+            }
+          }
+        },
+
+        // Serve index.html for the dev server
+        configureServer(server: ViteDevServer) {
+          return () => {
+            server.middlewares.use(async (req, res, next) => {
+              if (req.url === '/' || req.url === '/index.html') {
+                const html = generateIndexHtml(
+                  readLanguage(readCourseConfig(ctx.projectRoot)),
+                );
+                const transformed = await server.transformIndexHtml(
+                  req.url,
+                  html,
+                );
+                res.setHeader('Content-Type', 'text/html');
+                res.statusCode = 200;
+                res.end(transformed);
+                return;
+              }
+              next();
+            });
+          };
+        },
+      }),
     },
-  };
+  );
 }
 
 // 'en' fallback applied here: the config default-merge runs later than buildStart.
@@ -603,93 +554,65 @@ function tesseraExportPlugin(
 
 // ---------- Manifest Plugin ----------
 
-const VIRTUAL_MANIFEST_ID = 'virtual:tessera-manifest';
-const RESOLVED_MANIFEST_ID = '\0' + VIRTUAL_MANIFEST_ID;
-
 function tesseraManifestPlugin(manifestRef: {
   current: Manifest | null;
   root: string;
 }): Plugin {
-  let projectRoot: string;
-  let pagesDir: string;
+  return virtualModule(
+    'tessera:manifest',
+    'virtual:tessera-manifest',
+    function (ctx) {
+      const manifest = manifestRef.current ?? buildManifest(ctx);
 
-  function buildManifest(): Manifest {
-    const m = generateManifest(pagesDir);
-    manifestRef.current = m;
-    return m;
+      // Register watch files so Vite's built-in watcher (used in build --watch)
+      // knows to re-trigger when pages/ content changes.
+      addWatchFiles(this, resolve(ctx.projectRoot, 'pages'));
+
+      // Encode as base64 to prevent Vite's import analysis from
+      // scanning .svelte importPath strings as module imports.
+      // Replace Infinity with 1e9 since JSON.stringify drops it.
+      const json = JSON.stringify(manifest, (_key, value) =>
+        value === Infinity ? 1e9 : value,
+      );
+      const b64 = Buffer.from(json).toString('base64');
+      // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
+      return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
+    },
+    {
+      hooks: (ctx) => ({
+        buildStart() {
+          buildManifest(ctx);
+        },
+
+        configureServer(devServer: ViteDevServer) {
+          const pagesDir = resolve(ctx.projectRoot, 'pages');
+          devServer.watcher.on('all', (event, filePath) => {
+            if (!filePath.startsWith(pagesDir)) return;
+
+            const isRelevant =
+              filePath.endsWith('.svelte') ||
+              filePath.endsWith('_meta.js') ||
+              event === 'addDir' ||
+              event === 'unlinkDir';
+
+            if (isRelevant) {
+              manifestRef.current = null;
+              ctx.reload(devServer);
+              console.log(
+                `[tessera] Manifest rebuilt (${event}: ${filePath.replace(ctx.projectRoot, '')})`,
+              );
+            }
+          });
+        },
+      }),
+    },
+  );
+
+  function buildManifest(ctx: VirtualModuleContext): Manifest {
+    manifestRef.root = ctx.projectRoot;
+    manifestRef.current = generateManifest(resolve(ctx.projectRoot, 'pages'));
+    return manifestRef.current;
   }
-
-  return {
-    name: 'tessera:manifest',
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      pagesDir = resolve(projectRoot, 'pages');
-      manifestRef.root = projectRoot;
-    },
-
-    configureServer(devServer: ViteDevServer) {
-      // Watch the pages directory for changes
-      devServer.watcher.on('all', (event, filePath) => {
-        if (!filePath.startsWith(pagesDir)) return;
-
-        // Rebuild manifest on relevant file changes
-        const isRelevant =
-          filePath.endsWith('.svelte') ||
-          filePath.endsWith('_meta.js') ||
-          event === 'addDir' ||
-          event === 'unlinkDir';
-
-        if (isRelevant) {
-          manifestRef.current = null; // invalidate cache
-
-          // Invalidate the virtual module to trigger HMR
-          const mod = devServer.moduleGraph.getModuleById(RESOLVED_MANIFEST_ID);
-          if (mod) {
-            devServer.moduleGraph.invalidateModule(mod);
-            devServer.ws.send({ type: 'full-reload' });
-          }
-
-          console.log(
-            `[tessera] Manifest rebuilt (${event}: ${filePath.replace(projectRoot, '')})`,
-          );
-        }
-      });
-    },
-
-    buildStart() {
-      buildManifest();
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_MANIFEST_ID) return RESOLVED_MANIFEST_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id === RESOLVED_MANIFEST_ID) {
-        if (!manifestRef.current) {
-          buildManifest();
-        }
-
-        // Register watch files so Vite's built-in watcher (used in build --watch)
-        // knows to re-trigger when pages/ content changes.
-        addWatchFiles(this, pagesDir);
-
-        // Encode as base64 to prevent Vite's import analysis from
-        // scanning .svelte importPath strings as module imports.
-        // Replace Infinity with 1e9 since JSON.stringify drops it.
-        const json = JSON.stringify(manifestRef.current, (_key, value) =>
-          value === Infinity ? 1e9 : value,
-        );
-        const b64 = Buffer.from(json).toString('base64');
-        // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
-        return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
-      }
-      return null;
-    },
-  };
 }
 
 const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
