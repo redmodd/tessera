@@ -183,10 +183,8 @@ function resolveExplicitActor(
   if (actor !== undefined) {
     return { kind: 'actor', value: actor };
   }
-  if (
-    standardProfile(config.export?.standard)?.hasLaunchLRS &&
-    adapter instanceof BaseXAPILaunchAdapter
-  ) {
+  const profile = standardProfile(config.export?.standard);
+  if (profile?.hasLaunchLRS && adapter instanceof BaseXAPILaunchAdapter) {
     const inner = adapter.getPublisher();
     if (!inner) return null;
     try {
@@ -195,7 +193,7 @@ function resolveExplicitActor(
       return null;
     }
   }
-  if (config.export?.standard === 'scorm12') {
+  if (profile?.derivesLearnerActor) {
     if (adapter instanceof SCORM12Adapter) {
       return {
         kind: 'actor',
@@ -206,9 +204,6 @@ function resolveExplicitActor(
         ) as XAPIAgent,
       };
     }
-    return { kind: 'scorm-fallback', standard: 'scorm12' };
-  }
-  if (config.export?.standard === 'scorm2004') {
     if (adapter instanceof SCORM2004Adapter) {
       return {
         kind: 'actor',
@@ -219,7 +214,7 @@ function resolveExplicitActor(
         ) as XAPIAgent,
       };
     }
-    return { kind: 'scorm-fallback', standard: 'scorm2004' };
+    return { kind: 'scorm-fallback', standard: profile.id };
   }
   console.warn(
     'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',

@@ -293,7 +293,8 @@ function readLanguage(read: CourseConfigRead): string {
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
 function cspMeta(read: CourseConfigRead & { standard: string }): string {
-  if (standardProfile(read.standard)?.packaged !== false) return '';
+  const profile = standardProfile(read.standard);
+  if (!profile || profile.packaged) return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -697,41 +698,37 @@ const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
 // cmi5/xAPI ones return a boolean.
 const LMS_ADAPTER_GEN: Record<
   LMSStandard,
-  { adapter: string; module: string; detect: string; takesApi: boolean }
+  { adapter: string; detect: string; takesApi: boolean }
 > = {
   scorm12: {
     adapter: 'SCORM12Adapter',
-    module: 'scorm12',
     detect: 'findSCORM12API',
     takesApi: true,
   },
   scorm2004: {
     adapter: 'SCORM2004Adapter',
-    module: 'scorm2004',
     detect: 'findSCORM2004API',
     takesApi: true,
   },
   cmi5: {
     adapter: 'CMI5Adapter',
-    module: 'cmi5',
     detect: 'hasCMI5LaunchParams',
     takesApi: false,
   },
   xapi: {
     adapter: 'XAPIAdapter',
-    module: 'xapi',
     detect: 'hasXAPILaunchParams',
     takesApi: false,
   },
 };
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
-  const { adapter, module, detect, takesApi } = LMS_ADAPTER_GEN[standard];
+  const { adapter, detect, takesApi } = LMS_ADAPTER_GEN[standard];
   const guard = takesApi
     ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
     : `if (!${detect}()) throw missingApiError('${standard}');\n  return new ${adapter}();`;
   return `
-import { ${adapter} } from 'tessera-learn/runtime/adapters/${module}.js';
+import { ${adapter} } from 'tessera-learn/runtime/adapters/${standard}.js';
 import { ${detect} } from 'tessera-learn/runtime/adapters/discovery.js';
 import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
 export function createAdapter() {

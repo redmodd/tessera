@@ -304,14 +304,14 @@ export async function runExport(
   const zipPath = resolve(projectRoot, zipName);
 
   const profile = standardProfile(standard);
-  if (profile?.packaged === false) {
+  if (!profile) return; // unknown standard: the validator rejects these upstream
+  if (!profile.packaged) {
     const files = collectFiles(distDir);
     let totalSize = 0;
     for (const f of files) totalSize += statSync(resolve(distDir, f)).size;
     console.log(`✓ Web export: dist/ (${formatSize(totalSize)})`);
     return;
   }
-  if (!profile) return; // unknown standard — the validator rejects these upstream
 
   const spec = PACKAGED_EXPORTS[profile.id];
 

@@ -82,7 +82,7 @@ export const STANDARDS = {
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };
 
-export type StandardProfile = (typeof STANDARDS)[StandardId];
+type StandardProfile = (typeof STANDARDS)[StandardId];
 
 type StandardsWhere<F extends keyof StandardProfile> = {
   [K in StandardId]: (typeof STANDARDS)[K][F] extends true ? K : never;
@@ -103,7 +103,10 @@ export function standardProfile(
 
 export function largerSuspendDataStandards(limit: number): StandardId[] {
   return STANDARD_IDS.filter((id) => {
-    const profile: ProfileShape = STANDARDS[id];
-    return profile.packaged && (profile.suspendDataLimit ?? Infinity) > limit;
+    const profile = STANDARDS[id];
+    return (
+      profile.packaged &&
+      (!('suspendDataLimit' in profile) || profile.suspendDataLimit > limit)
+    );
   });
 }
