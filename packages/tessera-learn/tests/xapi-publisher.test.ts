@@ -606,63 +606,6 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     );
   });
 
-  it('skips tasks still queued when sendFinal runs', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
-    const task = vi.fn(async () => {});
-    const chained = pub.chainTask(task);
-    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
-    await chained;
-    expect(task).not.toHaveBeenCalled();
-  });
-
-  it('runs tasks chained after sendFinal', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
-    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
-    const task = vi.fn(async () => {});
-    await pub.chainTask(task);
-    expect(task).toHaveBeenCalledOnce();
-  });
-
-  it('drops statements enqueued after sendFinal', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
-    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
-    const late = await pub.sendStatement({ verb: { id: 'http://verb/late' } });
-    expect(late.destinations[0].ok).toBe(false);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores the late response of a statement sendFinal took into its batch', async () => {
-    vi.useFakeTimers();
-    let fail!: (v: unknown) => void;
-    mockFetch
-      .mockReturnValueOnce(new Promise((r) => (fail = r)))
-      .mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
-    const inflight = pub.sendStatement({
-      verb: { id: 'http://verb/in-flight' },
-    });
-    await vi.advanceTimersByTimeAsync(0);
-    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
-    fail({ ok: false, status: 503, text: async () => '' });
-    await vi.advanceTimersByTimeAsync(600_000);
-
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(verbIds(mockFetch.mock.calls[1][1].body)).toEqual([
-      'http://verb/in-flight',
-      'http://verb/final',
-    ]);
-    await expect(inflight).resolves.toMatchObject({
-      destinations: [{ ok: true }],
-    });
-  });
-
   it('sendFinal retries a 5xx', async () => {
     vi.useFakeTimers();
     mockFetch

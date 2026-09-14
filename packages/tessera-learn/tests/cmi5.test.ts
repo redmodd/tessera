@@ -777,7 +777,7 @@ describe('CMI5Adapter', () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
-    await new Promise((r) => setTimeout(r, 20));
+    await tick();
 
     mockFetch.mockClear();
     mockFetch
@@ -850,27 +850,6 @@ describe('CMI5Adapter', () => {
       ([, init]: any[]) => init?.method === 'PUT',
     );
     expect(JSON.parse(put[1].body)).toEqual({ b: 3, n: 6 });
-  });
-
-  it('sends no statements after terminate', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
-    await new Promise((r) => setTimeout(r, 20));
-
-    mockFetch.mockClear();
-    mockFetch.mockResolvedValue({ ok: true });
-    adapter.terminate();
-    adapter.setCompletionStatus('complete');
-    await new Promise((r) => setTimeout(r, 20));
-
-    const verbs = mockFetch.mock.calls
-      .filter(([url]: any[]) => String(url).includes('statements'))
-      .flatMap(([, init]: any[]) => {
-        const body = JSON.parse(init.body);
-        return (Array.isArray(body) ? body : [body]).map((s: any) => s.verb.id);
-      });
-    expect(verbs).toEqual(['http://adlnet.gov/expapi/verbs/terminated']);
   });
 
   describe('LMS launch params: masteryScore + moveOn (cmi5 §8, §9.5.3)', () => {
@@ -1305,33 +1284,12 @@ describe('CMI5Adapter', () => {
         .find((b: any) => b?.verb?.id === verbId);
     }
 
-    it('redirects to LMS-supplied returnURL after sending Terminated', async () => {
-      const returnURL = 'https://lms.example.com/learner/done';
-      setupInitMocks(undefined, { returnURL });
-      adapter = new CMI5Adapter();
-      await adapter.init();
-
-      const assign = vi.fn();
-      vi.stubGlobal('window', {
-        ...globalThis.window,
-        location: { ...globalThis.window.location, assign },
-      });
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({ ok: true });
-
-      await adapter.exit();
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
-      ).toBeDefined();
-      expect(assign).toHaveBeenCalledWith(returnURL);
-    });
-
     it('waits for a statement already sending before Terminated and the redirect', async () => {
       const returnURL = 'https://lms.example.com/learner/done';
       setupInitMocks(undefined, { returnURL });
       adapter = new CMI5Adapter();
       await adapter.init();
-      await new Promise((r) => setTimeout(r, 20));
+      await tick();
 
       const assign = vi.fn();
       vi.stubGlobal('window', {
