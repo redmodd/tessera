@@ -10,6 +10,7 @@ import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity, type CourseConfig } from '../runtime/types.js';
+import { standardProfile } from '../runtime/standards.js';
 
 function slugify(text: string): string {
   return text
@@ -307,7 +308,7 @@ export async function runExport(
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
 
-  if (standard === 'web') {
+  if (standardProfile(standard)?.packaged === false) {
     const files = collectFiles(distDir);
     let totalSize = 0;
     for (const f of files) totalSize += statSync(resolve(distDir, f)).size;

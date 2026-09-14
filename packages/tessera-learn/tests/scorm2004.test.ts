@@ -104,7 +104,7 @@ describe('SCORM2004Adapter', () => {
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toMatch(
-        /SCORM 2004 4E cmi\.suspend_data 64000/,
+        /SCORM 2004 cmi\.suspend_data 64000/,
       );
       warn.mockRestore();
     });

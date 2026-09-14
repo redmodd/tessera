@@ -23,6 +23,7 @@ import {
   DEFAULT_PASSING_SCORE,
   DEFAULT_PERCENTAGE_THRESHOLD,
 } from '../runtime/defaults.js';
+import { DEFAULT_STANDARD, standardProfile } from '../runtime/standards.js';
 import {
   validateProject,
   reportValidationIssues,
@@ -288,7 +289,7 @@ function readLanguage(read: CourseConfigRead): string {
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
 function cspMeta(read: CourseConfigRead & { standard: string }): string {
-  if (read.standard !== 'web') return '';
+  if (standardProfile(read.standard)?.packaged !== false) return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -407,7 +408,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     navigation: { mode: 'free', ...userConfig.navigation },
     completion: { ...completion, ...userConfig.completion },
     scoring: { passingScore, ...userConfig.scoring },
-    export: { standard: 'web', ...userConfig.export },
+    export: { standard: DEFAULT_STANDARD, ...userConfig.export },
   };
 }
 
@@ -752,7 +753,7 @@ function tesseraAdapterPlugin(standardOverride?: string): Plugin {
 
       // The audit renders headless with no LMS in the frame chain; the SCORM/
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
-      if (isAuditBuild()) standard = 'web';
+      if (isAuditBuild()) standard = DEFAULT_STANDARD;
 
       if (standard in LMS_ADAPTER_GEN) {
         return generateLmsAdapterModule(
@@ -794,7 +795,7 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of
       // explicit xapi config.
-      if (hasExplicit || standard === 'cmi5' || standard === 'xapi') {
+      if (hasExplicit || standardProfile(standard)?.hasLaunchLRS) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 

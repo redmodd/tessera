@@ -6,20 +6,18 @@ import {
 } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
+import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
 
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
  *
- * `suspendDataLimit` is per-spec characters: SCORM 1.2 RTE §3.4.5.2 = 4096;
- * SCORM 2004 4E §4.2 = 64000. The `LMS*`-prefixed (1.2) vs bare (2004)
- * method names are abstracted here so the base class can stay version-
- * agnostic.
+ * The `LMS*`-prefixed (1.2) vs bare (2004) method names are abstracted here
+ * so the base class can stay version-agnostic.
  */
 export interface ScormDialect<TApi> {
+  profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   sessionTimeKey: string;
   formatDuration(seconds: number): string;
-  suspendDataLimit: number;
-  suspendDataLimitLabel: string;
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
     timestampField: 'time' | 'timestamp';
@@ -142,17 +140,15 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     if (!this.canWrite()) return;
     this.#state = state;
     const json = JSON.stringify(state);
-    if (
-      !this.#suspendOverflowWarned &&
-      json.length > this.dialect.suspendDataLimit
-    ) {
+    const { name, suspendDataLimit } = this.dialect.profile;
+    if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
       this.#suspendOverflowWarned = true;
       console.warn(
         `Tessera: cmi.suspend_data is ${json.length} chars, over the ` +
-          `${this.dialect.suspendDataLimitLabel} limit. The LMS will likely ` +
+          `${name} cmi.suspend_data ${suspendDataLimit}-char limit. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +
-          `larger-limit standard (scorm2004/cmi5).`,
+          `larger-limit standard (${largerSuspendDataStandards(suspendDataLimit).join('/')}).`,
       );
     }
     this.set('cmi.suspend_data', json);
