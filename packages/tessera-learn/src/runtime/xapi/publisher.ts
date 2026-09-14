@@ -52,6 +52,12 @@ export interface XAPIPublisherOptions {
   unavailableReason?: () => Error;
 }
 
+interface UnsentEntry {
+  body: Statement | Statement[];
+  settle: (o: DestinationOutcome) => void;
+  taken: boolean;
+}
+
 interface SendOutcome {
   ok: boolean;
   status?: number;
@@ -78,6 +84,10 @@ const QUEUE_DEPTH_SATURATED = 1000;
  * useful signal.
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
+
+function isClientError(status: number | undefined): boolean {
+  return status !== undefined && status >= 400 && status < 500;
+}
 
 /**
  * Single-destination xAPI publisher. Builds and sends statements with
@@ -124,6 +134,8 @@ export class XAPIPublisher {
   #queueDepth = 0;
   #queueWarned = false;
   #unloading = false;
+  #unsent: UnsentEntry[] = [];
+  #closed = false;
 
   constructor(opts: XAPIPublisherOptions) {
     if (!opts.endpoint || typeof opts.endpoint !== 'string') {
@@ -346,14 +358,25 @@ export class XAPIPublisher {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
+    if (this.#closed) {
+      return Promise.resolve(
+        this.#toDestination({
+          ok: false,
+          error: new XAPIConfigError(
+            'XAPIPublisher: Terminated was already sent; statement dropped.',
+          ),
+        }),
+      );
+    }
     if (this.#queueDepth >= QUEUE_DEPTH_SATURATED) {
-      return Promise.resolve<DestinationOutcome>({
-        endpoint: this.#endpoint,
-        ok: false,
-        error: new XAPIConfigError(
-          `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`,
-        ),
-      });
+      return Promise.resolve(
+        this.#toDestination({
+          ok: false,
+          error: new XAPIConfigError(
+            `XAPIPublisher queue saturated (${this.#queueDepth} in-flight); refusing further sends until the LRS catches up.`,
+          ),
+        }),
+      );
     }
     if (!this.#queueWarned && this.#queueDepth >= QUEUE_DEPTH_WARN) {
       this.#queueWarned = true;
@@ -373,44 +396,65 @@ export class XAPIPublisher {
     // path synchronously up to fetch — same timing as the original
     // cmi5.ts queue, which a few tests rely on (e.g., Initialized must
     // POST before mockClear() runs in the test body).
+    const entry: UnsentEntry = {
+      body: statementOrBatch,
+      settle: resolveOutcome,
+      taken: false,
+    };
+    this.#unsent.push(entry);
     this.#queue = this.#queue.then(() =>
-      this.#sendWithRetry(statementOrBatch, options).then((outcome) => {
-        this.#queueDepth--;
-        resolveOutcome({
-          endpoint: this.#endpoint,
-          ok: outcome.ok,
-          status: outcome.status,
-          error: outcome.error,
-        });
+      this.#sendQueued(entry, options).then((outcome) => {
+        if (!outcome) return;
+        this.#unsent.shift();
+        this.#settle(entry, outcome);
       }),
     );
     return outcomePromise;
   }
 
+  sendFinal(partial: PartialStatement): Promise<DestinationOutcome> {
+    if (this.#unavailableReason) {
+      return Promise.reject(this.#unavailableReason());
+    }
+    const flushed = this.#unsent;
+    this.#unsent = [];
+    this.#closed = true;
+    for (const e of flushed) e.taken = true;
+    const final = this.buildStatement(partial);
+    const batch = [...flushed.flatMap((e) => e.body), final];
+    return this.#sendClosing(flushed.length ? batch : final).then(
+      async (outcome) => {
+        if (!flushed.length || !isClientError(outcome.status)) {
+          for (const e of flushed) this.#settle(e, outcome);
+          return this.#toDestination(outcome);
+        }
+        for (const e of flushed) {
+          this.#settle(e, await this.#sendClosing(e.body));
+        }
+        return this.#toDestination(await this.#sendClosing(final));
+      },
+    );
+  }
+
   /**
-   * Chain an arbitrary task on the queue. Used by the cmi5 adapter for
-   * State API writes that need to land before Terminated.
+   * Chain an arbitrary task on the queue. Used by the launch adapters for
+   * State API writes.
    *
    * The task is wrapped so a thrown error never breaks the queue's
    * Promise chain — subsequent enqueues still flow.
    */
   chainTask(fn: () => Promise<void>): Promise<void> {
-    let resolveTask!: () => void;
-    const taskPromise = new Promise<void>((r) => {
-      resolveTask = r;
-    });
+    const closedAtEnqueue = this.#closed;
     this.#queue = this.#queue.then(() =>
-      fn()
-        .catch(() => {})
-        .then(() => resolveTask()),
+      this.#closed !== closedAtEnqueue ? undefined : fn().catch(() => {}),
     );
-    return taskPromise;
+    return this.#queue;
   }
 
   /**
    * Switch the publisher to "page is unloading" mode. Subsequent fetches
-   * use `keepalive: true` so they survive the unload. The cmi5 adapter
-   * calls this before enqueuing the final Terminated statement.
+   * use `keepalive: true` so they survive the unload. The launch adapters
+   * call this before `sendFinal`.
    */
   markUnloading(): void {
     this.#unloading = true;
@@ -421,56 +465,77 @@ export class XAPIPublisher {
     return this.#unloading;
   }
 
-  /** Whether this publisher participates in cmi5 ordering (Terminated must be last). */
-  isCmi5Mode(): boolean {
-    return this.#cmi5Mode;
-  }
-
   // ---- Internal: send with retry policy ----
 
-  #sendWithRetry(
-    statementOrBatch: Statement | Statement[],
+  #sendQueued(
+    entry: UnsentEntry,
     options?: SendStatementOptions,
+  ): Promise<SendOutcome | null> {
+    const taken = () => entry.taken;
+    return this.#sendRetrying(entry.body, {
+      attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
+      stop: taken,
+    }).then((outcome) => (taken() ? null : outcome));
+  }
+
+  #sendClosing(
+    statementOrBatch: Statement | Statement[],
+  ): Promise<SendOutcome> {
+    return this.#sendRetrying(statementOrBatch, {
+      attempts: RETRY_ATTEMPTS,
+      keepalive: true,
+    });
+  }
+
+  #sendRetrying(
+    statementOrBatch: Statement | Statement[],
+    opts: { attempts: number; keepalive?: boolean; stop?: () => boolean },
   ): Promise<SendOutcome> {
     const body = JSON.stringify(statementOrBatch);
-    const retry = options?.retry !== false; // default: retry enabled
-    const maxAttempts = retry ? RETRY_ATTEMPTS : 1;
+    const stop = opts.stop ?? (() => false);
 
     const attempt = (n: number): Promise<SendOutcome> => {
-      const isFinal = n === maxAttempts - 1;
+      const isFinal = n === opts.attempts - 1;
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
-      const keepalive = isFinal || this.#unloading;
-      if (keepalive && body.length > KEEPALIVE_BODY_LIMIT_BYTES) {
-        const count = Array.isArray(statementOrBatch)
-          ? statementOrBatch.length
-          : 1;
-        console.warn(
-          `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
-            `over the 64 KiB keepalive cap. The browser may silently drop this ` +
-            `request during unload. Reduce per-statement size or split sends ` +
-            `before terminate.`,
-        );
-      }
+      const keepalive = opts.keepalive || isFinal || this.#unloading;
+      if (keepalive) this.#warnOverKeepaliveCap(body, statementOrBatch);
       return this.#sendOnce(body, keepalive).then((outcome) => {
-        if (outcome.ok) return outcome;
         // 4xx (other than the 401 path which #sendOnce already retried) won't
-        // recover — short-circuit.
-        if (
-          outcome.status !== undefined &&
-          outcome.status >= 400 &&
-          outcome.status < 500
-        ) {
+        // recover, so short-circuit.
+        if (outcome.ok || isClientError(outcome.status) || isFinal || stop()) {
           return outcome;
         }
-        if (isFinal) return outcome;
         return new Promise<void>((r) => setTimeout(r, backoffMs(n))).then(() =>
-          attempt(n + 1),
+          stop() ? outcome : attempt(n + 1),
         );
       });
     };
 
-    return attempt(0);
+    return stop() ? Promise.resolve<SendOutcome>({ ok: false }) : attempt(0);
+  }
+
+  #warnOverKeepaliveCap(
+    body: string,
+    statementOrBatch: Statement | Statement[],
+  ): void {
+    if (body.length <= KEEPALIVE_BODY_LIMIT_BYTES) return;
+    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
+    console.warn(
+      `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
+        `over the 64 KiB keepalive cap. The browser may silently drop this ` +
+        `request during unload. Reduce per-statement size or split sends ` +
+        `before terminate.`,
+    );
+  }
+
+  #settle(entry: UnsentEntry, outcome: SendOutcome): void {
+    this.#queueDepth--;
+    entry.settle(this.#toDestination(outcome));
+  }
+
+  #toDestination(outcome: SendOutcome): DestinationOutcome {
+    return { endpoint: this.#endpoint, ...outcome };
   }
 
   #sendOnce(body: string, keepalive: boolean): Promise<SendOutcome> {

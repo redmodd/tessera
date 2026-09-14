@@ -385,9 +385,6 @@
       progress.completionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
-    // Stop accepting author-issued statements on independent destinations
-    // before terminate() so a late `useXAPI().sendStatement(...)` from a
-    // beforeunload handler can't slip in after Terminated.
     xapiClient?.markUnloading();
     adapter.terminate();
   }
@@ -490,7 +487,6 @@
     adapter.commit();
 
     window.addEventListener('pagehide', handleExit);
-    window.addEventListener('beforeunload', handleExit);
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn
@@ -517,7 +513,6 @@
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
     window.removeEventListener('pagehide', handleExit);
-    window.removeEventListener('beforeunload', handleExit);
     if (manualWatchdog !== null) {
       clearTimeout(manualWatchdog);
       manualWatchdog = null;

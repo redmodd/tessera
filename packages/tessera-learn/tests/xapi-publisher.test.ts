@@ -24,12 +24,18 @@ function basicOpts(
   };
 }
 
+function verbIds(body: string): string[] {
+  const parsed = JSON.parse(body);
+  return (Array.isArray(parsed) ? parsed : [parsed]).map((s) => s.verb.id);
+}
+
 beforeEach(() => {
   mockFetch.mockReset();
   vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -534,6 +540,160 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
   });
+
+  it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
+    mockFetch
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const inflight = pub.sendStatement({
+      verb: { id: 'http://verb/in-flight' },
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    const queued = pub.sendStatement({ verb: { id: 'http://verb/queued' } });
+
+    const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, init] = mockFetch.mock.calls[1];
+    expect(init.keepalive).toBe(true);
+    expect(verbIds(init.body)).toEqual([
+      'http://verb/in-flight',
+      'http://verb/queued',
+      'http://verb/final',
+    ]);
+    await expect(final).resolves.toMatchObject({ ok: true });
+    await expect(inflight).resolves.toMatchObject({
+      destinations: [{ ok: true }],
+    });
+    await expect(queued).resolves.toMatchObject({
+      destinations: [{ ok: true }],
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sendFinal takes a statement waiting to retry into its batch', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(verbIds(mockFetch.mock.calls[1][1].body)).toEqual([
+      'http://verb/retry',
+      'http://verb/final',
+    ]);
+    await expect(retrying).resolves.toMatchObject({
+      destinations: [{ ok: true }],
+    });
+  });
+
+  it('sendFinal with nothing queued posts a single statement', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body).verb.id).toBe(
+      'http://verb/final',
+    );
+  });
+
+  it('sendFinal retries a 5xx', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
+      .mockResolvedValue({ ok: true });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    await expect(final).resolves.toMatchObject({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sendFinal resends each statement, then the final one alone, when the batch is rejected', async () => {
+    let calls = 0;
+    mockFetch.mockImplementation((_url: string, init: RequestInit) => {
+      if (++calls === 1) return new Promise(() => {});
+      return Promise.resolve(
+        verbIds(init.body as string).includes('http://verb/bad')
+          ? { ok: false, status: 400, text: async () => '' }
+          : { ok: true },
+      );
+    });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    void pub.sendStatement({ verb: { id: 'http://verb/head' } });
+    await new Promise((r) => setTimeout(r, 0));
+    const good = pub.sendStatement({ verb: { id: 'http://verb/good' } });
+    const bad = pub.sendStatement({ verb: { id: 'http://verb/bad' } });
+
+    const final = await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+    expect(final.ok).toBe(true);
+    expect(
+      mockFetch.mock.calls
+        .slice(1)
+        .map(([, init]: any[]) => verbIds(init.body)),
+    ).toEqual([
+      [
+        'http://verb/head',
+        'http://verb/good',
+        'http://verb/bad',
+        'http://verb/final',
+      ],
+      ['http://verb/head'],
+      ['http://verb/good'],
+      ['http://verb/bad'],
+      ['http://verb/final'],
+    ]);
+    await expect(good).resolves.toMatchObject({ destinations: [{ ok: true }] });
+    await expect(bad).resolves.toMatchObject({
+      destinations: [{ ok: false, status: 400 }],
+    });
+  });
+
+  it('sendFinal resends each statement, then the final one alone, when a batch carrying an earlier statement gets a 409', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    mockFetch.mockImplementation((_url: string, init: RequestInit) => {
+      if (++calls === 1) return Promise.reject(new TypeError('reset'));
+      return Promise.resolve(
+        verbIds(init.body as string).includes('http://verb/retry')
+          ? { ok: false, status: 409, text: async () => '' }
+          : { ok: true },
+      );
+    });
+    const pub = new XAPIPublisher(basicOpts());
+    await pub.init();
+    const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const final = await pub.sendFinal({ verb: { id: 'http://verb/final' } });
+
+    expect(final).toMatchObject({ ok: true });
+    expect(
+      mockFetch.mock.calls
+        .slice(1)
+        .map(([, init]: any[]) => verbIds(init.body)),
+    ).toEqual([
+      ['http://verb/retry', 'http://verb/final'],
+      ['http://verb/retry'],
+      ['http://verb/final'],
+    ]);
+    await expect(retrying).resolves.toMatchObject({
+      destinations: [{ ok: true, status: 409 }],
+    });
+  });
 });
 
 describe('XAPIClient — fan-out', () => {
@@ -622,37 +782,9 @@ describe('XAPIClient — fan-out', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('rejects sendStatement after markUnloading when all publishers are cmi5-mode (Terminated must stay last)', async () => {
+  it('after the shared launch publisher sends Terminated, drops author sends to it but still sends to independent destinations', async () => {
     mockFetch.mockResolvedValue({ ok: true });
-    const p1 = new XAPIPublisher({
-      endpoint: 'https://lrs1.example.com/xapi/',
-      auth: 'tok',
-      actor: { mbox: 'mailto:a@b.c' },
-      activityId: 'https://example.com/c',
-      cmi5Mode: true,
-    });
-    const p2 = new XAPIPublisher({
-      endpoint: 'https://lrs2.example.com/xapi/',
-      auth: 'tok',
-      actor: { mbox: 'mailto:a@b.c' },
-      activityId: 'https://example.com/c',
-      cmi5Mode: true,
-    });
-    await p1.init();
-    await p2.init();
-    const client = new XAPIClient([p1, p2]);
-    client.markUnloading();
-    expect(p1.isUnloading()).toBe(true);
-    expect(p2.isUnloading()).toBe(true);
-    await expect(
-      client.sendStatement({ verb: { id: 'http://verb/late' } }),
-    ).rejects.toThrow(/unloading/);
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('after markUnloading still sends to independent (non-cmi5) destinations; only cmi5 destinations are dropped', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const cmi5Pub = new XAPIPublisher({
+    const launchPub = new XAPIPublisher({
       endpoint: 'https://cmi5.example.com/xapi/',
       auth: 'tok',
       actor: { mbox: 'mailto:a@b.c' },
@@ -660,18 +792,29 @@ describe('XAPIClient — fan-out', () => {
       cmi5Mode: true,
     });
     const independentPub = makePub('https://analytics.example.com/xapi/');
-    await cmi5Pub.init();
+    await launchPub.init();
     await independentPub.init();
-    const client = new XAPIClient([cmi5Pub, independentPub]);
+    const client = new XAPIClient([launchPub, independentPub]);
     client.markUnloading();
+    await launchPub.sendFinal({ verb: { id: 'http://verb/terminated' } });
+    mockFetch.mockClear();
+
     const r = await client.sendStatement({ verb: { id: 'http://verb/late' } });
-    const cmi5Outcome = r.destinations.find((d) => d.endpoint.includes('cmi5'));
+
+    const launchOutcome = r.destinations.find((d) =>
+      d.endpoint.includes('cmi5'),
+    );
     const indepOutcome = r.destinations.find((d) =>
       d.endpoint.includes('analytics'),
     );
-    expect(cmi5Outcome?.ok).toBe(false);
-    expect(cmi5Outcome?.error?.message).toMatch(/unloading|cmi5/i);
+    expect(launchOutcome?.ok).toBe(false);
+    expect(launchOutcome?.error?.message).toMatch(
+      /Terminated was already sent/,
+    );
     expect(indepOutcome?.ok).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(String(mockFetch.mock.calls[0][0])).toContain('analytics');
+    expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
   });
 });
 
