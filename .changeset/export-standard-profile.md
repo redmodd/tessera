@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-SCORM 2004 exports now get the suspend-data size warning, and the advice lists every larger-limit standard.
+The build-time suspend-data warning now covers SCORM 2004, and suspend-data advice lists every larger-limit standard.
