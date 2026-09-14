@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Per-standard knowledge (names, capabilities, suspend-data limits) lives in one export standard profile table.
+SCORM 2004 exports now get the suspend-data size warning, and the advice lists every larger-limit standard.

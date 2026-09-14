@@ -796,7 +796,7 @@ function validateSingleXAPIEntry(
   if (endpoint === 'lms') {
     // 'lms' inherits the LRS from the launch — only the launch-based
     // standards (cmi5, plain xAPI) carry one.
-    if (!profile?.hasLaunchLRS) {
+    if (profile && !profile.hasLaunchLRS) {
       // Only cmi5/xAPI launches carry an LRS to inherit. The runtime drops the
       // entry, so one config can still export to every standard.
       d.warn(
@@ -991,7 +991,7 @@ function validateSingleXAPIEntry(
         `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
       );
     }
-    if (!profile?.hasLaunchLRS) {
+    if (profile && !profile.hasLaunchLRS) {
       d.warn(
         `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
       );
