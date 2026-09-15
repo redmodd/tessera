@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { main } from '../src/plugin/cli.js';
+import { main, COMMANDS, USAGE } from '../src/plugin/cli.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -24,12 +24,21 @@ describe('tessera CLI dispatcher', () => {
     for (const argv of [
       ['a11y', '--help'],
       ['check', '-h'],
+      ['new', '--help'],
+      ['duplicate', '--help'],
+      ['duplicate', 'src', '-h'],
     ]) {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       const code = await main(argv);
       expect(code).toBe(0);
       expect(log.mock.calls.flat().join(' ')).toContain('Usage: tessera');
       vi.restoreAllMocks();
+    }
+  });
+
+  it('lists every command in USAGE', () => {
+    for (const name of Object.keys(COMMANDS)) {
+      expect(USAGE).toMatch(new RegExp(`^  ${name} `, 'm'));
     }
   });
 });

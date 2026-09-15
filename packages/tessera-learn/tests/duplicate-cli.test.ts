@@ -273,14 +273,4 @@ describe('runDuplicate', () => {
     expect(existsSync(join(dest, 'course.config.js'))).toBe(true);
     expect(existsSync(join(dest, 'pages', 'index.svelte'))).toBe(true);
   });
-
-  it('prints the synopsis and returns 0 for --help in either positional', () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    expect(runDuplicate('--help', undefined, ws)).toBe(0);
-    expect(runDuplicate('src', '--help', ws)).toBe(0);
-    expect(runDuplicate('src', '-h', ws)).toBe(0);
-    expect(log.mock.calls.flat().join(' ')).toContain(
-      'Usage: tessera duplicate',
-    );
-  });
 });

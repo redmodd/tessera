@@ -9,13 +9,6 @@ import { resolvePackageRoot } from './package-root.js';
 // `tessera new <name>` — stamp a new course into courses/<name> inside the
 // current workspace. No install step: the workspace already owns the deps.
 export function runNew(name: string | undefined, cwd: string): number {
-  if (name === '--help' || name === '-h') {
-    console.log(
-      'Usage: tessera new <name>\n\n' +
-        'Scaffold a new course into courses/<name> inside the current workspace.',
-    );
-    return 0;
-  }
   if (!name) {
     console.error('Usage: tessera new <name>');
     return 1;

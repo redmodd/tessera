@@ -4,6 +4,9 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main, splitCourseArg, parseExportFlags } from '../src/plugin/cli.js';
 
+const runAudit = vi.hoisted(() => vi.fn(async () => 0));
+vi.mock('../src/plugin/a11y/audit.js', () => ({ runAudit }));
+
 describe('parseExportFlags', () => {
   it('returns no override when --standard is absent', () => {
     expect(parseExportFlags([])).toEqual({});
@@ -22,14 +25,15 @@ describe('parseExportFlags', () => {
   });
 
   it('errors on an unknown standard value', () => {
-    const result = parseExportFlags(['--standard', 'bogus']);
-    expect(result.error).toContain('bogus');
-    expect(result.standardOverride).toBeUndefined();
+    expect(parseExportFlags(['--standard', 'bogus'])).toEqual({
+      error: expect.stringContaining('bogus'),
+    });
   });
 
   it('errors when --standard has no value', () => {
-    const result = parseExportFlags(['--standard']);
-    expect(result.error).toMatch(/--standard/);
+    expect(parseExportFlags(['--standard'])).toEqual({
+      error: '--standard requires a value',
+    });
   });
 
   it('accepts the --standard=value form', () => {
@@ -39,15 +43,15 @@ describe('parseExportFlags', () => {
   });
 
   it('errors on an unknown standard given as --standard=value', () => {
-    const result = parseExportFlags(['--standard=bogus']);
-    expect(result.error).toContain('bogus');
-    expect(result.standardOverride).toBeUndefined();
+    expect(parseExportFlags(['--standard=bogus'])).toEqual({
+      error: expect.stringContaining('bogus'),
+    });
   });
 
   it('rejects an unrecognized flag instead of ignoring it', () => {
-    const result = parseExportFlags(['--standrd', 'scorm2004']);
-    expect(result.error).toMatch(/Unknown argument/);
-    expect(result.standardOverride).toBeUndefined();
+    expect(parseExportFlags(['--standrd', 'scorm2004'])).toEqual({
+      error: 'Unknown argument: --standrd',
+    });
   });
 });
 
@@ -93,6 +97,7 @@ function makeWorkspace(courses: string[]): string {
 }
 
 beforeEach(() => {
+  runAudit.mockClear();
   ws = makeWorkspace(['getting-started']);
 });
 
@@ -135,6 +140,29 @@ describe('main dispatch', () => {
     );
     expect(code).toBe(1);
     expect(err.mock.calls.flat().join(' ')).toContain('bogus');
+  });
+
+  it('passes the parsed a11y threshold through to the audit', async () => {
+    const code = await main(
+      ['a11y', 'getting-started', '--threshold', 'minor'],
+      ws,
+    );
+    expect(code).toBe(0);
+    expect(runAudit).toHaveBeenCalledWith(
+      expect.stringContaining('getting-started'),
+      expect.any(String),
+      { threshold: 'minor' },
+    );
+  });
+
+  it('rejects a11y flags before resolving the course', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const code = await main(['a11y', 'nope', '--wat'], ws);
+    expect(code).toBe(1);
+    expect(err.mock.calls.flat().join(' ')).toContain(
+      '[tessera a11y] Unknown argument: --wat',
+    );
+    expect(runAudit).not.toHaveBeenCalled();
   });
 
   it('rejects validate with an invalid --standard', async () => {

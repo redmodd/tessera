@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { runValidate } from './validate-cli.js';
-import { runA11y } from './a11y-cli.js';
+import { parseA11yArgs, VALID_THRESHOLDS } from './a11y-cli.js';
+import { runAudit } from './a11y/audit.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
@@ -10,31 +11,43 @@ import {
   type StandardId,
 } from '../runtime/standards.js';
 
-const USAGE = `Usage: tessera <command> [course] [options]
+export type ParsedFlags<F> = F | { error: string };
 
-Commands:
-  new <name>                  Scaffold a new course into courses/<name>
-  duplicate <source> <new>    Copy courses/<source> to courses/<new>
-  dev       [course]          Start the Vite dev server
-  export    [course]          Build and package the course for its LMS standard
-  validate  [course]          Fast static structure checks
-  a11y      [course]          Runtime accessibility audit (builds + drives Playwright)
-  check     [course]          Run validate, then a11y
+interface Course {
+  courseRoot: string;
+  workspaceRoot: string;
+}
 
-Run a command from inside a course folder, or name the course explicitly.
+interface CommandInfo {
+  args: string;
+  summary: string;
+  options?: string;
+}
 
-export/validate options:
-  --standard <${STANDARD_IDS.join('|')}>    Override course.config.js export.standard
+interface WorkspaceCommand extends CommandInfo {
+  course: false;
+  run(args: string[], cwd: string): number;
+}
 
-a11y/check options:
-  --threshold <minor|moderate|serious|critical>   Failing impact (default: serious)`;
+interface CourseCommand<F> extends CommandInfo {
+  course: true;
+  parseFlags?(flags: string[]): ParsedFlags<F>;
+  run(course: Course, flags: F): number | Promise<number>;
+}
+
+type Command = WorkspaceCommand | CourseCommand<unknown>;
+
+function courseCommand<F>(
+  command: Omit<CourseCommand<F>, 'course'>,
+): CourseCommand<unknown> {
+  return { ...command, course: true };
+}
 
 // Validate here, against the standards table, so an unknown standard
 // fails before Vite spins up.
-export function parseExportFlags(flags: string[]): {
-  standardOverride?: StandardId;
-  error?: string;
-} {
+export function parseExportFlags(
+  flags: string[],
+): ParsedFlags<{ standardOverride?: StandardId }> {
   let standardOverride: StandardId | undefined;
   for (let i = 0; i < flags.length; i++) {
     const arg = flags[i];
@@ -73,70 +86,98 @@ export function splitCourseArg(rest: string[]): {
   return { course: undefined, flags: rest };
 }
 
-type CourseCommand = (
-  courseRoot: string,
-  workspaceRoot: string,
-  flags: string[],
-) => number | Promise<number>;
+const STANDARD_OPTION = `  --standard <${STANDARD_IDS.join('|')}>    Override course.config.js export.standard`;
+const THRESHOLD_OPTION = `  --threshold <${VALID_THRESHOLDS.join('|')}>   Failing impact (default: serious)`;
 
-const COURSE_COMMANDS: Record<string, CourseCommand> = {
-  dev: async (courseRoot, workspaceRoot) =>
-    (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
-  export: async (courseRoot, workspaceRoot, flags) => {
-    const { standardOverride, error } = parseExportFlags(flags);
-    if (error) {
-      console.error(`[tessera] ${error}`);
-      return 1;
-    }
-    return (await import('./build-commands.js')).runBuild(
-      courseRoot,
-      workspaceRoot,
-      standardOverride,
-    );
+export const COMMANDS: Record<string, Command> = {
+  new: {
+    course: false,
+    args: '<name>',
+    summary: 'Scaffold a new course into courses/<name>',
+    run: (args, cwd) => runNew(args[0], cwd),
   },
-  validate: (courseRoot, _workspaceRoot, flags) => {
-    const { standardOverride, error } = parseExportFlags(flags);
-    if (error) {
-      console.error(`[tessera] ${error}`);
-      return 1;
-    }
-    return runValidate(courseRoot, { standardOverride });
+  duplicate: {
+    course: false,
+    args: '<source> <new>',
+    summary: 'Copy courses/<source> to courses/<new>',
+    run: (args, cwd) => runDuplicate(args[0], args[1], cwd),
   },
-  a11y: (courseRoot, workspaceRoot, flags) =>
-    runA11y(courseRoot, workspaceRoot, flags),
-  check: (courseRoot, workspaceRoot, flags) => {
-    const validateCode = runValidate(courseRoot, { showA11yTip: false });
-    if (validateCode !== 0) return validateCode;
-    return runA11y(courseRoot, workspaceRoot, flags);
-  },
+  dev: courseCommand({
+    args: '[course]',
+    summary: 'Start the Vite dev server',
+    run: async ({ courseRoot, workspaceRoot }) =>
+      (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
+  }),
+  export: courseCommand({
+    args: '[course]',
+    summary: 'Build and package the course for its LMS standard',
+    options: STANDARD_OPTION,
+    parseFlags: parseExportFlags,
+    run: async ({ courseRoot, workspaceRoot }, { standardOverride }) =>
+      (await import('./build-commands.js')).runBuild(
+        courseRoot,
+        workspaceRoot,
+        standardOverride,
+      ),
+  }),
+  validate: courseCommand({
+    args: '[course]',
+    summary: 'Fast static structure checks',
+    options: STANDARD_OPTION,
+    parseFlags: parseExportFlags,
+    run: ({ courseRoot }, { standardOverride }) =>
+      runValidate(courseRoot, { standardOverride }),
+  }),
+  a11y: courseCommand({
+    args: '[course]',
+    summary: 'Runtime accessibility audit (builds + drives Playwright)',
+    options: THRESHOLD_OPTION,
+    parseFlags: parseA11yArgs,
+    run: ({ courseRoot, workspaceRoot }, options) =>
+      runAudit(courseRoot, workspaceRoot, options),
+  }),
+  check: courseCommand({
+    args: '[course]',
+    summary: 'Run validate, then a11y',
+    options: THRESHOLD_OPTION,
+    parseFlags: parseA11yArgs,
+    run: ({ courseRoot, workspaceRoot }, options) => {
+      const validateCode = runValidate(courseRoot, { showA11yTip: false });
+      if (validateCode !== 0) return validateCode;
+      return runAudit(courseRoot, workspaceRoot, options);
+    },
+  }),
 };
+
+function formatUsage(commands: Record<string, Command>): string {
+  const entries = Object.entries(commands);
+  const commandLines = entries.map(
+    ([name, { args, summary }]) =>
+      `  ${`${name} ${args}`.padEnd(28)}${summary}`,
+  );
+  const optionUsers = new Map<string, string[]>();
+  for (const [name, { options }] of entries) {
+    if (options)
+      optionUsers.set(options, [...(optionUsers.get(options) ?? []), name]);
+  }
+  const optionBlocks = [...optionUsers].map(
+    ([options, names]) => `${names.join('/')} options:\n${options}`,
+  );
+  return [
+    'Usage: tessera <command> [course] [options]',
+    `Commands:\n${commandLines.join('\n')}`,
+    'Run a command from inside a course folder, or name the course explicitly.',
+    ...optionBlocks,
+  ].join('\n\n');
+}
+
+export const USAGE = formatUsage(COMMANDS);
 
 export async function main(
   argv: string[],
   cwd: string = process.cwd(),
 ): Promise<number> {
   const [sub, ...rest] = argv;
-
-  if (sub === 'new') return runNew(rest[0], cwd);
-  if (sub === 'duplicate') return runDuplicate(rest[0], rest[1], cwd);
-
-  if (sub !== undefined && Object.hasOwn(COURSE_COMMANDS, sub)) {
-    if (rest.includes('--help') || rest.includes('-h')) {
-      console.log(USAGE);
-      return 0;
-    }
-    const { course, flags } = splitCourseArg(rest);
-    const resolved = resolveCourse(cwd, course);
-    if (!resolved.ok) {
-      console.error(`[tessera] ${resolved.error}`);
-      return 1;
-    }
-    return COURSE_COMMANDS[sub](
-      resolved.courseRoot,
-      resolved.workspaceRoot,
-      flags,
-    );
-  }
 
   if (sub === '--help' || sub === '-h') {
     console.log(USAGE);
@@ -146,8 +187,31 @@ export async function main(
     console.error(`No command given.\n\n${USAGE}`);
     return 1;
   }
-  console.error(`Unknown command: ${sub}\n\n${USAGE}`);
-  return 1;
+  if (!Object.hasOwn(COMMANDS, sub)) {
+    console.error(`Unknown command: ${sub}\n\n${USAGE}`);
+    return 1;
+  }
+
+  if (rest.includes('--help') || rest.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+
+  const command = COMMANDS[sub];
+  if (!command.course) return command.run(rest, cwd);
+
+  const { course, flags } = splitCourseArg(rest);
+  const parsed = command.parseFlags ? command.parseFlags(flags) : flags;
+  if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+    console.error(`[tessera ${sub}] ${parsed.error}`);
+    return 1;
+  }
+  const resolved = resolveCourse(cwd, course);
+  if (!resolved.ok) {
+    console.error(`[tessera] ${resolved.error}`);
+    return 1;
+  }
+  return command.run(resolved, parsed);
 }
 
 // import.meta.main is true only when this module is the program entry point,

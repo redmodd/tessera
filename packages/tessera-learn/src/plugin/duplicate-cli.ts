@@ -38,10 +38,6 @@ function reidentifyCourse(courseRoot: string): void {
   );
 }
 
-const HELP =
-  'Usage: tessera duplicate <source> <new>\n\n' +
-  'Copy courses/<source>/ to courses/<new>/ within the current workspace.';
-
 // Generated/build artifacts that should never travel with a verbatim copy. The
 // a11y throwaway build and Vite's cache live under node_modules, so they're
 // already pruned by the node_modules skip; the rest are belt-and-suspenders.
@@ -60,15 +56,6 @@ export function runDuplicate(
   target: string | undefined,
   cwd: string,
 ): number {
-  if (
-    source === '--help' ||
-    source === '-h' ||
-    target === '--help' ||
-    target === '-h'
-  ) {
-    console.log(HELP);
-    return 0;
-  }
   if (!source || !target) {
     console.error('Usage: tessera duplicate <source> <new>');
     return 1;
