@@ -1,20 +1,19 @@
-import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
+import type { Plugin, Rollup } from 'vite';
+import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { resolve, relative, isAbsolute, dirname, join } from 'node:path';
 import {
   existsSync,
   readdirSync,
-  statSync,
   writeFileSync,
-  unlinkSync,
   cpSync,
-  mkdirSync,
   rmSync,
 } from 'node:fs';
 import {
   generateManifest,
   readCourseConfig,
   readResolvedConfig,
+  walkPages,
   type CourseConfigRead,
 } from './manifest.js';
 import type { Manifest } from './manifest.js';
@@ -42,6 +41,7 @@ import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
+import { virtualModule } from './virtual-module.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -50,16 +50,6 @@ export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
 
 function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
-}
-
-// Resolve the runtime directory where App.svelte lives
-function resolveRuntimeDir(): string {
-  return resolve(resolvePackageRoot(), 'src', 'runtime');
-}
-
-// Resolve the framework styles directory
-function resolveStylesDir(): string {
-  return resolve(resolvePackageRoot(), 'styles');
 }
 
 // Tier-1a state shared between the svelte() onwarn handler and the sibling
@@ -77,6 +67,10 @@ interface A11yCompilerState {
 // writeBundle leaves it closed.
 interface BuildState {
   written: boolean;
+}
+
+interface ManifestRef {
+  current: Manifest | null;
 }
 
 // Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
@@ -103,43 +97,9 @@ function projectFileRel(
   return rel;
 }
 
-type VirtualLoadCtx = { projectRoot: string; isBuild: boolean };
-
-function virtualModule(
-  name: string,
-  virtualId: string,
-  load: (
-    this: import('vite').Rollup.PluginContext,
-    ctx: VirtualLoadCtx,
-  ) => string | null,
-): Plugin {
-  const resolvedId = '\0' + virtualId;
-  let projectRoot = '';
-  let isBuild = false;
-  return {
-    name,
-    enforce: 'pre',
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
-    },
-    resolveId(id) {
-      return id === virtualId ? resolvedId : null;
-    },
-    load(id) {
-      return id === resolvedId
-        ? load.call(this, { projectRoot, isBuild })
-        : null;
-    },
-  };
-}
-
 export function tesseraPlugin(options: { standardOverride?: string } = {}) {
   const { standardOverride } = options;
-  const manifestRef: { current: Manifest | null; root: string } = {
-    current: null,
-    root: '',
-  };
+  const manifestRef: ManifestRef = { current: null };
   const a11y: A11yCompilerState = {
     warnings: [],
     projectRoot: '',
@@ -168,7 +128,8 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     }),
     tesseraA11yCompilerPlugin(a11y),
     tesseraValidationPlugin(standardOverride),
-    tesseraEntryPlugin(standardOverride, build),
+    tesseraEntryPlugin(),
+    tesseraIndexHtmlPlugin(standardOverride, build),
     tesseraConfigDefaultsPlugin(),
     tesseraConfigPlugin(standardOverride),
     tesseraPagesPlugin(),
@@ -185,27 +146,42 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
 
 // ---------- Entry Plugin ----------
 
-const VIRTUAL_ENTRY_ID = 'virtual:tessera-entry';
-const RESOLVED_ENTRY_ID = '\0' + VIRTUAL_ENTRY_ID;
-const VIRTUAL_MAIN_ID = '/virtual:tessera-main';
-const RESOLVED_MAIN_ID = '\0virtual:tessera-main';
+function tesseraEntryPlugin(): Plugin {
+  const packageRoot = resolvePackageRoot();
+  const appPath = normalizePath(
+    resolve(packageRoot, 'src', 'runtime', 'App.svelte'),
+  );
+  const frameworkStyles = ['theme.css', 'base.css', 'layout.css'].map((file) =>
+    normalizePath(resolve(packageRoot, 'styles', file)),
+  );
+  return virtualModule(
+    'tessera:entry',
+    'virtual:tessera-main',
+    ({ projectRoot }) =>
+      generateEntryScript(appPath, [
+        ...frameworkStyles,
+        ...userStylesheets(projectRoot),
+      ]),
+    (type, file, { projectRoot }) =>
+      type !== 'update' &&
+      file.endsWith('.css') &&
+      dirname(file) === stylesDir(projectRoot),
+  );
+}
 
-function tesseraEntryPlugin(
+function tesseraIndexHtmlPlugin(
   standardOverride: string | undefined,
   build: BuildState,
 ): Plugin {
-  const runtimeDir = resolveRuntimeDir();
-  const stylesDir = resolveStylesDir();
-  const appSveltePath = resolve(runtimeDir, 'App.svelte');
   let projectRoot: string;
   let outDir: string;
   let isBuild = false;
 
   return {
-    name: 'tessera:entry',
+    name: 'tessera:index-html',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       outDir = resolve(config.root, config.build.outDir);
       isBuild = config.command === 'build';
@@ -226,27 +202,20 @@ function tesseraEntryPlugin(
     // For build mode: clean up temporary index.html and copy assets
     closeBundle() {
       if (isBuild) {
-        const htmlPath = resolve(projectRoot, 'index.html');
-        if (existsSync(htmlPath)) {
-          try {
-            unlinkSync(htmlPath);
-          } catch {}
-        }
+        rmSync(resolve(projectRoot, 'index.html'), { force: true });
 
         if (!build.written) return;
 
         // Copy assets/ into the build's assets/ so $assets/ references resolve
         const assetsDir = resolve(projectRoot, 'assets');
-        const distAssetsDir = resolve(outDir, 'assets');
         if (existsSync(assetsDir)) {
-          mkdirSync(distAssetsDir, { recursive: true });
-          cpSync(assetsDir, distAssetsDir, { recursive: true });
+          cpSync(assetsDir, resolve(outDir, 'assets'), { recursive: true });
         }
       }
     },
 
     // Serve index.html for the dev server
-    configureServer(server: ViteDevServer) {
+    configureServer(server) {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
@@ -262,20 +231,6 @@ function tesseraEntryPlugin(
           next();
         });
       };
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_ENTRY_ID) return RESOLVED_ENTRY_ID;
-      if (id === VIRTUAL_MAIN_ID || id === 'virtual:tessera-main')
-        return RESOLVED_MAIN_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id === RESOLVED_ENTRY_ID || id === RESOLVED_MAIN_ID) {
-        return generateEntryScript(appSveltePath, stylesDir, projectRoot);
-      }
-      return null;
     },
   };
 }
@@ -315,41 +270,24 @@ function generateIndexHtml(lang: string, csp = ''): string {
 </html>`;
 }
 
-function generateEntryScript(
-  appSveltePath: string,
-  frameworkStylesDir: string,
-  projectRoot: string,
-): string {
-  const normalizedPath = appSveltePath.replace(/\\/g, '/');
+function stylesDir(projectRoot: string): string {
+  return normalizePath(resolve(projectRoot, 'styles'));
+}
 
-  // Framework CSS imports (theme → base → layout)
-  const frameworkCssOrder = ['theme.css', 'base.css', 'layout.css'];
-  const frameworkImports = frameworkCssOrder
-    .map((file) => resolve(frameworkStylesDir, file).replace(/\\/g, '/'))
-    .filter((path) => existsSync(path))
-    .map((path) => `import '${path}';`)
-    .join('\n');
+function userStylesheets(projectRoot: string): string[] {
+  const dir = stylesDir(projectRoot);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((file) => file.endsWith('.css'))
+    .sort()
+    .map((file) => `${dir}/${file}`);
+}
 
-  // User CSS imports from project's styles/ directory
-  const userStylesDir = resolve(projectRoot, 'styles');
-  let userImports = '';
-  if (existsSync(userStylesDir)) {
-    const userCssFiles = readdirSync(userStylesDir)
-      .filter((f) => f.endsWith('.css'))
-      .sort();
-    userImports = userCssFiles
-      .map((f) => resolve(userStylesDir, f).replace(/\\/g, '/'))
-      .map((path) => `import '${path}';`)
-      .join('\n');
-  }
-
-  return `// Framework styles
-${frameworkImports}
-// User styles
-${userImports}
+function generateEntryScript(appPath: string, stylesheets: string[]): string {
+  return `${stylesheets.map((path) => `import '${path}';`).join('\n')}
 
 import { mount } from 'svelte';
-import App from '${normalizedPath}';
+import App from '${appPath}';
 
 mount(App, {
   target: document.getElementById('tessera-root'),
@@ -358,8 +296,6 @@ mount(App, {
 }
 
 // ---------- Config Plugin ----------
-
-const VIRTUAL_CONFIG_ID = 'virtual:tessera-config';
 
 function completionDefaults(mode: string | undefined): {
   completion: Record<string, unknown>;
@@ -420,7 +356,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
 function tesseraConfigPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:config',
-    VIRTUAL_CONFIG_ID,
+    'virtual:tessera-config',
     function ({ projectRoot }) {
       const configPath = resolve(projectRoot, 'course.config.js');
       if (existsSync(configPath)) this.addWatchFile(configPath);
@@ -433,27 +369,7 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
   );
 }
 
-// ---------- Manifest Watch Helpers ----------
-
-/** Register all _meta.js and .svelte files under pagesDir as watch files for build mode. */
-function addWatchFiles(
-  ctx: { addWatchFile(id: string): void },
-  dir: string,
-): void {
-  if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    const full = resolve(dir, entry);
-    if (statSync(full).isDirectory()) {
-      addWatchFiles(ctx, full);
-    } else if (entry.endsWith('.svelte') || entry === '_meta.js') {
-      ctx.addWatchFile(full);
-    }
-  }
-}
-
 // ---------- Pages Plugin ----------
-
-const VIRTUAL_PAGES_ID = 'virtual:tessera-pages';
 
 /**
  * Provides a virtual module that exports an import.meta.glob map for all .svelte
@@ -461,9 +377,11 @@ const VIRTUAL_PAGES_ID = 'virtual:tessera-pages';
  * pages/ directory, and Vite can statically analyze it for code splitting.
  */
 function tesseraPagesPlugin(): Plugin {
-  return virtualModule('tessera:pages', VIRTUAL_PAGES_ID, () => {
-    return `export default import.meta.glob('/pages/**/*.svelte');`;
-  });
+  return virtualModule(
+    'tessera:pages',
+    'virtual:tessera-pages',
+    () => `export default import.meta.glob('/pages/**/*.svelte');`,
+  );
 }
 
 // ---------- Validation Plugin ----------
@@ -476,7 +394,7 @@ function tesseraValidationPlugin(standardOverride?: string): Plugin {
     name: 'tessera:validation',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       isBuild = config.command === 'build';
       // Run validation during dev (configResolved fires before server starts)
@@ -502,7 +420,7 @@ function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
     name: 'tessera:a11y-compiler',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       a11y.projectRoot = config.root;
       a11y.isBuild = config.command === 'build';
       const read = readCourseConfig(config.root);
@@ -550,7 +468,7 @@ function tesseraExportPlugin(
     name: 'tessera:export',
     enforce: 'post',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       isBuild = config.command === 'build';
     },
@@ -603,96 +521,53 @@ function tesseraExportPlugin(
 
 // ---------- Manifest Plugin ----------
 
-const VIRTUAL_MANIFEST_ID = 'virtual:tessera-manifest';
-const RESOLVED_MANIFEST_ID = '\0' + VIRTUAL_MANIFEST_ID;
-
-function tesseraManifestPlugin(manifestRef: {
-  current: Manifest | null;
-  root: string;
-}): Plugin {
-  let projectRoot: string;
-  let pagesDir: string;
-
-  function buildManifest(): Manifest {
-    const m = generateManifest(pagesDir);
-    manifestRef.current = m;
-    return m;
-  }
-
-  return {
-    name: 'tessera:manifest',
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      projectRoot = config.root;
-      pagesDir = resolve(projectRoot, 'pages');
-      manifestRef.root = projectRoot;
-    },
-
-    configureServer(devServer: ViteDevServer) {
-      // Watch the pages directory for changes
-      devServer.watcher.on('all', (event, filePath) => {
-        if (!filePath.startsWith(pagesDir)) return;
-
-        // Rebuild manifest on relevant file changes
-        const isRelevant =
-          filePath.endsWith('.svelte') ||
-          filePath.endsWith('_meta.js') ||
-          event === 'addDir' ||
-          event === 'unlinkDir';
-
-        if (isRelevant) {
-          manifestRef.current = null; // invalidate cache
-
-          // Invalidate the virtual module to trigger HMR
-          const mod = devServer.moduleGraph.getModuleById(RESOLVED_MANIFEST_ID);
-          if (mod) {
-            devServer.moduleGraph.invalidateModule(mod);
-            devServer.ws.send({ type: 'full-reload' });
-          }
-
-          console.log(
-            `[tessera] Manifest rebuilt (${event}: ${filePath.replace(projectRoot, '')})`,
-          );
-        }
-      });
-    },
-
-    buildStart() {
-      buildManifest();
-    },
-
-    resolveId(id) {
-      if (id === VIRTUAL_MANIFEST_ID) return RESOLVED_MANIFEST_ID;
-      return null;
-    },
-
-    load(id) {
-      if (id === RESOLVED_MANIFEST_ID) {
-        if (!manifestRef.current) {
-          buildManifest();
-        }
-
-        // Register watch files so Vite's built-in watcher (used in build --watch)
-        // knows to re-trigger when pages/ content changes.
-        addWatchFiles(this, pagesDir);
-
-        // Encode as base64 to prevent Vite's import analysis from
-        // scanning .svelte importPath strings as module imports.
-        // Replace Infinity with 1e9 since JSON.stringify drops it.
-        const json = JSON.stringify(manifestRef.current, (_key, value) =>
-          value === Infinity ? 1e9 : value,
-        );
-        const b64 = Buffer.from(json).toString('base64');
-        // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
-        return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
-      }
-      return null;
-    },
-  };
+// Encode as base64 to prevent Vite's import analysis from
+// scanning .svelte importPath strings as module imports.
+// Replace Infinity with 1e9 since JSON.stringify drops it.
+function manifestModule(manifest: Manifest): string {
+  const json = JSON.stringify(manifest, (_key, value) =>
+    value === Infinity ? 1e9 : value,
+  );
+  const b64 = Buffer.from(json).toString('base64');
+  // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
+  return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
 }
 
-const VIRTUAL_ADAPTER_ID = 'virtual:tessera-adapter';
+function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
+  let loaded: string | undefined;
+
+  return virtualModule(
+    'tessera:manifest',
+    'virtual:tessera-manifest',
+    function ({ projectRoot }) {
+      const pagesDir = resolve(projectRoot, 'pages');
+      const sections = walkPages(pagesDir);
+      manifestRef.current = generateManifest(pagesDir, sections);
+
+      for (const section of sections) {
+        for (const { metaPath } of [section, ...section.lessons]) {
+          if (existsSync(metaPath)) this.addWatchFile(metaPath);
+        }
+        for (const lesson of section.lessons) {
+          for (const file of lesson.files) {
+            this.addWatchFile(resolve(lesson.dir, file));
+          }
+        }
+      }
+
+      loaded = manifestModule(manifestRef.current);
+      return loaded;
+    },
+    (_type, file, { projectRoot }) => {
+      const pagesDir = resolve(projectRoot, 'pages');
+      return (
+        file.startsWith(normalizePath(pagesDir) + '/') &&
+        (file.endsWith('.svelte') || file.endsWith('/_meta.js')) &&
+        manifestModule(generateManifest(pagesDir)) !== loaded
+      );
+    },
+  );
+}
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
   const { adapter, detect, takesApi } = LMS_BUILD[standard];
@@ -712,7 +587,7 @@ export function createAdapter() {
 function tesseraAdapterPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:adapter',
-    VIRTUAL_ADAPTER_ID,
+    'virtual:tessera-adapter',
     ({ projectRoot, isBuild }) => {
       // In dev, defer to the runtime selector so its WebAdapter fallback
       // for unreachable LMS APIs keeps working.
@@ -738,12 +613,10 @@ export function createAdapter(config, options) {
   );
 }
 
-const VIRTUAL_XAPI_SETUP_ID = 'virtual:tessera-xapi-setup';
-
 function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
   return virtualModule(
     'tessera:xapi-setup',
-    VIRTUAL_XAPI_SETUP_ID,
+    'virtual:tessera-xapi-setup',
     ({ projectRoot, isBuild }) => {
       if (!isBuild) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
@@ -772,27 +645,26 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
   );
 }
 
-function tesseraFirstPagePreloadPlugin(manifestRef: {
-  current: Manifest | null;
-  root: string;
-}): Plugin {
+function tesseraFirstPagePreloadPlugin(manifestRef: ManifestRef): Plugin {
+  let projectRoot: string;
+
   return {
     name: 'tessera:first-page-preload',
     apply: 'build',
+    configResolved(config) {
+      projectRoot = config.root;
+    },
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {
         const firstPagePath = manifestRef.current?.pages[0]?.importPath;
         if (!firstPagePath || !ctx.bundle) return;
-        const normalized = resolve(
-          manifestRef.root,
-          firstPagePath.replace(/^\//, ''),
-        ).replace(/\\/g, '/');
+        const normalized = normalizePath(join(projectRoot, firstPagePath));
         const chunk = Object.values(ctx.bundle).find(
-          (c): c is import('vite').Rollup.OutputChunk =>
+          (c): c is Rollup.OutputChunk =>
             c.type === 'chunk' &&
             !!c.facadeModuleId &&
-            c.facadeModuleId.replace(/\\/g, '/') === normalized,
+            normalizePath(c.facadeModuleId) === normalized,
         );
         if (!chunk) return;
         return [

@@ -1,7 +1,8 @@
-import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
+import type { Plugin } from 'vite';
 import { normalizePath } from 'vite';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { virtualModule } from './virtual-module.js';
 
 export interface OverridePluginOptions {
   name: string;
@@ -25,50 +26,24 @@ export function createOverridePlugin({
   builtinFile,
   namespace = false,
 }: OverridePluginOptions): Plugin {
-  const resolvedId = '\0' + virtualId;
   const fallback = builtinFile
     ? `export { default } from '${normalizePath(builtinFile)}';`
     : 'export default null;';
-  let filePath: string;
 
-  return {
+  return virtualModule(
     name,
-    enforce: 'pre',
-
-    configResolved(config: ResolvedConfig) {
-      filePath = resolve(config.root, projectFile);
+    virtualId,
+    ({ projectRoot }) => {
+      const filePath = resolve(projectRoot, projectFile);
+      if (!existsSync(filePath)) return fallback;
+      const path = normalizePath(filePath);
+      return namespace
+        ? `import * as mod from '${path}';\nexport default mod;`
+        : `export { default } from '${path}';`;
     },
-
-    resolveId(id) {
-      if (id === virtualId) return resolvedId;
-      return null;
-    },
-
-    load(id) {
-      if (id !== resolvedId) return null;
-      if (existsSync(filePath)) {
-        // Only watch when it exists — addWatchFile on a missing path makes
-        // Vite's importAnalysis try to resolve it as a real import.
-        this.addWatchFile(filePath);
-        const path = normalizePath(filePath);
-        return namespace
-          ? `import * as mod from '${path}';\nexport default mod;`
-          : `export { default } from '${path}';`;
-      }
-      return fallback;
-    },
-
-    configureServer(server: ViteDevServer) {
-      // Only add/unlink flips load()'s output between the override and the
-      // fallback; a `change` leaves it identical and Svelte's own HMR handles
-      // the underlying file.
-      server.watcher.on('all', (event, changed) => {
-        if (changed !== filePath) return;
-        if (event !== 'add' && event !== 'unlink') return;
-        const mod = server.moduleGraph.getModuleById(resolvedId);
-        if (mod) server.moduleGraph.invalidateModule(mod);
-        server.ws.send({ type: 'full-reload' });
-      });
-    },
-  };
+    // Only create/delete swaps override vs fallback; Svelte HMR does updates.
+    (type, file, { projectRoot }) =>
+      type !== 'update' &&
+      file === normalizePath(resolve(projectRoot, projectFile)),
+  );
 }

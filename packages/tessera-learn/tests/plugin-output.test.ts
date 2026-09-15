@@ -55,11 +55,9 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 
     const plugin = findPlugin('tessera:manifest');
     (plugin.configResolved as any).call(plugin, { root: projectRoot });
-    (plugin.buildStart as any).call(plugin);
-    const code = (plugin.load as any).call(
-      { addWatchFile() {} },
-      '\0virtual:tessera-manifest',
-    ) as string;
+    const code = (plugin.load as any).handler.call({
+      addWatchFile() {},
+    }) as string;
 
     const expr = code.replace(/^export default /, '').replace(/;$/, '');
     const manifest = (0, eval)(expr) as { pages: { title: string }[] };
@@ -70,7 +68,7 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -86,7 +84,7 @@ describe('generated index.html Content-Security-Policy', () => {
       `export default ${body};`,
       'utf-8',
     );
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -115,7 +113,7 @@ describe('generated index.html Content-Security-Policy', () => {
       'export default {',
       'utf-8',
     );
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -159,7 +157,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
   it('omits the CSP meta from the dev server (would block Vite HMR)', async () => {
     writeConfig('web');
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -197,7 +195,7 @@ describe('export packaging gate', () => {
       if (!plugin) throw new Error(`plugin ${name} not found`);
       return plugin;
     };
-    const entry = get('tessera:entry');
+    const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
     for (const plugin of [entry, exporter, validation]) {
@@ -395,7 +393,7 @@ describe('xapi setup virtual module', () => {
       root: projectRoot,
       command: 'build',
     });
-    return (plugin.load as any).call({}, '\0virtual:tessera-xapi-setup');
+    return (plugin.load as any).handler.call({});
   }
 
   const real = `export { buildXAPIClient }`;
