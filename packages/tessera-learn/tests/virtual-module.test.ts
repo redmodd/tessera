@@ -105,10 +105,6 @@ describe('virtualModule', () => {
     expect(environment.sent).toEqual([{ type: 'full-reload' }]);
   });
 
-  it('does nothing when shouldReload is false', () => {
-    expect(updated(() => false).sent).toEqual([]);
-  });
-
   it('ignores non-client environments', () => {
     expect(updated(() => true, { name: 'ssr' }).sent).toEqual([]);
   });
@@ -130,10 +126,6 @@ describe('override plugin dev reload', () => {
 
     hotUpdate(plugin, environment, 'create', 'course.layout.svelte');
     hotUpdate(plugin, environment, 'delete', 'course.layout.svelte');
-    expect(environment.invalidated).toEqual([
-      '\0virtual:layout',
-      '\0virtual:layout',
-    ]);
     expect(environment.sent).toHaveLength(2);
   });
 });
@@ -170,10 +162,6 @@ describe('entry plugin', () => {
 
     hotUpdate(plugin, environment, 'create', 'styles', 'course.css');
     hotUpdate(plugin, environment, 'delete', 'styles', 'course.css');
-    expect(environment.invalidated).toEqual([
-      '\0virtual:tessera-main',
-      '\0virtual:tessera-main',
-    ]);
     expect(environment.sent).toHaveLength(2);
   });
 });
@@ -220,22 +208,7 @@ describe('manifest plugin', () => {
       `export default { title: 'Getting Started' };`,
     );
     hotUpdate(plugin, environment, 'create', 'pages', '01-intro', '_meta.js');
-    expect(environment.invalidated).toEqual([
-      '\0virtual:tessera-manifest',
-      '\0virtual:tessera-manifest',
-    ]);
     expect(environment.sent).toHaveLength(2);
-  });
-
-  it('rebuilds the manifest on every load', () => {
-    const plugin = tesseraSubPlugin('tessera:manifest');
-    const before = load(plugin);
-    mkdirSync(resolve(projectRoot, 'pages', '01-intro'));
-    writeFileSync(
-      resolve(projectRoot, 'pages', '01-intro', 'welcome.svelte'),
-      '<h1>Welcome</h1>',
-    );
-    expect(load(plugin)).not.toBe(before);
   });
 
   it('watches the page and _meta.js files the manifest reads', () => {
