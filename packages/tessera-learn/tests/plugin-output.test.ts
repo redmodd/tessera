@@ -70,7 +70,7 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -86,7 +86,7 @@ describe('generated index.html Content-Security-Policy', () => {
       `export default ${body};`,
       'utf-8',
     );
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -115,7 +115,7 @@ describe('generated index.html Content-Security-Policy', () => {
       'export default {',
       'utf-8',
     );
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -159,7 +159,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
   it('omits the CSP meta from the dev server (would block Vite HMR)', async () => {
     writeConfig('web');
-    const plugin = findPlugin('tessera:entry');
+    const plugin = findPlugin('tessera:index-html');
     (plugin.configResolved as any).call(plugin, {
       root: projectRoot,
       build: { outDir: 'dist' },
@@ -197,7 +197,7 @@ describe('export packaging gate', () => {
       if (!plugin) throw new Error(`plugin ${name} not found`);
       return plugin;
     };
-    const entry = get('tessera:entry');
+    const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
     for (const plugin of [entry, exporter, validation]) {

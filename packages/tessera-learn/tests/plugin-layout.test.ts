@@ -28,16 +28,6 @@ describe('tessera:layout virtual module', () => {
     return plugin;
   }
 
-  it('resolveId maps the public id to a resolved id', () => {
-    const plugin = makePlugin();
-    const resolved = (plugin as any).resolveId.call(
-      {},
-      'virtual:tessera-layout',
-    );
-    expect(resolved).toBe('\0virtual:tessera-layout');
-    expect((plugin as any).resolveId.call({}, 'something-else')).toBeNull();
-  });
-
   it('load() returns null re-export when no layout.svelte exists', () => {
     const plugin = makePlugin();
     const watched: string[] = [];
@@ -76,14 +66,5 @@ describe('tessera:layout virtual module', () => {
     expect(code).toContain(`from '${normalized}'`);
     expect(code).toMatch(/export\s+\{\s*default\s*\}/);
     expect(watched).toContain(layoutPath);
-  });
-
-  it('load() ignores ids that are not the resolved virtual id', () => {
-    const plugin = makePlugin();
-    const code = (plugin as any).load.call(
-      { addWatchFile() {} },
-      'some-other-id',
-    );
-    expect(code).toBeNull();
   });
 });
