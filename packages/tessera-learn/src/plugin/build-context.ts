@@ -7,13 +7,11 @@ import {
 } from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
 
-/** True when `child` is `parent` or a path beneath it. */
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
-/** Build state shared by every plugin `tesseraPlugin()` returns. */
 export class BuildContext {
   root = '';
   outDir = '';

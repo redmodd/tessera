@@ -21,7 +21,6 @@ export function resolvedContext(
   return ctx;
 }
 
-/** `tesseraPlugin()` with its shared context resolved; returns a by-name lookup. */
 export function resolvedPlugins(
   root: string,
   command: Command = 'serve',
