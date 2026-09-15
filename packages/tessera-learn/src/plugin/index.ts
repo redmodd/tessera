@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute, dirname } from 'node:path';
+import { resolve, relative, isAbsolute, dirname, join } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -167,7 +167,7 @@ function tesseraEntryPlugin(): Plugin {
     (type, file, { projectRoot }) =>
       type !== 'update' &&
       file.endsWith('.css') &&
-      dirname(file) === normalizePath(resolve(projectRoot, 'styles')),
+      dirname(file) === stylesDir(projectRoot),
   );
 }
 
@@ -279,13 +279,17 @@ function generateIndexHtml(lang: string, csp = ''): string {
 </html>`;
 }
 
+function stylesDir(projectRoot: string): string {
+  return normalizePath(resolve(projectRoot, 'styles'));
+}
+
 function userStylesheets(projectRoot: string): string[] {
-  const stylesDir = resolve(projectRoot, 'styles');
-  if (!existsSync(stylesDir)) return [];
-  return readdirSync(stylesDir)
+  const dir = stylesDir(projectRoot);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
     .filter((file) => file.endsWith('.css'))
     .sort()
-    .map((file) => normalizePath(resolve(stylesDir, file)));
+    .map((file) => `${dir}/${file}`);
 }
 
 function generateEntryScript(appPath: string, stylesheets: string[]): string {
@@ -664,9 +668,7 @@ function tesseraFirstPagePreloadPlugin(manifestRef: ManifestRef): Plugin {
       handler(_html, ctx) {
         const firstPagePath = manifestRef.current?.pages[0]?.importPath;
         if (!firstPagePath || !ctx.bundle) return;
-        const normalized = normalizePath(
-          resolve(projectRoot, firstPagePath.replace(/^\//, '')),
-        );
+        const normalized = normalizePath(join(projectRoot, firstPagePath));
         const chunk = Object.values(ctx.bundle).find(
           (c): c is Rollup.OutputChunk =>
             c.type === 'chunk' &&

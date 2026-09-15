@@ -18,7 +18,7 @@ export function virtualModule(
 ): Plugin {
   const resolvedId = '\0' + virtualId;
   const ctx: VirtualModuleContext = { projectRoot: '', isBuild: false };
-  return {
+  const plugin: Plugin = {
     name,
     enforce: 'pre',
     configResolved(config) {
@@ -35,17 +35,20 @@ export function virtualModule(
         return load.call(this, ctx);
       },
     },
-    hotUpdate({ type, file }) {
-      if (this.environment.name !== 'client') return;
-      if (!shouldReload?.(type, file, ctx)) return;
-      const { moduleGraph, hot, logger } = this.environment;
-      logger.info(
-        `[${name}] Reloading (${type}: ${relative(ctx.projectRoot, file)})`,
-        { timestamp: true },
-      );
-      const mod = moduleGraph.getModuleById(resolvedId);
-      if (mod) moduleGraph.invalidateModule(mod);
-      hot.send({ type: 'full-reload' });
-    },
   };
+  if (!shouldReload) return plugin;
+
+  plugin.hotUpdate = function ({ type, file }) {
+    if (this.environment.name !== 'client') return;
+    if (!shouldReload(type, file, ctx)) return;
+    const { moduleGraph, hot, logger } = this.environment;
+    logger.info(
+      `[${name}] Reloading (${type}: ${relative(ctx.projectRoot, file)})`,
+      { timestamp: true },
+    );
+    const mod = moduleGraph.getModuleById(resolvedId);
+    if (mod) moduleGraph.invalidateModule(mod);
+    hot.send({ type: 'full-reload' });
+  };
+  return plugin;
 }

@@ -37,7 +37,6 @@ describe('tessera:layout virtual module', () => {
         watched.push(p);
       },
     });
-    expect(typeof code).toBe('string');
     expect(code).toMatch(/export\s+default\s+null/);
     // Must NOT addWatchFile a non-existent path: Vite's importAnalysis
     // treats it as a real import and errors out.
@@ -56,7 +55,6 @@ describe('tessera:layout virtual module', () => {
       },
     });
 
-    expect(typeof code).toBe('string');
     expect(code).toContain(`from '${normalizePath(layoutPath)}'`);
     expect(code).toMatch(/export\s+\{\s*default\s*\}/);
     expect(watched).toContain(layoutPath);

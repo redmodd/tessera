@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { normalizePath, type Plugin } from 'vite';
+import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
 import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 import { tesseraPlugin } from '../src/plugin/index.js';
@@ -53,7 +53,7 @@ type Environment = ReturnType<typeof fakeEnvironment>;
 function hotUpdate(
   plugin: Plugin,
   environment: Environment,
-  type: string,
+  type: HotUpdateOptions['type'],
   ...segments: string[]
 ) {
   const file = normalizePath(resolve(projectRoot, ...segments));
