@@ -33,12 +33,9 @@ export function createOverridePlugin({
   return virtualModule(
     name,
     virtualId,
-    function ({ projectRoot }) {
+    ({ projectRoot }) => {
       const filePath = resolve(projectRoot, projectFile);
       if (!existsSync(filePath)) return fallback;
-      // Only watch when it exists: addWatchFile on a missing path makes
-      // Vite's importAnalysis try to resolve it as a real import.
-      this.addWatchFile(filePath);
       const path = normalizePath(filePath);
       return namespace
         ? `import * as mod from '${path}';\nexport default mod;`

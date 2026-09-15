@@ -49,6 +49,7 @@ export function virtualModule(
     const mod = moduleGraph.getModuleById(resolvedId);
     if (mod) moduleGraph.invalidateModule(mod);
     hot.send({ type: 'full-reload' });
+    return [];
   };
   return plugin;
 }

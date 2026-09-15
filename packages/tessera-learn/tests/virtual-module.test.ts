@@ -57,7 +57,7 @@ function hotUpdate(
   ...segments: string[]
 ) {
   const file = normalizePath(resolve(projectRoot, ...segments));
-  (plugin.hotUpdate as any).call({ environment }, { type, file });
+  return (plugin.hotUpdate as any).call({ environment }, { type, file });
 }
 
 describe('virtualModule', () => {
@@ -89,14 +89,21 @@ describe('virtualModule', () => {
     const environment = fakeEnvironment(options);
     const plugin = virtualModule('test', 'virtual:x', () => '', shouldReload);
     configure(plugin);
-    hotUpdate(plugin, environment, 'update', 'any');
-    return environment;
+    const result = hotUpdate(plugin, environment, 'update', 'any');
+    return { ...environment, result };
   }
 
-  it('invalidates the module and sends a full reload when shouldReload is true', () => {
+  it('invalidates the module and sends a full reload in place of HMR when shouldReload is true', () => {
     const environment = updated(() => true);
     expect(environment.invalidated).toEqual(['\0virtual:x']);
     expect(environment.sent).toEqual([{ type: 'full-reload' }]);
+    expect(environment.result).toEqual([]);
+  });
+
+  it('leaves HMR alone when shouldReload is false', () => {
+    const environment = updated(() => false);
+    expect(environment.sent).toEqual([]);
+    expect(environment.result).toBeUndefined();
   });
 
   it('still sends a full reload when the module is not in the graph', () => {

@@ -6,9 +6,7 @@ import {
   existsSync,
   readdirSync,
   writeFileSync,
-  unlinkSync,
   cpSync,
-  mkdirSync,
   rmSync,
 } from 'node:fs';
 import {
@@ -204,21 +202,14 @@ function tesseraIndexHtmlPlugin(
     // For build mode: clean up temporary index.html and copy assets
     closeBundle() {
       if (isBuild) {
-        const htmlPath = resolve(projectRoot, 'index.html');
-        if (existsSync(htmlPath)) {
-          try {
-            unlinkSync(htmlPath);
-          } catch {}
-        }
+        rmSync(resolve(projectRoot, 'index.html'), { force: true });
 
         if (!build.written) return;
 
         // Copy assets/ into the build's assets/ so $assets/ references resolve
         const assetsDir = resolve(projectRoot, 'assets');
-        const distAssetsDir = resolve(outDir, 'assets');
         if (existsSync(assetsDir)) {
-          mkdirSync(distAssetsDir, { recursive: true });
-          cpSync(assetsDir, distAssetsDir, { recursive: true });
+          cpSync(assetsDir, resolve(outDir, 'assets'), { recursive: true });
         }
       }
     },

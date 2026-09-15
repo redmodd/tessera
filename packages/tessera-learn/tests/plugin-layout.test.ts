@@ -30,33 +30,17 @@ describe('tessera:layout virtual module', () => {
   }
 
   it('load() returns null re-export when no layout.svelte exists', () => {
-    const plugin = makePlugin();
-    const watched: string[] = [];
-    const code = (plugin as any).load.handler.call({
-      addWatchFile(p: string) {
-        watched.push(p);
-      },
-    });
+    const code = (makePlugin() as any).load.handler();
     expect(code).toMatch(/export\s+default\s+null/);
-    // Must NOT addWatchFile a non-existent path: Vite's importAnalysis
-    // treats it as a real import and errors out.
-    expect(watched).toHaveLength(0);
   });
 
   it('load() re-exports the project layout.svelte when present', () => {
     const layoutPath = resolve(projectRoot, 'layout.svelte');
     writeFileSync(layoutPath, '<div>custom layout</div>');
 
-    const plugin = makePlugin();
-    const watched: string[] = [];
-    const code = (plugin as any).load.handler.call({
-      addWatchFile(p: string) {
-        watched.push(p);
-      },
-    });
+    const code = (makePlugin() as any).load.handler();
 
     expect(code).toContain(`from '${normalizePath(layoutPath)}'`);
     expect(code).toMatch(/export\s+\{\s*default\s*\}/);
-    expect(watched).toContain(layoutPath);
   });
 });
