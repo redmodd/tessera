@@ -57,10 +57,13 @@ describe('readResolvedConfig', () => {
     expect(read.profile).toBeUndefined();
   });
 
-  it('resolves no profile for a standard outside the table', () => {
-    writeConfig(`{ export: { standard: "scorm13" } }`);
-    expect(readResolvedConfig(projectRoot).profile).toBeUndefined();
-  });
+  it.each(['scorm13', ''])(
+    'resolves no profile for a standard of "%s"',
+    (standard) => {
+      writeConfig(`{ export: { standard: "${standard}" } }`);
+      expect(readResolvedConfig(projectRoot).profile).toBeUndefined();
+    },
+  );
 
   it('honours the override even when the config is unreadable', () => {
     const read = readResolvedConfig(projectRoot, 'scorm2004');

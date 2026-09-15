@@ -24,7 +24,8 @@ export class BuildContext {
   // Tier-1a state shared between the svelte() onwarn handler and the sibling
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
-  a11y = { warnings: [] as string[], settings: normalizeA11y(undefined) };
+  a11yWarnings: string[] = [];
+  a11ySettings = normalizeA11y(undefined);
   // Gates post-build side effects (asset copy, packaging) on a bundle that wrote
   // cleanly. Set from the enforce:'post' plugin, so a throw in an earlier
   // writeBundle leaves it closed.
@@ -34,7 +35,7 @@ export class BuildContext {
     this.standardOverride = standardOverride;
   }
 
-  resolve(config: ResolvedConfig): void {
+  configure(config: ResolvedConfig): void {
     this.root = config.root;
     this.outDir = resolve(config.root, config.build.outDir);
     this.isBuild = config.command === 'build';
@@ -43,6 +44,8 @@ export class BuildContext {
         `build.outDir (${this.outDir}) must not be or contain the project root.`,
       );
     }
+    const read = this.readConfig();
+    this.a11ySettings = normalizeA11y(read.ok ? read.config.a11y : undefined);
   }
 
   readConfig(): ResolvedConfigRead {

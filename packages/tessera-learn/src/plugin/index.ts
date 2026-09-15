@@ -29,7 +29,6 @@ import {
 import {
   validateProject,
   reportValidationIssues,
-  normalizeA11y,
   isPlausibleLanguageTag,
   isIgnored,
 } from './validation.js';
@@ -68,11 +67,7 @@ function projectFileRel(
     return null;
   }
   const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
-  const rel = relative(projectRoot, abs);
-  if (!isInside(projectRoot, abs) || rel.includes('node_modules')) {
-    return null;
-  }
-  return rel;
+  return isInside(projectRoot, abs) ? relative(projectRoot, abs) : null;
 }
 
 export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
@@ -82,7 +77,7 @@ export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
       name: 'tessera:context',
       enforce: 'pre',
       configResolved(config) {
-        ctx.resolve(config);
+        ctx.configure(config);
       },
     } satisfies Plugin,
     svelte({
@@ -93,8 +88,8 @@ export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
           if (rel !== null) {
             const msg = `[${warning.code}] ${rel}: ${warning.message}`;
             if (ctx.isBuild) {
-              ctx.a11y.warnings.push(msg);
-            } else if (!ctx.a11y.settings.ignore.includes(warning.code)) {
+              ctx.a11yWarnings.push(msg);
+            } else if (!ctx.a11ySettings.ignore.includes(warning.code)) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
           }
@@ -351,18 +346,12 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     name: 'tessera:validation',
     enforce: 'pre',
 
-    configResolved() {
-      // Run validation during dev (configResolved fires before server starts)
-      if (!ctx.isBuild) {
-        runValidation(ctx);
-      }
+    configureServer() {
+      runValidation(ctx);
     },
 
     buildStart() {
-      // Run validation during build (buildStart fires once before bundling)
-      if (ctx.isBuild) {
-        runValidation(ctx);
-      }
+      if (ctx.isBuild) runValidation(ctx);
     },
   };
 }
@@ -371,23 +360,20 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
 // every module is transformed. svelte() accepts `onwarn` but not arbitrary
 // Rollup hooks, so the gate lives here and shares the onwarn closure.
 function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
-  const { a11y } = ctx;
   return {
     name: 'tessera:a11y-compiler',
     enforce: 'pre',
-
-    configResolved() {
-      const read = ctx.readConfig();
-      a11y.settings = normalizeA11y(read.ok ? read.config.a11y : undefined);
-    },
+    apply: 'build',
 
     buildEnd() {
-      if (!ctx.isBuild || a11y.warnings.length === 0) return;
-      const ignored = new Set(a11y.settings.ignore);
-      const warnings = a11y.warnings.filter((msg) => !isIgnored(msg, ignored));
-      a11y.warnings = [];
+      if (ctx.a11yWarnings.length === 0) return;
+      const ignored = new Set(ctx.a11ySettings.ignore);
+      const warnings = ctx.a11yWarnings.filter(
+        (msg) => !isIgnored(msg, ignored),
+      );
+      ctx.a11yWarnings = [];
       if (warnings.length === 0) return;
-      if (a11y.settings.level === 'error') {
+      if (ctx.a11ySettings.level === 'error') {
         reportValidationIssues({ errors: warnings, warnings: [] });
         throw new Error(
           `Tessera: ${warnings.length} a11y issue(s) with a11y.level: 'error'. Fix the errors above to continue.`,

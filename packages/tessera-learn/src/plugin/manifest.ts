@@ -147,7 +147,7 @@ export type ResolvedConfigRead = CourseConfigRead & {
  * config with no override, or a standard outside the table, fails closed with
  * no `profile` so callers withhold standard-specific output rather than guess.
  * The returned `config` already has the override applied, so consumers read it
- * back directly. Exported for tests.
+ * back directly.
  */
 export function readResolvedConfig(
   projectRoot: string,
@@ -164,7 +164,7 @@ export function readResolvedConfig(
   return {
     ok: true,
     config,
-    profile: standardProfile(config.export?.standard || DEFAULT_STANDARD),
+    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
   };
 }
 

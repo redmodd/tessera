@@ -1,32 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import type { ResolvedConfig } from 'vite';
 import { BuildContext, isInside } from '../src/plugin/build-context.js';
+import { resolvedConfig } from './helpers/plugin.js';
 
 const root = resolve('/project');
 
-function resolveWith(outDir: string, command = 'build') {
-  new BuildContext().resolve({
-    root,
-    command,
-    build: { outDir },
-  } as ResolvedConfig);
+function configureWith(outDir: string, command = 'build') {
+  new BuildContext().configure(resolvedConfig(root, command, outDir));
 }
 
-describe('BuildContext.resolve', () => {
+describe('BuildContext.configure', () => {
   it.each(['.', '..'])('rejects a build outDir of "%s"', (outDir) => {
-    expect(() => resolveWith(outDir)).toThrow(
+    expect(() => configureWith(outDir)).toThrow(
       /must not be or contain the project root/,
     );
   });
 
   it('accepts an outDir inside or beside the project', () => {
-    expect(() => resolveWith('build')).not.toThrow();
-    expect(() => resolveWith('../out')).not.toThrow();
+    expect(() => configureWith('build')).not.toThrow();
+    expect(() => configureWith('../out')).not.toThrow();
   });
 
   it('ignores outDir outside a build', () => {
-    expect(() => resolveWith('.', 'serve')).not.toThrow();
+    expect(() => configureWith('.', 'serve')).not.toThrow();
   });
 });
 

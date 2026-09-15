@@ -2,13 +2,17 @@ import type { Plugin, ResolvedConfig } from 'vite';
 import { tesseraPlugin } from '../../src/plugin/index.js';
 import { BuildContext } from '../../src/plugin/build-context.js';
 
-function resolvedConfig(root: string, command: string): ResolvedConfig {
-  return { root, command, build: { outDir: 'dist' } } as ResolvedConfig;
+export function resolvedConfig(
+  root: string,
+  command: string,
+  outDir = 'dist',
+): ResolvedConfig {
+  return { root, command, build: { outDir } } as ResolvedConfig;
 }
 
 export function resolvedContext(root: string, command = 'serve'): BuildContext {
   const ctx = new BuildContext();
-  ctx.resolve(resolvedConfig(root, command));
+  ctx.configure(resolvedConfig(root, command));
   return ctx;
 }
 
