@@ -1,177 +1,174 @@
 #!/usr/bin/env node
+import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
 import { runValidate } from './validate-cli.js';
-import { parseA11yArgs, VALID_THRESHOLDS } from './a11y-cli.js';
-import { runAudit } from './a11y/audit.js';
+import { IMPACT_LEVELS, runAudit, type ImpactLevel } from './a11y/audit.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
-import { resolveCourse } from './course-root.js';
-import {
-  STANDARD_IDS,
-  standardProfile,
-  type StandardId,
-} from '../runtime/standards.js';
+import { resolveCourse, type ResolvedCourse } from './course-root.js';
+import { STANDARD_IDS, type StandardId } from '../runtime/standards.js';
 
-export type ParsedFlags<F> = F | { error: string };
-
-interface Course {
-  courseRoot: string;
-  workspaceRoot: string;
+interface Flag {
+  name: string;
+  choices: readonly string[];
+  description: string;
 }
 
-interface CommandInfo {
+const STANDARD_FLAG: Flag = {
+  name: 'standard',
+  choices: STANDARD_IDS,
+  description: 'Override course.config.js export.standard',
+};
+
+const THRESHOLD_FLAG: Flag = {
+  name: 'threshold',
+  choices: IMPACT_LEVELS,
+  description: 'Failing impact (default: serious)',
+};
+
+type Command = {
   args: string;
   summary: string;
-  options?: string;
-}
-
-interface WorkspaceCommand extends CommandInfo {
-  course: false;
-  run(args: string[], cwd: string): number;
-}
-
-interface CourseCommand<F> extends CommandInfo {
-  course: true;
-  parseFlags?(flags: string[]): ParsedFlags<F>;
-  run(course: Course, flags: F): number | Promise<number>;
-}
-
-type Command = WorkspaceCommand | CourseCommand<unknown>;
-
-function courseCommand<F>(
-  command: Omit<CourseCommand<F>, 'course'>,
-): CourseCommand<unknown> {
-  return { ...command, course: true };
-}
-
-// Validate here, against the standards table, so an unknown standard
-// fails before Vite spins up.
-export function parseExportFlags(
-  flags: string[],
-): ParsedFlags<{ standardOverride?: StandardId }> {
-  let standardOverride: StandardId | undefined;
-  for (let i = 0; i < flags.length; i++) {
-    const arg = flags[i];
-    let value: string | undefined;
-    if (arg === '--standard') {
-      value = flags[++i];
-    } else if (arg.startsWith('--standard=')) {
-      value = arg.slice('--standard='.length);
-    } else {
-      return { error: `Unknown argument: ${arg}` };
+  flag?: Flag;
+} & (
+  | { course: false; run(positionals: string[], cwd: string): number }
+  | {
+      course: true;
+      run(
+        course: ResolvedCourse,
+        flagValue: string | undefined,
+      ): number | Promise<number>;
     }
-    if (value === undefined || value.startsWith('-')) {
-      return { error: '--standard requires a value' };
-    }
-    const profile = standardProfile(value);
-    if (!profile) {
-      return {
-        error: `--standard must be one of ${STANDARD_IDS.join(', ')}, got "${value}"`,
-      };
-    }
-    standardOverride = profile.id;
-  }
-  return standardOverride ? { standardOverride } : {};
-}
+);
 
-// The course is a leading positional: `tessera <cmd> [course] [flags]`. Only the
-// first token can be the course, and only when it isn't a flag — otherwise a flag
-// value (e.g. the `serious` in `--threshold serious`) would be misread as a name.
-export function splitCourseArg(rest: string[]): {
-  course?: string;
-  flags: string[];
-} {
-  if (rest.length > 0 && !rest[0].startsWith('-')) {
-    return { course: rest[0], flags: rest.slice(1) };
-  }
-  return { course: undefined, flags: rest };
-}
-
-const STANDARD_OPTION = `  --standard <${STANDARD_IDS.join('|')}>    Override course.config.js export.standard`;
-const THRESHOLD_OPTION = `  --threshold <${VALID_THRESHOLDS.join('|')}>   Failing impact (default: serious)`;
-
-export const COMMANDS: Record<string, Command> = {
+const COMMANDS: Record<string, Command> = {
   new: {
     course: false,
     args: '<name>',
     summary: 'Scaffold a new course into courses/<name>',
-    run: (args, cwd) => runNew(args[0], cwd),
+    run: ([name], cwd) => runNew(name, cwd),
   },
   duplicate: {
     course: false,
     args: '<source> <new>',
     summary: 'Copy courses/<source> to courses/<new>',
-    run: (args, cwd) => runDuplicate(args[0], args[1], cwd),
+    run: ([source, target], cwd) => runDuplicate(source, target, cwd),
   },
-  dev: courseCommand({
+  dev: {
+    course: true,
     args: '[course]',
     summary: 'Start the Vite dev server',
     run: async ({ courseRoot, workspaceRoot }) =>
       (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
-  }),
-  export: courseCommand({
+  },
+  export: {
+    course: true,
     args: '[course]',
     summary: 'Build and package the course for its LMS standard',
-    options: STANDARD_OPTION,
-    parseFlags: parseExportFlags,
-    run: async ({ courseRoot, workspaceRoot }, { standardOverride }) =>
+    flag: STANDARD_FLAG,
+    run: async ({ courseRoot, workspaceRoot }, standard) =>
       (await import('./build-commands.js')).runBuild(
         courseRoot,
         workspaceRoot,
-        standardOverride,
+        standard as StandardId | undefined,
       ),
-  }),
-  validate: courseCommand({
+  },
+  validate: {
+    course: true,
     args: '[course]',
     summary: 'Fast static structure checks',
-    options: STANDARD_OPTION,
-    parseFlags: parseExportFlags,
-    run: ({ courseRoot }, { standardOverride }) =>
-      runValidate(courseRoot, { standardOverride }),
-  }),
-  a11y: courseCommand({
+    flag: STANDARD_FLAG,
+    run: ({ courseRoot }, standard) =>
+      runValidate(courseRoot, {
+        standardOverride: standard as StandardId | undefined,
+      }),
+  },
+  a11y: {
+    course: true,
     args: '[course]',
     summary: 'Runtime accessibility audit (builds + drives Playwright)',
-    options: THRESHOLD_OPTION,
-    parseFlags: parseA11yArgs,
-    run: ({ courseRoot, workspaceRoot }, options) =>
-      runAudit(courseRoot, workspaceRoot, options),
-  }),
-  check: courseCommand({
+    flag: THRESHOLD_FLAG,
+    run: ({ courseRoot, workspaceRoot }, threshold) =>
+      runAudit(courseRoot, workspaceRoot, {
+        threshold: threshold as ImpactLevel | undefined,
+      }),
+  },
+  check: {
+    course: true,
     args: '[course]',
     summary: 'Run validate, then a11y',
-    options: THRESHOLD_OPTION,
-    parseFlags: parseA11yArgs,
-    run: ({ courseRoot, workspaceRoot }, options) => {
+    flag: THRESHOLD_FLAG,
+    run: ({ courseRoot, workspaceRoot }, threshold) => {
       const validateCode = runValidate(courseRoot, { showA11yTip: false });
       if (validateCode !== 0) return validateCode;
-      return runAudit(courseRoot, workspaceRoot, options);
+      return runAudit(courseRoot, workspaceRoot, {
+        threshold: threshold as ImpactLevel | undefined,
+      });
     },
-  }),
+  },
 };
 
-function formatUsage(commands: Record<string, Command>): string {
-  const entries = Object.entries(commands);
+function formatUsage(): string {
+  const entries = Object.entries(COMMANDS);
+  const flagUsers = new Map<Flag, string[]>();
+  for (const [name, { flag }] of entries) {
+    if (flag) flagUsers.set(flag, [...(flagUsers.get(flag) ?? []), name]);
+  }
   const commandLines = entries.map(
     ([name, { args, summary }]) =>
       `  ${`${name} ${args}`.padEnd(28)}${summary}`,
   );
-  const optionUsers = new Map<string, string[]>();
-  for (const [name, { options }] of entries) {
-    if (options)
-      optionUsers.set(options, [...(optionUsers.get(options) ?? []), name]);
-  }
-  const optionBlocks = [...optionUsers].map(
-    ([options, names]) => `${names.join('/')} options:\n${options}`,
+  const flagBlocks = [...flagUsers].map(
+    ([{ name, choices, description }, users]) =>
+      `${users.join('/')} options:\n  ${`--${name} <${choices.join('|')}>`.padEnd(48)}${description}`,
   );
   return [
     'Usage: tessera <command> [course] [options]',
     `Commands:\n${commandLines.join('\n')}`,
     'Run a command from inside a course folder, or name the course explicitly.',
-    ...optionBlocks,
+    ...flagBlocks,
   ].join('\n\n');
 }
 
-export const USAGE = formatUsage(COMMANDS);
+const USAGE = formatUsage();
+
+// Flag values are checked here, before the course resolves, so an unknown
+// standard fails before Vite spins up.
+function parseCommandArgs(
+  { args: synopsis, flag }: Command,
+  args: string[],
+):
+  | { error: string }
+  | { help: boolean; positionals: string[]; flagValue?: string } {
+  const options: ParseArgsOptionsConfig = {
+    help: { type: 'boolean', short: 'h' },
+  };
+  if (flag) options[flag.name] = { type: 'string' };
+
+  let parsed;
+  try {
+    parsed = parseArgs({ args, options, allowPositionals: true });
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+  const { values, positionals } = parsed;
+  if (values.help) return { help: true, positionals };
+
+  const maxPositionals = synopsis.split(' ').length;
+  if (positionals.length > maxPositionals) {
+    return { error: `Unexpected argument: ${positionals[maxPositionals]}` };
+  }
+
+  const flagValue = flag ? values[flag.name] : undefined;
+  if (!flag || typeof flagValue !== 'string') {
+    return { help: false, positionals };
+  }
+  if (!flag.choices.includes(flagValue)) {
+    return {
+      error: `--${flag.name} must be one of: ${flag.choices.join(', ')}, got "${flagValue}"`,
+    };
+  }
+  return { help: false, positionals, flagValue };
+}
 
 export async function main(
   argv: string[],
@@ -192,30 +189,28 @@ export async function main(
     return 1;
   }
 
-  if (rest.includes('--help') || rest.includes('-h')) {
-    console.log(USAGE);
-    return 0;
-  }
-
   const command = COMMANDS[sub];
-  if (!command.course) return command.run(rest, cwd);
-
-  const { course, flags } = splitCourseArg(rest);
-  const parsed = command.parseFlags ? command.parseFlags(flags) : flags;
-  if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+  const parsed = parseCommandArgs(command, rest);
+  if ('error' in parsed) {
     console.error(`[tessera ${sub}] ${parsed.error}`);
     return 1;
   }
-  const resolved = resolveCourse(cwd, course);
+  if (parsed.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  if (!command.course) return command.run(parsed.positionals, cwd);
+
+  const resolved = resolveCourse(cwd, parsed.positionals[0]);
   if (!resolved.ok) {
-    console.error(`[tessera] ${resolved.error}`);
+    console.error(`[tessera ${sub}] ${resolved.error}`);
     return 1;
   }
-  return command.run(resolved, parsed);
+  return command.run(resolved, parsed.flagValue);
 }
 
 // import.meta.main is true only when this module is the program entry point,
-// and resolves symlinks itself (pnpm/npm bin shims) — Node >= 24.
+// and resolves symlinks itself (pnpm/npm bin shims). Requires Node >= 24.
 if (import.meta.main) {
   void main(process.argv.slice(2)).then((code) => process.exit(code));
 }

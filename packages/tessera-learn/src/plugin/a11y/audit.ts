@@ -19,6 +19,8 @@ const IMPACT_RANK: Record<ImpactLevel, number> = {
   critical: 4,
 };
 
+export const IMPACT_LEVELS = Object.keys(IMPACT_RANK) as ImpactLevel[];
+
 // Set by runAudit during its build/preview; the plugin forces the WebAdapter,
 // skips export packaging, and stubs xAPI while it's set. See plugin/index.ts.
 export const AUDIT_ENV_FLAG = 'TESSERA_A11Y_AUDIT';
