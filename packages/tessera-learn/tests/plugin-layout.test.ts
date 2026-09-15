@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { normalizePath } from 'vite';
 
 import { tesseraLayoutPlugin } from '../src/plugin/layout.js';
+import { resolvedContext } from './helpers/plugin.js';
 
 describe('tessera:layout virtual module', () => {
   let projectRoot: string;
@@ -23,10 +24,7 @@ describe('tessera:layout virtual module', () => {
   });
 
   function makePlugin() {
-    const plugin = tesseraLayoutPlugin();
-    // Manually invoke the lifecycle hooks so we can test load() without spinning up Vite.
-    (plugin as any).configResolved?.({ root: projectRoot });
-    return plugin;
+    return tesseraLayoutPlugin(resolvedContext(projectRoot));
   }
 
   it('load() returns null re-export when no layout.svelte exists', () => {

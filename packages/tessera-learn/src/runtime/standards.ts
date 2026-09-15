@@ -88,7 +88,7 @@ export const STANDARDS = {
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };
 
-type StandardProfile = (typeof STANDARDS)[StandardId];
+export type StandardProfile = (typeof STANDARDS)[StandardId];
 
 type StandardsWhere<F extends keyof StandardProfile> = {
   [K in StandardId]: (typeof STANDARDS)[K][F] extends true ? K : never;

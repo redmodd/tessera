@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { normalizePath } from 'vite';
 
 import { tesseraCourseRuntimePlugin } from '../src/plugin/course-runtime.js';
+import { resolvedContext } from './helpers/plugin.js';
 
 describe('tessera:course-runtime virtual module', () => {
   let projectRoot: string;
@@ -18,9 +19,8 @@ describe('tessera:course-runtime virtual module', () => {
   });
 
   function load(): string {
-    const plugin = tesseraCourseRuntimePlugin() as any;
-    plugin.configResolved({ root: projectRoot });
-    return plugin.load.handler();
+    const plugin = tesseraCourseRuntimePlugin(resolvedContext(projectRoot));
+    return (plugin as any).load.handler();
   }
 
   it('default-exports the course.runtime.js module namespace when present', () => {

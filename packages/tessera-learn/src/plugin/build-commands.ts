@@ -1,4 +1,5 @@
 import { resolveTesseraConfig } from './inline-config.js';
+import type { StandardId } from '../runtime/standards.js';
 
 export async function runDev(
   projectRoot: string,
@@ -20,7 +21,7 @@ export async function runDev(
 export async function runBuild(
   projectRoot: string,
   workspaceRoot: string,
-  standardOverride?: string,
+  standardOverride?: StandardId,
 ): Promise<number> {
   const vite = await import('vite');
   const config = await resolveTesseraConfig(

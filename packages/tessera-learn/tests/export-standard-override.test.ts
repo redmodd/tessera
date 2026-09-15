@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readResolvedConfig } from '../src/plugin/manifest.js';
 import { validateProject } from '../src/plugin/validation.js';
+import { tesseraPlugin } from '../src/plugin/index.js';
 
 let projectRoot: string;
 
@@ -32,48 +33,70 @@ describe('readResolvedConfig', () => {
   it('uses the course config standard when no override is given', () => {
     writeConfig(`{ export: { standard: "scorm12" } }`);
     const read = readResolvedConfig(projectRoot);
-    expect(read.standard).toBe('scorm12');
+    expect(read.profile?.id).toBe('scorm12');
     expect(read.ok && read.config.export?.standard).toBe('scorm12');
   });
 
   it('defaults to web when the config omits export.standard', () => {
     writeConfig(`{ title: "x" }`);
-    expect(readResolvedConfig(projectRoot).standard).toBe('web');
+    expect(readResolvedConfig(projectRoot).profile?.id).toBe('web');
   });
 
   it('lets a CLI override win while preserving other export fields', () => {
     writeConfig(`{ export: { standard: "web", csp: false } }`);
     const read = readResolvedConfig(projectRoot, 'cmi5');
-    expect(read.standard).toBe('cmi5');
+    expect(read.profile?.id).toBe('cmi5');
     expect(read.ok && read.config.export).toEqual({
       standard: 'cmi5',
       csp: false,
     });
   });
 
-  it('reports unknown for an unreadable config with no override', () => {
+  it('resolves no profile for an unreadable config with no override', () => {
     const read = readResolvedConfig(projectRoot);
     expect(read.ok).toBe(false);
-    expect(read.standard).toBe('unknown');
+    expect(read.profile).toBeUndefined();
   });
+
+  it.each(['scorm13', ''])(
+    'resolves no profile for a standard of "%s"',
+    (standard) => {
+      writeConfig(`{ export: { standard: "${standard}" } }`);
+      expect(readResolvedConfig(projectRoot).profile).toBeUndefined();
+    },
+  );
 
   it('honours the override even when the config is unreadable', () => {
     const read = readResolvedConfig(projectRoot, 'scorm2004');
     expect(read.ok).toBe(false);
-    expect(read.standard).toBe('scorm2004');
+    expect(read.profile?.id).toBe('scorm2004');
+  });
+});
+
+describe('tesseraPlugin standardOverride', () => {
+  it('rejects an override outside the allowed set', () => {
+    expect(() => tesseraPlugin({ standardOverride: 'scorm13' })).toThrow(
+      /standardOverride must be one of .*, got "scorm13"/,
+    );
+  });
+
+  it.each([undefined, ''])('treats %j as no override', (standardOverride) => {
+    expect(() => tesseraPlugin({ standardOverride })).not.toThrow();
   });
 });
 
 describe('validateProject standardOverride', () => {
-  it('rejects an override outside the allowed set', () => {
-    writeConfig(`{ export: { standard: "web" } }`);
-    const { errors } = validateProject(projectRoot, 'scorm13');
-    expect(errors.some((e) => e.includes('standardOverride'))).toBe(true);
+  it('still rejects an invalid file standard when an override is given', () => {
+    writeConfig(`{ export: { standard: "scorm13" } }`);
+    const { errors } = validateProject(projectRoot, 'scorm12');
+    expect(errors).toContainEqual(
+      expect.stringContaining('"export.standard" must be one of'),
+    );
   });
 
   it('accepts a valid override', () => {
     writeConfig(`{ export: { standard: "web" } }`);
     const { errors } = validateProject(projectRoot, 'cmi5');
-    expect(errors.some((e) => e.includes('standardOverride'))).toBe(false);
+    expect(errors.some((e) => e.includes('"export.standard"'))).toBe(false);
   });
 });

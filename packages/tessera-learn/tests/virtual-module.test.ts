@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
 import { createOverridePlugin } from '../src/plugin/override-plugin.js';
-import { tesseraPlugin } from '../src/plugin/index.js';
+import { resolvedContext, resolvedPlugins } from './helpers/plugin.js';
 
 let projectRoot: string;
 
@@ -18,14 +24,8 @@ afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
 });
 
-function configure(plugin: Plugin, command = 'serve') {
-  (plugin.configResolved as any).call(plugin, { root: projectRoot, command });
-}
-
 function tesseraSubPlugin(name: string) {
-  const plugin = (tesseraPlugin() as Plugin[]).find((p) => p.name === name)!;
-  configure(plugin);
-  return plugin;
+  return resolvedPlugins(projectRoot)(name);
 }
 
 function load(plugin: Plugin, addWatchFile = (_file: string) => {}): string {
@@ -37,6 +37,7 @@ function fakeEnvironment({ name = 'client', loaded = true } = {}) {
   const sent: unknown[] = [];
   return {
     name,
+    config: { root: projectRoot },
     moduleGraph: {
       getModuleById: (id: string) => (loaded ? { id } : undefined),
       invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
@@ -71,15 +72,12 @@ describe('virtualModule', () => {
     expect(handler()).toBe('\0virtual:x');
   });
 
-  it('filters load to the resolved id and passes the resolved config', () => {
-    const plugin = virtualModule('test', 'virtual:x', (ctx) =>
-      JSON.stringify([ctx.projectRoot, ctx.isBuild]),
-    );
-    configure(plugin, 'build');
+  it('filters load to the resolved id', () => {
+    const plugin = virtualModule('test', 'virtual:x', () => 'code');
     const { filter } = plugin.load as any;
     expect(filter.id.test('\0virtual:x')).toBe(true);
     expect(filter.id.test('virtual:x')).toBe(false);
-    expect(JSON.parse(load(plugin))).toEqual([projectRoot, true]);
+    expect(load(plugin)).toBe('code');
   });
 
   function updated(
@@ -88,7 +86,6 @@ describe('virtualModule', () => {
   ) {
     const environment = fakeEnvironment(options);
     const plugin = virtualModule('test', 'virtual:x', () => '', shouldReload);
-    configure(plugin);
     const result = hotUpdate(plugin, environment, 'update', 'any');
     return { ...environment, result };
   }
@@ -120,12 +117,11 @@ describe('virtualModule', () => {
 describe('override plugin dev reload', () => {
   it('reloads only when the override file is created or deleted', () => {
     const environment = fakeEnvironment();
-    const plugin = createOverridePlugin({
+    const plugin = createOverridePlugin(resolvedContext(projectRoot), {
       name: 'test',
       virtualId: 'virtual:layout',
       projectFile: 'course.layout.svelte',
     });
-    configure(plugin);
 
     hotUpdate(plugin, environment, 'update', 'course.layout.svelte');
     hotUpdate(plugin, environment, 'create', 'other.svelte');
@@ -229,5 +225,20 @@ describe('manifest plugin', () => {
       resolve(projectRoot, 'pages', '01-intro', '_meta.js'),
       resolve(lessonDir, 'welcome.svelte'),
     ]);
+  });
+});
+
+describe('config plugin', () => {
+  it('loads course.config.js edits made between loads', () => {
+    const configPath = resolve(projectRoot, 'course.config.js');
+    const plugin = tesseraSubPlugin('tessera:config');
+
+    writeFileSync(configPath, `export default { title: 'First' };`);
+    utimesSync(configPath, 1, 1);
+    expect(load(plugin)).toContain('"title":"First"');
+
+    writeFileSync(configPath, `export default { title: 'Second' };`);
+    utimesSync(configPath, 2, 2);
+    expect(load(plugin)).toContain('"title":"Second"');
   });
 });

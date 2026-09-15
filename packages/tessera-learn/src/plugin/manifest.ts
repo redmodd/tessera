@@ -7,7 +7,12 @@ import {
   pageConfigLiteral,
 } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
-import { DEFAULT_STANDARD } from '../runtime/standards.js';
+import {
+  DEFAULT_STANDARD,
+  standardProfile,
+  type StandardId,
+  type StandardProfile,
+} from '../runtime/standards.js';
 
 // ---------- Types ----------
 
@@ -132,29 +137,34 @@ export function readCourseConfig(projectRoot: string): CourseConfigRead {
   }
 }
 
+export type ResolvedConfigRead = CourseConfigRead & {
+  profile: StandardProfile | undefined;
+};
+
 /**
  * Resolve a project's effective export standard once: the CLI `--standard`
- * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable config with
- * no override fails closed with `'unknown'` so callers withhold standard-specific
- * output rather than guess. The returned `config` already has the override
- * applied, so consumers read it back directly. Exported for tests.
+ * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
+ * config with no override, or a standard outside the table, fails closed with
+ * no `profile` so callers withhold standard-specific output rather than guess.
+ * The returned `config` already has the override applied, so consumers read it
+ * back directly.
  */
 export function readResolvedConfig(
   projectRoot: string,
-  standardOverride?: string,
-): CourseConfigRead & { standard: string } {
+  standardOverride?: StandardId,
+): ResolvedConfigRead {
   const read = readCourseConfig(projectRoot);
-  if (!read.ok) return { ...read, standard: standardOverride || 'unknown' };
-  // `standardOverride` arrives as a raw CLI string; `parseConfig` errors on a
-  // value outside the allowed set, so no build reaches output with a bad one.
-  const override = standardOverride as CourseConfig['export']['standard'];
-  const config: Partial<CourseConfig> = override
-    ? { ...read.config, export: { ...read.config.export, standard: override } }
+  if (!read.ok) return { ...read, profile: standardProfile(standardOverride) };
+  const config: Partial<CourseConfig> = standardOverride
+    ? {
+        ...read.config,
+        export: { ...read.config.export, standard: standardOverride },
+      }
     : read.config;
   return {
     ok: true,
     config,
-    standard: config.export?.standard || DEFAULT_STANDARD,
+    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
   };
 }
 

@@ -4,7 +4,11 @@ import { runA11y } from './a11y-cli.js';
 import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse } from './course-root.js';
-import { STANDARD_IDS, standardProfile } from '../runtime/standards.js';
+import {
+  STANDARD_IDS,
+  standardProfile,
+  type StandardId,
+} from '../runtime/standards.js';
 
 const USAGE = `Usage: tessera <command> [course] [options]
 
@@ -28,10 +32,10 @@ a11y/check options:
 // Validate here, against the standards table, so an unknown standard
 // fails before Vite spins up.
 export function parseExportFlags(flags: string[]): {
-  standardOverride?: string;
+  standardOverride?: StandardId;
   error?: string;
 } {
-  let standardOverride: string | undefined;
+  let standardOverride: StandardId | undefined;
   for (let i = 0; i < flags.length; i++) {
     const arg = flags[i];
     let value: string | undefined;
@@ -45,12 +49,13 @@ export function parseExportFlags(flags: string[]): {
     if (value === undefined || value.startsWith('-')) {
       return { error: '--standard requires a value' };
     }
-    if (!standardProfile(value)) {
+    const profile = standardProfile(value);
+    if (!profile) {
       return {
         error: `--standard must be one of ${STANDARD_IDS.join(', ')}, got "${value}"`,
       };
     }
-    standardOverride = value;
+    standardOverride = profile.id;
   }
   return standardOverride ? { standardOverride } : {};
 }

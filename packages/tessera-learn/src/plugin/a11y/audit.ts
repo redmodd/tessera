@@ -2,8 +2,8 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-import { generateManifest, readCourseConfig } from '../manifest.js';
-import { normalizeA11y, type A11ySettings } from '../validation.js';
+import { generateManifest } from '../manifest.js';
+import { readA11ySettings, type A11ySettings } from '../validation.js';
 
 export interface AuditOptions {
   /** Minimum violation impact that fails the run (CI gate). Default 'serious'. */
@@ -352,8 +352,7 @@ export async function runAudit(
   }
   const { chromium, AxeBuilder } = deps.deps;
 
-  const read = readCourseConfig(projectRoot);
-  const settings = normalizeA11y(read.ok ? read.config.a11y : undefined);
+  const settings = readA11ySettings(projectRoot);
   const tags = axeTags(settings.standard);
   const disableRules = axeIgnoreRules(settings.ignore);
 

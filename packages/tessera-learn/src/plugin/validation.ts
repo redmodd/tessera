@@ -36,12 +36,16 @@ import {
   STANDARD_IDS,
   largerSuspendDataStandards,
   standardProfile,
+  type StandardId,
 } from '../runtime/standards.js';
 import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
   courseIdentity,
+  type CourseConfig,
+  type ManualCompletion,
+  type PercentageCompletion,
 } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isCspOverrides } from './csp.js';
@@ -124,7 +128,7 @@ const VALID_A11Y_LEVELS = ['warn', 'error'];
 const VALID_A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'];
 
 /** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
-export function normalizeA11y(raw: unknown): A11ySettings {
+function normalizeA11y(raw: unknown): A11ySettings {
   const a11y =
     raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const level = a11y.level === 'error' ? 'error' : 'warn';
@@ -135,6 +139,11 @@ export function normalizeA11y(raw: unknown): A11ySettings {
     ? a11y.ignore.filter((x): x is string => typeof x === 'string')
     : [];
   return { level, standard, ignore };
+}
+
+export function readA11ySettings(projectRoot: string): A11ySettings {
+  const read = readCourseConfig(projectRoot);
+  return normalizeA11y(read.ok ? read.config.a11y : undefined);
 }
 
 /**
@@ -223,7 +232,7 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  */
 export function validateProject(
   projectRoot: string,
-  standardOverride?: string,
+  standardOverride?: StandardId,
 ): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
@@ -269,27 +278,19 @@ export function validateProject(
 
 // ---------- Config Validation ----------
 
-interface ParsedConfig {
-  title?: string;
-  id?: string;
-  resume?: string;
-  navigation?: { mode?: string };
-  completion?: {
-    mode?: string;
-    percentageThreshold?: number;
-    trigger?: string;
-    requireSuccessStatus?: string;
-  };
-  scoring?: { passingScore?: number };
-  export?: { standard?: string; csp?: unknown };
-  [key: string]: unknown;
-}
+type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
+  completion?: Partial<
+    Pick<CourseConfig['completion'], 'mode'> &
+      Omit<ManualCompletion, 'mode'> &
+      Omit<PercentageCompletion, 'mode'>
+  >;
+};
 
 function parseConfig(
   projectRoot: string,
   d: Diagnostics,
   runtimeHooks: XAPIHookRead,
-  standardOverride?: string,
+  standardOverride?: StandardId,
 ): ParsedConfig | null {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
@@ -301,7 +302,7 @@ function parseConfig(
     }
     return null;
   }
-  const config = read.config as ParsedConfig;
+  const config: ParsedConfig = read.config;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
@@ -364,13 +365,7 @@ function parseConfig(
   // standard-dependent check below (identity, csp, xapi, crossValidate) sees
   // what actually ships.
   if (standardOverride) {
-    if (!standardProfile(standardOverride)) {
-      d.error(
-        `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
-      );
-    } else {
-      config.export = { ...config.export, standard: standardOverride };
-    }
+    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
@@ -687,7 +682,7 @@ function validateHookIds(
 
 function validateXAPIConfig(
   raw: unknown,
-  standard: string,
+  standard: StandardId,
   hooks: XAPIHookRead,
   d: Diagnostics,
 ): void {
@@ -765,7 +760,7 @@ function validateXAPIConfig(
 function validateSingleXAPIEntry(
   entry: Record<string, unknown>,
   label: string,
-  standard: string,
+  standard: StandardId,
   hooks: XAPIHookRead,
   ids: Set<string>,
   d: Diagnostics,
@@ -1142,7 +1137,7 @@ function validatePages(
   assetsDir: string,
   projectRoot: string,
   d: Diagnostics,
-  exportStandard?: string,
+  exportStandard?: StandardId,
 ): PagesValidationResult {
   const pages: PageInfo[] = [];
   let totalPages = 0;
