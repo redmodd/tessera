@@ -89,7 +89,7 @@ export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
             const msg = `[${warning.code}] ${rel}: ${warning.message}`;
             if (ctx.isBuild) {
               ctx.a11yWarnings.push(msg);
-            } else if (!ctx.a11ySettings.ignore.includes(warning.code)) {
+            } else if (!ctx.a11ySettings().ignore.includes(warning.code)) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
           }
@@ -357,13 +357,14 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 
     buildEnd() {
       if (ctx.a11yWarnings.length === 0) return;
-      const ignored = new Set(ctx.a11ySettings.ignore);
+      const settings = ctx.a11ySettings();
+      const ignored = new Set(settings.ignore);
       const warnings = ctx.a11yWarnings.filter(
         (msg) => !isIgnored(msg, ignored),
       );
       ctx.a11yWarnings = [];
       if (warnings.length === 0) return;
-      if (ctx.a11ySettings.level === 'error') {
+      if (settings.level === 'error') {
         reportValidationIssues({ errors: warnings, warnings: [] });
         throw new Error(
           `Tessera: ${warnings.length} a11y issue(s) with a11y.level: 'error'. Fix the errors above to continue.`,
@@ -400,7 +401,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
     writeBundle(options, bundle) {
       written = true;
-      emitted = Object.keys(bundle).map((file) => resolve(options.dir!, file));
+      emitted = Object.keys(bundle).map((file) => resolve(ctx.outDir, file));
     },
 
     onLog(_level, log) {

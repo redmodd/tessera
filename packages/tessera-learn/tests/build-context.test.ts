@@ -5,7 +5,7 @@ import { resolvedConfig } from './helpers/plugin.js';
 
 const root = resolve('/project');
 
-function configureWith(outDir: string, command = 'build') {
+function configureWith(outDir: string, command: 'build' | 'serve' = 'build') {
   new BuildContext().configure(resolvedConfig(root, command, outDir));
 }
 

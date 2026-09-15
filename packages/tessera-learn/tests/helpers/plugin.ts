@@ -2,15 +2,20 @@ import type { Plugin, ResolvedConfig } from 'vite';
 import { tesseraPlugin } from '../../src/plugin/index.js';
 import { BuildContext } from '../../src/plugin/build-context.js';
 
+type Command = ResolvedConfig['command'];
+
 export function resolvedConfig(
   root: string,
-  command: string,
+  command: Command,
   outDir = 'dist',
 ): ResolvedConfig {
   return { root, command, build: { outDir } } as ResolvedConfig;
 }
 
-export function resolvedContext(root: string, command = 'serve'): BuildContext {
+export function resolvedContext(
+  root: string,
+  command: Command = 'serve',
+): BuildContext {
   const ctx = new BuildContext();
   ctx.configure(resolvedConfig(root, command));
   return ctx;
@@ -19,7 +24,7 @@ export function resolvedContext(root: string, command = 'serve'): BuildContext {
 /** `tesseraPlugin()` with its shared context resolved; returns a by-name lookup. */
 export function resolvedPlugins(
   root: string,
-  command = 'serve',
+  command: Command = 'serve',
 ): (name: string) => Plugin {
   const plugins = tesseraPlugin() as Plugin[];
   const get = (name: string) => {

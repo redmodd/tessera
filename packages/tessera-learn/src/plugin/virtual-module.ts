@@ -17,9 +17,7 @@ export function virtualModule(
     },
     load: {
       filter: { id: new RegExp(`^${resolvedId}$`) },
-      handler() {
-        return load.call(this);
-      },
+      handler: load,
     },
   };
   if (!shouldReload) return plugin;

@@ -5,7 +5,7 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import { normalizeA11y } from './validation.js';
+import { normalizeA11y, type A11ySettings } from './validation.js';
 import type { StandardId } from '../runtime/standards.js';
 
 /** True when `child` is `parent` or a path beneath it. */
@@ -25,7 +25,6 @@ export class BuildContext {
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
-  a11ySettings = normalizeA11y(undefined);
 
   constructor(standardOverride?: StandardId) {
     this.standardOverride = standardOverride;
@@ -40,11 +39,14 @@ export class BuildContext {
         `build.outDir (${this.outDir}) must not be or contain the project root.`,
       );
     }
-    const read = this.readConfig();
-    this.a11ySettings = normalizeA11y(read.ok ? read.config.a11y : undefined);
   }
 
   readConfig(): ResolvedConfigRead {
     return readResolvedConfig(this.root, this.standardOverride);
+  }
+
+  a11ySettings(): A11ySettings {
+    const read = this.readConfig();
+    return normalizeA11y(read.ok ? read.config.a11y : undefined);
   }
 }
