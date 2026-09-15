@@ -1,5 +1,23 @@
 # tessera-learn
 
+## 0.7.0
+
+### Minor Changes
+
+- 31909ea: Custom page access rules and xAPI login/learner functions now go in a new optional `course.runtime.js` file (functions in `course.config.js` never worked), and each xAPI destination with its own endpoint now needs an `id`.
+
+### Patch Changes
+
+- 929a7a4: Export packages the configured `build.outDir` instead of always `dist/`, and a build now fails if `outDir` is or contains the project root. `tesseraPlugin()` also throws on an unknown `standardOverride` instead of reporting it as a validation error.
+- 8d2ce31: Manifest generation and adapter code generation share one build-side table keyed by export standard.
+- 236c6bd: cmi5 packages for manual-completion courses declare the same passing score the runtime uses.
+- 037a703: The build-time suspend-data warning now covers SCORM 2004, and suspend-data advice lists every larger-limit standard.
+- 1adfe9f: Interaction formats declare option-index encoding with an `encodesOptionIndex` flag.
+- 42a9f7c: `tessera validate` no longer reports missing xAPI `auth`/`actor` when `course.runtime.js` sets them through an alias of the `xapi` export.
+- ee53c8a: The SCORM 2004 adapter reads `cmi.mode` and `cmi.scaled_passing_score` through its dialect.
+- 0e85421: cmi5 and xAPI courses now send Terminated and pending statements when the course closes, and download or mailto links no longer end the session.
+- 6b2068a: Build every Vite virtual module through one shared helper, and reload the dev server only when the manifest or stylesheet list changes.
+
 ## 0.6.0
 
 ### Minor Changes
