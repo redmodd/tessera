@@ -55,10 +55,9 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 
     const plugin = findPlugin('tessera:manifest');
     (plugin.configResolved as any).call(plugin, { root: projectRoot });
-    const code = (plugin.load as any).handler.call(
-      { addWatchFile() {} },
-      '\0virtual:tessera-manifest',
-    ) as string;
+    const code = (plugin.load as any).handler.call({
+      addWatchFile() {},
+    }) as string;
 
     const expr = code.replace(/^export default /, '').replace(/;$/, '');
     const manifest = (0, eval)(expr) as { pages: { title: string }[] };

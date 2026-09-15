@@ -12,6 +12,7 @@ let projectRoot: string;
 beforeEach(() => {
   projectRoot = mkdtempSync(resolve(tmpdir(), 'tessera-virtual-test-'));
   mkdirSync(resolve(projectRoot, 'pages'));
+  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -132,7 +133,6 @@ describe('manifest plugin', () => {
   }
 
   it('reloads on page changes and ignores other files', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const server = fakeServer();
     (manifestPlugin().configureServer as any)(server);
 
@@ -158,5 +158,20 @@ describe('manifest plugin', () => {
       '<h1>Welcome</h1>',
     );
     expect(load()).not.toBe(before);
+  });
+
+  it('watches the page and _meta.js files the manifest reads', () => {
+    const lessonDir = resolve(projectRoot, 'pages', '01-intro', '01-basics');
+    mkdirSync(lessonDir, { recursive: true });
+    writeFileSync(resolve(projectRoot, 'pages', '01-intro', '_meta.js'), '');
+    writeFileSync(resolve(lessonDir, 'welcome.svelte'), '<h1>Hi</h1>');
+    const watched: string[] = [];
+    (manifestPlugin().load as any).handler.call({
+      addWatchFile: (file: string) => watched.push(file),
+    });
+    expect(watched).toEqual([
+      resolve(projectRoot, 'pages', '01-intro', '_meta.js'),
+      resolve(lessonDir, 'welcome.svelte'),
+    ]);
   });
 });

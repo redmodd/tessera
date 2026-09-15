@@ -1,37 +1,29 @@
-import type { Plugin, ResolvedConfig, Rollup } from 'vite';
+import type { Plugin, Rollup } from 'vite';
+import { relative } from 'node:path';
 
-export interface VirtualModuleContext {
-  readonly projectRoot: string;
-  readonly isBuild: boolean;
+interface VirtualModuleContext {
+  projectRoot: string;
+  isBuild: boolean;
 }
-
-export type ShouldReload = (
-  event: string,
-  file: string,
-  ctx: VirtualModuleContext,
-) => boolean;
 
 export function virtualModule(
   name: string,
   virtualId: string,
   load: (this: Rollup.PluginContext, ctx: VirtualModuleContext) => string,
-  shouldReload?: ShouldReload,
+  shouldReload?: (
+    event: string,
+    file: string,
+    ctx: VirtualModuleContext,
+  ) => boolean,
 ): Plugin {
   const resolvedId = '\0' + virtualId;
-  let config: ResolvedConfig;
-  const ctx: VirtualModuleContext = {
-    get projectRoot() {
-      return config.root;
-    },
-    get isBuild() {
-      return config.command === 'build';
-    },
-  };
+  const ctx: VirtualModuleContext = { projectRoot: '', isBuild: false };
   return {
     name,
     enforce: 'pre',
-    configResolved(resolved) {
-      config = resolved;
+    configResolved(config) {
+      ctx.projectRoot = config.root;
+      ctx.isBuild = config.command === 'build';
     },
     resolveId: {
       filter: { id: new RegExp(`^/?${virtualId}$`) },
@@ -48,6 +40,9 @@ export function virtualModule(
       const client = server.environments.client;
       server.watcher.on('all', (event, file) => {
         if (!shouldReload(event, file, ctx)) return;
+        console.log(
+          `[${name}] Reloading (${event}: ${relative(ctx.projectRoot, file)})`,
+        );
         const mod = client.moduleGraph.getModuleById(resolvedId);
         if (mod) client.moduleGraph.invalidateModule(mod);
         client.hot.send({ type: 'full-reload' });

@@ -1,11 +1,10 @@
-import type { Plugin, ResolvedConfig, Rollup, ViteDevServer } from 'vite';
+import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve, relative, isAbsolute, basename, sep } from 'node:path';
 import {
   existsSync,
   readdirSync,
-  statSync,
   writeFileSync,
   unlinkSync,
   cpSync,
@@ -16,6 +15,7 @@ import {
   generateManifest,
   readCourseConfig,
   readResolvedConfig,
+  walkPages,
   type CourseConfigRead,
 } from './manifest.js';
 import type { Manifest } from './manifest.js';
@@ -172,7 +172,7 @@ function tesseraIndexHtmlPlugin(
     name: 'tessera:index-html',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       outDir = resolve(config.root, config.build.outDir);
       isBuild = config.command === 'build';
@@ -213,7 +213,7 @@ function tesseraIndexHtmlPlugin(
     },
 
     // Serve index.html for the dev server
-    configureServer(server: ViteDevServer) {
+    configureServer(server) {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
@@ -386,18 +386,20 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
 
 // ---------- Manifest Watch Helpers ----------
 
-/** Register all _meta.js and .svelte files under pagesDir as watch files for build mode. */
+/** Register the _meta.js and .svelte files the manifest reads as watch files for build mode. */
 function addWatchFiles(
   ctx: { addWatchFile(id: string): void },
-  dir: string,
+  pagesDir: string,
 ): void {
-  if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    const full = resolve(dir, entry);
-    if (statSync(full).isDirectory()) {
-      addWatchFiles(ctx, full);
-    } else if (entry.endsWith('.svelte') || entry === '_meta.js') {
-      ctx.addWatchFile(full);
+  for (const section of walkPages(pagesDir)) {
+    const metaPaths = [section, ...section.lessons].map((s) => s.metaPath);
+    for (const metaPath of new Set(metaPaths)) {
+      if (existsSync(metaPath)) ctx.addWatchFile(metaPath);
+    }
+    for (const lesson of section.lessons) {
+      for (const file of lesson.files) {
+        ctx.addWatchFile(resolve(lesson.dir, file));
+      }
     }
   }
 }
@@ -427,7 +429,7 @@ function tesseraValidationPlugin(standardOverride?: string): Plugin {
     name: 'tessera:validation',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       isBuild = config.command === 'build';
       // Run validation during dev (configResolved fires before server starts)
@@ -453,7 +455,7 @@ function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
     name: 'tessera:a11y-compiler',
     enforce: 'pre',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       a11y.projectRoot = config.root;
       a11y.isBuild = config.command === 'build';
       const read = readCourseConfig(config.root);
@@ -501,7 +503,7 @@ function tesseraExportPlugin(
     name: 'tessera:export',
     enforce: 'post',
 
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
       isBuild = config.command === 'build';
     },
@@ -577,22 +579,12 @@ function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
       // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
       return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
     },
-    (event, filePath, { projectRoot }) => {
-      if (!filePath.startsWith(resolve(projectRoot, 'pages') + sep)) {
-        return false;
-      }
-      const isRelevant =
-        filePath.endsWith('.svelte') ||
+    (event, filePath, { projectRoot }) =>
+      filePath.startsWith(resolve(projectRoot, 'pages') + sep) &&
+      (filePath.endsWith('.svelte') ||
         basename(filePath) === '_meta.js' ||
         event === 'addDir' ||
-        event === 'unlinkDir';
-      if (isRelevant) {
-        console.log(
-          `[tessera] Manifest rebuilt (${event}: ${relative(projectRoot, filePath)})`,
-        );
-      }
-      return isRelevant;
-    },
+        event === 'unlinkDir'),
   );
 }
 
@@ -678,7 +670,7 @@ function tesseraFirstPagePreloadPlugin(manifestRef: ManifestRef): Plugin {
   return {
     name: 'tessera:first-page-preload',
     apply: 'build',
-    configResolved(config: ResolvedConfig) {
+    configResolved(config) {
       projectRoot = config.root;
     },
     transformIndexHtml: {
