@@ -5,7 +5,6 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import { readA11ySettings, type A11ySettings } from './validation.js';
 import type { StandardId } from '../runtime/standards.js';
 
 /** True when `child` is `parent` or a path beneath it. */
@@ -40,9 +39,5 @@ export class BuildContext {
 
   readConfig(): ResolvedConfigRead {
     return readResolvedConfig(this.root, this.standardOverride);
-  }
-
-  a11ySettings(): A11ySettings {
-    return readA11ySettings(this.root);
   }
 }

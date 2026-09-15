@@ -31,6 +31,7 @@ import {
   reportValidationIssues,
   isPlausibleLanguageTag,
   isIgnored,
+  readA11ySettings,
 } from './validation.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
@@ -89,7 +90,9 @@ export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
             const msg = `[${warning.code}] ${rel}: ${warning.message}`;
             if (ctx.isBuild) {
               ctx.a11yWarnings.push(msg);
-            } else if (!ctx.a11ySettings().ignore.includes(warning.code)) {
+            } else if (
+              !readA11ySettings(ctx.root).ignore.includes(warning.code)
+            ) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
           }
@@ -357,7 +360,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 
     buildEnd() {
       if (ctx.a11yWarnings.length === 0) return;
-      const settings = ctx.a11ySettings();
+      const settings = readA11ySettings(ctx.root);
       const ignored = new Set(settings.ignore);
       const warnings = ctx.a11yWarnings.filter(
         (msg) => !isIgnored(msg, ignored),
