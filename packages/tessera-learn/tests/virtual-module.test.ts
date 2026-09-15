@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Plugin } from 'vite';
@@ -20,11 +20,7 @@ afterEach(() => {
 });
 
 function configure(plugin: Plugin, command = 'serve') {
-  (plugin.configResolved as any).call(plugin, {
-    root: projectRoot,
-    command,
-    build: { outDir: 'dist' },
-  });
+  (plugin.configResolved as any).call(plugin, { root: projectRoot, command });
 }
 
 function fakeServer({ loaded = true } = {}) {
@@ -35,11 +31,15 @@ function fakeServer({ loaded = true } = {}) {
     watcher: {
       on: (_: string, fn: (typeof listeners)[number]) => listeners.push(fn),
     },
-    moduleGraph: {
-      getModuleById: (id: string) => (loaded ? { id } : undefined),
-      invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
+    environments: {
+      client: {
+        moduleGraph: {
+          getModuleById: (id: string) => (loaded ? { id } : undefined),
+          invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
+        },
+        hot: { send: (payload: unknown) => sent.push(payload) },
+      },
     },
-    ws: { send: (payload: unknown) => sent.push(payload) },
     emit: (event: string, file: string) =>
       listeners.forEach((fn) => fn(event, file)),
     invalidated,
@@ -48,52 +48,51 @@ function fakeServer({ loaded = true } = {}) {
 }
 
 describe('virtualModule', () => {
-  it('resolves the id with or without a leading slash', () => {
-    const plugin = virtualModule('test', 'virtual:x', () => '');
-    const resolveId = plugin.resolveId as any;
-    expect(resolveId('virtual:x')).toBe('\0virtual:x');
-    expect(resolveId('/virtual:x')).toBe('\0virtual:x');
-    expect(resolveId('virtual:y')).toBeNull();
+  it('filters resolveId to the id with or without a leading slash', () => {
+    const { filter, handler } = virtualModule('test', 'virtual:x', () => '')
+      .resolveId as any;
+    expect(filter.id.test('virtual:x')).toBe(true);
+    expect(filter.id.test('/virtual:x')).toBe(true);
+    expect(filter.id.test('virtual:xy')).toBe(false);
+    expect(filter.id.test('\0virtual:x')).toBe(false);
+    expect(handler()).toBe('\0virtual:x');
   });
 
-  it('loads with the resolved config as context', () => {
+  it('filters load to the resolved id and passes the resolved config', () => {
     const plugin = virtualModule('test', 'virtual:x', (ctx) =>
       JSON.stringify([ctx.projectRoot, ctx.isBuild]),
     );
     configure(plugin, 'build');
-    expect((plugin.load as any)('\0virtual:y')).toBeNull();
-    expect(JSON.parse((plugin.load as any)('\0virtual:x'))).toEqual([
-      projectRoot,
-      true,
-    ]);
+    const { filter, handler } = plugin.load as any;
+    expect(filter.id.test('\0virtual:x')).toBe(true);
+    expect(filter.id.test('virtual:x')).toBe(false);
+    expect(JSON.parse(handler())).toEqual([projectRoot, true]);
   });
 
-  function reloadOnChange() {
-    const plugin = virtualModule('test', 'virtual:x', () => '', {
-      hooks: (ctx) => ({
-        configureServer: (s) => {
-          s.watcher.on('all', () => ctx.reload(s));
-        },
-      }),
-    });
+  function watching(shouldReload: () => boolean, loaded = true) {
+    const server = fakeServer({ loaded });
+    const plugin = virtualModule('test', 'virtual:x', () => '', shouldReload);
     configure(plugin);
-    return plugin;
+    (plugin.configureServer as any)(server);
+    server.emit('change', 'any');
+    return server;
   }
 
-  it('reload invalidates the module and sends a full reload', () => {
-    const server = fakeServer();
-    (reloadOnChange().configureServer as any)(server);
-    server.emit('change', 'any');
+  it('invalidates the module and sends a full reload when shouldReload is true', () => {
+    const server = watching(() => true);
     expect(server.invalidated).toEqual(['\0virtual:x']);
     expect(server.sent).toEqual([{ type: 'full-reload' }]);
   });
 
-  it('reload still sends a full reload when the module is not in the graph', () => {
-    const server = fakeServer({ loaded: false });
-    (reloadOnChange().configureServer as any)(server);
-    server.emit('change', 'any');
+  it('still sends a full reload when the module is not in the graph', () => {
+    const server = watching(() => true, false);
     expect(server.invalidated).toEqual([]);
     expect(server.sent).toEqual([{ type: 'full-reload' }]);
+  });
+
+  it('does nothing when shouldReload is false', () => {
+    const server = watching(() => false);
+    expect(server.sent).toEqual([]);
   });
 });
 
@@ -123,22 +122,41 @@ describe('override plugin dev reload', () => {
   });
 });
 
-describe('manifest plugin dev reload', () => {
-  it('reloads on page changes and ignores files outside pages/', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const server = fakeServer();
+describe('manifest plugin', () => {
+  function manifestPlugin() {
     const plugin = (tesseraPlugin() as Plugin[]).find(
       (p) => p.name === 'tessera:manifest',
     )!;
     configure(plugin);
-    (plugin.configureServer as any)(server);
+    return plugin;
+  }
+
+  it('reloads on page changes and ignores other files', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const server = fakeServer();
+    (manifestPlugin().configureServer as any)(server);
 
     server.emit('change', resolve(projectRoot, 'course.config.js'));
     server.emit('change', resolve(projectRoot, 'pages', 'notes.txt'));
+    server.emit('change', resolve(projectRoot, 'pages', 'foo_meta.js'));
+    server.emit('add', resolve(projectRoot, 'pages-old', 'intro.svelte'));
     expect(server.sent).toEqual([]);
 
     server.emit('add', resolve(projectRoot, 'pages', 'intro.svelte'));
     expect(server.invalidated).toEqual(['\0virtual:tessera-manifest']);
     expect(server.sent).toEqual([{ type: 'full-reload' }]);
+  });
+
+  it('rebuilds the manifest on every load', () => {
+    const load = (manifestPlugin().load as any).handler.bind({
+      addWatchFile() {},
+    });
+    const before = load();
+    mkdirSync(resolve(projectRoot, 'pages', '01-intro'));
+    writeFileSync(
+      resolve(projectRoot, 'pages', '01-intro', 'welcome.svelte'),
+      '<h1>Welcome</h1>',
+    );
+    expect(load()).not.toBe(before);
   });
 });

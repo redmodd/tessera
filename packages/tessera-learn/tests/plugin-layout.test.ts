@@ -31,14 +31,11 @@ describe('tessera:layout virtual module', () => {
   it('load() returns null re-export when no layout.svelte exists', () => {
     const plugin = makePlugin();
     const watched: string[] = [];
-    const code = (plugin as any).load.call(
-      {
-        addWatchFile(p: string) {
-          watched.push(p);
-        },
+    const code = (plugin as any).load.handler.call({
+      addWatchFile(p: string) {
+        watched.push(p);
       },
-      '\0virtual:tessera-layout',
-    );
+    });
     expect(typeof code).toBe('string');
     expect(code).toMatch(/export\s+default\s+null/);
     // Must NOT addWatchFile a non-existent path: Vite's importAnalysis
@@ -52,14 +49,11 @@ describe('tessera:layout virtual module', () => {
 
     const plugin = makePlugin();
     const watched: string[] = [];
-    const code = (plugin as any).load.call(
-      {
-        addWatchFile(p: string) {
-          watched.push(p);
-        },
+    const code = (plugin as any).load.handler.call({
+      addWatchFile(p: string) {
+        watched.push(p);
       },
-      '\0virtual:tessera-layout',
-    );
+    });
 
     expect(typeof code).toBe('string');
     const normalized = layoutPath.replace(/\\/g, '/');

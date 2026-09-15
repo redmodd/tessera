@@ -19,10 +19,7 @@ describe('tessera:course-runtime virtual module', () => {
   function load(): string {
     const plugin = tesseraCourseRuntimePlugin() as any;
     plugin.configResolved({ root: projectRoot });
-    return plugin.load.call(
-      { addWatchFile() {} },
-      '\0virtual:tessera-course-runtime',
-    );
+    return plugin.load.handler.call({ addWatchFile() {} });
   }
 
   it('default-exports the course.runtime.js module namespace when present', () => {

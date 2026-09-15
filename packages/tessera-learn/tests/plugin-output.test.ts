@@ -55,8 +55,7 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 
     const plugin = findPlugin('tessera:manifest');
     (plugin.configResolved as any).call(plugin, { root: projectRoot });
-    (plugin.buildStart as any).call(plugin);
-    const code = (plugin.load as any).call(
+    const code = (plugin.load as any).handler.call(
       { addWatchFile() {} },
       '\0virtual:tessera-manifest',
     ) as string;
@@ -395,7 +394,7 @@ describe('xapi setup virtual module', () => {
       root: projectRoot,
       command: 'build',
     });
-    return (plugin.load as any).call({}, '\0virtual:tessera-xapi-setup');
+    return (plugin.load as any).handler.call({});
   }
 
   const real = `export { buildXAPIClient }`;

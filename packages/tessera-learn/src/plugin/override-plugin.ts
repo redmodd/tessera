@@ -36,7 +36,7 @@ export function createOverridePlugin({
     function ({ projectRoot }) {
       const filePath = resolve(projectRoot, projectFile);
       if (!existsSync(filePath)) return fallback;
-      // Only watch when it exists — addWatchFile on a missing path makes
+      // Only watch when it exists: addWatchFile on a missing path makes
       // Vite's importAnalysis try to resolve it as a real import.
       this.addWatchFile(filePath);
       const path = normalizePath(filePath);
@@ -44,20 +44,11 @@ export function createOverridePlugin({
         ? `import * as mod from '${path}';\nexport default mod;`
         : `export { default } from '${path}';`;
     },
-    {
-      hooks: (ctx) => ({
-        configureServer(server) {
-          const filePath = resolve(ctx.projectRoot, projectFile);
-          // Only add/unlink flips load()'s output between the override and the
-          // fallback; a `change` leaves it identical and Svelte's own HMR handles
-          // the underlying file.
-          server.watcher.on('all', (event, changed) => {
-            if (event !== 'add' && event !== 'unlink') return;
-            if (changed !== filePath) return;
-            ctx.reload(server);
-          });
-        },
-      }),
-    },
+    // Only add/unlink flips load()'s output between the override and the
+    // fallback; a `change` leaves it identical and Svelte's own HMR handles
+    // the underlying file.
+    (event, file, { projectRoot }) =>
+      (event === 'add' || event === 'unlink') &&
+      file === resolve(projectRoot, projectFile),
   );
 }

@@ -1,6 +1,7 @@
-import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
+import type { Plugin, ResolvedConfig, Rollup, ViteDevServer } from 'vite';
+import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { resolve, relative, isAbsolute, basename, sep } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -42,7 +43,7 @@ import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
-import { virtualModule, type VirtualModuleContext } from './virtual-module.js';
+import { virtualModule } from './virtual-module.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -51,16 +52,6 @@ export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
 
 function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
-}
-
-// Resolve the runtime directory where App.svelte lives
-function resolveRuntimeDir(): string {
-  return resolve(resolvePackageRoot(), 'src', 'runtime');
-}
-
-// Resolve the framework styles directory
-function resolveStylesDir(): string {
-  return resolve(resolvePackageRoot(), 'styles');
 }
 
 // Tier-1a state shared between the svelte() onwarn handler and the sibling
@@ -158,8 +149,9 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
 // ---------- Entry Plugin ----------
 
 function tesseraEntryPlugin(): Plugin {
-  const appSveltePath = resolve(resolveRuntimeDir(), 'App.svelte');
-  const stylesDir = resolveStylesDir();
+  const packageRoot = resolvePackageRoot();
+  const appSveltePath = resolve(packageRoot, 'src', 'runtime', 'App.svelte');
+  const stylesDir = resolve(packageRoot, 'styles');
   return virtualModule(
     'tessera:entry',
     'virtual:tessera-main',
@@ -281,12 +273,12 @@ function generateEntryScript(
   frameworkStylesDir: string,
   projectRoot: string,
 ): string {
-  const normalizedPath = appSveltePath.replace(/\\/g, '/');
+  const normalizedPath = normalizePath(appSveltePath);
 
   // Framework CSS imports (theme → base → layout)
   const frameworkCssOrder = ['theme.css', 'base.css', 'layout.css'];
   const frameworkImports = frameworkCssOrder
-    .map((file) => resolve(frameworkStylesDir, file).replace(/\\/g, '/'))
+    .map((file) => normalizePath(resolve(frameworkStylesDir, file)))
     .filter((path) => existsSync(path))
     .map((path) => `import '${path}';`)
     .join('\n');
@@ -299,7 +291,7 @@ function generateEntryScript(
       .filter((f) => f.endsWith('.css'))
       .sort();
     userImports = userCssFiles
-      .map((f) => resolve(userStylesDir, f).replace(/\\/g, '/'))
+      .map((f) => normalizePath(resolve(userStylesDir, f)))
       .map((path) => `import '${path}';`)
       .join('\n');
   }
@@ -563,20 +555,17 @@ function tesseraExportPlugin(
 // ---------- Manifest Plugin ----------
 
 function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
-  function buildManifest(ctx: VirtualModuleContext): Manifest {
-    manifestRef.current = generateManifest(resolve(ctx.projectRoot, 'pages'));
-    return manifestRef.current;
-  }
-
   return virtualModule(
     'tessera:manifest',
     'virtual:tessera-manifest',
-    function (ctx) {
-      const manifest = manifestRef.current ?? buildManifest(ctx);
+    function ({ projectRoot }) {
+      const pagesDir = resolve(projectRoot, 'pages');
+      const manifest = generateManifest(pagesDir);
+      manifestRef.current = manifest;
 
       // Register watch files so Vite's built-in watcher (used in build --watch)
       // knows to re-trigger when pages/ content changes.
-      addWatchFiles(this, resolve(ctx.projectRoot, 'pages'));
+      addWatchFiles(this, pagesDir);
 
       // Encode as base64 to prevent Vite's import analysis from
       // scanning .svelte importPath strings as module imports.
@@ -588,33 +577,21 @@ function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
       // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
       return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
     },
-    {
-      hooks: (ctx) => ({
-        buildStart() {
-          buildManifest(ctx);
-        },
-
-        configureServer(devServer) {
-          const pagesDir = resolve(ctx.projectRoot, 'pages');
-          devServer.watcher.on('all', (event, filePath) => {
-            if (!filePath.startsWith(pagesDir)) return;
-
-            const isRelevant =
-              filePath.endsWith('.svelte') ||
-              filePath.endsWith('_meta.js') ||
-              event === 'addDir' ||
-              event === 'unlinkDir';
-
-            if (isRelevant) {
-              manifestRef.current = null;
-              ctx.reload(devServer);
-              console.log(
-                `[tessera] Manifest rebuilt (${event}: ${filePath.replace(ctx.projectRoot, '')})`,
-              );
-            }
-          });
-        },
-      }),
+    (event, filePath, { projectRoot }) => {
+      if (!filePath.startsWith(resolve(projectRoot, 'pages') + sep)) {
+        return false;
+      }
+      const isRelevant =
+        filePath.endsWith('.svelte') ||
+        basename(filePath) === '_meta.js' ||
+        event === 'addDir' ||
+        event === 'unlinkDir';
+      if (isRelevant) {
+        console.log(
+          `[tessera] Manifest rebuilt (${event}: ${relative(projectRoot, filePath)})`,
+        );
+      }
+      return isRelevant;
     },
   );
 }
@@ -709,15 +686,14 @@ function tesseraFirstPagePreloadPlugin(manifestRef: ManifestRef): Plugin {
       handler(_html, ctx) {
         const firstPagePath = manifestRef.current?.pages[0]?.importPath;
         if (!firstPagePath || !ctx.bundle) return;
-        const normalized = resolve(
-          projectRoot,
-          firstPagePath.replace(/^\//, ''),
-        ).replace(/\\/g, '/');
+        const normalized = normalizePath(
+          resolve(projectRoot, firstPagePath.replace(/^\//, '')),
+        );
         const chunk = Object.values(ctx.bundle).find(
-          (c): c is import('vite').Rollup.OutputChunk =>
+          (c): c is Rollup.OutputChunk =>
             c.type === 'chunk' &&
             !!c.facadeModuleId &&
-            c.facadeModuleId.replace(/\\/g, '/') === normalized,
+            normalizePath(c.facadeModuleId) === normalized,
         );
         if (!chunk) return;
         return [

@@ -1,22 +1,21 @@
-import type { Plugin, ResolvedConfig, Rollup, ViteDevServer } from 'vite';
+import type { Plugin, ResolvedConfig, Rollup } from 'vite';
 
 export interface VirtualModuleContext {
   readonly projectRoot: string;
   readonly isBuild: boolean;
-  reload(server: ViteDevServer): void;
 }
 
-export interface VirtualModuleOptions {
-  hooks?: (
-    ctx: VirtualModuleContext,
-  ) => Pick<Plugin, 'buildStart' | 'configureServer'>;
-}
+export type ShouldReload = (
+  event: string,
+  file: string,
+  ctx: VirtualModuleContext,
+) => boolean;
 
 export function virtualModule(
   name: string,
   virtualId: string,
   load: (this: Rollup.PluginContext, ctx: VirtualModuleContext) => string,
-  { hooks }: VirtualModuleOptions = {},
+  shouldReload?: ShouldReload,
 ): Plugin {
   const resolvedId = '\0' + virtualId;
   let config: ResolvedConfig;
@@ -27,24 +26,32 @@ export function virtualModule(
     get isBuild() {
       return config.command === 'build';
     },
-    reload(server) {
-      const mod = server.moduleGraph.getModuleById(resolvedId);
-      if (mod) server.moduleGraph.invalidateModule(mod);
-      server.ws.send({ type: 'full-reload' });
-    },
   };
   return {
-    ...hooks?.(ctx),
     name,
     enforce: 'pre',
     configResolved(resolved) {
       config = resolved;
     },
-    resolveId(id) {
-      return id === virtualId || id === '/' + virtualId ? resolvedId : null;
+    resolveId: {
+      filter: { id: new RegExp(`^/?${virtualId}$`) },
+      handler: () => resolvedId,
     },
-    load(id) {
-      return id === resolvedId ? load.call(this, ctx) : null;
+    load: {
+      filter: { id: new RegExp(`^${resolvedId}$`) },
+      handler() {
+        return load.call(this, ctx);
+      },
+    },
+    configureServer(server) {
+      if (!shouldReload) return;
+      const client = server.environments.client;
+      server.watcher.on('all', (event, file) => {
+        if (!shouldReload(event, file, ctx)) return;
+        const mod = client.moduleGraph.getModuleById(resolvedId);
+        if (mod) client.moduleGraph.invalidateModule(mod);
+        client.hot.send({ type: 'full-reload' });
+      });
     },
   };
 }
