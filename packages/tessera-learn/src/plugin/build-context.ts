@@ -26,10 +26,6 @@ export class BuildContext {
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
   a11ySettings = normalizeA11y(undefined);
-  // Gates post-build side effects (asset copy, packaging) on a bundle that wrote
-  // cleanly. Set from the enforce:'post' plugin, so a throw in an earlier
-  // writeBundle leaves it closed.
-  bundleWritten = false;
 
   constructor(standardOverride?: StandardId) {
     this.standardOverride = standardOverride;

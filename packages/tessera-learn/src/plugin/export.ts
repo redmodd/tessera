@@ -1,4 +1,5 @@
 import {
+  createWriteStream,
   existsSync,
   readdirSync,
   statSync,
@@ -6,7 +7,6 @@ import {
   unlinkSync,
 } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity, type CourseConfig } from '../runtime/types.js';
@@ -107,10 +107,10 @@ interface ScormManifestDialect {
 function generateScormManifest(
   dialect: ScormManifestDialect,
   config: ExportConfig,
-  distDir: string,
+  outDir: string,
 ): string {
   const title = escapeXml(config.title);
-  const files = collectFiles(distDir);
+  const files = collectFiles(outDir);
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
     .join('\n');
@@ -198,7 +198,7 @@ export function generateTincanXml(config: ExportConfig): string {
 // ---------- ZIP Packaging ----------
 
 export async function createZip(
-  distDir: string,
+  outDir: string,
   outputPath: string,
 ): Promise<number> {
   return new Promise((res, reject) => {
@@ -212,7 +212,7 @@ export async function createZip(
     archive.on('error', reject);
 
     archive.pipe(output);
-    archive.directory(distDir, false);
+    archive.directory(outDir, false);
     void archive.finalize();
   });
 }
@@ -232,12 +232,12 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   } catch {}
 }
 
-type ManifestGenerator = (config: ExportConfig, distDir: string) => string;
+type ManifestGenerator = (config: ExportConfig, outDir: string) => string;
 
 const scormManifest =
   (dialect: ScormManifestDialect): ManifestGenerator =>
-  (config, distDir) =>
-    generateScormManifest(dialect, config, distDir);
+  (config, outDir) =>
+    generateScormManifest(dialect, config, outDir);
 
 /** Build-side half of each packaged standard: manifest generation and adapter codegen. */
 export const LMS_BUILD: Record<

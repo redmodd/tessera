@@ -58,7 +58,7 @@ function projectFileRel(
   filename: string | undefined,
   projectRoot: string,
 ): string | null {
-  if (!filename || !projectRoot) return null;
+  if (!filename) return null;
   if (
     filename.startsWith('\0') ||
     filename.includes('virtual:') ||
@@ -158,19 +158,9 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
       }
     },
 
-    // For build mode: clean up temporary index.html and copy assets
+    // For build mode: clean up temporary index.html
     closeBundle() {
-      if (ctx.isBuild) {
-        rmSync(resolve(ctx.root, 'index.html'), { force: true });
-
-        if (!ctx.bundleWritten) return;
-
-        // Copy assets/ into the build's assets/ so $assets/ references resolve
-        const assetsDir = resolve(ctx.root, 'assets');
-        if (existsSync(assetsDir)) {
-          cpSync(assetsDir, resolve(ctx.outDir, 'assets'), { recursive: true });
-        }
-      }
+      if (ctx.isBuild) rmSync(resolve(ctx.root, 'index.html'), { force: true });
     },
 
     // Serve index.html for the dev server
@@ -398,31 +388,41 @@ function runValidation(ctx: BuildContext): void {
 
 function tesseraExportPlugin(ctx: BuildContext): Plugin {
   let emitted: string[] = [];
+  // Gates post-build side effects (asset copy, packaging) on a bundle that wrote
+  // cleanly. Set from this enforce:'post' plugin, so a throw in an earlier
+  // writeBundle leaves it closed.
+  let written = false;
 
   return {
     name: 'tessera:export',
     enforce: 'post',
+    apply: 'build',
 
     writeBundle(options, bundle) {
-      ctx.bundleWritten = true;
+      written = true;
       emitted = Object.keys(bundle).map((file) => resolve(options.dir!, file));
     },
 
     onLog(_level, log) {
-      if (!ctx.isBuild || log.code !== 'IMPORT_IS_UNDEFINED') return;
+      if (log.code !== 'IMPORT_IS_UNDEFINED') return;
       if (!projectFileRel(log.id, ctx.root)) return;
-      ctx.bundleWritten = false;
+      written = false;
       for (const file of emitted) rmSync(file, { force: true });
       emitted = [];
       this.error(log);
     },
 
     async closeBundle() {
-      const written = ctx.bundleWritten;
-      ctx.bundleWritten = false;
-      if (!ctx.isBuild) return;
-      if (isAuditBuild()) return;
       if (!written) return;
+      written = false;
+
+      // Copy assets/ into the build's assets/ so $assets/ references resolve
+      const assetsDir = resolve(ctx.root, 'assets');
+      if (existsSync(assetsDir)) {
+        cpSync(assetsDir, resolve(ctx.outDir, 'assets'), { recursive: true });
+      }
+
+      if (isAuditBuild()) return;
 
       const read = ctx.readConfig();
       if (!read.ok) {
@@ -536,33 +536,21 @@ export function createAdapter(config, options) {
 }
 
 function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
-  return virtualModule(
-    'tessera:xapi-setup',
-    'virtual:tessera-xapi-setup',
-    () => {
-      if (!ctx.isBuild) {
-        return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
-      }
+  return virtualModule('tessera:xapi-setup', 'virtual:tessera-xapi-setup', () =>
+    // The audit runs offline, so it never wires real LRS destinations.
+    !ctx.isBuild || (!isAuditBuild() && wiresXAPIClient(ctx.readConfig()))
+      ? `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`
+      : `export async function buildXAPIClient() { return null; }`,
+  );
+}
 
-      // The audit runs offline — don't wire real LRS destinations into it.
-      if (isAuditBuild()) {
-        return `export async function buildXAPIClient() { return null; }`;
-      }
-
-      const read = ctx.readConfig();
-      const entries =
-        read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
-      const hasExplicit = entries.some((e) => e?.endpoint !== 'lms');
-
-      // The launch standards (cmi5, plain xAPI) own a publisher the runtime
-      // can share for `endpoint: 'lms'`, so wire the client regardless of
-      // explicit xapi config.
-      if (hasExplicit || read.profile?.hasLaunchLRS) {
-        return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
-      }
-
-      return `export async function buildXAPIClient() { return null; }`;
-    },
+// The launch standards (cmi5, plain xAPI) own a publisher the runtime can share
+// for `endpoint: 'lms'`, so they wire the client regardless of explicit xapi config.
+function wiresXAPIClient(read: ResolvedConfigRead): boolean {
+  const entries =
+    read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
+  return (
+    entries.some((e) => e?.endpoint !== 'lms') || !!read.profile?.hasLaunchLRS
   );
 }
 
