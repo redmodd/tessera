@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readResolvedConfig } from '../src/plugin/manifest.js';
 import { validateProject } from '../src/plugin/validation.js';
+import { tesseraPlugin } from '../src/plugin/index.js';
 
 let projectRoot: string;
 
@@ -72,15 +73,19 @@ describe('readResolvedConfig', () => {
   });
 });
 
-describe('validateProject standardOverride', () => {
+describe('tesseraPlugin standardOverride', () => {
   it('rejects an override outside the allowed set', () => {
-    writeConfig(`{ export: { standard: "web" } }`);
-    const { errors } = validateProject(projectRoot, 'scorm13' as never);
-    expect(errors).toContainEqual(
-      expect.stringContaining('standardOverride must be one of'),
+    expect(() => tesseraPlugin({ standardOverride: 'scorm13' })).toThrow(
+      /standardOverride must be one of .*, got "scorm13"/,
     );
-    expect(errors.some((e) => e.includes('course.config.js'))).toBe(false);
   });
+
+  it.each([undefined, ''])('treats %j as no override', (standardOverride) => {
+    expect(() => tesseraPlugin({ standardOverride })).not.toThrow();
+  });
+});
+
+describe('validateProject standardOverride', () => {
 
   it('still rejects an invalid file standard when an override is given', () => {
     writeConfig(`{ export: { standard: "scorm13" } }`);

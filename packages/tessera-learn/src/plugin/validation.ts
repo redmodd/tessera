@@ -365,13 +365,7 @@ function parseConfig(
   // standard-dependent check below (identity, csp, xapi, crossValidate) sees
   // what actually ships.
   if (standardOverride) {
-    if (!standardProfile(standardOverride)) {
-      d.error(
-        `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
-      );
-    } else {
-      config.export = { ...config.export, standard: standardOverride };
-    }
+    config.export = { ...config.export, standard: standardOverride };
   }
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);

@@ -23,8 +23,9 @@ import {
 } from '../runtime/defaults.js';
 import {
   DEFAULT_STANDARD,
+  STANDARD_IDS,
+  standardProfile,
   type LMSStandard,
-  type StandardId,
 } from '../runtime/standards.js';
 import {
   validateProject,
@@ -71,8 +72,15 @@ function projectFileRel(
   return isInside(projectRoot, abs) ? relative(projectRoot, abs) : null;
 }
 
-export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
-  const ctx = new BuildContext(options.standardOverride);
+export function tesseraPlugin(options: { standardOverride?: string } = {}) {
+  const { standardOverride } = options;
+  const profile = standardProfile(standardOverride);
+  if (standardOverride && !profile) {
+    throw new Error(
+      `standardOverride must be one of ${STANDARD_IDS.join(', ')}, got "${standardOverride}"`,
+    );
+  }
+  const ctx = new BuildContext(profile?.id);
   return [
     {
       name: 'tessera:context',
