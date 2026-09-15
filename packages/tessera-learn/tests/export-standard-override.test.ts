@@ -73,7 +73,18 @@ describe('validateProject standardOverride', () => {
   it('rejects an override outside the allowed set', () => {
     writeConfig(`{ export: { standard: "web" } }`);
     const { errors } = validateProject(projectRoot, 'scorm13' as never);
-    expect(errors.some((e) => e.includes('"export.standard"'))).toBe(true);
+    expect(errors).toContainEqual(
+      expect.stringContaining('standardOverride must be one of'),
+    );
+    expect(errors.some((e) => e.includes('course.config.js'))).toBe(false);
+  });
+
+  it('still rejects an invalid file standard when an override is given', () => {
+    writeConfig(`{ export: { standard: "scorm13" } }`);
+    const { errors } = validateProject(projectRoot, 'scorm12');
+    expect(errors).toContainEqual(
+      expect.stringContaining('"export.standard" must be one of'),
+    );
   });
 
   it('accepts a valid override', () => {

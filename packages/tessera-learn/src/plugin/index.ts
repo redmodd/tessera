@@ -408,7 +408,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 }
 
 function runValidation(ctx: BuildContext): void {
-  const result = validateProject(ctx.root, ctx.standardOverride, ctx.config);
+  const result = validateProject(ctx.root, ctx.standardOverride);
   reportValidationIssues(result);
   if (result.errors.length > 0) {
     throw new Error(

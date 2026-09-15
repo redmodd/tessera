@@ -6,10 +6,9 @@ import {
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
-  readResolvedConfig,
+  readCourseConfig,
   orderPageFiles,
   walkPages,
-  type CourseConfigRead,
   type WalkedLesson,
   type PageConfig,
 } from './manifest.js';
@@ -229,7 +228,6 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
 export function validateProject(
   projectRoot: string,
   standardOverride?: StandardId,
-  read: CourseConfigRead = readResolvedConfig(projectRoot, standardOverride),
 ): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
@@ -243,7 +241,7 @@ export function validateProject(
 
   // 2. Parse and validate config
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
-  const config = parseConfig(projectRoot, d, runtimeHooks, read);
+  const config = parseConfig(projectRoot, d, runtimeHooks, standardOverride);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -287,8 +285,9 @@ function parseConfig(
   projectRoot: string,
   d: Diagnostics,
   runtimeHooks: XAPIHookRead,
-  read: CourseConfigRead,
+  standardOverride?: StandardId,
 ): ParsedConfig | null {
+  const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
@@ -354,6 +353,19 @@ function parseConfig(
       d.error(
         `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
       );
+    }
+  }
+
+  // Apply the override after validating the file value above, so every
+  // standard-dependent check below (identity, csp, xapi, crossValidate) sees
+  // what actually ships.
+  if (standardOverride) {
+    if (!standardProfile(standardOverride)) {
+      d.error(
+        `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
+      );
+    } else {
+      config.export = { ...config.export, standard: standardOverride };
     }
   }
 
