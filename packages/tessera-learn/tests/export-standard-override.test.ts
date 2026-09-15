@@ -86,7 +86,6 @@ describe('tesseraPlugin standardOverride', () => {
 });
 
 describe('validateProject standardOverride', () => {
-
   it('still rejects an invalid file standard when an override is given', () => {
     writeConfig(`{ export: { standard: "scorm13" } }`);
     const { errors } = validateProject(projectRoot, 'scorm12');
