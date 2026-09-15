@@ -38,10 +38,11 @@ export function virtualModule(
     hotUpdate({ type, file }) {
       if (this.environment.name !== 'client') return;
       if (!shouldReload?.(type, file, ctx)) return;
-      console.log(
+      const { moduleGraph, hot, logger } = this.environment;
+      logger.info(
         `[${name}] Reloading (${type}: ${relative(ctx.projectRoot, file)})`,
+        { timestamp: true },
       );
-      const { moduleGraph, hot } = this.environment;
       const mod = moduleGraph.getModuleById(resolvedId);
       if (mod) moduleGraph.invalidateModule(mod);
       hot.send({ type: 'full-reload' });

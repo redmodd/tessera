@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,16 +12,24 @@ let projectRoot: string;
 beforeEach(() => {
   projectRoot = mkdtempSync(resolve(tmpdir(), 'tessera-virtual-test-'));
   mkdirSync(resolve(projectRoot, 'pages'));
-  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
 afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
-  vi.restoreAllMocks();
 });
 
 function configure(plugin: Plugin, command = 'serve') {
   (plugin.configResolved as any).call(plugin, { root: projectRoot, command });
+}
+
+function tesseraSubPlugin(name: string) {
+  const plugin = (tesseraPlugin() as Plugin[]).find((p) => p.name === name)!;
+  configure(plugin);
+  return plugin;
+}
+
+function load(plugin: Plugin, addWatchFile = (_file: string) => {}): string {
+  return (plugin.load as any).handler.call({ addWatchFile });
 }
 
 function fakeEnvironment({ name = 'client', loaded = true } = {}) {
@@ -34,6 +42,7 @@ function fakeEnvironment({ name = 'client', loaded = true } = {}) {
       invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
     },
     hot: { send: (payload: unknown) => sent.push(payload) },
+    logger: { info() {} },
     invalidated,
     sent,
   };
@@ -67,10 +76,10 @@ describe('virtualModule', () => {
       JSON.stringify([ctx.projectRoot, ctx.isBuild]),
     );
     configure(plugin, 'build');
-    const { filter, handler } = plugin.load as any;
+    const { filter } = plugin.load as any;
     expect(filter.id.test('\0virtual:x')).toBe(true);
     expect(filter.id.test('virtual:x')).toBe(false);
-    expect(JSON.parse(handler())).toEqual([projectRoot, true]);
+    expect(JSON.parse(load(plugin))).toEqual([projectRoot, true]);
   });
 
   function updated(
@@ -129,18 +138,55 @@ describe('override plugin dev reload', () => {
   });
 });
 
-describe('manifest plugin', () => {
-  function manifestPlugin() {
-    const plugin = (tesseraPlugin() as Plugin[]).find(
-      (p) => p.name === 'tessera:manifest',
-    )!;
-    configure(plugin);
-    return plugin;
-  }
+describe('entry plugin', () => {
+  it('imports framework then sorted project stylesheets', () => {
+    mkdirSync(resolve(projectRoot, 'styles'));
+    writeFileSync(resolve(projectRoot, 'styles', 'b.css'), '');
+    writeFileSync(resolve(projectRoot, 'styles', 'a.css'), '');
+    writeFileSync(resolve(projectRoot, 'styles', 'notes.txt'), '');
 
-  it('reloads on page changes and ignores other files', () => {
+    const code = load(tesseraSubPlugin('tessera:entry'));
+    const stylesheets = [...code.matchAll(/import '(.+)';/g)].map((m) =>
+      m[1].split('/').pop(),
+    );
+    expect(stylesheets).toEqual([
+      'theme.css',
+      'base.css',
+      'layout.css',
+      'a.css',
+      'b.css',
+    ]);
+  });
+
+  it('reloads when a stylesheet is added to or removed from styles/', () => {
     const environment = fakeEnvironment();
-    const plugin = manifestPlugin();
+    const plugin = tesseraSubPlugin('tessera:entry');
+
+    hotUpdate(plugin, environment, 'update', 'styles', 'course.css');
+    hotUpdate(plugin, environment, 'create', 'styles', 'nested', 'course.css');
+    hotUpdate(plugin, environment, 'create', 'styles', 'notes.txt');
+    hotUpdate(plugin, environment, 'create', 'course.css');
+    expect(environment.sent).toEqual([]);
+
+    hotUpdate(plugin, environment, 'create', 'styles', 'course.css');
+    hotUpdate(plugin, environment, 'delete', 'styles', 'course.css');
+    expect(environment.invalidated).toEqual([
+      '\0virtual:tessera-main',
+      '\0virtual:tessera-main',
+    ]);
+    expect(environment.sent).toHaveLength(2);
+  });
+});
+
+describe('manifest plugin', () => {
+  it('reloads only when a page change alters the manifest', () => {
+    const environment = fakeEnvironment();
+    const plugin = tesseraSubPlugin('tessera:manifest');
+    load(plugin);
+
+    const introDir = resolve(projectRoot, 'pages', '01-intro');
+    mkdirSync(introDir);
+    writeFileSync(resolve(introDir, 'welcome.svelte'), '<h1>Welcome</h1>');
 
     hotUpdate(plugin, environment, 'update', 'course.config.js');
     hotUpdate(plugin, environment, 'update', 'pages', 'notes.txt');
@@ -148,8 +194,32 @@ describe('manifest plugin', () => {
     hotUpdate(plugin, environment, 'create', 'pages-old', 'intro.svelte');
     expect(environment.sent).toEqual([]);
 
-    hotUpdate(plugin, environment, 'create', 'pages', 'intro.svelte');
-    hotUpdate(plugin, environment, 'update', 'pages', '01', '_meta.js');
+    hotUpdate(
+      plugin,
+      environment,
+      'create',
+      'pages',
+      '01-intro',
+      'welcome.svelte',
+    );
+    expect(environment.sent).toHaveLength(1);
+
+    load(plugin);
+    hotUpdate(
+      plugin,
+      environment,
+      'update',
+      'pages',
+      '01-intro',
+      'welcome.svelte',
+    );
+    expect(environment.sent).toHaveLength(1);
+
+    writeFileSync(
+      resolve(introDir, '_meta.js'),
+      `export default { title: 'Getting Started' };`,
+    );
+    hotUpdate(plugin, environment, 'create', 'pages', '01-intro', '_meta.js');
     expect(environment.invalidated).toEqual([
       '\0virtual:tessera-manifest',
       '\0virtual:tessera-manifest',
@@ -158,16 +228,14 @@ describe('manifest plugin', () => {
   });
 
   it('rebuilds the manifest on every load', () => {
-    const load = (manifestPlugin().load as any).handler.bind({
-      addWatchFile() {},
-    });
-    const before = load();
+    const plugin = tesseraSubPlugin('tessera:manifest');
+    const before = load(plugin);
     mkdirSync(resolve(projectRoot, 'pages', '01-intro'));
     writeFileSync(
       resolve(projectRoot, 'pages', '01-intro', 'welcome.svelte'),
       '<h1>Welcome</h1>',
     );
-    expect(load()).not.toBe(before);
+    expect(load(plugin)).not.toBe(before);
   });
 
   it('watches the page and _meta.js files the manifest reads', () => {
@@ -176,9 +244,7 @@ describe('manifest plugin', () => {
     writeFileSync(resolve(projectRoot, 'pages', '01-intro', '_meta.js'), '');
     writeFileSync(resolve(lessonDir, 'welcome.svelte'), '<h1>Hi</h1>');
     const watched: string[] = [];
-    (manifestPlugin().load as any).handler.call({
-      addWatchFile: (file: string) => watched.push(file),
-    });
+    load(tesseraSubPlugin('tessera:manifest'), (file) => watched.push(file));
     expect(watched).toEqual([
       resolve(projectRoot, 'pages', '01-intro', '_meta.js'),
       resolve(lessonDir, 'welcome.svelte'),

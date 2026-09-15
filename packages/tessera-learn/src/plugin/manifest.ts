@@ -296,13 +296,16 @@ export function walkPages(pagesDir: string): WalkedSection[] {
 /**
  * Generate a course manifest by scanning the pages/ directory.
  */
-export function generateManifest(pagesDir: string): Manifest {
+export function generateManifest(
+  pagesDir: string,
+  walked: WalkedSection[] = walkPages(pagesDir),
+): Manifest {
   clearParseCache();
   const sections: ManifestSection[] = [];
   const flatPages: ManifestPage[] = [];
   let pageIndex = 0;
 
-  for (const walkedSection of walkPages(pagesDir)) {
+  for (const walkedSection of walked) {
     const sectionMeta = readMetaFile(walkedSection.metaPath);
     const sectionSlug = deriveSlug(walkedSection.name);
 

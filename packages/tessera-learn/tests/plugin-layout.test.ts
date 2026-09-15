@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { normalizePath } from 'vite';
 
 import { tesseraLayoutPlugin } from '../src/plugin/layout.js';
 
@@ -56,8 +57,7 @@ describe('tessera:layout virtual module', () => {
     });
 
     expect(typeof code).toBe('string');
-    const normalized = layoutPath.replace(/\\/g, '/');
-    expect(code).toContain(`from '${normalized}'`);
+    expect(code).toContain(`from '${normalizePath(layoutPath)}'`);
     expect(code).toMatch(/export\s+\{\s*default\s*\}/);
     expect(watched).toContain(layoutPath);
   });

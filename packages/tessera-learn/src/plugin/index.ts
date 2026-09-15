@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute, basename } from 'node:path';
+import { resolve, relative, isAbsolute, dirname } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -150,13 +150,24 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
 
 function tesseraEntryPlugin(): Plugin {
   const packageRoot = resolvePackageRoot();
-  const appSveltePath = resolve(packageRoot, 'src', 'runtime', 'App.svelte');
-  const stylesDir = resolve(packageRoot, 'styles');
+  const appPath = normalizePath(
+    resolve(packageRoot, 'src', 'runtime', 'App.svelte'),
+  );
+  const frameworkStyles = ['theme.css', 'base.css', 'layout.css'].map((file) =>
+    normalizePath(resolve(packageRoot, 'styles', file)),
+  );
   return virtualModule(
     'tessera:entry',
     'virtual:tessera-main',
     ({ projectRoot }) =>
-      generateEntryScript(appSveltePath, stylesDir, projectRoot),
+      generateEntryScript(appPath, [
+        ...frameworkStyles,
+        ...userStylesheets(projectRoot),
+      ]),
+    (type, file, { projectRoot }) =>
+      type !== 'update' &&
+      file.endsWith('.css') &&
+      dirname(file) === normalizePath(resolve(projectRoot, 'styles')),
   );
 }
 
@@ -268,41 +279,20 @@ function generateIndexHtml(lang: string, csp = ''): string {
 </html>`;
 }
 
-function generateEntryScript(
-  appSveltePath: string,
-  frameworkStylesDir: string,
-  projectRoot: string,
-): string {
-  const normalizedPath = normalizePath(appSveltePath);
+function userStylesheets(projectRoot: string): string[] {
+  const stylesDir = resolve(projectRoot, 'styles');
+  if (!existsSync(stylesDir)) return [];
+  return readdirSync(stylesDir)
+    .filter((file) => file.endsWith('.css'))
+    .sort()
+    .map((file) => normalizePath(resolve(stylesDir, file)));
+}
 
-  // Framework CSS imports (theme → base → layout)
-  const frameworkCssOrder = ['theme.css', 'base.css', 'layout.css'];
-  const frameworkImports = frameworkCssOrder
-    .map((file) => normalizePath(resolve(frameworkStylesDir, file)))
-    .filter((path) => existsSync(path))
-    .map((path) => `import '${path}';`)
-    .join('\n');
-
-  // User CSS imports from project's styles/ directory
-  const userStylesDir = resolve(projectRoot, 'styles');
-  let userImports = '';
-  if (existsSync(userStylesDir)) {
-    const userCssFiles = readdirSync(userStylesDir)
-      .filter((f) => f.endsWith('.css'))
-      .sort();
-    userImports = userCssFiles
-      .map((f) => normalizePath(resolve(userStylesDir, f)))
-      .map((path) => `import '${path}';`)
-      .join('\n');
-  }
-
-  return `// Framework styles
-${frameworkImports}
-// User styles
-${userImports}
+function generateEntryScript(appPath: string, stylesheets: string[]): string {
+  return `${stylesheets.map((path) => `import '${path}';`).join('\n')}
 
 import { mount } from 'svelte';
-import App from '${normalizedPath}';
+import App from '${appPath}';
 
 mount(App, {
   target: document.getElementById('tessera-root'),
@@ -382,26 +372,6 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
       return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
     },
   );
-}
-
-// ---------- Manifest Watch Helpers ----------
-
-/** Register the _meta.js and .svelte files the manifest reads as watch files for build mode. */
-function addWatchFiles(
-  ctx: { addWatchFile(id: string): void },
-  pagesDir: string,
-): void {
-  for (const section of walkPages(pagesDir)) {
-    const metaPaths = [section, ...section.lessons].map((s) => s.metaPath);
-    for (const metaPath of new Set(metaPaths)) {
-      if (existsSync(metaPath)) ctx.addWatchFile(metaPath);
-    }
-    for (const lesson of section.lessons) {
-      for (const file of lesson.files) {
-        ctx.addWatchFile(resolve(lesson.dir, file));
-      }
-    }
-  }
 }
 
 // ---------- Pages Plugin ----------
@@ -556,32 +526,51 @@ function tesseraExportPlugin(
 
 // ---------- Manifest Plugin ----------
 
+// Encode as base64 to prevent Vite's import analysis from
+// scanning .svelte importPath strings as module imports.
+// Replace Infinity with 1e9 since JSON.stringify drops it.
+function manifestModule(manifest: Manifest): string {
+  const json = JSON.stringify(manifest, (_key, value) =>
+    value === Infinity ? 1e9 : value,
+  );
+  const b64 = Buffer.from(json).toString('base64');
+  // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
+  return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
+}
+
 function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
+  let loaded: string | undefined;
+
   return virtualModule(
     'tessera:manifest',
     'virtual:tessera-manifest',
     function ({ projectRoot }) {
       const pagesDir = resolve(projectRoot, 'pages');
-      const manifest = generateManifest(pagesDir);
-      manifestRef.current = manifest;
+      const sections = walkPages(pagesDir);
+      manifestRef.current = generateManifest(pagesDir, sections);
 
-      // Register watch files so Vite's built-in watcher (used in build --watch)
-      // knows to re-trigger when pages/ content changes.
-      addWatchFiles(this, pagesDir);
+      for (const section of sections) {
+        for (const { metaPath } of [section, ...section.lessons]) {
+          if (existsSync(metaPath)) this.addWatchFile(metaPath);
+        }
+        for (const lesson of section.lessons) {
+          for (const file of lesson.files) {
+            this.addWatchFile(resolve(lesson.dir, file));
+          }
+        }
+      }
 
-      // Encode as base64 to prevent Vite's import analysis from
-      // scanning .svelte importPath strings as module imports.
-      // Replace Infinity with 1e9 since JSON.stringify drops it.
-      const json = JSON.stringify(manifest, (_key, value) =>
-        value === Infinity ? 1e9 : value,
-      );
-      const b64 = Buffer.from(json).toString('base64');
-      // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
-      return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
+      loaded = manifestModule(manifestRef.current);
+      return loaded;
     },
-    (_type, file, { projectRoot }) =>
-      file.startsWith(normalizePath(resolve(projectRoot, 'pages')) + '/') &&
-      (file.endsWith('.svelte') || basename(file) === '_meta.js'),
+    (_type, file, { projectRoot }) => {
+      const pagesDir = resolve(projectRoot, 'pages');
+      return (
+        file.startsWith(normalizePath(pagesDir) + '/') &&
+        (file.endsWith('.svelte') || file.endsWith('/_meta.js')) &&
+        manifestModule(generateManifest(pagesDir)) !== loaded
+      );
+    },
   );
 }
 
