@@ -5,7 +5,7 @@ import {
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
@@ -219,10 +219,6 @@ export async function createZip(
 
 // ---------- Main Export ----------
 
-/**
- * Run the export process after Vite build completes.
- * Writes manifest XML into the build output, then packages into ZIP if needed.
- */
 /** Remove any previously built zips for this package to prevent accumulation. */
 function cleanOldZips(projectRoot: string, slug: string): void {
   try {
@@ -302,6 +298,10 @@ export const LMS_BUILD: Record<
   },
 };
 
+/**
+ * Run the export process after Vite build completes.
+ * Writes manifest XML into the build output, then packages into ZIP if needed.
+ */
 export async function runExport(
   projectRoot: string,
   outDir: string,
@@ -323,17 +323,6 @@ export async function runExport(
       `✓ Web export: ${relative(projectRoot, outDir)}/ (${formatSize(totalSize)})`,
     );
     return;
-  }
-
-  const rootFromOut = relative(outDir, projectRoot);
-  if (
-    rootFromOut !== '..' &&
-    !rootFromOut.startsWith(`..${sep}`) &&
-    !isAbsolute(rootFromOut)
-  ) {
-    throw new Error(
-      `build.outDir (${outDir}) must not contain the project root; ${profile.name} export would package the whole project.`,
-    );
   }
 
   const spec = LMS_BUILD[profile.id];

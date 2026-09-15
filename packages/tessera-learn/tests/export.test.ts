@@ -347,21 +347,6 @@ describe('runExport', () => {
     expect(files.filter((f) => f.endsWith('.zip'))).toHaveLength(0);
   });
 
-  it.each([
-    ['is the project root', () => testRoot],
-    ['contains the project root', () => resolve(testRoot, '..')],
-  ])('packaged export rejects an outDir that %s', async (_, outDir) => {
-    await expect(
-      runExport(testRoot, outDir(), {
-        title: 'Test',
-        version: '1.0.0',
-        export: { standard: 'scorm12' },
-      }),
-    ).rejects.toThrow(/must not contain the project root/);
-    expect(existsSync(resolve(testRoot, 'imsmanifest.xml'))).toBe(false);
-    expect(readdirSync(testRoot).filter((f) => f.endsWith('.zip'))).toEqual([]);
-  });
-
   it('scorm12 export creates imsmanifest.xml and zip', async () => {
     createDistDir(testRoot);
     await runExport(testRoot, resolve(testRoot, 'dist'), {

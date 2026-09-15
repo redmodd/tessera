@@ -13,9 +13,9 @@ import {
   generateManifest,
   walkPages,
   type CourseConfigRead,
+  type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
 import {
   DEFAULT_PASSING_SCORE,
@@ -23,7 +23,6 @@ import {
 } from '../runtime/defaults.js';
 import {
   DEFAULT_STANDARD,
-  standardProfile,
   type LMSStandard,
   type StandardId,
 } from '../runtime/standards.js';
@@ -41,7 +40,7 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
-import { BuildContext } from './build-context.js';
+import { BuildContext, isInside } from './build-context.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -70,7 +69,7 @@ function projectFileRel(
   }
   const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
   const rel = relative(projectRoot, abs);
-  if (rel.startsWith('..') || isAbsolute(rel) || rel.includes('node_modules')) {
+  if (!isInside(projectRoot, abs) || rel.includes('node_modules')) {
     return null;
   }
   return rel;
@@ -110,7 +109,7 @@ export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
     tesseraIndexHtmlPlugin(ctx),
     tesseraConfigDefaultsPlugin(),
     tesseraConfigPlugin(ctx),
-    tesseraPagesPlugin(ctx),
+    tesseraPagesPlugin(),
     tesseraManifestPlugin(ctx),
     tesseraLayoutPlugin(ctx),
     tesseraQuizPlugin(ctx),
@@ -133,7 +132,6 @@ function tesseraEntryPlugin(ctx: BuildContext): Plugin {
     normalizePath(resolve(packageRoot, 'styles', file)),
   );
   return virtualModule(
-    ctx,
     'tessera:entry',
     'virtual:tessera-main',
     () =>
@@ -156,7 +154,7 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
     // For build mode: write index.html so Rollup can find it
     buildStart() {
       if (ctx.isBuild) {
-        const read = ctx.config;
+        const read = ctx.readConfig();
         writeFileSync(
           resolve(ctx.root, 'index.html'),
           generateIndexHtml(readLanguage(read), cspMeta(read)),
@@ -185,7 +183,7 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(readLanguage(ctx.config));
+            const html = generateIndexHtml(readLanguage(ctx.readConfig()));
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -212,8 +210,7 @@ function readLanguage(read: CourseConfigRead): string {
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
 function cspMeta(read: ResolvedConfigRead): string {
-  const profile = standardProfile(read.standard);
-  if (!profile || profile.packaged) return '';
+  if (!read.profile || read.profile.packaged) return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
@@ -321,20 +318,15 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
 }
 
 function tesseraConfigPlugin(ctx: BuildContext): Plugin {
-  return virtualModule(
-    ctx,
-    'tessera:config',
-    'virtual:tessera-config',
-    function () {
-      const configPath = resolve(ctx.root, 'course.config.js');
-      if (existsSync(configPath)) this.addWatchFile(configPath);
-      // The runtime reads export.standard too, so the override must apply to
-      // the bundled config, not just the manifest/adapter.
-      const read = ctx.config;
-      const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
-      return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
-    },
-  );
+  return virtualModule('tessera:config', 'virtual:tessera-config', function () {
+    const configPath = resolve(ctx.root, 'course.config.js');
+    if (existsSync(configPath)) this.addWatchFile(configPath);
+    // The runtime reads export.standard too, so the override must apply to
+    // the bundled config, not just the manifest/adapter.
+    const read = ctx.readConfig();
+    const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
+    return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
+  });
 }
 
 // ---------- Pages Plugin ----------
@@ -344,9 +336,8 @@ function tesseraConfigPlugin(ctx: BuildContext): Plugin {
  * pages. This runs in the user's project context so the glob resolves against their
  * pages/ directory, and Vite can statically analyze it for code splitting.
  */
-function tesseraPagesPlugin(ctx: BuildContext): Plugin {
+function tesseraPagesPlugin(): Plugin {
   return virtualModule(
-    ctx,
     'tessera:pages',
     'virtual:tessera-pages',
     () => `export default import.meta.glob('/pages/**/*.svelte');`,
@@ -386,7 +377,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configResolved() {
-      const read = ctx.config;
+      const read = ctx.readConfig();
       a11y.settings = normalizeA11y(read.ok ? read.config.a11y : undefined);
     },
 
@@ -447,7 +438,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
       if (isAuditBuild()) return;
       if (!written) return;
 
-      const read = ctx.config;
+      const read = ctx.readConfig();
       if (!read.ok) {
         // Validation already required a parseable course.config.js — getting
         // here means it vanished or broke mid-build. Surface that loudly
@@ -490,7 +481,6 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
   let loaded: string | undefined;
 
   return virtualModule(
-    ctx,
     'tessera:manifest',
     'virtual:tessera-manifest',
     function () {
@@ -539,34 +529,28 @@ export function createAdapter() {
 }
 
 function tesseraAdapterPlugin(ctx: BuildContext): Plugin {
-  return virtualModule(
-    ctx,
-    'tessera:adapter',
-    'virtual:tessera-adapter',
-    () => {
-      // In dev, defer to the runtime selector so its WebAdapter fallback
-      // for unreachable LMS APIs keeps working.
-      if (!ctx.isBuild) {
-        return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
-      }
+  return virtualModule('tessera:adapter', 'virtual:tessera-adapter', () => {
+    // In dev, defer to the runtime selector so its WebAdapter fallback
+    // for unreachable LMS APIs keeps working.
+    if (!ctx.isBuild) {
+      return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
+    }
 
-      // The audit renders headless with no LMS in the frame chain; the SCORM/
-      // cmi5 adapters throw when their API is absent, so render with WebAdapter.
-      const profile = isAuditBuild() ? undefined : ctx.profile;
-      if (profile?.packaged) return generateLmsAdapterModule(profile.id);
-      return `
+    // The audit renders headless with no LMS in the frame chain; the SCORM/
+    // cmi5 adapters throw when their API is absent, so render with WebAdapter.
+    const profile = isAuditBuild() ? undefined : ctx.readConfig().profile;
+    if (profile?.packaged) return generateLmsAdapterModule(profile.id);
+    return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
 export function createAdapter(config, options) {
   return new WebAdapter(config, options && options.manifest);
 }
 `;
-    },
-  );
+  });
 }
 
 function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
   return virtualModule(
-    ctx,
     'tessera:xapi-setup',
     'virtual:tessera-xapi-setup',
     () => {
@@ -579,7 +563,7 @@ function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
         return `export async function buildXAPIClient() { return null; }`;
       }
 
-      const read = ctx.config;
+      const read = ctx.readConfig();
       const entries =
         read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
       const hasExplicit = entries.some((e) => e?.endpoint !== 'lms');
@@ -587,7 +571,7 @@ function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of
       // explicit xapi config.
-      if (hasExplicit || standardProfile(read.standard)?.hasLaunchLRS) {
+      if (hasExplicit || read.profile?.hasLaunchLRS) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 

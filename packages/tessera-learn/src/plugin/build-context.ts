@@ -1,12 +1,18 @@
 import type { ResolvedConfig } from 'vite';
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   readResolvedConfig,
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
 import { normalizeA11y } from './validation.js';
-import { standardProfile, type StandardId } from '../runtime/standards.js';
+import type { StandardId } from '../runtime/standards.js';
+
+/** True when `child` is `parent` or a path beneath it. */
+export function isInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
 
 /** Build state shared by every plugin `tesseraPlugin()` returns. */
 export class BuildContext {
@@ -32,13 +38,14 @@ export class BuildContext {
     this.root = config.root;
     this.outDir = resolve(config.root, config.build.outDir);
     this.isBuild = config.command === 'build';
+    if (this.isBuild && isInside(this.outDir, this.root)) {
+      throw new Error(
+        `build.outDir (${this.outDir}) must not be or contain the project root.`,
+      );
+    }
   }
 
-  get config(): ResolvedConfigRead {
+  readConfig(): ResolvedConfigRead {
     return readResolvedConfig(this.root, this.standardOverride);
-  }
-
-  get profile() {
-    return standardProfile(this.config.standard);
   }
 }

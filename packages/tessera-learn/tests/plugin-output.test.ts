@@ -10,7 +10,7 @@ import {
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Plugin } from 'vite';
-import { tesseraPlugin } from '../src/plugin/index.js';
+import { resolvedPlugins } from './helpers/plugin.js';
 
 let projectRoot: string;
 
@@ -27,24 +27,8 @@ afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
 });
 
-function resolvedPlugins(command = 'build'): (name: string) => Plugin {
-  const plugins = tesseraPlugin() as Plugin[];
-  const get = (name: string) => {
-    const plugin = plugins.find((p) => p.name === name);
-    if (!plugin) throw new Error(`plugin ${name} not found`);
-    return plugin;
-  };
-  const context = get('tessera:context');
-  (context.configResolved as any).call(context, {
-    root: projectRoot,
-    command,
-    build: { outDir: 'dist' },
-  });
-  return get;
-}
-
-function findPlugin(name: string, command?: string): Plugin {
-  return resolvedPlugins(command)(name);
+function findPlugin(name: string, command = 'build'): Plugin {
+  return resolvedPlugins(projectRoot, command)(name);
 }
 
 function writeConfig(standard: string) {
@@ -182,7 +166,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
 describe('export packaging gate', () => {
   function buildPlugins() {
-    const get = resolvedPlugins();
+    const get = resolvedPlugins(projectRoot, 'build');
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');

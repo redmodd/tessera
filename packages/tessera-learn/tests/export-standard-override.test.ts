@@ -32,40 +32,40 @@ describe('readResolvedConfig', () => {
   it('uses the course config standard when no override is given', () => {
     writeConfig(`{ export: { standard: "scorm12" } }`);
     const read = readResolvedConfig(projectRoot);
-    expect(read.standard).toBe('scorm12');
+    expect(read.profile?.id).toBe('scorm12');
     expect(read.ok && read.config.export?.standard).toBe('scorm12');
   });
 
   it('defaults to web when the config omits export.standard', () => {
     writeConfig(`{ title: "x" }`);
-    expect(readResolvedConfig(projectRoot).standard).toBe('web');
+    expect(readResolvedConfig(projectRoot).profile?.id).toBe('web');
   });
 
   it('lets a CLI override win while preserving other export fields', () => {
     writeConfig(`{ export: { standard: "web", csp: false } }`);
     const read = readResolvedConfig(projectRoot, 'cmi5');
-    expect(read.standard).toBe('cmi5');
+    expect(read.profile?.id).toBe('cmi5');
     expect(read.ok && read.config.export).toEqual({
       standard: 'cmi5',
       csp: false,
     });
   });
 
-  it('resolves no standard for an unreadable config with no override', () => {
+  it('resolves no profile for an unreadable config with no override', () => {
     const read = readResolvedConfig(projectRoot);
     expect(read.ok).toBe(false);
-    expect(read.standard).toBeUndefined();
+    expect(read.profile).toBeUndefined();
   });
 
-  it('resolves no standard for a value outside the table', () => {
+  it('resolves no profile for a standard outside the table', () => {
     writeConfig(`{ export: { standard: "scorm13" } }`);
-    expect(readResolvedConfig(projectRoot).standard).toBeUndefined();
+    expect(readResolvedConfig(projectRoot).profile).toBeUndefined();
   });
 
   it('honours the override even when the config is unreadable', () => {
     const read = readResolvedConfig(projectRoot, 'scorm2004');
     expect(read.ok).toBe(false);
-    expect(read.standard).toBe('scorm2004');
+    expect(read.profile?.id).toBe('scorm2004');
   });
 });
 

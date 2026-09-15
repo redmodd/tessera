@@ -35,7 +35,6 @@ export function createOverridePlugin(
     : 'export default null;';
 
   return virtualModule(
-    ctx,
     name,
     virtualId,
     () => {

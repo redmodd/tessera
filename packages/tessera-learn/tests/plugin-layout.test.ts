@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { normalizePath } from 'vite';
 
 import { tesseraLayoutPlugin } from '../src/plugin/layout.js';
-import { BuildContext } from '../src/plugin/build-context.js';
+import { resolvedContext } from './helpers/plugin.js';
 
 describe('tessera:layout virtual module', () => {
   let projectRoot: string;
@@ -24,9 +24,7 @@ describe('tessera:layout virtual module', () => {
   });
 
   function makePlugin() {
-    const ctx = new BuildContext();
-    ctx.resolve({ root: projectRoot, build: { outDir: 'dist' } } as never);
-    return tesseraLayoutPlugin(ctx);
+    return tesseraLayoutPlugin(resolvedContext(projectRoot));
   }
 
   it('load() returns null re-export when no layout.svelte exists', () => {

@@ -8,16 +8,10 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import {
-  normalizePath,
-  type HotUpdateOptions,
-  type Plugin,
-  type ResolvedConfig,
-} from 'vite';
+import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
 import { createOverridePlugin } from '../src/plugin/override-plugin.js';
-import { tesseraPlugin } from '../src/plugin/index.js';
-import { BuildContext } from '../src/plugin/build-context.js';
+import { resolvedContext, resolvedPlugins } from './helpers/plugin.js';
 
 let projectRoot: string;
 
@@ -30,25 +24,8 @@ afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
 });
 
-function resolvedConfig() {
-  return {
-    root: projectRoot,
-    command: 'serve',
-    build: { outDir: 'dist' },
-  } as ResolvedConfig;
-}
-
-function context() {
-  const ctx = new BuildContext();
-  ctx.resolve(resolvedConfig());
-  return ctx;
-}
-
 function tesseraSubPlugin(name: string) {
-  const plugins = tesseraPlugin() as Plugin[];
-  const contextPlugin = plugins.find((p) => p.name === 'tessera:context')!;
-  (contextPlugin.configResolved as any).call(contextPlugin, resolvedConfig());
-  return plugins.find((p) => p.name === name)!;
+  return resolvedPlugins(projectRoot)(name);
 }
 
 function load(plugin: Plugin, addWatchFile = (_file: string) => {}): string {
@@ -60,6 +37,7 @@ function fakeEnvironment({ name = 'client', loaded = true } = {}) {
   const sent: unknown[] = [];
   return {
     name,
+    config: { root: projectRoot },
     moduleGraph: {
       getModuleById: (id: string) => (loaded ? { id } : undefined),
       invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
@@ -85,12 +63,8 @@ function hotUpdate(
 
 describe('virtualModule', () => {
   it('filters resolveId to the id with or without a leading slash', () => {
-    const { filter, handler } = virtualModule(
-      context(),
-      'test',
-      'virtual:x',
-      () => '',
-    ).resolveId as any;
+    const { filter, handler } = virtualModule('test', 'virtual:x', () => '')
+      .resolveId as any;
     expect(filter.id.test('virtual:x')).toBe(true);
     expect(filter.id.test('/virtual:x')).toBe(true);
     expect(filter.id.test('virtual:xy')).toBe(false);
@@ -99,7 +73,7 @@ describe('virtualModule', () => {
   });
 
   it('filters load to the resolved id', () => {
-    const plugin = virtualModule(context(), 'test', 'virtual:x', () => 'code');
+    const plugin = virtualModule('test', 'virtual:x', () => 'code');
     const { filter } = plugin.load as any;
     expect(filter.id.test('\0virtual:x')).toBe(true);
     expect(filter.id.test('virtual:x')).toBe(false);
@@ -111,13 +85,7 @@ describe('virtualModule', () => {
     options?: Parameters<typeof fakeEnvironment>[0],
   ) {
     const environment = fakeEnvironment(options);
-    const plugin = virtualModule(
-      context(),
-      'test',
-      'virtual:x',
-      () => '',
-      shouldReload,
-    );
+    const plugin = virtualModule('test', 'virtual:x', () => '', shouldReload);
     const result = hotUpdate(plugin, environment, 'update', 'any');
     return { ...environment, result };
   }
@@ -149,7 +117,7 @@ describe('virtualModule', () => {
 describe('override plugin dev reload', () => {
   it('reloads only when the override file is created or deleted', () => {
     const environment = fakeEnvironment();
-    const plugin = createOverridePlugin(context(), {
+    const plugin = createOverridePlugin(resolvedContext(projectRoot), {
       name: 'test',
       virtualId: 'virtual:layout',
       projectFile: 'course.layout.svelte',
