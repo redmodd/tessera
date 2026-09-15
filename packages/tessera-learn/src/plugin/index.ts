@@ -351,7 +351,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
 
 // Tier 1a: flush + gate the Svelte compiler's a11y warnings at buildEnd, after
 // every module is transformed. svelte() accepts `onwarn` but not arbitrary
-// Rollup hooks, so the gate lives here and shares the onwarn closure.
+// Rollup hooks, so the gate lives here.
 function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
   return {
     name: 'tessera:a11y-compiler',
