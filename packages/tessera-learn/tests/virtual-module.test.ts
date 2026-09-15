@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Plugin } from 'vite';
+import { normalizePath, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
 import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 import { tesseraPlugin } from '../src/plugin/index.js';
@@ -24,28 +24,31 @@ function configure(plugin: Plugin, command = 'serve') {
   (plugin.configResolved as any).call(plugin, { root: projectRoot, command });
 }
 
-function fakeServer({ loaded = true } = {}) {
-  const listeners: ((event: string, file: string) => void)[] = [];
+function fakeEnvironment({ name = 'client', loaded = true } = {}) {
   const invalidated: string[] = [];
   const sent: unknown[] = [];
   return {
-    watcher: {
-      on: (_: string, fn: (typeof listeners)[number]) => listeners.push(fn),
+    name,
+    moduleGraph: {
+      getModuleById: (id: string) => (loaded ? { id } : undefined),
+      invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
     },
-    environments: {
-      client: {
-        moduleGraph: {
-          getModuleById: (id: string) => (loaded ? { id } : undefined),
-          invalidateModule: (mod: { id: string }) => invalidated.push(mod.id),
-        },
-        hot: { send: (payload: unknown) => sent.push(payload) },
-      },
-    },
-    emit: (event: string, file: string) =>
-      listeners.forEach((fn) => fn(event, file)),
+    hot: { send: (payload: unknown) => sent.push(payload) },
     invalidated,
     sent,
   };
+}
+
+type Environment = ReturnType<typeof fakeEnvironment>;
+
+function hotUpdate(
+  plugin: Plugin,
+  environment: Environment,
+  type: string,
+  ...segments: string[]
+) {
+  const file = normalizePath(resolve(projectRoot, ...segments));
+  (plugin.hotUpdate as any).call({ environment }, { type, file });
 }
 
 describe('virtualModule', () => {
@@ -70,56 +73,59 @@ describe('virtualModule', () => {
     expect(JSON.parse(handler())).toEqual([projectRoot, true]);
   });
 
-  function watching(shouldReload: () => boolean, loaded = true) {
-    const server = fakeServer({ loaded });
+  function updated(
+    shouldReload: () => boolean,
+    options?: Parameters<typeof fakeEnvironment>[0],
+  ) {
+    const environment = fakeEnvironment(options);
     const plugin = virtualModule('test', 'virtual:x', () => '', shouldReload);
     configure(plugin);
-    (plugin.configureServer as any)(server);
-    server.emit('change', 'any');
-    return server;
+    hotUpdate(plugin, environment, 'update', 'any');
+    return environment;
   }
 
   it('invalidates the module and sends a full reload when shouldReload is true', () => {
-    const server = watching(() => true);
-    expect(server.invalidated).toEqual(['\0virtual:x']);
-    expect(server.sent).toEqual([{ type: 'full-reload' }]);
+    const environment = updated(() => true);
+    expect(environment.invalidated).toEqual(['\0virtual:x']);
+    expect(environment.sent).toEqual([{ type: 'full-reload' }]);
   });
 
   it('still sends a full reload when the module is not in the graph', () => {
-    const server = watching(() => true, false);
-    expect(server.invalidated).toEqual([]);
-    expect(server.sent).toEqual([{ type: 'full-reload' }]);
+    const environment = updated(() => true, { loaded: false });
+    expect(environment.invalidated).toEqual([]);
+    expect(environment.sent).toEqual([{ type: 'full-reload' }]);
   });
 
   it('does nothing when shouldReload is false', () => {
-    const server = watching(() => false);
-    expect(server.sent).toEqual([]);
+    expect(updated(() => false).sent).toEqual([]);
+  });
+
+  it('ignores non-client environments', () => {
+    expect(updated(() => true, { name: 'ssr' }).sent).toEqual([]);
   });
 });
 
 describe('override plugin dev reload', () => {
-  it('reloads only when the override file is added or removed', () => {
-    const server = fakeServer();
+  it('reloads only when the override file is created or deleted', () => {
+    const environment = fakeEnvironment();
     const plugin = createOverridePlugin({
       name: 'test',
       virtualId: 'virtual:layout',
       projectFile: 'course.layout.svelte',
     });
     configure(plugin);
-    (plugin.configureServer as any)(server);
 
-    const file = resolve(projectRoot, 'course.layout.svelte');
-    server.emit('change', file);
-    server.emit('add', resolve(projectRoot, 'other.svelte'));
-    expect(server.sent).toEqual([]);
+    hotUpdate(plugin, environment, 'update', 'course.layout.svelte');
+    hotUpdate(plugin, environment, 'create', 'other.svelte');
+    expect(environment.sent).toEqual([]);
 
-    server.emit('add', file);
-    server.emit('unlink', file);
-    expect(server.invalidated).toEqual([
+    hotUpdate(plugin, environment, 'create', 'course.layout.svelte');
+    hotUpdate(plugin, environment, 'delete', 'course.layout.svelte');
+    expect(environment.invalidated).toEqual([
       '\0virtual:layout',
       '\0virtual:layout',
     ]);
-    expect(server.sent).toHaveLength(2);
+    expect(environment.sent).toHaveLength(2);
   });
 });
 
@@ -133,18 +139,22 @@ describe('manifest plugin', () => {
   }
 
   it('reloads on page changes and ignores other files', () => {
-    const server = fakeServer();
-    (manifestPlugin().configureServer as any)(server);
+    const environment = fakeEnvironment();
+    const plugin = manifestPlugin();
 
-    server.emit('change', resolve(projectRoot, 'course.config.js'));
-    server.emit('change', resolve(projectRoot, 'pages', 'notes.txt'));
-    server.emit('change', resolve(projectRoot, 'pages', 'foo_meta.js'));
-    server.emit('add', resolve(projectRoot, 'pages-old', 'intro.svelte'));
-    expect(server.sent).toEqual([]);
+    hotUpdate(plugin, environment, 'update', 'course.config.js');
+    hotUpdate(plugin, environment, 'update', 'pages', 'notes.txt');
+    hotUpdate(plugin, environment, 'update', 'pages', 'foo_meta.js');
+    hotUpdate(plugin, environment, 'create', 'pages-old', 'intro.svelte');
+    expect(environment.sent).toEqual([]);
 
-    server.emit('add', resolve(projectRoot, 'pages', 'intro.svelte'));
-    expect(server.invalidated).toEqual(['\0virtual:tessera-manifest']);
-    expect(server.sent).toEqual([{ type: 'full-reload' }]);
+    hotUpdate(plugin, environment, 'create', 'pages', 'intro.svelte');
+    hotUpdate(plugin, environment, 'update', 'pages', '01', '_meta.js');
+    expect(environment.invalidated).toEqual([
+      '\0virtual:tessera-manifest',
+      '\0virtual:tessera-manifest',
+    ]);
+    expect(environment.sent).toHaveLength(2);
   });
 
   it('rebuilds the manifest on every load', () => {

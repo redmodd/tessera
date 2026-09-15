@@ -47,8 +47,8 @@ export function createOverridePlugin({
     // Only add/unlink flips load()'s output between the override and the
     // fallback; a `change` leaves it identical and Svelte's own HMR handles
     // the underlying file.
-    (event, file, { projectRoot }) =>
-      (event === 'add' || event === 'unlink') &&
-      file === resolve(projectRoot, projectFile),
+    (type, file, { projectRoot }) =>
+      type !== 'update' &&
+      file === normalizePath(resolve(projectRoot, projectFile)),
   );
 }

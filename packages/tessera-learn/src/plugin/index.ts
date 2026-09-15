@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute, basename, sep } from 'node:path';
+import { resolve, relative, isAbsolute, basename } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -579,12 +579,9 @@ function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
       // atob yields Latin1 bytes; decode through UTF-8 or non-ASCII titles ship as mojibake.
       return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
     },
-    (event, filePath, { projectRoot }) =>
-      filePath.startsWith(resolve(projectRoot, 'pages') + sep) &&
-      (filePath.endsWith('.svelte') ||
-        basename(filePath) === '_meta.js' ||
-        event === 'addDir' ||
-        event === 'unlinkDir'),
+    (_type, file, { projectRoot }) =>
+      file.startsWith(normalizePath(resolve(projectRoot, 'pages')) + '/') &&
+      (file.endsWith('.svelte') || basename(file) === '_meta.js'),
   );
 }
 

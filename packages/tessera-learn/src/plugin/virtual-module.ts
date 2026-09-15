@@ -1,4 +1,4 @@
-import type { Plugin, Rollup } from 'vite';
+import type { HotUpdateOptions, Plugin, Rollup } from 'vite';
 import { relative } from 'node:path';
 
 interface VirtualModuleContext {
@@ -11,7 +11,7 @@ export function virtualModule(
   virtualId: string,
   load: (this: Rollup.PluginContext, ctx: VirtualModuleContext) => string,
   shouldReload?: (
-    event: string,
+    type: HotUpdateOptions['type'],
     file: string,
     ctx: VirtualModuleContext,
   ) => boolean,
@@ -35,18 +35,16 @@ export function virtualModule(
         return load.call(this, ctx);
       },
     },
-    configureServer(server) {
-      if (!shouldReload) return;
-      const client = server.environments.client;
-      server.watcher.on('all', (event, file) => {
-        if (!shouldReload(event, file, ctx)) return;
-        console.log(
-          `[${name}] Reloading (${event}: ${relative(ctx.projectRoot, file)})`,
-        );
-        const mod = client.moduleGraph.getModuleById(resolvedId);
-        if (mod) client.moduleGraph.invalidateModule(mod);
-        client.hot.send({ type: 'full-reload' });
-      });
+    hotUpdate({ type, file }) {
+      if (this.environment.name !== 'client') return;
+      if (!shouldReload?.(type, file, ctx)) return;
+      console.log(
+        `[${name}] Reloading (${type}: ${relative(ctx.projectRoot, file)})`,
+      );
+      const { moduleGraph, hot } = this.environment;
+      const mod = moduleGraph.getModuleById(resolvedId);
+      if (mod) moduleGraph.invalidateModule(mod);
+      hot.send({ type: 'full-reload' });
     },
   };
 }
