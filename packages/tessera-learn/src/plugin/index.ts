@@ -399,7 +399,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
     enforce: 'post',
     apply: 'build',
 
-    writeBundle(options, bundle) {
+    writeBundle(_options, bundle) {
       written = true;
       emitted = Object.keys(bundle).map((file) => resolve(ctx.outDir, file));
     },

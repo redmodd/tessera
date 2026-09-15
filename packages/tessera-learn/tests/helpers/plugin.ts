@@ -2,7 +2,7 @@ import type { Plugin, ResolvedConfig } from 'vite';
 import { tesseraPlugin } from '../../src/plugin/index.js';
 import { BuildContext } from '../../src/plugin/build-context.js';
 
-type Command = ResolvedConfig['command'];
+export type Command = ResolvedConfig['command'];
 
 export function resolvedConfig(
   root: string,

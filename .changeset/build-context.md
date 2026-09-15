@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Share one build context across the Vite plugins, so exports package the configured `build.outDir` instead of always `dist/`, and reject an `outDir` that contains the project root.
+Export the configured `build.outDir` instead of always `dist/`, and reject one that contains the project root.

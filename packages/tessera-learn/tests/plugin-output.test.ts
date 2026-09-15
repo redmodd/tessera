@@ -10,7 +10,7 @@ import {
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Plugin } from 'vite';
-import { resolvedPlugins } from './helpers/plugin.js';
+import { resolvedPlugins, type Command } from './helpers/plugin.js';
 
 let projectRoot: string;
 
@@ -27,7 +27,7 @@ afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
 });
 
-function findPlugin(name: string, command = 'build'): Plugin {
+function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
