@@ -41,9 +41,7 @@ export function createOverridePlugin({
         ? `import * as mod from '${path}';\nexport default mod;`
         : `export { default } from '${path}';`;
     },
-    // Only add/unlink flips load()'s output between the override and the
-    // fallback; a `change` leaves it identical and Svelte's own HMR handles
-    // the underlying file.
+    // Only create/delete swaps override vs fallback; Svelte HMR does updates.
     (type, file, { projectRoot }) =>
       type !== 'update' &&
       file === normalizePath(resolve(projectRoot, projectFile)),
