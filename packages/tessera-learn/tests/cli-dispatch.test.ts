@@ -1,83 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+  readdirSync,
+} from 'node:fs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { main, splitCourseArg, parseExportFlags } from '../src/plugin/cli.js';
+import { main } from '../src/plugin/cli.js';
 
-describe('parseExportFlags', () => {
-  it('returns no override when --standard is absent', () => {
-    expect(parseExportFlags([])).toEqual({});
-  });
-
-  it('extracts a valid --standard value', () => {
-    expect(parseExportFlags(['--standard', 'scorm2004'])).toEqual({
-      standardOverride: 'scorm2004',
-    });
-  });
-
-  it('accepts web as a standard override', () => {
-    expect(parseExportFlags(['--standard', 'web'])).toEqual({
-      standardOverride: 'web',
-    });
-  });
-
-  it('errors on an unknown standard value', () => {
-    const result = parseExportFlags(['--standard', 'bogus']);
-    expect(result.error).toContain('bogus');
-    expect(result.standardOverride).toBeUndefined();
-  });
-
-  it('errors when --standard has no value', () => {
-    const result = parseExportFlags(['--standard']);
-    expect(result.error).toMatch(/--standard/);
-  });
-
-  it('accepts the --standard=value form', () => {
-    expect(parseExportFlags(['--standard=scorm2004'])).toEqual({
-      standardOverride: 'scorm2004',
-    });
-  });
-
-  it('errors on an unknown standard given as --standard=value', () => {
-    const result = parseExportFlags(['--standard=bogus']);
-    expect(result.error).toContain('bogus');
-    expect(result.standardOverride).toBeUndefined();
-  });
-
-  it('rejects an unrecognized flag instead of ignoring it', () => {
-    const result = parseExportFlags(['--standrd', 'scorm2004']);
-    expect(result.error).toMatch(/Unknown argument/);
-    expect(result.standardOverride).toBeUndefined();
-  });
-});
-
-describe('splitCourseArg', () => {
-  it('treats a leading non-flag token as the course name', () => {
-    expect(splitCourseArg(['getting-started'])).toEqual({
-      course: 'getting-started',
-      flags: [],
-    });
-  });
-
-  it('keeps flags after the course name', () => {
-    expect(
-      splitCourseArg(['getting-started', '--threshold', 'serious']),
-    ).toEqual({ course: 'getting-started', flags: ['--threshold', 'serious'] });
-  });
-
-  it('does not mistake a flag value for the course name', () => {
-    expect(splitCourseArg(['--threshold', 'serious'])).toEqual({
-      course: undefined,
-      flags: ['--threshold', 'serious'],
-    });
-  });
-
-  it('handles an empty arg list', () => {
-    expect(splitCourseArg([])).toEqual({ course: undefined, flags: [] });
-  });
-});
+const { runAudit, runBuild, runDev, runValidate } = vi.hoisted(() => ({
+  runAudit: vi.fn(async () => 0),
+  runBuild: vi.fn(async () => 0),
+  runDev: vi.fn(async () => 0),
+  runValidate: vi.fn(() => 0),
+}));
+vi.mock('../src/plugin/a11y/audit.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  runAudit,
+}));
+vi.mock('../src/plugin/build-commands.js', () => ({ runBuild, runDev }));
+vi.mock('../src/plugin/validate-cli.js', () => ({ runValidate }));
 
 let ws: string;
+let course: string;
 let counter = 0;
 
 function makeWorkspace(courses: string[]): string {
@@ -92,8 +39,16 @@ function makeWorkspace(courses: string[]): string {
   return root;
 }
 
+function stderr(): string {
+  return vi.mocked(console.error).mock.calls.flat().join('\n');
+}
+
 beforeEach(() => {
+  vi.clearAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   ws = makeWorkspace(['getting-started']);
+  course = join(ws, 'courses', 'getting-started');
 });
 
 afterEach(() => {
@@ -105,7 +60,6 @@ afterEach(() => {
 
 describe('main dispatch', () => {
   it('dispatches `new` and scaffolds a course', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const code = await main(['new', 'second'], ws);
     expect(code).toBe(0);
     expect(existsSync(join(ws, 'courses', 'second', 'course.config.js'))).toBe(
@@ -114,36 +68,81 @@ describe('main dispatch', () => {
   });
 
   it('errors when a command names a course that does not exist', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = await main(['dev', 'nope'], ws);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('nope');
+    expect(stderr()).toContain('[tessera dev] Course "nope" not found');
   });
 
   it('errors with the course list when a bare command is run at the workspace root', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = await main(['dev'], ws);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('getting-started');
+    expect(stderr()).toContain('getting-started');
   });
 
-  it('rejects export with an invalid --standard before building', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const code = await main(
-      ['export', 'getting-started', '--standard', 'bogus'],
-      ws,
-    );
-    expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('bogus');
+  it('passes --standard through to export', async () => {
+    expect(
+      await main(['export', 'getting-started', '--standard', 'scorm2004'], ws),
+    ).toBe(0);
+    expect(runBuild).toHaveBeenCalledWith(course, ws, 'scorm2004');
   });
 
-  it('rejects validate with an invalid --standard', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const code = await main(
-      ['validate', 'getting-started', '--standard', 'bogus'],
-      ws,
-    );
-    expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('bogus');
+  it('accepts flags before the course and the --flag=value form', async () => {
+    expect(
+      await main(['export', '--standard=web', 'getting-started'], ws),
+    ).toBe(0);
+    expect(runBuild).toHaveBeenCalledWith(course, ws, 'web');
+  });
+
+  it('passes --standard through to validate', async () => {
+    expect(
+      await main(['validate', 'getting-started', '--standard', 'cmi5'], ws),
+    ).toBe(0);
+    expect(runValidate).toHaveBeenCalledWith(course, {
+      standardOverride: 'cmi5',
+    });
+  });
+
+  it('passes the a11y threshold through to the audit', async () => {
+    expect(
+      await main(['a11y', 'getting-started', '--threshold', 'minor'], ws),
+    ).toBe(0);
+    expect(runAudit).toHaveBeenCalledWith(course, ws, { threshold: 'minor' });
+  });
+
+  it('runs validate, then the audit, for check', async () => {
+    expect(
+      await main(['check', 'getting-started', '--threshold=moderate'], ws),
+    ).toBe(0);
+    expect(runValidate).toHaveBeenCalledWith(course, { showA11yTip: false });
+    expect(runAudit).toHaveBeenCalledWith(course, ws, {
+      threshold: 'moderate',
+    });
+  });
+
+  it.each([
+    [['export', 'getting-started', '--standard', 'bogus'], 'got "bogus"'],
+    [['validate', 'getting-started', '--standard=bogus'], 'got "bogus"'],
+    [['export', 'getting-started', '--standard'], 'argument missing'],
+    [['export', 'getting-started', '--standrd', 'scorm2004'], "'--standrd'"],
+    [
+      ['a11y', 'getting-started', '--threshold', 'nope'],
+      '--threshold must be one of',
+    ],
+    [['a11y', 'getting-started', '--build'], "Unknown option '--build'"],
+    [['a11y', 'nope', '--wat'], "[tessera a11y] Unknown option '--wat'"],
+    [['dev', 'getting-started', '--standard', 'web'], "'--standard'"],
+    [['check', 'getting-started', 'extra'], 'Unexpected argument: extra'],
+    [['new', 'second', '--wat'], "Unknown option '--wat'"],
+    [
+      ['duplicate', 'getting-started', 'copy', 'extra'],
+      'Unexpected argument: extra',
+    ],
+  ])('rejects %j before running anything', async (argv, message) => {
+    expect(await main(argv, ws)).toBe(1);
+    expect(stderr()).toContain(message);
+    for (const run of [runAudit, runBuild, runDev, runValidate]) {
+      expect(run).not.toHaveBeenCalled();
+    }
+    expect(readdirSync(join(ws, 'courses'))).toEqual(['getting-started']);
   });
 });
