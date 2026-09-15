@@ -128,7 +128,7 @@ const VALID_A11Y_LEVELS = ['warn', 'error'];
 const VALID_A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'];
 
 /** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
-export function normalizeA11y(raw: unknown): A11ySettings {
+function normalizeA11y(raw: unknown): A11ySettings {
   const a11y =
     raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const level = a11y.level === 'error' ? 'error' : 'warn';
@@ -139,6 +139,11 @@ export function normalizeA11y(raw: unknown): A11ySettings {
     ? a11y.ignore.filter((x): x is string => typeof x === 'string')
     : [];
   return { level, standard, ignore };
+}
+
+export function readA11ySettings(projectRoot: string): A11ySettings {
+  const read = readCourseConfig(projectRoot);
+  return normalizeA11y(read.ok ? read.config.a11y : undefined);
 }
 
 /**

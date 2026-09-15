@@ -244,7 +244,7 @@ mount(App, {
 // ---------- Config Plugin ----------
 
 function completionDefaults(mode: string | undefined): {
-  completion: Record<string, unknown>;
+  completion: CourseConfig['completion'];
   passingScore: number;
 } {
   if (mode === 'manual') {

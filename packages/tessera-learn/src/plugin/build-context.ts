@@ -5,7 +5,7 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import { normalizeA11y, type A11ySettings } from './validation.js';
+import { readA11ySettings, type A11ySettings } from './validation.js';
 import type { StandardId } from '../runtime/standards.js';
 
 /** True when `child` is `parent` or a path beneath it. */
@@ -16,7 +16,6 @@ export function isInside(parent: string, child: string): boolean {
 
 /** Build state shared by every plugin `tesseraPlugin()` returns. */
 export class BuildContext {
-  readonly standardOverride: StandardId | undefined;
   root = '';
   outDir = '';
   isBuild = false;
@@ -26,9 +25,7 @@ export class BuildContext {
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
 
-  constructor(standardOverride?: StandardId) {
-    this.standardOverride = standardOverride;
-  }
+  constructor(readonly standardOverride?: StandardId) {}
 
   configure(config: ResolvedConfig): void {
     this.root = config.root;
@@ -46,7 +43,6 @@ export class BuildContext {
   }
 
   a11ySettings(): A11ySettings {
-    const read = this.readConfig();
-    return normalizeA11y(read.ok ? read.config.a11y : undefined);
+    return readA11ySettings(this.root);
   }
 }

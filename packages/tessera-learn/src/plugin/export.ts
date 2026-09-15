@@ -27,7 +27,8 @@ function slugify(text: string): string {
 type ExportConfig = Pick<
   CourseConfig,
   'title' | 'id' | 'description' | 'version' | 'scoring' | 'export'
-> & { completion?: { mode?: CourseConfig['completion']['mode'] } };
+> &
+  Partial<Pick<CourseConfig, 'completion'>>;
 
 // ---------- Helpers ----------
 
