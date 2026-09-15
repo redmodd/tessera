@@ -6,9 +6,10 @@ import {
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
-  readCourseConfig,
+  readResolvedConfig,
   orderPageFiles,
   walkPages,
+  type CourseConfigRead,
   type WalkedLesson,
   type PageConfig,
 } from './manifest.js';
@@ -36,12 +37,16 @@ import {
   STANDARD_IDS,
   largerSuspendDataStandards,
   standardProfile,
+  type StandardId,
 } from '../runtime/standards.js';
 import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
   courseIdentity,
+  type CourseConfig,
+  type ManualCompletion,
+  type PercentageCompletion,
 } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isCspOverrides } from './csp.js';
@@ -223,7 +228,8 @@ const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
  */
 export function validateProject(
   projectRoot: string,
-  standardOverride?: string,
+  standardOverride?: StandardId,
+  read: CourseConfigRead = readResolvedConfig(projectRoot, standardOverride),
 ): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
@@ -237,7 +243,7 @@ export function validateProject(
 
   // 2. Parse and validate config
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
-  const config = parseConfig(projectRoot, d, runtimeHooks, standardOverride);
+  const config = parseConfig(projectRoot, d, runtimeHooks, read);
 
   // 3. Validate pages directory
   const pagesDir = resolve(projectRoot, 'pages');
@@ -269,29 +275,20 @@ export function validateProject(
 
 // ---------- Config Validation ----------
 
-interface ParsedConfig {
-  title?: string;
-  id?: string;
-  resume?: string;
-  navigation?: { mode?: string };
-  completion?: {
-    mode?: string;
-    percentageThreshold?: number;
-    trigger?: string;
-    requireSuccessStatus?: string;
-  };
-  scoring?: { passingScore?: number };
-  export?: { standard?: string; csp?: unknown };
-  [key: string]: unknown;
-}
+type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
+  completion?: Partial<
+    Pick<CourseConfig['completion'], 'mode'> &
+      Omit<ManualCompletion, 'mode'> &
+      Omit<PercentageCompletion, 'mode'>
+  >;
+};
 
 function parseConfig(
   projectRoot: string,
   d: Diagnostics,
   runtimeHooks: XAPIHookRead,
-  standardOverride?: string,
+  read: CourseConfigRead,
 ): ParsedConfig | null {
-  const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
     if (read.reason === 'no-export') {
@@ -301,7 +298,7 @@ function parseConfig(
     }
     return null;
   }
-  const config = read.config as ParsedConfig;
+  const config: ParsedConfig = read.config;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
@@ -357,19 +354,6 @@ function parseConfig(
       d.error(
         `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
       );
-    }
-  }
-
-  // Apply the override after validating the file value above, so every
-  // standard-dependent check below (identity, csp, xapi, crossValidate) sees
-  // what actually ships.
-  if (standardOverride) {
-    if (!standardProfile(standardOverride)) {
-      d.error(
-        `standardOverride must be one of ${EXPORT_STANDARD_LIST}, got "${standardOverride}"`,
-      );
-    } else {
-      config.export = { ...config.export, standard: standardOverride };
     }
   }
 
@@ -687,7 +671,7 @@ function validateHookIds(
 
 function validateXAPIConfig(
   raw: unknown,
-  standard: string,
+  standard: StandardId,
   hooks: XAPIHookRead,
   d: Diagnostics,
 ): void {
@@ -765,7 +749,7 @@ function validateXAPIConfig(
 function validateSingleXAPIEntry(
   entry: Record<string, unknown>,
   label: string,
-  standard: string,
+  standard: StandardId,
   hooks: XAPIHookRead,
   ids: Set<string>,
   d: Diagnostics,
@@ -1142,7 +1126,7 @@ function validatePages(
   assetsDir: string,
   projectRoot: string,
   d: Diagnostics,
-  exportStandard?: string,
+  exportStandard?: StandardId,
 ): PagesValidationResult {
   const pages: PageInfo[] = [];
   let totalPages = 0;

@@ -1,12 +1,13 @@
 import { basename } from 'node:path';
 import { validateProject, reportValidationIssues } from './validation.js';
+import type { StandardId } from '../runtime/standards.js';
 
 export function runValidate(
   projectRoot: string,
   {
     showA11yTip = true,
     standardOverride,
-  }: { showA11yTip?: boolean; standardOverride?: string } = {},
+  }: { showA11yTip?: boolean; standardOverride?: StandardId } = {},
 ): number {
   const result = validateProject(projectRoot, standardOverride);
   const { errors, warnings } = result;

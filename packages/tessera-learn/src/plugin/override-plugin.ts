@@ -3,6 +3,7 @@ import { normalizePath } from 'vite';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { virtualModule } from './virtual-module.js';
+import type { BuildContext } from './build-context.js';
 
 export interface OverridePluginOptions {
   name: string;
@@ -19,22 +20,26 @@ export interface OverridePluginOptions {
  * and to the built-in (or a null export) otherwise. Shared by the layout, quiz
  * and course-runtime plugins.
  */
-export function createOverridePlugin({
-  name,
-  virtualId,
-  projectFile,
-  builtinFile,
-  namespace = false,
-}: OverridePluginOptions): Plugin {
+export function createOverridePlugin(
+  ctx: BuildContext,
+  {
+    name,
+    virtualId,
+    projectFile,
+    builtinFile,
+    namespace = false,
+  }: OverridePluginOptions,
+): Plugin {
   const fallback = builtinFile
     ? `export { default } from '${normalizePath(builtinFile)}';`
     : 'export default null;';
 
   return virtualModule(
+    ctx,
     name,
     virtualId,
-    ({ projectRoot }) => {
-      const filePath = resolve(projectRoot, projectFile);
+    () => {
+      const filePath = resolve(ctx.root, projectFile);
       if (!existsSync(filePath)) return fallback;
       const path = normalizePath(filePath);
       return namespace
@@ -42,8 +47,8 @@ export function createOverridePlugin({
         : `export { default } from '${path}';`;
     },
     // Only create/delete swaps override vs fallback; Svelte HMR does updates.
-    (type, file, { projectRoot }) =>
+    (type, file) =>
       type !== 'update' &&
-      file === normalizePath(resolve(projectRoot, projectFile)),
+      file === normalizePath(resolve(ctx.root, projectFile)),
   );
 }

@@ -5,7 +5,7 @@ import {
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
@@ -24,15 +24,10 @@ function slugify(text: string): string {
 
 // ---------- Types ----------
 
-interface ExportConfig {
-  title: string;
-  id?: string;
-  description?: string;
-  version?: string;
-  scoring: { passingScore: number };
-  completion?: { mode?: CourseConfig['completion']['mode'] };
-  export: { standard: string };
-}
+type ExportConfig = Pick<
+  CourseConfig,
+  'title' | 'id' | 'description' | 'version' | 'scoring' | 'export'
+> & { completion?: Partial<Pick<CourseConfig['completion'], 'mode'>> };
 
 // ---------- Helpers ----------
 
@@ -226,7 +221,7 @@ export async function createZip(
 
 /**
  * Run the export process after Vite build completes.
- * Writes manifest XML into dist/, then packages into ZIP if needed.
+ * Writes manifest XML into the build output, then packages into ZIP if needed.
  */
 /** Remove any previously built zips for this package to prevent accumulation. */
 function cleanOldZips(projectRoot: string, slug: string): void {
@@ -309,9 +304,9 @@ export const LMS_BUILD: Record<
 
 export async function runExport(
   projectRoot: string,
+  outDir: string,
   config: ExportConfig,
 ): Promise<void> {
-  const distDir = resolve(projectRoot, 'dist');
   const standard = config.export.standard;
   const slug = slugify(config.title) || 'tessera-course';
   const version = config.version || '1.0.0';
@@ -321,21 +316,23 @@ export async function runExport(
   const profile = standardProfile(standard);
   if (!profile) return; // unknown standard: the validator rejects these upstream
   if (!profile.packaged) {
-    const files = collectFiles(distDir);
+    const files = collectFiles(outDir);
     let totalSize = 0;
-    for (const f of files) totalSize += statSync(resolve(distDir, f)).size;
-    console.log(`✓ Web export: dist/ (${formatSize(totalSize)})`);
+    for (const f of files) totalSize += statSync(resolve(outDir, f)).size;
+    console.log(
+      `✓ Web export: ${relative(projectRoot, outDir)}/ (${formatSize(totalSize)})`,
+    );
     return;
   }
 
   const spec = LMS_BUILD[profile.id];
 
   writeFileSync(
-    resolve(distDir, spec.manifestFile),
-    spec.generate(config, distDir),
+    resolve(outDir, spec.manifestFile),
+    spec.generate(config, outDir),
     'utf-8',
   );
   cleanOldZips(projectRoot, slug);
-  const zipSize = await createZip(distDir, zipPath);
+  const zipSize = await createZip(outDir, zipPath);
   console.log(`✓ ${profile.name} export: ${zipName} (${formatSize(zipSize)})`);
 }

@@ -11,10 +11,9 @@ import {
 } from 'node:fs';
 import {
   generateManifest,
-  readCourseConfig,
-  readResolvedConfig,
   walkPages,
   type CourseConfigRead,
+  type ResolvedConfigRead,
 } from './manifest.js';
 import type { Manifest } from './manifest.js';
 import type { CourseConfig } from '../runtime/types.js';
@@ -26,6 +25,7 @@ import {
   DEFAULT_STANDARD,
   standardProfile,
   type LMSStandard,
+  type StandardId,
 } from '../runtime/standards.js';
 import {
   validateProject,
@@ -33,7 +33,6 @@ import {
   normalizeA11y,
   isPlausibleLanguageTag,
   isIgnored,
-  type A11ySettings,
 } from './validation.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
@@ -42,6 +41,7 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
+import { BuildContext } from './build-context.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -50,27 +50,6 @@ export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
 
 function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
-}
-
-// Tier-1a state shared between the svelte() onwarn handler and the sibling
-// gate plugin. onwarn fires during transform (after the Tier-1b buildStart
-// gate), so a11y warnings are collected here and flushed/gated at buildEnd.
-interface A11yCompilerState {
-  warnings: string[];
-  projectRoot: string;
-  isBuild: boolean;
-  settings: A11ySettings;
-}
-
-// Gates post-build side effects (asset copy, packaging) on a bundle that wrote
-// cleanly. Set from the enforce:'post' plugin, so a throw in an earlier
-// writeBundle leaves it closed.
-interface BuildState {
-  written: boolean;
-}
-
-interface ManifestRef {
-  current: Manifest | null;
 }
 
 // Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
@@ -97,27 +76,26 @@ function projectFileRel(
   return rel;
 }
 
-export function tesseraPlugin(options: { standardOverride?: string } = {}) {
-  const { standardOverride } = options;
-  const manifestRef: ManifestRef = { current: null };
-  const a11y: A11yCompilerState = {
-    warnings: [],
-    projectRoot: '',
-    isBuild: false,
-    settings: normalizeA11y(undefined),
-  };
-  const build = { written: false };
+export function tesseraPlugin(options: { standardOverride?: StandardId } = {}) {
+  const ctx = new BuildContext(options.standardOverride);
   return [
+    {
+      name: 'tessera:context',
+      enforce: 'pre',
+      configResolved(config) {
+        ctx.resolve(config);
+      },
+    } satisfies Plugin,
     svelte({
       compilerOptions: { css: 'external' },
       onwarn(warning, defaultHandler) {
         if (warning.code?.startsWith('a11y')) {
-          const rel = projectFileRel(warning.filename, a11y.projectRoot);
+          const rel = projectFileRel(warning.filename, ctx.root);
           if (rel !== null) {
             const msg = `[${warning.code}] ${rel}: ${warning.message}`;
-            if (a11y.isBuild) {
-              a11y.warnings.push(msg);
-            } else if (!a11y.settings.ignore.includes(warning.code)) {
+            if (ctx.isBuild) {
+              ctx.a11y.warnings.push(msg);
+            } else if (!ctx.a11y.settings.ignore.includes(warning.code)) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
           }
@@ -126,27 +104,27 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
         defaultHandler?.(warning);
       },
     }),
-    tesseraA11yCompilerPlugin(a11y),
-    tesseraValidationPlugin(standardOverride),
-    tesseraEntryPlugin(),
-    tesseraIndexHtmlPlugin(standardOverride, build),
+    tesseraA11yCompilerPlugin(ctx),
+    tesseraValidationPlugin(ctx),
+    tesseraEntryPlugin(ctx),
+    tesseraIndexHtmlPlugin(ctx),
     tesseraConfigDefaultsPlugin(),
-    tesseraConfigPlugin(standardOverride),
-    tesseraPagesPlugin(),
-    tesseraManifestPlugin(manifestRef),
-    tesseraLayoutPlugin(),
-    tesseraQuizPlugin(),
-    tesseraCourseRuntimePlugin(),
-    tesseraAdapterPlugin(standardOverride),
-    tesseraXAPISetupPlugin(standardOverride),
-    tesseraFirstPagePreloadPlugin(manifestRef),
-    tesseraExportPlugin(standardOverride, build),
+    tesseraConfigPlugin(ctx),
+    tesseraPagesPlugin(ctx),
+    tesseraManifestPlugin(ctx),
+    tesseraLayoutPlugin(ctx),
+    tesseraQuizPlugin(ctx),
+    tesseraCourseRuntimePlugin(ctx),
+    tesseraAdapterPlugin(ctx),
+    tesseraXAPISetupPlugin(ctx),
+    tesseraFirstPagePreloadPlugin(ctx),
+    tesseraExportPlugin(ctx),
   ];
 }
 
 // ---------- Entry Plugin ----------
 
-function tesseraEntryPlugin(): Plugin {
+function tesseraEntryPlugin(ctx: BuildContext): Plugin {
   const packageRoot = resolvePackageRoot();
   const appPath = normalizePath(
     resolve(packageRoot, 'src', 'runtime', 'App.svelte'),
@@ -155,44 +133,32 @@ function tesseraEntryPlugin(): Plugin {
     normalizePath(resolve(packageRoot, 'styles', file)),
   );
   return virtualModule(
+    ctx,
     'tessera:entry',
     'virtual:tessera-main',
-    ({ projectRoot }) =>
+    () =>
       generateEntryScript(appPath, [
         ...frameworkStyles,
-        ...userStylesheets(projectRoot),
+        ...userStylesheets(ctx.root),
       ]),
-    (type, file, { projectRoot }) =>
+    (type, file) =>
       type !== 'update' &&
       file.endsWith('.css') &&
-      dirname(file) === stylesDir(projectRoot),
+      dirname(file) === stylesDir(ctx.root),
   );
 }
 
-function tesseraIndexHtmlPlugin(
-  standardOverride: string | undefined,
-  build: BuildState,
-): Plugin {
-  let projectRoot: string;
-  let outDir: string;
-  let isBuild = false;
-
+function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
   return {
     name: 'tessera:index-html',
     enforce: 'pre',
 
-    configResolved(config) {
-      projectRoot = config.root;
-      outDir = resolve(config.root, config.build.outDir);
-      isBuild = config.command === 'build';
-    },
-
     // For build mode: write index.html so Rollup can find it
     buildStart() {
-      if (isBuild) {
-        const read = readResolvedConfig(projectRoot, standardOverride);
+      if (ctx.isBuild) {
+        const read = ctx.config;
         writeFileSync(
-          resolve(projectRoot, 'index.html'),
+          resolve(ctx.root, 'index.html'),
           generateIndexHtml(readLanguage(read), cspMeta(read)),
           'utf-8',
         );
@@ -201,15 +167,15 @@ function tesseraIndexHtmlPlugin(
 
     // For build mode: clean up temporary index.html and copy assets
     closeBundle() {
-      if (isBuild) {
-        rmSync(resolve(projectRoot, 'index.html'), { force: true });
+      if (ctx.isBuild) {
+        rmSync(resolve(ctx.root, 'index.html'), { force: true });
 
-        if (!build.written) return;
+        if (!ctx.bundleWritten) return;
 
         // Copy assets/ into the build's assets/ so $assets/ references resolve
-        const assetsDir = resolve(projectRoot, 'assets');
+        const assetsDir = resolve(ctx.root, 'assets');
         if (existsSync(assetsDir)) {
-          cpSync(assetsDir, resolve(outDir, 'assets'), { recursive: true });
+          cpSync(assetsDir, resolve(ctx.outDir, 'assets'), { recursive: true });
         }
       }
     },
@@ -219,9 +185,7 @@ function tesseraIndexHtmlPlugin(
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(
-              readLanguage(readCourseConfig(projectRoot)),
-            );
+            const html = generateIndexHtml(readLanguage(ctx.config));
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -247,7 +211,7 @@ function readLanguage(read: CourseConfigRead): string {
 // could break) and never on the dev server (a meta connect-src would block
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
-function cspMeta(read: CourseConfigRead & { standard: string }): string {
+function cspMeta(read: ResolvedConfigRead): string {
   const profile = standardProfile(read.standard);
   if (!profile || profile.packaged) return '';
   const csp = read.ok ? read.config.export?.csp : undefined;
@@ -349,20 +313,24 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     navigation: { mode: 'free', ...userConfig.navigation },
     completion: { ...completion, ...userConfig.completion },
     scoring: { passingScore, ...userConfig.scoring },
-    export: { standard: DEFAULT_STANDARD, ...userConfig.export },
+    export: {
+      ...userConfig.export,
+      standard: userConfig.export?.standard ?? DEFAULT_STANDARD,
+    },
   };
 }
 
-function tesseraConfigPlugin(standardOverride?: string): Plugin {
+function tesseraConfigPlugin(ctx: BuildContext): Plugin {
   return virtualModule(
+    ctx,
     'tessera:config',
     'virtual:tessera-config',
-    function ({ projectRoot }) {
-      const configPath = resolve(projectRoot, 'course.config.js');
+    function () {
+      const configPath = resolve(ctx.root, 'course.config.js');
       if (existsSync(configPath)) this.addWatchFile(configPath);
-      // The runtime reads export.standard too, so readResolvedConfig must apply
-      // the override here — the bundled config, not just the manifest/adapter.
-      const read = readResolvedConfig(projectRoot, standardOverride);
+      // The runtime reads export.standard too, so the override must apply to
+      // the bundled config, not just the manifest/adapter.
+      const read = ctx.config;
       const userConfig: Partial<CourseConfig> = read.ok ? read.config : {};
       return `export default ${JSON.stringify(mergeCourseConfig(userConfig))};`;
     },
@@ -376,8 +344,9 @@ function tesseraConfigPlugin(standardOverride?: string): Plugin {
  * pages. This runs in the user's project context so the glob resolves against their
  * pages/ directory, and Vite can statically analyze it for code splitting.
  */
-function tesseraPagesPlugin(): Plugin {
+function tesseraPagesPlugin(ctx: BuildContext): Plugin {
   return virtualModule(
+    ctx,
     'tessera:pages',
     'virtual:tessera-pages',
     () => `export default import.meta.glob('/pages/**/*.svelte');`,
@@ -386,27 +355,22 @@ function tesseraPagesPlugin(): Plugin {
 
 // ---------- Validation Plugin ----------
 
-function tesseraValidationPlugin(standardOverride?: string): Plugin {
-  let projectRoot: string;
-  let isBuild = false;
-
+function tesseraValidationPlugin(ctx: BuildContext): Plugin {
   return {
     name: 'tessera:validation',
     enforce: 'pre',
 
-    configResolved(config) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
+    configResolved() {
       // Run validation during dev (configResolved fires before server starts)
-      if (!isBuild) {
-        runValidation(projectRoot, standardOverride);
+      if (!ctx.isBuild) {
+        runValidation(ctx);
       }
     },
 
     buildStart() {
       // Run validation during build (buildStart fires once before bundling)
-      if (isBuild) {
-        runValidation(projectRoot, standardOverride);
+      if (ctx.isBuild) {
+        runValidation(ctx);
       }
     },
   };
@@ -415,20 +379,19 @@ function tesseraValidationPlugin(standardOverride?: string): Plugin {
 // Tier 1a: flush + gate the Svelte compiler's a11y warnings at buildEnd, after
 // every module is transformed. svelte() accepts `onwarn` but not arbitrary
 // Rollup hooks, so the gate lives here and shares the onwarn closure.
-function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
+function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
+  const { a11y } = ctx;
   return {
     name: 'tessera:a11y-compiler',
     enforce: 'pre',
 
-    configResolved(config) {
-      a11y.projectRoot = config.root;
-      a11y.isBuild = config.command === 'build';
-      const read = readCourseConfig(config.root);
+    configResolved() {
+      const read = ctx.config;
       a11y.settings = normalizeA11y(read.ok ? read.config.a11y : undefined);
     },
 
     buildEnd() {
-      if (!a11y.isBuild || a11y.warnings.length === 0) return;
+      if (!ctx.isBuild || a11y.warnings.length === 0) return;
       const ignored = new Set(a11y.settings.ignore);
       const warnings = a11y.warnings.filter((msg) => !isIgnored(msg, ignored));
       a11y.warnings = [];
@@ -444,8 +407,8 @@ function tesseraA11yCompilerPlugin(a11y: A11yCompilerState): Plugin {
   };
 }
 
-function runValidation(projectRoot: string, standardOverride?: string): void {
-  const result = validateProject(projectRoot, standardOverride);
+function runValidation(ctx: BuildContext): void {
+  const result = validateProject(ctx.root, ctx.standardOverride, ctx.config);
   reportValidationIssues(result);
   if (result.errors.length > 0) {
     throw new Error(
@@ -456,45 +419,35 @@ function runValidation(projectRoot: string, standardOverride?: string): void {
 
 // ---------- Export Plugin ----------
 
-function tesseraExportPlugin(
-  standardOverride: string | undefined,
-  build: BuildState,
-): Plugin {
-  let projectRoot: string;
-  let isBuild = false;
+function tesseraExportPlugin(ctx: BuildContext): Plugin {
   let emitted: string[] = [];
 
   return {
     name: 'tessera:export',
     enforce: 'post',
 
-    configResolved(config) {
-      projectRoot = config.root;
-      isBuild = config.command === 'build';
-    },
-
     writeBundle(options, bundle) {
-      build.written = true;
+      ctx.bundleWritten = true;
       emitted = Object.keys(bundle).map((file) => resolve(options.dir!, file));
     },
 
     onLog(_level, log) {
-      if (!isBuild || log.code !== 'IMPORT_IS_UNDEFINED') return;
-      if (!projectFileRel(log.id, projectRoot)) return;
-      build.written = false;
+      if (!ctx.isBuild || log.code !== 'IMPORT_IS_UNDEFINED') return;
+      if (!projectFileRel(log.id, ctx.root)) return;
+      ctx.bundleWritten = false;
       for (const file of emitted) rmSync(file, { force: true });
       emitted = [];
       this.error(log);
     },
 
     async closeBundle() {
-      const written = build.written;
-      build.written = false;
-      if (!isBuild) return;
+      const written = ctx.bundleWritten;
+      ctx.bundleWritten = false;
+      if (!ctx.isBuild) return;
       if (isAuditBuild()) return;
       if (!written) return;
 
-      const read = readResolvedConfig(projectRoot, standardOverride);
+      const read = ctx.config;
       if (!read.ok) {
         // Validation already required a parseable course.config.js — getting
         // here means it vanished or broke mid-build. Surface that loudly
@@ -514,7 +467,7 @@ function tesseraExportPlugin(
         );
       }
 
-      await runExport(projectRoot, mergeCourseConfig(read.config));
+      await runExport(ctx.root, ctx.outDir, mergeCourseConfig(read.config));
     },
   };
 }
@@ -533,16 +486,17 @@ function manifestModule(manifest: Manifest): string {
   return `export default JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("${b64}"),(c)=>c.charCodeAt(0))));`;
 }
 
-function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
+function tesseraManifestPlugin(ctx: BuildContext): Plugin {
   let loaded: string | undefined;
 
   return virtualModule(
+    ctx,
     'tessera:manifest',
     'virtual:tessera-manifest',
-    function ({ projectRoot }) {
-      const pagesDir = resolve(projectRoot, 'pages');
+    function () {
+      const pagesDir = resolve(ctx.root, 'pages');
       const sections = walkPages(pagesDir);
-      manifestRef.current = generateManifest(pagesDir, sections);
+      ctx.manifest = generateManifest(pagesDir, sections);
 
       for (const section of sections) {
         for (const { metaPath } of [section, ...section.lessons]) {
@@ -555,11 +509,11 @@ function tesseraManifestPlugin(manifestRef: ManifestRef): Plugin {
         }
       }
 
-      loaded = manifestModule(manifestRef.current);
+      loaded = manifestModule(ctx.manifest);
       return loaded;
     },
-    (_type, file, { projectRoot }) => {
-      const pagesDir = resolve(projectRoot, 'pages');
+    (_type, file) => {
+      const pagesDir = resolve(ctx.root, 'pages');
       return (
         file.startsWith(normalizePath(pagesDir) + '/') &&
         (file.endsWith('.svelte') || file.endsWith('/_meta.js')) &&
@@ -584,24 +538,21 @@ export function createAdapter() {
 `;
 }
 
-function tesseraAdapterPlugin(standardOverride?: string): Plugin {
+function tesseraAdapterPlugin(ctx: BuildContext): Plugin {
   return virtualModule(
+    ctx,
     'tessera:adapter',
     'virtual:tessera-adapter',
-    ({ projectRoot, isBuild }) => {
+    () => {
       // In dev, defer to the runtime selector so its WebAdapter fallback
       // for unreachable LMS APIs keeps working.
-      if (!isBuild) {
+      if (!ctx.isBuild) {
         return `export { createAdapter } from 'tessera-learn/runtime/adapters/index.js';`;
       }
 
-      let standard = readResolvedConfig(projectRoot, standardOverride).standard;
-
       // The audit renders headless with no LMS in the frame chain; the SCORM/
       // cmi5 adapters throw when their API is absent, so render with WebAdapter.
-      if (isAuditBuild()) standard = DEFAULT_STANDARD;
-
-      const profile = standardProfile(standard);
+      const profile = isAuditBuild() ? undefined : ctx.profile;
       if (profile?.packaged) return generateLmsAdapterModule(profile.id);
       return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
@@ -613,12 +564,13 @@ export function createAdapter(config, options) {
   );
 }
 
-function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
+function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
   return virtualModule(
+    ctx,
     'tessera:xapi-setup',
     'virtual:tessera-xapi-setup',
-    ({ projectRoot, isBuild }) => {
-      if (!isBuild) {
+    () => {
+      if (!ctx.isBuild) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 
@@ -627,8 +579,7 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
         return `export async function buildXAPIClient() { return null; }`;
       }
 
-      const read = readResolvedConfig(projectRoot, standardOverride);
-      const standard = read.standard;
+      const read = ctx.config;
       const entries =
         read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
       const hasExplicit = entries.some((e) => e?.endpoint !== 'lms');
@@ -636,7 +587,7 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
       // The launch standards (cmi5, plain xAPI) own a publisher the runtime
       // can share for `endpoint: 'lms'`, so wire the client regardless of
       // explicit xapi config.
-      if (hasExplicit || standardProfile(standard)?.hasLaunchLRS) {
+      if (hasExplicit || standardProfile(read.standard)?.hasLaunchLRS) {
         return `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`;
       }
 
@@ -645,22 +596,17 @@ function tesseraXAPISetupPlugin(standardOverride?: string): Plugin {
   );
 }
 
-function tesseraFirstPagePreloadPlugin(manifestRef: ManifestRef): Plugin {
-  let projectRoot: string;
-
+function tesseraFirstPagePreloadPlugin(ctx: BuildContext): Plugin {
   return {
     name: 'tessera:first-page-preload',
     apply: 'build',
-    configResolved(config) {
-      projectRoot = config.root;
-    },
     transformIndexHtml: {
       order: 'post',
-      handler(_html, ctx) {
-        const firstPagePath = manifestRef.current?.pages[0]?.importPath;
-        if (!firstPagePath || !ctx.bundle) return;
-        const normalized = normalizePath(join(projectRoot, firstPagePath));
-        const chunk = Object.values(ctx.bundle).find(
+      handler(_html, { bundle }) {
+        const firstPagePath = ctx.manifest?.pages[0]?.importPath;
+        if (!firstPagePath || !bundle) return;
+        const normalized = normalizePath(join(ctx.root, firstPagePath));
+        const chunk = Object.values(bundle).find(
           (c): c is Rollup.OutputChunk =>
             c.type === 'chunk' &&
             !!c.facadeModuleId &&

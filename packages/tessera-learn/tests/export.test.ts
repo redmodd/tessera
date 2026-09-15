@@ -337,7 +337,7 @@ describe('createZip', () => {
 describe('runExport', () => {
   it('web export does not create a zip', async () => {
     createDistDir(testRoot);
-    await runExport(testRoot, {
+    await runExport(testRoot, resolve(testRoot, 'dist'), {
       title: 'Test',
       version: '1.0.0',
       export: { standard: 'web' },
@@ -349,7 +349,7 @@ describe('runExport', () => {
 
   it('scorm12 export creates imsmanifest.xml and zip', async () => {
     createDistDir(testRoot);
-    await runExport(testRoot, {
+    await runExport(testRoot, resolve(testRoot, 'dist'), {
       title: 'Test Course',
       version: '2.0.0',
       export: { standard: 'scorm12' },
@@ -372,7 +372,7 @@ describe('runExport', () => {
 
   it('scorm2004 export creates imsmanifest.xml and zip', async () => {
     createDistDir(testRoot);
-    await runExport(testRoot, {
+    await runExport(testRoot, resolve(testRoot, 'dist'), {
       title: 'Test Course',
       version: '1.0.0',
       export: { standard: 'scorm2004' },
@@ -392,7 +392,7 @@ describe('runExport', () => {
 
   it('cmi5 export creates cmi5.xml and zip', async () => {
     createDistDir(testRoot);
-    await runExport(testRoot, {
+    await runExport(testRoot, resolve(testRoot, 'dist'), {
       title: 'Test Course',
       version: '1.0.0',
       scoring: { passingScore: 80 },
@@ -408,7 +408,7 @@ describe('runExport', () => {
 
   it('uses slugified title and version for zip filename', async () => {
     createDistDir(testRoot);
-    await runExport(testRoot, {
+    await runExport(testRoot, resolve(testRoot, 'dist'), {
       title: 'My Amazing Course!',
       version: '3.2.1',
       export: { standard: 'scorm12' },
@@ -417,5 +417,21 @@ describe('runExport', () => {
     expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
       true,
     );
+  });
+
+  it('writes the manifest into a custom outDir and zips it', async () => {
+    const outDir = resolve(testRoot, 'build');
+    mkdirSync(outDir);
+    writeFileSync(resolve(outDir, 'index.html'), '<html></html>', 'utf-8');
+    await runExport(testRoot, outDir, {
+      title: 'Test Course',
+      version: '1.0.0',
+      export: { standard: 'scorm12' },
+    });
+
+    const manifest = readFileSync(resolve(outDir, 'imsmanifest.xml'), 'utf-8');
+    expect(manifest).toContain('<file href="index.html" />');
+    expect(existsSync(resolve(testRoot, 'dist'))).toBe(false);
+    expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
   });
 });

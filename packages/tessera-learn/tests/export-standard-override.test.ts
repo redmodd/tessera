@@ -51,10 +51,15 @@ describe('readResolvedConfig', () => {
     });
   });
 
-  it('reports unknown for an unreadable config with no override', () => {
+  it('resolves no standard for an unreadable config with no override', () => {
     const read = readResolvedConfig(projectRoot);
     expect(read.ok).toBe(false);
-    expect(read.standard).toBe('unknown');
+    expect(read.standard).toBeUndefined();
+  });
+
+  it('resolves no standard for a value outside the table', () => {
+    writeConfig(`{ export: { standard: "scorm13" } }`);
+    expect(readResolvedConfig(projectRoot).standard).toBeUndefined();
   });
 
   it('honours the override even when the config is unreadable', () => {
@@ -67,13 +72,13 @@ describe('readResolvedConfig', () => {
 describe('validateProject standardOverride', () => {
   it('rejects an override outside the allowed set', () => {
     writeConfig(`{ export: { standard: "web" } }`);
-    const { errors } = validateProject(projectRoot, 'scorm13');
-    expect(errors.some((e) => e.includes('standardOverride'))).toBe(true);
+    const { errors } = validateProject(projectRoot, 'scorm13' as never);
+    expect(errors.some((e) => e.includes('"export.standard"'))).toBe(true);
   });
 
   it('accepts a valid override', () => {
     writeConfig(`{ export: { standard: "web" } }`);
     const { errors } = validateProject(projectRoot, 'cmi5');
-    expect(errors.some((e) => e.includes('standardOverride'))).toBe(false);
+    expect(errors.some((e) => e.includes('"export.standard"'))).toBe(false);
   });
 });

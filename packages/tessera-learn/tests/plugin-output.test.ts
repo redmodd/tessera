@@ -27,10 +27,24 @@ afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
 });
 
-function findPlugin(name: string): Plugin {
-  const plugin = (tesseraPlugin() as Plugin[]).find((p) => p.name === name);
-  if (!plugin) throw new Error(`plugin ${name} not found`);
-  return plugin;
+function resolvedPlugins(command = 'build'): (name: string) => Plugin {
+  const plugins = tesseraPlugin() as Plugin[];
+  const get = (name: string) => {
+    const plugin = plugins.find((p) => p.name === name);
+    if (!plugin) throw new Error(`plugin ${name} not found`);
+    return plugin;
+  };
+  const context = get('tessera:context');
+  (context.configResolved as any).call(context, {
+    root: projectRoot,
+    command,
+    build: { outDir: 'dist' },
+  });
+  return get;
+}
+
+function findPlugin(name: string, command?: string): Plugin {
+  return resolvedPlugins(command)(name);
 }
 
 function writeConfig(standard: string) {
@@ -54,7 +68,6 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
     );
 
     const plugin = findPlugin('tessera:manifest');
-    (plugin.configResolved as any).call(plugin, { root: projectRoot });
     const code = (plugin.load as any).handler.call({
       addWatchFile() {},
     }) as string;
@@ -69,11 +82,6 @@ describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
     const plugin = findPlugin('tessera:index-html');
-    (plugin.configResolved as any).call(plugin, {
-      root: projectRoot,
-      build: { outDir: 'dist' },
-      command: 'build',
-    });
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
@@ -85,11 +93,6 @@ describe('generated index.html Content-Security-Policy', () => {
       'utf-8',
     );
     const plugin = findPlugin('tessera:index-html');
-    (plugin.configResolved as any).call(plugin, {
-      root: projectRoot,
-      build: { outDir: 'dist' },
-      command: 'build',
-    });
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
@@ -114,11 +117,6 @@ describe('generated index.html Content-Security-Policy', () => {
       'utf-8',
     );
     const plugin = findPlugin('tessera:index-html');
-    (plugin.configResolved as any).call(plugin, {
-      root: projectRoot,
-      build: { outDir: 'dist' },
-      command: 'build',
-    });
     (plugin.buildStart as any).call(plugin);
     const html = readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
     expect(html).not.toContain('Content-Security-Policy');
@@ -157,12 +155,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
   it('omits the CSP meta from the dev server (would block Vite HMR)', async () => {
     writeConfig('web');
-    const plugin = findPlugin('tessera:index-html');
-    (plugin.configResolved as any).call(plugin, {
-      root: projectRoot,
-      build: { outDir: 'dist' },
-      command: 'serve',
-    });
+    const plugin = findPlugin('tessera:index-html', 'serve');
     let handler: any;
     const server = {
       middlewares: {
@@ -189,22 +182,10 @@ describe('generated index.html Content-Security-Policy', () => {
 
 describe('export packaging gate', () => {
   function buildPlugins() {
-    const plugins = tesseraPlugin() as Plugin[];
-    const get = (name: string) => {
-      const plugin = plugins.find((p) => p.name === name);
-      if (!plugin) throw new Error(`plugin ${name} not found`);
-      return plugin;
-    };
+    const get = resolvedPlugins();
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
-    for (const plugin of [entry, exporter, validation]) {
-      (plugin.configResolved as any).call(plugin, {
-        root: projectRoot,
-        command: 'build',
-        build: { outDir: 'dist' },
-      });
-    }
     (entry.buildStart as any).call(entry);
     return { entry, exporter, validation };
   }
@@ -389,10 +370,6 @@ describe('xapi setup virtual module', () => {
       'utf-8',
     );
     const plugin = findPlugin('tessera:xapi-setup');
-    (plugin.configResolved as any).call(plugin, {
-      root: projectRoot,
-      command: 'build',
-    });
     return (plugin.load as any).handler.call({});
   }
 
