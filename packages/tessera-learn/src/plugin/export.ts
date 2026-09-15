@@ -5,7 +5,7 @@ import {
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
@@ -323,6 +323,17 @@ export async function runExport(
       `✓ Web export: ${relative(projectRoot, outDir)}/ (${formatSize(totalSize)})`,
     );
     return;
+  }
+
+  const rootFromOut = relative(outDir, projectRoot);
+  if (
+    rootFromOut !== '..' &&
+    !rootFromOut.startsWith(`..${sep}`) &&
+    !isAbsolute(rootFromOut)
+  ) {
+    throw new Error(
+      `build.outDir (${outDir}) must not contain the project root; ${profile.name} export would package the whole project.`,
+    );
   }
 
   const spec = LMS_BUILD[profile.id];
