@@ -10,16 +10,14 @@ export interface AuditOptions {
   threshold?: ImpactLevel;
 }
 
-export type ImpactLevel = 'minor' | 'moderate' | 'serious' | 'critical';
+export const IMPACT_LEVELS = [
+  'minor',
+  'moderate',
+  'serious',
+  'critical',
+] as const;
 
-const IMPACT_RANK: Record<ImpactLevel, number> = {
-  minor: 1,
-  moderate: 2,
-  serious: 3,
-  critical: 4,
-};
-
-export const IMPACT_LEVELS = Object.keys(IMPACT_RANK) as ImpactLevel[];
+export type ImpactLevel = (typeof IMPACT_LEVELS)[number];
 
 // Set by runAudit during its build/preview; the plugin forces the WebAdapter,
 // skips export packaging, and stubs xAPI while it's set. See plugin/index.ts.
@@ -285,7 +283,7 @@ export async function launchWithInstall({
 // A violation with no impact is treated as failing rather than slipping the
 // gate at every threshold.
 function isFailing(v: AxeViolation, thresholdRank: number): boolean {
-  return !v.impact || IMPACT_RANK[v.impact] >= thresholdRank;
+  return !v.impact || IMPACT_LEVELS.indexOf(v.impact) >= thresholdRank;
 }
 
 // Optional deps loaded by variable specifier so tsc doesn't require them to be
@@ -479,7 +477,7 @@ export async function runAudit(
       await browser.close();
     }
 
-    const thresholdRank = IMPACT_RANK[threshold];
+    const thresholdRank = IMPACT_LEVELS.indexOf(threshold);
     let totalViolations = 0;
     let failingViolations = 0;
     let pagesFailedToLoad = 0;
@@ -522,7 +520,7 @@ export async function runAudit(
 }
 
 function printSummary(report: AuditReport, reportPath: string): void {
-  const thresholdRank = IMPACT_RANK[report.threshold];
+  const thresholdRank = IMPACT_LEVELS.indexOf(report.threshold);
   for (const p of report.pages) {
     if (p.loadFailed) {
       console.log(`\x1b[31m  ✗\x1b[0m ${p.title} — failed to load`);

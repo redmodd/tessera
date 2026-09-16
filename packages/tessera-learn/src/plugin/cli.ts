@@ -48,10 +48,10 @@ function courseCommand<T extends string>(command: {
   args: string[];
   summary: string;
   flag?: Flag<T>;
-  run(
+  run: (
     course: ResolvedCourse,
     flagValue: T | undefined,
-  ): number | Promise<number>;
+  ) => number | Promise<number>;
 }): Command {
   return { course: true, ...command };
 }
@@ -159,7 +159,13 @@ function parseCommandArgs(
   try {
     parsed = parseArgs({ args, options, allowPositionals: true });
   } catch (error) {
-    return { error: (error as Error).message };
+    const { code, message } = error as NodeJS.ErrnoException;
+    return {
+      error:
+        code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION'
+          ? message.split('. ')[0]
+          : message,
+    };
   }
   const { values, positionals } = parsed;
   if (values.help) return { help: true, positionals };
@@ -168,10 +174,9 @@ function parseCommandArgs(
     return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
   }
 
-  const flagValue = flag ? values[flag.name] : undefined;
-  if (!flag || typeof flagValue !== 'string') {
-    return { help: false, positionals };
-  }
+  if (!flag) return { help: false, positionals };
+  const flagValue = values[flag.name];
+  if (typeof flagValue !== 'string') return { help: false, positionals };
   if (!flag.choices.includes(flagValue)) {
     return {
       error: `--${flag.name} must be one of: ${flag.choices.join(', ')}, got "${flagValue}"`,
