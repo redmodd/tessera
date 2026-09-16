@@ -132,15 +132,15 @@ function formatUsage(): string {
   );
 
   const flags = [...new Set(entries.flatMap(([, { flag }]) => flag ?? []))];
-  const specs = new Map(
-    flags.map((flag) => [flag, `--${flag.name} <${flag.choices.join('|')}>`]),
+  const specs = flags.map(
+    (flag) => `--${flag.name} <${flag.choices.join('|')}>`,
   );
-  const specWidth = column([...specs.values()]);
-  const flagBlocks = flags.map((flag) => {
+  const specWidth = column(specs);
+  const flagBlocks = flags.map((flag, i) => {
     const users = entries
       .filter(([, command]) => command.flag === flag)
       .map(([name]) => name);
-    return `${users.join('/')} options:\n  ${specs.get(flag)!.padEnd(specWidth)}${flag.description}`;
+    return `${users.join('/')} options:\n  ${specs[i].padEnd(specWidth)}${flag.description}`;
   });
 
   return [
@@ -180,6 +180,10 @@ function parseCommandArgs(
   }
   const { values, positionals } = parsed;
 
+  const required = synopsis.filter((arg) => arg.startsWith('<')).length;
+  if (positionals.length < required) {
+    return { error: `Missing argument: ${synopsis[positionals.length]}` };
+  }
   if (positionals.length > synopsis.length) {
     return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
   }

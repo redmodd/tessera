@@ -8,12 +8,7 @@ import { resolvePackageRoot } from './package-root.js';
 
 // `tessera new <name>` — stamp a new course into courses/<name> inside the
 // current workspace. No install step: the workspace already owns the deps.
-export function runNew(name: string | undefined, cwd: string): number {
-  if (!name) {
-    console.error('Usage: tessera new <name>');
-    return 1;
-  }
-
+export function runNew(name: string, cwd: string): number {
   const nameError = validateProjectName(name, 'Course name');
   if (nameError) {
     console.error(`[tessera new] ${nameError}`);

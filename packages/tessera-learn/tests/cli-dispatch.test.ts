@@ -157,6 +157,11 @@ describe('main dispatch', () => {
     [['dev', 'getting-started', '--standard', 'web'], "'--standard'"],
     [['check', 'getting-started', 'extra'], 'Unexpected argument: extra'],
     [['new', 'second', '--wat'], "Unknown option '--wat'"],
+    [['new'], '[tessera new] Missing argument: <name>'],
+    [
+      ['duplicate', 'getting-started'],
+      '[tessera duplicate] Missing argument: <new>',
+    ],
     [
       ['duplicate', 'getting-started', 'copy', 'extra'],
       'Unexpected argument: extra',

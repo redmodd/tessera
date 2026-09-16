@@ -211,15 +211,6 @@ describe('runDuplicate', () => {
     expect(readCopyConfig()).toContain("makeConfig('src')");
   });
 
-  it('requires both arguments', () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(runDuplicate('src', undefined, ws)).toBe(1);
-    expect(runDuplicate(undefined, 'copy', ws)).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain(
-      'Usage: tessera duplicate',
-    );
-  });
-
   it('rejects an invalid <new> name', () => {
     seedCourse('src');
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});

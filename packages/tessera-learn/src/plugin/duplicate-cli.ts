@@ -52,15 +52,10 @@ function skip(srcPath: string): boolean {
 // the current workspace. Unlike `new`, there is no template stamping: the JS
 // config (including its title) is copied untouched.
 export function runDuplicate(
-  source: string | undefined,
-  target: string | undefined,
+  source: string,
+  target: string,
   cwd: string,
 ): number {
-  if (!source || !target) {
-    console.error('Usage: tessera duplicate <source> <new>');
-    return 1;
-  }
-
   const nameError = validateProjectName(target, 'Course name');
   if (nameError) {
     console.error(`[tessera duplicate] ${nameError}`);
