@@ -84,18 +84,4 @@ describe('runNew', () => {
       'workspace',
     );
   });
-
-  it('requires a name', () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const code = runNew(undefined, ws);
-    expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('tessera new');
-  });
-
-  it('prints usage and returns 0 for --help', () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const code = runNew('--help', ws);
-    expect(code).toBe(0);
-    expect(log.mock.calls.flat().join(' ')).toContain('Usage: tessera new');
-  });
 });

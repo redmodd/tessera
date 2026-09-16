@@ -24,6 +24,10 @@ describe('tessera CLI dispatcher', () => {
     for (const argv of [
       ['a11y', '--help'],
       ['check', '-h'],
+      ['new', '--help'],
+      ['duplicate', '--help'],
+      ['duplicate', 'src', '-h'],
+      ['export', '--bogus', '--help'],
     ]) {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       const code = await main(argv);
@@ -31,5 +35,13 @@ describe('tessera CLI dispatcher', () => {
       expect(log.mock.calls.flat().join(' ')).toContain('Usage: tessera');
       vi.restoreAllMocks();
     }
+  });
+
+  it('lists each flag once, under the commands that take it', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await main(['--help']);
+    const usage = log.mock.calls.flat().join('\n');
+    expect(usage).toMatch(/^export\/validate options:\n {2}--standard </m);
+    expect(usage).toMatch(/^a11y\/check options:\n {2}--threshold <minor\|/m);
   });
 });

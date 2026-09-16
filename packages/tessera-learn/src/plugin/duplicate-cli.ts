@@ -38,10 +38,6 @@ function reidentifyCourse(courseRoot: string): void {
   );
 }
 
-const HELP =
-  'Usage: tessera duplicate <source> <new>\n\n' +
-  'Copy courses/<source>/ to courses/<new>/ within the current workspace.';
-
 // Generated/build artifacts that should never travel with a verbatim copy. The
 // a11y throwaway build and Vite's cache live under node_modules, so they're
 // already pruned by the node_modules skip; the rest are belt-and-suspenders.
@@ -56,24 +52,10 @@ function skip(srcPath: string): boolean {
 // the current workspace. Unlike `new`, there is no template stamping: the JS
 // config (including its title) is copied untouched.
 export function runDuplicate(
-  source: string | undefined,
-  target: string | undefined,
+  source: string,
+  target: string,
   cwd: string,
 ): number {
-  if (
-    source === '--help' ||
-    source === '-h' ||
-    target === '--help' ||
-    target === '-h'
-  ) {
-    console.log(HELP);
-    return 0;
-  }
-  if (!source || !target) {
-    console.error('Usage: tessera duplicate <source> <new>');
-    return 1;
-  }
-
   const nameError = validateProjectName(target, 'Course name');
   if (nameError) {
     console.error(`[tessera duplicate] ${nameError}`);
