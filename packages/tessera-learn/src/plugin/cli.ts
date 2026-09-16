@@ -7,32 +7,36 @@ import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse, type ResolvedCourse } from './course-root.js';
 import { STANDARD_IDS, type StandardId } from '../runtime/standards.js';
 
-interface Flag {
+interface Flag<T extends string = string> {
   name: string;
-  choices: readonly string[];
+  choices: readonly T[];
   description: string;
 }
 
-const STANDARD_FLAG: Flag = {
+const STANDARD_FLAG: Flag<StandardId> = {
   name: 'standard',
   choices: STANDARD_IDS,
   description: 'Override course.config.js export.standard',
 };
 
-const THRESHOLD_FLAG: Flag = {
+const THRESHOLD_FLAG: Flag<ImpactLevel> = {
   name: 'threshold',
   choices: IMPACT_LEVELS,
   description: 'Failing impact (default: serious)',
 };
 
 type Command = {
-  args: string;
+  args: string[];
   summary: string;
-  flag?: Flag;
 } & (
-  | { course: false; run(positionals: string[], cwd: string): number }
+  | {
+      course: false;
+      flag?: never;
+      run(positionals: string[], cwd: string): number;
+    }
   | {
       course: true;
+      flag?: Flag;
       run(
         course: ResolvedCourse,
         flagValue: string | undefined,
@@ -40,71 +44,78 @@ type Command = {
     }
 );
 
+function courseCommand<T extends string>(command: {
+  args: string[];
+  summary: string;
+  flag?: Flag<T>;
+  run(
+    course: ResolvedCourse,
+    flagValue: T | undefined,
+  ): number | Promise<number>;
+}): Command {
+  return { course: true, ...command };
+}
+
 const COMMANDS: Record<string, Command> = {
   new: {
     course: false,
-    args: '<name>',
+    args: ['<name>'],
     summary: 'Scaffold a new course into courses/<name>',
     run: ([name], cwd) => runNew(name, cwd),
   },
   duplicate: {
     course: false,
-    args: '<source> <new>',
+    args: ['<source>', '<new>'],
     summary: 'Copy courses/<source> to courses/<new>',
     run: ([source, target], cwd) => runDuplicate(source, target, cwd),
   },
-  dev: {
-    course: true,
-    args: '[course]',
+  dev: courseCommand({
+    args: ['[course]'],
     summary: 'Start the Vite dev server',
     run: async ({ courseRoot, workspaceRoot }) =>
       (await import('./build-commands.js')).runDev(courseRoot, workspaceRoot),
-  },
-  export: {
-    course: true,
-    args: '[course]',
+  }),
+  export: courseCommand({
+    args: ['[course]'],
     summary: 'Build and package the course for its LMS standard',
     flag: STANDARD_FLAG,
     run: async ({ courseRoot, workspaceRoot }, standard) =>
       (await import('./build-commands.js')).runBuild(
         courseRoot,
         workspaceRoot,
-        standard as StandardId | undefined,
+        standard,
       ),
-  },
-  validate: {
-    course: true,
-    args: '[course]',
+  }),
+  validate: courseCommand({
+    args: ['[course]'],
     summary: 'Fast static structure checks',
     flag: STANDARD_FLAG,
     run: ({ courseRoot }, standard) =>
       runValidate(courseRoot, {
-        standardOverride: standard as StandardId | undefined,
+        standardOverride: standard,
       }),
-  },
-  a11y: {
-    course: true,
-    args: '[course]',
+  }),
+  a11y: courseCommand({
+    args: ['[course]'],
     summary: 'Runtime accessibility audit (builds + drives Playwright)',
     flag: THRESHOLD_FLAG,
     run: ({ courseRoot, workspaceRoot }, threshold) =>
       runAudit(courseRoot, workspaceRoot, {
-        threshold: threshold as ImpactLevel | undefined,
+        threshold,
       }),
-  },
-  check: {
-    course: true,
-    args: '[course]',
+  }),
+  check: courseCommand({
+    args: ['[course]'],
     summary: 'Run validate, then a11y',
     flag: THRESHOLD_FLAG,
     run: ({ courseRoot, workspaceRoot }, threshold) => {
       const validateCode = runValidate(courseRoot, { showA11yTip: false });
       if (validateCode !== 0) return validateCode;
       return runAudit(courseRoot, workspaceRoot, {
-        threshold: threshold as ImpactLevel | undefined,
+        threshold,
       });
     },
-  },
+  }),
 };
 
 function formatUsage(): string {
@@ -115,7 +126,7 @@ function formatUsage(): string {
   }
   const commandLines = entries.map(
     ([name, { args, summary }]) =>
-      `  ${`${name} ${args}`.padEnd(28)}${summary}`,
+      `  ${`${name} ${args.join(' ')}`.padEnd(28)}${summary}`,
   );
   const flagBlocks = [...flagUsers].map(
     ([{ name, choices, description }, users]) =>
@@ -134,7 +145,7 @@ const USAGE = formatUsage();
 // Flag values are checked here, before the course resolves, so an unknown
 // standard fails before Vite spins up.
 function parseCommandArgs(
-  { args: synopsis, flag }: Command,
+  { args: synopsis, flag }: { args: string[]; flag?: Flag },
   args: string[],
 ):
   | { error: string }
@@ -153,9 +164,8 @@ function parseCommandArgs(
   const { values, positionals } = parsed;
   if (values.help) return { help: true, positionals };
 
-  const maxPositionals = synopsis.split(' ').length;
-  if (positionals.length > maxPositionals) {
-    return { error: `Unexpected argument: ${positionals[maxPositionals]}` };
+  if (positionals.length > synopsis.length) {
+    return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
   }
 
   const flagValue = flag ? values[flag.name] : undefined;
