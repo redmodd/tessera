@@ -118,20 +118,31 @@ const COMMANDS: Record<string, Command> = {
   }),
 };
 
+function column(values: string[]): number {
+  return Math.max(...values.map((value) => value.length)) + 2;
+}
+
 function formatUsage(): string {
   const entries = Object.entries(COMMANDS);
-  const flagUsers = new Map<Flag, string[]>();
-  for (const [name, { flag }] of entries) {
-    if (flag) flagUsers.set(flag, [...(flagUsers.get(flag) ?? []), name]);
-  }
+  const nameWidth = column(entries.map(([name]) => name));
+  const argsWidth = column(entries.map(([, { args }]) => args.join(' ')));
   const commandLines = entries.map(
     ([name, { args, summary }]) =>
-      `  ${`${name} ${args.join(' ')}`.padEnd(28)}${summary}`,
+      `  ${name.padEnd(nameWidth)}${args.join(' ').padEnd(argsWidth)}${summary}`,
   );
-  const flagBlocks = [...flagUsers].map(
-    ([{ name, choices, description }, users]) =>
-      `${users.join('/')} options:\n  ${`--${name} <${choices.join('|')}>`.padEnd(48)}${description}`,
+
+  const flags = [...new Set(entries.flatMap(([, { flag }]) => flag ?? []))];
+  const specs = new Map(
+    flags.map((flag) => [flag, `--${flag.name} <${flag.choices.join('|')}>`]),
   );
+  const specWidth = column([...specs.values()]);
+  const flagBlocks = flags.map((flag) => {
+    const users = entries
+      .filter(([, command]) => command.flag === flag)
+      .map(([name]) => name);
+    return `${users.join('/')} options:\n  ${specs.get(flag)!.padEnd(specWidth)}${flag.description}`;
+  });
+
   return [
     'Usage: tessera <command> [course] [options]',
     `Commands:\n${commandLines.join('\n')}`,
@@ -150,25 +161,24 @@ function parseCommandArgs(
 ):
   | { error: string }
   | { help: boolean; positionals: string[]; flagValue?: string } {
-  const options: ParseArgsOptionsConfig = {
-    help: { type: 'boolean', short: 'h' },
-  };
+  if (args.includes('--help') || args.includes('-h')) {
+    return { help: true, positionals: [] };
+  }
+
+  const options: ParseArgsOptionsConfig = {};
   if (flag) options[flag.name] = { type: 'string' };
 
   let parsed;
   try {
     parsed = parseArgs({ args, options, allowPositionals: true });
   } catch (error) {
-    const { code, message } = error as NodeJS.ErrnoException;
-    return {
-      error:
-        code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION'
-          ? message.split('. ')[0]
-          : message,
-    };
+    const { code, message } = error as Error & { code?: string };
+    if (flag && code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
+      return { error: `--${flag.name} requires a value` };
+    }
+    return { error: message.split('\n')[0].split('. ')[0] };
   }
   const { values, positionals } = parsed;
-  if (values.help) return { help: true, positionals };
 
   if (positionals.length > synopsis.length) {
     return { error: `Unexpected argument: ${positionals[synopsis.length]}` };

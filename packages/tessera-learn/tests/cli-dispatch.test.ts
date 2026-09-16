@@ -119,16 +119,40 @@ describe('main dispatch', () => {
     });
   });
 
+  it('reports a flag-shaped value as a missing value', async () => {
+    expect(
+      await main(['export', 'getting-started', '--standard', '--wat'], ws),
+    ).toBe(1);
+    expect(stderr()).toBe('[tessera export] --standard requires a value');
+  });
+
+  it('skips the audit when check fails validation', async () => {
+    runValidate.mockReturnValueOnce(1);
+    expect(await main(['check', 'getting-started'], ws)).toBe(1);
+    expect(runAudit).not.toHaveBeenCalled();
+  });
+
   it.each([
     [['export', 'getting-started', '--standard', 'bogus'], 'got "bogus"'],
     [['validate', 'getting-started', '--standard=bogus'], 'got "bogus"'],
-    [['export', 'getting-started', '--standard'], 'argument missing'],
+    [
+      ['export', 'getting-started', '--standard'],
+      '--standard requires a value',
+    ],
+    [
+      ['export', 'getting-started', '--standard', 'web', '--standard', '--wat'],
+      '--standard requires a value',
+    ],
     [['export', 'getting-started', '--standrd', 'scorm2004'], "'--standrd'"],
     [
       ['a11y', 'getting-started', '--threshold', 'nope'],
       '--threshold must be one of',
     ],
     [['a11y', 'getting-started', '--build'], "Unknown option '--build'"],
+    [
+      ['a11y', 'getting-started', '--threshold'],
+      '--threshold requires a value',
+    ],
     [['a11y', 'nope', '--wat'], "[tessera a11y] Unknown option '--wat'"],
     [['dev', 'getting-started', '--standard', 'web'], "'--standard'"],
     [['check', 'getting-started', 'extra'], 'Unexpected argument: extra'],

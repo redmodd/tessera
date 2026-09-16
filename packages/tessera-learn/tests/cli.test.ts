@@ -27,6 +27,7 @@ describe('tessera CLI dispatcher', () => {
       ['new', '--help'],
       ['duplicate', '--help'],
       ['duplicate', 'src', '-h'],
+      ['export', '--bogus', '--help'],
     ]) {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       const code = await main(argv);
@@ -42,5 +43,19 @@ describe('tessera CLI dispatcher', () => {
     const usage = log.mock.calls.flat().join('\n');
     expect(usage).toMatch(/^export\/validate options:\n {2}--standard </m);
     expect(usage).toMatch(/^a11y\/check options:\n {2}--threshold <minor\|/m);
+  });
+
+  it('aligns the argument and summary columns in the command list', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await main(['--help']);
+    const usage = log.mock.calls.flat().join('\n');
+    const commandLines = usage.split('\n\n')[1].split('\n').slice(1);
+    expect(commandLines).toHaveLength(7);
+    const columns = commandLines.map((line) =>
+      [...line.matchAll(/ {2,}\S/g)]
+        .map((match) => match.index + match[0].length - 1)
+        .join(','),
+    );
+    expect(new Set(columns).size).toBe(1);
   });
 });
