@@ -118,29 +118,35 @@ const COMMANDS: Record<string, Command> = {
   }),
 };
 
-function column(values: string[]): number {
+function padWidth(values: string[]): number {
   return Math.max(...values.map((value) => value.length)) + 2;
 }
 
 function formatUsage(): string {
   const entries = Object.entries(COMMANDS);
-  const nameWidth = column(entries.map(([name]) => name));
-  const argsWidth = column(entries.map(([, { args }]) => args.join(' ')));
+  const nameWidth = padWidth(entries.map(([name]) => name));
+  const argsWidth = padWidth(entries.map(([, { args }]) => args.join(' ')));
   const commandLines = entries.map(
     ([name, { args, summary }]) =>
       `  ${name.padEnd(nameWidth)}${args.join(' ').padEnd(argsWidth)}${summary}`,
   );
 
-  const flags = [...new Set(entries.flatMap(([, { flag }]) => flag ?? []))];
-  const specs = flags.map(
-    (flag) => `--${flag.name} <${flag.choices.join('|')}>`,
-  );
-  const specWidth = column(specs);
-  const flagBlocks = flags.map((flag, i) => {
+  const flags = [
+    ...new Set(
+      entries
+        .map(([, command]) => command.flag)
+        .filter((flag) => flag !== undefined),
+    ),
+  ].map((flag) => ({
+    flag,
+    spec: `--${flag.name} <${flag.choices.join('|')}>`,
+  }));
+  const specWidth = padWidth(flags.map(({ spec }) => spec));
+  const flagBlocks = flags.map(({ flag, spec }) => {
     const users = entries
       .filter(([, command]) => command.flag === flag)
       .map(([name]) => name);
-    return `${users.join('/')} options:\n  ${specs[i].padEnd(specWidth)}${flag.description}`;
+    return `${users.join('/')} options:\n  ${spec.padEnd(specWidth)}${flag.description}`;
   });
 
   return [
@@ -160,9 +166,10 @@ function parseCommandArgs(
   args: string[],
 ):
   | { error: string }
-  | { help: boolean; positionals: string[]; flagValue?: string } {
+  | { help: true }
+  | { help: false; positionals: string[]; flagValue?: string } {
   if (args.includes('--help') || args.includes('-h')) {
-    return { help: true, positionals: [] };
+    return { help: true };
   }
 
   const options: ParseArgsOptionsConfig = {};
@@ -176,7 +183,7 @@ function parseCommandArgs(
     if (flag && code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
       return { error: `--${flag.name} requires a value` };
     }
-    return { error: message.split('\n')[0].split('. ')[0] };
+    return { error: message.split('. ')[0] };
   }
   const { values, positionals } = parsed;
 
