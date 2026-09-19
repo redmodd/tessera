@@ -4,6 +4,7 @@ import {
   type SCORM12API,
 } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import { validateAgent } from '../src/runtime/xapi/validation.js';
 import { scorm12Api } from './helpers.js';
 
 /** Wait for the async write queue to flush */
@@ -597,6 +598,40 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/Incorrect Data Type/);
       expect(messages).toMatch(/student_response invalid CMIFeedback/);
       warn.mockRestore();
+    });
+  });
+
+  describe('deriveActor', () => {
+    const activityId = 'https://example.com/courses/1';
+
+    it('builds an Identified Agent from cmi.core.student_id / student_name', () => {
+      const adapter = new SCORM12Adapter(
+        scorm12Api({
+          'cmi.core.student_id': 'student-42',
+          'cmi.core.student_name': 'Ada Lovelace',
+        }),
+      );
+      const actor = adapter.deriveActor(activityId);
+      expect(actor).toEqual({
+        account: { homePage: 'https://example.com', name: 'student-42' },
+        name: 'Ada Lovelace',
+        objectType: 'Agent',
+      });
+      expect(validateAgent(actor)).toBeNull();
+    });
+
+    it('honors an actorAccountHomePage override', () => {
+      const adapter = new SCORM12Adapter(
+        scorm12Api({ 'cmi.core.student_id': 'sid' }),
+      );
+      expect(
+        adapter.deriveActor(activityId, 'https://lms.example.com')?.account
+          ?.homePage,
+      ).toBe('https://lms.example.com');
+    });
+
+    it('returns null when the LMS has no learner id', () => {
+      expect(adapter.deriveActor(activityId)).toBeNull();
     });
   });
 });

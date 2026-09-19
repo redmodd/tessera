@@ -614,4 +614,20 @@ describe('SCORM2004Adapter', () => {
       ).toBe(true);
     });
   });
+
+  describe('deriveActor', () => {
+    it('reads cmi.learner_id / cmi.learner_name', () => {
+      const adapter = new SCORM2004Adapter(
+        scorm2004Api({
+          'cmi.learner_id': 'learner-7',
+          'cmi.learner_name': 'Grace Hopper',
+        }),
+      );
+      expect(adapter.deriveActor('https://example.com/courses/1')).toEqual({
+        account: { homePage: 'https://example.com', name: 'learner-7' },
+        name: 'Grace Hopper',
+        objectType: 'Agent',
+      });
+    });
+  });
 });
