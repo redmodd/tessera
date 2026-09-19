@@ -831,14 +831,15 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
     });
 
+    const threeGradedQuizzes = createManifest(3, {
+      0: { graded: true },
+      1: { graded: true },
+      2: { graded: true },
+    });
+
     it('judges pass/fail on the 2-decimal average it reports', () => {
-      const manifest = createManifest(3, {
-        0: { graded: true },
-        1: { graded: true },
-        2: { graded: true },
-      });
       const progress = new ProgressState(
-        manifest,
+        threeGradedQuizzes,
         createConfig({ scoring: { passingScore: 66.66667 } }),
       );
 
@@ -851,12 +852,7 @@ describe('ProgressState', () => {
     });
 
     it('fails an average that would round up to the pass mark', () => {
-      const manifest = createManifest(3, {
-        0: { graded: true },
-        1: { graded: true },
-        2: { graded: true },
-      });
-      const progress = new ProgressState(manifest, createConfig());
+      const progress = new ProgressState(threeGradedQuizzes, createConfig());
 
       progress.quizCompleted(0, 67);
       progress.quizCompleted(1, 67);

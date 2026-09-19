@@ -31,6 +31,16 @@ const manifest = {
   totalPages: 2,
 };
 
+function savedWith(fields: object) {
+  return {
+    b: 1,
+    v: [0, 1],
+    d: 120,
+    f: structureFingerprint(manifest),
+    ...fields,
+  };
+}
+
 function makeConfig(resume: 'auto' | 'never') {
   return {
     title: 'Demo',
@@ -128,15 +138,7 @@ describe('App restore gate honours config.resume', () => {
   it('leaves a malformed saved record untouched', async () => {
     const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, seedLifecycle, setCompletionStatus, unmount } =
-      await mountApp('auto', {
-        saved: {
-          b: 1,
-          v: [0, 1],
-          g: [],
-          d: 120,
-          f: structureFingerprint(manifest),
-        },
-      });
+      await mountApp('auto', { saved: savedWith({ g: [] }) });
     cleanup = () => {
       unmount(component);
       warns.mockRestore();
@@ -147,14 +149,10 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('restores every optional field intact', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
+    const saved = savedWith({
       c: { '1': 2 },
       g: { '0': { s: 80, a: 3 }, '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
+    });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
@@ -167,13 +165,7 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
-      f: structureFingerprint(manifest),
-    };
+    const saved = savedWith({ g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } } });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
@@ -183,15 +175,8 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('saves a restored answer whose question is no longer graded as ungraded', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
     const { component, saveState, unmount } = await mountApp('auto', {
-      saved,
+      saved: savedWith({ g: { '1': { q: { q1: 100 } } } }),
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
     cleanup = () => unmount(component);
@@ -201,13 +186,9 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  const scoredSave = {
-    b: 1,
-    v: [0, 1],
-    d: 120,
+  const scoredSave = savedWith({
     g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
-    f: structureFingerprint(manifest),
-  };
+  });
 
   it('reports no score for a resume that only restores what was saved', async () => {
     const { component, saveState, seedLifecycle, setScore, unmount } =

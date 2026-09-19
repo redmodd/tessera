@@ -35,6 +35,10 @@ export function formatReal107(value: number): string {
     .replace(/\.$/, '');
 }
 
+export function toScaled(score: number): number {
+  return Math.round(Math.max(0, Math.min(1, score / 100)) * 1e7) / 1e7;
+}
+
 /**
  * SCORM 2004 4E §3.3.10.1 references ISO 8601 §5.3.3 — local date+time, no
  * zone designator. Strict validators reject `Z`, `±hh:mm`, and fractional

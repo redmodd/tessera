@@ -9,6 +9,7 @@ import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
+  toScaled,
 } from './format.js';
 import { STANDARDS } from '../standards.js';
 
@@ -86,10 +87,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     this.set('cmi.score.min', '0');
     this.set('cmi.score.max', '100');
     // §4.2.4.3.5 — score.scaled is bounded to [-1, 1].
-    this.set(
-      'cmi.score.scaled',
-      formatReal107(Math.max(0, Math.min(1, score / 100))),
-    );
+    this.set('cmi.score.scaled', formatReal107(toScaled(score)));
   }
 
   setCompletionStatus(status: CompletionStatus): void {

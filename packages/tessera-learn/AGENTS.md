@@ -874,10 +874,9 @@ function useProgress(): {
 };
 ```
 
-A standalone-question page renders no score on its own, so read `pageScore` and print one.
+A standalone-question page renders no score on its own, so read `pageScore` and print it as is.
 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
-- **Print it as is.** It's already rounded to 2 decimal places.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
 `gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `completion.mode: "manual"`, where `requireSuccessStatus` sets it on `markComplete()`.
