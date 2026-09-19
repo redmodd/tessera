@@ -717,7 +717,11 @@ describe('manual completion — adapter integration', () => {
 // 5. Persistence — m: 1 round-trip
 // ============================================================================
 
-import type { SavedState } from '../src/runtime/persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../src/runtime/persistence.js';
 
 describe('manual completion — persistence', () => {
   it('serializes m: 1 only when manuallyCompleted is true', () => {
@@ -856,13 +860,13 @@ describe('manual completion — live success-status push', () => {
   function makeStatusPusher(
     progress: ProgressState,
     adapter: {
-      setCompletionStatus(s: 'incomplete' | 'complete'): void;
-      setSuccessStatus(s: 'unknown' | 'passed' | 'failed'): void;
+      setCompletionStatus(s: CompletionStatus): void;
+      setSuccessStatus(s: SuccessStatus): void;
       commit(): void;
     },
   ) {
-    let prevCompletion: 'incomplete' | 'complete' = progress.completionStatus;
-    let prevSuccess: 'unknown' | 'passed' | 'failed' = progress.successStatus;
+    let prevCompletion: CompletionStatus = progress.completionStatus;
+    let prevSuccess: SuccessStatus = progress.successStatus;
     return () => {
       if (progress.completionStatus !== prevCompletion) {
         prevCompletion = progress.completionStatus;
