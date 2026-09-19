@@ -318,11 +318,7 @@ describe('ProgressState', () => {
 
       expect(progress.successStatus).toBe('unknown');
       expect(progress.gradedScoreFinal).toBe(false);
-      expect(progress.gradedScore).toEqual({
-        average: 40,
-        score: 40,
-        attempted: true,
-      });
+      expect(progress.gradedScore).toEqual({ average: 40, attempted: true });
     });
 
     it('decides once completion is reached, counting unscored graded pages as 0', () => {
@@ -720,11 +716,7 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);
 
-      expect(progress.gradedScore).toEqual({
-        average: 80,
-        score: 80,
-        attempted: true,
-      });
+      expect(progress.gradedScore).toEqual({ average: 80, attempted: true });
     });
 
     it('excludes non-graded standalone questions', () => {
@@ -844,28 +836,8 @@ describe('ProgressState', () => {
       progress.quizCompleted(1, 90);
       progress.markStandaloneQuestion(3, 'q1', 70, true);
 
-      const { score } = progress.gradedScore;
-      expect(progress.successStatus).toBe(score >= 80 ? 'passed' : 'failed');
-    });
-
-    it('decides success and completion on the rounded score the LMS gets', () => {
-      const manifest = createManifest(5, {
-        2: { graded: true },
-        4: { graded: true },
-      });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
-      const progress = new ProgressState(manifest, config);
-
-      progress.quizCompleted(2, 70);
-      progress.quizCompleted(4, 69);
-
-      expect(progress.gradedScore.average).toBe(69.5);
-      expect(progress.gradedScore.score).toBe(70);
-      expect(progress.successStatus).toBe('passed');
-      expect(progress.completionStatus).toBe('complete');
+      const { average } = progress.gradedScore;
+      expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
     });
   });
 

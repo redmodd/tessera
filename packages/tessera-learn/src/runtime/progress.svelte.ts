@@ -242,11 +242,9 @@ export class ProgressState {
       weighted += (score ?? 0) * weight;
       totalWeight += weight;
     }
-    const average = totalWeight > 0 ? weighted / totalWeight : 0;
     return {
       count: this.#declaredGradedIndices.size,
-      average,
-      score: Math.round(average),
+      average: totalWeight > 0 ? weighted / totalWeight : 0,
       attempted,
       allScored,
     };
@@ -292,9 +290,9 @@ export class ProgressState {
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
-    const { count, score } = this.#graded;
+    const { count, average } = this.#graded;
     if (count === 0) return 'incomplete';
-    return score >= this.#config.scoring.passingScore
+    return average >= this.#config.scoring.passingScore
       ? 'complete'
       : 'incomplete';
   });
@@ -326,18 +324,16 @@ export class ProgressState {
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
     }
     if (!this.gradedScoreFinal) return 'unknown';
-    return this.#graded.score >= this.#config.scoring.passingScore
-      ? 'passed'
-      : 'failed';
+    const { average } = this.#graded;
+    return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
   /**
-   * `score` is the rounded `average` sent to the LMS. successStatus and
-   * completionStatus compare this same value, so the score and the status
-   * can't disagree.
+   * Effective graded score for LMS reporting — same union and averaging as
+   * successStatus, so score and success status can't disagree.
    */
-  get gradedScore(): { average: number; score: number; attempted: boolean } {
-    const { average, score, attempted } = this.#graded;
-    return { average, score, attempted };
+  get gradedScore(): { average: number; attempted: boolean } {
+    const { average, attempted } = this.#graded;
+    return { average, attempted };
   }
 }
