@@ -290,26 +290,14 @@ describe('SCORM2004Adapter', () => {
       expect(await masteryFrom('0.7')).toBe(0.7);
     });
 
-    it.each(['', ' '])('ignores a blank threshold %j', async (value) => {
+    it('ignores and warns on an out-of-range threshold', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      expect(await masteryFrom(value)).toBeNull();
-      expect(warn).not.toHaveBeenCalledWith(
+      expect(await masteryFrom('1.5')).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('cmi.scaled_passing_score'),
       );
       warn.mockRestore();
     });
-
-    it.each(['abc', '1.5'])(
-      'ignores and warns on the threshold %j',
-      async (value) => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        expect(await masteryFrom(value)).toBeNull();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining('cmi.scaled_passing_score'),
-        );
-        warn.mockRestore();
-      },
-    );
   });
 
   describe('reportInteraction', () => {

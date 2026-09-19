@@ -13,8 +13,9 @@ import {
   interactionWrites,
   openGradedQuiz,
   reportedQuestionCount,
+  scormData,
+  scormLog,
   startPreview,
-  waitForScormCall,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
@@ -64,9 +65,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
+    const log = await scormLog(page);
     const verbs = log.map((entry) => entry[0]);
     expect(verbs).toContain('LMSInitialize');
     // First read after init should be suspend_data
@@ -91,10 +90,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await expect
       .poll(
         async () => {
-          const data = await page.evaluate(() =>
-            (window as any).__scormDataSnapshot(),
-          );
-          const raw = data['cmi.suspend_data'];
+          const raw = (await scormData(page))['cmi.suspend_data'];
           if (!raw) return 0;
           try {
             const state = JSON.parse(raw);
@@ -107,9 +103,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       )
       .toBeGreaterThanOrEqual(3);
 
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
+    const data = await scormData(page);
     const state = JSON.parse(data['cmi.suspend_data']);
     expect(state).toHaveProperty('b');
     expect(state.b).toBeGreaterThan(0); // not on first page
@@ -129,10 +123,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       'Callouts & Images',
     );
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.suspend_data',
-    );
+    await expect
+      .poll(() => scormLog(page))
+      .toContainEqual(['LMSSetValue', 'cmi.suspend_data', expect.any(String)]);
 
     // Simulate re-launch by reloading the page. sessionStorage preserves mock
     // data across the reload, which is what the LMS would do.
@@ -197,20 +190,15 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
-    // Wait for the SCORM score to be committed
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.core.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.core.score.raw']).toBe('100');
-    expect(data['cmi.core.score.min']).toBe('0');
-    expect(data['cmi.core.score.max']).toBe('100');
-    // All answers correct → lesson_status should reflect passed (success takes priority)
-    expect(data['cmi.core.lesson_status']).toBe('passed');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '100',
+        'cmi.core.score.min': '0',
+        'cmi.core.score.max': '100',
+        // All answers correct → lesson_status should reflect passed (success takes priority)
+        'cmi.core.lesson_status': 'passed',
+      });
 
     // Per-question Interaction writes land before the final score, so by now
     // each built-in must have emitted cmi.interactions.<n>.id / .type.
@@ -246,9 +234,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
     // Assert the adapter's written format from the call log: scorm-again
     // normalizes session_time on storage, so the snapshot is not verbatim.
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
+    const log = await scormLog(page);
     const sessionTimeWrite = log.find(
       (entry) =>
         entry[0] === 'LMSSetValue' && entry[1] === 'cmi.core.session_time',
@@ -267,13 +253,10 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       await waitForTesseraContent(page);
       await openGradedQuiz(page);
 
-      await answerGradedQuiz(page, 0);
+      await answerGradedQuiz(page, { q1Correct: false });
 
       await expect
-        .poll(
-          () => page.evaluate(() => (window as any).__scormDataSnapshot()),
-          { timeout: 5000 },
-        )
+        .poll(() => scormData(page))
         .toMatchObject({
           'cmi.core.lesson_status': 'passed',
           'cmi.core.score.raw': '67',
@@ -323,9 +306,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
+    const log = await scormLog(page);
     const verbs = log.map((entry) => entry[0]);
     expect(verbs).toContain('Initialize');
 
@@ -349,10 +330,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'Accordion & Carousel',
     );
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'SetValue' && e[1] === 'cmi.suspend_data',
-    );
+    await expect
+      .poll(() => scormLog(page))
+      .toContainEqual(['SetValue', 'cmi.suspend_data', expect.any(String)]);
 
     await page.reload();
     await waitForTesseraContent(page);
@@ -371,21 +351,17 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
     await answerGradedQuiz(page);
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'SetValue' && e[1] === 'cmi.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.score.raw']).toBe('100');
-    expect(data['cmi.score.scaled']).toBe('1');
-    // SCORM 2004 keeps completion and success as separate fields. This course
-    // completes on percentage, so passing the quiz sets success only; the
-    // completion-quiz variant in lms-variants.spec.ts is the contrast.
-    expect(data['cmi.success_status']).toBe('passed');
-    expect(data['cmi.completion_status']).toBe('incomplete');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.score.raw': '100',
+        'cmi.score.scaled': '1',
+        // SCORM 2004 keeps completion and success as separate fields. This course
+        // completes on percentage, so passing the quiz sets success only; the
+        // completion-quiz variant in lms-variants.spec.ts is the contrast.
+        'cmi.success_status': 'passed',
+        'cmi.completion_status': 'incomplete',
+      });
 
     // Per-question Interaction writes: 2004 emits the SCORM vocab verbatim.
     expect(await interactionField(page, 'type')).toEqual([
@@ -415,14 +391,10 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       );
     });
 
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
+    const data = await scormData(page);
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
 
-    const log = (await page.evaluate(
-      () => (window as any).__scormLog,
-    )) as string[][];
+    const log = await scormLog(page);
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
   });
 });

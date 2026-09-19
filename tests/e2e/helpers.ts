@@ -47,38 +47,24 @@ export async function waitForTesseraContent(page: Page): Promise<void> {
     .catch(() => {});
 }
 
+/** Every call the SCORM mock has logged so far, as `[method, ...args]`. */
+export async function scormLog(page: Page): Promise<string[][]> {
+  return page.evaluate(() => (window as any).__scormLog);
+}
+
+/** The SCORM mock's current data model, keyed by `cmi.*` element. */
+export async function scormData(page: Page): Promise<Record<string, string>> {
+  return page.evaluate(() => (window as any).__scormDataSnapshot());
+}
+
 /**
  * Every cmi.interactions.* write the SCORM mock has logged so far. Matches
  * both mocks: SCORM 1.2 logs LMSSetValue, SCORM 2004 logs SetValue.
  */
 export async function interactionWrites(page: Page): Promise<string[][]> {
-  const log = (await page.evaluate(
-    () => (window as any).__scormLog,
-  )) as string[][];
-  return log.filter(
+  return (await scormLog(page)).filter(
     (e) => /^(LMS)?SetValue$/.test(e[0]) && /^cmi\.interactions\./.test(e[1]),
   );
-}
-
-/**
- * Wait until the SCORM mock has logged a call matching `predicate`. The
- * adapter's write queue is async, so poll the log rather than sleeping.
- */
-export async function waitForScormCall(
-  page: Page,
-  predicate: (entry: string[]) => boolean,
-): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        const log = (await page.evaluate(
-          () => (window as any).__scormLog ?? [],
-        )) as string[][];
-        return log.some(predicate);
-      },
-      { timeout: 5000 },
-    )
-    .toBe(true);
 }
 
 /** Values written to cmi.interactions.<n>.<field>, in write order. */
@@ -136,19 +122,19 @@ export async function openGradedQuiz(page: Page): Promise<void> {
 
 /**
  * Answer the `free` fixture's three-question graded quiz and submit, returning
- * once the results panel is visible. Every answer is correct unless `mcOption`
- * picks a wrong option (not 1) for the first question. Asserts on button text
- * rather than sleeping, so it stays in step with the quiz's feedback transitions.
+ * once the results panel is visible. Every answer is correct unless
+ * `q1Correct` is false. Asserts on button text rather than sleeping, so it
+ * stays in step with the quiz's feedback transitions.
  */
 export async function answerGradedQuiz(
   page: Page,
-  mcOption = 1,
+  { q1Correct = true } = {},
 ): Promise<void> {
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await page
     .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-    .nth(mcOption)
+    .nth(q1Correct ? 1 : 0)
     .click();
   await expect(primary).toHaveText('Submit');
   await primary.click();

@@ -8,6 +8,7 @@ import {
   interactionWrites,
   openGradedQuiz,
   reportedQuestionCount,
+  scormData,
   startPreview,
   waitForServer,
   waitForTesseraContent,
@@ -201,19 +202,10 @@ test.describe.serial('completion.mode quiz', () => {
     await answerGradedQuiz(page);
 
     await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () =>
-              (window as any).__scormDataSnapshot()['cmi.completion_status'],
-          ),
-        { timeout: 5000 },
-      )
-      .toBe('completed');
+      .poll(() => scormData(page))
+      .toMatchObject({ 'cmi.completion_status': 'completed' });
 
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
+    const data = await scormData(page);
     const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
     expect(visited.length).toBeLessThan(totalPages);
   });
@@ -254,14 +246,8 @@ test.describe.serial('weighted standalone questions', () => {
       .check();
 
     await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () => (window as any).__scormDataSnapshot()['cmi.core.score.raw'],
-          ),
-        { timeout: 5000 },
-      )
-      .toBe('75');
+      .poll(() => scormData(page))
+      .toMatchObject({ 'cmi.core.score.raw': '75' });
   });
 });
 
@@ -293,9 +279,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
   }
 
   async function courseScore(page: Page) {
-    return page.evaluate(
-      () => (window as any).__scormDataSnapshot()['cmi.core.score.raw'],
-    );
+    return (await scormData(page))['cmi.core.score.raw'];
   }
 
   test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({

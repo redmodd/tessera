@@ -8,8 +8,8 @@ import {
 } from './lms-mocks.js';
 import {
   interactionField,
+  scormData,
   startPreview,
-  waitForScormCall,
   waitForServer,
 } from './helpers.js';
 
@@ -93,16 +93,12 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     // page and waits for the custom-quiz shell before answering.
     await answerCustomQuizCorrectly(page);
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.core.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.core.score.raw']).toBe('100');
-    expect(data['cmi.core.lesson_status']).toBe('passed');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '100',
+        'cmi.core.lesson_status': 'passed',
+      });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
@@ -150,17 +146,13 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     await page.goto(BASE);
     await answerCustomQuizCorrectly(page);
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'SetValue' && e[1] === 'cmi.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.score.raw']).toBe('100');
-    expect(data['cmi.score.scaled']).toBe('1');
-    expect(data['cmi.success_status']).toBe('passed');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.score.raw': '100',
+        'cmi.score.scaled': '1',
+        'cmi.success_status': 'passed',
+      });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q-planet', 'q-water']);
