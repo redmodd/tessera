@@ -13,7 +13,7 @@ import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig, QuizConfig } from './types.js';
-import type { PersistenceAdapter } from './persistence.js';
+import type { BaseAdapter } from './adapters/base.js';
 
 // ---- Keys ----
 
@@ -32,7 +32,7 @@ export interface NavContext {
 }
 
 export interface AdapterContext {
-  readonly adapter: PersistenceAdapter;
+  readonly adapter: BaseAdapter;
 }
 
 /** Saved quiz progress for the current page, seeded into a fresh QuizEngine. */

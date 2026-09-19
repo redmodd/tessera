@@ -605,13 +605,13 @@ describe('SCORM12Adapter', () => {
     const activityId = 'https://example.com/courses/1';
 
     it('builds an Identified Agent from cmi.core.student_id / student_name', () => {
-      const adapter = new SCORM12Adapter(
+      const withLearner = new SCORM12Adapter(
         scorm12Api({
           'cmi.core.student_id': 'student-42',
           'cmi.core.student_name': 'Ada Lovelace',
         }),
       );
-      const actor = adapter.deriveActor(activityId);
+      const actor = withLearner.deriveActor(activityId);
       expect(actor).toEqual({
         account: { homePage: 'https://example.com', name: 'student-42' },
         name: 'Ada Lovelace',
@@ -621,11 +621,11 @@ describe('SCORM12Adapter', () => {
     });
 
     it('honors an actorAccountHomePage override', () => {
-      const adapter = new SCORM12Adapter(
+      const withLearner = new SCORM12Adapter(
         scorm12Api({ 'cmi.core.student_id': 'sid' }),
       );
       expect(
-        adapter.deriveActor(activityId, 'https://lms.example.com')?.account
+        withLearner.deriveActor(activityId, 'https://lms.example.com')?.account
           ?.homePage,
       ).toBe('https://lms.example.com');
     });

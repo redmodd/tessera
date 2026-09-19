@@ -357,10 +357,6 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
     } as CourseConfig;
   }
 
-  function scorm12(values: Record<string, string>): SCORM12Adapter {
-    return new SCORM12Adapter(scorm12Api(values));
-  }
-
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -368,7 +364,7 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
   it('derives the actor from the connected LMS', async () => {
     const client = await buildXAPIClient(
       scormConfig(),
-      scorm12({ 'cmi.core.student_id': 'learner-7' }),
+      new SCORM12Adapter(scorm12Api({ 'cmi.core.student_id': 'learner-7' })),
     );
     expect(client!.getActor()).toEqual({
       account: { homePage: 'https://example.com', name: 'learner-7' },
@@ -378,7 +374,9 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
 
   it('skips the destination with a warning when the LMS has no learner id', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(await buildXAPIClient(scormConfig(), scorm12({}))).toBeNull();
+    expect(
+      await buildXAPIClient(scormConfig(), new SCORM12Adapter(scorm12Api())),
+    ).toBeNull();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/LMS supplied no learner id/),
     );

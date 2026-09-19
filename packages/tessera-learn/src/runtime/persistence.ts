@@ -1,71 +1,9 @@
 /**
- * Persistence API — interface for saving/restoring course state.
+ * Persistence API: the lifecycle statuses and saved course state that adapters exchange.
  */
-
-import type { Interaction } from './interaction.js';
-import type { XAPIAgent } from './xapi/types.js';
-import type { XAPIPublisher } from './xapi/publisher.js';
 
 export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = 'passed' | 'failed' | 'unknown';
-
-export interface PersistenceAdapter {
-  /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
-  readonly connected: boolean;
-  /**
-   * Connect to the LMS. Failure is fatal: nothing can be reported, so the
-   * course must not start.
-   */
-  init(): Promise<void>;
-  /**
-   * Fetch previously saved state, where that costs a network round trip. Split
-   * from `init()` so a stalled State API costs resume rather than the launch;
-   * the adapter bounds the request itself and resolves either way. An adapter
-   * that could not read its state must then refuse `saveState` rather than
-   * overwrite what it failed to read.
-   */
-  loadState(): Promise<void>;
-  getState(): SavedState | null;
-  saveState(state: SavedState): void;
-  /** LMS-supplied pass threshold in [0, 1], overriding `scoring.passingScore`; null when absent. */
-  getMasteryScore(): number | null;
-  setScore(score: number): void;
-  setCompletionStatus(status: CompletionStatus): void;
-  setSuccessStatus(status: SuccessStatus): void;
-  /**
-   * Tell the adapter what was already emitted in prior sessions, so it skips
-   * re-emitting on resume. Returns true when the adapter dedupes against the
-   * seeded values; false means the caller re-reports them.
-   */
-  seedLifecycle(
-    completion: CompletionStatus,
-    success: SuccessStatus,
-    score?: number | null,
-  ): boolean;
-  /** Learner actor for an explicit xAPI destination, derived from the LMS; null when unavailable. */
-  deriveActor(activityId: string, homePage?: string): XAPIAgent | null;
-  /** The launch LRS publisher that `xapi.endpoint: 'lms'` shares; null without a launch LRS. */
-  launchPublisher(): XAPIPublisher | null;
-  setDuration(seconds: number): void;
-  /**
-   * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps
-   * `'suspend'` → `cmi.core.exit = 'suspend'`, `'normal'` → empty (the
-   * vocabulary has no explicit normal value). SCORM 2004 maps directly
-   * onto `cmi.exit`. cmi5 / web adapters no-op.
-   */
-  setExit(mode: 'suspend' | 'normal'): void;
-  /**
-   * Report a single learner interaction (answered question) to the LMS.
-   * Called once per question on quiz submit or standalone useQuestion submit.
-   */
-  reportInteraction(
-    questionId: string,
-    interaction: Interaction,
-    correct: boolean | null,
-  ): void;
-  commit(): void;
-  terminate(): void;
-}
 
 /** One page's entry in `SavedState.g`. */
 export interface GradedUnitState {

@@ -629,14 +629,8 @@ describe('manual completion — useCompletion hook', () => {
 //    directly to verify per-standard behavior.
 // ============================================================================
 
-import {
-  SCORM12Adapter,
-  type SCORM12API,
-} from '../src/runtime/adapters/scorm12.js';
-import {
-  SCORM2004Adapter,
-  type SCORM2004API,
-} from '../src/runtime/adapters/scorm2004.js';
+import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
+import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 50));

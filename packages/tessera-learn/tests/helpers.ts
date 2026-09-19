@@ -1,10 +1,7 @@
 import { vi } from 'vitest';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import type {
-  PersistenceAdapter,
-  SavedState,
-} from '../src/runtime/persistence.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
@@ -56,9 +53,7 @@ class StubAdapter extends BaseAdapter {
 }
 
 /** A connected adapter whose members all no-op, for mounting App without an LMS. */
-export function stubAdapter(
-  overrides: Partial<PersistenceAdapter> = {},
-): PersistenceAdapter {
+export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
   return Object.assign(new StubAdapter(), overrides);
 }
 

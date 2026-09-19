@@ -11,12 +11,12 @@ declare module 'virtual:tessera-course-runtime' {
 }
 
 declare module 'virtual:tessera-adapter' {
-  import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
+  import type { BaseAdapter } from 'tessera-learn/runtime/adapters/base.js';
   import type { CourseConfig } from 'tessera-learn/runtime/types.js';
   export function createAdapter(
     config: CourseConfig,
     options?: { manifest?: unknown; allowFallback?: boolean },
-  ): PersistenceAdapter;
+  ): BaseAdapter;
 }
 
 declare module 'virtual:tessera-xapi-setup' {
@@ -24,11 +24,11 @@ declare module 'virtual:tessera-xapi-setup' {
     CourseConfig,
     CourseRuntime,
   } from 'tessera-learn/runtime/types.js';
-  import type { PersistenceAdapter } from 'tessera-learn/runtime/persistence.js';
+  import type { BaseAdapter } from 'tessera-learn/runtime/adapters/base.js';
   import type { XAPIClient } from 'tessera-learn/runtime/xapi/client.js';
   export function buildXAPIClient(
     config: CourseConfig,
-    adapter: PersistenceAdapter,
+    adapter: BaseAdapter,
     hooks?: CourseRuntime['xapi'],
   ): Promise<XAPIClient | null>;
 }

@@ -4,7 +4,7 @@ import type {
   XAPIConfig,
   XAPIExplicitConfig,
 } from '../types.js';
-import type { PersistenceAdapter } from '../persistence.js';
+import type { BaseAdapter } from '../adapters/base.js';
 import { XAPIPublisher } from './publisher.js';
 import { XAPIClient } from './client.js';
 import { XAPIConfigError } from './validation.js';
@@ -16,22 +16,18 @@ import {
 } from '../standards.js';
 
 /**
- * Throws synchronously when `endpoint: 'lms'` appears under cmi5 or plain
- * xAPI export but the runtime was constructed without launch parameters
- * (i.e., running locally outside an LMS). Surfaced through every
- * `sendStatement` call rather than silently no-oping — the alternative
- * produces the "works in dev, silently broken in prod" footgun.
+ * `endpoint: 'lms'` under cmi5 or plain xAPI export with no launch parameters
+ * (running locally outside an LMS). Surfaced through every `sendStatement`
+ * call rather than silently no-oping, which would work in dev and silently
+ * break in prod.
  */
-class XAPIDevFallbackError extends Error {
-  constructor(standard: LaunchLRSStandard) {
-    super(
-      `Tessera xAPI: xapi.endpoint is 'lms' but ${STANDARDS[standard].missingDetail} ` +
-        'Either launch this course from a real LMS / SCORM Cloud, or ' +
-        'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
-        'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
-    );
-    this.name = 'XAPIDevFallbackError';
-  }
+function devFallbackError(standard: LaunchLRSStandard): Error {
+  return new Error(
+    `Tessera xAPI: xapi.endpoint is 'lms' but ${STANDARDS[standard].missingDetail} ` +
+      'Either launch this course from a real LMS / SCORM Cloud, or ' +
+      'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
+      'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
+  );
 }
 
 /**
@@ -39,7 +35,7 @@ class XAPIDevFallbackError extends Error {
  * both dev-fallback paths: cmi5/xAPI `endpoint: 'lms'` with no launch params, and
  * SCORM explicit endpoints that depend on a learner identity the dev fallback
  * can't synthesize. The placeholder carries a static actor so the constructor
- * invariants hold and `XAPIClient.buildStatement` can run without throwing —
+ * invariants hold and `XAPIClient.buildStatement` can run without throwing;
  * the `unavailableReason` opt makes only the network-bound methods reject.
  */
 function makeRejectingPublisher(error: () => Error): XAPIPublisher {
@@ -52,18 +48,15 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-class XAPISCORMDevFallbackError extends Error {
-  constructor(standard: ActorDerivingStandard) {
-    const { name, learnerIdField } = STANDARDS[standard];
-    super(
-      `Tessera xAPI: ${name} learner identity is unavailable in dev (no LMS API found, ` +
-        'falling back to localStorage). The runtime cannot synthesize an actor for this xapi ' +
-        'destination. Either set xapi.actor in course.config.js, export an actor resolver ' +
-        'for it from course.runtime.js, or launch from ' +
-        `a real LMS / SCORM Cloud where ${learnerIdField} is populated.`,
-    );
-    this.name = 'XAPISCORMDevFallbackError';
-  }
+function scormDevFallbackError(standard: ActorDerivingStandard): Error {
+  const { name, learnerIdField } = STANDARDS[standard];
+  return new Error(
+    `Tessera xAPI: ${name} learner identity is unavailable in dev (no LMS API found, ` +
+      'falling back to localStorage). The runtime cannot synthesize an actor for this xapi ' +
+      'destination. Either set xapi.actor in course.config.js, export an actor resolver ' +
+      'for it from course.runtime.js, or launch from ' +
+      `a real LMS / SCORM Cloud where ${learnerIdField} is populated.`,
+  );
 }
 
 /**
@@ -81,7 +74,7 @@ class XAPISCORMDevFallbackError extends Error {
 function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
-  adapter: PersistenceAdapter,
+  adapter: BaseAdapter,
   hooks: CourseRuntime['xapi'],
 ): XAPIPublisher | null {
   const profile = standardProfile(config.export?.standard);
@@ -96,7 +89,7 @@ function resolveDestination(
     // publisher. Its sends reject so author code surfaces the dev/prod gap.
     return (
       adapter.launchPublisher() ??
-      makeRejectingPublisher(() => new XAPIDevFallbackError(profile.id))
+      makeRejectingPublisher(() => devFallbackError(profile.id))
     );
   }
 
@@ -120,9 +113,7 @@ function resolveDestination(
     adapter.deriveActor(explicit.activityId, explicit.actorAccountHomePage);
   if (!actor) {
     if (!adapter.connected && profile?.derivesLearnerActor) {
-      return makeRejectingPublisher(
-        () => new XAPISCORMDevFallbackError(profile.id),
-      );
+      return makeRejectingPublisher(() => scormDevFallbackError(profile.id));
     }
     console.warn(
       adapter.connected
@@ -152,7 +143,7 @@ function resolveDestination(
  */
 export async function buildXAPIClient(
   config: CourseConfig,
-  adapter: PersistenceAdapter,
+  adapter: BaseAdapter,
   hooks?: CourseRuntime['xapi'],
 ): Promise<XAPIClient | null> {
   const raw = config.xapi;
