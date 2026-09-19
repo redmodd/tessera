@@ -87,6 +87,12 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
+// Manual completion takes success from requireSuccessStatus, so no manifest
+// declares a pass mark for it.
+function declaresPassMark(config: ExportConfig): boolean {
+  return config.completion?.mode !== 'manual';
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -120,10 +126,9 @@ function generateScormManifest(
   const xmlns = Object.entries(dialect.xmlns)
     .map(([prefix, uri]) => `\n  xmlns:${prefix}="${uri}"`)
     .join('');
-  const passMark =
-    config.completion?.mode !== 'manual'
-      ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
-      : '';
+  const passMark = declaresPassMark(config)
+    ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
+    : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
@@ -161,13 +166,16 @@ export function generateCMI5Xml(config: ExportConfig): string {
   );
   const auId = auIdFor(config);
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
-  const masteryScore = Number((config.scoring.passingScore / 100).toFixed(4));
+  const masteryAttr = declaresPassMark(config)
+    ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
+    : '';
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
   // the LMS needs both a Completed AND a Passed before satisfaction.
-  // Percentage-mode courses don't surface pass/fail, so completion alone
-  // is the right signal.
+  // Quiz is the only mode that gates satisfaction on the verb. Percentage and
+  // manual courses satisfy on Completed alone, including when a manual course
+  // asserts Failed through requireSuccessStatus.
   const moveOn =
     config.completion?.mode === 'quiz' ? 'CompletedAndPassed' : 'Completed';
 
@@ -177,7 +185,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
   </course>
-  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}" masteryScore="${masteryScore}">
+  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}"${masteryAttr}>
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
     <url>index.html</url>

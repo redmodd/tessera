@@ -1052,7 +1052,8 @@ Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
-- **`scoring.passingScore` is the mastery score.** SCORM 1.2, SCORM 2004 and cmi5 packages declare it (the SCORM packages skip it under `completion.mode: "manual"`), and an LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5. Read it via `useQuiz().passingScore`.
+- **`scoring.passingScore` is the mastery score.** SCORM 1.2, SCORM 2004 and cmi5 packages declare it, and an LMS-supplied mastery score overrides it at launch in all three. Read it via `useQuiz().passingScore`.
+- **Under `completion.mode: "manual"` no package declares a pass mark.** Success comes from `requireSuccessStatus`, and stays `"unknown"` when you omit it. A `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, and scores are still reported, but the LMS gets no threshold to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing
