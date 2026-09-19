@@ -17,6 +17,10 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
+export function roundScore(score: number): number {
+  return Math.round(Number((score * 100).toPrecision(15))) / 100;
+}
+
 /**
  * Score state for one gradable page. A page can carry both a <Quiz> and
  * standalone `useQuestion` answers; `quizScore` wins when it does.
@@ -215,7 +219,7 @@ export class ProgressState {
       weighted += score * weight;
       totalWeight += weight;
     }
-    return weighted / totalWeight;
+    return roundScore(weighted / totalWeight);
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it
@@ -244,8 +248,7 @@ export class ProgressState {
     }
     return {
       count: this.#declaredGradedIndices.size,
-      average:
-        totalWeight > 0 ? Math.round((weighted / totalWeight) * 1e5) / 1e5 : 0,
+      average: totalWeight > 0 ? roundScore(weighted / totalWeight) : 0,
       attempted,
       allScored,
     };

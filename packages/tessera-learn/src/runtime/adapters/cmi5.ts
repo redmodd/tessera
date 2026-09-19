@@ -219,8 +219,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected override scoreForSuccess(
     status: 'passed' | 'failed',
   ): number | null {
-    if (this.score === null) return null;
-    const scaled = this.score / 100;
+    const { scaled } = this;
+    if (scaled === null) return null;
     if (this.masteryScore !== null) {
       const violatesPassed = status === 'passed' && scaled < this.masteryScore;
       const violatesFailed = status === 'failed' && scaled >= this.masteryScore;

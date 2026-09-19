@@ -1,6 +1,6 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
+import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
@@ -13,10 +13,6 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
-
-const test = base.extend<{ lmsData: Record<string, string> }>({
-  lmsData: [{}, { option: true }],
-});
 
 /**
  * SCORM 1.2 roundtrips that `free` cannot host.
@@ -287,7 +283,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     return (await scormData(page))['cmi.core.score.raw'];
   }
 
-  test('a weight-50 exam outweighs a weight-25 quiz page: 66.66667, not 50', async ({
+  test('a weight-50 exam outweighs a weight-25 quiz page: 66.67, not 50', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -302,9 +298,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(2)
       .check();
 
-    await expect
-      .poll(() => courseScore(page), { timeout: 5000 })
-      .toBe('66.66667');
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('66.67');
   });
 
   test('no score reaches the LMS until every graded page is scored', async ({
@@ -324,9 +318,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(0)
       .check();
 
-    await expect
-      .poll(() => courseScore(page), { timeout: 5000 })
-      .toBe('33.33333');
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('33.33');
   });
 
   test.describe('LMS mastery_score', () => {
@@ -337,7 +329,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
       },
     });
 
-    test('a 66.66667 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
+    test('a 66.67 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -356,7 +348,10 @@ test.describe.serial('per-page weights in the course rollup', () => {
 
       await expect
         .poll(() => courseScore(page), { timeout: 5000 })
-        .toBe('66.66667');
+        .toBe('66.67');
+      expect(await scormData(page)).toMatchObject({
+        'cmi.core.lesson_status': 'failed',
+      });
 
       await page.evaluate(() => {
         window.dispatchEvent(
@@ -365,7 +360,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
       });
 
       expect(await scormData(page)).toMatchObject({
-        'cmi.core.score.raw': '66.66667',
+        'cmi.core.score.raw': '66.67',
         'cmi.core.lesson_status': 'failed',
       });
     });

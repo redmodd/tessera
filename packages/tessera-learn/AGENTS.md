@@ -357,7 +357,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### Per-question weighting
 
-Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded; in a quiz each `score` is 0 or 100, standalone it is whatever `score()` returns. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
+Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places; in a quiz each `score` is 0 or 100, standalone it is whatever `score()` returns. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
 
 ### Per-page weighting
 
@@ -813,7 +813,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
-  readonly score: number; // the attempt just submitted, or the restored result
+  readonly score: number; // 0–100, to 2 decimal places; the attempt just submitted, or the restored result
   readonly bestScore: number; // highest across attempts; this is what the LMS gets
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
@@ -862,9 +862,9 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 function useProgress(): {
   readonly visitedPages: Set<number>;
   readonly completedPages: number; // visited pages, minus graded pages still awaiting a score
-  quizScore(pageIndex: number): number | undefined; // 0–100; undefined until the quiz is submitted
-  pageScore(pageIndex?: number): number | undefined; // 0–100, unrounded; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the current page
-  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 5 decimal places; the LMS gets exactly this
+  quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
+  pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the current page
+  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; the score the LMS gets and successStatus is judged on
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
@@ -877,7 +877,7 @@ function useProgress(): {
 A standalone-question page renders no score on its own, so read `pageScore` and print one.
 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
-- **Round it yourself** for display.
+- **Print it as is.** It's already rounded to 2 decimal places.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
 `gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `completion.mode: "manual"`, where `requireSuccessStatus` sets it on `markComplete()`.
@@ -885,7 +885,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 Three rules for displaying it:
 
 - **An unattempted graded page counts as 0.** `average` is `Σ(weight × pageScore) / Σ(weight)` over every graded page, so a learner who has aced the two equally weighted quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
-- **Don't round it up to the pass mark.** `successStatus` is judged on `average` itself, so `Math.round` can print "70%" beside `failed` when the average is 69.67. Floor it or show a decimal.
+- **Print it as is.** `successStatus` is judged on `average` itself, so rounding it further can print "70%" beside `failed` when the average is 69.67.
 - **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
 
 ```svelte
@@ -896,7 +896,7 @@ Three rules for displaying it:
 </script>
 
 {#if attempted}
-  <p>Course score so far: {Math.floor(average)}%</p>
+  <p>Course score so far: {average}%</p>
   {#if progress.passingScore > 0}
     <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
   {/if}

@@ -1,9 +1,14 @@
 // E2E LMS doubles backed by scorm-again; spec-illegal writes surface in window.__scormErrors.
 import { createRequire } from 'node:module';
-import type { Page } from '@playwright/test';
+import { test as base, type Page } from '@playwright/test';
 
 const require = createRequire(import.meta.url);
 type LmsData = Record<string, string>;
+
+/** Playwright `test` with an `lmsData` option, seeded into the mock LMS via `test.use({ lmsData })`. */
+export const test = base.extend<{ lmsData: LmsData }>({
+  lmsData: [{}, { option: true }],
+});
 
 const SCORM_DIALECTS = {
   scorm12: {

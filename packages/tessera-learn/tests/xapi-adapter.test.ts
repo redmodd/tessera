@@ -474,6 +474,32 @@ describe('XAPIAdapter', () => {
     expect(bodies[1].result.duration).toBe('PT2M');
   });
 
+  it('sends a fractional score as an exact scaled value', async () => {
+    launch({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify(ACTOR),
+      activity_id: 'urn:tessera:au:abc',
+    });
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await new Promise((r) => setTimeout(r, 0));
+    fetchMock.mockClear();
+
+    adapter.setScore(33.33);
+    adapter.setSuccessStatus('failed');
+    adapter.setScore(58.33);
+    adapter.commit();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const scaled = fetchMock.mock.calls
+      .filter(
+        ([u, o]) => String(u).includes('/statements') && o?.method === 'POST',
+      )
+      .map(([, o]) => JSON.parse(o.body).result.score.scaled);
+    expect(scaled).toEqual([0.3333, 0.5833]);
+  });
+
   it('does not re-send the resumed score on launch', async () => {
     launch({
       endpoint: 'https://lrs.example/xapi',

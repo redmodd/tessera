@@ -1,8 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { ProgressState } from '../src/runtime/progress.svelte.js';
+import { ProgressState, roundScore } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
 // ---------- ProgressState ----------
+
+describe('roundScore', () => {
+  it('rounds to 2 decimal places, halves up despite float drift', () => {
+    expect(roundScore(200 / 3)).toBe(66.67);
+    expect(roundScore((66.67 + 70) / 2)).toBe(68.34);
+    expect(roundScore(68.335)).toBe(68.34);
+  });
+});
 
 describe('ProgressState', () => {
   describe('markVisited', () => {
@@ -852,7 +860,7 @@ describe('ProgressState', () => {
       progress.quizCompleted(1, 67);
       progress.quizCompleted(2, 75);
 
-      expect(progress.gradedScore.average).toBe(69.66667);
+      expect(progress.gradedScore.average).toBe(69.67);
       expect(progress.successStatus).toBe('failed');
     });
 
@@ -873,6 +881,35 @@ describe('ProgressState', () => {
       expect(progress.gradedScore.average).toBe(70);
       expect(progress.successStatus).toBe('passed');
       expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('passes a 2-decimal average that meets a finer pass mark', () => {
+      const manifest = createManifest(3, {
+        0: { graded: true },
+        1: { graded: true },
+        2: { graded: true },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ scoring: { passingScore: 66.66667 } }),
+      );
+
+      progress.quizCompleted(0, 100);
+      progress.quizCompleted(1, 100);
+      progress.quizCompleted(2, 0);
+
+      expect(progress.gradedScore.average).toBe(66.67);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('keeps a standalone page score to 2 decimal places', () => {
+      const manifest = createManifest(3, {}, { 0: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.markStandaloneQuestion(0, 'q1', 70, true, 0.1);
+      progress.markStandaloneQuestion(0, 'q2', 70, true, 0.2);
+
+      expect(progress.pageScore(0)).toBe(70);
     });
   });
 

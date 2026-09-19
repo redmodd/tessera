@@ -233,7 +233,7 @@ describe('App restore gate honours config.resume', () => {
     await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));
   });
 
-  it('reports the restored score unrounded', async () => {
+  it('reports the restored score to 2 decimal places', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
@@ -246,10 +246,10 @@ describe('App restore gate honours config.resume', () => {
       seeds: false,
     });
     cleanup = () => unmount(component);
-    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33333));
+    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33));
   });
 
-  it('seeds the adapter with the restored score unrounded', async () => {
+  it('seeds the adapter with the restored score to 2 decimal places', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
@@ -262,11 +262,7 @@ describe('App restore gate honours config.resume', () => {
     });
     cleanup = () => unmount(component);
     await vi.waitFor(() =>
-      expect(seedLifecycle).toHaveBeenCalledWith(
-        'complete',
-        'failed',
-        33.33333,
-      ),
+      expect(seedLifecycle).toHaveBeenCalledWith('complete', 'failed', 33.33),
     );
   });
 

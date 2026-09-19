@@ -1,10 +1,11 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
   xapiLaunchURL,
+  test,
 } from './lms-mocks.js';
 import {
   answerGradedQuiz,
@@ -19,10 +20,6 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
-
-const test = base.extend<{ lmsData: Record<string, string> }>({
-  lmsData: [{}, { option: true }],
-});
 
 // ---------------------------------------------------------------------------
 // SCORM 1.2
@@ -235,7 +232,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
-    test('a 67 passes against mastery_score 60 despite passingScore 70', async ({
+    test('a 66.67 passes against mastery_score 60 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -248,7 +245,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
         .poll(() => scormData(page))
         .toMatchObject({
           'cmi.core.lesson_status': 'passed',
-          'cmi.core.score.raw': '67',
+          'cmi.core.score.raw': '66.67',
         });
     });
   });
@@ -390,7 +387,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   test.describe('LMS scaled_passing_score', () => {
     test.use({ lmsData: { 'cmi.scaled_passing_score': '0.6' } });
 
-    test('a 67 passes against scaled_passing_score 0.6 despite passingScore 70', async ({
+    test('a 66.67 passes against scaled_passing_score 0.6 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -403,7 +400,8 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
         .poll(() => scormData(page))
         .toMatchObject({
           'cmi.success_status': 'passed',
-          'cmi.score.raw': '67',
+          'cmi.score.raw': '66.67',
+          'cmi.score.scaled': '0.6667',
         });
     });
   });
