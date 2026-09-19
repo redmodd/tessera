@@ -8,7 +8,7 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { synthesizeActor } from '../xapi/derive-actor.js';
+import { httpOrigin } from '../xapi/origin.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
 
@@ -63,17 +63,28 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.queue.errorReporter = this.errorReporter;
   }
 
+  /**
+   * `{ account: { homePage, name: <learner id> }, name: <learner name> }`.
+   * `homePage` defaults to the activityId origin so analytics keyed on actor
+   * identity stay stable across LMS hosts; the author's `actorAccountHomePage`
+   * overrides it when the authority namespace is elsewhere. Null when the LMS
+   * has no learner id or no homePage can be derived.
+   */
   override deriveActor(
     activityId: string,
-    homePage?: string,
+    actorAccountHomePage?: string,
   ): XAPIAgent | null {
     const { learnerIdField, learnerNameField } = this.dialect.profile;
-    return synthesizeActor(
-      this.#read(learnerIdField),
-      this.#read(learnerNameField),
-      activityId,
-      homePage,
-    );
+    const id = this.#read(learnerIdField);
+    const homePage = actorAccountHomePage ?? httpOrigin(activityId);
+    if (!id || !homePage) return null;
+    const agent: XAPIAgent = {
+      account: { homePage, name: id },
+      objectType: 'Agent',
+    };
+    const name = this.#read(learnerNameField);
+    if (name) agent.name = name;
+    return agent;
   }
 
   #read(key: string): string {

@@ -13,6 +13,7 @@ import {
   standardProfile,
   type ActorDerivingStandard,
   type LaunchLRSStandard,
+  type StandardProfile,
 } from '../standards.js';
 
 /**
@@ -73,11 +74,10 @@ function scormDevFallbackError(standard: ActorDerivingStandard): Error {
  */
 function resolveDestination(
   entry: XAPIConfig,
-  config: CourseConfig,
+  profile: StandardProfile | undefined,
   adapter: BaseAdapter,
   hooks: CourseRuntime['xapi'],
 ): XAPIPublisher | null {
-  const profile = standardProfile(config.export?.standard);
   if (entry.endpoint === 'lms') {
     if (!profile?.hasLaunchLRS) {
       console.warn(
@@ -149,9 +149,10 @@ export async function buildXAPIClient(
   const raw = config.xapi;
   if (raw === undefined || raw === null) return null;
   const entries: XAPIConfig[] = Array.isArray(raw) ? raw : [raw];
+  const profile = standardProfile(config.export?.standard);
   const publishers: XAPIPublisher[] = [];
   for (const entry of entries) {
-    const publisher = resolveDestination(entry, config, adapter, hooks);
+    const publisher = resolveDestination(entry, profile, adapter, hooks);
     if (!publisher) continue;
     try {
       await publisher.init();

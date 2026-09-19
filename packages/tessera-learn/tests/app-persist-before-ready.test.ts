@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { stubAdapter } from './helpers.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const pages = [0].map((index) => ({
@@ -51,7 +52,7 @@ async function mountWithSlowInit(
   const commit = vi.fn();
   const adapter = stubAdapter({
     init: () => initGate,
-    getState: () => savedState,
+    getState: () => savedState as SavedState | null,
     saveState,
     commit,
   });

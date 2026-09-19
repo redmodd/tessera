@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { stubAdapter } from './helpers.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 
 const page = {
   index: 0,
@@ -37,7 +38,11 @@ function makeAdapter(
   loadState: () => Promise<void> = async () => {},
   getState: () => unknown = () => null,
 ) {
-  return stubAdapter({ init, loadState, getState });
+  return stubAdapter({
+    init,
+    loadState,
+    getState: getState as () => SavedState | null,
+  });
 }
 
 async function mountApp(

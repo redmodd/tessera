@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { stubAdapter } from './helpers.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const page = {
@@ -53,7 +54,7 @@ function makeAdapter(saved: unknown, seeds: boolean) {
     saveState,
     setScore,
     adapter: stubAdapter({
-      getState: () => saved,
+      getState: () => saved as SavedState | null,
       seedLifecycle,
       saveState,
       setScore,
