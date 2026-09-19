@@ -141,6 +141,10 @@ test.describe('Export — SCORM 2004', () => {
     expect(xml).toContain('adlcp_v1p3');
     expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>');
     expect(xml).toContain('adlcp:scormType="sco"'); // capital T for 2004
+    expect(xml).toContain('satisfiedByMeasure="true"');
+    expect(xml).toContain(
+      '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
+    );
   });
 });
 

@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity, type CourseConfig } from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
-import { formatReal107 } from '../runtime/adapters/format.js';
+import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 
 function slugify(text: string): string {
   return text
@@ -98,13 +98,13 @@ function formatSize(bytes: number): string {
 /** Per-version XML differences in imsmanifest.xml between SCORM 1.2 and 2004. */
 interface ScormManifestDialect {
   rootNs: string;
-  adlcpNs: string;
+  xmlns: Record<string, string>;
   schemaversion: string;
   /** Attribute name on <resource>: SCORM 1.2 uses lowercase, 2004 uses camelCase. */
   scormTypeAttr: 'scormtype' | 'scormType';
   /** Whitespace-separated namespace+XSD pairs for xsi:schemaLocation. */
   schemaLocation: string;
-  declaresMasteryScore?: boolean;
+  passMark(passingScore: number): string;
 }
 
 function generateScormManifest(
@@ -117,15 +117,17 @@ function generateScormManifest(
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
     .join('\n');
-  const masteryScore =
-    dialect.declaresMasteryScore && config.completion?.mode !== 'manual'
-      ? `\n        <adlcp:masteryscore>${formatReal107(config.scoring.passingScore)}</adlcp:masteryscore>`
+  const xmlns = Object.entries(dialect.xmlns)
+    .map(([prefix, uri]) => `\n  xmlns:${prefix}="${uri}"`)
+    .join('');
+  const passMark =
+    config.completion?.mode !== 'manual'
+      ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
       : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
-  xmlns="${dialect.rootNs}"
-  xmlns:adlcp="${dialect.adlcpNs}"
+  xmlns="${dialect.rootNs}"${xmlns}
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="${dialect.schemaLocation}">
   <metadata>
@@ -136,7 +138,7 @@ function generateScormManifest(
     <organization identifier="org-1">
       <title>${title}</title>
       <item identifier="item-1" identifierref="res-1">
-        <title>${title}</title>${masteryScore}
+        <title>${title}</title>${passMark}
       </item>
     </organization>
   </organizations>
@@ -262,14 +264,15 @@ export const LMS_BUILD: Record<
     manifestFile: 'imsmanifest.xml',
     generate: scormManifest({
       rootNs: 'http://www.imsproject.org/xsd/imscp_rootv1p1p2',
-      adlcpNs: 'http://www.adlnet.org/xsd/adlcp_rootv1p2',
+      xmlns: { adlcp: 'http://www.adlnet.org/xsd/adlcp_rootv1p2' },
       schemaversion: '1.2',
       scormTypeAttr: 'scormtype',
       schemaLocation:
         'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
         'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
         'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
-      declaresMasteryScore: true,
+      passMark: (score) =>
+        `<adlcp:masteryscore>${formatReal107(score)}</adlcp:masteryscore>`,
     }),
     adapter: 'SCORM12Adapter',
     detect: 'findSCORM12API',
@@ -279,12 +282,23 @@ export const LMS_BUILD: Record<
     manifestFile: 'imsmanifest.xml',
     generate: scormManifest({
       rootNs: 'http://www.imsglobal.org/xsd/imscp_v1p1',
-      adlcpNs: 'http://www.adlnet.org/xsd/adlcp_v1p3',
+      xmlns: {
+        adlcp: 'http://www.adlnet.org/xsd/adlcp_v1p3',
+        imsss: 'http://www.imsglobal.org/xsd/imsss',
+      },
       schemaversion: '2004 4th Edition',
       scormTypeAttr: 'scormType',
       schemaLocation:
         'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd ' +
-        'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
+        'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd ' +
+        'http://www.imsglobal.org/xsd/imsss imsss_v1p0.xsd',
+      passMark: (score) => `<imsss:sequencing>
+          <imsss:objectives>
+            <imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">
+              <imsss:minNormalizedMeasure>${formatReal107(toScaled(score))}</imsss:minNormalizedMeasure>
+            </imsss:primaryObjective>
+          </imsss:objectives>
+        </imsss:sequencing>`,
     }),
     adapter: 'SCORM2004Adapter',
     detect: 'findSCORM2004API',
