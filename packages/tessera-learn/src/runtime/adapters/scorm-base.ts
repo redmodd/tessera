@@ -9,9 +9,12 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { httpOrigin } from '../xapi/agent-rules.js';
 import type { XAPIAgent } from '../xapi/types.js';
-import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
+import {
+  httpOrigin,
+  largerSuspendDataStandards,
+  type STANDARDS,
+} from '../standards.js';
 
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.

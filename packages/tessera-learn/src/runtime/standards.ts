@@ -119,3 +119,19 @@ export function largerSuspendDataStandards(limit: number): StandardId[] {
     );
   });
 }
+
+/**
+ * Origin of an http(s) URL, else null: the default `account.homePage` of a
+ * SCORM-derived actor, which the config validator predicts to know when
+ * `actorAccountHomePage` becomes required.
+ */
+export function httpOrigin(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.origin
+      : null;
+  } catch {
+    return null;
+  }
+}

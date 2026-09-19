@@ -28,12 +28,12 @@ import {
   validateAgent,
   validateAuthCredential,
   joinFieldError,
-  httpOrigin,
 } from '../runtime/xapi/agent-rules.js';
 import {
   DEFAULT_STANDARD,
   STANDARDS,
   STANDARD_IDS,
+  httpOrigin,
   largerSuspendDataStandards,
   standardProfile,
   type StandardId,
