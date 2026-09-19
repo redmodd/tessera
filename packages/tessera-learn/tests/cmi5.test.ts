@@ -1620,8 +1620,8 @@ describe('CMI5Adapter', () => {
       warn.mockRestore();
     });
 
-    it('keeps the score on Failed when no masteryScore is declared (manual completion)', async () => {
-      setupInitMocks();
+    it('keeps the score on Failed when the AU declares no masteryScore', async () => {
+      setupInitMocks(undefined, { launchMode: 'Normal' });
       adapter = new CMI5Adapter();
       await adapter.init();
       mockFetch.mockClear();
@@ -1631,6 +1631,7 @@ describe('CMI5Adapter', () => {
       adapter.setSuccessStatus('failed');
       await new Promise((r) => setTimeout(r, 50));
       const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      expect(failed).toBeDefined();
       expect(failed.result.score.scaled).toBeCloseTo(0.85);
     });
 

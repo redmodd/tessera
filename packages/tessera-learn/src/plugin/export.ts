@@ -87,6 +87,12 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
+// Manual completion takes success from completion.requireSuccessStatus rather
+// than the score, so no manifest declares a pass mark for it.
+function declaresPassMark(config: ExportConfig): boolean {
+  return config.completion?.mode !== 'manual';
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -120,10 +126,9 @@ function generateScormManifest(
   const xmlns = Object.entries(dialect.xmlns)
     .map(([prefix, uri]) => `\n  xmlns:${prefix}="${uri}"`)
     .join('');
-  const passMark =
-    config.completion?.mode !== 'manual'
-      ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
-      : '';
+  const passMark = declaresPassMark(config)
+    ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
+    : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
@@ -160,20 +165,16 @@ export function generateCMI5Xml(config: ExportConfig): string {
     courseIdentity(config) || 'tessera-course',
   );
   const auId = auIdFor(config);
-  // Manual completion takes success from completion.requireSuccessStatus, not
-  // from the score, so a declared masteryScore would only contradict the verb
-  // and cost the score (cmi5 §9.3.4 / §9.3.5). The attribute is optional.
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
-  const masteryScore =
-    config.completion?.mode === 'manual'
-      ? ''
-      : ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`;
+  const masteryAttr = declaresPassMark(config)
+    ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
+    : '';
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
   // the LMS needs both a Completed AND a Passed before satisfaction.
-  // Percentage-mode courses don't surface pass/fail, so completion alone
-  // is the right signal.
+  // Percentage and manual courses don't gate completion on the score, and
+  // many carry no graded page to pass, so completion alone is the signal.
   const moveOn =
     config.completion?.mode === 'quiz' ? 'CompletedAndPassed' : 'Completed';
 
@@ -183,7 +184,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
   </course>
-  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}"${masteryScore}>
+  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}"${masteryAttr}>
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
     <url>index.html</url>
