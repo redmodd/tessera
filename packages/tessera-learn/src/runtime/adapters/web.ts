@@ -31,8 +31,7 @@ export class WebAdapter extends BaseAdapter {
         this.state = JSON.parse(raw);
       }
     } catch {
-      // Corrupted data or localStorage unavailable — start fresh
-      this.state = null;
+      // Corrupted data or localStorage unavailable: start fresh.
     }
   }
 

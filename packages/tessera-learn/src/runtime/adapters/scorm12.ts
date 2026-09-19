@@ -1,6 +1,7 @@
 import { scorm12Type } from '../interaction-format.js';
 import type {
   CompletionStatus,
+  ExitMode,
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
@@ -92,7 +93,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.set('cmi.core.lesson_status', value);
   }
 
-  setExit(mode: 'suspend' | 'normal'): void {
+  setExit(mode: ExitMode): void {
     // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
     this.set('cmi.core.exit', mode === 'suspend' ? 'suspend' : '');
   }

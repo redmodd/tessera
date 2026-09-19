@@ -144,10 +144,10 @@ describe('SCORM12Adapter', () => {
     await adapter.init();
     adapter.setScore((7 / 11) * 100);
     await flush();
-    const rawCall = api.LMSSetValue.mock.calls.find(
-      ([k]) => k === 'cmi.core.score.raw',
+    expect(api.LMSSetValue).toHaveBeenCalledWith(
+      'cmi.core.score.raw',
+      '63.6363636',
     );
-    expect(rawCall?.[1]).toBe('63.6363636');
   });
 
   // ---- lesson_status ----
@@ -176,9 +176,9 @@ describe('SCORM12Adapter', () => {
       adapter.setSuccessStatus('passed');
       await flush();
       const calls = api.LMSSetValue.mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+        ([k]) => k === 'cmi.core.lesson_status',
       );
-      expect(calls[calls.length - 1][1]).toBe('passed');
+      expect(calls.at(-1)?.[1]).toBe('passed');
     });
 
     it('failed status takes priority over completion', async () => {
@@ -186,9 +186,9 @@ describe('SCORM12Adapter', () => {
       adapter.setSuccessStatus('failed');
       await flush();
       const calls = api.LMSSetValue.mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+        ([k]) => k === 'cmi.core.lesson_status',
       );
-      expect(calls[calls.length - 1][1]).toBe('failed');
+      expect(calls.at(-1)?.[1]).toBe('failed');
     });
 
     it('success still takes priority after completion update', async () => {
@@ -196,10 +196,10 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('incomplete');
       await flush();
       const calls = api.LMSSetValue.mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+        ([k]) => k === 'cmi.core.lesson_status',
       );
       // Success status still takes priority
-      expect(calls[calls.length - 1][1]).toBe('passed');
+      expect(calls.at(-1)?.[1]).toBe('passed');
     });
   });
 
@@ -249,7 +249,7 @@ describe('SCORM12Adapter', () => {
 
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
-    api.LMSSetValue.mockImplementation((key: string, _value: string) => {
+    api.LMSSetValue.mockImplementation((key) => {
       order.push(key);
       return 'true';
     });

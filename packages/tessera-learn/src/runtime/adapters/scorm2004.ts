@@ -1,5 +1,6 @@
 import type {
   CompletionStatus,
+  ExitMode,
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
@@ -64,7 +65,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   override async init(): Promise<void> {
     await super.init();
     this.#mode = this.#readMode();
-    this.#masteryScore = this.#readScaledThreshold('cmi.scaled_passing_score');
+    this.#masteryScore = parseScaled01(this.read('cmi.scaled_passing_score'));
   }
 
   getLaunchMode(): SCORM2004Mode {
@@ -80,21 +81,8 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   #readMode(): SCORM2004Mode {
-    try {
-      const v = this.dialect.getValue(this.api, 'cmi.mode');
-      if (v === 'browse' || v === 'review' || v === 'normal') return v;
-    } catch {}
-    return 'normal';
-  }
-
-  #readScaledThreshold(key: string): number | null {
-    let raw: string;
-    try {
-      raw = this.dialect.getValue(this.api, key);
-    } catch {
-      return null;
-    }
-    return parseScaled01(raw);
+    const v = this.read('cmi.mode');
+    return v === 'browse' || v === 'review' ? v : 'normal';
   }
 
   override saveState(state: SavedState): void {
@@ -129,7 +117,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     this.set('cmi.success_status', status);
   }
 
-  setExit(mode: 'suspend' | 'normal'): void {
+  setExit(mode: ExitMode): void {
     this.set('cmi.exit', mode);
   }
 }

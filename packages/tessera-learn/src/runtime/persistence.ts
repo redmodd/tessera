@@ -4,6 +4,7 @@
 
 export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = 'passed' | 'failed' | 'unknown';
+export type ExitMode = 'suspend' | 'normal';
 
 /** One page's entry in `SavedState.g`. */
 export interface GradedUnitState {

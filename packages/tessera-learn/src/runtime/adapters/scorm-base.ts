@@ -1,5 +1,6 @@
 import type {
   CompletionStatus,
+  ExitMode,
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
@@ -74,19 +75,19 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     actorAccountHomePage?: string,
   ): XAPIAgent | null {
     const { learnerIdField, learnerNameField } = this.dialect.profile;
-    const id = this.#read(learnerIdField);
+    const id = this.read(learnerIdField);
     const homePage = actorAccountHomePage ?? httpOrigin(activityId);
     if (!id || !homePage) return null;
     const agent: XAPIAgent = {
       account: { homePage, name: id },
       objectType: 'Agent',
     };
-    const name = this.#read(learnerNameField);
+    const name = this.read(learnerNameField);
     if (name) agent.name = name;
     return agent;
   }
 
-  #read(key: string): string {
+  protected read(key: string): string {
     try {
       return this.dialect.getValue(this.api, key);
     } catch {
@@ -135,7 +136,6 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
           'Tessera: cmi.suspend_data is not valid JSON; resume disabled for this launch (the LMS may have truncated a prior write)',
           err,
         );
-        this.state = null;
       }
     }
 
@@ -234,5 +234,5 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   abstract override setScore(score: number): void;
   abstract override setCompletionStatus(status: CompletionStatus): void;
   abstract override setSuccessStatus(status: SuccessStatus): void;
-  abstract override setExit(mode: 'suspend' | 'normal'): void;
+  abstract override setExit(mode: ExitMode): void;
 }

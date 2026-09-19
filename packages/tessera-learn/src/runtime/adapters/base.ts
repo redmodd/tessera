@@ -1,5 +1,6 @@
 import type {
   CompletionStatus,
+  ExitMode,
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
@@ -74,7 +75,7 @@ export abstract class BaseAdapter {
    * vocabulary has no explicit normal value). SCORM 2004 maps directly onto
    * `cmi.exit`. cmi5 / xAPI / web adapters no-op.
    */
-  setExit(_mode: 'suspend' | 'normal'): void {}
+  setExit(_mode: ExitMode): void {}
   /**
    * Report a single learner interaction (answered question) to the LMS.
    * Called once per question on quiz submit or standalone useQuestion submit.

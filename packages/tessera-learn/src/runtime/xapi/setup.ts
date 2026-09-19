@@ -33,9 +33,10 @@ function devFallbackError(standard: LaunchLRSStandard): Error {
 
 /**
  * Build a stub publisher whose sends reject with the supplied error. Used for
- * both dev-fallback paths: cmi5/xAPI `endpoint: 'lms'` with no launch params, and
- * SCORM explicit endpoints that depend on a learner identity the dev fallback
- * can't synthesize. The placeholder carries a static actor so the constructor
+ * an explicit destination with no auth, and for both dev-fallback paths:
+ * cmi5/xAPI `endpoint: 'lms'` with no launch params, and SCORM explicit
+ * endpoints that depend on a learner identity the dev fallback can't
+ * synthesize. The placeholder carries a static actor so the constructor
  * invariants hold and `XAPIClient.buildStatement` can run without throwing;
  * the `unavailableReason` opt makes only the network-bound methods reject.
  */

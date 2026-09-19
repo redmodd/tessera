@@ -121,23 +121,14 @@ describe('SCORM2004Adapter', () => {
     // 7 / 11 * 100 = 63.6363636363... → raw must not exceed 7 fractional digits
     adapter.setScore((7 / 11) * 100);
     await flush();
-    const rawCall = api.SetValue.mock.calls.find(
-      ([k]) => k === 'cmi.score.raw',
-    );
-    const scaledCall = api.SetValue.mock.calls.find(
-      ([k]) => k === 'cmi.score.scaled',
-    );
-    expect(rawCall?.[1]).toBe('63.6363636');
-    expect(scaledCall?.[1]).toBe('0.6363636');
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.raw', '63.6363636');
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.scaled', '0.6363636');
   });
 
   it('clamps cmi.score.scaled to the spec-defined [-1,1] band', async () => {
     adapter.setScore(150);
     await flush();
-    const scaledCall = api.SetValue.mock.calls.find(
-      ([k]) => k === 'cmi.score.scaled',
-    );
-    expect(scaledCall?.[1]).toBe('1');
+    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.scaled', '1');
   });
 
   it('sets completion_status to completed', async () => {
@@ -202,7 +193,7 @@ describe('SCORM2004Adapter', () => {
 
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
-    api.SetValue.mockImplementation((key: string, _value: string) => {
+    api.SetValue.mockImplementation((key) => {
       order.push(key);
       return 'true';
     });
@@ -598,18 +589,8 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      expect(
-        api.SetValue.mock.calls.some(
-          (c: [string, string]) =>
-            c[0] === 'cmi.interactions.0.id' && c[1] === 'q1',
-        ),
-      ).toBe(true);
-      expect(
-        api.SetValue.mock.calls.some(
-          (c: [string, string]) =>
-            c[0] === 'cmi.interactions.1.id' && c[1] === 'q2',
-        ),
-      ).toBe(true);
+      expect(api.SetValue).toHaveBeenCalledWith('cmi.interactions.0.id', 'q1');
+      expect(api.SetValue).toHaveBeenCalledWith('cmi.interactions.1.id', 'q2');
     });
   });
 
