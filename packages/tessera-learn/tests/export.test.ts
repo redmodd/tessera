@@ -124,7 +124,7 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('defaults adlcp:masteryscore to 70', () => {
-    const xml = scorm12Xml({ title: 'Test', completion: { mode: 'quiz' } });
+    const xml = scorm12Xml({ title: 'Test' });
     expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
   });
 

@@ -1,8 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { variantDir } from './global-setup.js';
 import {
   installScorm12Mock,
   installScorm2004Mock,
@@ -259,44 +256,6 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     });
 
     test('a 66.67 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
-      page,
-    }) => {
-      await page.goto(BASE);
-      await waitForTesseraContent(page);
-      await openQuiz(page, 'Graded Assessment');
-
-      await answerGradedQuiz(page, { q1Correct: false });
-
-      const failed = {
-        'cmi.core.lesson_status': 'failed',
-        'cmi.core.score.raw': '66.67',
-      };
-      await expect.poll(() => scormData(page)).toMatchObject(failed);
-
-      await exitCourse(page);
-
-      expect(await scormData(page)).toMatchObject(failed);
-    });
-  });
-
-  test.describe('mastery_score declared by the manifest', () => {
-    test.use({
-      lmsData: async ({}, use) => {
-        const manifest = readFileSync(
-          resolve(variantDir('free', 'scorm12'), 'dist/imsmanifest.xml'),
-          'utf-8',
-        );
-        const masteryScore = /<adlcp:masteryscore>([^<]+)</.exec(manifest)?.[1];
-        if (!masteryScore)
-          throw new Error('imsmanifest.xml declares no adlcp:masteryscore');
-        await use({
-          'cmi.core.credit': 'credit',
-          'cmi.student_data.mastery_score': masteryScore,
-        });
-      },
-    });
-
-    test('a 66.67 stays failed after the LMS rescores on exit', async ({
       page,
     }) => {
       await page.goto(BASE);

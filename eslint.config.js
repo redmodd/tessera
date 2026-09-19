@@ -126,7 +126,6 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       'no-empty': 'off',
-      'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }],
       'preserve-caught-error': 'off',
     },
   },

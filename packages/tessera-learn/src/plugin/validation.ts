@@ -457,7 +457,7 @@ function parseConfig(
   // Validate scoring.passingScore
   if (config.scoring?.passingScore !== undefined) {
     const score = config.scoring.passingScore;
-    if (typeof score !== 'number' || score < 0 || score > 100) {
+    if (typeof score !== 'number' || !(score >= 0 && score <= 100)) {
       d.error(
         `course.config.js: "scoring.passingScore" must be 0–100, got ${score}`,
       );
@@ -467,7 +467,10 @@ function parseConfig(
   // Validate completion.percentageThreshold
   if (config.completion?.percentageThreshold !== undefined) {
     const threshold = config.completion.percentageThreshold;
-    if (typeof threshold !== 'number' || threshold < 0 || threshold > 100) {
+    if (
+      typeof threshold !== 'number' ||
+      !(threshold >= 0 && threshold <= 100)
+    ) {
       d.error(
         `course.config.js: "completion.percentageThreshold" must be 0–100, got ${threshold}`,
       );
