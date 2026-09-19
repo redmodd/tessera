@@ -1,6 +1,10 @@
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import type { PersistenceAdapter } from '../src/runtime/persistence.js';
+import type {
+  PersistenceAdapter,
+  SavedState,
+} from '../src/runtime/persistence.js';
+import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
 
@@ -34,30 +38,19 @@ export function scorm2004Api(
   };
 }
 
+class StubAdapter extends BaseAdapter {
+  async init(): Promise<void> {}
+  getState(): SavedState | null {
+    return null;
+  }
+  saveState(): void {}
+}
+
 /** A connected adapter whose members all no-op, for mounting App without an LMS. */
 export function stubAdapter(
   overrides: Partial<PersistenceAdapter> = {},
 ): PersistenceAdapter {
-  return {
-    connected: true,
-    init: async () => {},
-    loadState: async () => {},
-    getState: () => null,
-    saveState: () => {},
-    getMasteryScore: () => null,
-    setScore: () => {},
-    setCompletionStatus: () => {},
-    setSuccessStatus: () => {},
-    seedLifecycle: () => false,
-    deriveActor: () => null,
-    launchPublisher: () => null,
-    setDuration: () => {},
-    setExit: () => {},
-    reportInteraction: () => {},
-    commit: () => {},
-    terminate: () => {},
-    ...overrides,
-  };
+  return Object.assign(new StubAdapter(), overrides);
 }
 
 export function createManifest(

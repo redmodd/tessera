@@ -6,8 +6,11 @@ import type { Interaction } from './interaction.js';
 import type { XAPIAgent } from './xapi/types.js';
 import type { XAPIPublisher } from './xapi/publisher.js';
 
+export type CompletionStatus = 'incomplete' | 'complete';
+export type SuccessStatus = 'passed' | 'failed' | 'unknown';
+
 export interface PersistenceAdapter {
-  /** False only when no LMS or launch LRS is behind the adapter (web, and the dev fallback). */
+  /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
   readonly connected: boolean;
   /**
    * Connect to the LMS. Failure is fatal: nothing can be reported, so the
@@ -27,16 +30,16 @@ export interface PersistenceAdapter {
   /** LMS-supplied pass threshold in [0, 1], overriding `scoring.passingScore`; null when absent. */
   getMasteryScore(): number | null;
   setScore(score: number): void;
-  setCompletionStatus(status: 'incomplete' | 'complete'): void;
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
+  setCompletionStatus(status: CompletionStatus): void;
+  setSuccessStatus(status: SuccessStatus): void;
   /**
    * Tell the adapter what was already emitted in prior sessions, so it skips
    * re-emitting on resume. Returns true when the adapter dedupes against the
    * seeded values; false means the caller re-reports them.
    */
   seedLifecycle(
-    completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed',
+    completion: CompletionStatus,
+    success: SuccessStatus,
     score?: number | null,
   ): boolean;
   /** Learner actor for an explicit xAPI destination, derived from the LMS; null when unavailable. */

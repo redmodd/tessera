@@ -1,4 +1,8 @@
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
   formatISO8601Duration,
@@ -110,7 +114,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     );
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  setCompletionStatus(status: CompletionStatus): void {
     this.set(
       'cmi.completion_status',
       status === 'complete' ? 'completed' : 'incomplete',
@@ -119,7 +123,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     if (status === 'complete') this.set('cmi.progress_measure', '1');
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  setSuccessStatus(status: SuccessStatus): void {
     // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
     // a null status to "passed".
     this.set('cmi.success_status', status);

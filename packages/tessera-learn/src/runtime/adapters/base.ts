@@ -1,4 +1,9 @@
-import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  PersistenceAdapter,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import type { XAPIPublisher } from '../xapi/publisher.js';
@@ -18,8 +23,8 @@ export abstract class BaseAdapter implements PersistenceAdapter {
   }
 
   seedLifecycle(
-    _completion: 'incomplete' | 'complete',
-    _success: 'unknown' | 'passed' | 'failed',
+    _completion: CompletionStatus,
+    _success: SuccessStatus,
     _score?: number | null,
   ): boolean {
     return false;
@@ -34,8 +39,8 @@ export abstract class BaseAdapter implements PersistenceAdapter {
   }
 
   setScore(_score: number): void {}
-  setCompletionStatus(_status: 'incomplete' | 'complete'): void {}
-  setSuccessStatus(_status: 'passed' | 'failed' | 'unknown'): void {}
+  setCompletionStatus(_status: CompletionStatus): void {}
+  setSuccessStatus(_status: SuccessStatus): void {}
   setDuration(_seconds: number): void {}
   setExit(_mode: 'suspend' | 'normal'): void {}
   reportInteraction(

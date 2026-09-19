@@ -1,5 +1,9 @@
 import { scorm12Type } from '../interaction-format.js';
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
 import { STANDARDS } from '../standards.js';
@@ -71,12 +75,12 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.set('cmi.core.score.max', '100');
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  setCompletionStatus(status: CompletionStatus): void {
     this.#completionStatus = status === 'complete' ? 'completed' : 'incomplete';
     this.#flushLessonStatus();
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  setSuccessStatus(status: SuccessStatus): void {
     // SCORM 1.2 has no "unknown" lesson_status — clear the success override
     // so completion status drives lesson_status until a real result is known.
     this.#successStatus = status === 'unknown' ? null : status;

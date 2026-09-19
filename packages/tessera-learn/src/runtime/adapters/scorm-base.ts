@@ -1,4 +1,8 @@
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
@@ -65,11 +69,19 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   ): XAPIAgent | null {
     const { learnerIdField, learnerNameField } = this.dialect.profile;
     return synthesizeActor(
-      () => this.dialect.getValue(this.api, learnerIdField),
-      () => this.dialect.getValue(this.api, learnerNameField),
+      this.#read(learnerIdField),
+      this.#read(learnerNameField),
       activityId,
       homePage,
     );
+  }
+
+  #read(key: string): string {
+    try {
+      return this.dialect.getValue(this.api, key);
+    } catch {
+      return '';
+    }
   }
 
   // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
@@ -214,11 +226,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   }
 
   abstract override setScore(score: number): void;
-  abstract override setCompletionStatus(
-    status: 'incomplete' | 'complete',
-  ): void;
-  abstract override setSuccessStatus(
-    status: 'passed' | 'failed' | 'unknown',
-  ): void;
+  abstract override setCompletionStatus(status: CompletionStatus): void;
+  abstract override setSuccessStatus(status: SuccessStatus): void;
   abstract override setExit(mode: 'suspend' | 'normal'): void;
 }

@@ -28,19 +28,11 @@ export function httpOrigin(url: string): string | null {
  * the caller should not construct a publisher (the LRS would 400 every send).
  */
 export function synthesizeActor(
-  readId: () => string,
-  readName: () => string,
+  id: string,
+  name: string,
   activityId: string,
   actorAccountHomePage?: string,
 ): XAPIAgent | null {
-  let id = '';
-  let name = '';
-  try {
-    id = readId() || '';
-  } catch {}
-  try {
-    name = readName() || '';
-  } catch {}
   if (!id) return null;
   const homePage = actorAccountHomePage ?? httpOrigin(activityId);
   if (!homePage) return null;

@@ -436,7 +436,7 @@
     // document must cost the resume, not the course.
     try {
       const lmsMastery = adapter.getMasteryScore();
-      if (typeof lmsMastery === 'number') {
+      if (lmsMastery !== null) {
         config.scoring.passingScore = lmsMastery * 100;
       }
 

@@ -1,4 +1,8 @@
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS } from '../standards.js';
@@ -96,7 +100,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected state: SavedState | null = null;
   protected stateLoadFailed = false;
   protected completedEmitted = false;
-  protected lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
+  protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
   protected terminated = false;
   protected returnURL: string | undefined;
@@ -186,8 +190,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override seedLifecycle(
-    completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed',
+    completion: CompletionStatus,
+    success: SuccessStatus,
     score?: number | null,
   ): boolean {
     if (completion === 'complete') this.completedEmitted = true;
@@ -201,7 +205,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return true;
   }
 
-  override setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  override setCompletionStatus(status: CompletionStatus): void {
     if (status !== 'complete' || this.completedEmitted || !this.publisher)
       return;
     if (!this.isDefinedStatementAllowed()) return;
@@ -217,7 +221,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  override setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  override setSuccessStatus(status: SuccessStatus): void {
     if (status === 'unknown' || !this.publisher) return;
     if (status === this.lastSuccessEmitted) return;
     if (!this.isDefinedStatementAllowed()) return;
