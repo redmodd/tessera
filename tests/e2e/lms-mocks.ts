@@ -11,14 +11,12 @@ const SCORM_DIALECTS = {
     global: 'API',
     prefix: 'LMS',
     end: 'Finish',
-    options: { mastery_override: false },
   },
   scorm2004: {
     version: '2004',
     global: 'API_1484_11',
     prefix: '',
     end: 'Terminate',
-    options: {},
   },
 } as const;
 
@@ -27,14 +25,14 @@ async function installScormMock(
   standard: keyof typeof SCORM_DIALECTS,
   lmsData: LmsData,
 ): Promise<void> {
-  const { version, global, prefix: p, end, options } = SCORM_DIALECTS[standard];
+  const { version, global, prefix: p, end } = SCORM_DIALECTS[standard];
   await page.addInitScript({
     path: require.resolve(`scorm-again/${standard}`),
   });
   await page.addInitScript(`
 (() => {
   const KEY = '__scorm${version}_data';
-  const api = new window.Scorm${version}API(${JSON.stringify({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE', ...options })});
+  const api = new window.Scorm${version}API(${JSON.stringify({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' })});
   api.loadFromFlattenedJSON(${JSON.stringify(lmsData)});
   try {
     const raw = sessionStorage.getItem(KEY);

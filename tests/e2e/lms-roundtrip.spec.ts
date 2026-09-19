@@ -8,7 +8,7 @@ import {
 } from './lms-mocks.js';
 import {
   answerGradedQuiz,
-  answerMatching,
+  answerGradedQuizAfterQ1,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -168,22 +168,8 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await expect(primary).toHaveText('Next Question');
     await primary.click(); // continue
 
-    // Q2: FillInTheBlank — "blue"
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await expect(primary).toHaveText('Submit');
-    await primary.click();
-    await expect(primary).toHaveText('Next Question');
-    await primary.click();
-
-    // Q3: Matching 1→One, 2→Two, 3→Three
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-    await expect(primary).toHaveText('Submit');
-    await primary.click();
-
+    await answerGradedQuizAfterQ1(page);
     const submit = page.locator('.tessera-quiz-btn-submit');
-    await submit.waitFor({ state: 'visible', timeout: 5000 });
 
     // Every answer was revealed, so every answer is already reported.
     await expect
@@ -791,20 +777,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(primary).toHaveText('Next Question');
     await primary.click();
 
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await expect(primary).toHaveText('Submit');
-    await primary.click();
-    await expect(primary).toHaveText('Next Question');
-    await primary.click();
-
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-    await expect(primary).toHaveText('Submit');
-    await primary.click();
-
+    await answerGradedQuizAfterQ1(page);
     const submit = page.locator('.tessera-quiz-btn-submit');
-    await submit.waitFor({ state: 'visible', timeout: 5000 });
 
     // Every answer was revealed, so every answer is already reported.
     await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(3);

@@ -139,6 +139,15 @@ export async function answerGradedQuiz(
   await expect(primary).toHaveText('Next Question');
   await primary.click();
 
+  await answerGradedQuizAfterQ1(page);
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
+/** Answer Q2 and Q3 of the `free` graded quiz correctly, stopping once the final Submit is visible. */
+export async function answerGradedQuizAfterQ1(page: Page): Promise<void> {
+  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
   await page
     .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
     .fill('blue');
@@ -151,8 +160,5 @@ export async function answerGradedQuiz(
   await expect(primary).toHaveText('Submit');
   await primary.click();
 
-  const submit = page.locator('.tessera-quiz-btn-submit');
-  await expect(submit).toBeVisible();
-  await submit.click();
-  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+  await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
 }
