@@ -11,34 +11,32 @@ import { XAPIConfigError } from './validation.js';
 import {
   STANDARDS,
   standardProfile,
-  type ActorDerivingStandard,
-  type LaunchLRSStandard,
+  type LMSStandard,
   type StandardProfile,
 } from '../standards.js';
 
 /**
- * `endpoint: 'lms'` under cmi5 or plain xAPI export with no launch parameters
- * (running locally outside an LMS). Surfaced through every `sendStatement`
- * call rather than silently no-oping, which would work in dev and silently
- * break in prod.
+ * A packaged export on the dev fallback (no LMS API or launch parameters) has
+ * no launch LRS and no learner to derive an actor from. Its destinations
+ * reject every send with this rather than being skipped, so the gap surfaces
+ * in dev instead of the destination silently vanishing there.
  */
-function devFallbackError(standard: LaunchLRSStandard): Error {
+function devFallbackError(standard: LMSStandard): Error {
   return new Error(
-    `Tessera xAPI: xapi.endpoint is 'lms' but ${STANDARDS[standard].missingDetail} ` +
-      'Either launch this course from a real LMS / SCORM Cloud, or ' +
-      'temporarily change xapi.endpoint to an explicit URL pointed at a ' +
-      'local LRS (e.g. http://localhost:8080/data/xAPI/) for dev work.',
+    `Tessera xAPI: ${STANDARDS[standard].missingDetail} ` +
+      'Launch this course from a real LMS / SCORM Cloud, or for dev work give ' +
+      'this xapi destination an explicit endpoint (e.g. a local LRS at ' +
+      'http://localhost:8080/data/xAPI/) and an actor, via xapi.actor or a ' +
+      'course.runtime.js resolver.',
   );
 }
 
 /**
- * Build a stub publisher whose sends reject with the supplied error. Used for
- * an explicit destination with no auth, and for both dev-fallback paths:
- * cmi5/xAPI `endpoint: 'lms'` with no launch params, and SCORM explicit
- * endpoints that depend on a learner identity the dev fallback can't
- * synthesize. The placeholder carries a static actor so the constructor
- * invariants hold and `XAPIClient.buildStatement` can run without throwing;
- * the `unavailableReason` opt makes only the network-bound methods reject.
+ * Build a stub publisher whose sends reject with the supplied error, for an
+ * explicit destination with no auth and for the dev fallback. The placeholder
+ * carries a static actor so the constructor invariants hold and
+ * `XAPIClient.buildStatement` can run without throwing; the
+ * `unavailableReason` opt makes only the network-bound methods reject.
  */
 function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   return new XAPIPublisher({
@@ -50,17 +48,6 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-function scormDevFallbackError(standard: ActorDerivingStandard): Error {
-  const { name, learnerIdField } = STANDARDS[standard];
-  return new Error(
-    `Tessera xAPI: ${name} learner identity is unavailable in dev (no LMS API found, ` +
-      'falling back to localStorage). The runtime cannot synthesize an actor for this xapi ' +
-      'destination. Either set xapi.actor in course.config.js, export an actor resolver ' +
-      'for it from course.runtime.js, or launch from ' +
-      `a real LMS / SCORM Cloud where ${learnerIdField} is populated.`,
-  );
-}
-
 /**
  * Resolve a single `XAPIConfig` entry into its publisher: the launch adapter's
  * own (shared queue) for `endpoint: 'lms'`, else a fresh one. Returns null
@@ -69,9 +56,8 @@ function scormDevFallbackError(standard: ActorDerivingStandard): Error {
  *
  * An explicit destination's actor comes from the author (course.runtime.js
  * resolver, then `xapi.actor`), else the connected adapter (launch actor or
- * SCORM learner fields). Unconnected, a SCORM export gets a rejecting dev
- * publisher; anything else (a web export with no actor, which the build-time
- * validator rejects) is skipped.
+ * SCORM learner fields). Without one, a packaged export on the dev fallback
+ * gets a rejecting publisher; anything else is skipped.
  */
 function resolveDestination(
   entry: XAPIConfig,
@@ -87,7 +73,7 @@ function resolveDestination(
       return null;
     }
     // Only the dev fallback (a WebAdapter, launch params absent) has no launch
-    // publisher. Its sends reject so author code surfaces the dev/prod gap.
+    // publisher.
     return (
       adapter.launchPublisher() ??
       makeRejectingPublisher(() => devFallbackError(profile.id))
@@ -95,10 +81,10 @@ function resolveDestination(
   }
 
   const explicit = entry as XAPIExplicitConfig;
+  const id = JSON.stringify(explicit.id);
   const hook = hooks?.[explicit.id];
   const auth = hook?.auth ?? explicit.auth;
   if (auth === undefined) {
-    const id = JSON.stringify(explicit.id);
     return makeRejectingPublisher(
       () =>
         new XAPIConfigError(
@@ -113,13 +99,11 @@ function resolveDestination(
     explicit.actor ??
     adapter.deriveActor(explicit.activityId, explicit.actorAccountHomePage);
   if (!actor) {
-    if (!adapter.connected && profile?.derivesLearnerActor) {
-      return makeRejectingPublisher(() => scormDevFallbackError(profile.id));
+    if (!adapter.connected && profile?.packaged) {
+      return makeRejectingPublisher(() => devFallbackError(profile.id));
     }
     console.warn(
-      adapter.connected
-        ? 'Tessera xAPI: cannot derive a learner actor for an explicit destination (the LMS supplied no learner id, or its activityId is not http(s) and actorAccountHomePage is unset); skipping it.'
-        : 'Tessera xAPI: explicit destination has no actor and no derivation source; skipping it.',
+      `Tessera xAPI: destination ${id} has no actor and the LMS supplied none to derive (no learner id, or an activityId that is not http(s) with actorAccountHomePage unset); skipping it.`,
     );
     return null;
   }

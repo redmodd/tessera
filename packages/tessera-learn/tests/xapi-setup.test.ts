@@ -282,6 +282,26 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
       ),
     ).rejects.toThrow(/no cmi5 launch parameters/);
   });
+
+  it('dev fallback: an explicit destination with no actor under cmi5 rejects sends', async () => {
+    setSearchParams({});
+
+    const config = baseConfig();
+    config.xapi = {
+      id: 'analytics',
+      endpoint: 'https://analytics.example.com/xapi/',
+      auth: 'analytics-token',
+      activityId: 'https://example.com/course/analytics',
+    };
+
+    const client = await buildXAPIClient(config, new WebAdapter(config));
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/no cmi5 launch parameters/);
+  });
 });
 
 describe('buildXAPIClient — plain xAPI launch integration', () => {
@@ -406,11 +426,11 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
       await buildXAPIClient(scormConfig(), new SCORM12Adapter(scorm12Api())),
     ).toBeNull();
     expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(/LMS supplied no learner id/),
+      expect.stringMatching(/"analytics" has no actor/),
     );
   });
 
-  it('dev fallback: rejects sends with the SCORM learner-identity error', async () => {
+  it('dev fallback: rejects sends because no SCORM API was found', async () => {
     const config = scormConfig();
     const client = await buildXAPIClient(config, new WebAdapter(config));
     await expect(
@@ -418,6 +438,6 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
         { verb: { id: 'http://verb/exp' } },
         { retry: false },
       ),
-    ).rejects.toThrow(/SCORM 1.2 learner identity is unavailable in dev/);
+    ).rejects.toThrow(/no SCORM 1.2 API object found/);
   });
 });
