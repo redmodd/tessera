@@ -52,17 +52,20 @@ afterEach(() => {
   } catch {}
 });
 
+const scormXml = (
+  standard: 'scorm12' | 'scorm2004',
+  config: Parameters<typeof mergeCourseConfig>[0],
+) =>
+  LMS_BUILD[standard].generate(
+    mergeCourseConfig(config),
+    createDistDir(testRoot),
+  );
+
 // ---- SCORM 1.2 Manifest ----
 
 describe('SCORM 1.2 manifest', () => {
-  const scorm12Xml = (config: Parameters<typeof mergeCourseConfig>[0]) =>
-    LMS_BUILD.scorm12.generate(
-      mergeCourseConfig(config),
-      createDistDir(testRoot),
-    );
-
   it('generates valid XML with correct schema', () => {
-    const xml = scorm12Xml({ title: 'My Course' });
+    const xml = scormXml('scorm12', { title: 'My Course' });
 
     expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain(
@@ -76,22 +79,22 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('includes course title', () => {
-    const xml = scorm12Xml({ title: 'My Course' });
+    const xml = scormXml('scorm12', { title: 'My Course' });
     expect(xml).toContain('<title>My Course</title>');
   });
 
   it('escapes XML special characters in title', () => {
-    const xml = scorm12Xml({ title: 'A & B <Course>' });
+    const xml = scormXml('scorm12', { title: 'A & B <Course>' });
     expect(xml).toContain('<title>A &amp; B &lt;Course&gt;</title>');
   });
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
-    const xml = scorm12Xml({ title: '' });
+    const xml = scormXml('scorm12', { title: '' });
     expect(xml).toContain('<title>Untitled Course</title>');
   });
 
   it('lists all files in dist/', () => {
-    const xml = scorm12Xml({ title: 'Test' });
+    const xml = scormXml('scorm12', { title: 'Test' });
 
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
@@ -99,12 +102,12 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('references index.html as resource href', () => {
-    const xml = scorm12Xml({ title: 'Test' });
+    const xml = scormXml('scorm12', { title: 'Test' });
     expect(xml).toMatch(/href="index.html">/);
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
-    const xml = scorm12Xml({ title: 'Test' });
+    const xml = scormXml('scorm12', { title: 'Test' });
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
@@ -117,19 +120,22 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('declares passingScore as adlcp:masteryscore on the item', () => {
-    const xml = scorm12Xml({ title: 'Test', scoring: { passingScore: 72.5 } });
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      scoring: { passingScore: 72.5 },
+    });
     expect(xml).toMatch(
       /<item identifier="item-1" identifierref="res-1">\s*<title>Test<\/title>\s*<adlcp:masteryscore>72\.5<\/adlcp:masteryscore>\s*<\/item>/,
     );
   });
 
   it('defaults adlcp:masteryscore to 70', () => {
-    const xml = scorm12Xml({ title: 'Test' });
+    const xml = scormXml('scorm12', { title: 'Test' });
     expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
   });
 
   it('omits adlcp:masteryscore in manual mode, even with a passingScore', () => {
-    const xml = scorm12Xml({
+    const xml = scormXml('scorm12', {
       title: 'Test',
       completion: { mode: 'manual' },
       scoring: { passingScore: 80 },
@@ -142,8 +148,7 @@ describe('SCORM 1.2 manifest', () => {
 
 describe('SCORM 2004 manifest', () => {
   it('generates valid XML with correct schema', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'My Course' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'My Course' });
 
     expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"');
     expect(xml).toContain('xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"');
@@ -151,29 +156,23 @@ describe('SCORM 2004 manifest', () => {
   });
 
   it('uses capital T in scormType', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain('adlcp:scormType="sco"');
   });
 
   it('does not declare adlcp:masteryscore', () => {
-    const xml = LMS_BUILD.scorm2004.generate(
-      mergeCourseConfig({ title: 'Test' }),
-      createDistDir(testRoot),
-    );
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).not.toContain('masteryscore');
   });
 
   it('lists all files', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
