@@ -26,6 +26,7 @@ interface ProfileShape {
   warnLabel?: string;
   missingDetail?: string;
   learnerIdField?: string;
+  learnerNameField?: string;
   suspendDataLimit?: number;
   interactionFormat?: InteractionFormat;
 }
@@ -48,6 +49,7 @@ export const STANDARDS = {
     missingDetail:
       'no SCORM 1.2 API object found in the window.parent or window.opener chain.',
     learnerIdField: 'cmi.core.student_id',
+    learnerNameField: 'cmi.core.student_name',
     suspendDataLimit: 4096,
     interactionFormat: SCORM12_INTERACTION_FORMAT,
   },
@@ -61,6 +63,7 @@ export const STANDARDS = {
     missingDetail:
       'no SCORM 2004 API object found in the window.parent or window.opener chain.',
     learnerIdField: 'cmi.learner_id',
+    learnerNameField: 'cmi.learner_name',
     suspendDataLimit: 64000,
     interactionFormat: SCORM2004_INTERACTION_FORMAT,
   },
@@ -115,4 +118,20 @@ export function largerSuspendDataStandards(limit: number): StandardId[] {
       (!('suspendDataLimit' in profile) || profile.suspendDataLimit > limit)
     );
   });
+}
+
+/**
+ * Origin of an http(s) URL, else null: the default `account.homePage` of a
+ * SCORM-derived actor, which the config validator predicts to know when
+ * `actorAccountHomePage` becomes required.
+ */
+export function httpOrigin(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.origin
+      : null;
+  } catch {
+    return null;
+  }
 }

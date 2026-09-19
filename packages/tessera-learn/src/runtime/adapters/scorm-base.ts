@@ -1,9 +1,20 @@
-import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  ExitMode,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
-import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
+import { BaseAdapter } from './base.js';
+import type { XAPIAgent } from '../xapi/types.js';
+import {
+  httpOrigin,
+  largerSuspendDataStandards,
+  type STANDARDS,
+} from '../standards.js';
 
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
@@ -29,35 +40,60 @@ export interface ScormDialect<TApi> {
   commit(api: TApi): string;
   getLastError(api: TApi): string;
   getErrorString(api: TApi, code: string): string;
-  getDiagnostic?(api: TApi, code: string): string;
+  getDiagnostic(api: TApi, code: string): string;
 }
 
-export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
+export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly api: TApi;
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
   protected readonly errorReporter: LMSErrorReporter;
-  #state: SavedState | null = null;
   #terminated = false;
   #suspendOverflowWarned = false;
   protected interactionCount = 0;
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
+    super();
     this.api = api;
     this.dialect = dialect;
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),
-      diagnostic: this.dialect.getDiagnostic
-        ? (c) => this.dialect.getDiagnostic!(this.api, c)
-        : undefined,
+      diagnostic: (c) => this.dialect.getDiagnostic(this.api, c),
     };
     this.queue.errorReporter = this.errorReporter;
   }
 
-  /** Exposed for xAPI actor synthesis (reads learner fields off the API). */
-  getAPI(): TApi {
-    return this.api;
+  /**
+   * `{ account: { homePage, name: <learner id> }, name: <learner name> }`.
+   * `homePage` defaults to the activityId origin so analytics keyed on actor
+   * identity stay stable across LMS hosts; the author's `actorAccountHomePage`
+   * overrides it when the authority namespace is elsewhere. Null when the LMS
+   * has no learner id or no homePage can be derived.
+   */
+  override deriveActor(
+    activityId: string,
+    actorAccountHomePage?: string,
+  ): XAPIAgent | null {
+    const { learnerIdField, learnerNameField } = this.dialect.profile;
+    const id = this.read(learnerIdField);
+    const homePage = actorAccountHomePage ?? httpOrigin(activityId);
+    if (!id || !homePage) return null;
+    const agent: XAPIAgent = {
+      account: { homePage, name: id },
+      objectType: 'Agent',
+    };
+    const name = this.read(learnerNameField);
+    if (name) agent.name = name;
+    return agent;
+  }
+
+  protected read(key: string): string {
+    try {
+      return this.dialect.getValue(this.api, key);
+    } catch {
+      return '';
+    }
   }
 
   // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
@@ -95,13 +131,12 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     }
     if (raw && raw.trim()) {
       try {
-        this.#state = JSON.parse(raw);
+        this.state = JSON.parse(raw);
       } catch (err) {
         console.warn(
           'Tessera: cmi.suspend_data is not valid JSON; resume disabled for this launch (the LMS may have truncated a prior write)',
           err,
         );
-        this.#state = null;
       }
     }
 
@@ -128,13 +163,9 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     }
   }
 
-  getState(): SavedState | null {
-    return this.#state;
-  }
-
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
-    this.#state = state;
+    this.state = state;
     const json = JSON.stringify(state);
     const { name, suspendDataLimit } = this.dialect.profile;
     if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
@@ -150,11 +181,11 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     this.set('cmi.suspend_data', json);
   }
 
-  setDuration(seconds: number): void {
+  override setDuration(seconds: number): void {
     this.set(this.dialect.sessionTimeKey, this.dialect.formatDuration(seconds));
   }
 
-  reportInteraction(
+  override reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
@@ -180,11 +211,11 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     }
   }
 
-  commit(): void {
+  override commit(): void {
     this.queue.enqueue(() => this.dialect.commit(this.api), 'Commit');
   }
 
-  terminate(): void {
+  override terminate(): void {
     if (this.#terminated) return;
     this.#terminated = true;
     // Async retries can't run during page unload — drain + commit + finish synchronously.
@@ -201,8 +232,8 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
     );
   }
 
-  abstract setScore(score: number): void;
-  abstract setCompletionStatus(status: 'incomplete' | 'complete'): void;
-  abstract setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
-  abstract setExit(mode: 'suspend' | 'normal'): void;
+  abstract override setScore(score: number): void;
+  abstract override setCompletionStatus(status: CompletionStatus): void;
+  abstract override setSuccessStatus(status: SuccessStatus): void;
+  abstract override setExit(mode: ExitMode): void;
 }

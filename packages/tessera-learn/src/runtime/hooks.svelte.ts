@@ -2,6 +2,7 @@ import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import type { QuizConfig } from './types.js';
+import type { CompletionStatus } from './persistence.js';
 import {
   requireNavContext,
   getNavContext,
@@ -349,7 +350,7 @@ export function __resetUseCompletionWarning(): void {
 
 export function useCompletion(): {
   markComplete(): void;
-  readonly completionStatus: 'incomplete' | 'complete';
+  readonly completionStatus: CompletionStatus;
 } {
   const { progress, config } = requireNavContext('useCompletion()');
   return {

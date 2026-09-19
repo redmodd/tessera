@@ -22,21 +22,10 @@ import {
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig } from './helpers.js';
+import { createManifest, createConfig, stubAdapter } from './helpers.js';
 
 function makeAdapter() {
-  return {
-    init: vi.fn(),
-    getState: vi.fn(),
-    saveState: vi.fn(),
-    setScore: vi.fn(),
-    setCompletionStatus: vi.fn(),
-    setSuccessStatus: vi.fn(),
-    setDuration: vi.fn(),
-    reportInteraction: vi.fn(),
-    commit: vi.fn(),
-    terminate: vi.fn(),
-  };
+  return stubAdapter({ reportInteraction: vi.fn() });
 }
 
 function makeNavCtx(progress: ProgressState, currentIndex = 0) {

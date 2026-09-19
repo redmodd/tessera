@@ -1,5 +1,10 @@
 import { scorm12Type } from '../interaction-format.js';
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  ExitMode,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
 import { STANDARDS } from '../standards.js';
@@ -51,15 +56,14 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * combined result through `#flushLessonStatus`.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
-  // SCORM 1.2 combines completion and success into a single lesson_status field.
-  #completionStatus: string = 'incomplete';
-  #successStatus: string | null = null;
+  #completionStatus: 'completed' | 'incomplete' = 'incomplete';
+  #successStatus: 'passed' | 'failed' | null = null;
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);
   }
 
-  saveState(state: SavedState): void {
+  override saveState(state: SavedState): void {
     super.saveState(state);
     // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.core.lesson_location', String(state.b));
@@ -71,12 +75,12 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.set('cmi.core.score.max', '100');
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  setCompletionStatus(status: CompletionStatus): void {
     this.#completionStatus = status === 'complete' ? 'completed' : 'incomplete';
     this.#flushLessonStatus();
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  setSuccessStatus(status: SuccessStatus): void {
     // SCORM 1.2 has no "unknown" lesson_status — clear the success override
     // so completion status drives lesson_status until a real result is known.
     this.#successStatus = status === 'unknown' ? null : status;
@@ -88,7 +92,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.set('cmi.core.lesson_status', value);
   }
 
-  setExit(mode: 'suspend' | 'normal'): void {
+  setExit(mode: ExitMode): void {
     // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
     this.set('cmi.core.exit', mode === 'suspend' ? 'suspend' : '');
   }

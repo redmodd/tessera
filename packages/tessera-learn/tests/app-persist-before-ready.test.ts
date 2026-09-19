@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { stubAdapter } from './helpers.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const pages = [0].map((index) => ({
@@ -48,18 +50,12 @@ async function mountWithSlowInit(
   });
   const saveState = vi.fn();
   const commit = vi.fn();
-  const adapter = {
+  const adapter = stubAdapter({
     init: () => initGate,
-    getState: () => savedState,
+    getState: () => savedState as SavedState | null,
     saveState,
-    setDuration: () => {},
-    setExit: () => {},
-    setScore: () => {},
-    setCompletionStatus: () => {},
-    setSuccessStatus: () => {},
     commit,
-    terminate: () => {},
-  };
+  });
 
   vi.resetModules();
   const { mount, unmount } = await import('svelte');

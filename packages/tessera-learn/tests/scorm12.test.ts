@@ -1,39 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import {
   SCORM12Adapter,
   type SCORM12API,
 } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-
-function createMockAPI(overrides: Partial<SCORM12API> = {}): SCORM12API {
-  const store = new Map<string, string>();
-  return {
-    LMSInitialize: vi.fn().mockReturnValue('true'),
-    LMSFinish: vi.fn().mockReturnValue('true'),
-    LMSGetValue: vi.fn((key: string) => store.get(key) || ''),
-    LMSSetValue: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-      return 'true';
-    }),
-    LMSCommit: vi.fn().mockReturnValue('true'),
-    LMSGetLastError: vi.fn().mockReturnValue('0'),
-    LMSGetErrorString: vi.fn().mockReturnValue(''),
-    LMSGetDiagnostic: vi.fn().mockReturnValue(''),
-    ...overrides,
-  };
-}
-
-/** Wait for the async write queue to flush */
-async function flush() {
-  await new Promise((r) => setTimeout(r, 50));
-}
+import { validateAgent } from '../src/runtime/xapi/validation.js';
+import { flush, scorm12Api } from './helpers.js';
 
 describe('SCORM12Adapter', () => {
-  let api: SCORM12API;
+  let api: Mocked<SCORM12API>;
   let adapter: SCORM12Adapter;
 
   beforeEach(() => {
-    api = createMockAPI();
+    api = scorm12Api();
     adapter = new SCORM12Adapter(api);
   });
 
@@ -51,7 +30,7 @@ describe('SCORM12Adapter', () => {
       q: { '2': 80 },
       d: 100,
     };
-    (api.LMSGetValue as any).mockImplementation((key: string) =>
+    api.LMSGetValue.mockImplementation((key) =>
       key === 'cmi.suspend_data' ? JSON.stringify(state) : '',
     );
     await adapter.init();
@@ -64,7 +43,7 @@ describe('SCORM12Adapter', () => {
   });
 
   it('returns null state for corrupted suspend_data', async () => {
-    (api.LMSGetValue as any).mockReturnValue('{broken');
+    api.LMSGetValue.mockReturnValue('{broken');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
@@ -160,10 +139,10 @@ describe('SCORM12Adapter', () => {
     await adapter.init();
     adapter.setScore((7 / 11) * 100);
     await flush();
-    const rawCall = (api.LMSSetValue as any).mock.calls.find(
-      ([k]: [string]) => k === 'cmi.core.score.raw',
+    expect(api.LMSSetValue).toHaveBeenCalledWith(
+      'cmi.core.score.raw',
+      '63.6363636',
     );
-    expect(rawCall[1]).toBe('63.6363636');
   });
 
   // ---- lesson_status ----
@@ -191,31 +170,31 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('passed');
       await flush();
-      const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+      const calls = api.LMSSetValue.mock.calls.filter(
+        ([k]) => k === 'cmi.core.lesson_status',
       );
-      expect(calls[calls.length - 1][1]).toBe('passed');
+      expect(calls.at(-1)?.[1]).toBe('passed');
     });
 
     it('failed status takes priority over completion', async () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('failed');
       await flush();
-      const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+      const calls = api.LMSSetValue.mock.calls.filter(
+        ([k]) => k === 'cmi.core.lesson_status',
       );
-      expect(calls[calls.length - 1][1]).toBe('failed');
+      expect(calls.at(-1)?.[1]).toBe('failed');
     });
 
     it('success still takes priority after completion update', async () => {
       adapter.setSuccessStatus('passed');
       adapter.setCompletionStatus('incomplete');
       await flush();
-      const calls = (api.LMSSetValue as any).mock.calls.filter(
-        (c: string[]) => c[0] === 'cmi.core.lesson_status',
+      const calls = api.LMSSetValue.mock.calls.filter(
+        ([k]) => k === 'cmi.core.lesson_status',
       );
       // Success status still takes priority
-      expect(calls[calls.length - 1][1]).toBe('passed');
+      expect(calls.at(-1)?.[1]).toBe('passed');
     });
   });
 
@@ -265,12 +244,10 @@ describe('SCORM12Adapter', () => {
 
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
-    (api.LMSSetValue as any).mockImplementation(
-      (key: string, _value: string) => {
-        order.push(key);
-        return 'true';
-      },
-    );
+    api.LMSSetValue.mockImplementation((key) => {
+      order.push(key);
+      return 'true';
+    });
 
     adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
     adapter.setScore(85);
@@ -285,7 +262,7 @@ describe('SCORM12Adapter', () => {
 
   it('retries on failed LMSSetValue via queue', async () => {
     let callCount = 0;
-    (api.LMSSetValue as any).mockImplementation(() => {
+    api.LMSSetValue.mockImplementation(() => {
       callCount++;
       return callCount >= 3 ? 'true' : 'false';
     });
@@ -301,9 +278,7 @@ describe('SCORM12Adapter', () => {
   describe('reportInteraction', () => {
     function setValuesFor(prefix: string): Record<string, string> {
       const result: Record<string, string> = {};
-      for (const call of (api.LMSSetValue as any).mock.calls as Array<
-        [string, string]
-      >) {
+      for (const call of api.LMSSetValue.mock.calls) {
         if (call[0].startsWith(prefix)) result[call[0]] = call[1];
       }
       return result;
@@ -546,10 +521,10 @@ describe('SCORM12Adapter', () => {
   describe('error logging parity with cmi5', () => {
     it('warns with LMS error code + diagnostic when LMSInitialize fails', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (api.LMSInitialize as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
-      (api.LMSGetDiagnostic as any).mockReturnValue('LMS unavailable');
+      api.LMSInitialize.mockReturnValue('false');
+      api.LMSGetLastError.mockReturnValue('101');
+      api.LMSGetErrorString.mockReturnValue('General Exception');
+      api.LMSGetDiagnostic.mockReturnValue('LMS unavailable');
       await adapter.init();
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/Initialize/);
@@ -562,7 +537,7 @@ describe('SCORM12Adapter', () => {
 
     it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (api.LMSGetValue as any).mockImplementation((key: string) =>
+      api.LMSGetValue.mockImplementation((key) =>
         key === 'cmi.interactions._count' ? 'NaN' : '',
       );
       await adapter.init();
@@ -575,9 +550,9 @@ describe('SCORM12Adapter', () => {
     it('warns when LMSCommit fails during terminate', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
-      (api.LMSCommit as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
+      api.LMSCommit.mockReturnValue('false');
+      api.LMSGetLastError.mockReturnValue('101');
+      api.LMSGetErrorString.mockReturnValue('General Exception');
       adapter.terminate();
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/Commit.*during terminate/);
@@ -588,9 +563,9 @@ describe('SCORM12Adapter', () => {
     it('warns when LMSFinish fails during terminate', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
-      (api.LMSFinish as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('101');
-      (api.LMSGetErrorString as any).mockReturnValue('General Exception');
+      api.LMSFinish.mockReturnValue('false');
+      api.LMSGetLastError.mockReturnValue('101');
+      api.LMSGetErrorString.mockReturnValue('General Exception');
       adapter.terminate();
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/Terminate.*during terminate/);
@@ -600,10 +575,10 @@ describe('SCORM12Adapter', () => {
     it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
-      (api.LMSSetValue as any).mockReturnValue('false');
-      (api.LMSGetLastError as any).mockReturnValue('405');
-      (api.LMSGetErrorString as any).mockReturnValue('Incorrect Data Type');
-      (api.LMSGetDiagnostic as any).mockReturnValue(
+      api.LMSSetValue.mockReturnValue('false');
+      api.LMSGetLastError.mockReturnValue('405');
+      api.LMSGetErrorString.mockReturnValue('Incorrect Data Type');
+      api.LMSGetDiagnostic.mockReturnValue(
         'student_response invalid CMIFeedback',
       );
       adapter.setScore(85);
@@ -614,6 +589,40 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/Incorrect Data Type/);
       expect(messages).toMatch(/student_response invalid CMIFeedback/);
       warn.mockRestore();
+    });
+  });
+
+  describe('deriveActor', () => {
+    const activityId = 'https://example.com/courses/1';
+
+    it('builds an Identified Agent from cmi.core.student_id / student_name', () => {
+      const withLearner = new SCORM12Adapter(
+        scorm12Api({
+          'cmi.core.student_id': 'student-42',
+          'cmi.core.student_name': 'Ada Lovelace',
+        }),
+      );
+      const actor = withLearner.deriveActor(activityId);
+      expect(actor).toEqual({
+        account: { homePage: 'https://example.com', name: 'student-42' },
+        name: 'Ada Lovelace',
+        objectType: 'Agent',
+      });
+      expect(validateAgent(actor)).toBeNull();
+    });
+
+    it('honors an actorAccountHomePage override', () => {
+      const withLearner = new SCORM12Adapter(
+        scorm12Api({ 'cmi.core.student_id': 'sid' }),
+      );
+      expect(
+        withLearner.deriveActor(activityId, 'https://lms.example.com')?.account
+          ?.homePage,
+      ).toBe('https://lms.example.com');
+    });
+
+    it('returns null when the LMS has no learner id', () => {
+      expect(adapter.deriveActor(activityId)).toBeNull();
     });
   });
 });

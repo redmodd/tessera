@@ -1,4 +1,9 @@
-import type { SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  ExitMode,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import {
   formatISO8601Duration,
@@ -46,55 +51,32 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 
 /**
  * Per §4.2.1.5, the SCO MUST NOT alter the learner record in `browse` or
- * `review` mode — every write below is gated on `#mode === 'normal'`.
- * `#masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
+ * `review` mode: every write below is gated on `#mode === 'normal'`.
+ * `masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
-  #masteryScore: number | null = null;
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);
   }
 
-  async init(): Promise<void> {
+  override async init(): Promise<void> {
     await super.init();
     this.#mode = this.#readMode();
-    this.#masteryScore = this.#readScaledThreshold('cmi.scaled_passing_score');
+    this.masteryScore = parseScaled01(this.read('cmi.scaled_passing_score'));
   }
 
-  getLaunchMode(): SCORM2004Mode {
-    return this.#mode;
-  }
-
-  /** Read by App.svelte to override `course.config.js scoring.passingScore`. */
-  getMasteryScore(): number | null {
-    return this.#masteryScore;
-  }
-
-  protected canWrite(): boolean {
+  protected override canWrite(): boolean {
     return this.#mode === 'normal';
   }
 
   #readMode(): SCORM2004Mode {
-    try {
-      const v = this.dialect.getValue(this.api, 'cmi.mode');
-      if (v === 'browse' || v === 'review' || v === 'normal') return v;
-    } catch {}
-    return 'normal';
+    const v = this.read('cmi.mode');
+    return v === 'browse' || v === 'review' ? v : 'normal';
   }
 
-  #readScaledThreshold(key: string): number | null {
-    let raw: string;
-    try {
-      raw = this.dialect.getValue(this.api, key);
-    } catch {
-      return null;
-    }
-    return parseScaled01(raw);
-  }
-
-  saveState(state: SavedState): void {
+  override saveState(state: SavedState): void {
     super.saveState(state);
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.location', String(state.b));
@@ -111,7 +93,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     );
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  setCompletionStatus(status: CompletionStatus): void {
     this.set(
       'cmi.completion_status',
       status === 'complete' ? 'completed' : 'incomplete',
@@ -120,13 +102,13 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     if (status === 'complete') this.set('cmi.progress_measure', '1');
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  setSuccessStatus(status: SuccessStatus): void {
     // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
     // a null status to "passed".
     this.set('cmi.success_status', status);
   }
 
-  setExit(mode: 'suspend' | 'normal'): void {
+  setExit(mode: ExitMode): void {
     this.set('cmi.exit', mode);
   }
 }

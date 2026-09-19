@@ -3,9 +3,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildXAPIClient } from '../src/runtime/xapi/setup.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
+import { WebAdapter } from '../src/runtime/adapters/web.js';
+import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import { scorm12Api } from './helpers.js';
 
 const mockFetch = vi.fn();
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const baseLaunchParams = {
   fetch: 'https://lms.example.com/fetch-token',
@@ -62,10 +69,6 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
     setSearchParams(baseLaunchParams);
     setupLMSMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("fan-outs a useXAPI() sendStatement through the cmi5 publisher (endpoint: 'lms')", async () => {
@@ -225,18 +228,73 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     ]);
   });
 
+  it('skips a destination the publisher rejects without dropping the others', async () => {
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const config = baseConfig();
+    config.xapi = [
+      { endpoint: 'lms' },
+      {
+        id: 'analytics',
+        endpoint: 'ftp://analytics.example.com/xapi/',
+        auth: 'analytics-token',
+        activityId: 'https://example.com/course/analytics',
+      },
+    ];
+
+    const client = await buildXAPIClient(config, adapter);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/failed to initialize a destination/),
+      expect.any(Error),
+    );
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+    const result = await client!.sendStatement({
+      verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
+      object: {
+        id: 'https://example.com/course/xapi/note',
+        objectType: 'Activity',
+      },
+    });
+    expect(result.destinations.map((d) => d.endpoint)).toEqual([
+      'https://lms.example.com/xapi/',
+    ]);
+  });
+
   it("dev fallback: 'lms' under cmi5 with no launch params surfaces a clear error on send", async () => {
-    // No launch params → the runtime hands buildXAPIClient `null` (it'd
-    // otherwise pass the WebAdapter fallback). Mirror that shape here.
+    // No launch params: createAdapter's dev fallback is a WebAdapter.
     setSearchParams({});
 
     const config = baseConfig();
     config.xapi = { endpoint: 'lms' };
 
-    const client = await buildXAPIClient(config, null);
+    const client = await buildXAPIClient(config, new WebAdapter(config));
     expect(client).not.toBeNull();
 
     // sendStatement is Promise.all-fail-fast — the whole call rejects.
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/no cmi5 launch parameters/);
+  });
+
+  it('dev fallback: an explicit destination with no actor under cmi5 rejects sends', async () => {
+    setSearchParams({});
+
+    const config = baseConfig();
+    config.xapi = {
+      id: 'analytics',
+      endpoint: 'https://analytics.example.com/xapi/',
+      auth: 'analytics-token',
+      activityId: 'https://example.com/course/analytics',
+    };
+
+    const client = await buildXAPIClient(config, new WebAdapter(config));
     await expect(
       client!.sendStatement(
         { verb: { id: 'http://verb/exp' } },
@@ -268,10 +326,6 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
       }
       return { ok: true, status: 204 };
     });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("fan-outs a useXAPI() sendStatement through the xAPI launch publisher (endpoint: 'lms')", async () => {
@@ -325,7 +379,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     } as CourseConfig;
     config.xapi = { endpoint: 'lms' };
 
-    const client = await buildXAPIClient(config, null);
+    const client = await buildXAPIClient(config, new WebAdapter(config));
     expect(client).not.toBeNull();
 
     await expect(
@@ -336,5 +390,54 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     ).rejects.toThrow(
       /xAPI launch parameters \(endpoint \/ auth \/ actor \/ activity_id\)/,
     );
+  });
+});
+
+describe('buildXAPIClient — SCORM explicit destination', () => {
+  const explicit = {
+    id: 'analytics',
+    endpoint: 'https://analytics.example.com/xapi/',
+    auth: 'analytics-token',
+    activityId: 'https://example.com/course/analytics',
+  };
+
+  function scormConfig(): CourseConfig {
+    return {
+      ...baseConfig(),
+      export: { standard: 'scorm12' },
+      xapi: explicit,
+    } as CourseConfig;
+  }
+
+  it('derives the actor from the connected LMS', async () => {
+    const client = await buildXAPIClient(
+      scormConfig(),
+      new SCORM12Adapter(scorm12Api({ 'cmi.core.student_id': 'learner-7' })),
+    );
+    expect(client!.getActor()).toEqual({
+      account: { homePage: 'https://example.com', name: 'learner-7' },
+      objectType: 'Agent',
+    });
+  });
+
+  it('skips the destination with a warning when the LMS has no learner id', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(
+      await buildXAPIClient(scormConfig(), new SCORM12Adapter(scorm12Api())),
+    ).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"analytics" has no actor/),
+    );
+  });
+
+  it('dev fallback: rejects sends because no SCORM API was found', async () => {
+    const config = scormConfig();
+    const client = await buildXAPIClient(config, new WebAdapter(config));
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/no SCORM 1.2 API object found/);
   });
 });

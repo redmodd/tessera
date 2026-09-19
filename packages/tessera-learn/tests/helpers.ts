@@ -1,5 +1,66 @@
+import { vi, type Mocked } from 'vitest';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import { BaseAdapter } from '../src/runtime/adapters/base.js';
+import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
+import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
+
+/** A SCORM 1.2 API backed by a store seeded from `values`; every call is a spy that succeeds. */
+export function scorm12Api(
+  values: Record<string, string> = {},
+): Mocked<SCORM12API> {
+  const store = new Map(Object.entries(values));
+  return {
+    LMSInitialize: vi.fn().mockReturnValue('true'),
+    LMSFinish: vi.fn().mockReturnValue('true'),
+    LMSGetValue: vi.fn((key: string) => store.get(key) ?? ''),
+    LMSSetValue: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+      return 'true';
+    }),
+    LMSCommit: vi.fn().mockReturnValue('true'),
+    LMSGetLastError: vi.fn().mockReturnValue('0'),
+    LMSGetErrorString: vi.fn().mockReturnValue(''),
+    LMSGetDiagnostic: vi.fn().mockReturnValue(''),
+  };
+}
+
+/** A SCORM 2004 API backed by a store seeded from `values`; every call is a spy that succeeds. */
+export function scorm2004Api(
+  values: Record<string, string> = {},
+): Mocked<SCORM2004API> {
+  const store = new Map(Object.entries(values));
+  return {
+    Initialize: vi.fn().mockReturnValue('true'),
+    Terminate: vi.fn().mockReturnValue('true'),
+    GetValue: vi.fn((key: string) => store.get(key) ?? ''),
+    SetValue: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+      return 'true';
+    }),
+    Commit: vi.fn().mockReturnValue('true'),
+    GetLastError: vi.fn().mockReturnValue('0'),
+    GetErrorString: vi.fn().mockReturnValue(''),
+    GetDiagnostic: vi.fn().mockReturnValue(''),
+  };
+}
+
+class StubAdapter extends BaseAdapter {
+  async init(): Promise<void> {}
+  saveState(): void {}
+}
+
+/**
+ * A connected adapter whose members all no-op, for mounting App without an
+ * LMS. An override left undefined keeps the default member.
+ */
+export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
+  const defined = Object.entries(overrides).filter(([, v]) => v !== undefined);
+  return Object.assign(new StubAdapter(), Object.fromEntries(defined));
+}
+
+/** Let an adapter's async write queue drain. */
+export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 export function createManifest(
   pageCount: number,

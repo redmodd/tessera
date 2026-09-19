@@ -1,9 +1,14 @@
-import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS } from '../standards.js';
 import { formatISO8601Duration } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
+import { BaseAdapter } from './base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type {
@@ -77,7 +82,7 @@ const EXIT_STATE_ID = 'tessera-state-exit';
  * buildContext()/isDefinedStatementAllowed()/scoreForSuccess() to layer
  * profile rules on top.
  */
-export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
+export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected publisher: XAPIPublisher | null = null;
   protected endpoint = '';
   protected activityId = '';
@@ -92,17 +97,14 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
 
   protected score: number | null = null;
   protected durationSeconds = 0;
-  protected state: SavedState | null = null;
   protected stateLoadFailed = false;
   protected completedEmitted = false;
-  protected lastSuccessEmitted: 'unknown' | 'passed' | 'failed' = 'unknown';
+  protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
   protected terminated = false;
   protected returnURL: string | undefined;
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
-
-  abstract init(): Promise<void>;
 
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
@@ -121,12 +123,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     return this.score !== null ? this.score / 100 : null;
   }
 
-  getPublisher(): XAPIPublisher | null {
+  override launchPublisher(): XAPIPublisher | null {
     return this.publisher;
   }
 
-  getState(): SavedState | null {
-    return this.state;
+  override deriveActor(): XAPIAgent | null {
+    return this.actor;
   }
 
   saveState(state: SavedState): void {
@@ -156,7 +158,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     }
   }
 
-  setScore(score: number): void {
+  override setScore(score: number): void {
     if (!Number.isFinite(score)) {
       this.score = null;
       return;
@@ -164,15 +166,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     this.score = Math.max(0, Math.min(100, score));
   }
 
-  setDuration(seconds: number): void {
+  override setDuration(seconds: number): void {
     this.durationSeconds = seconds;
   }
 
-  setExit(_mode: 'suspend' | 'normal'): void {
-    // No cmi.exit analogue in xAPI; suspend is implicit. No-op.
-  }
-
-  commit(): void {
+  override commit(): void {
     if (!this.publisher || this.score === null) return;
     const scaled = this.score / 100;
     if (scaled === this.lastScoreEmitted) return;
@@ -186,11 +184,11 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     });
   }
 
-  seedLifecycle(
-    completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed',
+  override seedLifecycle(
+    completion: CompletionStatus,
+    success: SuccessStatus,
     score?: number | null,
-  ): void {
+  ): boolean {
     if (completion === 'complete') this.completedEmitted = true;
     if (success === 'passed' || success === 'failed') {
       this.lastSuccessEmitted = success;
@@ -199,9 +197,10 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       this.setScore(score);
       this.lastScoreEmitted = this.score === null ? null : this.score / 100;
     }
+    return true;
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  override setCompletionStatus(status: CompletionStatus): void {
     if (status !== 'complete' || this.completedEmitted || !this.publisher)
       return;
     if (!this.isDefinedStatementAllowed()) return;
@@ -217,7 +216,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     });
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  override setSuccessStatus(status: SuccessStatus): void {
     if (status === 'unknown' || !this.publisher) return;
     if (status === this.lastSuccessEmitted) return;
     if (!this.isDefinedStatementAllowed()) return;
@@ -241,7 +240,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     });
   }
 
-  reportInteraction(
+  override reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
@@ -272,7 +271,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     });
   }
 
-  terminate(): void {
+  override terminate(): void {
     if (this.terminated) return;
     this.terminated = true;
     if (!this.publisher) return;
@@ -416,7 +415,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
    * with saving enabled. Exhausting the attempts or the deadline leaves the
    * stored state unread, so `stateLoadFailed` withholds every later write.
    */
-  async loadState(): Promise<void> {
+  override async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
     let lastDetail = '';
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {

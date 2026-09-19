@@ -1015,7 +1015,7 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 
 ### Gotchas
 
-- **Actor priority:** an author-supplied actor (`xapi.actor` or a `course.runtime.js` resolver) always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model; else error. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
+- **Actor priority:** an author-supplied actor (`xapi.actor` or a `course.runtime.js` resolver) always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model. If the SCORM LMS supplies no learner id, that destination is skipped with a console warning, so `useXAPI()` is null when it was the only one. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
 - **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` resolver or run a proxy.
 - **`course.config.js` and `course.runtime.js` ship in the client bundle.** Every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in either; export an `auth` resolver that fetches a server-brokered short-lived token. CORS must allow the served origin.
 - **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).

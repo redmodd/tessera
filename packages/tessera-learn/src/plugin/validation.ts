@@ -29,11 +29,11 @@ import {
   validateAuthCredential,
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
-import { httpOrigin } from '../runtime/xapi/derive-actor.js';
 import {
   DEFAULT_STANDARD,
   STANDARDS,
   STANDARD_IDS,
+  httpOrigin,
   largerSuspendDataStandards,
   standardProfile,
   type StandardId,

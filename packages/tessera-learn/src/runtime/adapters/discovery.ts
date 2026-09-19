@@ -1,6 +1,6 @@
 /**
  * LMS-runtime discovery helpers. Internal to the adapters layer — these
- * decide which `PersistenceAdapter` `createAdapter()` returns for a given
+ * decide which adapter `createAdapter()` returns for a given
  * `export.standard`. Not part of the public package API.
  */
 

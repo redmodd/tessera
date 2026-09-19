@@ -65,10 +65,6 @@ interface CMI5LaunchData {
  * Agent Profile GET.
  */
 export class CMI5Adapter extends BaseXAPILaunchAdapter {
-  // cmi5 §8 launch params. masteryScore (when present) overrides the
-  // course's manifest passingScore for this launch — the LMS is the authority.
-  #masteryScore: number | null = null;
-
   // cmi5 §10 LMS.LaunchData; `contextTemplate` (§9.6.2) is the base context
   // strict LRSes validate every Defined Statement against.
   #launchData: CMI5LaunchData | null = null;
@@ -92,7 +88,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     if (rawMastery !== null && rawMastery !== '') {
       const m = parseScaled01(rawMastery);
       if (m !== null) {
-        this.#masteryScore = m;
+        this.masteryScore = m;
       } else {
         console.warn(
           `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`,
@@ -196,7 +192,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
       const launchMastery = parseScaled01(this.#launchData.masteryScore);
       if (launchMastery !== null) {
-        this.#masteryScore = launchMastery;
+        this.masteryScore = launchMastery;
       }
     }
 
@@ -213,23 +209,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     this.sendInitialized();
   }
 
-  /**
-   * LMS-supplied masteryScore from the cmi5 launch URL (a decimal in
-   * [0, 1]), or null when omitted. When present, the runtime should treat
-   * it as the authoritative pass threshold for this session, overriding
-   * `course.config.js scoring.passingScore`.
-   */
-  getMasteryScore(): number | null {
-    return this.#masteryScore;
-  }
-
-  /** cmi5 §10.2.2 — "Normal" is the only mode where progress-bearing Defined Statements are permitted. */
-  getLaunchMode(): CMI5LaunchMode {
-    return this.#launchMode;
-  }
-
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */
-  protected isDefinedStatementAllowed(): boolean {
+  protected override isDefinedStatementAllowed(): boolean {
     return this.#launchMode === 'Normal';
   }
 
@@ -239,17 +220,18 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * author asserted the verb, so on contradiction keep the verb and drop
    * the score (and warn).
    */
-  protected scoreForSuccess(status: 'passed' | 'failed'): number | null {
+  protected override scoreForSuccess(
+    status: 'passed' | 'failed',
+  ): number | null {
     if (this.score === null) return null;
     const scaled = this.score / 100;
-    if (this.#masteryScore !== null) {
-      const violatesPassed = status === 'passed' && scaled < this.#masteryScore;
-      const violatesFailed =
-        status === 'failed' && scaled >= this.#masteryScore;
+    if (this.masteryScore !== null) {
+      const violatesPassed = status === 'passed' && scaled < this.masteryScore;
+      const violatesFailed = status === 'failed' && scaled >= this.masteryScore;
       if (violatesPassed || violatesFailed) {
         console.warn(
           `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to ` +
-            `${status === 'passed' ? 'Passed' : 'Failed'} (masteryScore=${this.#masteryScore}); ` +
+            `${status === 'passed' ? 'Passed' : 'Failed'} (masteryScore=${this.masteryScore}); ` +
             `per cmi5 §9.3.${status === 'passed' ? '4' : '5'} the score would contradict the verb. ` +
             `Statement will be sent without a score.`,
         );
@@ -266,7 +248,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * Completed/Passed/Failed (§9.6.2.2), and the masteryScore extension
    * for Passed/Failed (§9.6.3.2).
    */
-  protected buildContext(
+  protected override buildContext(
     opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> {
     const tmpl = this.#launchData?.contextTemplate ?? {};
@@ -301,10 +283,10 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       contextActivities,
     };
     // cmi5 §9.6.3.2 — masteryScore extension is scoped to Passed/Failed.
-    if (opts.mastery && this.#masteryScore !== null) {
+    if (opts.mastery && this.masteryScore !== null) {
       ctx.extensions = {
         ...(tmpl.extensions ?? {}),
-        [CMI5_MASTERYSCORE_EXT]: this.#masteryScore,
+        [CMI5_MASTERYSCORE_EXT]: this.masteryScore,
       };
     }
     return ctx;

@@ -1,54 +1,10 @@
 /**
- * Persistence API — interface for saving/restoring course state.
+ * Persistence API: the lifecycle statuses and saved course state that adapters exchange.
  */
 
-import type { Interaction } from './interaction.js';
-
-export interface PersistenceAdapter {
-  /**
-   * Connect to the LMS. Failure is fatal: nothing can be reported, so the
-   * course must not start.
-   */
-  init(): Promise<void>;
-  /**
-   * Fetch previously saved state, where that costs a network round trip. Split
-   * from `init()` so a stalled State API costs resume rather than the launch;
-   * the adapter bounds the request itself and resolves either way. An adapter
-   * that could not read its state must then refuse `saveState` rather than
-   * overwrite what it failed to read.
-   */
-  loadState?(): Promise<void>;
-  getState(): SavedState | null;
-  saveState(state: SavedState): void;
-  setScore(score: number): void;
-  setCompletionStatus(status: 'incomplete' | 'complete'): void;
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
-  /** Tell the adapter what was already emitted in prior sessions, so it skips re-emitting on resume. */
-  seedLifecycle?(
-    completion: 'incomplete' | 'complete',
-    success: 'unknown' | 'passed' | 'failed',
-    score?: number | null,
-  ): void;
-  setDuration(seconds: number): void;
-  /**
-   * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps
-   * `'suspend'` → `cmi.core.exit = 'suspend'`, `'normal'` → empty (the
-   * vocabulary has no explicit normal value). SCORM 2004 maps directly
-   * onto `cmi.exit`. cmi5 / web adapters no-op.
-   */
-  setExit(mode: 'suspend' | 'normal'): void;
-  /**
-   * Report a single learner interaction (answered question) to the LMS.
-   * Called once per question on quiz submit or standalone useQuestion submit.
-   */
-  reportInteraction(
-    questionId: string,
-    interaction: Interaction,
-    correct: boolean | null,
-  ): void;
-  commit(): void;
-  terminate(): void;
-}
+export type CompletionStatus = 'incomplete' | 'complete';
+export type SuccessStatus = 'passed' | 'failed' | 'unknown';
+export type ExitMode = 'suspend' | 'normal';
 
 /** One page's entry in `SavedState.g`. */
 export interface GradedUnitState {

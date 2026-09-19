@@ -1,6 +1,6 @@
 import type { CourseConfig } from '../types.js';
 import type { Manifest } from '../../plugin/manifest.js';
-import type { PersistenceAdapter } from '../persistence.js';
+import type { BaseAdapter } from './base.js';
 import { WebAdapter } from './web.js';
 import { SCORM12Adapter } from './scorm12.js';
 import { SCORM2004Adapter } from './scorm2004.js';
@@ -29,7 +29,7 @@ export interface CreateAdapterOptions {
 }
 
 /** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. */
-const LMS_ADAPTERS: Record<LMSStandard, () => PersistenceAdapter | null> = {
+const LMS_ADAPTERS: Record<LMSStandard, () => BaseAdapter | null> = {
   scorm12: () => {
     const api = findSCORM12API();
     return api ? new SCORM12Adapter(api) : null;
@@ -56,7 +56,7 @@ const LMS_ADAPTERS: Record<LMSStandard, () => PersistenceAdapter | null> = {
 export function createAdapter(
   config: CourseConfig,
   options: CreateAdapterOptions = {},
-): PersistenceAdapter {
+): BaseAdapter {
   const allowFallback = options.allowFallback ?? import.meta.env?.DEV === true;
   const profile = standardProfile(config.export?.standard);
   if (profile?.packaged) {
