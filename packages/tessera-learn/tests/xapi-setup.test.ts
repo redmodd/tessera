@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildXAPIClient } from '../src/runtime/xapi/setup.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
+import { WebAdapter } from '../src/runtime/adapters/web.js';
+import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 
 const mockFetch = vi.fn();
@@ -226,14 +228,13 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it("dev fallback: 'lms' under cmi5 with no launch params surfaces a clear error on send", async () => {
-    // No launch params → the runtime hands buildXAPIClient `null` (it'd
-    // otherwise pass the WebAdapter fallback). Mirror that shape here.
+    // No launch params: createAdapter's dev fallback is a WebAdapter.
     setSearchParams({});
 
     const config = baseConfig();
     config.xapi = { endpoint: 'lms' };
 
-    const client = await buildXAPIClient(config, null);
+    const client = await buildXAPIClient(config, new WebAdapter(config));
     expect(client).not.toBeNull();
 
     // sendStatement is Promise.all-fail-fast — the whole call rejects.
@@ -325,7 +326,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     } as CourseConfig;
     config.xapi = { endpoint: 'lms' };
 
-    const client = await buildXAPIClient(config, null);
+    const client = await buildXAPIClient(config, new WebAdapter(config));
     expect(client).not.toBeNull();
 
     await expect(
@@ -336,5 +337,70 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     ).rejects.toThrow(
       /xAPI launch parameters \(endpoint \/ auth \/ actor \/ activity_id\)/,
     );
+  });
+});
+
+describe('buildXAPIClient — SCORM explicit destination', () => {
+  const explicit = {
+    id: 'analytics',
+    endpoint: 'https://analytics.example.com/xapi/',
+    auth: 'analytics-token',
+    activityId: 'https://example.com/course/analytics',
+  };
+
+  function scormConfig(): CourseConfig {
+    return {
+      ...baseConfig(),
+      export: { standard: 'scorm12' },
+      xapi: explicit,
+    } as CourseConfig;
+  }
+
+  function scorm12(values: Record<string, string>): SCORM12Adapter {
+    return new SCORM12Adapter({
+      LMSInitialize: () => 'true',
+      LMSFinish: () => 'true',
+      LMSGetValue: (k: string) => values[k] ?? '',
+      LMSSetValue: () => 'true',
+      LMSCommit: () => 'true',
+      LMSGetLastError: () => '0',
+      LMSGetErrorString: () => '',
+      LMSGetDiagnostic: () => '',
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('derives the actor from the connected LMS', async () => {
+    const client = await buildXAPIClient(
+      scormConfig(),
+      scorm12({ 'cmi.core.student_id': 'learner-7' }),
+    );
+    expect(client!.getActor()).toEqual({
+      account: { homePage: 'https://example.com', name: 'learner-7' },
+      objectType: 'Agent',
+    });
+  });
+
+  it('skips the destination with a warning when the LMS has no learner id', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await buildXAPIClient(scormConfig(), scorm12({}))).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/failed to initialize an explicit destination/),
+      expect.anything(),
+    );
+  });
+
+  it('dev fallback: rejects sends with the SCORM learner-identity error', async () => {
+    const config = scormConfig();
+    const client = await buildXAPIClient(config, new WebAdapter(config));
+    await expect(
+      client!.sendStatement(
+        { verb: { id: 'http://verb/exp' } },
+        { retry: false },
+      ),
+    ).rejects.toThrow(/SCORM 1.2 learner identity is unavailable in dev/);
   });
 });

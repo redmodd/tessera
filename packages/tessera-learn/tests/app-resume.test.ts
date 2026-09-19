@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { stubAdapter } from './helpers.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const page = {
@@ -41,8 +42,8 @@ function makeConfig(resume: 'auto' | 'never') {
   };
 }
 
-function makeAdapter(saved: unknown, withSeedLifecycle = true) {
-  const seedLifecycle = vi.fn();
+function makeAdapter(saved: unknown, seeds: boolean) {
+  const seedLifecycle = vi.fn(() => seeds);
   const setCompletionStatus = vi.fn();
   const saveState = vi.fn();
   const setScore = vi.fn();
@@ -51,19 +52,13 @@ function makeAdapter(saved: unknown, withSeedLifecycle = true) {
     setCompletionStatus,
     saveState,
     setScore,
-    adapter: {
-      init: async () => {},
+    adapter: stubAdapter({
       getState: () => saved,
-      ...(withSeedLifecycle ? { seedLifecycle } : {}),
+      seedLifecycle,
       saveState,
-      setDuration: () => {},
-      setExit: () => {},
       setScore,
       setCompletionStatus,
-      setSuccessStatus: () => {},
-      commit: () => {},
-      terminate: () => {},
-    },
+    }),
   };
 }
 
@@ -72,7 +67,7 @@ async function mountApp(
   options: {
     saved?: unknown;
     pageModule?: () => Promise<unknown>;
-    withSeedLifecycle?: boolean;
+    seeds?: boolean;
   } = {},
 ) {
   const savedState = options.saved ?? {
@@ -82,7 +77,7 @@ async function mountApp(
     f: structureFingerprint(manifest),
   };
   const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(savedState, options.withSeedLifecycle ?? true);
+    makeAdapter(savedState, options.seeds ?? true);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -221,7 +216,7 @@ describe('App restore gate honours config.resume', () => {
     expect(setScore).not.toHaveBeenCalled();
   });
 
-  it('re-reports the restored score to an adapter without seedLifecycle', async () => {
+  it('re-reports the restored score to an adapter that does not seed', async () => {
     const saved = {
       b: 1,
       v: [0, 1],
@@ -231,7 +226,7 @@ describe('App restore gate honours config.resume', () => {
     };
     const { component, setScore, unmount } = await mountApp('auto', {
       saved,
-      withSeedLifecycle: false,
+      seeds: false,
     });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { stubAdapter } from './helpers.js';
 
 const page = {
   index: 0,
@@ -36,19 +37,7 @@ function makeAdapter(
   loadState: () => Promise<void> = async () => {},
   getState: () => unknown = () => null,
 ) {
-  return {
-    init,
-    getState,
-    loadState,
-    saveState: () => {},
-    setDuration: () => {},
-    setExit: () => {},
-    setScore: () => {},
-    setCompletionStatus: () => {},
-    setSuccessStatus: () => {},
-    commit: () => {},
-    terminate: () => {},
-  };
+  return stubAdapter({ init, loadState, getState });
 }
 
 async function mountApp(

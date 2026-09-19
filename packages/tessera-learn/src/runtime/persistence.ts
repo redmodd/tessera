@@ -3,8 +3,12 @@
  */
 
 import type { Interaction } from './interaction.js';
+import type { XAPIAgent } from './xapi/types.js';
+import type { XAPIPublisher } from './xapi/publisher.js';
 
 export interface PersistenceAdapter {
+  /** False only when no LMS or launch LRS is behind the adapter (web, and the dev fallback). */
+  readonly connected: boolean;
   /**
    * Connect to the LMS. Failure is fatal: nothing can be reported, so the
    * course must not start.
@@ -17,18 +21,28 @@ export interface PersistenceAdapter {
    * that could not read its state must then refuse `saveState` rather than
    * overwrite what it failed to read.
    */
-  loadState?(): Promise<void>;
+  loadState(): Promise<void>;
   getState(): SavedState | null;
   saveState(state: SavedState): void;
+  /** LMS-supplied pass threshold in [0, 1], overriding `scoring.passingScore`; null when absent. */
+  getMasteryScore(): number | null;
   setScore(score: number): void;
   setCompletionStatus(status: 'incomplete' | 'complete'): void;
   setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
-  /** Tell the adapter what was already emitted in prior sessions, so it skips re-emitting on resume. */
-  seedLifecycle?(
+  /**
+   * Tell the adapter what was already emitted in prior sessions, so it skips
+   * re-emitting on resume. Returns true when the adapter dedupes against the
+   * seeded values; false means the caller re-reports them.
+   */
+  seedLifecycle(
     completion: 'incomplete' | 'complete',
     success: 'unknown' | 'passed' | 'failed',
     score?: number | null,
-  ): void;
+  ): boolean;
+  /** Learner actor for an explicit xAPI destination, derived from the LMS; null when unavailable. */
+  deriveActor(activityId: string, homePage?: string): XAPIAgent | null;
+  /** The launch LRS publisher that `xapi.endpoint: 'lms'` shares; null without a launch LRS. */
+  launchPublisher(): XAPIPublisher | null;
   setDuration(seconds: number): void;
   /**
    * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps

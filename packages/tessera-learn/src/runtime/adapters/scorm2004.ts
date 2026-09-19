@@ -7,6 +7,8 @@ import {
   parseScaled01,
 } from './format.js';
 import { STANDARDS } from '../standards.js';
+import { synthesizeSCORM2004Actor } from '../xapi/derive-actor.js';
+import type { XAPIAgent } from '../xapi/types.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -67,9 +69,12 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     return this.#mode;
   }
 
-  /** Read by App.svelte to override `course.config.js scoring.passingScore`. */
   getMasteryScore(): number | null {
     return this.#masteryScore;
+  }
+
+  deriveActor(activityId: string, homePage?: string): XAPIAgent | null {
+    return synthesizeSCORM2004Actor(this.api, activityId, homePage);
   }
 
   protected canWrite(): boolean {

@@ -1,5 +1,32 @@
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import type { PersistenceAdapter } from '../src/runtime/persistence.js';
+
+/** A connected adapter whose members all no-op, for mounting App without an LMS. */
+export function stubAdapter(
+  overrides: Partial<PersistenceAdapter> = {},
+): PersistenceAdapter {
+  return {
+    connected: true,
+    init: async () => {},
+    loadState: async () => {},
+    getState: () => null,
+    saveState: () => {},
+    getMasteryScore: () => null,
+    setScore: () => {},
+    setCompletionStatus: () => {},
+    setSuccessStatus: () => {},
+    seedLifecycle: () => false,
+    deriveActor: () => null,
+    launchPublisher: () => null,
+    setDuration: () => {},
+    setExit: () => {},
+    reportInteraction: () => {},
+    commit: () => {},
+    terminate: () => {},
+    ...overrides,
+  };
+}
 
 export function createManifest(
   pageCount: number,

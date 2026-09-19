@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { stubAdapter } from './helpers.js';
 
 const pages = [0].map((index) => ({
   index,
@@ -31,19 +32,9 @@ async function mountWithMastery(masteryScore: number | undefined) {
     completion: { mode: 'quiz' },
     export: { standard: 'cmi5' },
   };
-  const adapter = {
-    init: () => Promise.resolve(),
-    getState: () => null,
+  const adapter = stubAdapter({
     getMasteryScore: () => masteryScore ?? null,
-    saveState: () => {},
-    setDuration: () => {},
-    setExit: () => {},
-    setScore: () => {},
-    setCompletionStatus: () => {},
-    setSuccessStatus: () => {},
-    commit: () => {},
-    terminate: () => {},
-  };
+  });
 
   vi.resetModules();
   const { mount, unmount } = await import('svelte');

@@ -1,9 +1,10 @@
-import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type { SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS } from '../standards.js';
 import { formatISO8601Duration } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
+import { BaseAdapter } from './base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type {
@@ -77,7 +78,7 @@ const EXIT_STATE_ID = 'tessera-state-exit';
  * buildContext()/isDefinedStatementAllowed()/scoreForSuccess() to layer
  * profile rules on top.
  */
-export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
+export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected publisher: XAPIPublisher | null = null;
   protected endpoint = '';
   protected activityId = '';
@@ -121,8 +122,12 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     return this.score !== null ? this.score / 100 : null;
   }
 
-  getPublisher(): XAPIPublisher | null {
+  launchPublisher(): XAPIPublisher | null {
     return this.publisher;
+  }
+
+  deriveActor(): XAPIAgent | null {
+    return this.actor;
   }
 
   getState(): SavedState | null {
@@ -168,10 +173,6 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     this.durationSeconds = seconds;
   }
 
-  setExit(_mode: 'suspend' | 'normal'): void {
-    // No cmi.exit analogue in xAPI; suspend is implicit. No-op.
-  }
-
   commit(): void {
     if (!this.publisher || this.score === null) return;
     const scaled = this.score / 100;
@@ -190,7 +191,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
     completion: 'incomplete' | 'complete',
     success: 'unknown' | 'passed' | 'failed',
     score?: number | null,
-  ): void {
+  ): boolean {
     if (completion === 'complete') this.completedEmitted = true;
     if (success === 'passed' || success === 'failed') {
       this.lastSuccessEmitted = success;
@@ -199,6 +200,7 @@ export abstract class BaseXAPILaunchAdapter implements PersistenceAdapter {
       this.setScore(score);
       this.lastScoreEmitted = this.score === null ? null : this.score / 100;
     }
+    return true;
   }
 
   setCompletionStatus(status: 'incomplete' | 'complete'): void {

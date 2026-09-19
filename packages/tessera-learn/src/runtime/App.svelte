@@ -422,7 +422,7 @@
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
     try {
-      await adapter.loadState?.();
+      await adapter.loadState();
     } catch (err) {
       console.warn('Tessera: resume state load failed', err);
     }
@@ -435,7 +435,7 @@
     // The first page is gated on persistenceReady, so a malformed saved
     // document must cost the resume, not the course.
     try {
-      const lmsMastery = adapter.getMasteryScore?.();
+      const lmsMastery = adapter.getMasteryScore();
       if (typeof lmsMastery === 'number') {
         config.scoring.passingScore = lmsMastery * 100;
       }
@@ -448,12 +448,13 @@
         const seededScore = progress.gradedScoreFinal
           ? Math.round(progress.gradedScore.average)
           : null;
-        if (adapter.seedLifecycle) {
+        if (
           adapter.seedLifecycle(
             progress.completionStatus,
             progress.successStatus,
             seededScore,
-          );
+          )
+        ) {
           prevReportedScore = seededScore;
         }
       }

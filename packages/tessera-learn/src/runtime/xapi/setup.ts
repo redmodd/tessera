@@ -11,13 +11,6 @@ import { XAPIPublisher } from './publisher.js';
 import { XAPIClient } from './client.js';
 import { XAPIConfigError } from './validation.js';
 import {
-  synthesizeSCORM12Actor,
-  synthesizeSCORM2004Actor,
-} from './derive-actor.js';
-import { BaseXAPILaunchAdapter } from '../adapters/xapi-launch-base.js';
-import { SCORM12Adapter } from '../adapters/scorm12.js';
-import { SCORM2004Adapter } from '../adapters/scorm2004.js';
-import {
   STANDARDS,
   standardProfile,
   type ActorDerivingStandard,
@@ -25,14 +18,13 @@ import {
 } from '../standards.js';
 
 /**
- * Wraps a value that the runtime knows how to materialize into an
- * `XAPIPublisher`. Either a fresh publisher constructed for an explicit
- * destination, or a reference to a launch adapter's existing publisher
- * (for the `endpoint: 'lms'` sentinel — same instance, shared queue). Both
- * the cmi5 and plain-xAPI adapters expose that publisher via the base.
+ * A destination's publisher: either a fresh one constructed for an explicit
+ * destination, or the launch adapter's own publisher (for the
+ * `endpoint: 'lms'` sentinel — same instance, shared queue, already
+ * initialized).
  */
 type DestinationSource =
-  | { kind: 'lms-shared'; adapter: BaseXAPILaunchAdapter }
+  | { kind: 'lms-shared'; publisher: XAPIPublisher }
   | { kind: 'explicit'; publisher: XAPIPublisher };
 
 /**
@@ -108,7 +100,7 @@ type ActorResolution =
 function resolveDestination(
   entry: XAPIConfig,
   config: CourseConfig,
-  adapter: PersistenceAdapter | null,
+  adapter: PersistenceAdapter,
   hooks: CourseRuntime['xapi'],
 ): DestinationSource | null {
   if (entry.endpoint === 'lms') {
@@ -119,16 +111,17 @@ function resolveDestination(
       );
       return null;
     }
-    if (adapter instanceof BaseXAPILaunchAdapter) {
-      return { kind: 'lms-shared', adapter };
+    if (!adapter.connected) {
+      // Dev fallback — launch params absent, adapter is the WebAdapter
+      // fallback. Materialize a publisher whose sends reject with an
+      // explicit error so author code surfaces the dev/prod gap.
+      return {
+        kind: 'explicit',
+        publisher: makeDevFallbackPublisher(profile.id),
+      };
     }
-    // Dev fallback — launch params absent, adapter is the WebAdapter
-    // fallback. Materialize a publisher whose sends reject with an
-    // explicit error so author code surfaces the dev/prod gap.
-    return {
-      kind: 'explicit',
-      publisher: makeDevFallbackPublisher(profile.id),
-    };
+    const publisher = adapter.launchPublisher();
+    return publisher ? { kind: 'lms-shared', publisher } : null;
   }
 
   // Explicit endpoint.
@@ -177,43 +170,26 @@ function resolveExplicitActor(
   explicit: XAPIExplicitConfig,
   hook: XAPIDestinationHooks | undefined,
   config: CourseConfig,
-  adapter: PersistenceAdapter | null,
+  adapter: PersistenceAdapter,
 ): ActorResolution | null {
   const actor = hook?.actor ?? explicit.actor;
   if (actor !== undefined) {
     return { kind: 'actor', value: actor };
   }
-  const profile = standardProfile(config.export?.standard);
-  if (profile?.hasLaunchLRS && adapter instanceof BaseXAPILaunchAdapter) {
-    const inner = adapter.getPublisher();
-    if (!inner) return null;
-    try {
-      return { kind: 'actor', value: inner.getActor() };
-    } catch {
-      return null;
-    }
+  if (adapter.connected) {
+    // A connected SCORM adapter whose LMS leaves the learner id empty yields
+    // null; the publisher's init() then rejects it and the destination is
+    // skipped with a warning.
+    return {
+      kind: 'actor',
+      value: adapter.deriveActor(
+        explicit.activityId,
+        explicit.actorAccountHomePage,
+      ) as XAPIAgent,
+    };
   }
+  const profile = standardProfile(config.export?.standard);
   if (profile?.derivesLearnerActor) {
-    if (adapter instanceof SCORM12Adapter) {
-      return {
-        kind: 'actor',
-        value: synthesizeSCORM12Actor(
-          adapter.getAPI(),
-          explicit.activityId,
-          explicit.actorAccountHomePage,
-        ) as XAPIAgent,
-      };
-    }
-    if (adapter instanceof SCORM2004Adapter) {
-      return {
-        kind: 'actor',
-        value: synthesizeSCORM2004Actor(
-          adapter.getAPI(),
-          explicit.activityId,
-          explicit.actorAccountHomePage,
-        ) as XAPIAgent,
-      };
-    }
     return { kind: 'scorm-fallback', standard: profile.id };
   }
   console.warn(
@@ -233,7 +209,7 @@ function resolveExplicitActor(
  */
 export async function buildXAPIClient(
   config: CourseConfig,
-  adapter: PersistenceAdapter | null,
+  adapter: PersistenceAdapter,
   hooks?: CourseRuntime['xapi'],
 ): Promise<XAPIClient | null> {
   const raw = config.xapi;
@@ -252,8 +228,7 @@ export async function buildXAPIClient(
   const publishers: XAPIPublisher[] = [];
   for (const src of sources) {
     if (src.kind === 'lms-shared') {
-      const inner = src.adapter.getPublisher();
-      if (inner) publishers.push(inner);
+      publishers.push(src.publisher);
     } else {
       try {
         await src.publisher.init();

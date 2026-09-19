@@ -1,8 +1,9 @@
-import type { PersistenceAdapter, SavedState } from '../persistence.js';
+import type { SavedState } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
+import { BaseAdapter } from './base.js';
 import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
 
 /**
@@ -32,7 +33,7 @@ export interface ScormDialect<TApi> {
   getDiagnostic?(api: TApi, code: string): string;
 }
 
-export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
+export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly api: TApi;
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
@@ -43,6 +44,7 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
   protected interactionCount = 0;
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
+    super();
     this.api = api;
     this.dialect = dialect;
     this.errorReporter = {
@@ -53,11 +55,6 @@ export abstract class BaseScormAdapter<TApi> implements PersistenceAdapter {
         : undefined,
     };
     this.queue.errorReporter = this.errorReporter;
-  }
-
-  /** Exposed for xAPI actor synthesis (reads learner fields off the API). */
-  getAPI(): TApi {
-    return this.api;
   }
 
   // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
