@@ -12,6 +12,7 @@ import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
+  parseMastery,
 } from '../src/runtime/adapters/format.js';
 
 describe('formatISO8601Timestamp', () => {
@@ -105,8 +106,6 @@ describe('formatISO8601Duration', () => {
   });
 });
 
-import { parseMastery } from '../src/runtime/adapters/format.js';
-
 describe('parseMastery', () => {
   let warn: MockInstance;
   beforeEach(() => {
@@ -127,8 +126,8 @@ describe('parseMastery', () => {
     expect(parseMastery(undefined, 'm')).toBeNull();
     expect(warn).not.toHaveBeenCalled();
   });
-  it.each([-0.1, 1.1, NaN, Infinity, 'abc', true])(
-    'rejects %j with a warning naming the source',
+  it.each([-0.1, 1.1, NaN, Infinity, 'abc', '0x1', true])(
+    'rejects %s with a warning naming the source',
     (raw) => {
       expect(parseMastery(raw, 'cmi.scaled_passing_score')).toBeNull();
       expect(warn).toHaveBeenCalledWith(
@@ -136,10 +135,15 @@ describe('parseMastery', () => {
       );
     },
   );
-  it('divides by scale before the range check', () => {
-    expect(parseMastery('60', 'm', 100)).toBe(0.6);
-    expect(parseMastery('100', 'm', 100)).toBe(1);
-    expect(parseMastery('', 'm', 100)).toBeNull();
-    expect(parseMastery('101', 'm', 100)).toBeNull();
+  it('scales a [0, max] range to [0, 1]', () => {
+    expect(parseMastery('60', 'm', [0, 100])).toBe(0.6);
+    expect(parseMastery('100', 'm', [0, 100])).toBe(1);
+    expect(parseMastery('', 'm', [0, 100])).toBeNull();
+    expect(parseMastery('101', 'm', [0, 100])).toBeNull();
+  });
+  it('reads a negative mastery score in range as 0', () => {
+    expect(parseMastery('-0.5', 'm', [-1, 1])).toBe(0);
+    expect(parseMastery('-1', 'm', [-1, 1])).toBe(0);
+    expect(parseMastery('-1.5', 'm', [-1, 1])).toBeNull();
   });
 });

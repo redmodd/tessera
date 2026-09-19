@@ -290,6 +290,13 @@ describe('SCORM2004Adapter', () => {
       expect(await masteryFrom('0.7')).toBe(0.7);
     });
 
+    it('reads a negative cmi.scaled_passing_score as a pass mark of 0', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await masteryFrom('-0.5')).toBe(0);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
     it('ignores and warns on an out-of-range threshold', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       expect(await masteryFrom('1.5')).toBeNull();

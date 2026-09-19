@@ -66,19 +66,23 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
+const DECIMAL = /^-?(\d+\.?\d*|\.\d+)$/;
+
 export function parseMastery(
   raw: unknown,
   source: string,
-  scale = 1,
+  [min, max]: readonly [number, number] = [0, 1],
 ): number | null {
   if (raw == null || (typeof raw === 'string' && !raw.trim())) return null;
   const n =
-    typeof raw === 'number' || typeof raw === 'string'
-      ? Number(raw) / scale
-      : NaN;
-  if (n >= 0 && n <= 1) return n;
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && DECIMAL.test(raw.trim())
+        ? Number(raw)
+        : NaN;
+  if (n >= min && n <= max) return Math.max(n, 0) / max;
   console.warn(
-    `Tessera: ${source} is not a number in [0,${scale}] (got "${raw}"); ignoring.`,
+    `Tessera: ${source} is not a decimal in [${min},${max}] (got "${raw}"); ignoring.`,
   );
   return null;
 }

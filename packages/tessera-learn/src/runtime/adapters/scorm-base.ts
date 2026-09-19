@@ -27,7 +27,7 @@ export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   sessionTimeKey: string;
   masteryKey: string;
-  masteryScale: number;
+  masteryRange: readonly [number, number];
   formatDuration(seconds: number): string;
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
@@ -93,7 +93,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected read(key: string): string {
     try {
-      return String(this.dialect.getValue(this.api, key) ?? '');
+      return this.dialect.getValue(this.api, key);
     } catch {
       return '';
     }
@@ -123,11 +123,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       return;
     }
 
-    const { masteryKey, masteryScale } = this.dialect;
+    const { masteryKey, masteryRange } = this.dialect;
     this.masteryScore = parseMastery(
       this.read(masteryKey),
       masteryKey,
-      masteryScale,
+      masteryRange,
     );
 
     let raw = '';

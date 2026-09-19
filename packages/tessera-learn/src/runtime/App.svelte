@@ -434,7 +434,7 @@
     // in a custom layout.
     const lmsMastery = adapter.getMasteryScore();
     if (lmsMastery !== null) {
-      config.scoring.passingScore = Number((lmsMastery * 100).toFixed(5));
+      config.scoring.passingScore = Number((lmsMastery * 100).toPrecision(15));
     }
 
     // The first page is gated on persistenceReady, so a malformed saved

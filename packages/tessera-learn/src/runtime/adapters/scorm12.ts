@@ -27,7 +27,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   profile: STANDARDS.scorm12,
   sessionTimeKey: 'cmi.core.session_time',
   masteryKey: 'cmi.student_data.mastery_score',
-  masteryScale: 100,
+  masteryRange: [0, 100],
   formatDuration: formatHHMMSS,
   interactionFields: {
     responseField: 'student_response',

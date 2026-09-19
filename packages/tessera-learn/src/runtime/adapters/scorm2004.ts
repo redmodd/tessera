@@ -27,7 +27,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
   sessionTimeKey: 'cmi.session_time',
   masteryKey: 'cmi.scaled_passing_score',
-  masteryScale: 1,
+  masteryRange: [-1, 1],
   formatDuration: formatISO8601Duration,
   interactionFields: {
     responseField: 'learner_response',
