@@ -125,6 +125,37 @@ describe('SCORM12Adapter', () => {
     });
   });
 
+  describe('LMS-supplied mastery_score', () => {
+    async function masteryFrom(value: string) {
+      api = scorm12Api({ 'cmi.student_data.mastery_score': value });
+      adapter = new SCORM12Adapter(api);
+      await adapter.init();
+      return adapter.getMasteryScore();
+    }
+
+    it('scales cmi.student_data.mastery_score to [0, 1]', async () => {
+      expect(await masteryFrom('60')).toBe(0.6);
+      expect(await masteryFrom('0')).toBe(0);
+      expect(await masteryFrom('100')).toBe(1);
+    });
+
+    it.each(['', ' ', 'abc', '-1', '101'])(
+      'ignores mastery_score %j',
+      async (value) => {
+        expect(await masteryFrom(value)).toBeNull();
+      },
+    );
+
+    it('ignores a mastery_score read that throws', async () => {
+      api.LMSGetValue.mockImplementation((key) => {
+        if (key === 'cmi.student_data.mastery_score') throw new Error('boom');
+        return '';
+      });
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+    });
+  });
+
   // ---- setScore ----
 
   it('sets score with raw, min, max via queue', async () => {

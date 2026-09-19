@@ -10,6 +10,7 @@ const SCORM12_SEAM = `
 (() => {
   const KEY = '__scorm12_data';
   const api = new window.Scorm12API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
+  api.loadFromFlattenedJSON(window.__scormLmsData);
   try {
     const raw = sessionStorage.getItem(KEY);
     if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
@@ -68,9 +69,15 @@ const SCORM2004_SEAM = `
 })();
 `;
 
-/** Install a `scorm-again`-backed SCORM 1.2 LMS (`window.API`). */
-export async function installScorm12Mock(page: Page): Promise<void> {
+/** Install a `scorm-again`-backed SCORM 1.2 LMS (`window.API`), seeded with LMS-owned values like `cmi.student_data.mastery_score`. */
+export async function installScorm12Mock(
+  page: Page,
+  lmsData: Record<string, string> = {},
+): Promise<void> {
   await page.addInitScript({ path: SCORM12_BUNDLE });
+  await page.addInitScript((data) => {
+    (window as any).__scormLmsData = data;
+  }, lmsData);
   await page.addInitScript(SCORM12_SEAM);
 }
 

@@ -6,7 +6,7 @@ import type {
   SuccessStatus,
 } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
-import { formatHHMMSS, formatReal107 } from './format.js';
+import { formatHHMMSS, formatReal107, parseScaled01 } from './format.js';
 import { STANDARDS } from '../standards.js';
 
 /**
@@ -61,6 +61,12 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);
+  }
+
+  override async init(): Promise<void> {
+    await super.init();
+    const raw = this.read('cmi.student_data.mastery_score').trim();
+    this.masteryScore = raw ? parseScaled01(Number(raw) / 100) : null;
   }
 
   override saveState(state: SavedState): void {

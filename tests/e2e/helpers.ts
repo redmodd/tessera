@@ -106,16 +106,20 @@ export async function answerMatching(
 }
 
 /**
- * Answer the `free` fixture's three-question graded quiz correctly and submit,
- * returning once the results panel is visible. Asserts on button text rather
- * than sleeping, so it stays in step with the quiz's feedback transitions.
+ * Answer the `free` fixture's three-question graded quiz and submit, returning
+ * once the results panel is visible. Every answer is correct unless `mcOption`
+ * picks a wrong option (not 1) for the first question. Asserts on button text
+ * rather than sleeping, so it stays in step with the quiz's feedback transitions.
  */
-export async function answerGradedQuiz(page: Page): Promise<void> {
+export async function answerGradedQuiz(
+  page: Page,
+  mcOption = 1,
+): Promise<void> {
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await page
     .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-    .nth(1)
+    .nth(mcOption)
     .click();
   await expect(primary).toHaveText('Submit');
   await primary.click();
