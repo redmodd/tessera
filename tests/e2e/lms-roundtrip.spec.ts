@@ -162,22 +162,22 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
         timeout: 5000,
       })
       .toBeGreaterThan(0);
+    await expect(primary).toHaveText('Next Question');
     await primary.click(); // continue
-    await page.waitForTimeout(300);
 
     // Q2: FillInTheBlank — "blue"
     await page
       .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
       .fill('blue');
+    await expect(primary).toHaveText('Submit');
     await primary.click();
-    await page.waitForTimeout(300);
+    await expect(primary).toHaveText('Next Question');
     await primary.click();
-    await page.waitForTimeout(300);
 
     // Q3: Matching 1→One, 2→Two, 3→Three
     await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+    await expect(primary).toHaveText('Submit');
     await primary.click();
-    await page.waitForTimeout(300);
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
@@ -764,20 +764,20 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     await primary.click();
     await expect.poll(() => answeredSoFar().length, { timeout: 5000 }).toBe(1);
+    await expect(primary).toHaveText('Next Question');
     await primary.click();
-    await page.waitForTimeout(300);
 
     await page
       .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
       .fill('blue');
+    await expect(primary).toHaveText('Submit');
     await primary.click();
-    await page.waitForTimeout(300);
+    await expect(primary).toHaveText('Next Question');
     await primary.click();
-    await page.waitForTimeout(300);
 
     await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+    await expect(primary).toHaveText('Submit');
     await primary.click();
-    await page.waitForTimeout(300);
 
     const submit = page.locator('.tessera-quiz-btn-submit');
     await submit.waitFor({ state: 'visible', timeout: 5000 });
