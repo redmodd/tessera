@@ -201,53 +201,30 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
+  const scoredSave = {
+    b: 1,
+    v: [0, 1],
+    d: 120,
+    g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
+    f: structureFingerprint(manifest),
+  };
+
   it('reports no score for a resume that only restores what was saved', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
-    const { component, saveState, setScore, unmount } = await mountApp('auto', {
-      saved,
-    });
+    const { component, saveState, seedLifecycle, setScore, unmount } =
+      await mountApp('auto', { saved: scoredSave });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(seedLifecycle).toHaveBeenCalledWith('complete', 'failed', 33.33);
     expect(setScore).not.toHaveBeenCalled();
   });
 
   it('re-reports the restored score to an adapter that does not seed', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
-      f: structureFingerprint(manifest),
-    };
     const { component, setScore, unmount } = await mountApp('auto', {
-      saved,
+      saved: scoredSave,
       seeds: false,
     });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33));
-  });
-
-  it('seeds the adapter with the restored score to 2 decimal places', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
-      f: structureFingerprint(manifest),
-    };
-    const { component, seedLifecycle, unmount } = await mountApp('auto', {
-      saved,
-    });
-    cleanup = () => unmount(component);
-    await vi.waitFor(() =>
-      expect(seedLifecycle).toHaveBeenCalledWith('complete', 'failed', 33.33),
-    );
   });
 
   it('ignores saved state when resume is "never"', async () => {

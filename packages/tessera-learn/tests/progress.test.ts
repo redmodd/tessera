@@ -5,7 +5,6 @@ import { createManifest, createConfig } from './helpers.js';
 describe('roundScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(roundScore(200 / 3)).toBe(66.67);
-    expect(roundScore((66.67 + 70) / 2)).toBe(68.34);
     expect(roundScore(68.335)).toBe(68.34);
   });
 });

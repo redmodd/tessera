@@ -6,7 +6,7 @@ import type {
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS } from '../standards.js';
-import { formatISO8601Duration } from './format.js';
+import { formatISO8601Duration, formatReal107 } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
@@ -163,9 +163,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.scaled = null;
       return;
     }
-    this.scaled = Number(
-      (Math.max(0, Math.min(100, score)) / 100).toPrecision(15),
-    );
+    this.scaled = Number(formatReal107(Math.max(0, Math.min(1, score / 100))));
   }
 
   override setDuration(seconds: number): void {

@@ -449,12 +449,12 @@ describe('XAPIAdapter', () => {
     await new Promise((r) => setTimeout(r, 0));
     fetchMock.mockClear();
 
-    adapter.setScore(50);
+    adapter.setScore(33.33);
     adapter.setSuccessStatus('failed');
     adapter.commit();
     await new Promise((r) => setTimeout(r, 0));
 
-    adapter.setScore(70);
+    adapter.setScore(58.33);
     adapter.setSuccessStatus('failed');
     adapter.setDuration(120);
     adapter.commit();
@@ -469,35 +469,9 @@ describe('XAPIAdapter', () => {
       'http://adlnet.gov/expapi/verbs/failed',
       'http://adlnet.gov/expapi/verbs/scored',
     ]);
-    expect(bodies[0].result.score.scaled).toBe(0.5);
-    expect(bodies[1].result.score.scaled).toBe(0.7);
+    expect(bodies[0].result.score.scaled).toBe(0.3333);
+    expect(bodies[1].result.score.scaled).toBe(0.5833);
     expect(bodies[1].result.duration).toBe('PT2M');
-  });
-
-  it('sends a fractional score as an exact scaled value', async () => {
-    launch({
-      endpoint: 'https://lrs.example/xapi',
-      auth: 'Basic Zm9vOmJhcg==',
-      actor: JSON.stringify(ACTOR),
-      activity_id: 'urn:tessera:au:abc',
-    });
-    const adapter = new XAPIAdapter();
-    await adapter.init();
-    await new Promise((r) => setTimeout(r, 0));
-    fetchMock.mockClear();
-
-    adapter.setScore(33.33);
-    adapter.setSuccessStatus('failed');
-    adapter.setScore(58.33);
-    adapter.commit();
-    await new Promise((r) => setTimeout(r, 0));
-
-    const scaled = fetchMock.mock.calls
-      .filter(
-        ([u, o]) => String(u).includes('/statements') && o?.method === 'POST',
-      )
-      .map(([, o]) => JSON.parse(o.body).result.score.scaled);
-    expect(scaled).toEqual([0.3333, 0.5833]);
   });
 
   it('does not re-send the resumed score on launch', async () => {
