@@ -1954,6 +1954,12 @@ function crossValidate(
       'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"',
     );
   }
+  if (isManual && config.scoring?.passingScore !== undefined) {
+    d.warn(
+      'course.config.js: "scoring.passingScore" gates quiz pages under completion.mode: "manual" but is not declared as a mastery score. ' +
+        'Scores are still reported to the LMS, without a threshold to judge them against. Success comes from completion.requireSuccessStatus.',
+    );
+  }
   if (!isManual) {
     for (const page of completesOnPages) {
       d.warn(

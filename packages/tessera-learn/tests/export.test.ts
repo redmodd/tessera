@@ -243,12 +243,12 @@ describe('generateCMI5Xml', () => {
     );
   });
 
-  it('sets masteryScore from passingScore', () => {
+  it('sets masteryScore from passingScore, separated from the preceding attribute', () => {
     const xml = cmi5Xml({
       title: 'Test',
       scoring: { passingScore: 80 },
     });
-    expect(xml).toContain('masteryScore="0.8"');
+    expect(xml).toContain('moveOn="Completed" masteryScore="0.8">');
   });
 
   it('defaults masteryScore to 0.7', () => {
@@ -260,11 +260,6 @@ describe('generateCMI5Xml', () => {
     const xml = cmi5Xml({ title: 'Test', completion: { mode: 'manual' } });
     expect(xml).not.toContain('masteryScore');
     expect(xml).toContain('moveOn="Completed">');
-  });
-
-  it('separates masteryScore from the preceding attribute', () => {
-    const xml = cmi5Xml({ title: 'Test', scoring: { passingScore: 80 } });
-    expect(xml).toContain('moveOn="Completed" masteryScore="0.8">');
   });
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {

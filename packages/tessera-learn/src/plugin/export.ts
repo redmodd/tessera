@@ -87,8 +87,8 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// Manual completion takes success from completion.requireSuccessStatus rather
-// than the score, so no manifest declares a pass mark for it.
+// Manual completion takes success from requireSuccessStatus, so no manifest
+// declares a pass mark for it.
 function declaresPassMark(config: ExportConfig): boolean {
   return config.completion?.mode !== 'manual';
 }
@@ -173,8 +173,9 @@ export function generateCMI5Xml(config: ExportConfig): string {
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
   // the LMS needs both a Completed AND a Passed before satisfaction.
-  // Percentage and manual courses don't gate completion on the score, and
-  // many carry no graded page to pass, so completion alone is the signal.
+  // Quiz is the only mode that gates satisfaction on the verb. Percentage and
+  // manual courses satisfy on Completed alone, including when a manual course
+  // asserts Failed through requireSuccessStatus.
   const moveOn =
     config.completion?.mode === 'quiz' ? 'CompletedAndPassed' : 'Completed';
 

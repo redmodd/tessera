@@ -317,6 +317,27 @@ describe('manual completion — validation', () => {
     ).toBe(true);
   });
 
+  it('warns when passingScore is set under manual', () => {
+    createBareProject(
+      testRoot,
+      `export default {
+  title: "T",
+  navigation: { mode: "free" },
+  completion: { mode: "manual" },
+  scoring: { passingScore: 80 },
+  export: { standard: "web" },
+};`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.some((w) =>
+        /"scoring\.passingScore" gates quiz pages .* not declared as a mastery score/.test(
+          w,
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it('warns when completesOn is set under non-manual mode', () => {
     writeConfig(
       testRoot,
