@@ -56,9 +56,8 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * combined result through `#flushLessonStatus`.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
-  // SCORM 1.2 combines completion and success into a single lesson_status field.
-  #completionStatus: string = 'incomplete';
-  #successStatus: string | null = null;
+  #completionStatus: 'completed' | 'incomplete' = 'incomplete';
+  #successStatus: 'passed' | 'failed' | null = null;
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);

@@ -6,7 +6,7 @@ import { structureFingerprint } from '../fingerprint.js';
 import { BaseAdapter } from './base.js';
 
 /**
- * Web persistence adapter — stores course state in localStorage.
+ * Web persistence adapter: stores course state in localStorage.
  * Used for standalone web deployments (no LMS).
  */
 export class WebAdapter extends BaseAdapter {
@@ -19,7 +19,7 @@ export class WebAdapter extends BaseAdapter {
     // Fingerprint in the key invalidates web resume on a structure change (a
     // changed key misses, so getState() returns null). LMS adapters can't key
     // their storage, so they rely on SavedState.f + shouldRestore instead. Keep
-    // both — neither mechanism covers the other's adapters.
+    // both: neither mechanism covers the other's adapters.
     const fp = manifest ? structureFingerprint(manifest) : '';
     this.#storageKey = `tessera-${base}${fp ? `-${fp}` : ''}`;
   }
@@ -40,7 +40,6 @@ export class WebAdapter extends BaseAdapter {
     try {
       localStorage.setItem(this.#storageKey, JSON.stringify(state));
     } catch {
-      // localStorage full or unavailable — silently fail
       console.warn('Tessera: Failed to save state to localStorage');
     }
   }

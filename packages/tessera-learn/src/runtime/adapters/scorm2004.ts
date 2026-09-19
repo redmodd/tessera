@@ -51,12 +51,11 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 
 /**
  * Per §4.2.1.5, the SCO MUST NOT alter the learner record in `browse` or
- * `review` mode — every write below is gated on `#mode === 'normal'`.
- * `#masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
+ * `review` mode: every write below is gated on `#mode === 'normal'`.
+ * `masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
-  #masteryScore: number | null = null;
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);
@@ -65,15 +64,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   override async init(): Promise<void> {
     await super.init();
     this.#mode = this.#readMode();
-    this.#masteryScore = parseScaled01(this.read('cmi.scaled_passing_score'));
-  }
-
-  getLaunchMode(): SCORM2004Mode {
-    return this.#mode;
-  }
-
-  override getMasteryScore(): number | null {
-    return this.#masteryScore;
+    this.masteryScore = parseScaled01(this.read('cmi.scaled_passing_score'));
   }
 
   protected override canWrite(): boolean {

@@ -1351,28 +1351,25 @@ describe('CMI5Adapter', () => {
         .find((b: any) => b?.verb?.id === verbId);
     }
 
-    it('exposes launchMode from LaunchData via getter', async () => {
-      setupInitMocks(undefined, { launchMode: 'Review' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getLaunchMode()).toBe('Review');
-    });
-
-    it('defaults launchMode to Normal when LaunchData is absent', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getLaunchMode()).toBe('Normal');
-    });
-
-    it('rejects invalid launchMode values and falls back to Normal', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setupInitMocks(undefined, { launchMode: 'NotARealMode' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
-      expect(adapter.getLaunchMode()).toBe('Normal');
-      warn.mockRestore();
-    });
+    it.each([
+      ['LaunchData is absent', undefined],
+      ['launchMode is invalid', { launchMode: 'NotARealMode' }],
+    ])(
+      'launches in Normal mode and emits Completed when %s',
+      async (_, data) => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        setupInitMocks(undefined, data);
+        adapter = new CMI5Adapter();
+        await adapter.init();
+        mockFetch.mockClear();
+        mockFetch.mockResolvedValue({ ok: true });
+        adapter.setCompletionStatus('complete');
+        await new Promise((r) => setTimeout(r, 50));
+        expect(
+          findStatement('http://adlnet.gov/expapi/verbs/completed'),
+        ).toBeDefined();
+      },
+    );
 
     it('prefers LaunchData.masteryScore over the URL launch param (§10.2.4)', async () => {
       // URL says 0.5, LaunchData says 0.8 — LaunchData is the authoritative

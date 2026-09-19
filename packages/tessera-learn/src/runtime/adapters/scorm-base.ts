@@ -40,7 +40,7 @@ export interface ScormDialect<TApi> {
   commit(api: TApi): string;
   getLastError(api: TApi): string;
   getErrorString(api: TApi, code: string): string;
-  getDiagnostic?(api: TApi, code: string): string;
+  getDiagnostic(api: TApi, code: string): string;
 }
 
 export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
@@ -59,9 +59,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),
-      diagnostic: this.dialect.getDiagnostic
-        ? (c) => this.dialect.getDiagnostic!(this.api, c)
-        : undefined,
+      diagnostic: (c) => this.dialect.getDiagnostic(this.api, c),
     };
     this.queue.errorReporter = this.errorReporter;
   }

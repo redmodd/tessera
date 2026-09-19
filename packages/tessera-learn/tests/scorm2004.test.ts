@@ -4,12 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { scorm2004Api } from './helpers.js';
-
-/** Wait for the async write queue to flush */
-async function flush() {
-  await new Promise((r) => setTimeout(r, 50));
-}
+import { flush, scorm2004Api } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -32,7 +27,7 @@ describe('SCORM2004Adapter', () => {
       q: { '2': 80 },
       d: 100,
     };
-    api.GetValue.mockImplementation((key: string) =>
+    api.GetValue.mockImplementation((key) =>
       key === 'cmi.suspend_data' ? JSON.stringify(state) : '',
     );
     await adapter.init();
@@ -234,12 +229,12 @@ describe('SCORM2004Adapter', () => {
 
   describe('cmi.mode honoring (browse / review launches)', () => {
     function mockReview(): void {
-      api.GetValue.mockImplementation((key: string) =>
+      api.GetValue.mockImplementation((key) =>
         key === 'cmi.mode' ? 'review' : '',
       );
     }
     function mockBrowse(): void {
-      api.GetValue.mockImplementation((key: string) =>
+      api.GetValue.mockImplementation((key) =>
         key === 'cmi.mode' ? 'browse' : '',
       );
     }
@@ -253,12 +248,6 @@ describe('SCORM2004Adapter', () => {
       expect(writes).not.toContain('cmi.suspend_data');
       expect(writes).not.toContain('cmi.location');
     }
-
-    it('exposes the LMS-supplied mode via getLaunchMode()', async () => {
-      mockReview();
-      await adapter.init();
-      expect(adapter.getLaunchMode()).toBe('review');
-    });
 
     it('refuses every learner-record write in review mode', async () => {
       mockReview();
@@ -291,7 +280,7 @@ describe('SCORM2004Adapter', () => {
 
   describe('LMS-supplied thresholds', () => {
     it('reads cmi.scaled_passing_score and exposes via getMasteryScore()', async () => {
-      api.GetValue.mockImplementation((key: string) =>
+      api.GetValue.mockImplementation((key) =>
         key === 'cmi.scaled_passing_score' ? '0.7' : '',
       );
       await adapter.init();
@@ -299,7 +288,7 @@ describe('SCORM2004Adapter', () => {
     });
 
     it('returns null for out-of-range or missing thresholds', async () => {
-      api.GetValue.mockImplementation((key: string) =>
+      api.GetValue.mockImplementation((key) =>
         key === 'cmi.scaled_passing_score' ? '1.5' : '',
       );
       await adapter.init();
@@ -596,13 +585,13 @@ describe('SCORM2004Adapter', () => {
 
   describe('deriveActor', () => {
     it('reads cmi.learner_id / cmi.learner_name', () => {
-      const adapter = new SCORM2004Adapter(
+      const withLearner = new SCORM2004Adapter(
         scorm2004Api({
           'cmi.learner_id': 'learner-7',
           'cmi.learner_name': 'Grace Hopper',
         }),
       );
-      expect(adapter.deriveActor('https://example.com/courses/1')).toEqual({
+      expect(withLearner.deriveActor('https://example.com/courses/1')).toEqual({
         account: { homePage: 'https://example.com', name: 'learner-7' },
         name: 'Grace Hopper',
         objectType: 'Agent',

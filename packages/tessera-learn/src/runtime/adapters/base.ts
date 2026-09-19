@@ -13,6 +13,7 @@ export abstract class BaseAdapter {
   /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
   readonly connected: boolean = true;
   protected state: SavedState | null = null;
+  protected masteryScore: number | null = null;
 
   /**
    * Connect to the LMS. Failure is fatal: nothing can be reported, so the
@@ -36,7 +37,7 @@ export abstract class BaseAdapter {
 
   /** LMS-supplied pass threshold in [0, 1], overriding `scoring.passingScore`; null when absent. */
   getMasteryScore(): number | null {
-    return null;
+    return this.masteryScore;
   }
 
   /**
@@ -69,12 +70,7 @@ export abstract class BaseAdapter {
   setCompletionStatus(_status: CompletionStatus): void {}
   setSuccessStatus(_status: SuccessStatus): void {}
   setDuration(_seconds: number): void {}
-  /**
-   * Tell the LMS how the learner is leaving the SCO. SCORM 1.2 maps
-   * `'suspend'` to `cmi.core.exit = 'suspend'` and `'normal'` to empty (the
-   * vocabulary has no explicit normal value). SCORM 2004 maps directly onto
-   * `cmi.exit`. cmi5 / xAPI / web adapters no-op.
-   */
+  /** Tell the LMS how the learner is leaving the SCO. */
   setExit(_mode: ExitMode): void {}
   /**
    * Report a single learner interaction (answered question) to the LMS.
