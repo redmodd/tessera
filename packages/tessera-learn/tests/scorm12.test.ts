@@ -139,12 +139,36 @@ describe('SCORM12Adapter', () => {
       expect(await masteryFrom('100')).toBe(1);
     });
 
-    it.each(['', ' ', 'abc', '-1', '101'])(
-      'ignores mastery_score %j',
+    it.each(['', ' '])('ignores a blank mastery_score %j', async (value) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await masteryFrom(value)).toBeNull();
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('cmi.student_data.mastery_score'),
+      );
+      warn.mockRestore();
+    });
+
+    it.each(['abc', '-1', '101'])(
+      'ignores and warns on mastery_score %j',
       async (value) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         expect(await masteryFrom(value)).toBeNull();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('cmi.student_data.mastery_score'),
+        );
+        warn.mockRestore();
       },
     );
+
+    it('ignores a mastery_score the LMS returns as null', async () => {
+      api.LMSGetValue.mockImplementation((key) =>
+        key === 'cmi.student_data.mastery_score'
+          ? (null as unknown as string)
+          : '',
+      );
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+    });
 
     it('ignores a mastery_score read that throws', async () => {
       api.LMSGetValue.mockImplementation((key) => {

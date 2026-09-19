@@ -9,6 +9,7 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
+import { parseScaled01 } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import {
   httpOrigin,
@@ -25,6 +26,8 @@ import {
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   sessionTimeKey: string;
+  masteryKey: string;
+  masteryScale: number;
   formatDuration(seconds: number): string;
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
@@ -90,7 +93,8 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected read(key: string): string {
     try {
-      return this.dialect.getValue(this.api, key);
+      const value: unknown = this.dialect.getValue(this.api, key);
+      return value == null ? '' : String(value);
     } catch {
       return '';
     }
@@ -118,6 +122,15 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         'Tessera: LMS Initialize failed — all subsequent persistence calls will fail with error 301 (Not Initialized). Reload the launch from the LMS.',
       );
       return;
+    }
+
+    const { masteryKey, masteryScale } = this.dialect;
+    const mastery = this.read(masteryKey);
+    this.masteryScore = parseScaled01(mastery, masteryScale);
+    if (this.masteryScore === null && mastery.trim()) {
+      console.warn(
+        `Tessera: ${masteryKey} is not a number in [0,${masteryScale}] (got "${mastery}"); using scoring.passingScore.`,
+      );
     }
 
     let raw = '';

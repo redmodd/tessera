@@ -287,13 +287,18 @@ describe('SCORM2004Adapter', () => {
       expect(adapter.getMasteryScore()).toBe(0.7);
     });
 
-    it('returns null for out-of-range or missing thresholds', async () => {
-      api.GetValue.mockImplementation((key) =>
-        key === 'cmi.scaled_passing_score' ? '1.5' : '',
-      );
-      await adapter.init();
-      expect(adapter.getMasteryScore()).toBeNull();
-    });
+    it.each(['1.5', '', ' '])(
+      'returns null for the threshold %j',
+      async (value) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        api.GetValue.mockImplementation((key) =>
+          key === 'cmi.scaled_passing_score' ? value : '',
+        );
+        await adapter.init();
+        expect(adapter.getMasteryScore()).toBeNull();
+        warn.mockRestore();
+      },
+    );
   });
 
   describe('reportInteraction', () => {

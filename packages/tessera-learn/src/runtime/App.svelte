@@ -329,12 +329,12 @@
 
     if (!progress.gradedScoreFinal) return;
 
-    const rounded = Math.round(progress.gradedScore.average);
-    if (rounded === prevReportedScore) return;
-    prevReportedScore = rounded;
+    const score = progress.reportedScore;
+    if (score === prevReportedScore) return;
+    prevReportedScore = score;
 
     untrack(() => {
-      adapter.setScore(rounded);
+      adapter.setScore(score);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
         adapter.setSuccessStatus(progress.successStatus);
@@ -427,17 +427,18 @@
       console.warn('Tessera: resume state load failed', err);
     }
 
-    // cmi5 §8: an LMS-supplied masteryScore is the authoritative pass
-    // threshold for this launch and overrides the manifest. `config` is a
-    // $state proxy, so this one write re-derives every consumer: completion
-    // and success status, navigation gating, the Quiz page context, and
-    // useProgress().passingScore in a custom layout.
+    // An LMS-supplied mastery score (SCORM 1.2 cmi.student_data.mastery_score,
+    // SCORM 2004 cmi.scaled_passing_score, cmi5 masteryScore) is the
+    // authoritative pass threshold for this launch and overrides the manifest.
+    // `config` is a $state proxy, so this one write re-derives every consumer:
+    // completion and success status, navigation gating, the Quiz page context,
+    // and useProgress().passingScore in a custom layout.
     // The first page is gated on persistenceReady, so a malformed saved
     // document must cost the resume, not the course.
     try {
       const lmsMastery = adapter.getMasteryScore();
       if (lmsMastery !== null) {
-        config.scoring.passingScore = lmsMastery * 100;
+        config.scoring.passingScore = Number((lmsMastery * 100).toFixed(5));
       }
 
       const saved = adapter.getState();
@@ -446,7 +447,7 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
-          ? Math.round(progress.gradedScore.average)
+          ? progress.reportedScore
           : null;
         if (
           adapter.seedLifecycle(

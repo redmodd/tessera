@@ -66,8 +66,13 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
-export function parseScaled01(raw: unknown): number | null {
-  if (raw === null || raw === undefined || raw === '') return null;
-  const n = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+export function parseScaled01(raw: unknown, scale = 1): number | null {
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim()
+        ? Number(raw)
+        : NaN;
+  const scaled = n / scale;
+  return Number.isFinite(scaled) && scaled >= 0 && scaled <= 1 ? scaled : null;
 }

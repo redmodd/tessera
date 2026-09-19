@@ -115,5 +115,13 @@ describe('parseScaled01', () => {
     expect(parseScaled01(null)).toBeNull();
     expect(parseScaled01(undefined)).toBeNull();
     expect(parseScaled01('abc')).toBeNull();
+    expect(parseScaled01(' ')).toBeNull();
+    expect(parseScaled01(true)).toBeNull();
+  });
+  it('divides by scale before the range check', () => {
+    expect(parseScaled01('60', 100)).toBe(0.6);
+    expect(parseScaled01('100', 100)).toBe(1);
+    expect(parseScaled01('', 100)).toBeNull();
+    expect(parseScaled01('101', 100)).toBeNull();
   });
 });

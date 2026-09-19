@@ -839,6 +839,26 @@ describe('ProgressState', () => {
       const { average } = progress.gradedScore;
       expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
     });
+
+    it('decides success and completion on the rounded score the LMS gets', () => {
+      const manifest = createManifest(5, {
+        2: { graded: true },
+        4: { graded: true },
+      });
+      const config = createConfig({
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 70 },
+      });
+      const progress = new ProgressState(manifest, config);
+
+      progress.quizCompleted(2, 70);
+      progress.quizCompleted(4, 69);
+
+      expect(progress.gradedScore.average).toBe(69.5);
+      expect(progress.reportedScore).toBe(70);
+      expect(progress.successStatus).toBe('passed');
+      expect(progress.completionStatus).toBe('complete');
+    });
   });
 
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {

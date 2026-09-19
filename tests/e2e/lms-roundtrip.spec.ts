@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
@@ -16,6 +16,10 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
+
+const test = base.extend<{ lmsData: Record<string, string> }>({
+  lmsData: [{}, { option: true }],
+});
 
 /**
  * Wait until the SCORM mock has received at least one LMSCommit / Commit
@@ -64,8 +68,8 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     preview?.kill('SIGTERM');
   });
 
-  test.beforeEach(async ({ page }) => {
-    await installScorm12Mock(page);
+  test.beforeEach(async ({ page, lmsData }) => {
+    await installScorm12Mock(page, lmsData);
   });
 
   test.afterEach(async ({ page }) => {
@@ -275,6 +279,38 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     );
     expect(sessionTimeWrite?.[2]).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
+  });
+
+  test.describe('LMS mastery_score', () => {
+    test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
+
+    test('a 67 passes against mastery_score 60 despite passingScore 70', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+      await page
+        .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+        .click();
+      await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+
+      await answerGradedQuiz(page, 0);
+
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () =>
+                (window as any).__scormDataSnapshot()['cmi.core.lesson_status'],
+            ),
+          { timeout: 5000 },
+        )
+        .toBe('passed');
+      const data = await page.evaluate(() =>
+        (window as any).__scormDataSnapshot(),
+      );
+      expect(data['cmi.core.score.raw']).toBe('67');
+    });
   });
 });
 

@@ -6,11 +6,11 @@ const require = createRequire(import.meta.url);
 const SCORM12_BUNDLE = require.resolve('scorm-again/scorm12');
 const SCORM2004_BUNDLE = require.resolve('scorm-again/scorm2004');
 
-const SCORM12_SEAM = `
+const scorm12Seam = (lmsData: Record<string, string>) => `
 (() => {
   const KEY = '__scorm12_data';
-  const api = new window.Scorm12API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
-  api.loadFromFlattenedJSON(window.__scormLmsData);
+  const api = new window.Scorm12API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE', mastery_override: false });
+  api.loadFromFlattenedJSON(${JSON.stringify(lmsData)});
   try {
     const raw = sessionStorage.getItem(KEY);
     if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
@@ -75,10 +75,7 @@ export async function installScorm12Mock(
   lmsData: Record<string, string> = {},
 ): Promise<void> {
   await page.addInitScript({ path: SCORM12_BUNDLE });
-  await page.addInitScript((data) => {
-    (window as any).__scormLmsData = data;
-  }, lmsData);
-  await page.addInitScript(SCORM12_SEAM);
+  await page.addInitScript(scorm12Seam(lmsData));
 }
 
 /** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`). */

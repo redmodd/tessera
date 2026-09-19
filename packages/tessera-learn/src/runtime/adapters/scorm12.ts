@@ -6,7 +6,7 @@ import type {
   SuccessStatus,
 } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
-import { formatHHMMSS, formatReal107, parseScaled01 } from './format.js';
+import { formatHHMMSS, formatReal107 } from './format.js';
 import { STANDARDS } from '../standards.js';
 
 /**
@@ -26,6 +26,8 @@ export interface SCORM12API {
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   profile: STANDARDS.scorm12,
   sessionTimeKey: 'cmi.core.session_time',
+  masteryKey: 'cmi.student_data.mastery_score',
+  masteryScale: 100,
   formatDuration: formatHHMMSS,
   interactionFields: {
     responseField: 'student_response',
@@ -61,12 +63,6 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);
-  }
-
-  override async init(): Promise<void> {
-    await super.init();
-    const raw = this.read('cmi.student_data.mastery_score').trim();
-    this.masteryScore = raw ? parseScaled01(Number(raw) / 100) : null;
   }
 
   override saveState(state: SavedState): void {
