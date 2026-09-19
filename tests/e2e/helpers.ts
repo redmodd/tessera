@@ -113,8 +113,8 @@ export async function answerMatching(
 }
 
 /**
- * Fire the course's exit handler as a closing tab would. It drains the LMS
- * queue synchronously, so the SCORM mock holds the final writes on return.
+ * Fire the course's exit handler as a closing tab would. The SCORM mock holds
+ * the final writes on return; xAPI statements send asynchronously, so poll.
  */
 export async function exitCourse(page: Page): Promise<void> {
   await page.evaluate(() => {

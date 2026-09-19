@@ -454,7 +454,7 @@ describe('XAPIAdapter', () => {
     adapter.commit();
     await new Promise((r) => setTimeout(r, 0));
 
-    adapter.setScore(70);
+    adapter.setScore(53.3);
     adapter.setSuccessStatus('failed');
     adapter.setDuration(120);
     adapter.commit();
@@ -470,7 +470,7 @@ describe('XAPIAdapter', () => {
       'http://adlnet.gov/expapi/verbs/scored',
     ]);
     expect(bodies[0].result.score.scaled).toBe(0.5);
-    expect(bodies[1].result.score.scaled).toBe(0.7);
+    expect(bodies[1].result.score.scaled).toBe(0.533);
     expect(bodies[1].result.duration).toBe('PT2M');
   });
 
