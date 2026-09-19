@@ -72,9 +72,12 @@ export async function installScorm12Mock(
   await installScormMock(page, 'scorm12', lmsData);
 }
 
-/** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`). */
-export async function installScorm2004Mock(page: Page): Promise<void> {
-  await installScormMock(page, 'scorm2004', {});
+/** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`), seeded with LMS-owned values like `cmi.scaled_passing_score`. */
+export async function installScorm2004Mock(
+  page: Page,
+  lmsData: LmsData = {},
+): Promise<void> {
+  await installScormMock(page, 'scorm2004', lmsData);
 }
 
 export function cmi5LaunchURL(base: string): string {

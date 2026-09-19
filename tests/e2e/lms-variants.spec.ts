@@ -6,7 +6,7 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
-  openGradedQuiz,
+  openQuiz,
   reportedQuestionCount,
   scormData,
   startPreview,
@@ -23,11 +23,10 @@ import {
  * fixture.
  */
 
-async function openQuiz(page: Page, base: string, title: string) {
+async function launchQuiz(page: Page, base: string, title: string) {
   await page.goto(base);
   await waitForTesseraContent(page);
-  await page.locator('.tessera-nav-page', { hasText: title }).click();
-  await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+  await openQuiz(page, title);
 }
 
 test.describe.serial('quiz reporting timing — review and never', () => {
@@ -52,7 +51,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
   test('Review mode reports nothing until Submit, then every question at once', async ({
     page,
   }) => {
-    await openQuiz(page, BASE, 'Review Timing Quiz');
+    await launchQuiz(page, BASE, 'Review Timing Quiz');
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
@@ -98,7 +97,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
   test('Never mode has no reveal path and reports only on Submit', async ({
     page,
   }) => {
-    await openQuiz(page, BASE, 'Never Timing Quiz');
+    await launchQuiz(page, BASE, 'Never Timing Quiz');
 
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
@@ -131,7 +130,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
   test('questions whose ids collide at runtime both render and report separately', async ({
     page,
   }) => {
-    await openQuiz(page, BASE, 'Id Collision Quiz');
+    await launchQuiz(page, BASE, 'Id Collision Quiz');
 
     // The shell keys its {#each} on the question id, and Svelte throws on a
     // duplicate key in production, so a collision that survives registration
@@ -197,7 +196,7 @@ test.describe.serial('completion.mode quiz', () => {
 
     const totalPages = await page.locator('.tessera-nav-page').count();
 
-    await openGradedQuiz(page);
+    await openQuiz(page, 'Graded Assessment');
 
     await answerGradedQuiz(page);
 

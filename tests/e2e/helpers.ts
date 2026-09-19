@@ -112,11 +112,9 @@ export async function answerMatching(
   }
 }
 
-/** Open the `free` fixture's graded quiz from the sidebar. */
-export async function openGradedQuiz(page: Page): Promise<void> {
-  await page
-    .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-    .click();
+/** Open a quiz page from the sidebar by its title. */
+export async function openQuiz(page: Page, title: string): Promise<void> {
+  await page.locator('.tessera-nav-page', { hasText: title }).click();
   await expect(page.locator('.tessera-quiz')).toBeVisible({ timeout: 10000 });
 }
 

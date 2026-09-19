@@ -11,7 +11,7 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
-  openGradedQuiz,
+  openQuiz,
   reportedQuestionCount,
   scormData,
   scormLog,
@@ -68,8 +68,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     const log = await scormLog(page);
     const verbs = log.map((entry) => entry[0]);
     expect(verbs).toContain('LMSInitialize');
-    // First read after init should be suspend_data
-    expect(verbs).toContain('LMSGetValue');
+    expect(log).toContainEqual([
+      'LMSGetValue',
+      'cmi.suspend_data',
+      expect.any(String),
+    ]);
   });
 
   test('Navigation writes suspend_data containing bookmark and visited pages', async ({
@@ -144,7 +147,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await openGradedQuiz(page);
+    await openQuiz(page, 'Graded Assessment');
 
     // Q1: "What is 2 + 2?" → option index 1 ("4")
     await page
@@ -251,7 +254,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     }) => {
       await page.goto(BASE);
       await waitForTesseraContent(page);
-      await openGradedQuiz(page);
+      await openQuiz(page, 'Graded Assessment');
 
       await answerGradedQuiz(page, { q1Correct: false });
 
@@ -289,8 +292,8 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     preview?.kill('SIGTERM');
   });
 
-  test.beforeEach(async ({ page }) => {
-    await installScorm2004Mock(page);
+  test.beforeEach(async ({ page, lmsData }) => {
+    await installScorm2004Mock(page, lmsData);
   });
 
   test.afterEach(async ({ page }) => {
@@ -347,7 +350,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await openGradedQuiz(page);
+    await openQuiz(page, 'Graded Assessment');
 
     await answerGradedQuiz(page);
 
@@ -396,6 +399,27 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
     const log = await scormLog(page);
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
+  });
+
+  test.describe('LMS scaled_passing_score', () => {
+    test.use({ lmsData: { 'cmi.scaled_passing_score': '0.6' } });
+
+    test('a 67 passes against scaled_passing_score 0.6 despite passingScore 70', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+      await openQuiz(page, 'Graded Assessment');
+
+      await answerGradedQuiz(page, { q1Correct: false });
+
+      await expect
+        .poll(() => scormData(page))
+        .toMatchObject({
+          'cmi.success_status': 'passed',
+          'cmi.score.raw': '67',
+        });
+    });
   });
 });
 
@@ -523,7 +547,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await openGradedQuiz(page);
+    await openQuiz(page, 'Graded Assessment');
 
     await answerGradedQuiz(page);
 
@@ -747,7 +771,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await openGradedQuiz(page);
+    await openQuiz(page, 'Graded Assessment');
 
     await page
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
