@@ -10,6 +10,10 @@ import { scorm12Api } from './helpers.js';
 
 const mockFetch = vi.fn();
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const baseLaunchParams = {
   fetch: 'https://lms.example.com/fetch-token',
   endpoint: 'https://lms.example.com/xapi/',
@@ -65,10 +69,6 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
     setSearchParams(baseLaunchParams);
     setupLMSMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("fan-outs a useXAPI() sendStatement through the cmi5 publisher (endpoint: 'lms')", async () => {
@@ -272,10 +272,6 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("fan-outs a useXAPI() sendStatement through the xAPI launch publisher (endpoint: 'lms')", async () => {
     const adapter = new XAPIAdapter();
     await adapter.init();
@@ -356,10 +352,6 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
       xapi: explicit,
     } as CourseConfig;
   }
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
 
   it('derives the actor from the connected LMS', async () => {
     const client = await buildXAPIClient(

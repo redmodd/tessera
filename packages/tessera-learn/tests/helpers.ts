@@ -1,13 +1,14 @@
-import { vi } from 'vitest';
+import { vi, type Mocked } from 'vitest';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import type { SavedState } from '../src/runtime/persistence.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
 
 /** A SCORM 1.2 API backed by a store seeded from `values`; every call is a spy that succeeds. */
-export function scorm12Api(values: Record<string, string> = {}): SCORM12API {
+export function scorm12Api(
+  values: Record<string, string> = {},
+): Mocked<SCORM12API> {
   const store = new Map(Object.entries(values));
   return {
     LMSInitialize: vi.fn().mockReturnValue('true'),
@@ -27,7 +28,7 @@ export function scorm12Api(values: Record<string, string> = {}): SCORM12API {
 /** A SCORM 2004 API backed by a store seeded from `values`; every call is a spy that succeeds. */
 export function scorm2004Api(
   values: Record<string, string> = {},
-): SCORM2004API {
+): Mocked<SCORM2004API> {
   const store = new Map(Object.entries(values));
   return {
     Initialize: vi.fn().mockReturnValue('true'),
@@ -46,9 +47,6 @@ export function scorm2004Api(
 
 class StubAdapter extends BaseAdapter {
   async init(): Promise<void> {}
-  getState(): SavedState | null {
-    return null;
-  }
   saveState(): void {}
 }
 
