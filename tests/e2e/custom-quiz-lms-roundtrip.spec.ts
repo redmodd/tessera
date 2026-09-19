@@ -6,7 +6,12 @@ import {
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
-import { interactionField, startPreview, waitForServer } from './helpers.js';
+import {
+  interactionField,
+  scormData,
+  startPreview,
+  waitForServer,
+} from './helpers.js';
 
 /**
  * Phase 5 Task 2 Step 4 — load-bearing custom-quiz LMS roundtrip.
@@ -22,24 +27,6 @@ import { interactionField, startPreview, waitForServer } from './helpers.js';
 
 async function waitForCustomQuiz(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 15000 });
-}
-
-async function waitForScormCall(
-  page: Page,
-  predicate: (entry: string[]) => boolean,
-  timeoutMs = 5000,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const matched = await page.evaluate((pred: string) => {
-      const log = (window as any).__scormLog || [];
-      const fn = new Function('entry', `return (${pred})(entry)`);
-      return log.some((entry: string[]) => fn(entry));
-    }, predicate.toString());
-    if (matched) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('Timed out waiting for SCORM call');
 }
 
 /**
@@ -106,16 +93,12 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     // page and waits for the custom-quiz shell before answering.
     await answerCustomQuizCorrectly(page);
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'LMSSetValue' && e[1] === 'cmi.core.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.core.score.raw']).toBe('100');
-    expect(data['cmi.core.lesson_status']).toBe('passed');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '100',
+        'cmi.core.lesson_status': 'passed',
+      });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
@@ -163,17 +146,13 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     await page.goto(BASE);
     await answerCustomQuizCorrectly(page);
 
-    await waitForScormCall(
-      page,
-      (e) => e[0] === 'SetValue' && e[1] === 'cmi.score.raw',
-    );
-
-    const data = await page.evaluate(() =>
-      (window as any).__scormDataSnapshot(),
-    );
-    expect(data['cmi.score.raw']).toBe('100');
-    expect(data['cmi.score.scaled']).toBe('1');
-    expect(data['cmi.success_status']).toBe('passed');
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.score.raw': '100',
+        'cmi.score.scaled': '1',
+        'cmi.success_status': 'passed',
+      });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q-planet', 'q-water']);

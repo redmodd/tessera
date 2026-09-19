@@ -47,15 +47,22 @@ export async function waitForTesseraContent(page: Page): Promise<void> {
     .catch(() => {});
 }
 
+/** Every call the SCORM mock has logged so far, as `[method, ...args]`. */
+export async function scormLog(page: Page): Promise<string[][]> {
+  return page.evaluate(() => (window as any).__scormLog);
+}
+
+/** The SCORM mock's current data model, keyed by `cmi.*` element. */
+export async function scormData(page: Page): Promise<Record<string, string>> {
+  return page.evaluate(() => (window as any).__scormDataSnapshot());
+}
+
 /**
  * Every cmi.interactions.* write the SCORM mock has logged so far. Matches
  * both mocks: SCORM 1.2 logs LMSSetValue, SCORM 2004 logs SetValue.
  */
 export async function interactionWrites(page: Page): Promise<string[][]> {
-  const log = (await page.evaluate(
-    () => (window as any).__scormLog,
-  )) as string[][];
-  return log.filter(
+  return (await scormLog(page)).filter(
     (e) => /^(LMS)?SetValue$/.test(e[0]) && /^cmi\.interactions\./.test(e[1]),
   );
 }
@@ -105,22 +112,41 @@ export async function answerMatching(
   }
 }
 
+/** Open a quiz page from the sidebar by its title. */
+export async function openQuiz(page: Page, title: string): Promise<void> {
+  await page.locator('.tessera-nav-page', { hasText: title }).click();
+  await expect(page.locator('.tessera-quiz')).toBeVisible({ timeout: 10000 });
+}
+
 /**
- * Answer the `free` fixture's three-question graded quiz correctly and submit,
- * returning once the results panel is visible. Asserts on button text rather
- * than sleeping, so it stays in step with the quiz's feedback transitions.
+ * Answer the `free` fixture's three-question graded quiz and submit, returning
+ * once the results panel is visible. Every answer is correct unless
+ * `q1Correct` is false. Asserts on button text rather than sleeping, so it
+ * stays in step with the quiz's feedback transitions.
  */
-export async function answerGradedQuiz(page: Page): Promise<void> {
+export async function answerGradedQuiz(
+  page: Page,
+  { q1Correct = true } = {},
+): Promise<void> {
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await page
     .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-    .nth(1)
+    .nth(q1Correct ? 1 : 0)
     .click();
   await expect(primary).toHaveText('Submit');
   await primary.click();
   await expect(primary).toHaveText('Next Question');
   await primary.click();
+
+  await answerGradedQuizAfterQ1(page);
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
+/** Answer Q2 and Q3 of the `free` graded quiz correctly, stopping once the final Submit is visible. */
+export async function answerGradedQuizAfterQ1(page: Page): Promise<void> {
+  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await page
     .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
@@ -134,8 +160,5 @@ export async function answerGradedQuiz(page: Page): Promise<void> {
   await expect(primary).toHaveText('Submit');
   await primary.click();
 
-  const submit = page.locator('.tessera-quiz-btn-submit');
-  await expect(submit).toBeVisible();
-  await submit.click();
-  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+  await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
 }

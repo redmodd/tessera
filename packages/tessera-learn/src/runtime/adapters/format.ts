@@ -66,8 +66,23 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
-export function parseScaled01(raw: unknown): number | null {
-  if (raw === null || raw === undefined || raw === '') return null;
-  const n = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+
+export function parseMastery(
+  raw: unknown,
+  source: string,
+  [min, max]: readonly [number, number] = [0, 1],
+): number | null {
+  if (raw == null || (typeof raw === 'string' && !raw.trim())) return null;
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && DECIMAL.test(raw.trim())
+        ? Number(raw)
+        : NaN;
+  if (n >= min && n <= max) return Math.max(n, 0) / max;
+  console.warn(
+    `Tessera: ${source} is not a decimal in [${min},${max}] (got "${raw}"); ignoring.`,
+  );
+  return null;
 }

@@ -9,7 +9,6 @@ import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
-  parseScaled01,
 } from './format.js';
 import { STANDARDS } from '../standards.js';
 
@@ -27,6 +26,8 @@ export interface SCORM2004API {
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
   sessionTimeKey: 'cmi.session_time',
+  masteryKey: 'cmi.scaled_passing_score',
+  masteryRange: [-1, 1],
   formatDuration: formatISO8601Duration,
   interactionFields: {
     responseField: 'learner_response',
@@ -52,7 +53,6 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 /**
  * Per §4.2.1.5, the SCO MUST NOT alter the learner record in `browse` or
  * `review` mode: every write below is gated on `#mode === 'normal'`.
- * `masteryScore` (§4.2.4.3) is the LMS-supplied pass threshold in [0,1].
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
@@ -64,7 +64,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   override async init(): Promise<void> {
     await super.init();
     this.#mode = this.#readMode();
-    this.masteryScore = parseScaled01(this.read('cmi.scaled_passing_score'));
   }
 
   protected override canWrite(): boolean {

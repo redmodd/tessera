@@ -92,6 +92,34 @@ describe('an LMS mastery override reaches a custom layout', () => {
     expect(progress.successStatus).toBe('passed');
   });
 
+  it('converts the mastery score to a pass mark without float drift', async () => {
+    const { component, unmount } = await mountWithMastery(0.55);
+    cleanup = () => unmount(component);
+
+    await vi.waitFor(() => {
+      expect((globalThis as any).__tesseraSeenPassingScore).toContain(55);
+    });
+
+    const { progress } = (globalThis as any).__tesseraNavCtx;
+    progress.quizCompleted(0, 55);
+    expect(progress.successStatus).toBe('passed');
+  });
+
+  it('keeps every decimal of the mastery score in the pass mark', async () => {
+    const { component, unmount } = await mountWithMastery(0.5500000001);
+    cleanup = () => unmount(component);
+
+    await vi.waitFor(() => {
+      expect((globalThis as any).__tesseraSeenPassingScore).toContain(
+        55.00000001,
+      );
+    });
+
+    const { progress } = (globalThis as any).__tesseraNavCtx;
+    progress.quizCompleted(0, 55);
+    expect(progress.successStatus).toBe('failed');
+  });
+
   it('keeps the course threshold when the LMS supplies none', async () => {
     const { component, unmount } = await mountWithMastery(undefined);
     cleanup = () => unmount(component);

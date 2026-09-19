@@ -832,7 +832,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
 
 **Branch on `restored`.** A quiz whose result came from saved progress opens in the `submitted` state with the score and attempt count intact, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 
-Throws on a page without `pageConfig.quiz`. Use `passingScore` from here, not `course.config.js` directly — importing the config skips the LMS mastery override (SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`).
+Throws on a page without `pageConfig.quiz`. Use `passingScore` from here, not `course.config.js` directly: importing the config skips the LMS mastery override (SCORM 1.2 `cmi.student_data.mastery_score`, SCORM 2004 `cmi.scaled_passing_score`, cmi5 `masteryScore`).
 
 ### `useNavigation`
 
@@ -1051,8 +1051,8 @@ The runtime translates author intent into adapter calls automatically. The autho
 Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
-- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown"); pass/fail uses `scoring.passingScore`, not the LMS's mastery field.
-- **SCORM 2004 / cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore` — read it via `useQuiz().passingScore`.
+- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
+- **SCORM 1.2, SCORM 2004 and cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore`. Read it via `useQuiz().passingScore`.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing

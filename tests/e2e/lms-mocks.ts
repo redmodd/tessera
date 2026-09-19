@@ -3,13 +3,37 @@ import { createRequire } from 'node:module';
 import type { Page } from '@playwright/test';
 
 const require = createRequire(import.meta.url);
-const SCORM12_BUNDLE = require.resolve('scorm-again/scorm12');
-const SCORM2004_BUNDLE = require.resolve('scorm-again/scorm2004');
+type LmsData = Record<string, string>;
 
-const SCORM12_SEAM = `
+const SCORM_DIALECTS = {
+  scorm12: {
+    version: '12',
+    global: 'API',
+    prefix: 'LMS',
+    end: 'Finish',
+  },
+  scorm2004: {
+    version: '2004',
+    global: 'API_1484_11',
+    prefix: '',
+    end: 'Terminate',
+  },
+} as const;
+
+async function installScormMock(
+  page: Page,
+  standard: keyof typeof SCORM_DIALECTS,
+  lmsData: LmsData,
+): Promise<void> {
+  const { version, global, prefix: p, end } = SCORM_DIALECTS[standard];
+  await page.addInitScript({
+    path: require.resolve(`scorm-again/${standard}`),
+  });
+  await page.addInitScript(`
 (() => {
-  const KEY = '__scorm12_data';
-  const api = new window.Scorm12API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
+  const KEY = '__scorm${version}_data';
+  const api = new window.Scorm${version}API(${JSON.stringify({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' })});
+  api.loadFromFlattenedJSON(${JSON.stringify(lmsData)});
   try {
     const raw = sessionStorage.getItem(KEY);
     if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
@@ -20,64 +44,38 @@ const SCORM12_SEAM = `
   window.__scormLog = [];
   window.__scormErrors = [];
   const capture = (key, ret) => {
-    const code = api.LMSGetLastError();
+    const code = api.${p}GetLastError();
     if (ret !== 'true' || code !== '0') window.__scormErrors.push({ key, code });
   };
-  window.API = {
-    LMSInitialize(s) { const r = api.LMSInitialize(s); window.__scormLog.push(['LMSInitialize', s]); capture('Initialize', r); return r; },
-    LMSFinish(s) { const r = api.LMSFinish(s); window.__scormLog.push(['LMSFinish', s]); capture('Finish', r); persist(); return r; },
-    LMSGetValue(k) { const v = api.LMSGetValue(k); window.__scormLog.push(['LMSGetValue', k, v]); return v; },
-    LMSSetValue(k, v) { const r = api.LMSSetValue(k, String(v)); window.__scormLog.push(['LMSSetValue', k, String(v)]); capture(k, r); persist(); return r; },
-    LMSCommit(s) { const r = api.LMSCommit(s); window.__scormLog.push(['LMSCommit', s]); capture('Commit', r); persist(); return r; },
-    LMSGetLastError() { return api.LMSGetLastError(); },
-    LMSGetErrorString(c) { return api.LMSGetErrorString(c); },
-    LMSGetDiagnostic(c) { return api.LMSGetDiagnostic(c); },
+  window.${global} = {
+    ${p}Initialize(s) { const r = api.${p}Initialize(s); window.__scormLog.push(['${p}Initialize', s]); capture('Initialize', r); return r; },
+    ${p}${end}(s) { const r = api.${p}${end}(s); window.__scormLog.push(['${p}${end}', s]); capture('${end}', r); persist(); return r; },
+    ${p}GetValue(k) { const v = api.${p}GetValue(k); window.__scormLog.push(['${p}GetValue', k, v]); return v; },
+    ${p}SetValue(k, v) { const r = api.${p}SetValue(k, String(v)); window.__scormLog.push(['${p}SetValue', k, String(v)]); capture(k, r); persist(); return r; },
+    ${p}Commit(s) { const r = api.${p}Commit(s); window.__scormLog.push(['${p}Commit', s]); capture('Commit', r); persist(); return r; },
+    ${p}GetLastError() { return api.${p}GetLastError(); },
+    ${p}GetErrorString(c) { return api.${p}GetErrorString(c); },
+    ${p}GetDiagnostic(c) { return api.${p}GetDiagnostic(c); },
   };
   window.__scormDataSnapshot = () => api.getFlattenedCMI();
 })();
-`;
-
-const SCORM2004_SEAM = `
-(() => {
-  const KEY = '__scorm2004_data';
-  const api = new window.Scorm2004API({ autocommit: false, lmsCommitUrl: false, logLevel: 'NONE' });
-  try {
-    const raw = sessionStorage.getItem(KEY);
-    if (raw) api.loadFromFlattenedJSON(JSON.parse(raw));
-  } catch {}
-  const persist = () => {
-    try { sessionStorage.setItem(KEY, JSON.stringify(api.getFlattenedCMI())); } catch {}
-  };
-  window.__scormLog = [];
-  window.__scormErrors = [];
-  const capture = (key, ret) => {
-    const code = api.GetLastError();
-    if (ret !== 'true' || code !== '0') window.__scormErrors.push({ key, code });
-  };
-  window.API_1484_11 = {
-    Initialize(s) { const r = api.Initialize(s); window.__scormLog.push(['Initialize', s]); capture('Initialize', r); return r; },
-    Terminate(s) { const r = api.Terminate(s); window.__scormLog.push(['Terminate', s]); capture('Terminate', r); persist(); return r; },
-    GetValue(k) { const v = api.GetValue(k); window.__scormLog.push(['GetValue', k, v]); return v; },
-    SetValue(k, v) { const r = api.SetValue(k, String(v)); window.__scormLog.push(['SetValue', k, String(v)]); capture(k, r); persist(); return r; },
-    Commit(s) { const r = api.Commit(s); window.__scormLog.push(['Commit', s]); capture('Commit', r); persist(); return r; },
-    GetLastError() { return api.GetLastError(); },
-    GetErrorString(c) { return api.GetErrorString(c); },
-    GetDiagnostic(c) { return api.GetDiagnostic(c); },
-  };
-  window.__scormDataSnapshot = () => api.getFlattenedCMI();
-})();
-`;
-
-/** Install a `scorm-again`-backed SCORM 1.2 LMS (`window.API`). */
-export async function installScorm12Mock(page: Page): Promise<void> {
-  await page.addInitScript({ path: SCORM12_BUNDLE });
-  await page.addInitScript(SCORM12_SEAM);
+`);
 }
 
-/** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`). */
-export async function installScorm2004Mock(page: Page): Promise<void> {
-  await page.addInitScript({ path: SCORM2004_BUNDLE });
-  await page.addInitScript(SCORM2004_SEAM);
+/** Install a `scorm-again`-backed SCORM 1.2 LMS (`window.API`), seeded with LMS-owned values like `cmi.student_data.mastery_score`. */
+export async function installScorm12Mock(
+  page: Page,
+  lmsData: LmsData = {},
+): Promise<void> {
+  await installScormMock(page, 'scorm12', lmsData);
+}
+
+/** Install a `scorm-again`-backed SCORM 2004 LMS (`window.API_1484_11`), seeded with LMS-owned values like `cmi.scaled_passing_score`. */
+export async function installScorm2004Mock(
+  page: Page,
+  lmsData: LmsData = {},
+): Promise<void> {
+  await installScormMock(page, 'scorm2004', lmsData);
 }
 
 export function cmi5LaunchURL(base: string): string {

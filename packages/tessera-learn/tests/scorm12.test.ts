@@ -125,6 +125,61 @@ describe('SCORM12Adapter', () => {
     });
   });
 
+  describe('LMS-supplied mastery_score', () => {
+    async function masteryFrom(value: string) {
+      api = scorm12Api({ 'cmi.student_data.mastery_score': value });
+      adapter = new SCORM12Adapter(api);
+      await adapter.init();
+      return adapter.getMasteryScore();
+    }
+
+    it('scales cmi.student_data.mastery_score to [0, 1]', async () => {
+      expect(await masteryFrom('60')).toBe(0.6);
+      expect(await masteryFrom('0')).toBe(0);
+      expect(await masteryFrom('100')).toBe(1);
+    });
+
+    it.each(['', ' '])('ignores a blank mastery_score %j', async (value) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await masteryFrom(value)).toBeNull();
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('cmi.student_data.mastery_score'),
+      );
+      warn.mockRestore();
+    });
+
+    it.each(['abc', '-1', '101'])(
+      'ignores and warns on mastery_score %j',
+      async (value) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        expect(await masteryFrom(value)).toBeNull();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('cmi.student_data.mastery_score'),
+        );
+        warn.mockRestore();
+      },
+    );
+
+    it('ignores a mastery_score the LMS returns as null', async () => {
+      api.LMSGetValue.mockImplementation((key) =>
+        key === 'cmi.student_data.mastery_score'
+          ? (null as unknown as string)
+          : '',
+      );
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+    });
+
+    it('ignores a mastery_score read that throws', async () => {
+      api.LMSGetValue.mockImplementation((key) => {
+        if (key === 'cmi.student_data.mastery_score') throw new Error('boom');
+        return '';
+      });
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBeNull();
+    });
+  });
+
   // ---- setScore ----
 
   it('sets score with raw, min, max via queue', async () => {

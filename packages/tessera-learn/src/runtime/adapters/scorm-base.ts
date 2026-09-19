@@ -9,6 +9,7 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
+import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import {
   httpOrigin,
@@ -25,6 +26,8 @@ import {
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   sessionTimeKey: string;
+  masteryKey: string;
+  masteryRange: readonly [number, number];
   formatDuration(seconds: number): string;
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
@@ -119,6 +122,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       );
       return;
     }
+
+    const { masteryKey, masteryRange } = this.dialect;
+    this.masteryScore = parseMastery(
+      this.read(masteryKey),
+      masteryKey,
+      masteryRange,
+    );
 
     let raw = '';
     try {
