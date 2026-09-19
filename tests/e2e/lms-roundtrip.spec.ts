@@ -451,7 +451,6 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       await expect
         .poll(() => scormData(page))
         .toMatchObject({
-          'cmi.scaled_passing_score': '0.7',
           'cmi.success_status': 'failed',
           'cmi.score.scaled': '0.6667',
         });

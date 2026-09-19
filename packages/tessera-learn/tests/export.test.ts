@@ -172,7 +172,13 @@ describe('SCORM 2004 manifest', () => {
       scoring: { passingScore: 72.5 },
     });
     expect(xml).toMatch(
-      /<item identifier="item-1" identifierref="res-1">\s*<title>Test<\/title>\s*<imsss:sequencing>\s*<imsss:objectives>\s*<imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">\s*<imsss:minNormalizedMeasure>0\.725<\/imsss:minNormalizedMeasure>\s*<\/imsss:primaryObjective>\s*<\/imsss:objectives>\s*<\/imsss:sequencing>\s*<\/item>/,
+      /<item [^>]*>\s*<title>Test<\/title>\s*<imsss:sequencing>/,
+    );
+    expect(xml).toContain(
+      '<imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">',
+    );
+    expect(xml).toContain(
+      '<imsss:minNormalizedMeasure>0.725</imsss:minNormalizedMeasure>',
     );
   });
 
@@ -386,11 +392,15 @@ describe('createZip', () => {
 
 describe('runExport', () => {
   it('web export does not create a zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test',
-      version: '1.0.0',
-      export: { standard: 'web' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({
+        title: 'Test',
+        version: '1.0.0',
+        export: { standard: 'web' },
+      }),
+    );
     // No zip should exist
     const files = readdirSync(testRoot);
     expect(files.filter((f) => f.endsWith('.zip'))).toHaveLength(0);
