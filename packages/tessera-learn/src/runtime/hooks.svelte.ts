@@ -425,7 +425,7 @@ export interface UseQuizHandle {
   readonly questions: ReadonlyArray<Question>;
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
-  /** Score for the attempt just submitted, or the restored result. */
+  /** 0–100, to 2 decimal places: the attempt just submitted, or the restored result. */
   readonly score: number;
   /**
    * Highest score across attempts. This is what the LMS is given, so show it

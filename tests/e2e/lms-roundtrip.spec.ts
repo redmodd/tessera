@@ -9,6 +9,7 @@ import {
 import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
+  exitCourse,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -212,14 +213,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(1100); // accumulate at least one whole second
 
-    // Dispatch pagehide synchronously — the exit handler drains the queue
-    // synchronously via drainSync(), so by the time this returns the mock
-    // has the final session_time and LMSFinish call.
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
 
     // Assert the adapter's written format from the call log: scorm-again
     // normalizes session_time on storage, so the snapshot is not verbatim.
@@ -235,7 +229,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
-    test('a 67 passes against mastery_score 60 despite passingScore 70', async ({
+    test('a 66.67 passes against mastery_score 60 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -248,8 +242,37 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
         .poll(() => scormData(page))
         .toMatchObject({
           'cmi.core.lesson_status': 'passed',
-          'cmi.core.score.raw': '67',
+          'cmi.core.score.raw': '66.67',
         });
+    });
+  });
+
+  test.describe('LMS mastery_score above the score', () => {
+    test.use({
+      lmsData: {
+        'cmi.core.credit': 'credit',
+        'cmi.student_data.mastery_score': '67',
+      },
+    });
+
+    test('a 66.67 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+      await openQuiz(page, 'Graded Assessment');
+
+      await answerGradedQuiz(page, { q1Correct: false });
+
+      const failed = {
+        'cmi.core.lesson_status': 'failed',
+        'cmi.core.score.raw': '66.67',
+      };
+      await expect.poll(() => scormData(page)).toMatchObject(failed);
+
+      await exitCourse(page);
+
+      expect(await scormData(page)).toMatchObject(failed);
     });
   });
 });
@@ -374,11 +397,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(1100);
 
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
 
     const data = await scormData(page);
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
@@ -390,7 +409,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   test.describe('LMS scaled_passing_score', () => {
     test.use({ lmsData: { 'cmi.scaled_passing_score': '0.6' } });
 
-    test('a 67 passes against scaled_passing_score 0.6 despite passingScore 70', async ({
+    test('a 66.67 passes against scaled_passing_score 0.6 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -403,7 +422,8 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
         .poll(() => scormData(page))
         .toMatchObject({
           'cmi.success_status': 'passed',
-          'cmi.score.raw': '67',
+          'cmi.score.raw': '66.67',
+          'cmi.score.scaled': '0.6667',
         });
     });
   });
@@ -814,13 +834,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'matching',
     ]);
 
-    // Dispatch pagehide synchronously — the exit handler drains the queue and
-    // fires Terminated as the final statement of the session.
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
     await expect
       .poll(
         () =>

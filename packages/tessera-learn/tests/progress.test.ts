@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { ProgressState } from '../src/runtime/progress.svelte.js';
+import {
+  ProgressState,
+  weightedScore,
+} from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
+
+describe('weightedScore', () => {
+  it('rounds to 2 decimal places, halves up despite float drift', () => {
+    expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
+  });
+});
 
 // ---------- ProgressState ----------
 
@@ -480,11 +489,11 @@ describe('ProgressState', () => {
       expect(progress.getPageStandaloneAverage(3)).toBe(80);
     });
 
-    it('weights each question — Σ(w·score)/Σ(w)', () => {
+    it('weights each question, Σ(w·score)/Σ(w), to 2 decimal places', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 2);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      expect(progress.getPageStandaloneAverage(3)).toBe(75);
+      expect(progress.getPageStandaloneAverage(3)).toBe(66.67);
     });
 
     it('skips ungraded practice answers', () => {
@@ -824,20 +833,35 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
     });
 
-    it('matches the average recalculateSuccess uses', () => {
-      const manifest = createManifest(
-        5,
-        { 1: { graded: true } },
-        { 3: { graded: true } },
+    const threeGradedQuizzes = createManifest(3, {
+      0: { graded: true },
+      1: { graded: true },
+      2: { graded: true },
+    });
+
+    it('judges pass/fail on the 2-decimal average it reports', () => {
+      const progress = new ProgressState(
+        threeGradedQuizzes,
+        createConfig({ scoring: { passingScore: 66.66667 } }),
       );
-      const config = createConfig({ scoring: { passingScore: 80 } });
-      const progress = new ProgressState(manifest, config);
 
-      progress.quizCompleted(1, 90);
-      progress.markStandaloneQuestion(3, 'q1', 70, true);
+      progress.quizCompleted(0, 100);
+      progress.quizCompleted(1, 100);
+      progress.quizCompleted(2, 0);
 
-      const { average } = progress.gradedScore;
-      expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
+      expect(progress.gradedScore.average).toBe(66.67);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('fails an average that would round up to the pass mark', () => {
+      const progress = new ProgressState(threeGradedQuizzes, createConfig());
+
+      progress.quizCompleted(0, 67);
+      progress.quizCompleted(1, 67);
+      progress.quizCompleted(2, 75);
+
+      expect(progress.gradedScore.average).toBe(69.67);
+      expect(progress.successStatus).toBe('failed');
     });
   });
 

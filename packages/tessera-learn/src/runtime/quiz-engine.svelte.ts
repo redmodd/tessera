@@ -1,5 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { normalizeWeight } from './progress.svelte.js';
+import { normalizeWeight, weightedScore } from './progress.svelte.js';
 import type { Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
@@ -256,15 +256,15 @@ export class QuizEngine implements UseQuizHandle {
 
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
-    const { rounded } = this.#computeScore();
-    this.#score = rounded;
-    this.#bestScore = Math.max(this.#bestScore, rounded);
+    const score = this.#computeScore();
+    this.#score = score;
+    this.#bestScore = Math.max(this.#bestScore, score);
     this.#submitted = true;
     this.#restored = false;
     this.#attemptCount++;
 
-    this.#deps.onComplete(rounded);
-    this.#deps.notify?.('tessera-quiz-complete', { score: rounded });
+    this.#deps.onComplete(score);
+    this.#deps.notify?.('tessera-quiz-complete', { score });
   }
 
   startReview(): void {
@@ -323,24 +323,13 @@ export class QuizEngine implements UseQuizHandle {
     this.#reportedAnswers.set(index, fingerprint);
   }
 
-  #computeScore(): { rounded: number; correctCount: number } {
-    let weighted = 0;
-    let totalWeight = 0;
-    let correctCount = 0;
-    for (let i = 0; i < this.#internalQuestions.length; i++) {
-      const q = this.#internalQuestions[i];
-      const ok = q.checkAnswer();
-      totalWeight += q.weight;
-      if (ok) {
-        weighted += q.weight;
-        correctCount++;
-      }
-    }
-    if (totalWeight === 0) return { rounded: 0, correctCount: 0 };
-    return {
-      rounded: Math.round((weighted / totalWeight) * 100),
-      correctCount,
-    };
+  #computeScore(): number {
+    return weightedScore(
+      this.#internalQuestions.map((q) => ({
+        score: q.checkAnswer() ? 100 : 0,
+        weight: q.weight,
+      })),
+    );
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

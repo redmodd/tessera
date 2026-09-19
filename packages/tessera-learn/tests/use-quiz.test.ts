@@ -586,8 +586,7 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(75);
   });
 
-  it('weight=1 (default) score matches unweighted-mean output byte-for-byte', () => {
-    // Default config produces the same score the pre-weighting unweighted formula did.
+  it('weight=1 (default) scores the unweighted mean to 2 decimal places', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct
     engine.registerQuestion(tfQuestion('b', false, true)); // wrong
@@ -596,7 +595,7 @@ describe('QuizEngine', () => {
     engine.setAnswer(1, false);
     engine.setAnswer(2, true);
     engine.submit();
-    expect(completeScore(events)).toBe(67); // 2/3 → Math.round(66.67)
+    expect(completeScore(events)).toBe(66.67);
   });
 
   it('tessera-quiz-complete is the only event the engine dispatches', () => {

@@ -1574,17 +1574,17 @@ describe('CMI5Adapter', () => {
     });
 
     it('keeps scaled score on Passed when at or above masteryScore', async () => {
-      setupInitMocks(undefined, { masteryScore: 0.7 });
+      setupInitMocks(undefined, { masteryScore: 0.533 });
       adapter = new CMI5Adapter();
       await adapter.init();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
-      adapter.setScore(85);
+      adapter.setScore(53.3);
       adapter.setSuccessStatus('passed');
       await new Promise((r) => setTimeout(r, 50));
       const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
-      expect(passed.result.score.scaled).toBeCloseTo(0.85);
+      expect(passed.result.score.scaled).toBe(0.533);
     });
 
     it('keeps scaled score on Failed when below mastery', async () => {

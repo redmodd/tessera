@@ -219,14 +219,14 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected override scoreForSuccess(
     status: 'passed' | 'failed',
   ): number | null {
-    if (this.score === null) return null;
-    const scaled = this.score / 100;
+    const { scaled } = this;
+    if (scaled === null) return null;
     if (this.masteryScore !== null) {
       const violatesPassed = status === 'passed' && scaled < this.masteryScore;
       const violatesFailed = status === 'failed' && scaled >= this.masteryScore;
       if (violatesPassed || violatesFailed) {
         console.warn(
-          `Tessera cmi5: refusing to attach scaled score ${scaled.toFixed(3)} to ` +
+          `Tessera cmi5: refusing to attach scaled score ${scaled} to ` +
             `${status === 'passed' ? 'Passed' : 'Failed'} (masteryScore=${this.masteryScore}); ` +
             `per cmi5 §9.3.${status === 'passed' ? '4' : '5'} the score would contradict the verb. ` +
             `Statement will be sent without a score.`,

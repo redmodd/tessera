@@ -6,7 +6,7 @@ import type {
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS } from '../standards.js';
-import { formatISO8601Duration } from './format.js';
+import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
@@ -95,7 +95,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
     STANDARDS.xapi;
 
-  protected score: number | null = null;
+  protected scaled: number | null = null;
   protected durationSeconds = 0;
   protected stateLoadFailed = false;
   protected completedEmitted = false;
@@ -120,7 +120,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   /** Scaled score to attach to Passed/Failed, or null to omit. cmi5 overrides for masteryScore gating. */
   protected scoreForSuccess(_status: 'passed' | 'failed'): number | null {
-    return this.score !== null ? this.score / 100 : null;
+    return this.scaled;
   }
 
   override launchPublisher(): XAPIPublisher | null {
@@ -159,11 +159,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override setScore(score: number): void {
-    if (!Number.isFinite(score)) {
-      this.score = null;
-      return;
-    }
-    this.score = Math.max(0, Math.min(100, score));
+    this.scaled = Number.isFinite(score) ? toScaled(score) : null;
   }
 
   override setDuration(seconds: number): void {
@@ -171,8 +167,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override commit(): void {
-    if (!this.publisher || this.score === null) return;
-    const scaled = this.score / 100;
+    const { scaled } = this;
+    if (!this.publisher || scaled === null) return;
     if (scaled === this.lastScoreEmitted) return;
     this.lastScoreEmitted = scaled;
     this.dispatch('Scored', {
@@ -195,7 +191,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     }
     if (typeof score === 'number' && Number.isFinite(score)) {
       this.setScore(score);
-      this.lastScoreEmitted = this.score === null ? null : this.score / 100;
+      this.lastScoreEmitted = this.scaled;
     }
     return true;
   }

@@ -31,6 +31,16 @@ const manifest = {
   totalPages: 2,
 };
 
+function savedWith(fields: object) {
+  return {
+    b: 1,
+    v: [0, 1],
+    d: 120,
+    f: structureFingerprint(manifest),
+    ...fields,
+  };
+}
+
 function makeConfig(resume: 'auto' | 'never') {
   return {
     title: 'Demo',
@@ -71,14 +81,8 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const savedState = options.saved ?? {
-    b: 1,
-    v: [0, 1],
-    d: 42,
-    f: structureFingerprint(manifest),
-  };
   const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(savedState, options.seeds ?? true);
+    makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -128,15 +132,7 @@ describe('App restore gate honours config.resume', () => {
   it('leaves a malformed saved record untouched', async () => {
     const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, seedLifecycle, setCompletionStatus, unmount } =
-      await mountApp('auto', {
-        saved: {
-          b: 1,
-          v: [0, 1],
-          g: [],
-          d: 120,
-          f: structureFingerprint(manifest),
-        },
-      });
+      await mountApp('auto', { saved: savedWith({ g: [] }) });
     cleanup = () => {
       unmount(component);
       warns.mockRestore();
@@ -147,14 +143,10 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('restores every optional field intact', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
+    const saved = savedWith({
       c: { '1': 2 },
       g: { '0': { s: 80, a: 3 }, '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
+    });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
@@ -167,13 +159,7 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
-      f: structureFingerprint(manifest),
-    };
+    const saved = savedWith({ g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } } });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
@@ -183,15 +169,8 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('saves a restored answer whose question is no longer graded as ungraded', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
     const { component, saveState, unmount } = await mountApp('auto', {
-      saved,
+      saved: savedWith({ g: { '1': { q: { q1: 100 } } } }),
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
     cleanup = () => unmount(component);
@@ -201,36 +180,26 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
+  const scoredSave = savedWith({
+    g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
+  });
+
   it('reports no score for a resume that only restores what was saved', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
-    const { component, saveState, setScore, unmount } = await mountApp('auto', {
-      saved,
-    });
+    const { component, saveState, seedLifecycle, setScore, unmount } =
+      await mountApp('auto', { saved: scoredSave });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(seedLifecycle).toHaveBeenCalledWith('complete', 'failed', 33.33);
     expect(setScore).not.toHaveBeenCalled();
   });
 
   it('re-reports the restored score to an adapter that does not seed', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
     const { component, setScore, unmount } = await mountApp('auto', {
-      saved,
+      saved: scoredSave,
       seeds: false,
     });
     cleanup = () => unmount(component);
-    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));
+    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33));
   });
 
   it('ignores saved state when resume is "never"', async () => {
