@@ -370,6 +370,29 @@ describe('config validation', () => {
     );
   });
 
+  it('errors on NaN passingScore and percentageThreshold', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: NaN },
+  scoring: { passingScore: NaN },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"scoring.passingScore" must be 0–100, got NaN'),
+    );
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        '"completion.percentageThreshold" must be 0–100, got NaN',
+      ),
+    );
+  });
+
   it('warns when title is missing', () => {
     createValidProject(testRoot);
     writeConfig(

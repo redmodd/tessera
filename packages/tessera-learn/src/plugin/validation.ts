@@ -454,29 +454,27 @@ function parseConfig(
     }
   }
 
-  // Validate scoring.passingScore
-  if (config.scoring?.passingScore !== undefined) {
-    const score = config.scoring.passingScore;
-    if (typeof score !== 'number' || score < 0 || score > 100) {
-      d.error(
-        `course.config.js: "scoring.passingScore" must be 0–100, got ${score}`,
-      );
-    }
-  }
-
-  // Validate completion.percentageThreshold
-  if (config.completion?.percentageThreshold !== undefined) {
-    const threshold = config.completion.percentageThreshold;
-    if (typeof threshold !== 'number' || threshold < 0 || threshold > 100) {
-      d.error(
-        `course.config.js: "completion.percentageThreshold" must be 0–100, got ${threshold}`,
-      );
-    }
-  }
+  validatePercent('scoring.passingScore', config.scoring?.passingScore, d);
+  validatePercent(
+    'completion.percentageThreshold',
+    config.completion?.percentageThreshold,
+    d,
+  );
 
   validateXAPIConfig(config.xapi, standard, runtimeHooks, d);
 
   return config;
+}
+
+function validatePercent(
+  key: string,
+  value: number | undefined,
+  d: Diagnostics,
+): void {
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    d.error(`course.config.js: "${key}" must be 0–100, got ${value}`);
+  }
 }
 
 function reportConfigParseError(projectRoot: string, d: Diagnostics): void {

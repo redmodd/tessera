@@ -52,12 +52,20 @@ afterEach(() => {
   } catch {}
 });
 
+const scormXml = (
+  standard: 'scorm12' | 'scorm2004',
+  config: Parameters<typeof mergeCourseConfig>[0],
+) =>
+  LMS_BUILD[standard].generate(
+    mergeCourseConfig(config),
+    createDistDir(testRoot),
+  );
+
 // ---- SCORM 1.2 Manifest ----
 
 describe('SCORM 1.2 manifest', () => {
   it('generates valid XML with correct schema', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate({ title: 'My Course' }, distDir);
+    const xml = scormXml('scorm12', { title: 'My Course' });
 
     expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain(
@@ -71,32 +79,22 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('includes course title', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate({ title: 'My Course' }, distDir);
+    const xml = scormXml('scorm12', { title: 'My Course' });
     expect(xml).toContain('<title>My Course</title>');
   });
 
   it('escapes XML special characters in title', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate(
-      { title: 'A & B <Course>' },
-      distDir,
-    );
+    const xml = scormXml('scorm12', { title: 'A & B <Course>' });
     expect(xml).toContain('<title>A &amp; B &lt;Course&gt;</title>');
   });
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate(
-      mergeCourseConfig({ title: '' }),
-      distDir,
-    );
+    const xml = scormXml('scorm12', { title: '' });
     expect(xml).toContain('<title>Untitled Course</title>');
   });
 
   it('lists all files in dist/', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm12', { title: 'Test' });
 
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
@@ -104,14 +102,12 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('references index.html as resource href', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm12', { title: 'Test' });
     expect(xml).toMatch(/href="index.html">/);
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm12.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm12', { title: 'Test' });
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
@@ -122,14 +118,37 @@ describe('SCORM 1.2 manifest', () => {
       'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
     );
   });
+
+  it('declares passingScore as adlcp:masteryscore on the item', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      scoring: { passingScore: 72.5 },
+    });
+    expect(xml).toMatch(
+      /<item identifier="item-1" identifierref="res-1">\s*<title>Test<\/title>\s*<adlcp:masteryscore>72\.5<\/adlcp:masteryscore>\s*<\/item>/,
+    );
+  });
+
+  it('defaults adlcp:masteryscore to 70', () => {
+    const xml = scormXml('scorm12', { title: 'Test' });
+    expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
+  });
+
+  it('omits adlcp:masteryscore in manual mode, even with a passingScore', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'manual' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).not.toContain('masteryscore');
+  });
 });
 
 // ---- SCORM 2004 Manifest ----
 
 describe('SCORM 2004 manifest', () => {
   it('generates valid XML with correct schema', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'My Course' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'My Course' });
 
     expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"');
     expect(xml).toContain('xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"');
@@ -137,21 +156,23 @@ describe('SCORM 2004 manifest', () => {
   });
 
   it('uses capital T in scormType', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain('adlcp:scormType="sco"');
   });
 
+  it('does not declare adlcp:masteryscore', () => {
+    const xml = scormXml('scorm2004', { title: 'Test' });
+    expect(xml).not.toContain('masteryscore');
+  });
+
   it('lists all files', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain('<file href="index.html" />');
     expect(xml).toContain('<file href="assets/main.js" />');
   });
 
   it('declares xsi namespace and schemaLocation pairs', () => {
-    const distDir = createDistDir(testRoot);
-    const xml = LMS_BUILD.scorm2004.generate({ title: 'Test' }, distDir);
+    const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain(
       'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
     );
@@ -347,11 +368,15 @@ describe('runExport', () => {
   });
 
   it('scorm12 export creates imsmanifest.xml and zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test Course',
-      version: '2.0.0',
-      export: { standard: 'scorm12' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({
+        title: 'Test Course',
+        version: '2.0.0',
+        export: { standard: 'scorm12' },
+      }),
+    );
 
     // Check manifest was written to dist
     expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
@@ -403,11 +428,15 @@ describe('runExport', () => {
   });
 
   it('uses slugified title and version for zip filename', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'My Amazing Course!',
-      version: '3.2.1',
-      export: { standard: 'scorm12' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({
+        title: 'My Amazing Course!',
+        version: '3.2.1',
+        export: { standard: 'scorm12' },
+      }),
+    );
 
     expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
       true,
@@ -418,11 +447,15 @@ describe('runExport', () => {
     const outDir = resolve(testRoot, 'build');
     mkdirSync(outDir);
     writeFileSync(resolve(outDir, 'index.html'), '<html></html>', 'utf-8');
-    await runExport(testRoot, outDir, {
-      title: 'Test Course',
-      version: '1.0.0',
-      export: { standard: 'scorm12' },
-    });
+    await runExport(
+      testRoot,
+      outDir,
+      mergeCourseConfig({
+        title: 'Test Course',
+        version: '1.0.0',
+        export: { standard: 'scorm12' },
+      }),
+    );
 
     const manifest = readFileSync(resolve(outDir, 'imsmanifest.xml'), 'utf-8');
     expect(manifest).toContain('<file href="index.html" />');
