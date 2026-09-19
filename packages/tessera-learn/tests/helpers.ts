@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type {
@@ -8,33 +9,41 @@ import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
 
-/** A SCORM 1.2 API whose GetValue reads from `values` and whose calls all succeed. */
+/** A SCORM 1.2 API backed by a store seeded from `values`; every call is a spy that succeeds. */
 export function scorm12Api(values: Record<string, string> = {}): SCORM12API {
+  const store = new Map(Object.entries(values));
   return {
-    LMSInitialize: () => 'true',
-    LMSFinish: () => 'true',
-    LMSGetValue: (k) => values[k] ?? '',
-    LMSSetValue: () => 'true',
-    LMSCommit: () => 'true',
-    LMSGetLastError: () => '0',
-    LMSGetErrorString: () => '',
-    LMSGetDiagnostic: () => '',
+    LMSInitialize: vi.fn().mockReturnValue('true'),
+    LMSFinish: vi.fn().mockReturnValue('true'),
+    LMSGetValue: vi.fn((key: string) => store.get(key) ?? ''),
+    LMSSetValue: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+      return 'true';
+    }),
+    LMSCommit: vi.fn().mockReturnValue('true'),
+    LMSGetLastError: vi.fn().mockReturnValue('0'),
+    LMSGetErrorString: vi.fn().mockReturnValue(''),
+    LMSGetDiagnostic: vi.fn().mockReturnValue(''),
   };
 }
 
-/** A SCORM 2004 API whose GetValue reads from `values` and whose calls all succeed. */
+/** A SCORM 2004 API backed by a store seeded from `values`; every call is a spy that succeeds. */
 export function scorm2004Api(
   values: Record<string, string> = {},
 ): SCORM2004API {
+  const store = new Map(Object.entries(values));
   return {
-    Initialize: () => 'true',
-    Terminate: () => 'true',
-    GetValue: (k) => values[k] ?? '',
-    SetValue: () => 'true',
-    Commit: () => 'true',
-    GetLastError: () => '0',
-    GetErrorString: () => '',
-    GetDiagnostic: () => '',
+    Initialize: vi.fn().mockReturnValue('true'),
+    Terminate: vi.fn().mockReturnValue('true'),
+    GetValue: vi.fn((key: string) => store.get(key) ?? ''),
+    SetValue: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+      return 'true';
+    }),
+    Commit: vi.fn().mockReturnValue('true'),
+    GetLastError: vi.fn().mockReturnValue('0'),
+    GetErrorString: vi.fn().mockReturnValue(''),
+    GetDiagnostic: vi.fn().mockReturnValue(''),
   };
 }
 

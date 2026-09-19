@@ -4,24 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-
-function createMockAPI(overrides: Partial<SCORM2004API> = {}): SCORM2004API {
-  const store = new Map<string, string>();
-  return {
-    Initialize: vi.fn().mockReturnValue('true'),
-    Terminate: vi.fn().mockReturnValue('true'),
-    GetValue: vi.fn((key: string) => store.get(key) || ''),
-    SetValue: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-      return 'true';
-    }),
-    Commit: vi.fn().mockReturnValue('true'),
-    GetLastError: vi.fn().mockReturnValue('0'),
-    GetErrorString: vi.fn().mockReturnValue(''),
-    GetDiagnostic: vi.fn().mockReturnValue(''),
-    ...overrides,
-  };
-}
+import { scorm2004Api } from './helpers.js';
 
 /** Wait for the async write queue to flush */
 async function flush() {
@@ -33,7 +16,7 @@ describe('SCORM2004Adapter', () => {
   let adapter: SCORM2004Adapter;
 
   beforeEach(() => {
-    api = createMockAPI();
+    api = scorm2004Api();
     adapter = new SCORM2004Adapter(api);
   });
 

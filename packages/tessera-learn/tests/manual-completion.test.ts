@@ -4,7 +4,12 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig } from './helpers.js';
+import {
+  createManifest,
+  createConfig,
+  scorm12Api,
+  scorm2004Api,
+} from './helpers.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
 
@@ -634,45 +639,11 @@ import {
 } from '../src/runtime/adapters/scorm2004.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 
-function mockSCORM12(): SCORM12API {
-  const store = new Map<string, string>();
-  return {
-    LMSInitialize: vi.fn().mockReturnValue('true'),
-    LMSFinish: vi.fn().mockReturnValue('true'),
-    LMSGetValue: vi.fn((key: string) => store.get(key) ?? ''),
-    LMSSetValue: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-      return 'true';
-    }),
-    LMSCommit: vi.fn().mockReturnValue('true'),
-    LMSGetLastError: vi.fn().mockReturnValue('0'),
-    LMSGetErrorString: vi.fn().mockReturnValue(''),
-    LMSGetDiagnostic: vi.fn().mockReturnValue(''),
-  };
-}
-
-function mockSCORM2004(): SCORM2004API {
-  const store = new Map<string, string>();
-  return {
-    Initialize: vi.fn().mockReturnValue('true'),
-    Terminate: vi.fn().mockReturnValue('true'),
-    GetValue: vi.fn((key: string) => store.get(key) ?? ''),
-    SetValue: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-      return 'true';
-    }),
-    Commit: vi.fn().mockReturnValue('true'),
-    GetLastError: vi.fn().mockReturnValue('0'),
-    GetErrorString: vi.fn().mockReturnValue(''),
-    GetDiagnostic: vi.fn().mockReturnValue(''),
-  };
-}
-
 const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 describe('manual completion — adapter integration', () => {
   it('SCORM 1.2 writes lesson_status = completed when only completion is set', async () => {
-    const api = mockSCORM12();
+    const api = scorm12Api();
     const adapter = new SCORM12Adapter(api);
     await adapter.init();
 
@@ -688,7 +659,7 @@ describe('manual completion — adapter integration', () => {
   });
 
   it('SCORM 1.2 writes lesson_status = passed when requireSuccessStatus = "passed"', async () => {
-    const api = mockSCORM12();
+    const api = scorm12Api();
     const adapter = new SCORM12Adapter(api);
     await adapter.init();
 
@@ -704,7 +675,7 @@ describe('manual completion — adapter integration', () => {
   });
 
   it('SCORM 2004 writes completion_status + success_status independently', async () => {
-    const api = mockSCORM2004();
+    const api = scorm2004Api();
     const adapter = new SCORM2004Adapter(api);
     await adapter.init();
 
@@ -721,7 +692,7 @@ describe('manual completion — adapter integration', () => {
   });
 
   it('SCORM 2004 writes success_status = "passed" when requireSuccessStatus is "passed"', async () => {
-    const api = mockSCORM2004();
+    const api = scorm2004Api();
     const adapter = new SCORM2004Adapter(api);
     await adapter.init();
 

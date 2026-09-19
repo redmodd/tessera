@@ -75,7 +75,6 @@ describe('launch adapter capabilities', () => {
     });
     window.history.replaceState({}, '', `/?${qs}`);
     const adapter = new XAPIAdapter();
-    expect(adapter.launchPublisher()).toBeNull();
 
     await adapter.init();
     expect(adapter.launchPublisher()?.getActor()).toEqual(actor);

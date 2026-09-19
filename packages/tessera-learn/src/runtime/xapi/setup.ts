@@ -114,30 +114,22 @@ function resolveDestination(
     );
   }
 
-  let actor = hook?.actor ?? explicit.actor;
-  if (actor === undefined) {
-    if (!adapter.connected) {
-      if (profile?.derivesLearnerActor) {
-        return makeRejectingPublisher(
-          () => new XAPISCORMDevFallbackError(profile.id),
-        );
-      }
-      console.warn(
-        'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
+  const actor =
+    hook?.actor ??
+    explicit.actor ??
+    adapter.deriveActor(explicit.activityId, explicit.actorAccountHomePage);
+  if (!actor) {
+    if (!adapter.connected && profile?.derivesLearnerActor) {
+      return makeRejectingPublisher(
+        () => new XAPISCORMDevFallbackError(profile.id),
       );
-      return null;
     }
-    const derived = adapter.deriveActor(
-      explicit.activityId,
-      explicit.actorAccountHomePage,
+    console.warn(
+      adapter.connected
+        ? 'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.'
+        : 'Tessera xAPI: explicit destination has no actor and no derivation source; skipping it.',
     );
-    if (!derived) {
-      console.warn(
-        'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.',
-      );
-      return null;
-    }
-    actor = derived;
+    return null;
   }
 
   return new XAPIPublisher({
@@ -175,7 +167,7 @@ export async function buildXAPIClient(
       publishers.push(publisher);
     } catch (err) {
       console.warn(
-        'Tessera xAPI: failed to initialize a destination — skipping.',
+        'Tessera xAPI: failed to initialize a destination; skipping it.',
         err,
       );
     }

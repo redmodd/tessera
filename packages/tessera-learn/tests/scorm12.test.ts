@@ -4,24 +4,7 @@ import {
   type SCORM12API,
 } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-
-function createMockAPI(overrides: Partial<SCORM12API> = {}): SCORM12API {
-  const store = new Map<string, string>();
-  return {
-    LMSInitialize: vi.fn().mockReturnValue('true'),
-    LMSFinish: vi.fn().mockReturnValue('true'),
-    LMSGetValue: vi.fn((key: string) => store.get(key) || ''),
-    LMSSetValue: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-      return 'true';
-    }),
-    LMSCommit: vi.fn().mockReturnValue('true'),
-    LMSGetLastError: vi.fn().mockReturnValue('0'),
-    LMSGetErrorString: vi.fn().mockReturnValue(''),
-    LMSGetDiagnostic: vi.fn().mockReturnValue(''),
-    ...overrides,
-  };
-}
+import { scorm12Api } from './helpers.js';
 
 /** Wait for the async write queue to flush */
 async function flush() {
@@ -33,7 +16,7 @@ describe('SCORM12Adapter', () => {
   let adapter: SCORM12Adapter;
 
   beforeEach(() => {
-    api = createMockAPI();
+    api = scorm12Api();
     adapter = new SCORM12Adapter(api);
   });
 
