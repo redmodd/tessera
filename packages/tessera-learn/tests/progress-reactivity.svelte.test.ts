@@ -72,7 +72,7 @@ describe('standalone question rescoring re-derives course status', () => {
     for (const score of [0, 100, 40, 90]) {
       progress.markStandaloneQuestion(0, 'q1', score, true);
       flushSync();
-      const passing = progress.gradedScore.average >= 70;
+      const passing = progress.gradedScore.score >= 70;
       expect(progress.successStatus).toBe(passing ? 'passed' : 'failed');
       expect(progress.completionStatus).toBe(
         passing ? 'complete' : 'incomplete',

@@ -331,16 +331,13 @@ export class ProgressState {
       : 'failed';
   });
 
-  get gradedScore(): { average: number; attempted: boolean } {
-    const { average, attempted } = this.#graded;
-    return { average, attempted };
-  }
-
   /**
-   * The course score sent to the LMS. successStatus and completionStatus
-   * compare this same value, so the score and the status can't disagree.
+   * `score` is the rounded `average` sent to the LMS. successStatus and
+   * completionStatus compare this same value, so the score and the status
+   * can't disagree.
    */
-  get reportedScore(): number {
-    return this.#graded.score;
+  get gradedScore(): { average: number; score: number; attempted: boolean } {
+    const { average, score, attempted } = this.#graded;
+    return { average, score, attempted };
   }
 }

@@ -833,13 +833,13 @@ describe('useProgress', () => {
 
     const h = useProgress();
     expect(h.passingScore).toBe(80);
-    expect(h.gradedScore).toEqual({ average: 0, attempted: false });
+    expect(h.gradedScore).toEqual({ average: 0, score: 0, attempted: false });
 
     progress.quizCompleted(1, 90);
-    expect(h.gradedScore).toEqual({ average: 45, attempted: true });
+    expect(h.gradedScore).toEqual({ average: 45, score: 45, attempted: true });
 
     progress.quizCompleted(2, 70);
-    expect(h.gradedScore).toEqual({ average: 80, attempted: true });
+    expect(h.gradedScore).toEqual({ average: 80, score: 80, attempted: true });
   });
 
   it('pageScore defaults to the current page', () => {

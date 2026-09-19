@@ -329,7 +329,7 @@
 
     if (!progress.gradedScoreFinal) return;
 
-    const score = progress.reportedScore;
+    const score = progress.gradedScore.score;
     if (score === prevReportedScore) return;
     prevReportedScore = score;
 
@@ -446,7 +446,7 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
-          ? progress.reportedScore
+          ? progress.gradedScore.score
           : null;
         if (
           adapter.seedLifecycle(
