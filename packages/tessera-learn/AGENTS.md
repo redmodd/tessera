@@ -1052,6 +1052,7 @@ Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
+- **SCORM 1.2 and cmi5 packages declare `scoring.passingScore` as the mastery score** (`adlcp:masteryscore`, `masteryScore`), so an LMS admin can change the pass mark without a rebuild. SCORM 1.2 omits it under `completion.mode: "manual"`.
 - **SCORM 1.2, SCORM 2004 and cmi5 honor an LMS-supplied mastery score** at launch, overriding `scoring.passingScore`. Read it via `useQuiz().passingScore`.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 

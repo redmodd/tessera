@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { courseIdentity, type CourseConfig } from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
+import { formatReal107 } from '../runtime/adapters/format.js';
 
 function slugify(text: string): string {
   return text
@@ -103,6 +104,7 @@ interface ScormManifestDialect {
   scormTypeAttr: 'scormtype' | 'scormType';
   /** Whitespace-separated namespace+XSD pairs for xsi:schemaLocation. */
   schemaLocation: string;
+  itemElements?(config: ExportConfig): string[];
 }
 
 function generateScormManifest(
@@ -114,6 +116,12 @@ function generateScormManifest(
   const files = collectFiles(outDir);
   const fileElements = files
     .map((f) => `      <file href="${escapeXml(f)}" />`)
+    .join('\n');
+  const itemElements = [
+    `<title>${title}</title>`,
+    ...(dialect.itemElements?.(config) ?? []),
+  ]
+    .map((e) => `        ${e}`)
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -130,7 +138,7 @@ function generateScormManifest(
     <organization identifier="org-1">
       <title>${title}</title>
       <item identifier="item-1" identifierref="res-1">
-        <title>${title}</title>
+${itemElements}
       </item>
     </organization>
   </organizations>
@@ -263,6 +271,12 @@ export const LMS_BUILD: Record<
         'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
         'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
         'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
+      itemElements: (config) =>
+        config.completion?.mode === 'manual'
+          ? []
+          : [
+              `<adlcp:masteryscore>${formatReal107(config.scoring.passingScore)}</adlcp:masteryscore>`,
+            ],
     }),
     adapter: 'SCORM12Adapter',
     detect: 'findSCORM12API',

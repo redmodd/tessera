@@ -118,6 +118,7 @@ test.describe('Export — SCORM 1.2', () => {
     expect(xml).toContain('adlcp_rootv1p2');
     expect(xml).toContain('<schemaversion>1.2</schemaversion>');
     expect(xml).toContain('adlcp:scormtype="sco"');
+    expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
     expect(xml).toContain('href="index.html"');
     expect(xml).toContain('<file href=');
     expect(xml).toContain('E2E Test Course');
