@@ -163,7 +163,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.scaled = null;
       return;
     }
-    this.scaled = Math.round(Math.max(0, Math.min(100, score)) * 100) / 1e4;
+    this.scaled = Number(
+      (Math.max(0, Math.min(100, score)) / 100).toPrecision(15),
+    );
   }
 
   override setDuration(seconds: number): void {

@@ -4,6 +4,7 @@ import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
+  exitCourse,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -279,6 +280,14 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.locator('.tessera-quiz-btn-submit').click();
   }
 
+  async function answerExam(page: Page, optionIndex: number) {
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(optionIndex)
+      .check();
+  }
+
   async function courseScore(page: Page) {
     return (await scormData(page))['cmi.core.score.raw'];
   }
@@ -291,12 +300,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
 
     await answerCheckQuiz(page, 0);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(2)
-      .check();
+    await answerExam(page, 2);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('66.67');
   });
@@ -311,12 +315,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.waitForSelector('.tessera-quiz-results');
     expect(await courseScore(page)).toBeFalsy();
 
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(0)
-      .check();
+    await answerExam(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('33.33');
   });
@@ -337,14 +336,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
 
       await answerCheckQuiz(page, 0);
 
-      await page
-        .locator('.tessera-nav-page', { hasText: 'Final Exam' })
-        .click();
-      await page.waitForSelector('[data-question-id="q-exam"]');
-      await page
-        .locator('[data-question-id="q-exam"] input[type="radio"]')
-        .nth(2)
-        .check();
+      await answerExam(page, 2);
 
       await expect
         .poll(() => courseScore(page), { timeout: 5000 })
@@ -353,11 +345,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
         'cmi.core.lesson_status': 'failed',
       });
 
-      await page.evaluate(() => {
-        window.dispatchEvent(
-          new PageTransitionEvent('pagehide', { persisted: false }),
-        );
-      });
+      await exitCourse(page);
 
       expect(await scormData(page)).toMatchObject({
         'cmi.core.score.raw': '66.67',

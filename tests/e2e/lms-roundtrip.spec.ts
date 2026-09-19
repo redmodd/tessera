@@ -10,6 +10,7 @@ import {
 import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
+  exitCourse,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -209,14 +210,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(1100); // accumulate at least one whole second
 
-    // Dispatch pagehide synchronously — the exit handler drains the queue
-    // synchronously via drainSync(), so by the time this returns the mock
-    // has the final session_time and LMSFinish call.
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
 
     // Assert the adapter's written format from the call log: scorm-again
     // normalizes session_time on storage, so the snapshot is not verbatim.
@@ -371,11 +365,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(1100);
 
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
 
     const data = await scormData(page);
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
@@ -812,13 +802,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'matching',
     ]);
 
-    // Dispatch pagehide synchronously — the exit handler drains the queue and
-    // fires Terminated as the final statement of the session.
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new PageTransitionEvent('pagehide', { persisted: false }),
-      );
-    });
+    await exitCourse(page);
     await expect
       .poll(
         () =>

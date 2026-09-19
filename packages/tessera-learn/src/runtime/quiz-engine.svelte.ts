@@ -256,15 +256,15 @@ export class QuizEngine implements UseQuizHandle {
 
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
-    const { rounded } = this.#computeScore();
-    this.#score = rounded;
-    this.#bestScore = Math.max(this.#bestScore, rounded);
+    const score = this.#computeScore();
+    this.#score = score;
+    this.#bestScore = Math.max(this.#bestScore, score);
     this.#submitted = true;
     this.#restored = false;
     this.#attemptCount++;
 
-    this.#deps.onComplete(rounded);
-    this.#deps.notify?.('tessera-quiz-complete', { score: rounded });
+    this.#deps.onComplete(score);
+    this.#deps.notify?.('tessera-quiz-complete', { score });
   }
 
   startReview(): void {
@@ -323,24 +323,14 @@ export class QuizEngine implements UseQuizHandle {
     this.#reportedAnswers.set(index, fingerprint);
   }
 
-  #computeScore(): { rounded: number; correctCount: number } {
+  #computeScore(): number {
     let weighted = 0;
     let totalWeight = 0;
-    let correctCount = 0;
-    for (let i = 0; i < this.#internalQuestions.length; i++) {
-      const q = this.#internalQuestions[i];
-      const ok = q.checkAnswer();
+    for (const q of this.#internalQuestions) {
       totalWeight += q.weight;
-      if (ok) {
-        weighted += q.weight;
-        correctCount++;
-      }
+      if (q.checkAnswer()) weighted += q.weight;
     }
-    if (totalWeight === 0) return { rounded: 0, correctCount: 0 };
-    return {
-      rounded: roundScore((weighted / totalWeight) * 100),
-      correctCount,
-    };
+    return totalWeight === 0 ? 0 : roundScore((weighted / totalWeight) * 100);
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

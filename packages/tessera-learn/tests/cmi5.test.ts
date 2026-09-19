@@ -1601,7 +1601,6 @@ describe('CMI5Adapter', () => {
       const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
       expect(passed.result.score.scaled).toBe(0.533);
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('keeps scaled score on Failed when below mastery', async () => {

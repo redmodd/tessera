@@ -222,22 +222,6 @@ describe('App restore gate honours config.resume', () => {
       b: 1,
       v: [0, 1],
       d: 120,
-      g: { '1': { q: { q1: 100 } } },
-      f: structureFingerprint(manifest),
-    };
-    const { component, setScore, unmount } = await mountApp('auto', {
-      saved,
-      seeds: false,
-    });
-    cleanup = () => unmount(component);
-    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));
-  });
-
-  it('reports the restored score to 2 decimal places', async () => {
-    const saved = {
-      b: 1,
-      v: [0, 1],
-      d: 120,
       g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
       f: structureFingerprint(manifest),
     };

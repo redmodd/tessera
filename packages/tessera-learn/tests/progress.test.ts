@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { ProgressState, roundScore } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
-// ---------- ProgressState ----------
-
 describe('roundScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(roundScore(200 / 3)).toBe(66.67);
@@ -11,6 +9,8 @@ describe('roundScore', () => {
     expect(roundScore(68.335)).toBe(68.34);
   });
 });
+
+// ---------- ProgressState ----------
 
 describe('ProgressState', () => {
   describe('markVisited', () => {
