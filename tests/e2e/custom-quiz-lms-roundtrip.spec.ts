@@ -6,7 +6,12 @@ import {
   cmi5LaunchURL,
   xapiLaunchURL,
 } from './lms-mocks.js';
-import { interactionField, startPreview, waitForServer } from './helpers.js';
+import {
+  interactionField,
+  startPreview,
+  waitForScormCall,
+  waitForServer,
+} from './helpers.js';
 
 /**
  * Phase 5 Task 2 Step 4 — load-bearing custom-quiz LMS roundtrip.
@@ -22,24 +27,6 @@ import { interactionField, startPreview, waitForServer } from './helpers.js';
 
 async function waitForCustomQuiz(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 15000 });
-}
-
-async function waitForScormCall(
-  page: Page,
-  predicate: (entry: string[]) => boolean,
-  timeoutMs = 5000,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const matched = await page.evaluate((pred: string) => {
-      const log = (window as any).__scormLog || [];
-      const fn = new Function('entry', `return (${pred})(entry)`);
-      return log.some((entry: string[]) => fn(entry));
-    }, predicate.toString());
-    if (matched) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('Timed out waiting for SCORM call');
 }
 
 /**

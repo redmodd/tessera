@@ -6,6 +6,7 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
+  openGradedQuiz,
   reportedQuestionCount,
   startPreview,
   waitForServer,
@@ -195,10 +196,7 @@ test.describe.serial('completion.mode quiz', () => {
 
     const totalPages = await page.locator('.tessera-nav-page').count();
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-      .click();
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await openGradedQuiz(page);
 
     await answerGradedQuiz(page);
 

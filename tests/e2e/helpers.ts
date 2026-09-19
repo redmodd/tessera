@@ -60,6 +60,27 @@ export async function interactionWrites(page: Page): Promise<string[][]> {
   );
 }
 
+/**
+ * Wait until the SCORM mock has logged a call matching `predicate`. The
+ * adapter's write queue is async, so poll the log rather than sleeping.
+ */
+export async function waitForScormCall(
+  page: Page,
+  predicate: (entry: string[]) => boolean,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const log = (await page.evaluate(
+          () => (window as any).__scormLog ?? [],
+        )) as string[][];
+        return log.some(predicate);
+      },
+      { timeout: 5000 },
+    )
+    .toBe(true);
+}
+
 /** Values written to cmi.interactions.<n>.<field>, in write order. */
 export async function interactionField(
   page: Page,
@@ -103,6 +124,14 @@ export async function answerMatching(
     expected++;
     await expect(matched).toHaveCount(expected);
   }
+}
+
+/** Open the `free` fixture's graded quiz from the sidebar. */
+export async function openGradedQuiz(page: Page): Promise<void> {
+  await page
+    .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
+    .click();
+  await expect(page.locator('.tessera-quiz')).toBeVisible({ timeout: 10000 });
 }
 
 /**

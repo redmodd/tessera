@@ -93,8 +93,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected read(key: string): string {
     try {
-      const value: unknown = this.dialect.getValue(this.api, key);
-      return value == null ? '' : String(value);
+      return String(this.dialect.getValue(this.api, key) ?? '');
     } catch {
       return '';
     }

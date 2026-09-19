@@ -11,8 +11,10 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
+  openGradedQuiz,
   reportedQuestionCount,
   startPreview,
+  waitForScormCall,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
@@ -20,29 +22,6 @@ import {
 const test = base.extend<{ lmsData: Record<string, string> }>({
   lmsData: [{}, { option: true }],
 });
-
-/**
- * Wait until the SCORM mock has received at least one LMSCommit / Commit
- * for the given value predicate. The adapter's write queue is async, so we
- * poll the log after interactions rather than sleeping a fixed amount.
- */
-async function waitForScormCall(
-  page: Page,
-  predicate: (entry: string[]) => boolean,
-  timeoutMs = 5000,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const matched = await page.evaluate((pred: string) => {
-      const log = (window as any).__scormLog || [];
-      const fn = new Function('entry', `return (${pred})(entry)`);
-      return log.some((entry: string[]) => fn(entry));
-    }, predicate.toString());
-    if (matched) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('Timed out waiting for SCORM call');
-}
 
 // ---------------------------------------------------------------------------
 // SCORM 1.2
@@ -172,10 +151,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-      .click();
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await openGradedQuiz(page);
 
     // Q1: "What is 2 + 2?" → option index 1 ("4")
     await page
@@ -289,27 +265,19 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     }) => {
       await page.goto(BASE);
       await waitForTesseraContent(page);
-      await page
-        .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-        .click();
-      await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+      await openGradedQuiz(page);
 
       await answerGradedQuiz(page, 0);
 
       await expect
         .poll(
-          () =>
-            page.evaluate(
-              () =>
-                (window as any).__scormDataSnapshot()['cmi.core.lesson_status'],
-            ),
+          () => page.evaluate(() => (window as any).__scormDataSnapshot()),
           { timeout: 5000 },
         )
-        .toBe('passed');
-      const data = await page.evaluate(() =>
-        (window as any).__scormDataSnapshot(),
-      );
-      expect(data['cmi.core.score.raw']).toBe('67');
+        .toMatchObject({
+          'cmi.core.lesson_status': 'passed',
+          'cmi.core.score.raw': '67',
+        });
     });
   });
 });
@@ -399,10 +367,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-      .click();
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await openGradedQuiz(page);
 
     await answerGradedQuiz(page);
 
@@ -586,10 +551,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-      .click();
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await openGradedQuiz(page);
 
     await answerGradedQuiz(page);
 
@@ -813,10 +775,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Graded Assessment' })
-      .click();
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await openGradedQuiz(page);
 
     await page
       .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')

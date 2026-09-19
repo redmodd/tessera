@@ -67,12 +67,9 @@ export function formatISO8601Duration(totalSeconds: number): string {
 }
 
 export function parseScaled01(raw: unknown, scale = 1): number | null {
-  const n =
-    typeof raw === 'number'
-      ? raw
-      : typeof raw === 'string' && raw.trim()
-        ? Number(raw)
-        : NaN;
-  const scaled = n / scale;
-  return Number.isFinite(scaled) && scaled >= 0 && scaled <= 1 ? scaled : null;
+  if (typeof raw === 'string' ? !raw.trim() : typeof raw !== 'number') {
+    return null;
+  }
+  const n = Number(raw) / scale;
+  return n >= 0 && n <= 1 ? n : null;
 }

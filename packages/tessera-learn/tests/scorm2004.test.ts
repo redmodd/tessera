@@ -279,23 +279,34 @@ describe('SCORM2004Adapter', () => {
   });
 
   describe('LMS-supplied thresholds', () => {
-    it('reads cmi.scaled_passing_score and exposes via getMasteryScore()', async () => {
-      api.GetValue.mockImplementation((key) =>
-        key === 'cmi.scaled_passing_score' ? '0.7' : '',
-      );
+    async function masteryFrom(value: string) {
+      api = scorm2004Api({ 'cmi.scaled_passing_score': value });
+      adapter = new SCORM2004Adapter(api);
       await adapter.init();
-      expect(adapter.getMasteryScore()).toBe(0.7);
+      return adapter.getMasteryScore();
+    }
+
+    it('reads cmi.scaled_passing_score and exposes via getMasteryScore()', async () => {
+      expect(await masteryFrom('0.7')).toBe(0.7);
     });
 
-    it.each(['1.5', '', ' '])(
-      'returns null for the threshold %j',
+    it.each(['', ' '])('ignores a blank threshold %j', async (value) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await masteryFrom(value)).toBeNull();
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('cmi.scaled_passing_score'),
+      );
+      warn.mockRestore();
+    });
+
+    it.each(['abc', '1.5'])(
+      'ignores and warns on the threshold %j',
       async (value) => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        api.GetValue.mockImplementation((key) =>
-          key === 'cmi.scaled_passing_score' ? value : '',
+        expect(await masteryFrom(value)).toBeNull();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('cmi.scaled_passing_score'),
         );
-        await adapter.init();
-        expect(adapter.getMasteryScore()).toBeNull();
         warn.mockRestore();
       },
     );

@@ -85,15 +85,11 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     this.activityId = params.get('activityId') || '';
 
     const rawMastery = params.get('masteryScore');
-    if (rawMastery !== null && rawMastery !== '') {
-      const m = parseScaled01(rawMastery);
-      if (m !== null) {
-        this.masteryScore = m;
-      } else {
-        console.warn(
-          `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`,
-        );
-      }
+    this.masteryScore = parseScaled01(rawMastery);
+    if (this.masteryScore === null && rawMastery?.trim()) {
+      console.warn(
+        `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`,
+      );
     }
 
     this.parseActorParam(params.get('actor') || '');

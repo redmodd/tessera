@@ -427,12 +427,11 @@
       console.warn('Tessera: resume state load failed', err);
     }
 
-    // An LMS-supplied mastery score (SCORM 1.2 cmi.student_data.mastery_score,
-    // SCORM 2004 cmi.scaled_passing_score, cmi5 masteryScore) is the
-    // authoritative pass threshold for this launch and overrides the manifest.
-    // `config` is a $state proxy, so this one write re-derives every consumer:
-    // completion and success status, navigation gating, the Quiz page context,
-    // and useProgress().passingScore in a custom layout.
+    // An LMS-supplied mastery score is the authoritative pass threshold for
+    // this launch and overrides the manifest. `config` is a $state proxy, so
+    // this one write re-derives every consumer: completion and success status,
+    // navigation gating, the Quiz page context, and useProgress().passingScore
+    // in a custom layout.
     // The first page is gated on persistenceReady, so a malformed saved
     // document must cost the resume, not the course.
     try {
