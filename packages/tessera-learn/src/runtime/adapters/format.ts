@@ -66,7 +66,7 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
-const DECIMAL = /^-?(\d+\.?\d*|\.\d+)$/;
+const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
 
 export function parseMastery(
   raw: unknown,

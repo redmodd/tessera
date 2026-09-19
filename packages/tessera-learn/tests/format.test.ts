@@ -118,6 +118,8 @@ describe('parseMastery', () => {
     expect(parseMastery(1, 'm')).toBe(1);
     expect(parseMastery(0.7, 'm')).toBe(0.7);
     expect(parseMastery('0.5', 'm')).toBe(0.5);
+    expect(parseMastery('+0.6', 'm')).toBe(0.6);
+    expect(parseMastery('6.0E-1', 'm')).toBe(0.6);
   });
   it('ignores blank and missing values silently', () => {
     expect(parseMastery('', 'm')).toBeNull();
