@@ -329,12 +329,12 @@
 
     if (!progress.gradedScoreFinal) return;
 
-    const rounded = Math.round(progress.gradedScore.average);
-    if (rounded === prevReportedScore) return;
-    prevReportedScore = rounded;
+    const { average } = progress.gradedScore;
+    if (average === prevReportedScore) return;
+    prevReportedScore = average;
 
     untrack(() => {
-      adapter.setScore(rounded);
+      adapter.setScore(average);
       // Under manual mode, success is owned by requireSuccessStatus.
       if (config.completion.mode !== 'manual') {
         adapter.setSuccessStatus(progress.successStatus);
@@ -446,7 +446,7 @@
         prevCompletionStatus = progress.completionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
-          ? Math.round(progress.gradedScore.average)
+          ? progress.gradedScore.average
           : null;
         if (
           adapter.seedLifecycle(

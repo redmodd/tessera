@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
 import {
@@ -13,6 +13,10 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
+
+const test = base.extend<{ lmsData: Record<string, string> }>({
+  lmsData: [{}, { option: true }],
+});
 
 /**
  * SCORM 1.2 roundtrips that `free` cannot host.
@@ -267,7 +271,9 @@ test.describe.serial('per-page weights in the course rollup', () => {
   });
 
   test.afterAll(() => preview?.kill('SIGTERM'));
-  test.beforeEach(async ({ page }) => installScorm12Mock(page));
+  test.beforeEach(async ({ page, lmsData }) =>
+    installScorm12Mock(page, lmsData),
+  );
 
   async function answerCheckQuiz(page: Page, optionIndex: number) {
     await page
@@ -281,7 +287,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     return (await scormData(page))['cmi.core.score.raw'];
   }
 
-  test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
+  test('a weight-50 exam outweighs a weight-25 quiz page: 66.66667, not 50', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -296,7 +302,9 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(2)
       .check();
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+    await expect
+      .poll(() => courseScore(page), { timeout: 5000 })
+      .toBe('66.66667');
   });
 
   test('no score reaches the LMS until every graded page is scored', async ({
@@ -316,6 +324,50 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(0)
       .check();
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
+    await expect
+      .poll(() => courseScore(page), { timeout: 5000 })
+      .toBe('33.33333');
+  });
+
+  test.describe('LMS mastery_score', () => {
+    test.use({
+      lmsData: {
+        'cmi.core.credit': 'credit',
+        'cmi.student_data.mastery_score': '67',
+      },
+    });
+
+    test('a 66.66667 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+
+      await answerCheckQuiz(page, 0);
+
+      await page
+        .locator('.tessera-nav-page', { hasText: 'Final Exam' })
+        .click();
+      await page.waitForSelector('[data-question-id="q-exam"]');
+      await page
+        .locator('[data-question-id="q-exam"] input[type="radio"]')
+        .nth(2)
+        .check();
+
+      await expect
+        .poll(() => courseScore(page), { timeout: 5000 })
+        .toBe('66.66667');
+
+      await page.evaluate(() => {
+        window.dispatchEvent(
+          new PageTransitionEvent('pagehide', { persisted: false }),
+        );
+      });
+
+      expect(await scormData(page)).toMatchObject({
+        'cmi.core.score.raw': '66.66667',
+        'cmi.core.lesson_status': 'failed',
+      });
+    });
   });
 });

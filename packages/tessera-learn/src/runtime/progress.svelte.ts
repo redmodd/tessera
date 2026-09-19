@@ -244,7 +244,8 @@ export class ProgressState {
     }
     return {
       count: this.#declaredGradedIndices.size,
-      average: totalWeight > 0 ? weighted / totalWeight : 0,
+      average:
+        totalWeight > 0 ? Math.round((weighted / totalWeight) * 1e5) / 1e5 : 0,
       attempted,
       allScored,
     };

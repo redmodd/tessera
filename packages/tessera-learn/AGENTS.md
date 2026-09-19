@@ -864,7 +864,7 @@ function useProgress(): {
   readonly completedPages: number; // visited pages, minus graded pages still awaiting a score
   quizScore(pageIndex: number): number | undefined; // 0–100; undefined until the quiz is submitted
   pageScore(pageIndex?: number): number | undefined; // 0–100, unrounded; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the current page
-  readonly gradedScore: { average: number; attempted: boolean }; // course-wide; unrounded, the LMS gets Math.round(average)
+  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 5 decimal places; the LMS gets exactly this
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete';
@@ -882,9 +882,10 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 
 `gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `completion.mode: "manual"`, where `requireSuccessStatus` sets it on `markComplete()`.
 
-Two rules for displaying it:
+Three rules for displaying it:
 
 - **An unattempted graded page counts as 0.** `average` is `Σ(weight × pageScore) / Σ(weight)` over every graded page, so a learner who has aced the two equally weighted quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
+- **Don't round it up to the pass mark.** `successStatus` is judged on `average` itself, so `Math.round` can print "70%" beside `failed` when the average is 69.67. Floor it or show a decimal.
 - **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
 
 ```svelte
@@ -895,7 +896,7 @@ Two rules for displaying it:
 </script>
 
 {#if attempted}
-  <p>Course score so far: {Math.round(average)}%</p>
+  <p>Course score so far: {Math.floor(average)}%</p>
   {#if progress.passingScore > 0}
     <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
   {/if}

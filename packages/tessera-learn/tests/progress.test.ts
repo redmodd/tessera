@@ -839,6 +839,41 @@ describe('ProgressState', () => {
       const { average } = progress.gradedScore;
       expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
     });
+
+    it('fails an average that would round up to the pass mark', () => {
+      const manifest = createManifest(3, {
+        0: { graded: true },
+        1: { graded: true },
+        2: { graded: true },
+      });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.quizCompleted(0, 67);
+      progress.quizCompleted(1, 67);
+      progress.quizCompleted(2, 75);
+
+      expect(progress.gradedScore.average).toBe(69.66667);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('passes a learner who scores the pass mark on fractionally weighted pages', () => {
+      const manifest = createManifest(
+        3,
+        { 0: { graded: true }, 1: { graded: true } },
+        { 0: { weight: 0.1 }, 1: { weight: 0.2 } },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(0, 70);
+      progress.quizCompleted(1, 70);
+
+      expect(progress.gradedScore.average).toBe(70);
+      expect(progress.successStatus).toBe('passed');
+      expect(progress.completionStatus).toBe('complete');
+    });
   });
 
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {

@@ -233,6 +233,43 @@ describe('App restore gate honours config.resume', () => {
     await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(100));
   });
 
+  it('reports the restored score unrounded', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, setScore, unmount } = await mountApp('auto', {
+      saved,
+      seeds: false,
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33333));
+  });
+
+  it('seeds the adapter with the restored score unrounded', async () => {
+    const saved = {
+      b: 1,
+      v: [0, 1],
+      d: 120,
+      g: { '1': { q: { q1: 100, q2: [0, 2, 1] } } },
+      f: structureFingerprint(manifest),
+    };
+    const { component, seedLifecycle, unmount } = await mountApp('auto', {
+      saved,
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() =>
+      expect(seedLifecycle).toHaveBeenCalledWith(
+        'complete',
+        'failed',
+        33.33333,
+      ),
+    );
+  });
+
   it('ignores saved state when resume is "never"', async () => {
     const { component, seedLifecycle, setCompletionStatus, unmount } =
       await mountApp('never');
