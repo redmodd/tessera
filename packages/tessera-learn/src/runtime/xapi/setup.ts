@@ -18,16 +18,6 @@ import {
 } from '../standards.js';
 
 /**
- * A destination's publisher: either a fresh one constructed for an explicit
- * destination, or the launch adapter's own publisher (for the
- * `endpoint: 'lms'` sentinel — same instance, shared queue, already
- * initialized).
- */
-type DestinationSource =
-  | { kind: 'lms-shared'; publisher: XAPIPublisher }
-  | { kind: 'explicit'; publisher: XAPIPublisher };
-
-/**
  * Throws synchronously when `endpoint: 'lms'` appears under cmi5 or plain
  * xAPI export but the runtime was constructed without launch parameters
  * (i.e., running locally outside an LMS). Surfaced through every
@@ -93,7 +83,8 @@ type ActorResolution =
   | { kind: 'scorm-fallback'; standard: ActorDerivingStandard };
 
 /**
- * Resolve a single `XAPIConfig` entry into a destination source. Returns null
+ * Resolve a single `XAPIConfig` entry into its publisher: the launch adapter's
+ * own (shared queue) for `endpoint: 'lms'`, else a fresh one. Returns null
  * when the entry can't materialize, which includes the supported case of
  * `endpoint: 'lms'` under a non-launch export standard.
  */
@@ -102,7 +93,7 @@ function resolveDestination(
   config: CourseConfig,
   adapter: PersistenceAdapter,
   hooks: CourseRuntime['xapi'],
-): DestinationSource | null {
+): XAPIPublisher | null {
   if (entry.endpoint === 'lms') {
     const profile = standardProfile(config.export?.standard);
     if (!profile?.hasLaunchLRS) {
@@ -111,17 +102,9 @@ function resolveDestination(
       );
       return null;
     }
-    if (!adapter.connected) {
-      // Dev fallback — launch params absent, adapter is the WebAdapter
-      // fallback. Materialize a publisher whose sends reject with an
-      // explicit error so author code surfaces the dev/prod gap.
-      return {
-        kind: 'explicit',
-        publisher: makeDevFallbackPublisher(profile.id),
-      };
-    }
-    const publisher = adapter.launchPublisher();
-    return publisher ? { kind: 'lms-shared', publisher } : null;
+    // Only the dev fallback (a WebAdapter, launch params absent) has no launch
+    // publisher. Its sends reject so author code surfaces the dev/prod gap.
+    return adapter.launchPublisher() ?? makeDevFallbackPublisher(profile.id);
   }
 
   // Explicit endpoint.
@@ -130,33 +113,26 @@ function resolveDestination(
   const auth = hook?.auth ?? explicit.auth;
   if (auth === undefined) {
     const id = JSON.stringify(explicit.id);
-    return {
-      kind: 'explicit',
-      publisher: makeRejectingPublisher(
-        () =>
-          new XAPIConfigError(
-            `Tessera xAPI: destination ${id} has no auth. Set its auth in course.config.js, ` +
-              `or export xapi[${id}].auth from course.runtime.js.`,
-          ),
-      ),
-    };
+    return makeRejectingPublisher(
+      () =>
+        new XAPIConfigError(
+          `Tessera xAPI: destination ${id} has no auth. Set its auth in course.config.js, ` +
+            `or export xapi[${id}].auth from course.runtime.js.`,
+        ),
+    );
   }
   const resolution = resolveExplicitActor(explicit, hook, config, adapter);
   if (resolution === null) return null;
   if (resolution.kind === 'scorm-fallback') {
-    return {
-      kind: 'explicit',
-      publisher: makeSCORMDevFallbackPublisher(resolution.standard),
-    };
+    return makeSCORMDevFallbackPublisher(resolution.standard);
   }
-  const publisher = new XAPIPublisher({
+  return new XAPIPublisher({
     endpoint: explicit.endpoint,
     auth,
     actor: resolution.value,
     activityId: explicit.activityId,
     registration: explicit.registration,
   });
-  return { kind: 'explicit', publisher };
 }
 
 /**
@@ -177,16 +153,15 @@ function resolveExplicitActor(
     return { kind: 'actor', value: actor };
   }
   if (adapter.connected) {
-    // A connected SCORM adapter whose LMS leaves the learner id empty yields
-    // null; the publisher's init() then rejects it and the destination is
-    // skipped with a warning.
-    return {
-      kind: 'actor',
-      value: adapter.deriveActor(
-        explicit.activityId,
-        explicit.actorAccountHomePage,
-      ) as XAPIAgent,
-    };
+    const derived = adapter.deriveActor(
+      explicit.activityId,
+      explicit.actorAccountHomePage,
+    );
+    if (derived) return { kind: 'actor', value: derived };
+    console.warn(
+      'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.',
+    );
+    return null;
   }
   const profile = standardProfile(config.export?.standard);
   if (profile?.derivesLearnerActor) {
@@ -215,30 +190,18 @@ export async function buildXAPIClient(
   const raw = config.xapi;
   if (raw === undefined || raw === null) return null;
   const entries: XAPIConfig[] = Array.isArray(raw) ? raw : [raw];
-  const sources: DestinationSource[] = [];
-  for (const entry of entries) {
-    const src = resolveDestination(entry, config, adapter, hooks);
-    if (src) sources.push(src);
-  }
-  if (sources.length === 0) return null;
-
-  // For each destination, get the publisher (either freshly constructed
-  // for an explicit entry, or the cmi5 adapter's existing instance for
-  // 'lms') and ensure it's initialized.
   const publishers: XAPIPublisher[] = [];
-  for (const src of sources) {
-    if (src.kind === 'lms-shared') {
-      publishers.push(src.publisher);
-    } else {
-      try {
-        await src.publisher.init();
-        publishers.push(src.publisher);
-      } catch (err) {
-        console.warn(
-          'Tessera xAPI: failed to initialize an explicit destination — skipping.',
-          err,
-        );
-      }
+  for (const entry of entries) {
+    const publisher = resolveDestination(entry, config, adapter, hooks);
+    if (!publisher) continue;
+    try {
+      await publisher.init();
+      publishers.push(publisher);
+    } catch (err) {
+      console.warn(
+        'Tessera xAPI: failed to initialize an explicit destination — skipping.',
+        err,
+      );
     }
   }
   if (publishers.length === 0) return null;

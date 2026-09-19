@@ -6,6 +6,7 @@ import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import { scorm12Api } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -357,16 +358,7 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
   }
 
   function scorm12(values: Record<string, string>): SCORM12Adapter {
-    return new SCORM12Adapter({
-      LMSInitialize: () => 'true',
-      LMSFinish: () => 'true',
-      LMSGetValue: (k: string) => values[k] ?? '',
-      LMSSetValue: () => 'true',
-      LMSCommit: () => 'true',
-      LMSGetLastError: () => '0',
-      LMSGetErrorString: () => '',
-      LMSGetDiagnostic: () => '',
-    });
+    return new SCORM12Adapter(scorm12Api(values));
   }
 
   afterEach(() => {
@@ -388,8 +380,7 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(await buildXAPIClient(scormConfig(), scorm12({}))).toBeNull();
     expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(/failed to initialize an explicit destination/),
-      expect.anything(),
+      expect.stringMatching(/LMS supplied no learner id/),
     );
   });
 

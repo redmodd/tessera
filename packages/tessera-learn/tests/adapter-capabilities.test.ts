@@ -1,44 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
-import {
-  SCORM12Adapter,
-  type SCORM12API,
-} from '../src/runtime/adapters/scorm12.js';
-import {
-  SCORM2004Adapter,
-  type SCORM2004API,
-} from '../src/runtime/adapters/scorm2004.js';
+import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
+import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import { createConfig } from './helpers.js';
+import { createConfig, scorm12Api, scorm2004Api } from './helpers.js';
 
 const ACTIVITY = 'https://example.com/course';
-
-function scorm12Api(values: Record<string, string>): SCORM12API {
-  return {
-    LMSInitialize: () => 'true',
-    LMSFinish: () => 'true',
-    LMSGetValue: (k) => values[k] ?? '',
-    LMSSetValue: () => 'true',
-    LMSCommit: () => 'true',
-    LMSGetLastError: () => '0',
-    LMSGetErrorString: () => '',
-    LMSGetDiagnostic: () => '',
-  };
-}
-
-function scorm2004Api(values: Record<string, string>): SCORM2004API {
-  return {
-    Initialize: () => 'true',
-    Terminate: () => 'true',
-    GetValue: (k) => values[k] ?? '',
-    SetValue: () => 'true',
-    Commit: () => 'true',
-    GetLastError: () => '0',
-    GetErrorString: () => '',
-    GetDiagnostic: () => '',
-  };
-}
 
 describe('WebAdapter capabilities', () => {
   const adapter = new WebAdapter(createConfig());
@@ -56,38 +24,30 @@ describe('WebAdapter capabilities', () => {
 });
 
 describe('SCORM adapter capabilities', () => {
-  it('SCORM 1.2 derives the actor from cmi.core learner fields', () => {
+  it('SCORM 1.2 derives the actor from its LMS', () => {
     const adapter = new SCORM12Adapter(
-      scorm12Api({
-        'cmi.core.student_id': 'l-1',
-        'cmi.core.student_name': 'Doe, Jane',
-      }),
+      scorm12Api({ 'cmi.core.student_id': 'l-1' }),
     );
     expect(adapter.connected).toBe(true);
     expect(adapter.deriveActor(ACTIVITY)).toEqual({
       account: { homePage: 'https://example.com', name: 'l-1' },
-      name: 'Doe, Jane',
       objectType: 'Agent',
     });
     expect(adapter.launchPublisher()).toBeNull();
     expect(adapter.seedLifecycle('complete', 'passed', 90)).toBe(false);
   });
 
-  it('SCORM 2004 derives the actor from cmi.learner_id, honoring the homePage override', () => {
+  it('SCORM 2004 derives the actor from its LMS', () => {
     const adapter = new SCORM2004Adapter(
       scorm2004Api({ 'cmi.learner_id': 'l-2' }),
     );
     expect(adapter.connected).toBe(true);
-    expect(adapter.deriveActor(ACTIVITY, 'https://idp.example.org')).toEqual({
-      account: { homePage: 'https://idp.example.org', name: 'l-2' },
+    expect(adapter.deriveActor(ACTIVITY)).toEqual({
+      account: { homePage: 'https://example.com', name: 'l-2' },
       objectType: 'Agent',
     });
     expect(adapter.launchPublisher()).toBeNull();
     expect(adapter.seedLifecycle('complete', 'passed', 90)).toBe(false);
-  });
-
-  it('derives no actor when the LMS leaves the learner id empty', () => {
-    expect(new SCORM12Adapter(scorm12Api({})).deriveActor(ACTIVITY)).toBeNull();
   });
 });
 

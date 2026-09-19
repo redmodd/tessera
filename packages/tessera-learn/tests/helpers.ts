@@ -1,6 +1,38 @@
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { PersistenceAdapter } from '../src/runtime/persistence.js';
+import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
+import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
+
+/** A SCORM 1.2 API whose GetValue reads from `values` and whose calls all succeed. */
+export function scorm12Api(values: Record<string, string> = {}): SCORM12API {
+  return {
+    LMSInitialize: () => 'true',
+    LMSFinish: () => 'true',
+    LMSGetValue: (k) => values[k] ?? '',
+    LMSSetValue: () => 'true',
+    LMSCommit: () => 'true',
+    LMSGetLastError: () => '0',
+    LMSGetErrorString: () => '',
+    LMSGetDiagnostic: () => '',
+  };
+}
+
+/** A SCORM 2004 API whose GetValue reads from `values` and whose calls all succeed. */
+export function scorm2004Api(
+  values: Record<string, string> = {},
+): SCORM2004API {
+  return {
+    Initialize: () => 'true',
+    Terminate: () => 'true',
+    GetValue: (k) => values[k] ?? '',
+    SetValue: () => 'true',
+    Commit: () => 'true',
+    GetLastError: () => '0',
+    GetErrorString: () => '',
+    GetDiagnostic: () => '',
+  };
+}
 
 /** A connected adapter whose members all no-op, for mounting App without an LMS. */
 export function stubAdapter(
