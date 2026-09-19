@@ -9,7 +9,7 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { parseScaled01 } from './format.js';
+import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import {
   httpOrigin,
@@ -124,13 +124,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     }
 
     const { masteryKey, masteryScale } = this.dialect;
-    const mastery = this.read(masteryKey);
-    this.masteryScore = parseScaled01(mastery, masteryScale);
-    if (this.masteryScore === null && mastery.trim()) {
-      console.warn(
-        `Tessera: ${masteryKey} is not a number in [0,${masteryScale}] (got "${mastery}"); using scoring.passingScore.`,
-      );
-    }
+    this.masteryScore = parseMastery(
+      this.read(masteryKey),
+      masteryKey,
+      masteryScale,
+    );
 
     let raw = '';
     try {

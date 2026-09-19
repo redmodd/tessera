@@ -1,4 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import {
   formatHHMMSS,
   formatISO8601Duration,
@@ -97,31 +105,41 @@ describe('formatISO8601Duration', () => {
   });
 });
 
-import { parseScaled01 } from '../src/runtime/adapters/format.js';
+import { parseMastery } from '../src/runtime/adapters/format.js';
 
-describe('parseScaled01', () => {
+describe('parseMastery', () => {
+  let warn: MockInstance;
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
   it('accepts in-range numbers and numeric strings', () => {
-    expect(parseScaled01(0)).toBe(0);
-    expect(parseScaled01(1)).toBe(1);
-    expect(parseScaled01(0.7)).toBe(0.7);
-    expect(parseScaled01('0.5')).toBe(0.5);
+    expect(parseMastery(0, 'm')).toBe(0);
+    expect(parseMastery(1, 'm')).toBe(1);
+    expect(parseMastery(0.7, 'm')).toBe(0.7);
+    expect(parseMastery('0.5', 'm')).toBe(0.5);
   });
-  it('rejects out-of-range, non-finite, empty, and null', () => {
-    expect(parseScaled01(-0.1)).toBeNull();
-    expect(parseScaled01(1.1)).toBeNull();
-    expect(parseScaled01(NaN)).toBeNull();
-    expect(parseScaled01(Infinity)).toBeNull();
-    expect(parseScaled01('')).toBeNull();
-    expect(parseScaled01(null)).toBeNull();
-    expect(parseScaled01(undefined)).toBeNull();
-    expect(parseScaled01('abc')).toBeNull();
-    expect(parseScaled01(' ')).toBeNull();
-    expect(parseScaled01(true)).toBeNull();
+  it('ignores blank and missing values silently', () => {
+    expect(parseMastery('', 'm')).toBeNull();
+    expect(parseMastery(' ', 'm')).toBeNull();
+    expect(parseMastery(null, 'm')).toBeNull();
+    expect(parseMastery(undefined, 'm')).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
   });
+  it.each([-0.1, 1.1, NaN, Infinity, 'abc', true])(
+    'rejects %j with a warning naming the source',
+    (raw) => {
+      expect(parseMastery(raw, 'cmi.scaled_passing_score')).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('cmi.scaled_passing_score'),
+      );
+    },
+  );
   it('divides by scale before the range check', () => {
-    expect(parseScaled01('60', 100)).toBe(0.6);
-    expect(parseScaled01('100', 100)).toBe(1);
-    expect(parseScaled01('', 100)).toBeNull();
-    expect(parseScaled01('101', 100)).toBeNull();
+    expect(parseMastery('60', 'm', 100)).toBe(0.6);
+    expect(parseMastery('100', 'm', 100)).toBe(1);
+    expect(parseMastery('', 'm', 100)).toBeNull();
+    expect(parseMastery('101', 'm', 100)).toBeNull();
   });
 });

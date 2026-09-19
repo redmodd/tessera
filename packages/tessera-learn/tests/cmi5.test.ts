@@ -1381,6 +1381,19 @@ describe('CMI5Adapter', () => {
       expect(adapter.getMasteryScore()).toBe(0.8);
     });
 
+    it('keeps the URL masteryScore and warns when LaunchData.masteryScore is out of range', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setSearchParams({ ...baseLaunchParams, masteryScore: '0.5' });
+      setupInitMocks(undefined, { masteryScore: 1.5 });
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      expect(adapter.getMasteryScore()).toBe(0.5);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('LaunchData masteryScore'),
+      );
+      warn.mockRestore();
+    });
+
     it('does NOT emit Completed under launchMode=Browse (§10.2.2)', async () => {
       setupInitMocks(undefined, { launchMode: 'Browse' });
       adapter = new CMI5Adapter();

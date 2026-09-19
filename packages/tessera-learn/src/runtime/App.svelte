@@ -432,14 +432,14 @@
     // this one write re-derives every consumer: completion and success status,
     // navigation gating, the Quiz page context, and useProgress().passingScore
     // in a custom layout.
+    const lmsMastery = adapter.getMasteryScore();
+    if (lmsMastery !== null) {
+      config.scoring.passingScore = Number((lmsMastery * 100).toFixed(5));
+    }
+
     // The first page is gated on persistenceReady, so a malformed saved
     // document must cost the resume, not the course.
     try {
-      const lmsMastery = adapter.getMasteryScore();
-      if (lmsMastery !== null) {
-        config.scoring.passingScore = Number((lmsMastery * 100).toFixed(5));
-      }
-
       const saved = adapter.getState();
       if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
         restoreState(saved);

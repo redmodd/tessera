@@ -1,4 +1,4 @@
-import { parseScaled01 } from './format.js';
+import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { STANDARDS } from '../standards.js';
 
@@ -84,13 +84,10 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     this.registration = reg ? reg : undefined;
     this.activityId = params.get('activityId') || '';
 
-    const rawMastery = params.get('masteryScore');
-    this.masteryScore = parseScaled01(rawMastery);
-    if (this.masteryScore === null && rawMastery?.trim()) {
-      console.warn(
-        `Tessera cmi5: launch parameter 'masteryScore' is not a decimal in [0,1] (got "${rawMastery}"); ignoring.`,
-      );
-    }
+    this.masteryScore = parseMastery(
+      params.get('masteryScore'),
+      "cmi5 launch parameter 'masteryScore'",
+    );
 
     this.parseActorParam(params.get('actor') || '');
 
@@ -186,7 +183,10 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       ) {
         this.returnURL = this.#launchData.returnURL;
       }
-      const launchMastery = parseScaled01(this.#launchData.masteryScore);
+      const launchMastery = parseMastery(
+        this.#launchData.masteryScore,
+        'cmi5 LaunchData masteryScore',
+      );
       if (launchMastery !== null) {
         this.masteryScore = launchMastery;
       }
