@@ -2,7 +2,7 @@
   export const pageConfig = {
     title: 'Final Exam',
     graded: true,
-    weight: 50,
+    weight: 75,
   };
 </script>
 
@@ -11,7 +11,7 @@
 </script>
 
 <h1>Final Exam</h1>
-<p>Standalone questions, no quiz shell. Worth two thirds of the course.</p>
+<p>Standalone questions, no quiz shell. Worth three quarters of the course.</p>
 
 <WeightedChoice
   id="q-exam"

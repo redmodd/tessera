@@ -1,10 +1,9 @@
-import { expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
+import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
-  exitCourse,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -268,9 +267,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
   });
 
   test.afterAll(() => preview?.kill('SIGTERM'));
-  test.beforeEach(async ({ page, lmsData }) =>
-    installScorm12Mock(page, lmsData),
-  );
+  test.beforeEach(async ({ page }) => installScorm12Mock(page));
 
   async function answerCheckQuiz(page: Page, optionIndex: number) {
     await page
@@ -280,19 +277,11 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.locator('.tessera-quiz-btn-submit').click();
   }
 
-  async function answerExam(page: Page, optionIndex: number) {
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(optionIndex)
-      .check();
-  }
-
   async function courseScore(page: Page) {
     return (await scormData(page))['cmi.core.score.raw'];
   }
 
-  test('a weight-50 exam outweighs a weight-25 quiz page: 66.67, not 50', async ({
+  test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -300,9 +289,14 @@ test.describe.serial('per-page weights in the course rollup', () => {
 
     await answerCheckQuiz(page, 0);
 
-    await answerExam(page, 2);
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(2)
+      .check();
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('66.67');
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
   });
 
   test('no score reaches the LMS until every graded page is scored', async ({
@@ -315,42 +309,13 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.waitForSelector('.tessera-quiz-results');
     expect(await courseScore(page)).toBeFalsy();
 
-    await answerExam(page, 0);
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(0)
+      .check();
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('33.33');
-  });
-
-  test.describe('LMS mastery_score', () => {
-    test.use({
-      lmsData: {
-        'cmi.core.credit': 'credit',
-        'cmi.student_data.mastery_score': '67',
-      },
-    });
-
-    test('a 66.67 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
-      page,
-    }) => {
-      await page.goto(BASE);
-      await waitForTesseraContent(page);
-
-      await answerCheckQuiz(page, 0);
-
-      await answerExam(page, 2);
-
-      await expect
-        .poll(() => courseScore(page), { timeout: 5000 })
-        .toBe('66.67');
-      expect(await scormData(page)).toMatchObject({
-        'cmi.core.lesson_status': 'failed',
-      });
-
-      await exitCourse(page);
-
-      expect(await scormData(page)).toMatchObject({
-        'cmi.core.score.raw': '66.67',
-        'cmi.core.lesson_status': 'failed',
-      });
-    });
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
   });
 });

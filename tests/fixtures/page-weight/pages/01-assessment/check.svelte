@@ -11,7 +11,7 @@
 </script>
 
 <h1>Knowledge Check</h1>
-<p>A quiz page worth a third of the course.</p>
+<p>A quiz page worth a quarter of the course.</p>
 
 <MultipleChoice
   id="q-check"

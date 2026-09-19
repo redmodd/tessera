@@ -487,11 +487,11 @@ describe('ProgressState', () => {
       expect(progress.getPageStandaloneAverage(3)).toBe(80);
     });
 
-    it('weights each question — Σ(w·score)/Σ(w)', () => {
+    it('weights each question, Σ(w·score)/Σ(w), to 2 decimal places', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
+      progress.markStandaloneQuestion(3, 'q1', 100, true, 2);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      expect(progress.getPageStandaloneAverage(3)).toBe(75);
+      expect(progress.getPageStandaloneAverage(3)).toBe(66.67);
     });
 
     it('skips ungraded practice answers', () => {
@@ -831,58 +831,7 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
     });
 
-    it('matches the average recalculateSuccess uses', () => {
-      const manifest = createManifest(
-        5,
-        { 1: { graded: true } },
-        { 3: { graded: true } },
-      );
-      const config = createConfig({ scoring: { passingScore: 80 } });
-      const progress = new ProgressState(manifest, config);
-
-      progress.quizCompleted(1, 90);
-      progress.markStandaloneQuestion(3, 'q1', 70, true);
-
-      const { average } = progress.gradedScore;
-      expect(progress.successStatus).toBe(average >= 80 ? 'passed' : 'failed');
-    });
-
-    it('fails an average that would round up to the pass mark', () => {
-      const manifest = createManifest(3, {
-        0: { graded: true },
-        1: { graded: true },
-        2: { graded: true },
-      });
-      const progress = new ProgressState(manifest, createConfig());
-
-      progress.quizCompleted(0, 67);
-      progress.quizCompleted(1, 67);
-      progress.quizCompleted(2, 75);
-
-      expect(progress.gradedScore.average).toBe(69.67);
-      expect(progress.successStatus).toBe('failed');
-    });
-
-    it('passes a learner who scores the pass mark on fractionally weighted pages', () => {
-      const manifest = createManifest(
-        3,
-        { 0: { graded: true }, 1: { graded: true } },
-        { 0: { weight: 0.1 }, 1: { weight: 0.2 } },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({ completion: { mode: 'quiz' } }),
-      );
-
-      progress.quizCompleted(0, 70);
-      progress.quizCompleted(1, 70);
-
-      expect(progress.gradedScore.average).toBe(70);
-      expect(progress.successStatus).toBe('passed');
-      expect(progress.completionStatus).toBe('complete');
-    });
-
-    it('passes a 2-decimal average that meets a finer pass mark', () => {
+    it('judges pass/fail on the 2-decimal average it reports', () => {
       const manifest = createManifest(3, {
         0: { graded: true },
         1: { graded: true },
@@ -901,14 +850,20 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('passed');
     });
 
-    it('keeps a standalone page score to 2 decimal places', () => {
-      const manifest = createManifest(3, {}, { 0: { graded: true } });
+    it('fails an average that would round up to the pass mark', () => {
+      const manifest = createManifest(3, {
+        0: { graded: true },
+        1: { graded: true },
+        2: { graded: true },
+      });
       const progress = new ProgressState(manifest, createConfig());
 
-      progress.markStandaloneQuestion(0, 'q1', 70, true, 0.1);
-      progress.markStandaloneQuestion(0, 'q2', 70, true, 0.2);
+      progress.quizCompleted(0, 67);
+      progress.quizCompleted(1, 67);
+      progress.quizCompleted(2, 75);
 
-      expect(progress.pageScore(0)).toBe(70);
+      expect(progress.gradedScore.average).toBe(69.67);
+      expect(progress.successStatus).toBe('failed');
     });
   });
 

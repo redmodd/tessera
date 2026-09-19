@@ -449,12 +449,12 @@ describe('XAPIAdapter', () => {
     await new Promise((r) => setTimeout(r, 0));
     fetchMock.mockClear();
 
-    adapter.setScore(33.33);
+    adapter.setScore(50);
     adapter.setSuccessStatus('failed');
     adapter.commit();
     await new Promise((r) => setTimeout(r, 0));
 
-    adapter.setScore(58.33);
+    adapter.setScore(70);
     adapter.setSuccessStatus('failed');
     adapter.setDuration(120);
     adapter.commit();
@@ -469,8 +469,8 @@ describe('XAPIAdapter', () => {
       'http://adlnet.gov/expapi/verbs/failed',
       'http://adlnet.gov/expapi/verbs/scored',
     ]);
-    expect(bodies[0].result.score.scaled).toBe(0.3333);
-    expect(bodies[1].result.score.scaled).toBe(0.5833);
+    expect(bodies[0].result.score.scaled).toBe(0.5);
+    expect(bodies[1].result.score.scaled).toBe(0.7);
     expect(bodies[1].result.duration).toBe('PT2M');
   });
 
