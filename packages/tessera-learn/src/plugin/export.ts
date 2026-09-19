@@ -98,7 +98,7 @@ function formatSize(bytes: number): string {
 /** Per-version XML differences in imsmanifest.xml between SCORM 1.2 and 2004. */
 interface ScormManifestDialect {
   rootNs: string;
-  xmlns: Record<string, string>;
+  xmlns: { adlcp: string } & Record<string, string>;
   schemaversion: string;
   /** Attribute name on <resource>: SCORM 1.2 uses lowercase, 2004 uses camelCase. */
   scormTypeAttr: 'scormtype' | 'scormType';
