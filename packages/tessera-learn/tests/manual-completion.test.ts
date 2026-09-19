@@ -4,12 +4,27 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
+import { NavigationState } from '../src/runtime/navigation.svelte.js';
+import {
+  useCompletion,
+  __resetUseCompletionWarning,
+} from '../src/runtime/hooks.svelte.js';
+import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
+import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
+import { WebAdapter } from '../src/runtime/adapters/web.js';
 import {
   createManifest,
   createConfig,
+  flush,
   scorm12Api,
   scorm2004Api,
 } from './helpers.js';
+import type { BaseAdapter } from '../src/runtime/adapters/base.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from '../src/runtime/persistence.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { ManifestPage } from '../src/plugin/manifest.js';
 
@@ -557,12 +572,6 @@ vi.mock('svelte', async () => {
   };
 });
 
-import {
-  useCompletion,
-  __resetUseCompletionWarning,
-} from '../src/runtime/hooks.svelte.js';
-import { NavigationState } from '../src/runtime/navigation.svelte.js';
-
 function makeNavCtx(progress: ProgressState, config: CourseConfig) {
   const manifest = createManifest(3);
   const nav = new NavigationState(manifest, progress, config);
@@ -628,12 +637,6 @@ describe('manual completion — useCompletion hook', () => {
 //    adapter when manual completion fires). We exercise the real adapters
 //    directly to verify per-standard behavior.
 // ============================================================================
-
-import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
-import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
-import { WebAdapter } from '../src/runtime/adapters/web.js';
-
-const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 describe('manual completion — adapter integration', () => {
   it('SCORM 1.2 writes lesson_status = completed when only completion is set', async () => {
@@ -716,12 +719,6 @@ describe('manual completion — adapter integration', () => {
 // ============================================================================
 // 5. Persistence — m: 1 round-trip
 // ============================================================================
-
-import type {
-  CompletionStatus,
-  SavedState,
-  SuccessStatus,
-} from '../src/runtime/persistence.js';
 
 describe('manual completion — persistence', () => {
   it('serializes m: 1 only when manuallyCompleted is true', () => {
@@ -859,11 +856,10 @@ describe('manual completion — live success-status push', () => {
    */
   function makeStatusPusher(
     progress: ProgressState,
-    adapter: {
-      setCompletionStatus(s: CompletionStatus): void;
-      setSuccessStatus(s: SuccessStatus): void;
-      commit(): void;
-    },
+    adapter: Pick<
+      BaseAdapter,
+      'setCompletionStatus' | 'setSuccessStatus' | 'commit'
+    >,
   ) {
     let prevCompletion: CompletionStatus = progress.completionStatus;
     let prevSuccess: SuccessStatus = progress.successStatus;

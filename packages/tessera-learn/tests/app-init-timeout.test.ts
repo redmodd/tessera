@@ -33,18 +33,6 @@ const config = {
   export: { standard: 'web' },
 };
 
-function makeAdapter(
-  init: () => Promise<void>,
-  loadState: () => Promise<void> = async () => {},
-  getState: () => unknown = () => null,
-) {
-  return stubAdapter({
-    init,
-    loadState,
-    getState: getState as () => SavedState | null,
-  });
-}
-
 async function mountApp(
   init: () => Promise<void>,
   loadState?: () => Promise<void>,
@@ -58,7 +46,11 @@ async function mountApp(
     pageModules: {
       [page.importPath]: () => import('./fixtures/app-page.svelte'),
     },
-    adapter: makeAdapter(init, loadState, getState),
+    adapter: stubAdapter({
+      init,
+      loadState,
+      getState: getState as (() => SavedState | null) | undefined,
+    }),
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });

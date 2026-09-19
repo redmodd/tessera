@@ -5,12 +5,7 @@ import {
 } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { validateAgent } from '../src/runtime/xapi/validation.js';
-import { scorm12Api } from './helpers.js';
-
-/** Wait for the async write queue to flush */
-async function flush() {
-  await new Promise((r) => setTimeout(r, 50));
-}
+import { flush, scorm12Api } from './helpers.js';
 
 describe('SCORM12Adapter', () => {
   let api: Mocked<SCORM12API>;
@@ -35,7 +30,7 @@ describe('SCORM12Adapter', () => {
       q: { '2': 80 },
       d: 100,
     };
-    api.LMSGetValue.mockImplementation((key: string) =>
+    api.LMSGetValue.mockImplementation((key) =>
       key === 'cmi.suspend_data' ? JSON.stringify(state) : '',
     );
     await adapter.init();
@@ -542,7 +537,7 @@ describe('SCORM12Adapter', () => {
 
     it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      api.LMSGetValue.mockImplementation((key: string) =>
+      api.LMSGetValue.mockImplementation((key) =>
         key === 'cmi.interactions._count' ? 'NaN' : '',
       );
       await adapter.init();

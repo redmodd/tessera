@@ -8,8 +8,7 @@ import {
   writtenValues,
   type RealLms12,
 } from './helpers/real-lms.js';
-
-const flush = () => new Promise((r) => setTimeout(r, 50));
+import { flush } from './helpers.js';
 
 describe('SCORM12Adapter against scorm-again', () => {
   let lms: RealLms12;

@@ -7,8 +7,7 @@ import {
   relaunch2004,
   type RealLms2004,
 } from './helpers/real-lms.js';
-
-const flush = () => new Promise((r) => setTimeout(r, 50));
+import { flush } from './helpers.js';
 
 describe('SCORM2004Adapter against scorm-again', () => {
   let lms: RealLms2004;

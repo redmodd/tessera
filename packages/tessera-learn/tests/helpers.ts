@@ -50,10 +50,17 @@ class StubAdapter extends BaseAdapter {
   saveState(): void {}
 }
 
-/** A connected adapter whose members all no-op, for mounting App without an LMS. */
+/**
+ * A connected adapter whose members all no-op, for mounting App without an
+ * LMS. An override left undefined keeps the default member.
+ */
 export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
-  return Object.assign(new StubAdapter(), overrides);
+  const defined = Object.entries(overrides).filter(([, v]) => v !== undefined);
+  return Object.assign(new StubAdapter(), Object.fromEntries(defined));
 }
+
+/** Let an adapter's async write queue drain. */
+export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 export function createManifest(
   pageCount: number,
