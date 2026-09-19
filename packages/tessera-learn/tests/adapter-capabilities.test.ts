@@ -1,53 +1,56 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import { createConfig, scorm12Api, scorm2004Api } from './helpers.js';
+import { validateAgent } from '../src/runtime/xapi/validation.js';
+import { scorm12Api, scorm2004Api } from './helpers.js';
 
-const ACTIVITY = 'https://example.com/course';
+const ACTIVITY = 'https://example.com/courses/1';
 
-describe('WebAdapter capabilities', () => {
-  const adapter = new WebAdapter(createConfig());
-
-  it('is not connected and has nothing to derive or share', () => {
-    expect(adapter.connected).toBe(false);
-    expect(adapter.deriveActor(ACTIVITY)).toBeNull();
-    expect(adapter.launchPublisher()).toBeNull();
-    expect(adapter.getMasteryScore()).toBeNull();
-  });
-
-  it('does not seed, so App re-reports restored values', () => {
-    expect(adapter.seedLifecycle('complete', 'passed', 90)).toBe(false);
-  });
-});
-
-describe('SCORM adapter capabilities', () => {
-  it('SCORM 1.2 derives the actor from its LMS', () => {
+describe('SCORM deriveActor', () => {
+  it('SCORM 1.2 builds an Identified Agent from cmi.core.student_id / student_name', () => {
     const adapter = new SCORM12Adapter(
-      scorm12Api({ 'cmi.core.student_id': 'l-1' }),
+      scorm12Api({
+        'cmi.core.student_id': 'student-42',
+        'cmi.core.student_name': 'Ada Lovelace',
+      }),
     );
-    expect(adapter.connected).toBe(true);
-    expect(adapter.deriveActor(ACTIVITY)).toEqual({
-      account: { homePage: 'https://example.com', name: 'l-1' },
+    const actor = adapter.deriveActor(ACTIVITY);
+    expect(actor).toEqual({
+      account: { homePage: 'https://example.com', name: 'student-42' },
+      name: 'Ada Lovelace',
       objectType: 'Agent',
     });
-    expect(adapter.launchPublisher()).toBeNull();
-    expect(adapter.seedLifecycle('complete', 'passed', 90)).toBe(false);
+    expect(validateAgent(actor)).toBeNull();
   });
 
-  it('SCORM 2004 derives the actor from its LMS', () => {
-    const adapter = new SCORM2004Adapter(
-      scorm2004Api({ 'cmi.learner_id': 'l-2' }),
+  it('honors an actorAccountHomePage override', () => {
+    const adapter = new SCORM12Adapter(
+      scorm12Api({ 'cmi.core.student_id': 'sid' }),
     );
-    expect(adapter.connected).toBe(true);
+    expect(
+      adapter.deriveActor(ACTIVITY, 'https://lms.example.com')?.account
+        ?.homePage,
+    ).toBe('https://lms.example.com');
+  });
+
+  it('returns null when the LMS has no learner id', () => {
+    expect(new SCORM12Adapter(scorm12Api()).deriveActor(ACTIVITY)).toBeNull();
+  });
+
+  it('SCORM 2004 reads cmi.learner_id / cmi.learner_name', () => {
+    const adapter = new SCORM2004Adapter(
+      scorm2004Api({
+        'cmi.learner_id': 'learner-7',
+        'cmi.learner_name': 'Grace Hopper',
+      }),
+    );
     expect(adapter.deriveActor(ACTIVITY)).toEqual({
-      account: { homePage: 'https://example.com', name: 'l-2' },
+      account: { homePage: 'https://example.com', name: 'learner-7' },
+      name: 'Grace Hopper',
       objectType: 'Agent',
     });
-    expect(adapter.launchPublisher()).toBeNull();
-    expect(adapter.seedLifecycle('complete', 'passed', 90)).toBe(false);
   });
 });
 
@@ -72,17 +75,10 @@ describe('launch adapter capabilities', () => {
     });
     window.history.replaceState({}, '', `/?${qs}`);
     const adapter = new XAPIAdapter();
-    expect(adapter.connected).toBe(true);
     expect(adapter.launchPublisher()).toBeNull();
 
     await adapter.init();
     expect(adapter.launchPublisher()?.getActor()).toEqual(actor);
     expect(adapter.deriveActor()).toEqual(actor);
-  });
-
-  it('seeds, so App skips re-reporting restored values', () => {
-    expect(new XAPIAdapter().seedLifecycle('complete', 'passed', 90)).toBe(
-      true,
-    );
   });
 });

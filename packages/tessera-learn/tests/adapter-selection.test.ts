@@ -10,6 +10,7 @@ import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import { scorm12Api, scorm2004Api } from './helpers.js';
 
 function makeConfig(standard: string): CourseConfig {
   return {
@@ -48,16 +49,7 @@ describe('createAdapter', () => {
   });
 
   it('returns SCORM12Adapter when API is found', () => {
-    (window as any).API = {
-      LMSInitialize: () => 'true',
-      LMSFinish: () => 'true',
-      LMSGetValue: () => '',
-      LMSSetValue: () => 'true',
-      LMSCommit: () => 'true',
-      LMSGetLastError: () => '0',
-      LMSGetErrorString: () => '',
-      LMSGetDiagnostic: () => '',
-    };
+    (window as any).API = scorm12Api();
     const adapter = createAdapter(makeConfig('scorm12'));
     expect(adapter).toBeInstanceOf(SCORM12Adapter);
   });
@@ -73,16 +65,7 @@ describe('createAdapter', () => {
   });
 
   it('returns SCORM2004Adapter when API_1484_11 is found', () => {
-    (window as any).API_1484_11 = {
-      Initialize: () => 'true',
-      Terminate: () => 'true',
-      GetValue: () => '',
-      SetValue: () => 'true',
-      Commit: () => 'true',
-      GetLastError: () => '0',
-      GetErrorString: () => '',
-      GetDiagnostic: () => '',
-    };
+    (window as any).API_1484_11 = scorm2004Api();
     const adapter = createAdapter(makeConfig('scorm2004'));
     expect(adapter).toBeInstanceOf(SCORM2004Adapter);
   });
@@ -195,16 +178,7 @@ describe('createAdapter', () => {
     });
 
     it('returns SCORM12Adapter when API is present', () => {
-      (window as any).API = {
-        LMSInitialize: () => 'true',
-        LMSFinish: () => 'true',
-        LMSGetValue: () => '',
-        LMSSetValue: () => 'true',
-        LMSCommit: () => 'true',
-        LMSGetLastError: () => '0',
-        LMSGetErrorString: () => '',
-        LMSGetDiagnostic: () => '',
-      };
+      (window as any).API = scorm12Api();
       const adapter = createAdapter(makeConfig('scorm12'), {
         allowFallback: false,
       });

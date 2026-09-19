@@ -4,6 +4,8 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
+import { synthesizeActor } from '../xapi/derive-actor.js';
+import type { XAPIAgent } from '../xapi/types.js';
 import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
 
 /**
@@ -55,6 +57,19 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         : undefined,
     };
     this.queue.errorReporter = this.errorReporter;
+  }
+
+  override deriveActor(
+    activityId: string,
+    homePage?: string,
+  ): XAPIAgent | null {
+    const { learnerIdField, learnerNameField } = this.dialect.profile;
+    return synthesizeActor(
+      () => this.dialect.getValue(this.api, learnerIdField),
+      () => this.dialect.getValue(this.api, learnerNameField),
+      activityId,
+      homePage,
+    );
   }
 
   // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
@@ -147,11 +162,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.set('cmi.suspend_data', json);
   }
 
-  setDuration(seconds: number): void {
+  override setDuration(seconds: number): void {
     this.set(this.dialect.sessionTimeKey, this.dialect.formatDuration(seconds));
   }
 
-  reportInteraction(
+  override reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
@@ -177,11 +192,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     }
   }
 
-  commit(): void {
+  override commit(): void {
     this.queue.enqueue(() => this.dialect.commit(this.api), 'Commit');
   }
 
-  terminate(): void {
+  override terminate(): void {
     if (this.#terminated) return;
     this.#terminated = true;
     // Async retries can't run during page unload — drain + commit + finish synchronously.
@@ -198,8 +213,12 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     );
   }
 
-  abstract setScore(score: number): void;
-  abstract setCompletionStatus(status: 'incomplete' | 'complete'): void;
-  abstract setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void;
-  abstract setExit(mode: 'suspend' | 'normal'): void;
+  abstract override setScore(score: number): void;
+  abstract override setCompletionStatus(
+    status: 'incomplete' | 'complete',
+  ): void;
+  abstract override setSuccessStatus(
+    status: 'passed' | 'failed' | 'unknown',
+  ): void;
+  abstract override setExit(mode: 'suspend' | 'normal'): void;
 }

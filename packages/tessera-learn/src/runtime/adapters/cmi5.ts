@@ -219,7 +219,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * it as the authoritative pass threshold for this session, overriding
    * `course.config.js scoring.passingScore`.
    */
-  getMasteryScore(): number | null {
+  override getMasteryScore(): number | null {
     return this.#masteryScore;
   }
 
@@ -229,7 +229,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */
-  protected isDefinedStatementAllowed(): boolean {
+  protected override isDefinedStatementAllowed(): boolean {
     return this.#launchMode === 'Normal';
   }
 
@@ -239,7 +239,9 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * author asserted the verb, so on contradiction keep the verb and drop
    * the score (and warn).
    */
-  protected scoreForSuccess(status: 'passed' | 'failed'): number | null {
+  protected override scoreForSuccess(
+    status: 'passed' | 'failed',
+  ): number | null {
     if (this.score === null) return null;
     const scaled = this.score / 100;
     if (this.#masteryScore !== null) {
@@ -266,7 +268,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * Completed/Passed/Failed (§9.6.2.2), and the masteryScore extension
    * for Passed/Failed (§9.6.3.2).
    */
-  protected buildContext(
+  protected override buildContext(
     opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> {
     const tmpl = this.#launchData?.contextTemplate ?? {};

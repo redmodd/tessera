@@ -12,6 +12,7 @@ import { BaseAdapter } from './base.js';
 export class WebAdapter extends BaseAdapter {
   #storageKey: string;
   #state: SavedState | null = null;
+  override readonly connected = false;
 
   constructor(config: CourseConfig, manifest?: Manifest) {
     super();
@@ -22,10 +23,6 @@ export class WebAdapter extends BaseAdapter {
     // both — neither mechanism covers the other's adapters.
     const fp = manifest ? structureFingerprint(manifest) : '';
     this.#storageKey = `tessera-${base}${fp ? `-${fp}` : ''}`;
-  }
-
-  get connected(): boolean {
-    return false;
   }
 
   async init(): Promise<void> {

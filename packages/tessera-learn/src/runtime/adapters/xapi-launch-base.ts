@@ -103,8 +103,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
 
-  abstract init(): Promise<void>;
-
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
     _opts: { moveOn?: boolean; mastery?: boolean } = {},
@@ -122,11 +120,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return this.score !== null ? this.score / 100 : null;
   }
 
-  launchPublisher(): XAPIPublisher | null {
+  override launchPublisher(): XAPIPublisher | null {
     return this.publisher;
   }
 
-  deriveActor(): XAPIAgent | null {
+  override deriveActor(): XAPIAgent | null {
     return this.actor;
   }
 
@@ -161,7 +159,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     }
   }
 
-  setScore(score: number): void {
+  override setScore(score: number): void {
     if (!Number.isFinite(score)) {
       this.score = null;
       return;
@@ -169,11 +167,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.score = Math.max(0, Math.min(100, score));
   }
 
-  setDuration(seconds: number): void {
+  override setDuration(seconds: number): void {
     this.durationSeconds = seconds;
   }
 
-  commit(): void {
+  override commit(): void {
     if (!this.publisher || this.score === null) return;
     const scaled = this.score / 100;
     if (scaled === this.lastScoreEmitted) return;
@@ -187,7 +185,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  seedLifecycle(
+  override seedLifecycle(
     completion: 'incomplete' | 'complete',
     success: 'unknown' | 'passed' | 'failed',
     score?: number | null,
@@ -203,7 +201,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return true;
   }
 
-  setCompletionStatus(status: 'incomplete' | 'complete'): void {
+  override setCompletionStatus(status: 'incomplete' | 'complete'): void {
     if (status !== 'complete' || this.completedEmitted || !this.publisher)
       return;
     if (!this.isDefinedStatementAllowed()) return;
@@ -219,7 +217,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
+  override setSuccessStatus(status: 'passed' | 'failed' | 'unknown'): void {
     if (status === 'unknown' || !this.publisher) return;
     if (status === this.lastSuccessEmitted) return;
     if (!this.isDefinedStatementAllowed()) return;
@@ -243,7 +241,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  reportInteraction(
+  override reportInteraction(
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
@@ -274,7 +272,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  terminate(): void {
+  override terminate(): void {
     if (this.terminated) return;
     this.terminated = true;
     if (!this.publisher) return;
@@ -418,7 +416,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * with saving enabled. Exhausting the attempts or the deadline leaves the
    * stored state unread, so `stateLoadFailed` withholds every later write.
    */
-  async loadState(): Promise<void> {
+  override async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
     let lastDetail = '';
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {

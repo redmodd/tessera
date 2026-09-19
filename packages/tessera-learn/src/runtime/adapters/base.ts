@@ -5,9 +5,7 @@ import type { XAPIPublisher } from '../xapi/publisher.js';
 
 /** Every adapter's optional capabilities default to no-ops, so callers never probe. */
 export abstract class BaseAdapter implements PersistenceAdapter {
-  get connected(): boolean {
-    return true;
-  }
+  readonly connected: boolean = true;
 
   abstract init(): Promise<void>;
   abstract getState(): SavedState | null;

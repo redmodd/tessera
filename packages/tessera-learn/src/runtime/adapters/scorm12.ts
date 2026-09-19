@@ -3,8 +3,6 @@ import type { SavedState } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
 import { STANDARDS } from '../standards.js';
-import { synthesizeSCORM12Actor } from '../xapi/derive-actor.js';
-import type { XAPIAgent } from '../xapi/types.js';
 
 /**
  * SCORM 1.2 API interface.
@@ -61,11 +59,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     super(api, SCORM12_DIALECT);
   }
 
-  deriveActor(activityId: string, homePage?: string): XAPIAgent | null {
-    return synthesizeSCORM12Actor(this.api, activityId, homePage);
-  }
-
-  saveState(state: SavedState): void {
+  override saveState(state: SavedState): void {
     super.saveState(state);
     // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.core.lesson_location', String(state.b));

@@ -2,11 +2,9 @@ import type {
   CourseConfig,
   CourseRuntime,
   XAPIConfig,
-  XAPIDestinationHooks,
   XAPIExplicitConfig,
 } from '../types.js';
 import type { PersistenceAdapter } from '../persistence.js';
-import type { XAPIAgent } from './types.js';
 import { XAPIPublisher } from './publisher.js';
 import { XAPIClient } from './client.js';
 import { XAPIConfigError } from './validation.js';
@@ -54,10 +52,6 @@ function makeRejectingPublisher(error: () => Error): XAPIPublisher {
   });
 }
 
-function makeDevFallbackPublisher(standard: LaunchLRSStandard): XAPIPublisher {
-  return makeRejectingPublisher(() => new XAPIDevFallbackError(standard));
-}
-
 class XAPISCORMDevFallbackError extends Error {
   constructor(standard: ActorDerivingStandard) {
     const { name, learnerIdField } = STANDARDS[standard];
@@ -72,21 +66,17 @@ class XAPISCORMDevFallbackError extends Error {
   }
 }
 
-function makeSCORMDevFallbackPublisher(
-  standard: ActorDerivingStandard,
-): XAPIPublisher {
-  return makeRejectingPublisher(() => new XAPISCORMDevFallbackError(standard));
-}
-
-type ActorResolution =
-  | { kind: 'actor'; value: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>) }
-  | { kind: 'scorm-fallback'; standard: ActorDerivingStandard };
-
 /**
  * Resolve a single `XAPIConfig` entry into its publisher: the launch adapter's
  * own (shared queue) for `endpoint: 'lms'`, else a fresh one. Returns null
  * when the entry can't materialize, which includes the supported case of
  * `endpoint: 'lms'` under a non-launch export standard.
+ *
+ * An explicit destination's actor comes from the author (course.runtime.js
+ * resolver, then `xapi.actor`), else the connected adapter (launch actor or
+ * SCORM learner fields). Unconnected, a SCORM export gets a rejecting dev
+ * publisher; anything else (a web export with no actor, which the build-time
+ * validator rejects) is skipped.
  */
 function resolveDestination(
   entry: XAPIConfig,
@@ -94,8 +84,8 @@ function resolveDestination(
   adapter: PersistenceAdapter,
   hooks: CourseRuntime['xapi'],
 ): XAPIPublisher | null {
+  const profile = standardProfile(config.export?.standard);
   if (entry.endpoint === 'lms') {
-    const profile = standardProfile(config.export?.standard);
     if (!profile?.hasLaunchLRS) {
       console.warn(
         "Tessera xAPI: ignoring xapi entry with endpoint: 'lms' under a non-launch export.",
@@ -104,10 +94,12 @@ function resolveDestination(
     }
     // Only the dev fallback (a WebAdapter, launch params absent) has no launch
     // publisher. Its sends reject so author code surfaces the dev/prod gap.
-    return adapter.launchPublisher() ?? makeDevFallbackPublisher(profile.id);
+    return (
+      adapter.launchPublisher() ??
+      makeRejectingPublisher(() => new XAPIDevFallbackError(profile.id))
+    );
   }
 
-  // Explicit endpoint.
   const explicit = entry as XAPIExplicitConfig;
   const hook = hooks?.[explicit.id];
   const auth = hook?.auth ?? explicit.auth;
@@ -121,56 +113,40 @@ function resolveDestination(
         ),
     );
   }
-  const resolution = resolveExplicitActor(explicit, hook, config, adapter);
-  if (resolution === null) return null;
-  if (resolution.kind === 'scorm-fallback') {
-    return makeSCORMDevFallbackPublisher(resolution.standard);
-  }
-  return new XAPIPublisher({
-    endpoint: explicit.endpoint,
-    auth,
-    actor: resolution.value,
-    activityId: explicit.activityId,
-    registration: explicit.registration,
-  });
-}
 
-/**
- * Pick an actor (object or resolver function) for an explicit destination,
- * applying the priority order: author-supplied (course.runtime.js resolver,
- * then `xapi.actor`) > cmi5 launch actor > SCORM-derived actor > error.
- * Returns null if no actor can be resolved (web export with no actor, which
- * the build-time validator rejects; the publisher is skipped).
- */
-function resolveExplicitActor(
-  explicit: XAPIExplicitConfig,
-  hook: XAPIDestinationHooks | undefined,
-  config: CourseConfig,
-  adapter: PersistenceAdapter,
-): ActorResolution | null {
-  const actor = hook?.actor ?? explicit.actor;
-  if (actor !== undefined) {
-    return { kind: 'actor', value: actor };
-  }
-  if (adapter.connected) {
+  let actor = hook?.actor ?? explicit.actor;
+  if (actor === undefined) {
+    if (!adapter.connected) {
+      if (profile?.derivesLearnerActor) {
+        return makeRejectingPublisher(
+          () => new XAPISCORMDevFallbackError(profile.id),
+        );
+      }
+      console.warn(
+        'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
+      );
+      return null;
+    }
     const derived = adapter.deriveActor(
       explicit.activityId,
       explicit.actorAccountHomePage,
     );
-    if (derived) return { kind: 'actor', value: derived };
-    console.warn(
-      'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.',
-    );
-    return null;
+    if (!derived) {
+      console.warn(
+        'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.',
+      );
+      return null;
+    }
+    actor = derived;
   }
-  const profile = standardProfile(config.export?.standard);
-  if (profile?.derivesLearnerActor) {
-    return { kind: 'scorm-fallback', standard: profile.id };
-  }
-  console.warn(
-    'Tessera xAPI: explicit destination has no actor and no derivation source — skipping.',
-  );
-  return null;
+
+  return new XAPIPublisher({
+    endpoint: explicit.endpoint,
+    auth,
+    actor,
+    activityId: explicit.activityId,
+    registration: explicit.registration,
+  });
 }
 
 /**
@@ -199,7 +175,7 @@ export async function buildXAPIClient(
       publishers.push(publisher);
     } catch (err) {
       console.warn(
-        'Tessera xAPI: failed to initialize an explicit destination — skipping.',
+        'Tessera xAPI: failed to initialize a destination — skipping.',
         err,
       );
     }

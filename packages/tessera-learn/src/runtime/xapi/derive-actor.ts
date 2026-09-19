@@ -1,6 +1,4 @@
 import type { XAPIAgent } from './types.js';
-import type { SCORM12API } from '../adapters/scorm12.js';
-import type { SCORM2004API } from '../adapters/scorm2004.js';
 
 /**
  * Origin of an http(s) URL, else null. Shared with the config validator, which
@@ -29,7 +27,7 @@ export function httpOrigin(url: string): string | null {
  * the authority namespace is elsewhere. Returns null if the id is missing —
  * the caller should not construct a publisher (the LRS would 400 every send).
  */
-function synthesizeActor(
+export function synthesizeActor(
   readId: () => string,
   readName: () => string,
   activityId: string,
@@ -52,32 +50,4 @@ function synthesizeActor(
   };
   if (name) agent.name = name;
   return agent;
-}
-
-/** SCORM 1.2 actor from `cmi.core.student_id` / `cmi.core.student_name`. */
-export function synthesizeSCORM12Actor(
-  api: SCORM12API,
-  activityId: string,
-  actorAccountHomePage?: string,
-): XAPIAgent | null {
-  return synthesizeActor(
-    () => api.LMSGetValue('cmi.core.student_id'),
-    () => api.LMSGetValue('cmi.core.student_name'),
-    activityId,
-    actorAccountHomePage,
-  );
-}
-
-/** SCORM 2004 actor from `cmi.learner_id` / `cmi.learner_name` (renamed 2004 fields). */
-export function synthesizeSCORM2004Actor(
-  api: SCORM2004API,
-  activityId: string,
-  actorAccountHomePage?: string,
-): XAPIAgent | null {
-  return synthesizeActor(
-    () => api.GetValue('cmi.learner_id'),
-    () => api.GetValue('cmi.learner_name'),
-    activityId,
-    actorAccountHomePage,
-  );
 }

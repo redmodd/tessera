@@ -7,8 +7,6 @@ import {
   parseScaled01,
 } from './format.js';
 import { STANDARDS } from '../standards.js';
-import { synthesizeSCORM2004Actor } from '../xapi/derive-actor.js';
-import type { XAPIAgent } from '../xapi/types.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -59,7 +57,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     super(api, SCORM2004_DIALECT);
   }
 
-  async init(): Promise<void> {
+  override async init(): Promise<void> {
     await super.init();
     this.#mode = this.#readMode();
     this.#masteryScore = this.#readScaledThreshold('cmi.scaled_passing_score');
@@ -69,15 +67,11 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     return this.#mode;
   }
 
-  getMasteryScore(): number | null {
+  override getMasteryScore(): number | null {
     return this.#masteryScore;
   }
 
-  deriveActor(activityId: string, homePage?: string): XAPIAgent | null {
-    return synthesizeSCORM2004Actor(this.api, activityId, homePage);
-  }
-
-  protected canWrite(): boolean {
+  protected override canWrite(): boolean {
     return this.#mode === 'normal';
   }
 
@@ -99,7 +93,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     return parseScaled01(raw);
   }
 
-  saveState(state: SavedState): void {
+  override saveState(state: SavedState): void {
     super.saveState(state);
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.location', String(state.b));
