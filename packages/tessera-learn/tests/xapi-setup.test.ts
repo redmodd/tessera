@@ -228,6 +228,42 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     ]);
   });
 
+  it('skips a destination the publisher rejects without dropping the others', async () => {
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const config = baseConfig();
+    config.xapi = [
+      { endpoint: 'lms' },
+      {
+        id: 'analytics',
+        endpoint: 'ftp://analytics.example.com/xapi/',
+        auth: 'analytics-token',
+        activityId: 'https://example.com/course/analytics',
+      },
+    ];
+
+    const client = await buildXAPIClient(config, adapter);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/failed to initialize a destination/),
+      expect.any(Error),
+    );
+
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+    const result = await client!.sendStatement({
+      verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
+      object: {
+        id: 'https://example.com/course/xapi/note',
+        objectType: 'Activity',
+      },
+    });
+    expect(result.destinations.map((d) => d.endpoint)).toEqual([
+      'https://lms.example.com/xapi/',
+    ]);
+  });
+
   it("dev fallback: 'lms' under cmi5 with no launch params surfaces a clear error on send", async () => {
     // No launch params: createAdapter's dev fallback is a WebAdapter.
     setSearchParams({});

@@ -153,9 +153,9 @@ export async function buildXAPIClient(
   const profile = standardProfile(config.export?.standard);
   const publishers: XAPIPublisher[] = [];
   for (const entry of entries) {
-    const publisher = resolveDestination(entry, profile, adapter, hooks);
-    if (!publisher) continue;
     try {
+      const publisher = resolveDestination(entry, profile, adapter, hooks);
+      if (!publisher) continue;
       await publisher.init();
       publishers.push(publisher);
     } catch (err) {
