@@ -159,11 +159,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override setScore(score: number): void {
-    if (!Number.isFinite(score)) {
-      this.scaled = null;
-      return;
-    }
-    this.scaled = toScaled(score);
+    this.scaled = Number.isFinite(score) ? toScaled(score) : null;
   }
 
   override setDuration(seconds: number): void {

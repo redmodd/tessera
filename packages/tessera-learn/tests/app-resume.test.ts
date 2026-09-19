@@ -81,14 +81,8 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const savedState = options.saved ?? {
-    b: 1,
-    v: [0, 1],
-    d: 42,
-    f: structureFingerprint(manifest),
-  };
   const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(savedState, options.seeds ?? true);
+    makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a

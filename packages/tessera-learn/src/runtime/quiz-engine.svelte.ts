@@ -1,5 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { normalizeWeight, roundScore } from './progress.svelte.js';
+import { normalizeWeight, weightedScore } from './progress.svelte.js';
 import type { Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
@@ -324,13 +324,12 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   #computeScore(): number {
-    let weighted = 0;
-    let totalWeight = 0;
-    for (const q of this.#internalQuestions) {
-      totalWeight += q.weight;
-      if (q.checkAnswer()) weighted += q.weight;
-    }
-    return totalWeight === 0 ? 0 : roundScore((weighted / totalWeight) * 100);
+    return weightedScore(
+      this.#internalQuestions.map((q) => ({
+        score: q.checkAnswer() ? 100 : 0,
+        weight: q.weight,
+      })),
+    );
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

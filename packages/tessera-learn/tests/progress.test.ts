@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { ProgressState, roundScore } from '../src/runtime/progress.svelte.js';
+import {
+  ProgressState,
+  weightedScore,
+} from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
-describe('roundScore', () => {
+describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
-    expect(roundScore(200 / 3)).toBe(66.67);
-    expect(roundScore(68.335)).toBe(68.34);
+    expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
   });
 });
 

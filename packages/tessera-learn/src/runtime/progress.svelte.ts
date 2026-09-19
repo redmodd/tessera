@@ -17,8 +17,18 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
-export function roundScore(score: number): number {
-  return Math.round(Number((score * 100).toPrecision(15))) / 100;
+export function weightedScore(
+  entries: { score: number; weight: number }[],
+): number {
+  let weighted = 0;
+  let totalWeight = 0;
+  for (const { score, weight } of entries) {
+    weighted += score * weight;
+    totalWeight += weight;
+  }
+  if (totalWeight === 0) return 0;
+  const mean = weighted / totalWeight;
+  return Math.round(Number((mean * 100).toPrecision(15))) / 100;
 }
 
 /**
@@ -211,15 +221,7 @@ export class ProgressState {
 
   /** Weighted mean of graded standalone scores on a page, or 0 if none. */
   getPageStandaloneAverage(pageIndex: number): number {
-    const results = this.#gradedResults(pageIndex);
-    if (results.length === 0) return 0;
-    let weighted = 0;
-    let totalWeight = 0;
-    for (const { score, weight } of results) {
-      weighted += score * weight;
-      totalWeight += weight;
-    }
-    return roundScore(weighted / totalWeight);
+    return weightedScore(this.#gradedResults(pageIndex));
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it
@@ -234,21 +236,21 @@ export class ProgressState {
   }
 
   #graded = $derived.by(() => {
-    let weighted = 0;
-    let totalWeight = 0;
+    const entries: { score: number; weight: number }[] = [];
     let attempted = false;
     let allScored = true;
     for (const pageIndex of this.#declaredGradedIndices) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
       else allScored = false;
-      const weight = this.#pageWeights.get(pageIndex) ?? 1;
-      weighted += (score ?? 0) * weight;
-      totalWeight += weight;
+      entries.push({
+        score: score ?? 0,
+        weight: this.#pageWeights.get(pageIndex) ?? 1,
+      });
     }
     return {
-      count: this.#declaredGradedIndices.size,
-      average: totalWeight > 0 ? roundScore(weighted / totalWeight) : 0,
+      count: entries.length,
+      average: weightedScore(entries),
       attempted,
       allScored,
     };
