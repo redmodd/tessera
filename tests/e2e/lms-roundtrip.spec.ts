@@ -427,6 +427,40 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
         });
     });
   });
+
+  test.describe('scaled_passing_score from the exported manifest', () => {
+    test.use({
+      lmsData: async ({ request }, use) => {
+        const xml = await (await request.get(`${BASE}/imsmanifest.xml`)).text();
+        const [, measure] = xml.match(
+          /<imsss:minNormalizedMeasure>(.*?)<\/imsss:minNormalizedMeasure>/,
+        )!;
+        await use({ 'cmi.scaled_passing_score': measure });
+      },
+    });
+
+    test('the LMS judges a 66.67 failed against the declared pass mark, as the course does', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+      await openQuiz(page, 'Graded Assessment');
+
+      await answerGradedQuiz(page, { q1Correct: false });
+
+      await expect
+        .poll(() => scormData(page))
+        .toMatchObject({
+          'cmi.success_status': 'failed',
+          'cmi.score.scaled': '0.6667',
+        });
+      expect(
+        await page.evaluate(() =>
+          (window as any).API_1484_11.GetValue('cmi.success_status'),
+        ),
+      ).toBe('failed');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

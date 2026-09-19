@@ -76,6 +76,7 @@ describe('SCORM 1.2 manifest', () => {
     );
     expect(xml).toContain('<schemaversion>1.2</schemaversion>');
     expect(xml).toContain('adlcp:scormtype="sco"');
+    expect(xml).not.toContain('imsss');
   });
 
   it('includes course title', () => {
@@ -165,6 +166,38 @@ describe('SCORM 2004 manifest', () => {
     expect(xml).not.toContain('masteryscore');
   });
 
+  it('declares passingScore as the primary objective minNormalizedMeasure on the item', () => {
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      scoring: { passingScore: 72.5 },
+    });
+    expect(xml).toMatch(
+      /<item [^>]*>\s*<title>Test<\/title>\s*<imsss:sequencing>/,
+    );
+    expect(xml).toContain(
+      '<imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">',
+    );
+    expect(xml).toContain(
+      '<imsss:minNormalizedMeasure>0.725</imsss:minNormalizedMeasure>',
+    );
+  });
+
+  it('defaults minNormalizedMeasure to 0.7', () => {
+    const xml = scormXml('scorm2004', { title: 'Test' });
+    expect(xml).toContain(
+      '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
+    );
+  });
+
+  it('omits sequencing in manual mode, even with a passingScore', () => {
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      completion: { mode: 'manual' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).not.toContain('imsss:sequencing');
+  });
+
   it('lists all files', () => {
     const xml = scormXml('scorm2004', { title: 'Test' });
     expect(xml).toContain('<file href="index.html" />');
@@ -182,6 +215,8 @@ describe('SCORM 2004 manifest', () => {
     expect(xml).toContain(
       'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd',
     );
+    expect(xml).toContain('xmlns:imsss="http://www.imsglobal.org/xsd/imsss"');
+    expect(xml).toContain('http://www.imsglobal.org/xsd/imsss imsss_v1p0.xsd');
   });
 });
 
@@ -357,11 +392,15 @@ describe('createZip', () => {
 
 describe('runExport', () => {
   it('web export does not create a zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test',
-      version: '1.0.0',
-      export: { standard: 'web' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({
+        title: 'Test',
+        version: '1.0.0',
+        export: { standard: 'web' },
+      }),
+    );
     // No zip should exist
     const files = readdirSync(testRoot);
     expect(files.filter((f) => f.endsWith('.zip'))).toHaveLength(0);
@@ -394,11 +433,15 @@ describe('runExport', () => {
   });
 
   it('scorm2004 export creates imsmanifest.xml and zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test Course',
-      version: '1.0.0',
-      export: { standard: 'scorm2004' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({
+        title: 'Test Course',
+        version: '1.0.0',
+        export: { standard: 'scorm2004' },
+      }),
+    );
 
     expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
     expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
