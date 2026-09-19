@@ -11,7 +11,6 @@ import { BaseAdapter } from './base.js';
  */
 export class WebAdapter extends BaseAdapter {
   #storageKey: string;
-  #state: SavedState | null = null;
   override readonly connected = false;
 
   constructor(config: CourseConfig, manifest?: Manifest) {
@@ -29,20 +28,16 @@ export class WebAdapter extends BaseAdapter {
     try {
       const raw = localStorage.getItem(this.#storageKey);
       if (raw) {
-        this.#state = JSON.parse(raw);
+        this.state = JSON.parse(raw);
       }
     } catch {
       // Corrupted data or localStorage unavailable — start fresh
-      this.#state = null;
+      this.state = null;
     }
   }
 
-  getState(): SavedState | null {
-    return this.#state;
-  }
-
   saveState(state: SavedState): void {
-    this.#state = state;
+    this.state = state;
     try {
       localStorage.setItem(this.#storageKey, JSON.stringify(state));
     } catch {

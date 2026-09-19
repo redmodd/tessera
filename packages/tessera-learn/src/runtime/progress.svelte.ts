@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig } from './types.js';
+import type { CompletionStatus, SuccessStatus } from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
 export interface StandaloneResult {
@@ -275,7 +276,7 @@ export class ProgressState {
       this.#gradedScoreDecided = true;
   }
 
-  completionStatus = $derived.by<'incomplete' | 'complete'>(() => {
+  completionStatus = $derived.by<CompletionStatus>(() => {
     if (this.#manuallyCompleted) return 'complete';
     const mode = this.#config.completion.mode;
     if (mode === 'manual') return 'incomplete';
@@ -317,7 +318,7 @@ export class ProgressState {
     );
   }
 
-  successStatus = $derived.by<'unknown' | 'passed' | 'failed'>(() => {
+  successStatus = $derived.by<SuccessStatus>(() => {
     if (this.#config.completion.mode === 'manual') {
       const want = this.#config.completion.requireSuccessStatus;
       return this.#manuallyCompleted && want !== undefined ? want : 'unknown';

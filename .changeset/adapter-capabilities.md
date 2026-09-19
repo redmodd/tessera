@@ -2,5 +2,5 @@
 'tessera-learn': patch
 ---
 
-cmi5, xAPI and web builds with an xAPI destination no longer bundle the SCORM adapters.
-When a SCORM LMS sends no learner id, an explicit xAPI destination is skipped with a warning naming that cause instead of a missing `xapi.actor`.
+cmi5 and xAPI builds, and any build with an explicit xAPI destination, now bundle only their own adapter.
+An explicit xAPI destination whose learner actor can't be derived from the SCORM LMS is skipped with a warning that says why, instead of failing on a missing `xapi.actor`.

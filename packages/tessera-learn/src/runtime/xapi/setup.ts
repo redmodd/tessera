@@ -117,7 +117,7 @@ function resolveDestination(
     }
     console.warn(
       adapter.connected
-        ? 'Tessera xAPI: the LMS supplied no learner id for an explicit destination; skipping it.'
+        ? 'Tessera xAPI: cannot derive a learner actor for an explicit destination (the LMS supplied no learner id, or its activityId is not http(s) and actorAccountHomePage is unset); skipping it.'
         : 'Tessera xAPI: explicit destination has no actor and no derivation source; skipping it.',
     );
     return null;

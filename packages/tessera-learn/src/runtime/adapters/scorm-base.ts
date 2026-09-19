@@ -8,7 +8,7 @@ import { buildScormInteractionFields } from '../interaction-format.js';
 import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { httpOrigin } from '../xapi/origin.js';
+import { httpOrigin } from '../xapi/agent-rules.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import { largerSuspendDataStandards, type STANDARDS } from '../standards.js';
 
@@ -44,7 +44,6 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
   protected readonly errorReporter: LMSErrorReporter;
-  #state: SavedState | null = null;
   #terminated = false;
   #suspendOverflowWarned = false;
   protected interactionCount = 0;
@@ -130,13 +129,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     }
     if (raw && raw.trim()) {
       try {
-        this.#state = JSON.parse(raw);
+        this.state = JSON.parse(raw);
       } catch (err) {
         console.warn(
           'Tessera: cmi.suspend_data is not valid JSON; resume disabled for this launch (the LMS may have truncated a prior write)',
           err,
         );
-        this.#state = null;
+        this.state = null;
       }
     }
 
@@ -163,13 +162,9 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     }
   }
 
-  getState(): SavedState | null {
-    return this.#state;
-  }
-
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
-    this.#state = state;
+    this.state = state;
     const json = JSON.stringify(state);
     const { name, suspendDataLimit } = this.dialect.profile;
     if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {

@@ -97,7 +97,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   protected score: number | null = null;
   protected durationSeconds = 0;
-  protected state: SavedState | null = null;
   protected stateLoadFailed = false;
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
@@ -130,10 +129,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override deriveActor(): XAPIAgent | null {
     return this.actor;
-  }
-
-  getState(): SavedState | null {
-    return this.state;
   }
 
   saveState(state: SavedState): void {

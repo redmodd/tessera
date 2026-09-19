@@ -28,8 +28,8 @@ import {
   validateAgent,
   validateAuthCredential,
   joinFieldError,
+  httpOrigin,
 } from '../runtime/xapi/agent-rules.js';
-import { httpOrigin } from '../runtime/xapi/origin.js';
 import {
   DEFAULT_STANDARD,
   STANDARDS,

@@ -11,14 +11,18 @@ import type { XAPIPublisher } from '../xapi/publisher.js';
 export abstract class BaseAdapter {
   /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
   readonly connected: boolean = true;
+  protected state: SavedState | null = null;
 
   /**
    * Connect to the LMS. Failure is fatal: nothing can be reported, so the
    * course must not start.
    */
   abstract init(): Promise<void>;
-  abstract getState(): SavedState | null;
   abstract saveState(state: SavedState): void;
+
+  getState(): SavedState | null {
+    return this.state;
+  }
 
   /**
    * Fetch previously saved state, where that costs a network round trip. Split
@@ -48,7 +52,10 @@ export abstract class BaseAdapter {
   }
 
   /** Learner actor for an explicit xAPI destination, derived from the LMS; null when unavailable. */
-  deriveActor(_activityId: string, _homePage?: string): XAPIAgent | null {
+  deriveActor(
+    _activityId: string,
+    _actorAccountHomePage?: string,
+  ): XAPIAgent | null {
     return null;
   }
 
