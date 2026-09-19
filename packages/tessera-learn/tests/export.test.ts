@@ -256,9 +256,9 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('masteryScore="0.7"');
   });
 
-  it('defaults masteryScore to 0 in manual mode', () => {
+  it('omits masteryScore in manual mode', () => {
     const xml = cmi5Xml({ title: 'Test', completion: { mode: 'manual' } });
-    expect(xml).toContain('masteryScore="0"');
+    expect(xml).not.toContain('masteryScore');
   });
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {

@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-cmi5 packages for manual-completion courses declare the same passing score the runtime uses.
+Passed and Failed statements from a manual-completion cmi5 course keep their score. The cmi5 package no longer declares `masteryScore` under `completion.mode: "manual"`, where success comes from `requireSuccessStatus` instead.

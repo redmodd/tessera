@@ -160,8 +160,14 @@ export function generateCMI5Xml(config: ExportConfig): string {
     courseIdentity(config) || 'tessera-course',
   );
   const auId = auIdFor(config);
+  // Manual completion takes success from completion.requireSuccessStatus, not
+  // from the score, so a declared masteryScore would only contradict the verb
+  // and cost the score (cmi5 §9.3.4 / §9.3.5). The attribute is optional.
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
-  const masteryScore = Number((config.scoring.passingScore / 100).toFixed(4));
+  const masteryScore =
+    config.completion?.mode === 'manual'
+      ? ''
+      : ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`;
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
   // satisfying the AU. For graded courses (completion gated on a quiz)
   // a learner who completes without passing should NOT receive credit, so
@@ -177,7 +183,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
   </course>
-  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}" masteryScore="${masteryScore}">
+  <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}"${masteryScore}>
     <title><langstring lang="en-US">${title}</langstring></title>
     <description><langstring lang="en-US">${description}</langstring></description>
     <url>index.html</url>

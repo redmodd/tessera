@@ -229,7 +229,7 @@ describe('export packaging gate', () => {
     ).toHaveLength(1);
   });
 
-  it('packages a manual-mode cmi5 course with the runtime passing score', async () => {
+  it('packages a manual-mode cmi5 course with no masteryScore', async () => {
     writeFileSync(
       resolve(projectRoot, 'course.config.js'),
       'export default { title: "Course", completion: { mode: "manual" }, export: { standard: "cmi5" } };',
@@ -243,7 +243,7 @@ describe('export packaging gate', () => {
     await (exporter.closeBundle as any).call(exporter);
 
     const xml = readFileSync(resolve(projectRoot, 'dist', 'cmi5.xml'), 'utf-8');
-    expect(xml).toContain('masteryScore="0"');
+    expect(xml).not.toContain('masteryScore');
     expect(xml).toContain('moveOn="Completed"');
   });
 

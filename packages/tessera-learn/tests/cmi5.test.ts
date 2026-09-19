@@ -1620,6 +1620,20 @@ describe('CMI5Adapter', () => {
       warn.mockRestore();
     });
 
+    it('keeps the score on Failed when no masteryScore is declared (manual completion)', async () => {
+      setupInitMocks();
+      adapter = new CMI5Adapter();
+      await adapter.init();
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValue({ ok: true });
+
+      adapter.setScore(85);
+      adapter.setSuccessStatus('failed');
+      await new Promise((r) => setTimeout(r, 50));
+      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      expect(failed.result.score.scaled).toBeCloseTo(0.85);
+    });
+
     it('sends Scored when a retry raises the score without flipping Passed', async () => {
       setupInitMocks(undefined, { masteryScore: 0.7 });
       adapter = new CMI5Adapter();
