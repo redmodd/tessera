@@ -91,9 +91,9 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// An LMS handed a threshold judges the score itself, on its own schedule.
-// That only agrees with the runtime when passing is what completes the
-// course, so quiz-mode completion is the one shape that declares a mark.
+// An LMS handed a threshold judges the score itself, on its own schedule, and
+// reaches a verdict of its own. That only agrees with the runtime when passing
+// is what completes the course and a quiz is what judges it.
 function declaresPassMark(config: ExportConfig): boolean {
   return (
     config.completion?.mode === 'quiz' && resolveSuccess(config).from === 'quiz'

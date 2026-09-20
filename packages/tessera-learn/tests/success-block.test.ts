@@ -5,6 +5,20 @@ import { mergeCourseConfig } from '../src/plugin/index.js';
 import { generateCMI5Xml } from '../src/plugin/export.js';
 import { createManifest, createConfig } from './helpers.js';
 
+const cmi5Xml = (
+  config: Parameters<typeof mergeCourseConfig>[0],
+  hasGradedPages: boolean,
+) =>
+  generateCMI5Xml(
+    mergeCourseConfig({
+      title: 'C',
+      scoring: { passingScore: 70 },
+      export: { standard: 'cmi5' },
+      ...config,
+    }),
+    hasGradedPages,
+  );
+
 describe('resolveSuccess', () => {
   it('implies a quiz verdict under quiz mode', () => {
     expect(resolveSuccess({ completion: { mode: 'quiz' } })).toEqual({
@@ -74,14 +88,8 @@ describe('an unreadable success criterion', () => {
   });
 
   it('satisfies the cmi5 AU on Completed alone', () => {
-    const xml = generateCMI5Xml(
-      {
-        title: 'C',
-        completion: { mode: 'manual' },
-        success: { from: 'vibes' } as never,
-        scoring: { passingScore: 70 },
-        export: { standard: 'cmi5' },
-      },
+    const xml = cmi5Xml(
+      { completion: { mode: 'manual' }, success: { from: 'vibes' } as never },
       true,
     );
 
@@ -107,13 +115,8 @@ describe('a quiz criterion with nothing graded', () => {
   });
 
   it('satisfies the cmi5 AU on Completed alone', () => {
-    const xml = generateCMI5Xml(
-      {
-        title: 'C',
-        completion: { mode: 'percentage', percentageThreshold: 100 },
-        scoring: { passingScore: 70 },
-        export: { standard: 'cmi5' },
-      },
+    const xml = cmi5Xml(
+      { completion: { mode: 'percentage', percentageThreshold: 100 } },
       false,
     );
 
@@ -194,14 +197,8 @@ describe('success.from: "quiz" under manual completion', () => {
   });
 
   it('declares no pass mark in the cmi5 manifest, but still needs a Passed', () => {
-    const xml = generateCMI5Xml(
-      {
-        title: 'C',
-        completion: { mode: 'manual' },
-        success: { from: 'quiz' },
-        scoring: { passingScore: 70 },
-        export: { standard: 'cmi5' },
-      },
+    const xml = cmi5Xml(
+      { completion: { mode: 'manual' }, success: { from: 'quiz' } },
       true,
     );
 
@@ -240,14 +237,8 @@ describe('success.from: "fixed"', () => {
   it.each(['passed', 'failed'] as const)(
     'makes cmi5 satisfaction turn on an asserted %s',
     (status) => {
-      const xml = generateCMI5Xml(
-        {
-          title: 'C',
-          completion: { mode: 'manual' },
-          success: { from: 'fixed', status },
-          scoring: { passingScore: 70 },
-          export: { standard: 'cmi5' },
-        },
+      const xml = cmi5Xml(
+        { completion: { mode: 'manual' }, success: { from: 'fixed', status } },
         false,
       );
 
@@ -270,13 +261,11 @@ describe('completion.mode presets still resolve as before', () => {
   });
 
   it('drops CompletedAndPassed when the quiz completes but does not judge', () => {
-    const xml = generateCMI5Xml(
+    const xml = cmi5Xml(
       {
-        title: 'C',
         completion: { mode: 'quiz' },
         success: { from: 'none' },
         scoring: { passingScore: 80 },
-        export: { standard: 'cmi5' },
       },
       true,
     );

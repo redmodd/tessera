@@ -203,6 +203,11 @@ describe('SCORM12Adapter', () => {
   // ---- lesson_status ----
 
   describe('lesson_status reconciliation', () => {
+    const lastLessonStatus = () =>
+      api.LMSSetValue.mock.calls
+        .filter(([k]) => k === 'cmi.core.lesson_status')
+        .at(-1)?.[1];
+
     it('sets incomplete when completion is incomplete', async () => {
       adapter.setCompletionStatus('incomplete');
       await flush();
@@ -225,30 +230,21 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('passed');
       await flush();
-      const calls = api.LMSSetValue.mock.calls.filter(
-        ([k]) => k === 'cmi.core.lesson_status',
-      );
-      expect(calls.at(-1)?.[1]).toBe('passed');
+      expect(lastLessonStatus()).toBe('passed');
     });
 
     it('failed status takes priority over completion', async () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('failed');
       await flush();
-      const calls = api.LMSSetValue.mock.calls.filter(
-        ([k]) => k === 'cmi.core.lesson_status',
-      );
-      expect(calls.at(-1)?.[1]).toBe('failed');
+      expect(lastLessonStatus()).toBe('failed');
     });
 
     it('withholds passed while the course is incomplete', async () => {
       adapter.setSuccessStatus('passed');
       adapter.setCompletionStatus('incomplete');
       await flush();
-      const calls = api.LMSSetValue.mock.calls.filter(
-        ([k]) => k === 'cmi.core.lesson_status',
-      );
-      expect(calls.at(-1)?.[1]).toBe('incomplete');
+      expect(lastLessonStatus()).toBe('incomplete');
     });
 
     it('releases the held passed once completion lands', async () => {
@@ -256,20 +252,14 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('incomplete');
       adapter.setCompletionStatus('complete');
       await flush();
-      const calls = api.LMSSetValue.mock.calls.filter(
-        ([k]) => k === 'cmi.core.lesson_status',
-      );
-      expect(calls.at(-1)?.[1]).toBe('passed');
+      expect(lastLessonStatus()).toBe('passed');
     });
 
     it('reports failed even while the course is incomplete', async () => {
       adapter.setSuccessStatus('failed');
       adapter.setCompletionStatus('incomplete');
       await flush();
-      const calls = api.LMSSetValue.mock.calls.filter(
-        ([k]) => k === 'cmi.core.lesson_status',
-      );
-      expect(calls.at(-1)?.[1]).toBe('failed');
+      expect(lastLessonStatus()).toBe('failed');
     });
   });
 

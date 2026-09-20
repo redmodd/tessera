@@ -1,9 +1,10 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
+  test,
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {

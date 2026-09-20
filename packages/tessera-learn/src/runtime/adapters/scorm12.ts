@@ -92,11 +92,13 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #flushLessonStatus(): void {
     // One field for both axes, and "passed" reads as finished. Success may
     // upgrade a completed course, never stand in for completion.
-    const success =
-      this.#successStatus === 'passed' && this.#completionStatus !== 'completed'
-        ? null
-        : this.#successStatus;
-    this.set('cmi.core.lesson_status', success ?? this.#completionStatus);
+    const held =
+      this.#successStatus === 'passed' &&
+      this.#completionStatus !== 'completed';
+    this.set(
+      'cmi.core.lesson_status',
+      (held ? null : this.#successStatus) ?? this.#completionStatus,
+    );
   }
 
   setExit(mode: ExitMode): void {
