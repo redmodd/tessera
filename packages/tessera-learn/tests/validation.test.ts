@@ -2954,6 +2954,39 @@ describe('success block validation', () => {
     );
   });
 
+  it('checks the requireSuccessStatus value even when success outranks it', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }', ', requireSuccessStatus: "maybe"');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" must be "passed" or "failed"',
+      ),
+    );
+  });
+
+  it('does not repeat the quiz-mode graded-pages error as a warning', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  success: { from: "quiz" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('completion.mode is "quiz" but no pages declare'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('success.from is "quiz" but no pages declare'),
+    );
+  });
+
   it('warns on a quiz verdict with no graded pages', () => {
     createValidProject(testRoot);
     withSuccess('{ from: "quiz" }');

@@ -221,7 +221,7 @@ const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
-const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
+const VALID_SUCCESS_STATUS = ['passed', 'failed'];
 const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 // Derived from the runtime types (single source of truth) — widened to
 // string[] so .includes() accepts an arbitrary author-supplied value.
@@ -432,7 +432,7 @@ function parseConfig(
       );
     } else if (
       success.from === 'fixed' &&
-      !VALID_REQUIRE_SUCCESS_STATUS.includes(success.status as string)
+      !VALID_SUCCESS_STATUS.includes(success.status as string)
     ) {
       d.error(
         `course.config.js: "success.status" must be "passed" or "failed" under success.from: "fixed", got "${success.status}"`,
@@ -447,22 +447,21 @@ function parseConfig(
     }
   }
 
-  if (config.completion?.requireSuccessStatus !== undefined) {
+  const requireStatus = config.completion?.requireSuccessStatus;
+  if (requireStatus !== undefined) {
+    const manual = config.completion?.mode === 'manual';
     if (successAccepted) {
       d.warn(
         'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
       );
-    } else if (config.completion.mode !== 'manual') {
+    } else if (!manual) {
       d.warn(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
-    } else if (
-      !VALID_REQUIRE_SUCCESS_STATUS.includes(
-        config.completion.requireSuccessStatus,
-      )
-    ) {
+    }
+    if (manual && !VALID_SUCCESS_STATUS.includes(requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
+        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${requireStatus}"`,
       );
     }
   }
@@ -1963,7 +1962,12 @@ function crossValidate(
   }
 
   const quizVerdict = config.success?.from === 'quiz';
-  if (quizVerdict && !pageResults.hasGraded && !pageResults.hasParseErrors) {
+  if (
+    quizVerdict &&
+    !quizMode &&
+    !pageResults.hasGraded &&
+    !pageResults.hasParseErrors
+  ) {
     d.warn(
       'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
     );
