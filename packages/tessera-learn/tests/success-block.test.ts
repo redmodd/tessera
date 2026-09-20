@@ -167,6 +167,30 @@ describe('success.from: "fixed"', () => {
     expect(progress.completionStatus).toBe('complete');
     expect(progress.successStatus).toBe('passed');
   });
+
+  it('denies cmi5 satisfaction to an asserted failure', () => {
+    const xml = generateCMI5Xml({
+      title: 'C',
+      completion: { mode: 'manual' },
+      success: { from: 'fixed', status: 'failed' },
+      scoring: { passingScore: 70 },
+      export: { standard: 'cmi5' },
+    });
+
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('still satisfies on an asserted pass', () => {
+    const xml = generateCMI5Xml({
+      title: 'C',
+      completion: { mode: 'manual' },
+      success: { from: 'fixed', status: 'passed' },
+      scoring: { passingScore: 70 },
+      export: { standard: 'cmi5' },
+    });
+
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
 });
 
 describe('completion.mode presets still resolve as before', () => {

@@ -347,8 +347,12 @@ export class ProgressState {
   });
 
   /**
-   * Effective graded score for LMS reporting — same union and averaging as
-   * successStatus, so score and success status can't disagree.
+   * Effective graded score for LMS reporting. Same union and averaging as
+   * successStatus, so a reported score and a reported verdict agree on the
+   * pages they cover. A course that completes with nothing attempted still
+   * reports 0 here while the verdict stays `unknown`: an unattempted graded
+   * page counts as 0, and whether that is the learner's score or no score at
+   * all is what a per-page required/optional flag would settle.
    */
   get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;

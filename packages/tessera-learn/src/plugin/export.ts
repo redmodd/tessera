@@ -12,6 +12,7 @@ import { ZipArchive } from 'archiver';
 import {
   courseIdentity,
   judgesScore,
+  resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
@@ -175,10 +176,11 @@ export function generateCMI5Xml(config: ExportConfig): string {
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
-  // satisfying the AU. Wherever a quiz judges, a learner who completes
-  // without passing should not receive credit, so the LMS needs a Completed
-  // AND a Passed. An asserted verdict or none at all satisfies on Completed.
-  const moveOn = judgesScore(config) ? 'CompletedAndPassed' : 'Completed';
+  // satisfying the AU. Wherever the course sends a verdict at all, that
+  // verdict can be Failed, and a failed learner should not receive credit.
+  // Only a course that never judges satisfies on Completed alone.
+  const moveOn =
+    resolveSuccess(config).from === 'none' ? 'Completed' : 'CompletedAndPassed';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
