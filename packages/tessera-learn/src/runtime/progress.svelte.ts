@@ -349,8 +349,8 @@ export class ProgressState {
       this.completionStatus !== 'complete'
     )
       return 'unknown';
-    if (!this.gradedScoreFinal) return 'unknown';
-    const { average } = this.#graded;
+    const { average, attempted } = this.#graded;
+    if (!this.gradedScoreFinal || !attempted) return 'unknown';
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 

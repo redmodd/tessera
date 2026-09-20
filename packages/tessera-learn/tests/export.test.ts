@@ -509,26 +509,34 @@ describe('runExport', () => {
 });
 
 describe('pass mark follows success.from, not completion.mode', () => {
-  it('declares adlcp:masteryscore under manual completion with a quiz verdict', () => {
+  it('omits adlcp:masteryscore under manual completion, even with a quiz verdict', () => {
     const xml = scormXml('scorm12', {
       title: 'Test',
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
       scoring: { passingScore: 80 },
     });
-    expect(xml).toContain('<adlcp:masteryscore>80</adlcp:masteryscore>');
+    expect(xml).not.toContain('masteryscore');
   });
 
-  it('declares minNormalizedMeasure under manual completion with a quiz verdict', () => {
+  it('omits minNormalizedMeasure under manual completion, even with a quiz verdict', () => {
     const xml = scormXml('scorm2004', {
       title: 'Test',
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
       scoring: { passingScore: 80 },
     });
-    expect(xml).toContain(
-      '<imsss:minNormalizedMeasure>0.8</imsss:minNormalizedMeasure>',
-    );
+    expect(xml).not.toContain('minNormalizedMeasure');
+  });
+
+  it('declares adlcp:masteryscore under a percentage course with a quiz verdict', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'percentage' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).toContain('<adlcp:masteryscore>80</adlcp:masteryscore>');
   });
 
   it('omits the SCORM 1.2 pass mark under success.from "none"', () => {

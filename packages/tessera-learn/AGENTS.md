@@ -506,7 +506,9 @@ success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
 
 Under `completion.mode: "manual"` a `from: "quiz"` verdict is **held until the trigger fires**, so SCORM 1.2 (one `lesson_status`) never reports `passed` on a course that is still incomplete. `passingScore` then defaults to 70 rather than manual mode's 0.
 
-A package declares a pass mark (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) exactly when `success.from` is `"quiz"`. cmi5 `moveOn` is `CompletedAndPassed` only when the quiz both completes and judges the course; anything else satisfies on `Completed`.
+A quiz verdict needs an attempt: with no graded page scored, `successStatus` stays `"unknown"` rather than failing the learner on an unattempted 0.
+
+A package declares a pass mark (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) when `success.from` is `"quiz"` and `completion.mode` is not `"manual"`. Manual is the exception because an LMS that sees a threshold judges the score itself, which would pre-empt the held verdict. cmi5 `moveOn` is `CompletedAndPassed` only when the quiz both completes and judges the course; anything else satisfies on `Completed`.
 
 ---
 
@@ -913,7 +915,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `success.from: "fixed"`, which sets it when the course completes.
+`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, and while `attempted` is `false`, except under `success.from: "fixed"`, which sets it when the course completes.
 
 Three rules for displaying it:
 
@@ -1087,7 +1089,7 @@ Author-facing consequences:
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
 - **`scoring.passingScore` is the mastery score.** SCORM 1.2, SCORM 2004 and cmi5 packages declare it, and an LMS-supplied mastery score overrides it at launch in all three. Read it via `useQuiz().passingScore`.
-- **A package declares a pass mark only when `success.from` is `"quiz"`.** Under `"fixed"` or `"none"` (which bare manual mode implies) a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, and scores are still reported, but the LMS gets no threshold to judge them against.
+- **A package declares a pass mark only when `success.from` is `"quiz"` and completion is not manual.** Under `"fixed"`, `"none"`, or any manual course, a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, and scores are still reported, but the LMS gets no threshold to judge them against. That is what keeps a manual course's verdict yours to time.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing

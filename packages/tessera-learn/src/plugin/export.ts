@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import {
   courseIdentity,
-  resolveSuccess,
+  judgesScore,
   type CourseConfig,
 } from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
@@ -91,9 +91,11 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// A package declares a pass mark exactly when a score is judged against it.
+// A package declares a pass mark only when the LMS would reach the same
+// verdict the runtime sends. Under manual completion the trigger owns the
+// moment, and an LMS that sees a threshold rescores from the score alone.
 function declaresPassMark(config: ExportConfig): boolean {
-  return resolveSuccess(config).from === 'quiz';
+  return judgesScore(config) && config.completion?.mode !== 'manual';
 }
 
 function formatSize(bytes: number): string {
@@ -179,7 +181,7 @@ export function generateCMI5Xml(config: ExportConfig): string {
   // satisfies on Completed alone: a visit-ratio or trigger completion, an
   // asserted Failed, or no verdict at all.
   const moveOn =
-    config.completion?.mode === 'quiz' && declaresPassMark(config)
+    config.completion?.mode === 'quiz' && judgesScore(config)
       ? 'CompletedAndPassed'
       : 'Completed';
 

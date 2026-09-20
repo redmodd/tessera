@@ -117,7 +117,17 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(fail.successStatus).toBe('failed');
   });
 
-  it('declares a pass mark in the cmi5 manifest, but satisfies on Completed', () => {
+  it('reports no verdict for a learner who triggers completion without attempting', () => {
+    const progress = build();
+
+    progress.markCompleteManually();
+
+    expect(progress.completionStatus).toBe('complete');
+    expect(progress.gradedScore.attempted).toBe(false);
+    expect(progress.successStatus).toBe('unknown');
+  });
+
+  it('declares no pass mark in the cmi5 manifest, and satisfies on Completed', () => {
     const xml = generateCMI5Xml({
       title: 'C',
       completion: { mode: 'manual' },
@@ -126,7 +136,7 @@ describe('success.from: "quiz" under manual completion', () => {
       export: { standard: 'cmi5' },
     });
 
-    expect(xml).toContain('masteryScore="0.7"');
+    expect(xml).not.toContain('masteryScore');
     expect(xml).toContain('moveOn="Completed"');
   });
 

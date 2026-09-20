@@ -20,20 +20,27 @@ export function courseIdentity(config: { id?: unknown }): string {
   return (typeof config.id === 'string' && config.id.trim()) || '';
 }
 
+interface SuccessSource {
+  completion?: { mode?: string; requireSuccessStatus?: 'passed' | 'failed' };
+  success?: SuccessConfig;
+}
+
 /**
  * What judges pass/fail, resolved from `success` or the `completion.mode`
  * preset that implies it. Single source of truth for the runtime rollup, the
  * validator, and the manifest generators, so the pass mark a package
  * declares can't disagree with the verdict it sends.
  */
-export function resolveSuccess(config: {
-  completion?: { mode?: string; requireSuccessStatus?: 'passed' | 'failed' };
-  success?: SuccessConfig;
-}): SuccessConfig {
+export function resolveSuccess(config: SuccessSource): SuccessConfig {
   if (config.success) return config.success;
   if (config.completion?.mode !== 'manual') return { from: 'quiz' };
   const status = config.completion.requireSuccessStatus;
   return status ? { from: 'fixed', status } : { from: 'none' };
+}
+
+/** Whether the graded average is what decides pass/fail. */
+export function judgesScore(config: SuccessSource): boolean {
+  return resolveSuccess(config).from === 'quiz';
 }
 
 /**

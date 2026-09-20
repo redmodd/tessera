@@ -44,7 +44,7 @@ import {
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
-  resolveSuccess,
+  judgesScore,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
@@ -222,7 +222,7 @@ const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
-const VALID_SUCCESS_SOURCES = [...SUCCESS_SOURCES];
+const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 // Derived from the runtime types (single source of truth) — widened to
 // string[] so .includes() accepts an arbitrary author-supplied value.
 const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
@@ -454,7 +454,7 @@ function parseConfig(
         `course.config.js: "success.status" is ignored unless success.from is "fixed"`,
       );
     }
-    if (config.completion?.requireSuccessStatus !== undefined) {
+    if (success && config.completion?.requireSuccessStatus !== undefined) {
       d.warn(
         'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
       );
@@ -1940,15 +1940,15 @@ function crossValidate(
     );
   }
 
-  const success = resolveSuccess(config);
-  const judgesScore = success.from === 'quiz';
+  const judged = judgesScore(config);
 
-  // A judged score with an implicit pass threshold — the merge defaults to 70,
-  // so this is a nudge, not an error.
+  // A threshold something reads with nothing set — the merge defaults to 70,
+  // so this is a nudge, not an error. Quiz mode always reads it for
+  // completion, whatever judges success.
   if (
-    judgesScore &&
     config.scoring?.passingScore === undefined &&
-    (config.completion?.mode === 'quiz' || config.success !== undefined)
+    (config.completion?.mode === 'quiz' ||
+      (judged && config.success !== undefined))
   ) {
     d.warn(
       `${config.completion?.mode === 'quiz' ? 'completion.mode is "quiz"' : 'success.from is "quiz"'} but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.`,
@@ -1957,7 +1957,7 @@ function crossValidate(
 
   if (
     config.success !== undefined &&
-    judgesScore &&
+    judged &&
     !pageResults.hasGraded &&
     !pageResults.hasParseErrors
   ) {
@@ -1983,7 +1983,7 @@ function crossValidate(
     );
   }
 
-  if (isManual && !judgesScore) {
+  if (isManual && !judged) {
     for (const page of pageResults.pages) {
       if (page.graded) {
         d.warn(

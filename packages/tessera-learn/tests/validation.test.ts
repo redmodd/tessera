@@ -2963,6 +2963,45 @@ describe('success block validation', () => {
     );
   });
 
+  it('keeps the passingScore nudge under quiz mode with a non-quiz verdict', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  success: { from: "none" },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'completion.mode is "quiz" but scoring.passingScore is not set',
+      ),
+    );
+  });
+
+  it('does not claim requireSuccessStatus is ignored when success is malformed', () => {
+    createValidProject(testRoot);
+    withSuccess('null', ', requireSuccessStatus: "passed"');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" is ignored when "success" is set',
+      ),
+    );
+  });
+
   it('drops the "graded under manual" warning when the quiz judges', () => {
     createValidProject(testRoot);
     withSuccess('{ from: "quiz" }');
