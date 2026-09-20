@@ -241,15 +241,35 @@ describe('SCORM12Adapter', () => {
       expect(calls.at(-1)?.[1]).toBe('failed');
     });
 
-    it('success still takes priority after completion update', async () => {
+    it('withholds passed while the course is incomplete', async () => {
       adapter.setSuccessStatus('passed');
       adapter.setCompletionStatus('incomplete');
       await flush();
       const calls = api.LMSSetValue.mock.calls.filter(
         ([k]) => k === 'cmi.core.lesson_status',
       );
-      // Success status still takes priority
+      expect(calls.at(-1)?.[1]).toBe('incomplete');
+    });
+
+    it('releases the held passed once completion lands', async () => {
+      adapter.setSuccessStatus('passed');
+      adapter.setCompletionStatus('incomplete');
+      adapter.setCompletionStatus('complete');
+      await flush();
+      const calls = api.LMSSetValue.mock.calls.filter(
+        ([k]) => k === 'cmi.core.lesson_status',
+      );
       expect(calls.at(-1)?.[1]).toBe('passed');
+    });
+
+    it('reports failed even while the course is incomplete', async () => {
+      adapter.setSuccessStatus('failed');
+      adapter.setCompletionStatus('incomplete');
+      await flush();
+      const calls = api.LMSSetValue.mock.calls.filter(
+        ([k]) => k === 'cmi.core.lesson_status',
+      );
+      expect(calls.at(-1)?.[1]).toBe('failed');
     });
   });
 

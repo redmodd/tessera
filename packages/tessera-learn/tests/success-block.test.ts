@@ -83,12 +83,12 @@ describe('success.from: "quiz" under manual completion', () => {
     return new ProgressState(manifest, config);
   };
 
-  it('holds the verdict until the completion trigger fires', () => {
+  it('judges the score as soon as it is final, before the trigger', () => {
     const progress = build();
 
     progress.quizCompleted(2, 90);
     expect(progress.completionStatus).toBe('incomplete');
-    expect(progress.successStatus).toBe('unknown');
+    expect(progress.successStatus).toBe('passed');
 
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('passed');
@@ -127,7 +127,7 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(progress.successStatus).toBe('unknown');
   });
 
-  it('declares no pass mark in the cmi5 manifest, and satisfies on Completed', () => {
+  it('declares no pass mark in the cmi5 manifest, but still needs a Passed', () => {
     const xml = generateCMI5Xml({
       title: 'C',
       completion: { mode: 'manual' },
@@ -137,7 +137,7 @@ describe('success.from: "quiz" under manual completion', () => {
     });
 
     expect(xml).not.toContain('masteryScore');
-    expect(xml).toContain('moveOn="Completed"');
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 
   it('defaults passingScore to 70 rather than manual mode’s 0', () => {

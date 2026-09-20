@@ -97,7 +97,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
       .poll(() => scormData(page))
       .toMatchObject({
         'cmi.core.score.raw': '100',
-        'cmi.core.lesson_status': 'passed',
+        'cmi.core.lesson_status': 'incomplete',
       });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);

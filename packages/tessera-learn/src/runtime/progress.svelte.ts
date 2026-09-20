@@ -341,14 +341,6 @@ export class ProgressState {
       return this.completionStatus === 'complete' && status !== undefined
         ? status
         : 'unknown';
-    // A trigger owns the completion moment under manual, so the verdict waits
-    // for it: SCORM 1.2 has one lesson_status, and "passed" there reads as
-    // finished to an LMS that can't see a separate completion field.
-    if (
-      this.#config.completion.mode === 'manual' &&
-      this.completionStatus !== 'complete'
-    )
-      return 'unknown';
     const { average, attempted } = this.#graded;
     if (!this.gradedScoreFinal || !attempted) return 'unknown';
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';

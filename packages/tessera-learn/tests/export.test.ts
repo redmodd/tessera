@@ -123,6 +123,7 @@ describe('SCORM 1.2 manifest', () => {
   it('declares passingScore as adlcp:masteryscore on the item', () => {
     const xml = scormXml('scorm12', {
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 72.5 },
     });
     expect(xml).toMatch(
@@ -131,7 +132,10 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('defaults adlcp:masteryscore to 70', () => {
-    const xml = scormXml('scorm12', { title: 'Test' });
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'quiz' },
+    });
     expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
   });
 
@@ -169,6 +173,7 @@ describe('SCORM 2004 manifest', () => {
   it('declares passingScore as the primary objective minNormalizedMeasure on the item', () => {
     const xml = scormXml('scorm2004', {
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 72.5 },
     });
     expect(xml).toMatch(
@@ -183,7 +188,10 @@ describe('SCORM 2004 manifest', () => {
   });
 
   it('defaults minNormalizedMeasure to 0.7', () => {
-    const xml = scormXml('scorm2004', { title: 'Test' });
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      completion: { mode: 'quiz' },
+    });
     expect(xml).toContain(
       '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
     );
@@ -246,14 +254,20 @@ describe('generateCMI5Xml', () => {
   it('sets masteryScore from passingScore, separated from the preceding attribute', () => {
     const xml = cmi5Xml({
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 80 },
     });
-    expect(xml).toContain('moveOn="Completed" masteryScore="0.8">');
+    expect(xml).toContain('moveOn="CompletedAndPassed" masteryScore="0.8">');
   });
 
   it('defaults masteryScore to 0.7', () => {
-    const xml = cmi5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test', completion: { mode: 'quiz' } });
     expect(xml).toContain('masteryScore="0.7"');
+  });
+
+  it('omits masteryScore under percentage completion', () => {
+    const xml = cmi5Xml({ title: 'Test', completion: { mode: 'percentage' } });
+    expect(xml).not.toContain('masteryScore');
   });
 
   it('omits masteryScore in manual mode', () => {
@@ -303,10 +317,19 @@ describe('generateCMI5Xml', () => {
     );
   });
 
-  it('defaults moveOn to Completed when completion mode is percentage', () => {
+  it('requires CompletedAndPassed when a percentage course is quiz-judged', () => {
     const xml = cmi5Xml({
       title: 'Test',
       completion: { mode: 'percentage' },
+    });
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('drops to Completed when a percentage course sends no verdict', () => {
+    const xml = cmi5Xml({
+      title: 'Test',
+      completion: { mode: 'percentage' },
+      success: { from: 'none' },
     });
     expect(xml).toContain('moveOn="Completed"');
   });
@@ -322,9 +345,9 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 
-  it('defaults moveOn to Completed when no completion config supplied', () => {
+  it('defaults moveOn to CompletedAndPassed when no completion config supplied', () => {
     const xml = cmi5Xml({ title: 'Test' });
-    expect(xml).toContain('moveOn="Completed"');
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 
   it('emits launchMethod attribute on <au> (defaults to AnyWindow)', () => {
@@ -460,6 +483,7 @@ describe('runExport', () => {
     await runExport(testRoot, createDistDir(testRoot), {
       title: 'Test Course',
       version: '1.0.0',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 80 },
       export: { standard: 'cmi5' },
     });
@@ -529,10 +553,20 @@ describe('pass mark follows success.from, not completion.mode', () => {
     expect(xml).not.toContain('minNormalizedMeasure');
   });
 
-  it('declares adlcp:masteryscore under a percentage course with a quiz verdict', () => {
+  it('omits adlcp:masteryscore under a percentage course, quiz verdict or not', () => {
     const xml = scormXml('scorm12', {
       title: 'Test',
       completion: { mode: 'percentage' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).not.toContain('masteryscore');
+  });
+
+  it('declares adlcp:masteryscore when the quiz completes and judges', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'quiz' },
       success: { from: 'quiz' },
       scoring: { passingScore: 80 },
     });

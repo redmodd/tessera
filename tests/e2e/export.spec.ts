@@ -118,7 +118,7 @@ test.describe('Export — SCORM 1.2', () => {
     expect(xml).toContain('adlcp_rootv1p2');
     expect(xml).toContain('<schemaversion>1.2</schemaversion>');
     expect(xml).toContain('adlcp:scormtype="sco"');
-    expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
+    expect(xml).not.toContain('masteryscore');
     expect(xml).toContain('href="index.html"');
     expect(xml).toContain('<file href=');
     expect(xml).toContain('E2E Test Course');
@@ -141,6 +141,16 @@ test.describe('Export — SCORM 2004', () => {
     expect(xml).toContain('adlcp_v1p3');
     expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>');
     expect(xml).toContain('adlcp:scormType="sco"'); // capital T for 2004
+    expect(xml).not.toContain('imsss:sequencing');
+  });
+
+  test('a quiz-mode course declares the pass mark the LMS judges against', async () => {
+    const distPath = resolve(
+      variantDir('completion-quiz', 'scorm2004'),
+      'dist',
+    );
+    const xml = readFileSync(resolve(distPath, 'imsmanifest.xml'), 'utf-8');
+
     expect(xml).toContain('satisfiedByMeasure="true"');
     expect(xml).toContain(
       '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
@@ -164,7 +174,8 @@ test.describe('Export — CMI5', () => {
     expect(xml).toContain('<url>index.html</url>');
     expect(xml).toContain('launchMethod="AnyWindow"');
     expect(xml).toContain('E2E Test Course');
-    expect(xml).toContain('masteryScore');
+    expect(xml).not.toContain('masteryScore');
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 });
 

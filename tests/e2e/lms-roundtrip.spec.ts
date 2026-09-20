@@ -142,7 +142,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     );
   });
 
-  test('Completing a graded quiz writes score and lesson_status=passed', async ({
+  test('Completing a graded quiz writes the score and holds lesson_status at incomplete', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -186,8 +186,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
         'cmi.core.score.raw': '100',
         'cmi.core.score.min': '0',
         'cmi.core.score.max': '100',
-        // All answers correct → lesson_status should reflect passed (success takes priority)
-        'cmi.core.lesson_status': 'passed',
+        // Passing the quiz does not finish a percentage course, and SCORM 1.2
+        // has one field: "passed" here would read as finished.
+        'cmi.core.lesson_status': 'incomplete',
       });
 
     // Per-question Interaction writes land before the final score, so by now
@@ -229,7 +230,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
-    test('a 66.67 passes against mastery_score 60 despite passingScore 70', async ({
+    test('a 66.67 escapes failed against mastery_score 60 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -238,10 +239,12 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
       await answerGradedQuiz(page, { q1Correct: false });
 
+      // Without the override a 66.67 against passingScore 70 would be failed,
+      // and failed is not held back the way passed is.
       await expect
         .poll(() => scormData(page))
         .toMatchObject({
-          'cmi.core.lesson_status': 'passed',
+          'cmi.core.lesson_status': 'incomplete',
           'cmi.core.score.raw': '66.67',
         });
     });
@@ -425,40 +428,6 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
           'cmi.score.raw': '66.67',
           'cmi.score.scaled': '0.6667',
         });
-    });
-  });
-
-  test.describe('scaled_passing_score from the exported manifest', () => {
-    test.use({
-      lmsData: async ({ request }, use) => {
-        const xml = await (await request.get(`${BASE}/imsmanifest.xml`)).text();
-        const [, measure] = xml.match(
-          /<imsss:minNormalizedMeasure>(.*?)<\/imsss:minNormalizedMeasure>/,
-        )!;
-        await use({ 'cmi.scaled_passing_score': measure });
-      },
-    });
-
-    test('the LMS judges a 66.67 failed against the declared pass mark, as the course does', async ({
-      page,
-    }) => {
-      await page.goto(BASE);
-      await waitForTesseraContent(page);
-      await openQuiz(page, 'Graded Assessment');
-
-      await answerGradedQuiz(page, { q1Correct: false });
-
-      await expect
-        .poll(() => scormData(page))
-        .toMatchObject({
-          'cmi.success_status': 'failed',
-          'cmi.score.scaled': '0.6667',
-        });
-      expect(
-        await page.evaluate(() =>
-          (window as any).API_1484_11.GetValue('cmi.success_status'),
-        ),
-      ).toBe('failed');
     });
   });
 });

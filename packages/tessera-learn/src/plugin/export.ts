@@ -91,11 +91,11 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// A package declares a pass mark only when the LMS would reach the same
-// verdict the runtime sends. Under manual completion the trigger owns the
-// moment, and an LMS that sees a threshold rescores from the score alone.
+// An LMS handed a threshold judges the score itself, on its own schedule.
+// That only agrees with the runtime when passing is what completes the
+// course, so quiz-mode completion is the one shape that declares a mark.
 function declaresPassMark(config: ExportConfig): boolean {
-  return judgesScore(config) && config.completion?.mode !== 'manual';
+  return config.completion?.mode === 'quiz' && judgesScore(config);
 }
 
 function formatSize(bytes: number): string {
@@ -175,15 +175,10 @@ export function generateCMI5Xml(config: ExportConfig): string {
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
-  // satisfying the AU. A learner who completes without passing should NOT
-  // receive credit only when the quiz is what both completes and judges the
-  // course, so the LMS needs a Completed AND a Passed. Anything else
-  // satisfies on Completed alone: a visit-ratio or trigger completion, an
-  // asserted Failed, or no verdict at all.
-  const moveOn =
-    config.completion?.mode === 'quiz' && judgesScore(config)
-      ? 'CompletedAndPassed'
-      : 'Completed';
+  // satisfying the AU. Wherever a quiz judges, a learner who completes
+  // without passing should not receive credit, so the LMS needs a Completed
+  // AND a Passed. An asserted verdict or none at all satisfies on Completed.
+  const moveOn = judgesScore(config) ? 'CompletedAndPassed' : 'Completed';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
