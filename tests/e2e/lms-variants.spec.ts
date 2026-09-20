@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
+import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
@@ -186,7 +186,9 @@ test.describe.serial('completion.mode quiz', () => {
   });
 
   test.afterAll(() => preview?.kill('SIGTERM'));
-  test.beforeEach(async ({ page }) => installScorm2004Mock(page));
+  test.beforeEach(async ({ page, lmsData }) =>
+    installScorm2004Mock(page, lmsData),
+  );
 
   test('passing the graded quiz completes the course with pages left unvisited', async ({
     page,

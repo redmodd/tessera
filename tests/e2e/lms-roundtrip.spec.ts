@@ -1,9 +1,10 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
+  test,
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
@@ -20,10 +21,6 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
-
-const test = base.extend<{ lmsData: Record<string, string> }>({
-  lmsData: [{}, { option: true }],
-});
 
 // ---------------------------------------------------------------------------
 // SCORM 1.2
