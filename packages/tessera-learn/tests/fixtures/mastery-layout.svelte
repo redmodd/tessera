@@ -7,7 +7,7 @@
   globalThis.__tesseraNavCtx = getNavContext();
 
   $effect(() => {
-    globalThis.__tesseraSeenPassingScore.push(progress.passingScore);
+    globalThis.__tesseraSeenPassingScore?.push(progress.passingScore);
   });
 </script>
 

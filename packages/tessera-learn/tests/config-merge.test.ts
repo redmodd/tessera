@@ -35,6 +35,14 @@ describe('mergeCourseConfig', () => {
     expect(merged.scoring.passingScore).toBe(0);
   });
 
+  it('keeps the 70 default under manual mode when a quiz judges success', () => {
+    const merged = mergeCourseConfig({
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+    });
+    expect(merged.scoring.passingScore).toBe(70);
+  });
+
   it('defaults resume to "auto" when absent', () => {
     expect(mergeCourseConfig({}).resume).toBe('auto');
   });

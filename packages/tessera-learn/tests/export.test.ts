@@ -123,6 +123,7 @@ describe('SCORM 1.2 manifest', () => {
   it('declares passingScore as adlcp:masteryscore on the item', () => {
     const xml = scormXml('scorm12', {
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 72.5 },
     });
     expect(xml).toMatch(
@@ -131,7 +132,10 @@ describe('SCORM 1.2 manifest', () => {
   });
 
   it('defaults adlcp:masteryscore to 70', () => {
-    const xml = scormXml('scorm12', { title: 'Test' });
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'quiz' },
+    });
     expect(xml).toContain('<adlcp:masteryscore>70</adlcp:masteryscore>');
   });
 
@@ -169,6 +173,7 @@ describe('SCORM 2004 manifest', () => {
   it('declares passingScore as the primary objective minNormalizedMeasure on the item', () => {
     const xml = scormXml('scorm2004', {
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 72.5 },
     });
     expect(xml).toMatch(
@@ -183,7 +188,10 @@ describe('SCORM 2004 manifest', () => {
   });
 
   it('defaults minNormalizedMeasure to 0.7', () => {
-    const xml = scormXml('scorm2004', { title: 'Test' });
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      completion: { mode: 'quiz' },
+    });
     expect(xml).toContain(
       '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
     );
@@ -223,8 +231,10 @@ describe('SCORM 2004 manifest', () => {
 // ---- CMI5 XML ----
 
 describe('generateCMI5Xml', () => {
-  const cmi5Xml = (config: Parameters<typeof mergeCourseConfig>[0]) =>
-    generateCMI5Xml(mergeCourseConfig(config));
+  const cmi5Xml = (
+    config: Parameters<typeof mergeCourseConfig>[0],
+    hasGradedPages = true,
+  ) => generateCMI5Xml(mergeCourseConfig(config), hasGradedPages);
 
   it('generates valid XML with course structure', () => {
     const xml = cmi5Xml({
@@ -246,14 +256,20 @@ describe('generateCMI5Xml', () => {
   it('sets masteryScore from passingScore, separated from the preceding attribute', () => {
     const xml = cmi5Xml({
       title: 'Test',
+      completion: { mode: 'quiz' },
       scoring: { passingScore: 80 },
     });
-    expect(xml).toContain('moveOn="Completed" masteryScore="0.8">');
+    expect(xml).toContain('moveOn="CompletedAndPassed" masteryScore="0.8">');
   });
 
   it('defaults masteryScore to 0.7', () => {
-    const xml = cmi5Xml({ title: 'Test' });
+    const xml = cmi5Xml({ title: 'Test', completion: { mode: 'quiz' } });
     expect(xml).toContain('masteryScore="0.7"');
+  });
+
+  it('omits masteryScore under percentage completion', () => {
+    const xml = cmi5Xml({ title: 'Test', completion: { mode: 'percentage' } });
+    expect(xml).not.toContain('masteryScore');
   });
 
   it('omits masteryScore in manual mode', () => {
@@ -303,12 +319,58 @@ describe('generateCMI5Xml', () => {
     );
   });
 
-  it('defaults moveOn to Completed when completion mode is percentage', () => {
+  it('drops to Completed when a percentage course sends no verdict', () => {
     const xml = cmi5Xml({
       title: 'Test',
       completion: { mode: 'percentage' },
+      success: { from: 'none' },
     });
     expect(xml).toContain('moveOn="Completed"');
+  });
+
+  it('drops to Completed when a quiz criterion has nothing to judge', () => {
+    // An informational course: the criterion resolves to "quiz", but with no
+    // graded page the runtime never sends a verdict, and CompletedAndPassed
+    // would leave the AU unsatisfiable for the whole attempt.
+    const xml = cmi5Xml(
+      { title: 'Test', completion: { mode: 'percentage' } },
+      false,
+    );
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
+  it('denies satisfaction to an asserted failure, with nothing graded', () => {
+    const xml = cmi5Xml(
+      {
+        title: 'Test',
+        completion: { mode: 'manual' },
+        success: { from: 'fixed', status: 'failed' },
+      },
+      false,
+    );
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('needs a Passed for a quiz verdict under manual completion, but declares no pass mark', () => {
+    const xml = cmi5Xml({
+      title: 'Test',
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 70 },
+    });
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+    expect(xml).not.toContain('masteryScore');
+  });
+
+  it('drops to Completed when a quiz-mode course sends no verdict', () => {
+    const xml = cmi5Xml({
+      title: 'Test',
+      completion: { mode: 'quiz' },
+      success: { from: 'none' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).toContain('moveOn="Completed"');
+    expect(xml).not.toContain('masteryScore');
   });
 
   it('uses moveOn=CompletedAndPassed for graded (quiz-mode) courses', () => {
@@ -322,9 +384,9 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 
-  it('defaults moveOn to Completed when no completion config supplied', () => {
+  it('defaults moveOn to CompletedAndPassed when no completion config supplied', () => {
     const xml = cmi5Xml({ title: 'Test' });
-    expect(xml).toContain('moveOn="Completed"');
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
 
   it('emits launchMethod attribute on <au> (defaults to AnyWindow)', () => {
@@ -401,6 +463,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'web' },
       }),
+      true,
     );
     // No zip should exist
     const files = readdirSync(testRoot);
@@ -416,6 +479,7 @@ describe('runExport', () => {
         version: '2.0.0',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     // Check manifest was written to dist
@@ -442,6 +506,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm2004' },
       }),
+      true,
     );
 
     expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
@@ -457,12 +522,18 @@ describe('runExport', () => {
   });
 
   it('cmi5 export creates cmi5.xml and zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test Course',
-      version: '1.0.0',
-      scoring: { passingScore: 80 },
-      export: { standard: 'cmi5' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      {
+        title: 'Test Course',
+        version: '1.0.0',
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 80 },
+        export: { standard: 'cmi5' },
+      },
+      true,
+    );
 
     expect(existsSync(resolve(testRoot, 'dist', 'cmi5.xml'))).toBe(true);
     expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
@@ -480,6 +551,7 @@ describe('runExport', () => {
         version: '3.2.1',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
@@ -499,11 +571,44 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     const manifest = readFileSync(resolve(outDir, 'imsmanifest.xml'), 'utf-8');
     expect(manifest).toContain('<file href="index.html" />');
     expect(existsSync(resolve(testRoot, 'dist'))).toBe(false);
     expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
+  });
+});
+
+describe('pass mark follows success.from, not completion.mode', () => {
+  const MARK = { scorm12: 'masteryscore', scorm2004: 'minNormalizedMeasure' };
+
+  const cases: [
+    'scorm12' | 'scorm2004',
+    string,
+    Parameters<typeof mergeCourseConfig>[0],
+  ][] = [
+    ['scorm12', 'percentage mode', { completion: { mode: 'percentage' } }],
+    ['scorm2004', 'percentage mode', { completion: { mode: 'percentage' } }],
+    [
+      'scorm12',
+      'quiz mode with a non-quiz verdict',
+      { completion: { mode: 'quiz' }, success: { from: 'none' } },
+    ],
+    [
+      'scorm2004',
+      'quiz mode with a non-quiz verdict',
+      { completion: { mode: 'quiz' }, success: { from: 'none' } },
+    ],
+  ];
+
+  it.each(cases)('%s declares none under %s', (standard, _shape, config) => {
+    const xml = scormXml(standard, {
+      title: 'Test',
+      scoring: { passingScore: 80 },
+      ...config,
+    });
+    expect(xml).not.toContain(MARK[standard]);
   });
 });

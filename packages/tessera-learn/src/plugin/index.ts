@@ -16,7 +16,11 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import type { CourseConfig } from '../runtime/types.js';
+import {
+  isGradedPage,
+  resolveSuccess,
+  type CourseConfig,
+} from '../runtime/types.js';
 import {
   DEFAULT_PASSING_SCORE,
   DEFAULT_PERCENTAGE_THRESHOLD,
@@ -254,25 +258,14 @@ mount(App, {
 
 // ---------- Config Plugin ----------
 
-function completionDefaults(mode: string | undefined): {
-  completion: CourseConfig['completion'];
-  passingScore: number;
-} {
-  if (mode === 'manual') {
-    return { completion: { mode: 'manual' }, passingScore: 0 };
-  }
-  if (mode === 'quiz') {
-    return {
-      completion: { mode: 'quiz' },
-      passingScore: DEFAULT_PASSING_SCORE,
-    };
-  }
+function completionDefaults(
+  mode: string | undefined,
+): CourseConfig['completion'] {
+  if (mode === 'manual') return { mode: 'manual' };
+  if (mode === 'quiz') return { mode: 'quiz' };
   return {
-    completion: {
-      mode: 'percentage',
-      percentageThreshold: DEFAULT_PERCENTAGE_THRESHOLD,
-    },
-    passingScore: DEFAULT_PASSING_SCORE,
+    mode: 'percentage',
+    percentageThreshold: DEFAULT_PERCENTAGE_THRESHOLD,
   };
 }
 
@@ -296,16 +289,23 @@ function tesseraConfigDefaultsPlugin(): Plugin {
 
 /** Fill runtime defaults into a parsed course.config.js. Exported for tests. */
 export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
-  const { completion, passingScore } = completionDefaults(
-    userConfig.completion?.mode,
-  );
+  const success = resolveSuccess(userConfig);
+  const unjudgedManual =
+    userConfig.completion?.mode === 'manual' && success.from !== 'quiz';
   return {
     ...userConfig,
     title: userConfig.title || 'Untitled Course',
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
-    completion: { ...completion, ...userConfig.completion },
-    scoring: { passingScore, ...userConfig.scoring },
+    completion: {
+      ...completionDefaults(userConfig.completion?.mode),
+      ...userConfig.completion,
+    },
+    success,
+    scoring: {
+      passingScore: unjudgedManual ? 0 : DEFAULT_PASSING_SCORE,
+      ...userConfig.scoring,
+    },
     export: {
       ...userConfig.export,
       standard: userConfig.export?.standard ?? DEFAULT_STANDARD,
@@ -456,7 +456,18 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         );
       }
 
-      await runExport(ctx.root, ctx.outDir, mergeCourseConfig(read.config));
+      if (!ctx.manifest) {
+        throw new Error(
+          '[tessera:export] the page manifest was never generated, so the export cannot tell which pages are graded.',
+        );
+      }
+
+      await runExport(
+        ctx.root,
+        ctx.outDir,
+        mergeCourseConfig(read.config),
+        ctx.manifest.pages.some(isGradedPage),
+      );
     },
   };
 }

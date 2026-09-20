@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
-import { installScorm12Mock, installScorm2004Mock } from './lms-mocks.js';
+import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
@@ -186,7 +186,9 @@ test.describe.serial('completion.mode quiz', () => {
   });
 
   test.afterAll(() => preview?.kill('SIGTERM'));
-  test.beforeEach(async ({ page }) => installScorm2004Mock(page));
+  test.beforeEach(async ({ page, lmsData }) =>
+    installScorm2004Mock(page, lmsData),
+  );
 
   test('passing the graded quiz completes the course with pages left unvisited', async ({
     page,
@@ -207,6 +209,40 @@ test.describe.serial('completion.mode quiz', () => {
     const data = await scormData(page);
     const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
     expect(visited.length).toBeLessThan(totalPages);
+  });
+
+  test.describe('scaled_passing_score from the exported manifest', () => {
+    test.use({
+      lmsData: async ({ request }, use) => {
+        const xml = await (await request.get(`${BASE}/imsmanifest.xml`)).text();
+        const [, measure] = xml.match(
+          /<imsss:minNormalizedMeasure>(.*?)<\/imsss:minNormalizedMeasure>/,
+        )!;
+        await use({ 'cmi.scaled_passing_score': measure });
+      },
+    });
+
+    test('the LMS judges a 66.67 failed against the declared pass mark, as the course does', async ({
+      page,
+    }) => {
+      await page.goto(BASE);
+      await waitForTesseraContent(page);
+      await openQuiz(page, 'Graded Assessment');
+
+      await answerGradedQuiz(page, { q1Correct: false });
+
+      await expect
+        .poll(() => scormData(page))
+        .toMatchObject({
+          'cmi.success_status': 'failed',
+          'cmi.score.scaled': '0.6667',
+        });
+      expect(
+        await page.evaluate(() =>
+          (window as any).API_1484_11.GetValue('cmi.success_status'),
+        ),
+      ).toBe('failed');
+    });
   });
 });
 

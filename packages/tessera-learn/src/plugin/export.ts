@@ -9,7 +9,11 @@ import {
 import { relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
-import { courseIdentity, type CourseConfig } from '../runtime/types.js';
+import {
+  courseIdentity,
+  resolveSuccess,
+  type CourseConfig,
+} from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 
@@ -29,7 +33,7 @@ type ExportConfig = Pick<
   CourseConfig,
   'title' | 'id' | 'description' | 'version' | 'scoring' | 'export'
 > &
-  Partial<Pick<CourseConfig, 'completion'>>;
+  Partial<Pick<CourseConfig, 'completion' | 'success'>>;
 
 // ---------- Helpers ----------
 
@@ -87,10 +91,18 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// Manual completion takes success from requireSuccessStatus, so no manifest
-// declares a pass mark for it.
+// An LMS handed a threshold judges the score itself, on its own schedule, and
+// reaches a verdict of its own. That only agrees with the runtime when passing
+// is what completes the course and a quiz is what judges it.
 function declaresPassMark(config: ExportConfig): boolean {
-  return config.completion?.mode !== 'manual';
+  return (
+    config.completion?.mode === 'quiz' && resolveSuccess(config).from === 'quiz'
+  );
+}
+
+function sendsVerdict(config: ExportConfig, hasGradedPages: boolean): boolean {
+  const { from } = resolveSuccess(config);
+  return from === 'fixed' || (from === 'quiz' && hasGradedPages);
 }
 
 function formatSize(bytes: number): string {
@@ -155,7 +167,10 @@ ${fileElements}
 </manifest>`;
 }
 
-export function generateCMI5Xml(config: ExportConfig): string {
+export function generateCMI5Xml(
+  config: ExportConfig,
+  hasGradedPages: boolean,
+): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course id so they survive rebuilds without
@@ -169,15 +184,13 @@ export function generateCMI5Xml(config: ExportConfig): string {
   const masteryAttr = declaresPassMark(config)
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
-  // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
-  // satisfying the AU. For graded courses (completion gated on a quiz)
-  // a learner who completes without passing should NOT receive credit, so
-  // the LMS needs both a Completed AND a Passed before satisfaction.
-  // Quiz is the only mode that gates satisfaction on the verb. Percentage and
-  // manual courses satisfy on Completed alone, including when a manual course
-  // asserts Failed through requireSuccessStatus.
-  const moveOn =
-    config.completion?.mode === 'quiz' ? 'CompletedAndPassed' : 'Completed';
+  // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
+  // the AU. Wherever the course sends a verdict, that verdict can be Failed and
+  // a failed learner should not receive credit. A course that sends none has to
+  // satisfy on Completed alone, or nothing ever satisfies the AU.
+  const moveOn = sendsVerdict(config, hasGradedPages)
+    ? 'CompletedAndPassed'
+    : 'Completed';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
@@ -249,7 +262,11 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   } catch {}
 }
 
-type ManifestGenerator = (config: ExportConfig, outDir: string) => string;
+type ManifestGenerator = (
+  config: ExportConfig,
+  outDir: string,
+  hasGradedPages: boolean,
+) => string;
 
 const scormManifest =
   (dialect: ScormManifestDialect): ManifestGenerator =>
@@ -314,7 +331,8 @@ export const LMS_BUILD: Record<
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
-    generate: (config) => generateCMI5Xml(config),
+    generate: (config, _outDir, hasGradedPages) =>
+      generateCMI5Xml(config, hasGradedPages),
     adapter: 'CMI5Adapter',
     detect: 'hasCMI5LaunchParams',
     takesApi: false,
@@ -336,6 +354,7 @@ export async function runExport(
   projectRoot: string,
   outDir: string,
   config: ExportConfig,
+  hasGradedPages: boolean,
 ): Promise<void> {
   const standard = config.export.standard;
   const slug = slugify(config.title) || 'tessera-course';
@@ -359,7 +378,7 @@ export async function runExport(
 
   writeFileSync(
     resolve(outDir, spec.manifestFile),
-    spec.generate(config, outDir),
+    spec.generate(config, outDir, hasGradedPages),
     'utf-8',
   );
   cleanOldZips(projectRoot, slug);

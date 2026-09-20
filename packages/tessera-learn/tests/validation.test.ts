@@ -2273,7 +2273,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'scoring.passingScore is not set — defaulting to 70%',
+        'scoring.passingScore is not set, so it defaults to 70%',
       ),
     );
   });
@@ -2894,6 +2894,248 @@ describe('resume policy validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('"resume" must be "auto" or "never"'),
+    );
+  });
+});
+
+// ---- success block ----
+
+describe('success block validation', () => {
+  const withSuccess = (success: string, extra = '') =>
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "manual"${extra} },
+  success: ${success},
+  export: { standard: "web" },
+};`,
+    );
+
+  it('accepts a well-formed success block', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('unknown field "success"'),
+    );
+  });
+
+  it('errors on an unknown success.from', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "vibes" }');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        '"success.from" must be "quiz", "fixed", or "none", got "vibes"',
+      ),
+    );
+  });
+
+  it('errors on success.from "fixed" without a status', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "fixed" }');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"success.status" must be "passed" or "failed"'),
+    );
+  });
+
+  it('warns that success.status is ignored unless success.from is "fixed"', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz", status: "passed" }');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"success.status" is ignored unless success.from is "fixed"',
+      ),
+    );
+  });
+
+  it('warns that success outranks requireSuccessStatus when both are set', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }', ', requireSuccessStatus: "passed"');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" is ignored when "success" is set',
+      ),
+    );
+  });
+
+  it('checks the requireSuccessStatus value even when success outranks it', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }', ', requireSuccessStatus: "maybe"');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" must be "passed" or "failed"',
+      ),
+    );
+  });
+
+  it('does not repeat the quiz-mode graded-pages error as a warning', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  success: { from: "quiz" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('completion.mode is "quiz" but no pages declare'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('success.from is "quiz" but no pages declare'),
+    );
+  });
+
+  it('warns on a quiz verdict with no graded pages', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz" }');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('success.from is "quiz" but no pages declare'),
+    );
+  });
+
+  it('keeps the passingScore nudge under quiz mode with a non-quiz verdict', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  success: { from: "none" },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'completion.mode is "quiz" but scoring.passingScore is not set',
+      ),
+    );
+  });
+
+  it('leaves requireSuccessStatus in charge when success is malformed', () => {
+    createValidProject(testRoot);
+    withSuccess('null', ', requireSuccessStatus: "passed"');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"success" must be an object'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" is ignored when "success" is set',
+      ),
+    );
+  });
+
+  it('gives one reason requireSuccessStatus is ignored, not two', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz", requireSuccessStatus: "passed" },
+  success: { from: "fixed", status: "passed" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('completion.requireSuccessStatus')),
+    ).toEqual([
+      expect.stringContaining('"success" is set, which takes precedence'),
+    ]);
+  });
+
+  it('nudges for an unset passingScore that an implied quiz verdict judges', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('scoring.passingScore is not set'),
+    );
+  });
+
+  it('stays quiet about passingScore when nothing is graded to judge', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('scoring.passingScore'),
+    );
+  });
+
+  it('drops the "graded under manual" warning when the quiz judges', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz" }');
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('is graded under completion.mode: "manual"'),
     );
   });
 });

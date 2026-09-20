@@ -1,7 +1,12 @@
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
-import type { CourseConfig } from './types.js';
+import {
+  isGradedPage,
+  resolveSuccess,
+  type CourseConfig,
+  type SuccessConfig,
+} from './types.js';
 import type { CompletionStatus, SuccessStatus } from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
@@ -48,6 +53,7 @@ export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
+  #success: SuccessConfig;
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
@@ -55,9 +61,7 @@ export class ProgressState {
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
-      manifest.pages
-        .filter((p) => p.quiz?.graded || p.graded)
-        .map((p) => p.index),
+      manifest.pages.filter(isGradedPage).map((p) => p.index),
     );
     this.#quizGradedIndices = new Set(
       manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
@@ -70,6 +74,7 @@ export class ProgressState {
     );
     this.#totalPages = manifest.totalPages;
     this.#config = config;
+    this.#success = resolveSuccess(config);
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -325,18 +330,19 @@ export class ProgressState {
   }
 
   successStatus = $derived.by<SuccessStatus>(() => {
-    if (this.#config.completion.mode === 'manual') {
-      const want = this.#config.completion.requireSuccessStatus;
-      return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
-    }
-    if (!this.gradedScoreFinal) return 'unknown';
-    const { average } = this.#graded;
+    const success = this.#success;
+    if (success.from === 'none') return 'unknown';
+    if (success.from === 'fixed')
+      return this.completionStatus === 'complete' ? success.status : 'unknown';
+    const { average, attempted } = this.#graded;
+    if (!this.gradedScoreFinal || !attempted) return 'unknown';
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 
   /**
-   * Effective graded score for LMS reporting — same union and averaging as
-   * successStatus, so score and success status can't disagree.
+   * Effective graded score for LMS reporting. Same union and averaging as
+   * successStatus, so a reported score and a reported verdict agree on the
+   * pages they cover.
    */
   get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;

@@ -3,12 +3,13 @@ import type { XAPIAgent } from './xapi/types.js';
 import type { StandardId } from './standards.js';
 
 /**
- * Quiz enum domains as runtime tuples. The unions below derive from these, and
+ * Enum domains as runtime tuples. The unions below derive from these, and
  * the build-time validator imports them too — so the accepted value set has a
  * single source and can't drift between the types and the validator.
  */
 export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
+export const SUCCESS_SOURCES = ['quiz', 'fixed', 'none'] as const;
 
 /**
  * Trimmed course identity, or '' when absent. Single source of truth for the
@@ -17,6 +18,34 @@ export const RETRY_MODES = ['full', 'incorrect-only'] as const;
  */
 export function courseIdentity(config: { id?: unknown }): string {
   return (typeof config.id === 'string' && config.id.trim()) || '';
+}
+
+interface SuccessSource {
+  completion?: { mode?: string; requireSuccessStatus?: 'passed' | 'failed' };
+  success?: SuccessConfig;
+}
+
+/**
+ * What judges pass/fail, resolved from `success` or the `completion.mode`
+ * preset that implies it. Single source of truth for the runtime rollup, the
+ * validator, and the manifest generators, so the pass mark a package
+ * declares can't disagree with the verdict it sends.
+ */
+export function resolveSuccess(config: SuccessSource): SuccessConfig {
+  const declared = config.success;
+  if (declared === undefined) {
+    if (config.completion?.mode !== 'manual') return { from: 'quiz' };
+    return asserted(config.completion.requireSuccessStatus);
+  }
+  if (declared.from === 'quiz') return { from: 'quiz' };
+  if (declared.from === 'fixed') return asserted(declared.status);
+  return { from: 'none' };
+}
+
+function asserted(status: string | undefined): SuccessConfig {
+  return status === 'passed' || status === 'failed'
+    ? { from: 'fixed', status }
+    : { from: 'none' };
 }
 
 /**
@@ -30,6 +59,17 @@ export interface QuizConfig {
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
   retryMode?: (typeof RETRY_MODES)[number];
+}
+
+/**
+ * Whether a page's score joins the course rollup. Shared so the criterion a
+ * package declares and the rollup that feeds it count the same pages.
+ */
+export function isGradedPage(page: {
+  quiz?: QuizConfig | null;
+  graded?: boolean;
+}): boolean {
+  return !!(page.quiz?.graded || page.graded);
 }
 
 export interface CourseConfig {
@@ -57,6 +97,11 @@ export interface CourseConfig {
     mode: 'free' | 'sequential';
   };
   completion: ManualCompletion | QuizCompletion | PercentageCompletion;
+  /**
+   * What judges pass/fail, independent of what makes the course complete.
+   * Omit to take the verdict implied by `completion.mode`.
+   */
+  success?: SuccessConfig;
   /** Optional under "manual"; required under "quiz". */
   scoring: {
     passingScore: number;
@@ -88,6 +133,15 @@ export interface A11yConfig {
   ignore?: string[];
 }
 
+/**
+ * The success axis. `quiz` judges the graded average against
+ * `scoring.passingScore`; `fixed` asserts `status` when the course completes;
+ * `none` reports completion and a score but never a verdict.
+ */
+export type SuccessConfig =
+  | { from: Exclude<(typeof SUCCESS_SOURCES)[number], 'fixed'>; status?: never }
+  | { from: 'fixed'; status: 'passed' | 'failed' };
+
 export interface ManualCompletion {
   mode: 'manual';
   /**
@@ -96,7 +150,10 @@ export interface ManualCompletion {
    * paths still work at runtime.
    */
   trigger?: 'page';
-  /** When set, markComplete() also flips successStatus. Omit for unknown. */
+  /**
+   * When set, markComplete() also flips successStatus. Omit for unknown.
+   * Alias for `success: { from: "fixed", status }`, which outranks it.
+   */
   requireSuccessStatus?: 'passed' | 'failed';
 }
 

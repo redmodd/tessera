@@ -42,7 +42,9 @@ import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
+  SUCCESS_SOURCES,
   courseIdentity,
+  resolveSuccess,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
@@ -198,6 +200,7 @@ const KNOWN_CONFIG_FIELDS = new Set([
   'branding',
   'navigation',
   'completion',
+  'success',
   'scoring',
   'export',
   'chrome',
@@ -218,9 +221,10 @@ const VALID_NAV_MODES = ['free', 'sequential'];
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
-const VALID_REQUIRE_SUCCESS_STATUS = ['passed', 'failed'];
+const VALID_SUCCESS_STATUS = ['passed', 'failed'];
 // Derived from the runtime types (single source of truth) — widened to
 // string[] so .includes() accepts an arbitrary author-supplied value.
+const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
 const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
 
@@ -413,18 +417,49 @@ function parseConfig(
     }
   }
 
-  if (config.completion?.requireSuccessStatus !== undefined) {
-    if (config.completion.mode !== 'manual') {
+  const success = config.success;
+  let successAccepted = false;
+  if (success !== undefined) {
+    if (!success || typeof success !== 'object' || Array.isArray(success)) {
+      d.error(
+        `course.config.js: "success" must be an object like { from: "quiz" }`,
+      );
+    } else if (!VALID_SUCCESS_SOURCES.includes(success.from)) {
+      d.error(
+        `course.config.js: "success.from" must be "quiz", "fixed", or "none", got "${success.from}"`,
+      );
+    } else if (
+      success.from === 'fixed' &&
+      !VALID_SUCCESS_STATUS.includes(success.status as string)
+    ) {
+      d.error(
+        `course.config.js: "success.status" must be "passed" or "failed" under success.from: "fixed", got "${success.status}"`,
+      );
+    } else {
+      successAccepted = true;
+      if (success.from !== 'fixed' && success.status !== undefined) {
+        d.warn(
+          `course.config.js: "success.status" is ignored unless success.from is "fixed"`,
+        );
+      }
+    }
+  }
+
+  const requireStatus = config.completion?.requireSuccessStatus;
+  if (requireStatus !== undefined) {
+    const manual = config.completion?.mode === 'manual';
+    if (successAccepted) {
+      d.warn(
+        'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
+      );
+    } else if (!manual) {
       d.warn(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
-    } else if (
-      !VALID_REQUIRE_SUCCESS_STATUS.includes(
-        config.completion.requireSuccessStatus,
-      )
-    ) {
+    }
+    if (manual && !VALID_SUCCESS_STATUS.includes(requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${config.completion.requireSuccessStatus}"`,
+        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${requireStatus}"`,
       );
     }
   }
@@ -1908,14 +1943,31 @@ function crossValidate(
     );
   }
 
-  // completion.mode "quiz" with an implicit pass threshold — the merge defaults
-  // to 70, so this is a nudge, not an error.
+  const quizMode = config.completion?.mode === 'quiz';
+  // A quiz verdict judges the graded average against the threshold whether
+  // `success` names it or `completion.mode` implies it, so read the resolved
+  // criterion. With nothing graded there is no average and nothing reads it.
+  const judgesScore =
+    pageResults.hasGraded && resolveSuccess(config).from === 'quiz';
+
+  // A threshold something reads with nothing set: the merge defaults to 70, so
+  // this is a nudge, not an error. Quiz mode always reads it for completion,
+  // whatever judges success.
+  if (config.scoring?.passingScore === undefined && (quizMode || judgesScore)) {
+    d.warn(
+      `${quizMode ? 'completion.mode is "quiz"' : 'the course judges pass/fail on the graded average'} but scoring.passingScore is not set, so it defaults to 70%. Set it explicitly to be sure.`,
+    );
+  }
+
+  const quizVerdict = config.success?.from === 'quiz';
   if (
-    config.completion?.mode === 'quiz' &&
-    config.scoring?.passingScore === undefined
+    quizVerdict &&
+    !quizMode &&
+    !pageResults.hasGraded &&
+    !pageResults.hasParseErrors
   ) {
     d.warn(
-      'completion.mode is "quiz" but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.',
+      'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
     );
   }
 
@@ -1936,14 +1988,15 @@ function crossValidate(
     );
   }
 
-  if (isManual) {
+  if (isManual && !quizVerdict) {
     for (const page of pageResults.pages) {
       if (page.graded) {
         d.warn(
           `${page.fileRel}: the page is graded under completion.mode: "manual". ` +
             'The score will be reported to the LMS for transcripts, but it will not drive ' +
             "completion or success status — `markComplete()` / completesOn does. If that's " +
-            'not what you want, set graded: false or change completion.mode.',
+            'not what you want, set graded: false, add success: { from: "quiz" } to judge ' +
+            'it, or change completion.mode.',
         );
       }
     }

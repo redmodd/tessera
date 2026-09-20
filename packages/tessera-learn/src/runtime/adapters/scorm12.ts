@@ -90,8 +90,15 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   #flushLessonStatus(): void {
-    const value = this.#successStatus ?? this.#completionStatus;
-    this.set('cmi.core.lesson_status', value);
+    // "passed" reads as finished, so it waits for completion; "failed" grants
+    // nothing and reports straight away.
+    const held =
+      this.#successStatus === 'passed' &&
+      this.#completionStatus !== 'completed';
+    this.set(
+      'cmi.core.lesson_status',
+      (held ? null : this.#successStatus) ?? this.#completionStatus,
+    );
   }
 
   setExit(mode: ExitMode): void {
