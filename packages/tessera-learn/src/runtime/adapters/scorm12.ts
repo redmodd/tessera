@@ -90,8 +90,8 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   #flushLessonStatus(): void {
-    // One field for both axes, and "passed" reads as finished. Success may
-    // upgrade a completed course, never stand in for completion.
+    // One field for both axes. "passed" reads as finished, so it waits for
+    // completion; "failed" grants nothing and reports straight away.
     const held =
       this.#successStatus === 'passed' &&
       this.#completionStatus !== 'completed';
