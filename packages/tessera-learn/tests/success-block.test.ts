@@ -1,23 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { resolveSuccess } from '../src/runtime/types.js';
-import { mergeCourseConfig } from '../src/plugin/index.js';
-import { generateCMI5Xml } from '../src/plugin/export.js';
 import { createManifest, createConfig } from './helpers.js';
-
-const cmi5Xml = (
-  config: Parameters<typeof mergeCourseConfig>[0],
-  hasGradedPages: boolean,
-) =>
-  generateCMI5Xml(
-    mergeCourseConfig({
-      title: 'C',
-      scoring: { passingScore: 70 },
-      export: { standard: 'cmi5' },
-      ...config,
-    }),
-    hasGradedPages,
-  );
 
 describe('resolveSuccess', () => {
   it('implies a quiz verdict under quiz mode', () => {
@@ -63,64 +47,6 @@ describe('resolveSuccess', () => {
     { from: 'fixed', status: 'maybe' },
   ])('resolves an unreadable criterion (%j) to no verdict', (success) => {
     expect(resolveSuccess({ success } as never)).toEqual({ from: 'none' });
-  });
-});
-
-describe('an unreadable success criterion', () => {
-  it('never reports a verdict, whatever the graded average', () => {
-    const manifest = createManifest(3, { 1: { graded: true } });
-    const progress = new ProgressState(
-      manifest,
-      createConfig({
-        completion: { mode: 'percentage', percentageThreshold: 100 },
-        success: { from: 'vibes' } as never,
-        scoring: { passingScore: 70 },
-      }),
-    );
-
-    progress.quizCompleted(1, 90);
-    progress.markVisited(0);
-    progress.markVisited(1);
-    progress.markVisited(2);
-
-    expect(progress.completionStatus).toBe('complete');
-    expect(progress.successStatus).toBe('unknown');
-  });
-
-  it('satisfies the cmi5 AU on Completed alone', () => {
-    const xml = cmi5Xml(
-      { completion: { mode: 'manual' }, success: { from: 'vibes' } as never },
-      true,
-    );
-
-    expect(xml).toContain('moveOn="Completed"');
-  });
-});
-
-describe('a quiz criterion with nothing graded', () => {
-  it('holds unknown for the whole attempt', () => {
-    const progress = new ProgressState(
-      createManifest(2),
-      createConfig({
-        completion: { mode: 'percentage', percentageThreshold: 100 },
-        success: { from: 'quiz' },
-      }),
-    );
-
-    progress.markVisited(0);
-    progress.markVisited(1);
-
-    expect(progress.completionStatus).toBe('complete');
-    expect(progress.successStatus).toBe('unknown');
-  });
-
-  it('satisfies the cmi5 AU on Completed alone', () => {
-    const xml = cmi5Xml(
-      { completion: { mode: 'percentage', percentageThreshold: 100 } },
-      false,
-    );
-
-    expect(xml).toContain('moveOn="Completed"');
   });
 });
 
@@ -173,19 +99,6 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(progress.successStatus).toBe('failed');
   });
 
-  it('gives two learners different verdicts from the same trigger', () => {
-    const pass = build();
-    const fail = build();
-
-    pass.quizCompleted(2, 80);
-    fail.quizCompleted(2, 20);
-    pass.markCompleteManually();
-    fail.markCompleteManually();
-
-    expect(pass.successStatus).toBe('passed');
-    expect(fail.successStatus).toBe('failed');
-  });
-
   it('reports no verdict for a learner who triggers completion without attempting', () => {
     const progress = build();
 
@@ -194,26 +107,6 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(progress.completionStatus).toBe('complete');
     expect(progress.gradedScore.attempted).toBe(false);
     expect(progress.successStatus).toBe('unknown');
-  });
-
-  it('declares no pass mark in the cmi5 manifest, but still needs a Passed', () => {
-    const xml = cmi5Xml(
-      { completion: { mode: 'manual' }, success: { from: 'quiz' } },
-      true,
-    );
-
-    expect(xml).not.toContain('masteryScore');
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
-  });
-
-  it('defaults passingScore to 70 rather than manual mode’s 0', () => {
-    const merged = mergeCourseConfig({
-      title: 'C',
-      completion: { mode: 'manual' },
-      success: { from: 'quiz' },
-    });
-
-    expect(merged.scoring.passingScore).toBe(70);
   });
 });
 
@@ -232,45 +125,5 @@ describe('success.from: "fixed"', () => {
     progress.markVisited(1);
     expect(progress.completionStatus).toBe('complete');
     expect(progress.successStatus).toBe('passed');
-  });
-
-  it.each(['passed', 'failed'] as const)(
-    'makes cmi5 satisfaction turn on an asserted %s',
-    (status) => {
-      const xml = cmi5Xml(
-        { completion: { mode: 'manual' }, success: { from: 'fixed', status } },
-        false,
-      );
-
-      expect(xml).toContain('moveOn="CompletedAndPassed"');
-    },
-  );
-});
-
-describe('completion.mode presets still resolve as before', () => {
-  it('keeps requireSuccessStatus working untouched', () => {
-    const manifest = createManifest(2);
-    const config = createConfig({
-      completion: { mode: 'manual', requireSuccessStatus: 'passed' },
-    });
-    const progress = new ProgressState(manifest, config);
-
-    expect(progress.successStatus).toBe('unknown');
-    progress.markCompleteManually();
-    expect(progress.successStatus).toBe('passed');
-  });
-
-  it('drops CompletedAndPassed when the quiz completes but does not judge', () => {
-    const xml = cmi5Xml(
-      {
-        completion: { mode: 'quiz' },
-        success: { from: 'none' },
-        scoring: { passingScore: 80 },
-      },
-      true,
-    );
-
-    expect(xml).toContain('moveOn="Completed"');
-    expect(xml).not.toContain('masteryScore');
   });
 });

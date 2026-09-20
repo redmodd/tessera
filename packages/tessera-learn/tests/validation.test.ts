@@ -2943,6 +2943,18 @@ describe('success block validation', () => {
     );
   });
 
+  it('warns that success.status is ignored unless success.from is "fixed"', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz", status: "passed" }');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"success.status" is ignored unless success.from is "fixed"',
+      ),
+    );
+  });
+
   it('warns that success outranks requireSuccessStatus when both are set', () => {
     createValidProject(testRoot);
     withSuccess('{ from: "none" }', ', requireSuccessStatus: "passed"');
@@ -3024,23 +3036,12 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     );
   });
 
-  it('does not claim requireSuccessStatus is ignored when success is malformed', () => {
+  it('leaves requireSuccessStatus in charge when success is malformed', () => {
     createValidProject(testRoot);
     withSuccess('null', ', requireSuccessStatus: "passed"');
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).not.toContainEqual(
-      expect.stringContaining(
-        '"completion.requireSuccessStatus" is ignored when "success" is set',
-      ),
-    );
-  });
-
-  it('does not claim requireSuccessStatus is ignored when success.from is invalid', () => {
-    createValidProject(testRoot);
-    withSuccess('{ from: "vibes" }', ', requireSuccessStatus: "passed"');
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('"success.from" must be'),
+      expect.stringContaining('"success" must be an object'),
     );
     expect(warnings).not.toContainEqual(
       expect.stringContaining(

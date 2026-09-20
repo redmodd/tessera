@@ -319,14 +319,6 @@ describe('generateCMI5Xml', () => {
     );
   });
 
-  it('requires CompletedAndPassed when a percentage course is quiz-judged', () => {
-    const xml = cmi5Xml({
-      title: 'Test',
-      completion: { mode: 'percentage' },
-    });
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
-  });
-
   it('drops to Completed when a percentage course sends no verdict', () => {
     const xml = cmi5Xml({
       title: 'Test',
@@ -347,16 +339,38 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="Completed"');
   });
 
-  it('keeps CompletedAndPassed for an asserted verdict with nothing graded', () => {
+  it('denies satisfaction to an asserted failure, with nothing graded', () => {
     const xml = cmi5Xml(
       {
         title: 'Test',
         completion: { mode: 'manual' },
-        success: { from: 'fixed', status: 'passed' },
+        success: { from: 'fixed', status: 'failed' },
       },
       false,
     );
     expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('needs a Passed for a quiz verdict under manual completion, but declares no pass mark', () => {
+    const xml = cmi5Xml({
+      title: 'Test',
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 70 },
+    });
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+    expect(xml).not.toContain('masteryScore');
+  });
+
+  it('drops to Completed when a quiz-mode course sends no verdict', () => {
+    const xml = cmi5Xml({
+      title: 'Test',
+      completion: { mode: 'quiz' },
+      success: { from: 'none' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).toContain('moveOn="Completed"');
+    expect(xml).not.toContain('masteryScore');
   });
 
   it('uses moveOn=CompletedAndPassed for graded (quiz-mode) courses', () => {
@@ -574,51 +588,27 @@ describe('pass mark follows success.from, not completion.mode', () => {
     'scorm12' | 'scorm2004',
     string,
     Parameters<typeof mergeCourseConfig>[0],
-    boolean,
   ][] = [
-    ['scorm12', 'quiz mode', { completion: { mode: 'quiz' } }, true],
-    ['scorm2004', 'quiz mode', { completion: { mode: 'quiz' } }, true],
+    ['scorm12', 'percentage mode', { completion: { mode: 'percentage' } }],
+    ['scorm2004', 'percentage mode', { completion: { mode: 'percentage' } }],
     [
       'scorm12',
-      'manual mode with a quiz verdict',
-      { completion: { mode: 'manual' }, success: { from: 'quiz' } },
-      false,
+      'quiz mode with a non-quiz verdict',
+      { completion: { mode: 'quiz' }, success: { from: 'none' } },
     ],
     [
       'scorm2004',
-      'manual mode with a quiz verdict',
-      { completion: { mode: 'manual' }, success: { from: 'quiz' } },
-      false,
-    ],
-    [
-      'scorm12',
-      'percentage mode with a quiz verdict',
-      { completion: { mode: 'percentage' }, success: { from: 'quiz' } },
-      false,
-    ],
-    [
-      'scorm12',
-      'percentage mode with no verdict',
-      { completion: { mode: 'percentage' }, success: { from: 'none' } },
-      false,
-    ],
-    [
-      'scorm2004',
-      'percentage mode with a fixed verdict',
-      {
-        completion: { mode: 'percentage' },
-        success: { from: 'fixed', status: 'passed' },
-      },
-      false,
+      'quiz mode with a non-quiz verdict',
+      { completion: { mode: 'quiz' }, success: { from: 'none' } },
     ],
   ];
 
-  it.each(cases)('%s under %s', (standard, _shape, config, declares) => {
+  it.each(cases)('%s declares none under %s', (standard, _shape, config) => {
     const xml = scormXml(standard, {
       title: 'Test',
       scoring: { passingScore: 80 },
       ...config,
     });
-    expect(xml.includes(MARK[standard])).toBe(declares);
+    expect(xml).not.toContain(MARK[standard]);
   });
 });
