@@ -335,6 +335,9 @@
 
     untrack(() => {
       adapter.setScore(average);
+      // Before the commit, so a verdict this score decides carries it and
+      // xAPI/cmi5 send one statement rather than a Scored and a Passed.
+      adapter.setSuccessStatus(progress.successStatus);
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });
