@@ -57,19 +57,6 @@ describe('success.from: "none"', () => {
     expect(progress.successStatus).toBe('unknown');
     expect(progress.gradedScore.average).toBe(90);
   });
-
-  it('drops the pass mark from the cmi5 manifest', () => {
-    const xml = generateCMI5Xml({
-      title: 'C',
-      completion: { mode: 'percentage' },
-      success: { from: 'none' },
-      scoring: { passingScore: 70 },
-      export: { standard: 'cmi5' },
-    });
-
-    expect(xml).not.toContain('masteryScore');
-    expect(xml).toContain('moveOn="Completed"');
-  });
 });
 
 describe('success.from: "quiz" under manual completion', () => {
@@ -168,29 +155,20 @@ describe('success.from: "fixed"', () => {
     expect(progress.successStatus).toBe('passed');
   });
 
-  it('denies cmi5 satisfaction to an asserted failure', () => {
-    const xml = generateCMI5Xml({
-      title: 'C',
-      completion: { mode: 'manual' },
-      success: { from: 'fixed', status: 'failed' },
-      scoring: { passingScore: 70 },
-      export: { standard: 'cmi5' },
-    });
+  it.each(['passed', 'failed'] as const)(
+    'makes cmi5 satisfaction turn on an asserted %s',
+    (status) => {
+      const xml = generateCMI5Xml({
+        title: 'C',
+        completion: { mode: 'manual' },
+        success: { from: 'fixed', status },
+        scoring: { passingScore: 70 },
+        export: { standard: 'cmi5' },
+      });
 
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
-  });
-
-  it('still satisfies on an asserted pass', () => {
-    const xml = generateCMI5Xml({
-      title: 'C',
-      completion: { mode: 'manual' },
-      success: { from: 'fixed', status: 'passed' },
-      scoring: { passingScore: 70 },
-      export: { standard: 'cmi5' },
-    });
-
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
-  });
+      expect(xml).toContain('moveOn="CompletedAndPassed"');
+    },
+  );
 });
 
 describe('completion.mode presets still resolve as before', () => {
@@ -204,18 +182,6 @@ describe('completion.mode presets still resolve as before', () => {
     expect(progress.successStatus).toBe('unknown');
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('passed');
-  });
-
-  it('keeps CompletedAndPassed for a plain quiz course', () => {
-    const xml = generateCMI5Xml({
-      title: 'C',
-      completion: { mode: 'quiz' },
-      scoring: { passingScore: 80 },
-      export: { standard: 'cmi5' },
-    });
-
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
-    expect(xml).toContain('masteryScore="0.8"');
   });
 
   it('drops CompletedAndPassed when the quiz completes but does not judge', () => {

@@ -504,17 +504,12 @@ completion: { mode: 'manual' },
 success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
 ```
 
-Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
-
-**A verdict never stands in for completion.** `successStatus` is judged as soon as the score is final, whatever the completion mode, and every standard that has two fields reports both honestly. SCORM 1.2 has one `lesson_status`, where `"passed"` reads as finished, so the SCORM 1.2 adapter holds `passed` back until the course completes and writes `incomplete` meanwhile. `failed` is never held: it grants nothing, and a failed quiz is worth reporting straight away.
-
-A quiz verdict needs an attempt: with no graded page scored, `successStatus` stays `"unknown"` rather than failing the learner on an unattempted 0.
-
-A package declares a pass mark (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict**. An LMS handed a threshold judges the score on its own schedule, which only agrees with the course when passing is what completes it. Everywhere else the runtime sends the verdict and the LMS is not invited to second-guess it.
-
-cmi5 `moveOn` is `CompletedAndPassed` whenever the course sends a verdict at all, so a learner who completes without passing is not satisfied, matching what SCORM 1.2 and 2004 do with the same course. Only `success.from: "none"` satisfies on `Completed` alone. Use it for a graded quiz that reports a score but should not gate credit.
-
-One edge to know about: under `success.from: "quiz"`, a learner who completes the course without ever attempting a graded page has no verdict, so cmi5 never satisfies the AU. That is correct for a quiz the learner was meant to take and wrong for one they could skip, and nothing distinguishes the two yet. Until it does, reach for `success: { from: "none" }` when the quiz is genuinely optional.
+- Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
+- **A verdict never stands in for completion.** `successStatus` is judged as soon as the score is final, whatever the completion mode. SCORM 1.2 has one `lesson_status`, where `"passed"` reads as finished, so its adapter holds `passed` back until the course completes and writes `incomplete` meanwhile. `failed` reports straight away.
+- **A quiz verdict needs an attempt.** With no graded page scored, `successStatus` stays `"unknown"` rather than failing the learner on an unattempted 0.
+- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) only under `completion.mode: "quiz"` with a quiz verdict. Everywhere else the runtime sends the verdict and the LMS gets no threshold of its own.
+- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course sends a verdict at all. Only `success.from: "none"` satisfies on `Completed` alone; use it for a graded quiz that reports a score but should not gate credit.
+- Under `success.from: "quiz"` a learner who completes without attempting a graded page has no verdict, so cmi5 never satisfies the AU. Set `success: { from: "none" }` when the quiz is genuinely optional.
 
 ---
 

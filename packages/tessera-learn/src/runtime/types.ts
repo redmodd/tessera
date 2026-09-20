@@ -38,11 +38,6 @@ export function resolveSuccess(config: SuccessSource): SuccessConfig {
   return status ? { from: 'fixed', status } : { from: 'none' };
 }
 
-/** Whether the graded average is what decides pass/fail. */
-export function judgesScore(config: SuccessSource): boolean {
-  return resolveSuccess(config).from === 'quiz';
-}
-
 /**
  * Per-page quiz configuration. Single source of truth — the build plugin
  * extracts this from `pageConfig.quiz` and embeds it in the manifest;
@@ -122,11 +117,9 @@ export interface A11yConfig {
  * `scoring.passingScore`; `fixed` asserts `status` when the course completes;
  * `none` reports completion and a score but never a verdict.
  */
-export interface SuccessConfig {
-  from: (typeof SUCCESS_SOURCES)[number];
-  /** Required under `from: "fixed"`, ignored otherwise. */
-  status?: 'passed' | 'failed';
-}
+export type SuccessConfig =
+  | { from: Exclude<(typeof SUCCESS_SOURCES)[number], 'fixed'>; status?: never }
+  | { from: 'fixed'; status: 'passed' | 'failed' };
 
 export interface ManualCompletion {
   mode: 'manual';

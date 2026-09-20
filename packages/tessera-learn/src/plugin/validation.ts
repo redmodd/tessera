@@ -44,7 +44,6 @@ import {
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
-  judgesScore,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
@@ -433,31 +432,34 @@ function parseConfig(
     }
   }
 
-  if (config.success !== undefined) {
-    const success = config.success;
+  const success = config.success;
+  if (success !== undefined) {
     if (!success || typeof success !== 'object' || Array.isArray(success)) {
       d.error(
         `course.config.js: "success" must be an object like { from: "quiz" }`,
       );
-    } else if (!VALID_SUCCESS_SOURCES.includes(success.from)) {
-      d.error(
-        `course.config.js: "success.from" must be "quiz", "fixed", or "none", got "${success.from}"`,
-      );
-    } else if (success.from === 'fixed') {
-      if (!VALID_REQUIRE_SUCCESS_STATUS.includes(success.status as string)) {
+    } else {
+      if (!VALID_SUCCESS_SOURCES.includes(success.from)) {
+        d.error(
+          `course.config.js: "success.from" must be "quiz", "fixed", or "none", got "${success.from}"`,
+        );
+      } else if (
+        success.from === 'fixed' &&
+        !VALID_REQUIRE_SUCCESS_STATUS.includes(success.status as string)
+      ) {
         d.error(
           `course.config.js: "success.status" must be "passed" or "failed" under success.from: "fixed", got "${success.status}"`,
         );
+      } else if (success.from !== 'fixed' && success.status !== undefined) {
+        d.warn(
+          `course.config.js: "success.status" is ignored unless success.from is "fixed"`,
+        );
       }
-    } else if (success.status !== undefined) {
-      d.warn(
-        `course.config.js: "success.status" is ignored unless success.from is "fixed"`,
-      );
-    }
-    if (success && config.completion?.requireSuccessStatus !== undefined) {
-      d.warn(
-        'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
-      );
+      if (config.completion?.requireSuccessStatus !== undefined) {
+        d.warn(
+          'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
+        );
+      }
     }
   }
 
@@ -1940,27 +1942,19 @@ function crossValidate(
     );
   }
 
-  const judged = judgesScore(config);
+  const quizMode = config.completion?.mode === 'quiz';
+  const quizVerdict = config.success?.from === 'quiz';
 
   // A threshold something reads with nothing set — the merge defaults to 70,
   // so this is a nudge, not an error. Quiz mode always reads it for
   // completion, whatever judges success.
-  if (
-    config.scoring?.passingScore === undefined &&
-    (config.completion?.mode === 'quiz' ||
-      (judged && config.success !== undefined))
-  ) {
+  if (config.scoring?.passingScore === undefined && (quizMode || quizVerdict)) {
     d.warn(
-      `${config.completion?.mode === 'quiz' ? 'completion.mode is "quiz"' : 'success.from is "quiz"'} but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.`,
+      `${quizMode ? 'completion.mode is "quiz"' : 'success.from is "quiz"'} but scoring.passingScore is not set — defaulting to 70%. Set it explicitly to be sure.`,
     );
   }
 
-  if (
-    config.success !== undefined &&
-    judged &&
-    !pageResults.hasGraded &&
-    !pageResults.hasParseErrors
-  ) {
+  if (quizVerdict && !pageResults.hasGraded && !pageResults.hasParseErrors) {
     d.warn(
       'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
     );
@@ -1983,7 +1977,7 @@ function crossValidate(
     );
   }
 
-  if (isManual && !judged) {
+  if (isManual && !quizVerdict) {
     for (const page of pageResults.pages) {
       if (page.graded) {
         d.warn(

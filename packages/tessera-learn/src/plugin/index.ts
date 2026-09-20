@@ -256,29 +256,12 @@ mount(App, {
 
 function completionDefaults(
   mode: string | undefined,
-  judgesScore: boolean,
-): {
-  completion: CourseConfig['completion'];
-  passingScore: number;
-} {
-  if (mode === 'manual') {
-    return {
-      completion: { mode: 'manual' },
-      passingScore: judgesScore ? DEFAULT_PASSING_SCORE : 0,
-    };
-  }
-  if (mode === 'quiz') {
-    return {
-      completion: { mode: 'quiz' },
-      passingScore: DEFAULT_PASSING_SCORE,
-    };
-  }
+): CourseConfig['completion'] {
+  if (mode === 'manual') return { mode: 'manual' };
+  if (mode === 'quiz') return { mode: 'quiz' };
   return {
-    completion: {
-      mode: 'percentage',
-      percentageThreshold: DEFAULT_PERCENTAGE_THRESHOLD,
-    },
-    passingScore: DEFAULT_PASSING_SCORE,
+    mode: 'percentage',
+    percentageThreshold: DEFAULT_PERCENTAGE_THRESHOLD,
   };
 }
 
@@ -303,18 +286,22 @@ function tesseraConfigDefaultsPlugin(): Plugin {
 /** Fill runtime defaults into a parsed course.config.js. Exported for tests. */
 export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
   const success = resolveSuccess(userConfig);
-  const { completion, passingScore } = completionDefaults(
-    userConfig.completion?.mode,
-    success.from === 'quiz',
-  );
+  const unjudgedManual =
+    userConfig.completion?.mode === 'manual' && success.from !== 'quiz';
   return {
     ...userConfig,
     title: userConfig.title || 'Untitled Course',
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
-    completion: { ...completion, ...userConfig.completion },
+    completion: {
+      ...completionDefaults(userConfig.completion?.mode),
+      ...userConfig.completion,
+    },
     success,
-    scoring: { passingScore, ...userConfig.scoring },
+    scoring: {
+      passingScore: unjudgedManual ? 0 : DEFAULT_PASSING_SCORE,
+      ...userConfig.scoring,
+    },
     export: {
       ...userConfig.export,
       standard: userConfig.export?.standard ?? DEFAULT_STANDARD,

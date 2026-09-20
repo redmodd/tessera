@@ -335,11 +335,6 @@
 
     untrack(() => {
       adapter.setScore(average);
-      // Only a quiz verdict moves with the score; a fixed one lands with
-      // completion instead, and `none` never sends one.
-      if (progress.success.from === 'quiz') {
-        adapter.setSuccessStatus(progress.successStatus);
-      }
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });

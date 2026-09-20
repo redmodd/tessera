@@ -78,10 +78,6 @@ export class ProgressState {
     this.#success = resolveSuccess(config);
   }
 
-  get success(): SuccessConfig {
-    return this.#success;
-  }
-
   visitedPages = $state(new SvelteSet<number>());
 
   /**
@@ -335,12 +331,10 @@ export class ProgressState {
   }
 
   successStatus = $derived.by<SuccessStatus>(() => {
-    const { from, status } = this.#success;
-    if (from === 'none') return 'unknown';
-    if (from === 'fixed')
-      return this.completionStatus === 'complete' && status !== undefined
-        ? status
-        : 'unknown';
+    const success = this.#success;
+    if (success.from === 'none') return 'unknown';
+    if (success.from === 'fixed')
+      return this.completionStatus === 'complete' ? success.status : 'unknown';
     const { average, attempted } = this.#graded;
     if (!this.gradedScoreFinal || !attempted) return 'unknown';
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';

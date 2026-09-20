@@ -11,7 +11,6 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import {
   courseIdentity,
-  judgesScore,
   resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
@@ -96,7 +95,9 @@ function auIdFor(config: ExportConfig): string {
 // That only agrees with the runtime when passing is what completes the
 // course, so quiz-mode completion is the one shape that declares a mark.
 function declaresPassMark(config: ExportConfig): boolean {
-  return config.completion?.mode === 'quiz' && judgesScore(config);
+  return (
+    config.completion?.mode === 'quiz' && resolveSuccess(config).from === 'quiz'
+  );
 }
 
 function formatSize(bytes: number): string {
