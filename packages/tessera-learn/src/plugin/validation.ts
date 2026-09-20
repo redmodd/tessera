@@ -1024,6 +1024,8 @@ interface PageInfo {
   fileRel: string;
   navIndex: number;
   graded: boolean;
+  /** Effective, not declared: only a graded page that opted out reads false. */
+  required: boolean;
   hasQuiz: boolean;
   weight?: number;
   completesOnView: boolean;
@@ -1066,6 +1068,7 @@ function validatePageFile(
         fileRel,
         navIndex,
         graded: false,
+        required: false,
         hasQuiz: false,
         completesOnView: false,
       },
@@ -1078,17 +1081,22 @@ function validatePageFile(
 
   const isQuiz = !!pageConfig?.quiz;
   let isGradedQuiz = false;
+  let quizRequired: unknown;
   if (pageConfig?.quiz) {
     validateQuizConfig(pageConfig.quiz, fileRel, d);
     if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
       isGradedQuiz = true;
     }
+    quizRequired = (pageConfig.quiz as { required?: unknown }).required;
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
   const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
+  const declaresRequired = validatePageRequired(pageConfig, fileRel, d);
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
+  const required =
+    graded && declaresRequired !== false && quizRequired !== false;
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
@@ -1099,6 +1107,13 @@ function validatePageFile(
         "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
         'and it never completes. ' +
         'Use quiz: { graded: true }, or drop graded: true.',
+    );
+  }
+  if (declaresRequired !== undefined && !graded) {
+    d.warn(
+      `${fileRel}: pageConfig.required only applies to a graded page. ` +
+        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+        'so nothing reads it.',
     );
   }
   if (weight !== undefined && !graded) {
@@ -1156,6 +1171,7 @@ function validatePageFile(
       fileRel,
       navIndex,
       graded,
+      required,
       hasQuiz: isQuiz,
       ...(weight !== undefined ? { weight } : {}),
       completesOnView,
@@ -1366,6 +1382,22 @@ function validatePageGraded(
   return graded;
 }
 
+function validatePageRequired(
+  pageConfig: { required?: unknown } | null,
+  fileRel: string,
+  d: Diagnostics,
+): boolean | undefined {
+  const required = pageConfig?.required;
+  if (required === undefined) return undefined;
+  if (typeof required !== 'boolean') {
+    d.error(
+      `${fileRel}: pageConfig.required must be a boolean, got ${JSON.stringify(required)}`,
+    );
+    return undefined;
+  }
+  return required;
+}
+
 function validatePageWeight(
   pageConfig: { weight?: unknown } | null,
   fileRel: string,
@@ -1404,7 +1436,14 @@ function validateQuizConfig(
     }
   }
 
-  for (const field of ['graded', 'gatesProgress']) {
+  if (cfg.required !== undefined && cfg.graded !== true) {
+    d.warn(
+      `${fileRel}: quiz.required only applies to a graded quiz. ` +
+        'Without `graded: true` the page never joins the rollup, so nothing reads it.',
+    );
+  }
+
+  for (const field of ['graded', 'required', 'gatesProgress']) {
     if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
       d.error(
         `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
@@ -1910,6 +1949,9 @@ function reportEffectiveWeights(
   }
 
   if (graded.length < 2) return;
+  // An optional page's weight joins the total only when it is attempted, so
+  // there is no one total to hit and a shortfall says nothing.
+  if (graded.some((p) => !p.required)) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
   const weights = graded.map((p) => p.weight ?? 1);
@@ -1956,6 +1998,18 @@ function crossValidate(
   if (config.scoring?.passingScore === undefined && (quizMode || judgesScore)) {
     d.warn(
       `${quizMode ? 'completion.mode is "quiz"' : 'the course judges pass/fail on the graded average'} but scoring.passingScore is not set, so it defaults to 70%. Set it explicitly to be sure.`,
+    );
+  }
+
+  if (
+    judgesScore &&
+    !pageResults.pages.some((p) => p.graded && p.required) &&
+    !pageResults.hasParseErrors
+  ) {
+    d.warn(
+      'every graded page sets required: false, so a learner who skips them all is never judged ' +
+        'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
+        'course reports, or drop required from the page that gates credit.',
     );
   }
 

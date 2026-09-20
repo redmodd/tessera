@@ -335,7 +335,31 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
   });
 
-  test('no score reaches the LMS until every graded page is scored', async ({
+  test('an untaken optional page leaves the rollup to the required pages', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await answerCheckQuiz(page, 0);
+
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(2)
+      .check();
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+
+    // Taking it adds its weight to both halves: (0*100 + 0*25 + 100*75) / 200.
+    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
+    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
+    await answerCheckQuiz(page, 0);
+
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');
+  });
+
+  test('no score reaches the LMS until every required graded page is scored', async ({
     page,
   }) => {
     await page.goto(BASE);

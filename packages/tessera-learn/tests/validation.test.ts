@@ -788,6 +788,123 @@ export const pageConfig = { title: "Exam", graded: "yes" };
     );
   });
 
+  it('errors on a non-boolean pageConfig.required', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true, required: "no" };
+</script>
+<h1>Exam</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig.required must be a boolean'),
+    );
+  });
+
+  it('warns when required is set on a page that is not declared graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Just Prose", required: false };
+</script>
+<h1>Just prose</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.required only applies to a graded page',
+      ),
+    );
+  });
+
+  it('warns when quiz.required is set on a quiz that is not graded', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Practice", quiz: { required: false } };
+</script>
+<h1>Practice</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('quiz.required only applies to a graded quiz'),
+    );
+  });
+
+  it('warns when every graded page is optional under a quiz verdict', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Practice", graded: true, required: false };
+</script>
+<h1>Practice</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('every graded page sets required: false'),
+    );
+  });
+
+  it('stays quiet when one graded page is required', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Practice", graded: true, required: false };
+</script>
+<h1>Practice</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<h1>Exam</h1>
+<MultipleChoice id="q2" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('every graded page sets required')),
+    ).toEqual([]);
+  });
+
+  it('skips the weight-total warning when a graded page is optional', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Practice", graded: true, required: false, weight: 25 };
+</script>
+<h1>Practice</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true, weight: 100 };
+</script>
+<h1>Exam</h1>
+<MultipleChoice id="q2" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
   it('warns when weight is set on a page that is not declared graded', () => {
     createValidProject(testRoot);
     writeFile(

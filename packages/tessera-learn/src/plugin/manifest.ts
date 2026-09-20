@@ -25,6 +25,7 @@ export interface ManifestPage {
   importPath: string;
   quiz: QuizConfig | null;
   graded?: boolean;
+  required?: boolean;
   weight?: number;
   completesOn?: 'view';
 }
@@ -33,6 +34,7 @@ export interface PageConfig {
   title?: string;
   quiz?: QuizConfig;
   graded?: boolean;
+  required?: boolean;
   weight?: number;
   completesOn?: 'view';
 }
@@ -364,6 +366,7 @@ export function generateManifest(
           importPath: `${relDir}/${fileName}`,
           quiz: pageConfig.quiz || null,
           ...(pageConfig.graded === true ? { graded: true } : {}),
+          ...(pageConfig.required === false ? { required: false } : {}),
           ...(pageConfig.weight !== undefined
             ? { weight: pageConfig.weight }
             : {}),

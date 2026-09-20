@@ -3,6 +3,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import {
   isGradedPage,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
@@ -51,6 +52,7 @@ export interface GradedUnit {
 
 export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
+  #requiredGradedIndices: ReadonlySet<number>;
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #success: SuccessConfig;
@@ -62,6 +64,9 @@ export class ProgressState {
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
       manifest.pages.filter(isGradedPage).map((p) => p.index),
+    );
+    this.#requiredGradedIndices = new Set(
+      manifest.pages.filter(isRequiredGradedPage).map((p) => p.index),
     );
     this.#quizGradedIndices = new Set(
       manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
@@ -247,7 +252,8 @@ export class ProgressState {
     for (const pageIndex of this.#declaredGradedIndices) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
-      else allScored = false;
+      else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
+      else continue;
       entries.push({
         score: score ?? 0,
         weight: this.#pageWeights.get(pageIndex) ?? 1,
@@ -334,8 +340,8 @@ export class ProgressState {
     if (success.from === 'none') return 'unknown';
     if (success.from === 'fixed')
       return this.completionStatus === 'complete' ? success.status : 'unknown';
-    const { average, attempted } = this.#graded;
-    if (!this.gradedScoreFinal || !attempted) return 'unknown';
+    if (!this.gradedScoreFinal) return 'unknown';
+    const { average } = this.#graded;
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
   });
 

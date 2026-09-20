@@ -55,6 +55,8 @@ function asserted(status: string | undefined): SuccessConfig {
  */
 export interface QuizConfig {
   graded?: boolean;
+  /** Graded-only. `false` keeps the page out of the rollup until it is attempted. */
+  required?: boolean;
   gatesProgress?: boolean;
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
@@ -70,6 +72,23 @@ export function isGradedPage(page: {
   graded?: boolean;
 }): boolean {
   return !!(page.quiz?.graded || page.graded);
+}
+
+/**
+ * Whether an unattempted page still counts, as a 0. Optional pages join the
+ * rollup only once they have a score, so skipping one neither depresses the
+ * course score nor decides the verdict.
+ */
+export function isRequiredGradedPage(page: {
+  quiz?: QuizConfig | null;
+  graded?: boolean;
+  required?: boolean;
+}): boolean {
+  return (
+    isGradedPage(page) &&
+    page.quiz?.required !== false &&
+    page.required !== false
+  );
 }
 
 export interface CourseConfig {

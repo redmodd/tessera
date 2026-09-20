@@ -99,8 +99,26 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(progress.successStatus).toBe('failed');
   });
 
-  it('reports no verdict for a learner who triggers completion without attempting', () => {
+  it('fails a learner who triggers completion without attempting a required page', () => {
     const progress = build();
+
+    progress.markCompleteManually();
+
+    expect(progress.completionStatus).toBe('complete');
+    expect(progress.gradedScore.attempted).toBe(false);
+    expect(progress.successStatus).toBe('failed');
+  });
+
+  it('reports no verdict when the only graded page was optional', () => {
+    const manifest = createManifest(5, {
+      2: { graded: true, required: false },
+    });
+    const config = createConfig({
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 70 },
+    });
+    const progress = new ProgressState(manifest, config);
 
     progress.markCompleteManually();
 

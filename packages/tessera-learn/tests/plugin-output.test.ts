@@ -250,6 +250,43 @@ describe('export packaging gate', () => {
     expect(xml).toContain('moveOn="Completed"');
   });
 
+  async function cmi5XmlFor(pageConfig: string): Promise<string> {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default { title: "Course", completion: { mode: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } };',
+      'utf-8',
+    );
+    mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
+    writeFileSync(
+      resolve(projectRoot, 'pages', '01-quiz', 'check.svelte'),
+      `<script module>\nexport const pageConfig = ${pageConfig}\n</script>\n<h1>Check</h1>`,
+      'utf-8',
+    );
+    seedStaleDist();
+
+    const { entry, exporter } = buildPlugins();
+    writeBundle(exporter);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    return readFileSync(resolve(projectRoot, 'dist', 'cmi5.xml'), 'utf-8');
+  }
+
+  it('asks for a Passed when a graded page is required', async () => {
+    const xml = await cmi5XmlFor('{ quiz: { graded: true } }');
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('satisfies on Completed when every graded page is optional', async () => {
+    const xml = await cmi5XmlFor('{ quiz: { graded: true, required: false } }');
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
+  it('reads the opt-out from a standalone graded page too', async () => {
+    const xml = await cmi5XmlFor('{ graded: true, required: false }');
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
   function undefinedImportLog(id: string) {
     return {
       code: 'IMPORT_IS_UNDEFINED',

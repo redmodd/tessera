@@ -64,8 +64,14 @@ export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 export function createManifest(
   pageCount: number,
-  quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
-  pageOpts: Record<number, { graded?: boolean; weight?: number }> = {},
+  quizPages: Record<
+    number,
+    { graded?: boolean; required?: boolean; gatesProgress?: boolean }
+  > = {},
+  pageOpts: Record<
+    number,
+    { graded?: boolean; required?: boolean; weight?: number }
+  > = {},
 ): Manifest {
   const pages = Array.from({ length: pageCount }, (_, i) => ({
     index: i,
@@ -77,9 +83,11 @@ export function createManifest(
           graded: quizPages[i].graded ?? false,
           gatesProgress: quizPages[i].gatesProgress ?? false,
           maxAttempts: 3,
+          ...(quizPages[i].required === false ? { required: false } : {}),
         }
       : null,
     ...(pageOpts[i]?.graded ? { graded: true } : {}),
+    ...(pageOpts[i]?.required === false ? { required: false } : {}),
     ...(pageOpts[i]?.weight !== undefined
       ? { weight: pageOpts[i].weight }
       : {}),

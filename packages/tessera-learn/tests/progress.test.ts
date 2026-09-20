@@ -865,6 +865,135 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('required: false — optional graded pages', () => {
+    it('keeps a skipped optional page out of both halves of the average', () => {
+      const manifest = createManifest(
+        5,
+        {},
+        {
+          1: { graded: true, weight: 75 },
+          3: { graded: true, required: false, weight: 25 },
+        },
+      );
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+
+      expect(progress.gradedScore.average).toBe(100);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('counts an optional page once it has a score', () => {
+      const manifest = createManifest(
+        5,
+        {},
+        {
+          1: { graded: true, weight: 75 },
+          3: { graded: true, required: false, weight: 25 },
+        },
+      );
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(75);
+    });
+
+    it('takes the opt-out from a quiz page too', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true },
+        3: { graded: true, required: false },
+      });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.quizCompleted(1, 90);
+
+      expect(progress.gradedScore.average).toBe(90);
+
+      progress.quizCompleted(3, 30);
+
+      expect(progress.gradedScore.average).toBe(60);
+    });
+
+    it('scores the practice-plus-exam course on the exam alone', () => {
+      const manifest = createManifest(4, {
+        0: { graded: true, required: false },
+        1: { graded: true, required: false },
+        2: { graded: true, required: false },
+        3: { graded: true },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(3, 100);
+
+      expect(progress.gradedScore.average).toBe(100);
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('does not wait on an optional page to report the score', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true },
+        3: { graded: true, required: false },
+      });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.quizCompleted(1, 80);
+
+      expect(progress.gradedScoreFinal).toBe(true);
+    });
+
+    it('still waits on a required page', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true },
+        3: { graded: true },
+      });
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.quizCompleted(1, 80);
+
+      expect(progress.gradedScoreFinal).toBe(false);
+    });
+
+    it('reports nothing while every graded page is optional and unattempted', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true, required: false },
+        3: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 0 },
+        }),
+      );
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
+    });
+
+    it('fails a completed course that skipped a required page', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true },
+        3: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({
+          completion: { mode: 'percentage', percentageThreshold: 0 },
+        }),
+      );
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScore.average).toBe(0);
+      expect(progress.successStatus).toBe('failed');
+    });
+  });
+
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {
     it('graded standalone pages count toward completion in quiz mode', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });

@@ -431,6 +431,31 @@ export const pageConfig = { graded: true, weight: 75 }
     expect(manifest.pages[1].weight).toBeUndefined();
   });
 
+  it('carries pageConfig.required: false, and omits the default', () => {
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["practice", "exam"] };',
+    );
+    createFile(
+      '01-s/01-l/practice.svelte',
+      `<script module>
+export const pageConfig = { graded: true, required: false }
+</script>
+<h1>Practice</h1>`,
+    );
+    createFile(
+      '01-s/01-l/exam.svelte',
+      `<script module>
+export const pageConfig = { graded: true, required: true }
+</script>
+<h1>Exam</h1>`,
+    );
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].required).toBe(false);
+    expect(manifest.pages[1].required).toBeUndefined();
+  });
+
   it('carries a non-positive weight through verbatim (the runtime treats it as 1)', () => {
     createFile(
       '01-s/01-l/_meta.js',
