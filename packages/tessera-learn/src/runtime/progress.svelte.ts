@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import {
+  isGradedPage,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
@@ -60,9 +61,7 @@ export class ProgressState {
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
-      manifest.pages
-        .filter((p) => p.quiz?.graded || p.graded)
-        .map((p) => p.index),
+      manifest.pages.filter(isGradedPage).map((p) => p.index),
     );
     this.#quizGradedIndices = new Set(
       manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
@@ -343,10 +342,7 @@ export class ProgressState {
   /**
    * Effective graded score for LMS reporting. Same union and averaging as
    * successStatus, so a reported score and a reported verdict agree on the
-   * pages they cover. A course that completes with nothing attempted still
-   * reports 0 here while the verdict stays `unknown`: an unattempted graded
-   * page counts as 0, and whether that is the learner's score or no score at
-   * all is what a per-page required/optional flag would settle.
+   * pages they cover.
    */
   get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;

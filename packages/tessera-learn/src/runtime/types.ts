@@ -30,12 +30,27 @@ interface SuccessSource {
  * preset that implies it. Single source of truth for the runtime rollup, the
  * validator, and the manifest generators, so the pass mark a package
  * declares can't disagree with the verdict it sends.
+ *
+ * `course.config.js` is plain JS, so the union is a shape the validator
+ * enforces rather than one this function can assume. A criterion it can't read
+ * resolves to no verdict, which reports completion and a score and leaves
+ * pass/fail alone.
  */
 export function resolveSuccess(config: SuccessSource): SuccessConfig {
-  if (config.success) return config.success;
-  if (config.completion?.mode !== 'manual') return { from: 'quiz' };
-  const status = config.completion.requireSuccessStatus;
-  return status ? { from: 'fixed', status } : { from: 'none' };
+  const declared = config.success;
+  if (declared === undefined) {
+    if (config.completion?.mode !== 'manual') return { from: 'quiz' };
+    return asserted(config.completion.requireSuccessStatus);
+  }
+  if (declared.from === 'quiz') return { from: 'quiz' };
+  if (declared.from === 'fixed') return asserted(declared.status);
+  return { from: 'none' };
+}
+
+function asserted(status: string | undefined): SuccessConfig {
+  return status === 'passed' || status === 'failed'
+    ? { from: 'fixed', status }
+    : { from: 'none' };
 }
 
 /**
@@ -49,6 +64,17 @@ export interface QuizConfig {
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
   retryMode?: (typeof RETRY_MODES)[number];
+}
+
+/**
+ * Whether a page's score joins the course rollup. Shared so the criterion a
+ * package declares and the rollup that feeds it count the same pages.
+ */
+export function isGradedPage(page: {
+  quiz?: QuizConfig | null;
+  graded?: boolean;
+}): boolean {
+  return !!(page.quiz?.graded || page.graded);
 }
 
 export interface CourseConfig {

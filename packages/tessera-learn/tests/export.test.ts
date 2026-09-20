@@ -231,8 +231,10 @@ describe('SCORM 2004 manifest', () => {
 // ---- CMI5 XML ----
 
 describe('generateCMI5Xml', () => {
-  const cmi5Xml = (config: Parameters<typeof mergeCourseConfig>[0]) =>
-    generateCMI5Xml(mergeCourseConfig(config));
+  const cmi5Xml = (
+    config: Parameters<typeof mergeCourseConfig>[0],
+    hasGradedPages = true,
+  ) => generateCMI5Xml(mergeCourseConfig(config), hasGradedPages);
 
   it('generates valid XML with course structure', () => {
     const xml = cmi5Xml({
@@ -334,6 +336,29 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain('moveOn="Completed"');
   });
 
+  it('drops to Completed when a quiz criterion has nothing to judge', () => {
+    // An informational course: the criterion resolves to "quiz", but with no
+    // graded page the runtime never sends a verdict, and CompletedAndPassed
+    // would leave the AU unsatisfiable for the whole attempt.
+    const xml = cmi5Xml(
+      { title: 'Test', completion: { mode: 'percentage' } },
+      false,
+    );
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
+  it('keeps CompletedAndPassed for an asserted verdict with nothing graded', () => {
+    const xml = cmi5Xml(
+      {
+        title: 'Test',
+        completion: { mode: 'manual' },
+        success: { from: 'fixed', status: 'passed' },
+      },
+      false,
+    );
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
   it('uses moveOn=CompletedAndPassed for graded (quiz-mode) courses', () => {
     // A learner who finishes a graded course without passing the quiz
     // should NOT be granted satisfaction. cmi5 §13.1.4 — CompletedAndPassed
@@ -424,6 +449,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'web' },
       }),
+      true,
     );
     // No zip should exist
     const files = readdirSync(testRoot);
@@ -439,6 +465,7 @@ describe('runExport', () => {
         version: '2.0.0',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     // Check manifest was written to dist
@@ -465,6 +492,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm2004' },
       }),
+      true,
     );
 
     expect(existsSync(resolve(testRoot, 'dist', 'imsmanifest.xml'))).toBe(true);
@@ -480,13 +508,18 @@ describe('runExport', () => {
   });
 
   it('cmi5 export creates cmi5.xml and zip', async () => {
-    await runExport(testRoot, createDistDir(testRoot), {
-      title: 'Test Course',
-      version: '1.0.0',
-      completion: { mode: 'quiz' },
-      scoring: { passingScore: 80 },
-      export: { standard: 'cmi5' },
-    });
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      {
+        title: 'Test Course',
+        version: '1.0.0',
+        completion: { mode: 'quiz' },
+        scoring: { passingScore: 80 },
+        export: { standard: 'cmi5' },
+      },
+      true,
+    );
 
     expect(existsSync(resolve(testRoot, 'dist', 'cmi5.xml'))).toBe(true);
     expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
@@ -504,6 +537,7 @@ describe('runExport', () => {
         version: '3.2.1',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
@@ -523,6 +557,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm12' },
       }),
+      true,
     );
 
     const manifest = readFileSync(resolve(outDir, 'imsmanifest.xml'), 'utf-8');

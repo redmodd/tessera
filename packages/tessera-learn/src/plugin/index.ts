@@ -16,7 +16,11 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import { resolveSuccess, type CourseConfig } from '../runtime/types.js';
+import {
+  isGradedPage,
+  resolveSuccess,
+  type CourseConfig,
+} from '../runtime/types.js';
 import {
   DEFAULT_PASSING_SCORE,
   DEFAULT_PERCENTAGE_THRESHOLD,
@@ -452,7 +456,16 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         );
       }
 
-      await runExport(ctx.root, ctx.outDir, mergeCourseConfig(read.config));
+      const pages =
+        ctx.manifest?.pages ??
+        generateManifest(resolve(ctx.root, 'pages')).pages;
+
+      await runExport(
+        ctx.root,
+        ctx.outDir,
+        mergeCourseConfig(read.config),
+        pages.some(isGradedPage),
+      );
     },
   };
 }

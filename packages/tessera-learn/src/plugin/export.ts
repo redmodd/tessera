@@ -100,6 +100,14 @@ function declaresPassMark(config: ExportConfig): boolean {
   );
 }
 
+// A quiz criterion judges the graded average, so with nothing graded there is
+// no average to judge and the runtime holds `unknown` for the whole attempt.
+// A fixed criterion asserts its status the moment the course completes.
+function sendsVerdict(config: ExportConfig, hasGradedPages: boolean): boolean {
+  const { from } = resolveSuccess(config);
+  return from === 'fixed' || (from === 'quiz' && hasGradedPages);
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -162,7 +170,10 @@ ${fileElements}
 </manifest>`;
 }
 
-export function generateCMI5Xml(config: ExportConfig): string {
+export function generateCMI5Xml(
+  config: ExportConfig,
+  hasGradedPages: boolean,
+): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
   // Derive stable IDs from the course id so they survive rebuilds without
@@ -176,12 +187,13 @@ export function generateCMI5Xml(config: ExportConfig): string {
   const masteryAttr = declaresPassMark(config)
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
-  // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
-  // satisfying the AU. Wherever the course sends a verdict at all, that
-  // verdict can be Failed, and a failed learner should not receive credit.
-  // Only a course that never judges satisfies on Completed alone.
-  const moveOn =
-    resolveSuccess(config).from === 'none' ? 'Completed' : 'CompletedAndPassed';
+  // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
+  // the AU. Wherever the course sends a verdict, that verdict can be Failed and
+  // a failed learner should not receive credit. A course that sends none has to
+  // satisfy on Completed alone, or nothing ever satisfies the AU.
+  const moveOn = sendsVerdict(config, hasGradedPages)
+    ? 'CompletedAndPassed'
+    : 'Completed';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
@@ -253,7 +265,11 @@ function cleanOldZips(projectRoot: string, slug: string): void {
   } catch {}
 }
 
-type ManifestGenerator = (config: ExportConfig, outDir: string) => string;
+type ManifestGenerator = (
+  config: ExportConfig,
+  outDir: string,
+  hasGradedPages: boolean,
+) => string;
 
 const scormManifest =
   (dialect: ScormManifestDialect): ManifestGenerator =>
@@ -318,7 +334,8 @@ export const LMS_BUILD: Record<
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
-    generate: (config) => generateCMI5Xml(config),
+    generate: (config, _outDir, hasGradedPages) =>
+      generateCMI5Xml(config, hasGradedPages),
     adapter: 'CMI5Adapter',
     detect: 'hasCMI5LaunchParams',
     takesApi: false,
@@ -340,6 +357,7 @@ export async function runExport(
   projectRoot: string,
   outDir: string,
   config: ExportConfig,
+  hasGradedPages: boolean,
 ): Promise<void> {
   const standard = config.export.standard;
   const slug = slugify(config.title) || 'tessera-course';
@@ -363,7 +381,7 @@ export async function runExport(
 
   writeFileSync(
     resolve(outDir, spec.manifestFile),
-    spec.generate(config, outDir),
+    spec.generate(config, outDir, hasGradedPages),
     'utf-8',
   );
   cleanOldZips(projectRoot, slug);
