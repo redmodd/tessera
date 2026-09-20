@@ -1,31 +1,47 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
+import type { BaseAdapter } from '../src/runtime/adapters/base.js';
+import { createManifest, flush, stubAdapter } from './helpers.js';
 
 const ACTOR = {
   objectType: 'Agent',
   account: { homePage: 'https://lms', name: 'learner-1' },
 };
 
-const pages = [0].map((index) => ({
-  index,
-  title: `Page ${index}`,
-  slug: `page-${index}`,
-  importPath: `/pages/01-intro/01-lesson/page-${index}.svelte`,
-  quiz: { graded: true },
-}));
+const manifest = createManifest(1, { 0: { graded: true } });
 
-const manifest = {
-  sections: [
-    {
-      title: 'Intro',
-      slug: 'intro',
-      lessons: [{ title: 'Lesson', slug: 'lesson', pages }],
-    },
-  ],
-  pages,
-  totalPages: pages.length,
+const config = {
+  title: 'Demo',
+  resume: 'auto',
+  branding: {},
+  navigation: { mode: 'free' },
+  scoring: { passingScore: 70 },
+  completion: { mode: 'quiz' },
+  export: { standard: 'xapi' },
 };
+
+async function mountApp(adapter: BaseAdapter) {
+  vi.resetModules();
+  const { mount, unmount } = await import('svelte');
+  (globalThis as any).__tesseraTest = {
+    config,
+    manifest,
+    pageModules: Object.fromEntries(
+      manifest.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
+    ),
+    adapter,
+    layout: (await import('./fixtures/mastery-layout.svelte')).default,
+  };
+  const App = (await import('../src/runtime/App.svelte')).default;
+  const component = mount(App, { target: document.body });
+
+  await vi.waitFor(() =>
+    expect((globalThis as any).__tesseraNavCtx).toBeTruthy(),
+  );
+  const { progress } = (globalThis as any).__tesseraNavCtx;
+  return { cleanup: () => unmount(component), progress };
+}
 
 async function mountLaunched() {
   const verbs: string[] = [];
@@ -52,33 +68,7 @@ async function mountLaunched() {
   });
   window.history.replaceState({}, '', `/?${params}`);
 
-  vi.resetModules();
-  const { mount, unmount } = await import('svelte');
-  (globalThis as any).__tesseraTest = {
-    config: {
-      title: 'Demo',
-      resume: 'auto',
-      branding: {},
-      navigation: { mode: 'free' },
-      scoring: { passingScore: 70 },
-      completion: { mode: 'quiz' },
-      export: { standard: 'xapi' },
-    },
-    manifest,
-    pageModules: Object.fromEntries(
-      pages.map((p) => [p.importPath, () => new Promise(() => {})]),
-    ),
-    adapter: new XAPIAdapter(),
-    layout: (await import('./fixtures/mastery-layout.svelte')).default,
-  };
-  const App = (await import('../src/runtime/App.svelte')).default;
-  const component = mount(App, { target: document.body });
-
-  await vi.waitFor(() =>
-    expect((globalThis as any).__tesseraNavCtx).toBeTruthy(),
-  );
-  const { progress } = (globalThis as any).__tesseraNavCtx;
-  return { cleanup: () => unmount(component), progress, verbs };
+  return { ...(await mountApp(new XAPIAdapter())), verbs };
 }
 
 describe('a graded submit that decides the verdict', () => {
@@ -103,8 +93,23 @@ describe('a graded submit that decides the verdict', () => {
     mounted.progress.quizCompleted(0, 90);
 
     await vi.waitFor(() => expect(mounted.verbs).toContain('passed'));
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     expect(mounted.verbs).not.toContain('scored');
+  });
+
+  it('sends the verdict once, not again from the success effect', async () => {
+    const setSuccessStatus = vi.fn();
+    const mounted = await mountApp(stubAdapter({ setSuccessStatus }));
+    cleanup = mounted.cleanup;
+    await flush();
+
+    mounted.progress.quizCompleted(0, 90);
+    await flush();
+
+    expect(setSuccessStatus.mock.calls.map(([status]) => status)).toEqual([
+      'unknown',
+      'passed',
+    ]);
   });
 });

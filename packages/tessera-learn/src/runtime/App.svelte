@@ -324,6 +324,7 @@
 
   // ---- Persistence: report score/completion/success to adapter ----
   let prevReportedScore = null;
+  let prevSuccessStatus = 'unknown';
   $effect(() => {
     if (!persistenceReady) return;
 
@@ -337,7 +338,8 @@
       adapter.setScore(average);
       // Before the commit, so a verdict this score decides carries it and
       // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-      adapter.setSuccessStatus(progress.successStatus);
+      prevSuccessStatus = progress.successStatus;
+      adapter.setSuccessStatus(prevSuccessStatus);
       adapter.setDuration(duration.sessionSeconds);
       adapter.commit();
     });
@@ -356,7 +358,6 @@
     });
   });
 
-  let prevSuccessStatus = 'unknown';
   $effect(() => {
     const status = progress.successStatus;
     if (!persistenceReady) return;
