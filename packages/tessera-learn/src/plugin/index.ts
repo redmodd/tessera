@@ -458,7 +458,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
       if (!ctx.manifest) {
         throw new Error(
-          '[tessera:export] the page manifest was never generated. A written bundle has resolved virtual:tessera-manifest, so reaching closeBundle without one means the build never ran.',
+          '[tessera:export] the page manifest was never generated, so the export cannot tell which pages are graded.',
         );
       }
 

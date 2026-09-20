@@ -222,9 +222,9 @@ const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
 const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'];
 const VALID_SUCCESS_STATUS = ['passed', 'failed'];
-const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 // Derived from the runtime types (single source of truth) — widened to
 // string[] so .includes() accepts an arbitrary author-supplied value.
+const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
 const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
 
@@ -418,8 +418,6 @@ function parseConfig(
   }
 
   const success = config.success;
-  // A criterion the runtime can read is the one that outranks
-  // requireSuccessStatus; a rejected block leaves the alias in charge.
   let successAccepted = false;
   if (success !== undefined) {
     if (!success || typeof success !== 'object' || Array.isArray(success)) {

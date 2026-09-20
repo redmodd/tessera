@@ -3,7 +3,7 @@ import type { XAPIAgent } from './xapi/types.js';
 import type { StandardId } from './standards.js';
 
 /**
- * Quiz enum domains as runtime tuples. The unions below derive from these, and
+ * Enum domains as runtime tuples. The unions below derive from these, and
  * the build-time validator imports them too — so the accepted value set has a
  * single source and can't drift between the types and the validator.
  */
@@ -30,11 +30,6 @@ interface SuccessSource {
  * preset that implies it. Single source of truth for the runtime rollup, the
  * validator, and the manifest generators, so the pass mark a package
  * declares can't disagree with the verdict it sends.
- *
- * `course.config.js` is plain JS, so the union is a shape the validator
- * enforces rather than one this function can assume. A criterion it can't read
- * resolves to no verdict, which reports completion and a score and leaves
- * pass/fail alone.
  */
 export function resolveSuccess(config: SuccessSource): SuccessConfig {
   const declared = config.success;

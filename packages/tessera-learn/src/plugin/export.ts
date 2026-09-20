@@ -100,9 +100,6 @@ function declaresPassMark(config: ExportConfig): boolean {
   );
 }
 
-// A quiz criterion judges the graded average, so with nothing graded there is
-// no average to judge and the runtime holds `unknown` for the whole attempt.
-// A fixed criterion asserts its status the moment the course completes.
 function sendsVerdict(config: ExportConfig, hasGradedPages: boolean): boolean {
   const { from } = resolveSuccess(config);
   return from === 'fixed' || (from === 'quiz' && hasGradedPages);

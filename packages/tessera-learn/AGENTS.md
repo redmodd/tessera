@@ -493,11 +493,11 @@ By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed
 | `"percentage"`    | `{ from: "quiz" }`                                                                  |
 | `"manual"`        | `{ from: "fixed", status: requireSuccessStatus }` when set, else `{ from: "none" }` |
 
-| `success.from` | Verdict                                                                               |
-| -------------- | ------------------------------------------------------------------------------------- |
-| `"quiz"`       | graded average vs `scoring.passingScore`, once every declared graded page has a score |
-| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                  |
-| `"none"`       | never sends a verdict; completion and score still report                              |
+| `success.from` | Verdict                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `"quiz"`       | graded average vs `scoring.passingScore`, once every declared graded page has a score or the course completes |
+| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                                          |
+| `"none"`       | never sends a verdict; completion and score still report                                                      |
 
 ```js
 completion: { mode: 'manual' },
@@ -507,9 +507,8 @@ success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
 - Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
 - **A verdict never stands in for completion.** `successStatus` is judged as soon as the score is final, whatever the completion mode. SCORM 1.2 has one `lesson_status`, where `"passed"` reads as finished, so its adapter holds `passed` back until the course completes and writes `incomplete` meanwhile. `failed` reports straight away.
 - **A quiz verdict needs an attempt.** With no graded page scored, `successStatus` stays `"unknown"` rather than failing the learner on an unattempted 0.
-- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) only under `completion.mode: "quiz"` with a quiz verdict. Everywhere else the runtime sends the verdict and the LMS gets no threshold of its own.
-- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course can send a verdict: a fixed one, or a quiz one with at least one graded page. `success.from: "none"`, and a quiz verdict with nothing graded, satisfy on `Completed` alone. Use `"none"` for a graded quiz that reports a score but should not gate credit.
-- Under `success.from: "quiz"` a learner who completes without attempting a graded page has no verdict, so cmi5 does not satisfy the AU. Set `success: { from: "none" }` when the quiz is genuinely optional.
+- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course can send a verdict: a fixed one, or a quiz one with at least one graded page. `success.from: "none"`, and a quiz verdict with nothing graded, satisfy on `Completed` alone.
+- Under `success.from: "quiz"` a learner who completes without attempting a graded page has no verdict, so cmi5 does not satisfy the AU. Set `success: { from: "none" }` for a graded quiz that reports a score but should not gate credit.
 
 ---
 
@@ -1078,19 +1077,18 @@ OAuth at the publisher level, statement signing/attachment helpers, offline/Inde
 
 The runtime translates author intent into adapter calls automatically. The author-relevant differences:
 
-| Concern              | SCORM 1.2                                                                            | SCORM 2004 4th                                                 | cmi5                                 |
-| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------ |
-| Completion + success | One field (`lesson_status`); no "unknown" — success wins when known, else completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
-| Score scale to LMS   | `score.raw` (0–100)                                                                  | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                          | 64000 chars                                                    | LRS-defined (typically unbounded)    |
-| Resume after reload  | From `cmi.suspend_data`                                                              | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
+| Concern              | SCORM 1.2                                                                                           | SCORM 2004 4th                                                 | cmi5                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
+| Completion + success | One field (`lesson_status`); no "unknown" — `failed` reports at once, `passed` waits for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
+| Score scale to LMS   | `score.raw` (0–100)                                                                                 | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
+| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                                         | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Resume after reload  | From `cmi.suspend_data`                                                                             | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
-- **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
 - **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5. Read it via `useQuiz().passingScore`.
-- **A package declares a pass mark only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against. That is what keeps the verdict and its timing yours.
+- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing

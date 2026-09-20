@@ -5,12 +5,6 @@ import { test as base, type Page } from '@playwright/test';
 const require = createRequire(import.meta.url);
 type LmsData = Record<string, string>;
 
-/**
- * `test` carrying the LMS-owned values a describe seeds its mock with, so
- * `test.use({ lmsData })` reaches the mock from any spec file. Playwright
- * ignores `test.use` of an option the `test` it is called on does not declare,
- * so a spec importing plain `@playwright/test` silently drops the seed.
- */
 export const test = base.extend<{ lmsData: LmsData }>({
   lmsData: [{}, { option: true }],
 });
