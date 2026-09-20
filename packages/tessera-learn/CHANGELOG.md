@@ -1,5 +1,38 @@
 # tessera-learn
 
+## 0.7.0
+
+### Minor Changes
+
+- 31909ea: Custom page access rules and xAPI login/learner functions now go in a new optional `course.runtime.js` file (functions in `course.config.js` never worked), and each xAPI destination with its own endpoint now needs an `id`.
+- 22059a7: Add a `success` block that sets what makes a course passed, independently of what `completion.mode` makes it complete. `success.from` is `"quiz"`, `"fixed"` (with `status`) or `"none"`; omit it and `completion.mode` supplies the verdict. `requireSuccessStatus` stays as an alias for the manual plus fixed case.
+  
+  A verdict no longer stands in for completion: SCORM 1.2 holds `passed` back until the course completes, and a quiz verdict now needs an attempt. Packages declare a pass mark only under `completion.mode: "quiz"` with a quiz verdict, and cmi5 `moveOn` is `CompletedAndPassed` whenever the course can send a verdict.
+
+### Patch Changes
+
+- 82f3bf0: cmi5 and xAPI builds, and any build with an explicit xAPI destination, now bundle only their own adapter.
+  An explicit xAPI destination whose learner actor can't be derived from the SCORM LMS is skipped with a warning that says why, instead of failing on a missing `xapi.actor`.
+  In dev without launch parameters, a cmi5 or xAPI explicit destination with no actor now rejects sends with an error, as SCORM already did, instead of being skipped.
+- 929a7a4: Export packages the configured `build.outDir` instead of always `dist/`, and a build now fails if `outDir` is or contains the project root. `tesseraPlugin()` also throws on an unknown `standardOverride` instead of reporting it as a validation error.
+- 8d2ce31: Manifest generation and adapter code generation share one build-side table keyed by export standard.
+- dc3ed30: Every `tessera` subcommand now parses arguments the same way: `--help` works on all of them and prints the full command list, flags can come before or after the course name and accept `--flag=value`, and unknown flags, missing arguments and extra arguments are rejected with the same `[tessera <command>]` prefix instead of being ignored.
+- 0893a61: cmi5 packages omit `masteryScore` under `completion.mode: "manual"`, where success comes from `requireSuccessStatus` rather than the score. Failed statements (and Passed ones under an author-set `scoring.passingScore`) keep their score instead of being sent without it.
+- 037a703: The build-time suspend-data warning now covers SCORM 2004, and suspend-data advice lists every larger-limit standard.
+- 1adfe9f: Interaction formats declare option-index encoding with an `encodesOptionIndex` flag.
+- 42a9f7c: `tessera validate` no longer reports missing xAPI `auth`/`actor` when `course.runtime.js` sets them through an alias of the `xapi` export.
+- 863cd2b: SCORM 1.2 packages declare `scoring.passingScore` as `adlcp:masteryscore` in `imsmanifest.xml`, so the LMS knows the pass mark without an admin entering it. Manual-completion courses declare none. `course.config.js` validation rejects `NaN` for `scoring.passingScore` and `completion.percentageThreshold`.
+- a89bed2: SCORM 1.2 courses take the pass mark from `cmi.student_data.mastery_score` when the LMS supplies one, overriding `scoring.passingScore`, as SCORM 2004 and cmi5 already do. A malformed LMS mastery score, including a cmi5 `LMS.LaunchData` `masteryScore`, logs a warning and is ignored.
+  
+  A whitespace-only SCORM 2004 `cmi.scaled_passing_score` no longer sets the pass mark to 0, and a negative one, which SCORM 2004 allows, now sets it to 0 instead of being ignored.
+  
+  An LMS pass mark such as 55 no longer lands a fraction above the mark, so a learner who scores exactly the mark passes.
+- ee53c8a: The SCORM 2004 adapter reads `cmi.mode` and `cmi.scaled_passing_score` through its dialect.
+- 31ae61f: SCORM 2004 packages declare `scoring.passingScore` in `imsmanifest.xml` as the primary objective's `minNormalizedMeasure`, so the LMS sets `cmi.scaled_passing_score` without an admin entering it. Manual-completion courses declare none.
+- 0e85421: cmi5 and xAPI courses now send Terminated and pending statements when the course closes, and download or mailto links no longer end the session.
+- 484d9ab: Quiz, page and course scores are now kept to 2 decimal places, and pass/fail is judged on the same score the LMS is sent. A course average of 69.67 against a pass mark of 70 now reports 69.67 with `failed`, instead of 70 with `failed`. Quiz scores are no longer rounded to whole numbers, so 2 of 3 correct scores 66.67 and no longer meets a pass mark of 67.
+- 6b2068a: Build every Vite virtual module through one shared helper, and reload the dev server only when the manifest or stylesheet list changes.
+
 ## 0.6.0
 
 ### Minor Changes
