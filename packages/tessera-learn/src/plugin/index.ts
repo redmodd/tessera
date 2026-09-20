@@ -456,15 +456,17 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         );
       }
 
-      const pages =
-        ctx.manifest?.pages ??
-        generateManifest(resolve(ctx.root, 'pages')).pages;
+      if (!ctx.manifest) {
+        throw new Error(
+          '[tessera:export] the page manifest was never generated. A written bundle has resolved virtual:tessera-manifest, so reaching closeBundle without one means the build never ran.',
+        );
+      }
 
       await runExport(
         ctx.root,
         ctx.outDir,
         mergeCourseConfig(read.config),
-        pages.some(isGradedPage),
+        ctx.manifest.pages.some(isGradedPage),
       );
     },
   };

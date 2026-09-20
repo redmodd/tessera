@@ -171,6 +171,9 @@ describe('export packaging gate', () => {
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
     (entry.buildStart as any).call(entry);
+    (get('tessera:manifest').load as any).handler.call({
+      addWatchFile() {},
+    });
     return { entry, exporter, validation };
   }
 
