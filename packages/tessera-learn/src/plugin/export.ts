@@ -93,10 +93,17 @@ function auIdFor(config: ExportConfig): string {
 
 // An LMS handed a threshold judges the score itself, on its own schedule, and
 // reaches a verdict of its own. That only agrees with the runtime when passing
-// is what completes the course and a quiz is what judges it.
-function declaresPassMark(config: ExportConfig): boolean {
+// is what completes the course, a quiz is what judges it, and a required page
+// is there to judge: a threshold the runtime never rules on leaves the LMS
+// holding a verdict of its own that nothing corroborates.
+function declaresPassMark(
+  config: ExportConfig,
+  hasRequiredGradedPage: boolean,
+): boolean {
   return (
-    config.completion?.mode === 'quiz' && resolveSuccess(config).from === 'quiz'
+    config.completion?.mode === 'quiz' &&
+    resolveSuccess(config).from === 'quiz' &&
+    hasRequiredGradedPage
   );
 }
 
@@ -132,6 +139,7 @@ function generateScormManifest(
   dialect: ScormManifestDialect,
   config: ExportConfig,
   outDir: string,
+  hasRequiredGradedPage: boolean,
 ): string {
   const title = escapeXml(config.title);
   const files = collectFiles(outDir);
@@ -141,7 +149,7 @@ function generateScormManifest(
   const xmlns = Object.entries(dialect.xmlns)
     .map(([prefix, uri]) => `\n  xmlns:${prefix}="${uri}"`)
     .join('');
-  const passMark = declaresPassMark(config)
+  const passMark = declaresPassMark(config, hasRequiredGradedPage)
     ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
     : '';
 
@@ -184,7 +192,7 @@ export function generateCMI5Xml(
   );
   const auId = auIdFor(config);
   // cmi5 §10.2.4 caps masteryScore at 4 decimals; avoid float drift like 0.7000000000000001.
-  const masteryAttr = declaresPassMark(config)
+  const masteryAttr = declaresPassMark(config, hasRequiredGradedPage)
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
@@ -275,8 +283,8 @@ type ManifestGenerator = (
 
 const scormManifest =
   (dialect: ScormManifestDialect): ManifestGenerator =>
-  (config, outDir) =>
-    generateScormManifest(dialect, config, outDir);
+  (config, outDir, hasRequiredGradedPage) =>
+    generateScormManifest(dialect, config, outDir, hasRequiredGradedPage);
 
 /** Build-side half of each packaged standard: manifest generation and adapter codegen. */
 export const LMS_BUILD: Record<

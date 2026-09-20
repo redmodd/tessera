@@ -252,8 +252,10 @@ export class ProgressState {
     for (const pageIndex of this.#declaredGradedIndices) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
-      else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
-      else continue;
+      else {
+        allScored = false;
+        if (!this.#requiredGradedIndices.has(pageIndex)) continue;
+      }
       entries.push({
         score: score ?? 0,
         weight: this.#pageWeights.get(pageIndex) ?? 1,
@@ -307,9 +309,8 @@ export class ProgressState {
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
-    const { count, average } = this.#graded;
-    if (count === 0) return 'incomplete';
-    return average >= this.#config.scoring.passingScore
+    if (this.#requiredGradedIndices.size === 0) return 'incomplete';
+    return this.#graded.average >= this.#config.scoring.passingScore
       ? 'complete'
       : 'incomplete';
   });

@@ -317,6 +317,10 @@ test.describe.serial('per-page weights in the course rollup', () => {
     return (await scormData(page))['cmi.core.score.raw'];
   }
 
+  async function lessonStatus(page: Page) {
+    return (await scormData(page))['cmi.core.lesson_status'];
+  }
+
   test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
     page,
   }) => {
@@ -333,6 +337,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .check();
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+    expect(await lessonStatus(page)).toBe('passed');
   });
 
   test('an untaken optional page leaves the rollup to the required pages', async ({
@@ -350,16 +355,19 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(2)
       .check();
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+    expect(await lessonStatus(page)).toBe('passed');
 
-    // Taking it adds its weight to both halves: (0*100 + 0*25 + 100*75) / 200.
+    // Graded work taken after the course completes re-grades it, optional or
+    // not: the page joins both halves, (0*25 + 100*75 + 0*100) / 200.
     await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
     await page.waitForSelector('.tessera-quiz-question-wrapper.active');
     await answerCheckQuiz(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');
+    expect(await lessonStatus(page)).toBe('failed');
   });
 
-  test('no score reaches the LMS until every required graded page is scored', async ({
+  test('no score reaches the LMS until every graded page is scored', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -376,6 +384,15 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(0)
       .check();
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
+    // 25 of the course is scored and 75 failed, but the optional page can
+    // still join the rollup, so nothing is final and nothing is sent.
+    await page.waitForTimeout(1000);
+    expect(await courseScore(page)).toBeFalsy();
+
+    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
+    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
+    await answerCheckQuiz(page, 0);
+
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('12.5');
   });
 });

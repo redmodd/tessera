@@ -880,7 +880,6 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(1, 'q1', 100, true);
 
       expect(progress.gradedScore.average).toBe(100);
-      expect(progress.successStatus).toBe('passed');
     });
 
     it('counts an optional page once it has a score', () => {
@@ -935,7 +934,7 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('passed');
     });
 
-    it('does not wait on an optional page to report the score', () => {
+    it('waits on an optional page before the score is final', () => {
       const manifest = createManifest(5, {
         1: { graded: true },
         3: { graded: true, required: false },
@@ -944,7 +943,74 @@ describe('ProgressState', () => {
 
       progress.quizCompleted(1, 80);
 
+      expect(progress.gradedScore.average).toBe(80);
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.quizCompleted(3, 40);
+
       expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.gradedScore.average).toBe(60);
+    });
+
+    it('never sends a verdict an optional page then contradicts', () => {
+      const manifest = createManifest(
+        5,
+        {},
+        {
+          1: { graded: true, weight: 75 },
+          3: { graded: true, required: false, weight: 100 },
+        },
+      );
+      const progress = new ProgressState(manifest, createConfig());
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(42.86);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('re-grades a course the learner completed before taking an optional page', () => {
+      const manifest = createManifest(4, {
+        0: { graded: true },
+        1: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(0, 100);
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('passed');
+
+      progress.quizCompleted(1, 0);
+
+      expect(progress.gradedScore.average).toBe(50);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('cannot complete on the quiz average with no required page to judge', () => {
+      const manifest = createManifest(5, {
+        1: { graded: true, required: false },
+        3: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(1, 100);
+
+      expect(progress.gradedScore.average).toBe(100);
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('unknown');
     });
 
     it('still waits on a required page', () => {

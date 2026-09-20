@@ -44,6 +44,7 @@ import {
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type ManualCompletion,
@@ -1081,13 +1082,14 @@ function validatePageFile(
 
   const isQuiz = !!pageConfig?.quiz;
   let isGradedQuiz = false;
-  let quizRequired: unknown;
+  let quizRequired: boolean | undefined;
   if (pageConfig?.quiz) {
     validateQuizConfig(pageConfig.quiz, fileRel, d);
     if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
       isGradedQuiz = true;
     }
-    quizRequired = (pageConfig.quiz as { required?: unknown }).required;
+    const declared = (pageConfig.quiz as { required?: unknown }).required;
+    if (typeof declared === 'boolean') quizRequired = declared;
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
@@ -1095,8 +1097,11 @@ function validatePageFile(
   const declaresRequired = validatePageRequired(pageConfig, fileRel, d);
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
-  const required =
-    graded && declaresRequired !== false && quizRequired !== false;
+  const required = isRequiredGradedPage({
+    graded,
+    required: declaresRequired,
+    quiz: { required: quizRequired },
+  });
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
@@ -1107,6 +1112,17 @@ function validatePageFile(
         "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
         'and it never completes. ' +
         'Use quiz: { graded: true }, or drop graded: true.',
+    );
+  }
+  if (
+    declaresRequired !== undefined &&
+    quizRequired !== undefined &&
+    declaresRequired !== quizRequired
+  ) {
+    d.error(
+      `${fileRel}: pageConfig.required is ${declaresRequired} but quiz.required is ${quizRequired}. ` +
+        'Either one set to false makes the page optional, so the other is discarded. ' +
+        'Set required in one place.',
     );
   }
   if (declaresRequired !== undefined && !graded) {
@@ -1933,11 +1949,27 @@ function reportEffectiveWeights(
 ): void {
   const graded = pageResults.pages.filter((p) => p.graded);
   if (!graded.some((p) => p.weight !== undefined)) return;
-  const total = graded.reduce((sum, p) => sum + (p.weight ?? 1), 0);
-  const shares = graded
-    .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
-    .join(', ');
-  d.info(`course score weighting: ${shares}`);
+  // The required pages are the whole rollup for a learner who takes nothing
+  // optional, so they are the denominator every share is quoted against.
+  const required = graded.filter((p) => p.required);
+  const optional = graded.filter((p) => !p.required);
+  const total = required.reduce((sum, p) => sum + (p.weight ?? 1), 0);
+  if (required.length > 0) {
+    const shares = required
+      .map(
+        (p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`,
+      )
+      .join(', ');
+    d.info(`course score weighting: ${shares}`);
+  }
+  if (optional.length > 0) {
+    d.info(
+      `course score weighting: these pages are optional, so each joins that total ` +
+        `only when the learner takes it: ${optional
+          .map((p) => `${p.fileRel} weight ${p.weight ?? 1}`)
+          .join(', ')}`,
+    );
+  }
 
   const unweighted = graded.filter((p) => p.weight === undefined);
   if (unweighted.length > 0) {
@@ -1948,13 +1980,10 @@ function reportEffectiveWeights(
     );
   }
 
-  if (graded.length < 2) return;
-  // An optional page's weight joins the total only when it is attempted, so
-  // there is no one total to hit and a shortfall says nothing.
-  if (graded.some((p) => !p.required)) return;
+  if (required.length < 2) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
-  const weights = graded.map((p) => p.weight ?? 1);
+  const weights = required.map((p) => p.weight ?? 1);
   const scale = weights.some((w) => w >= 5)
     ? 100
     : weights.every((w) => w < 1)
@@ -2001,11 +2030,17 @@ function crossValidate(
     );
   }
 
-  if (
-    judgesScore &&
-    !pageResults.pages.some((p) => p.graded && p.required) &&
-    !pageResults.hasParseErrors
-  ) {
+  const noRequiredGraded =
+    pageResults.hasGraded &&
+    !pageResults.pages.some((p) => p.required) &&
+    !pageResults.hasParseErrors;
+  if (quizMode && noRequiredGraded) {
+    d.error(
+      'completion.mode is "quiz" but every graded page sets required: false, so the course ' +
+        'score has no required page to judge and the course can never complete. ' +
+        'Drop required from the page that decides the course, or complete on something else.',
+    );
+  } else if (judgesScore && noRequiredGraded) {
     d.warn(
       'every graded page sets required: false, so a learner who skips them all is never judged ' +
         'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
