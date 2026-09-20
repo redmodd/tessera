@@ -2897,3 +2897,86 @@ describe('resume policy validation', () => {
     );
   });
 });
+
+// ---- success block ----
+
+describe('success block validation', () => {
+  const withSuccess = (success: string, extra = '') =>
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "manual"${extra} },
+  success: ${success},
+  export: { standard: "web" },
+};`,
+    );
+
+  it('accepts a well-formed success block', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('unknown field "success"'),
+    );
+  });
+
+  it('errors on an unknown success.from', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "vibes" }');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        '"success.from" must be "quiz", "fixed", or "none", got "vibes"',
+      ),
+    );
+  });
+
+  it('errors on success.from "fixed" without a status', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "fixed" }');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"success.status" must be "passed" or "failed"'),
+    );
+  });
+
+  it('warns that success outranks requireSuccessStatus when both are set', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "none" }', ', requireSuccessStatus: "passed"');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" is ignored when "success" is set',
+      ),
+    );
+  });
+
+  it('warns on a quiz verdict with no graded pages', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz" }');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('success.from is "quiz" but no pages declare'),
+    );
+  });
+
+  it('drops the "graded under manual" warning when the quiz judges', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "quiz" }');
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('is graded under completion.mode: "manual"'),
+    );
+  });
+});

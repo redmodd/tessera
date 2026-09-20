@@ -1,7 +1,11 @@
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
-import type { CourseConfig } from './types.js';
+import {
+  resolveSuccess,
+  type CourseConfig,
+  type SuccessConfig,
+} from './types.js';
 import type { CompletionStatus, SuccessStatus } from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
@@ -48,6 +52,7 @@ export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
+  #success: SuccessConfig;
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
@@ -70,6 +75,11 @@ export class ProgressState {
     );
     this.#totalPages = manifest.totalPages;
     this.#config = config;
+    this.#success = resolveSuccess(config);
+  }
+
+  get success(): SuccessConfig {
+    return this.#success;
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -325,10 +335,20 @@ export class ProgressState {
   }
 
   successStatus = $derived.by<SuccessStatus>(() => {
-    if (this.#config.completion.mode === 'manual') {
-      const want = this.#config.completion.requireSuccessStatus;
-      return this.#manuallyCompleted && want !== undefined ? want : 'unknown';
-    }
+    const { from, status } = this.#success;
+    if (from === 'none') return 'unknown';
+    if (from === 'fixed')
+      return this.completionStatus === 'complete' && status !== undefined
+        ? status
+        : 'unknown';
+    // A trigger owns the completion moment under manual, so the verdict waits
+    // for it: SCORM 1.2 has one lesson_status, and "passed" there reads as
+    // finished to an LMS that can't see a separate completion field.
+    if (
+      this.#config.completion.mode === 'manual' &&
+      this.completionStatus !== 'complete'
+    )
+      return 'unknown';
     if (!this.gradedScoreFinal) return 'unknown';
     const { average } = this.#graded;
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';

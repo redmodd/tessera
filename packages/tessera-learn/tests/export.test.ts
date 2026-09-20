@@ -507,3 +507,47 @@ describe('runExport', () => {
     expect(existsSync(resolve(testRoot, 'test-course-1.0.0.zip'))).toBe(true);
   });
 });
+
+describe('pass mark follows success.from, not completion.mode', () => {
+  it('declares adlcp:masteryscore under manual completion with a quiz verdict', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).toContain('<adlcp:masteryscore>80</adlcp:masteryscore>');
+  });
+
+  it('declares minNormalizedMeasure under manual completion with a quiz verdict', () => {
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).toContain(
+      '<imsss:minNormalizedMeasure>0.8</imsss:minNormalizedMeasure>',
+    );
+  });
+
+  it('omits the SCORM 1.2 pass mark under success.from "none"', () => {
+    const xml = scormXml('scorm12', {
+      title: 'Test',
+      completion: { mode: 'percentage' },
+      success: { from: 'none' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).not.toContain('masteryscore');
+  });
+
+  it('omits the SCORM 2004 pass mark under success.from "fixed"', () => {
+    const xml = scormXml('scorm2004', {
+      title: 'Test',
+      completion: { mode: 'percentage' },
+      success: { from: 'fixed', status: 'passed' },
+      scoring: { passingScore: 80 },
+    });
+    expect(xml).not.toContain('minNormalizedMeasure');
+  });
+});

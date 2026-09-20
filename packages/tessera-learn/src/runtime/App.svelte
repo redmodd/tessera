@@ -335,8 +335,9 @@
 
     untrack(() => {
       adapter.setScore(average);
-      // Under manual mode, success is owned by requireSuccessStatus.
-      if (config.completion.mode !== 'manual') {
+      // Only a quiz verdict moves with the score; a fixed one lands with
+      // completion instead, and `none` never sends one.
+      if (progress.success.from === 'quiz') {
         adapter.setSuccessStatus(progress.successStatus);
       }
       adapter.setDuration(duration.sessionSeconds);

@@ -9,7 +9,11 @@ import {
 import { relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
-import { courseIdentity, type CourseConfig } from '../runtime/types.js';
+import {
+  courseIdentity,
+  resolveSuccess,
+  type CourseConfig,
+} from '../runtime/types.js';
 import { standardProfile, type LMSStandard } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 
@@ -29,7 +33,7 @@ type ExportConfig = Pick<
   CourseConfig,
   'title' | 'id' | 'description' | 'version' | 'scoring' | 'export'
 > &
-  Partial<Pick<CourseConfig, 'completion'>>;
+  Partial<Pick<CourseConfig, 'completion' | 'success'>>;
 
 // ---------- Helpers ----------
 
@@ -87,10 +91,9 @@ function auIdFor(config: ExportConfig): string {
   return stableUrn('au', id ? `${id}#au` : 'tessera-au');
 }
 
-// Manual completion takes success from requireSuccessStatus, so no manifest
-// declares a pass mark for it.
+// A package declares a pass mark exactly when a score is judged against it.
 function declaresPassMark(config: ExportConfig): boolean {
-  return config.completion?.mode !== 'manual';
+  return resolveSuccess(config).from === 'quiz';
 }
 
 function formatSize(bytes: number): string {
@@ -170,14 +173,15 @@ export function generateCMI5Xml(config: ExportConfig): string {
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4 — `moveOn` decides which verb(s) the LMS treats as
-  // satisfying the AU. For graded courses (completion gated on a quiz)
-  // a learner who completes without passing should NOT receive credit, so
-  // the LMS needs both a Completed AND a Passed before satisfaction.
-  // Quiz is the only mode that gates satisfaction on the verb. Percentage and
-  // manual courses satisfy on Completed alone, including when a manual course
-  // asserts Failed through requireSuccessStatus.
+  // satisfying the AU. A learner who completes without passing should NOT
+  // receive credit only when the quiz is what both completes and judges the
+  // course, so the LMS needs a Completed AND a Passed. Anything else
+  // satisfies on Completed alone: a visit-ratio or trigger completion, an
+  // asserted Failed, or no verdict at all.
   const moveOn =
-    config.completion?.mode === 'quiz' ? 'CompletedAndPassed' : 'Completed';
+    config.completion?.mode === 'quiz' && declaresPassMark(config)
+      ? 'CompletedAndPassed'
+      : 'Completed';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">

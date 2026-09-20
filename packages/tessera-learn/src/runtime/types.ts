@@ -9,6 +9,7 @@ import type { StandardId } from './standards.js';
  */
 export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
+export const SUCCESS_SOURCES = ['quiz', 'fixed', 'none'] as const;
 
 /**
  * Trimmed course identity, or '' when absent. Single source of truth for the
@@ -17,6 +18,22 @@ export const RETRY_MODES = ['full', 'incorrect-only'] as const;
  */
 export function courseIdentity(config: { id?: unknown }): string {
   return (typeof config.id === 'string' && config.id.trim()) || '';
+}
+
+/**
+ * What judges pass/fail, resolved from `success` or the `completion.mode`
+ * preset that implies it. Single source of truth for the runtime rollup, the
+ * validator, and the manifest generators, so the pass mark a package
+ * declares can't disagree with the verdict it sends.
+ */
+export function resolveSuccess(config: {
+  completion?: { mode?: string; requireSuccessStatus?: 'passed' | 'failed' };
+  success?: SuccessConfig;
+}): SuccessConfig {
+  if (config.success) return config.success;
+  if (config.completion?.mode !== 'manual') return { from: 'quiz' };
+  const status = config.completion.requireSuccessStatus;
+  return status ? { from: 'fixed', status } : { from: 'none' };
 }
 
 /**
@@ -57,6 +74,11 @@ export interface CourseConfig {
     mode: 'free' | 'sequential';
   };
   completion: ManualCompletion | QuizCompletion | PercentageCompletion;
+  /**
+   * What judges pass/fail, independent of what makes the course complete.
+   * Omit to take the verdict implied by `completion.mode`.
+   */
+  success?: SuccessConfig;
   /** Optional under "manual"; required under "quiz". */
   scoring: {
     passingScore: number;
@@ -88,6 +110,17 @@ export interface A11yConfig {
   ignore?: string[];
 }
 
+/**
+ * The success axis. `quiz` judges the graded average against
+ * `scoring.passingScore`; `fixed` asserts `status` when the course completes;
+ * `none` reports completion and a score but never a verdict.
+ */
+export interface SuccessConfig {
+  from: (typeof SUCCESS_SOURCES)[number];
+  /** Required under `from: "fixed"`, ignored otherwise. */
+  status?: 'passed' | 'failed';
+}
+
 export interface ManualCompletion {
   mode: 'manual';
   /**
@@ -96,7 +129,10 @@ export interface ManualCompletion {
    * paths still work at runtime.
    */
   trigger?: 'page';
-  /** When set, markComplete() also flips successStatus. Omit for unknown. */
+  /**
+   * When set, markComplete() also flips successStatus. Omit for unknown.
+   * Alias for `success: { from: "fixed", status }`, which outranks it.
+   */
   requireSuccessStatus?: 'passed' | 'failed';
 }
 

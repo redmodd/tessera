@@ -16,7 +16,7 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import type { CourseConfig } from '../runtime/types.js';
+import { resolveSuccess, type CourseConfig } from '../runtime/types.js';
 import {
   DEFAULT_PASSING_SCORE,
   DEFAULT_PERCENTAGE_THRESHOLD,
@@ -254,12 +254,18 @@ mount(App, {
 
 // ---------- Config Plugin ----------
 
-function completionDefaults(mode: string | undefined): {
+function completionDefaults(
+  mode: string | undefined,
+  judgesScore: boolean,
+): {
   completion: CourseConfig['completion'];
   passingScore: number;
 } {
   if (mode === 'manual') {
-    return { completion: { mode: 'manual' }, passingScore: 0 };
+    return {
+      completion: { mode: 'manual' },
+      passingScore: judgesScore ? DEFAULT_PASSING_SCORE : 0,
+    };
   }
   if (mode === 'quiz') {
     return {
@@ -296,8 +302,10 @@ function tesseraConfigDefaultsPlugin(): Plugin {
 
 /** Fill runtime defaults into a parsed course.config.js. Exported for tests. */
 export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
+  const success = resolveSuccess(userConfig);
   const { completion, passingScore } = completionDefaults(
     userConfig.completion?.mode,
+    success.from === 'quiz',
   );
   return {
     ...userConfig,
@@ -305,6 +313,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
     completion: { ...completion, ...userConfig.completion },
+    success,
     scoring: { passingScore, ...userConfig.scoring },
     export: {
       ...userConfig.export,

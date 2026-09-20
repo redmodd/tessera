@@ -466,7 +466,7 @@ Use `completion.mode: "manual"` when the author owns the completion moment (fina
 
 ### Success status
 
-By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion:
+By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion. It is an alias for `success: { from: "fixed", status }`; see [Success criterion](#success-criterion) to judge a quiz instead.
 
 | Adapter        | `markComplete()`, default                                       | with `requireSuccessStatus: "passed"` |
 | -------------- | --------------------------------------------------------------- | ------------------------------------- |
@@ -478,8 +478,35 @@ By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed
 
 ### Rules and non-goals
 
-- A graded quiz reports its score but does **not** drive completion/success under manual — `markComplete()`/`completesOn` does (the build warns; set `graded: false` to silence).
-- Combining manual + quiz/percentage rules, or per-learner conditional completion → use `useCompletion()` in a custom `$effect`/component, not config.
+- A graded quiz reports its score but does **not** drive completion under manual: `markComplete()`/`completesOn` does. It drives success only under `success: { from: "quiz" }` (without it the build warns; set `graded: false` to silence).
+- Per-learner conditional **completion** → use `useCompletion()` in a custom `$effect`/component, not config.
+
+---
+
+## Success criterion
+
+`completion.mode` decides what makes a course **complete**. `success` decides what makes it **passed**, independently. Omit `success` and the mode supplies it:
+
+| `completion.mode` | implied `success`                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `"quiz"`          | `{ from: "quiz" }`                                                                  |
+| `"percentage"`    | `{ from: "quiz" }`                                                                  |
+| `"manual"`        | `{ from: "fixed", status: requireSuccessStatus }` when set, else `{ from: "none" }` |
+
+| `success.from` | Verdict                                                                               |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `"quiz"`       | graded average vs `scoring.passingScore`, once every declared graded page has a score |
+| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                  |
+| `"none"`       | never sends a verdict; completion and score still report                              |
+
+```js
+completion: { mode: 'manual' },
+success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
+```
+
+Under `completion.mode: "manual"` a `from: "quiz"` verdict is **held until the trigger fires**, so SCORM 1.2 (one `lesson_status`) never reports `passed` on a course that is still incomplete. `passingScore` then defaults to 70 rather than manual mode's 0.
+
+A package declares a pass mark (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) exactly when `success.from` is `"quiz"`. cmi5 `moveOn` is `CompletedAndPassed` only when the quiz both completes and judges the course; anything else satisfies on `Completed`.
 
 ---
 
@@ -590,8 +617,14 @@ export default {
     // (manual only) trigger: "page", requireSuccessStatus: "passed" | "failed"
   },
 
+  // optional; omitted, completion.mode implies it
+  success: {
+    from: 'quiz', // "quiz" | "fixed" | "none"
+    // status: "passed" | "failed"   (from: "fixed" only)
+  },
+
   scoring: {
-    passingScore: 70, // optional under "manual" (defaults to 0)
+    passingScore: 70, // optional under "manual" (defaults to 0, or 70 when a quiz judges)
   },
 
   export: {
@@ -618,6 +651,7 @@ export default {
 | `completion.mode: "percentage"` | Completes when `completedPages / totalPages * 100 >= percentageThreshold`. A quiz page counts only once its quiz has been submitted (pass or fail), and a `graded: true` page only once a graded question on it is answered.                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `completion.mode: "quiz"`       | Completes when graded quiz average >= `scoring.passingScore`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `success.from`                  | What judges pass/fail, independent of completion. `"quiz"` judges the graded average against `passingScore`, `"fixed"` asserts `success.status` on completion, `"none"` never sends a verdict. Omitted → implied by `completion.mode`. See [Success criterion](#success-criterion)                                                                                                                                                                                                                                                                                                                                                          |
 | `a11y.level: "error"`           | Promotes captions/transcript, heading order, contrast, language, Svelte a11y warnings to errors. Hard errors (missing `alt`, missing media `title`) always block regardless                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
@@ -879,13 +913,13 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `completion.mode: "manual"`, where `requireSuccessStatus` sets it on `markComplete()`.
+`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every declared graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `success.from: "fixed"`, which sets it when the course completes.
 
 Three rules for displaying it:
 
 - **An unattempted graded page counts as 0.** `average` is `Σ(weight × pageScore) / Σ(weight)` over every graded page, so a learner who has aced the two equally weighted quizzes they've reached out of four reads 50%, not 100%. Show it on a summary page the learner reaches after the graded pages, or say what it is ("course score so far").
 - **Print it as is.** `successStatus` is judged on `average` itself, so rounding it further can print "70%" beside `failed` when the average is 69.67.
-- **Under `completion.mode: "manual"`, don't derive pass/fail from it.** `requireSuccessStatus` owns the status the LMS is sent, and it can disagree with `average >= passingScore`. Read `successStatus` instead. `passingScore` defaults to 0 in that mode, so guard any pass mark you display.
+- **Unless `success.from` is `"quiz"`, don't derive pass/fail from it.** Under `"fixed"` the asserted status can disagree with `average >= passingScore`, and under `"none"` there is no verdict. Read `successStatus` instead. `passingScore` defaults to 0 under bare manual mode, so guard any pass mark you display.
 
 ```svelte
 <script>
@@ -1053,7 +1087,7 @@ Author-facing consequences:
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **SCORM 1.2 shows `incomplete` until a graded quiz produces a result** (no "unknown").
 - **`scoring.passingScore` is the mastery score.** SCORM 1.2, SCORM 2004 and cmi5 packages declare it, and an LMS-supplied mastery score overrides it at launch in all three. Read it via `useQuiz().passingScore`.
-- **Under `completion.mode: "manual"` no package declares a pass mark.** Success comes from `requireSuccessStatus`, and stays `"unknown"` when you omit it. A `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, and scores are still reported, but the LMS gets no threshold to judge them against.
+- **A package declares a pass mark only when `success.from` is `"quiz"`.** Under `"fixed"` or `"none"` (which bare manual mode implies) a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, and scores are still reported, but the LMS gets no threshold to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing
