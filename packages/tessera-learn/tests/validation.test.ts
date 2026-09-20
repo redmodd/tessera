@@ -2273,7 +2273,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        'scoring.passingScore is not set — defaulting to 70%',
+        'scoring.passingScore is not set, so it defaults to 70%',
       ),
     );
   });
@@ -2999,6 +2999,92 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       expect.stringContaining(
         '"completion.requireSuccessStatus" is ignored when "success" is set',
       ),
+    );
+  });
+
+  it('does not claim requireSuccessStatus is ignored when success.from is invalid', () => {
+    createValidProject(testRoot);
+    withSuccess('{ from: "vibes" }', ', requireSuccessStatus: "passed"');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"success.from" must be'),
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining(
+        '"completion.requireSuccessStatus" is ignored when "success" is set',
+      ),
+    );
+  });
+
+  it('gives one reason requireSuccessStatus is ignored, not two', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz", requireSuccessStatus: "passed" },
+  success: { from: "fixed", status: "passed" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('completion.requireSuccessStatus')),
+    ).toEqual([
+      expect.stringContaining('"success" is set, which takes precedence'),
+    ]);
+  });
+
+  it('nudges for an unset passingScore that an implied quiz verdict judges', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  export: { standard: "web" },
+};`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('scoring.passingScore is not set'),
+    );
+  });
+
+  it('stays quiet about passingScore when nothing is graded to judge', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage", percentageThreshold: 100 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toHaveLength(0);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('scoring.passingScore'),
     );
   });
 
