@@ -434,16 +434,32 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
+    adapter.terminate();
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
-      c[0].includes('statements'),
+    const verbs = mockFetch.mock.calls
+      .filter((c: any[]) => c[0].includes('statements'))
+      .flatMap((c: any[]) => JSON.parse(c[1].body));
+    const ids = verbs.map((b: any) => b.verb.id);
+    const failed = verbs.find(
+      (b: any) => b.verb.id === 'http://adlnet.gov/expapi/verbs/failed',
     );
-    const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/failed');
-    expect(body.result.success).toBe(false);
+    expect(failed.result.success).toBe(false);
+    expect(ids.indexOf('http://adlnet.gov/expapi/verbs/failed')).toBeLessThan(
+      ids.indexOf('http://adlnet.gov/expapi/verbs/terminated'),
+    );
   });
+
+  const PASSED = 'http://adlnet.gov/expapi/verbs/passed';
+  const FAILED = 'http://adlnet.gov/expapi/verbs/failed';
+
+  function sentVerbs(): string[] {
+    return mockFetch.mock.calls
+      .filter((c: any[]) => c[0].includes('statements') && c[1]?.body)
+      .flatMap((c: any[]) => JSON.parse(c[1].body))
+      .map((b: any) => b.verb.id);
+  }
 
   it('seedLifecycle suppresses duplicate Failed when resuming an already-failed session', async () => {
     setupInitMocks();
@@ -457,13 +473,46 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
+    adapter.terminate();
 
     await new Promise((r) => setTimeout(r, 50));
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
-    );
-    expect(statementCalls).toHaveLength(0);
+    expect(sentVerbs()).not.toContain(FAILED);
+  });
+
+  it('holds Failed for Terminated and drops it when the session passes', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setSuccessStatus('failed');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sentVerbs()).not.toContain(FAILED);
+
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(sentVerbs()).toContain(PASSED);
+    expect(sentVerbs()).not.toContain(FAILED);
+  });
+
+  it('never sends Failed after Passed', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setSuccessStatus('passed');
+    adapter.setSuccessStatus('failed');
+    adapter.terminate();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(sentVerbs()).toContain(PASSED);
+    expect(sentVerbs()).not.toContain(FAILED);
   });
 
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
@@ -925,6 +974,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(40);
       adapter.setSuccessStatus('failed');
+      adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
 
       const failed = mockFetch.mock.calls
@@ -935,6 +985,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find(
           (b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/failed',
         );
@@ -1039,6 +1090,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find((b: any) => b?.verb?.id === verbId);
     }
 
@@ -1083,6 +1135,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter2.setSuccessStatus('failed');
+      adapter2.terminate();
       await new Promise((r) => setTimeout(r, 50));
       const failed = statementFor('http://adlnet.gov/expapi/verbs/failed');
       expect(categoryIds(failed)).toEqual([CMI5_CAT, MOVEON_CAT]);
@@ -1281,6 +1334,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find((b: any) => b?.verb?.id === verbId);
     }
 
@@ -1348,6 +1402,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find((b: any) => b?.verb?.id === verbId);
     }
 
@@ -1487,6 +1542,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find((b: any) => b?.verb?.id === verbId);
     }
 
@@ -1535,6 +1591,7 @@ describe('CMI5Adapter', () => {
             return null;
           }
         })
+        .flat()
         .find((b: any) => b?.verb?.id === verbId);
     }
 
@@ -1596,6 +1653,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(40);
       adapter.setSuccessStatus('failed');
+      adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
       const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
       expect(failed.result.score.scaled).toBeCloseTo(0.4);
@@ -1613,6 +1671,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85); // scaled = 0.85, above mastery 0.7
       adapter.setSuccessStatus('failed');
+      adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
       const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
       expect(failed).toBeDefined();
@@ -1629,6 +1688,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85);
       adapter.setSuccessStatus('failed');
+      adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
       const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
       expect(failed).toBeDefined();
@@ -1667,6 +1727,7 @@ describe('CMI5Adapter', () => {
       adapter.setScore(60);
       adapter.setSuccessStatus('failed');
       adapter.commit();
+      adapter.terminate();
       await new Promise((r) => setTimeout(r, 50));
 
       expect(

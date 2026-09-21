@@ -1,6 +1,7 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { STANDARDS } from '../standards.js';
+import type { SuccessStatus } from '../persistence.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -203,6 +204,25 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // loadState(), so a slow LRS can't push it past the spec's "reasonable
     // period".
     this.sendInitialized();
+  }
+
+  #heldFailed = false;
+
+  override setSuccessStatus(status: SuccessStatus): void {
+    if (status === 'failed') {
+      this.#heldFailed = this.lastSuccessEmitted === 'unknown';
+      return;
+    }
+    this.#heldFailed = false;
+    super.setSuccessStatus(status);
+  }
+
+  override terminate(): void {
+    if (this.#heldFailed && !this.terminated) {
+      this.#heldFailed = false;
+      super.setSuccessStatus('failed');
+    }
+    super.terminate();
   }
 
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */
