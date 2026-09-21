@@ -1958,7 +1958,7 @@ function reportEffectiveWeights(
     );
   }
 
-  if (graded.length < 2) return;
+  if (graded.length < 2 || required.length === 0) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
   const weights = graded.map((p) => p.weight ?? 1);
@@ -1969,9 +1969,7 @@ function reportEffectiveWeights(
       : undefined;
   if (scale !== undefined && Math.abs(total - scale) > scale * 1e-6) {
     const excluded =
-      optional.length > 0
-        ? ` The total leaves out the optional pages: ${optional.map((p) => p.fileRel).join(', ')}.`
-        : '';
+      optional.length > 0 ? ' The total leaves out the optional pages.' : '';
     d.warn(
       `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +
         `Add up to ${scale} to make each weight the page's percentage of the course score, ` +

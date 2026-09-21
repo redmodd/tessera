@@ -942,8 +942,6 @@ export const pageConfig = { title: "${name}", graded: true, required: false, wei
     expect(sum).toHaveLength(1);
     expect(sum[0]).toContain('sum to 40, not 100');
     expect(sum[0]).toContain('leaves out the optional pages');
-    expect(sum[0]).toContain('p1.svelte');
-    expect(sum[0]).toContain('p2.svelte');
   });
 
   it('does not quote a total when no graded page is required', () => {
@@ -962,11 +960,12 @@ export const pageConfig = { title: "${name}", graded: true, required: false, wei
 <MultipleChoice id="q${name}" question="?" options={["a","b"]} correct={0} graded />`,
       );
     }
-    const { infos } = validateProject(testRoot);
+    const { infos, warnings } = validateProject(testRoot);
     const weighting = infos.filter((i) => i.includes('score weighting'));
     expect(weighting).toHaveLength(1);
     expect(weighting[0]).toContain('no graded page is required');
     expect(weighting[0]).not.toContain('that total');
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
   });
 
   it('quotes each weight share against the required pages alone', () => {
@@ -1038,8 +1037,7 @@ export const pageConfig = { title: "Practice", graded: true, required: false, we
     const { warnings } = validateProject(testRoot);
     const sum = warnings.find((w) => w.includes('weights sum to'));
     expect(sum).toContain('weights sum to 95, not 100');
-    expect(sum).toContain('leaves out the optional pages: ');
-    expect(sum).toContain('practice.svelte');
+    expect(sum).toContain('leaves out the optional pages');
   });
 
   it('errors when quiz completion has no required graded page to judge', () => {
