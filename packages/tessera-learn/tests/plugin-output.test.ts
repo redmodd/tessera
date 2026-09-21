@@ -278,7 +278,9 @@ describe('export packaging gate', () => {
   });
 
   it('satisfies on Completed when every graded page is optional', async () => {
-    const xml = await cmi5XmlFor('{ quiz: { graded: true, required: false } }');
+    const xml = await cmi5XmlFor(
+      '{ required: false, quiz: { graded: true } }',
+    );
     expect(xml).toContain('moveOn="Completed"');
   });
 

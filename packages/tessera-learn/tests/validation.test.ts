@@ -822,19 +822,20 @@ export const pageConfig = { title: "Just Prose", required: false };
     );
   });
 
-  it('warns when quiz.required is set on a quiz that is not graded', () => {
+  it('warns that quiz.required is ignored', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
       `<script module>
-export const pageConfig = { title: "Practice", quiz: { required: false } };
+export const pageConfig = { title: "Practice", quiz: { graded: true, required: false } };
 </script>
-<h1>Practice</h1>`,
+<h1>Practice</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} />`,
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining('quiz.required only applies to a graded quiz'),
+      expect.stringContaining('quiz.required is ignored'),
     );
   });
 
@@ -968,23 +969,6 @@ export const pageConfig = { title: "${name}", graded: true, required: false, wei
     expect(weighting[0]).not.toContain('that total');
   });
 
-  it('does not call a graded page optional when quiz.required opts out', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/exam.svelte',
-      `<script module>
-export const pageConfig = { title: "Exam", graded: true, quiz: { required: false } };
-</script>
-<h1>Exam</h1>
-<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('never joins the rollup')),
-    ).toEqual([]);
-  });
-
   it('quotes each weight share against the required pages alone', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1056,24 +1040,6 @@ export const pageConfig = { title: "Practice", graded: true, required: false, we
     expect(sum).toContain('weights sum to 95, not 100');
     expect(sum).toContain('leaves out the optional pages: ');
     expect(sum).toContain('practice.svelte');
-  });
-
-  it('errors when pageConfig.required contradicts quiz.required', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script module>
-export const pageConfig = { title: "Exam", required: true, quiz: { graded: true, required: false } };
-</script>
-<h1>Exam</h1>`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining(
-        'pageConfig.required is true but quiz.required is false',
-      ),
-    );
   });
 
   it('errors when quiz completion has no required graded page to judge', () => {

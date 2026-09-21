@@ -350,7 +350,6 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 | Field           | Type                                 | Default    | Description                                                                                                                                                                                        |
 | --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                     |
-| `required`      | `boolean`                            | `true`     | Graded only. `false` keeps an unattempted page out of the course score instead of counting it as 0                                                                                                 |
 | `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                        |
 | `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                                 |
 | `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                                  |
@@ -364,11 +363,11 @@ Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how
 
 Three top-level `pageConfig` fields control a page's share of the **course** score. All sit beside `quiz`, not inside it.
 
-| Field      | Type      | Default | Effect                                                                    |
-| ---------- | --------- | ------- | ------------------------------------------------------------------------- |
-| `graded`   | `boolean` | `false` | The page counts toward the course score from the start, answered or not   |
-| `required` | `boolean` | `true`  | `false` holds the page out of the score until it is answered              |
-| `weight`   | `number`  | `1`     | How hard the page pulls, relative to other graded pages. Must be positive |
+| Field      | Type      | Default | Effect                                                                            |
+| ---------- | --------- | ------- | --------------------------------------------------------------------------------- |
+| `graded`   | `boolean` | `false` | The page counts toward the course score                                           |
+| `required` | `boolean` | `true`  | Graded only. `true`: counts as 0 until answered. `false`: left out until answered |
+| `weight`   | `number`  | `1`     | How hard the page pulls, relative to other graded pages. Must be positive         |
 
 ```svelte
 <script module>
@@ -390,26 +389,26 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every required graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
+Required graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every required graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
 
-**`required: false` makes a graded page optional: it counts when attempted, and is absent from the rollup when not.** It leaves both halves of the average, so skipping it does not drag the course score down, and it is what expresses practice quizzes beside a final exam:
+**`required: false` makes a graded page optional.** Unanswered, it is left out of the rollup entirely; answered, it counts with its weight. Use it for practice quizzes beside a required exam:
 
 ```svelte
 <script module>
   export const pageConfig = {
     title: 'Practice',
-    quiz: { graded: true, required: false }, // quiz page
+    required: false,
+    quiz: { graded: true }, // or graded: true on a standalone page
   };
-  // standalone page: { graded: true, required: false }
 </script>
 ```
 
-Scoring and verdict only. Gating stays with `quiz.gatesProgress`: an optional page the learner opens still has to be answered before it counts as completed under `completion.mode: "percentage"`, or unlocks the next page under `navigation.mode: "sequential"`, the same as any other graded page. `tessera validate` quotes each weight's share against the required pages alone and lists the optional ones separately, since the required set is what a learner who takes nothing optional is scored on. `required` on a page that isn't graded warns: nothing reads it, and so does `quiz.required` on an ungraded quiz. Setting both `pageConfig.required` and `quiz.required` to different values errors: either one set to `false` makes the page optional, so the other is discarded.
-
-**An untaken optional page holds nothing back.** The score and the verdict reach the LMS once every required graded page has a score or the course completes, so a learner who skips every optional page is still scored and still judged. Two consequences worth designing around:
-
-- **Graded work taken after the score is reported re-grades it, optional or not.** A learner who is sent `passed` on the exam, then goes back and fails the optional practice, is re-scored across both and sent `failed`. The completion stands: once the LMS is told complete it is never told incomplete again, across sessions, so a re-grade moves the score and the verdict and leaves credit for finishing. `useProgress().completionStatus` is the live reading and does go back below the threshold, so gate a "course complete" badge on it only if that is what you want the learner to see. Keep an optional page out of the rollup entirely (`graded: false`) if its score should never move the verdict.
-- **`completion.mode: "quiz"` needs a required graded page.** With every graded page optional there is no average to judge, so the course can never complete on its score. `tessera validate` errors.
+- **Scoring and verdict only.** Under `completion.mode: "percentage"` and `navigation.mode: "sequential"` it behaves like any graded page: it counts as completed, and unlocks the next page, only once answered.
+- **Optional pages never hold the score back.** The score and verdict reach the LMS once every required graded page has a score, or the course completes.
+- **An optional page answered later re-grades the course.** A learner sent `passed` who then fails the practice is re-scored and sent `failed`. Use `graded: false` if a page's score should never move the verdict.
+- **Completion never goes backwards.** Once the LMS is told complete it stays complete, across sessions. `useProgress().completionStatus` is the live reading and can drop below the threshold again.
+- **`completion.mode: "quiz"` needs a required graded page.** `tessera validate` errors without one.
+- `tessera validate` quotes weight shares against the required pages and lists optional pages separately. `required` on an ungraded page warns. `quiz.required` is ignored and warns.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 

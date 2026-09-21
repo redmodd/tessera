@@ -2,7 +2,8 @@
   export const pageConfig = {
     title: 'Practice',
     weight: 100,
-    quiz: { graded: true, required: false },
+    required: false,
+    quiz: { graded: true },
   };
 </script>
 

@@ -117,10 +117,11 @@ describe('a graded submit that decides the verdict', () => {
     const setCompletionStatus = vi.fn();
     const mounted = await mountApp(
       stubAdapter({ setCompletionStatus }),
-      createManifest(2, {
-        0: { graded: true },
-        1: { graded: true, required: false },
-      }),
+      createManifest(
+        2,
+        { 0: { graded: true }, 1: { graded: true } },
+        { 1: { required: false } },
+      ),
     );
     cleanup = mounted.cleanup;
     await flush();

@@ -1025,8 +1025,7 @@ interface PageInfo {
   fileRel: string;
   navIndex: number;
   graded: boolean;
-  /** Effective, not declared: only a graded page that opted out reads false. */
-  required: boolean;
+  requiredGraded: boolean;
   hasQuiz: boolean;
   weight?: number;
   completesOnView: boolean;
@@ -1069,7 +1068,7 @@ function validatePageFile(
         fileRel,
         navIndex,
         graded: false,
-        required: false,
+        requiredGraded: false,
         hasQuiz: false,
         completesOnView: false,
       },
@@ -1082,25 +1081,27 @@ function validatePageFile(
 
   const isQuiz = !!pageConfig?.quiz;
   let isGradedQuiz = false;
-  let quizRequired: boolean | undefined;
   if (pageConfig?.quiz) {
     validateQuizConfig(pageConfig.quiz, fileRel, d);
     if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
       isGradedQuiz = true;
     }
-    const declared = (pageConfig.quiz as { required?: unknown }).required;
-    if (typeof declared === 'boolean') quizRequired = declared;
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
-  const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
-  const declaresRequired = validatePageRequired(pageConfig, fileRel, d);
+  const declaresGraded =
+    validatePageBoolean(pageConfig, 'graded', fileRel, d) ?? false;
+  const declaresRequired = validatePageBoolean(
+    pageConfig,
+    'required',
+    fileRel,
+    d,
+  );
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
-  const required = isRequiredGradedPage({
+  const requiredGraded = isRequiredGradedPage({
     graded,
     required: declaresRequired,
-    quiz: { graded: isGradedQuiz, required: quizRequired },
   });
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
@@ -1114,28 +1115,11 @@ function validatePageFile(
         'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
-  if (
-    declaresRequired !== undefined &&
-    quizRequired !== undefined &&
-    declaresRequired !== quizRequired
-  ) {
-    d.error(
-      `${fileRel}: pageConfig.required is ${declaresRequired} but quiz.required is ${quizRequired}. ` +
-        'Either one set to false makes the page optional, so the other is discarded. ' +
-        'Set required in one place.',
-    );
-  }
   if (declaresRequired !== undefined && !graded) {
     d.warn(
       `${fileRel}: pageConfig.required only applies to a graded page. ` +
         'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
         'so nothing reads it.',
-    );
-  }
-  if (quizRequired !== undefined && !graded) {
-    d.warn(
-      `${fileRel}: quiz.required only applies to a graded quiz. ` +
-        'Without `graded: true` the page never joins the rollup, so nothing reads it.',
     );
   }
   if (weight !== undefined && !graded) {
@@ -1193,7 +1177,7 @@ function validatePageFile(
       fileRel,
       navIndex,
       graded,
-      required,
+      requiredGraded,
       hasQuiz: isQuiz,
       ...(weight !== undefined ? { weight } : {}),
       completesOnView,
@@ -1388,36 +1372,21 @@ function validateCompletesOn(
   return false;
 }
 
-function validatePageGraded(
-  pageConfig: { graded?: unknown } | null,
-  fileRel: string,
-  d: Diagnostics,
-): boolean {
-  const graded = pageConfig?.graded;
-  if (graded === undefined) return false;
-  if (typeof graded !== 'boolean') {
-    d.error(
-      `${fileRel}: pageConfig.graded must be a boolean, got ${JSON.stringify(graded)}`,
-    );
-    return false;
-  }
-  return graded;
-}
-
-function validatePageRequired(
-  pageConfig: { required?: unknown } | null,
+function validatePageBoolean(
+  pageConfig: { graded?: unknown; required?: unknown } | null,
+  field: 'graded' | 'required',
   fileRel: string,
   d: Diagnostics,
 ): boolean | undefined {
-  const required = pageConfig?.required;
-  if (required === undefined) return undefined;
-  if (typeof required !== 'boolean') {
+  const value = pageConfig?.[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') {
     d.error(
-      `${fileRel}: pageConfig.required must be a boolean, got ${JSON.stringify(required)}`,
+      `${fileRel}: pageConfig.${field} must be a boolean, got ${JSON.stringify(value)}`,
     );
     return undefined;
   }
-  return required;
+  return value;
 }
 
 function validatePageWeight(
@@ -1458,12 +1427,18 @@ function validateQuizConfig(
     }
   }
 
-  for (const field of ['graded', 'required', 'gatesProgress']) {
+  for (const field of ['graded', 'gatesProgress']) {
     if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
       d.error(
         `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
       );
     }
+  }
+
+  if (cfg.required !== undefined) {
+    d.warn(
+      `${fileRel}: quiz.required is ignored. Set required on pageConfig, beside quiz.`,
+    );
   }
 
   if (
@@ -1950,8 +1925,8 @@ function reportEffectiveWeights(
   if (!graded.some((p) => p.weight !== undefined)) return;
   // The required pages are the whole rollup for a learner who takes nothing
   // optional, so they are the denominator every share is quoted against.
-  const required = graded.filter((p) => p.required);
-  const optional = graded.filter((p) => !p.required);
+  const required = graded.filter((p) => p.requiredGraded);
+  const optional = graded.filter((p) => !p.requiredGraded);
   const total = required.reduce((sum, p) => sum + (p.weight ?? 1), 0);
   if (required.length > 0) {
     const shares = required
@@ -2039,7 +2014,7 @@ function crossValidate(
 
   const noRequiredGraded =
     pageResults.hasGraded &&
-    !pageResults.pages.some((p) => p.required) &&
+    !pageResults.pages.some((p) => p.requiredGraded) &&
     !pageResults.hasParseErrors;
   if (quizMode && noRequiredGraded) {
     d.error(

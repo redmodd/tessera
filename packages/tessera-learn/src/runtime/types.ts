@@ -55,8 +55,6 @@ function asserted(status: string | undefined): SuccessConfig {
  */
 export interface QuizConfig {
   graded?: boolean;
-  /** Graded-only. `false` keeps the page out of the rollup until it is attempted. */
-  required?: boolean;
   gatesProgress?: boolean;
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
@@ -84,11 +82,7 @@ export function isRequiredGradedPage(page: {
   graded?: boolean;
   required?: boolean;
 }): boolean {
-  return (
-    isGradedPage(page) &&
-    page.quiz?.required !== false &&
-    page.required !== false
-  );
+  return isGradedPage(page) && page.required !== false;
 }
 
 export interface CourseConfig {

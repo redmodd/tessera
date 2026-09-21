@@ -17,7 +17,8 @@ const pages = [
     title: 'Practice',
     slug: 'practice',
     importPath: '/practice.svelte',
-    quiz: { graded: true, required: false },
+    required: false,
+    quiz: { graded: true },
   },
 ];
 

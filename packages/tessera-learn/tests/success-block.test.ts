@@ -110,9 +110,11 @@ describe('success.from: "quiz" under manual completion', () => {
   });
 
   it('reports no verdict when the only graded page was optional', () => {
-    const manifest = createManifest(5, {
-      2: { graded: true, required: false },
-    });
+    const manifest = createManifest(
+      5,
+      { 2: { graded: true } },
+      { 2: { required: false } },
+    );
     const config = createConfig({
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
