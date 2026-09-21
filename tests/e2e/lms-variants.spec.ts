@@ -348,8 +348,6 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
     expect(await lessonStatus(page)).toBe('passed');
 
-    // Graded work taken after the course completes re-grades it, optional or
-    // not: the page joins both halves, (0*25 + 100*75 + 0*100) / 200.
     await answerPractice(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');

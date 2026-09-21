@@ -68,8 +68,8 @@ describe('success.from: "none"', () => {
 });
 
 describe('success.from: "quiz" under manual completion', () => {
-  const build = () => {
-    const manifest = createManifest(5, { 2: { graded: true } });
+  const build = (pageOpts?: Parameters<typeof createManifest>[2]) => {
+    const manifest = createManifest(5, { 2: { graded: true } }, pageOpts);
     const config = createConfig({
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
@@ -110,17 +110,7 @@ describe('success.from: "quiz" under manual completion', () => {
   });
 
   it('reports no verdict when the only graded page was optional', () => {
-    const manifest = createManifest(
-      5,
-      { 2: { graded: true } },
-      { 2: { required: false } },
-    );
-    const config = createConfig({
-      completion: { mode: 'manual' },
-      success: { from: 'quiz' },
-      scoring: { passingScore: 70 },
-    });
-    const progress = new ProgressState(manifest, config);
+    const progress = build({ 2: { required: false } });
 
     progress.markCompleteManually();
 

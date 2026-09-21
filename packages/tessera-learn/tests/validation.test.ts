@@ -33,17 +33,6 @@ function writeFile(root: string, relPath: string, content: string): void {
 }
 
 /** Create a minimal valid project structure */
-function writeGradedPage(root: string, name: string, fields = ''): void {
-  writeFile(
-    root,
-    `pages/01-section/01-lesson/${name}.svelte`,
-    `<script module>
-export const pageConfig = { title: "${name}", graded: true${fields ? `, ${fields}` : ''} };
-</script>
-<h1>${name}</h1>`,
-  );
-}
-
 function createValidProject(root: string): void {
   writeConfig(
     root,
@@ -70,6 +59,17 @@ function createValidProject(root: string): void {
     'export default { title: "Lesson" };',
   );
   writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hello</h1>');
+}
+
+function writeGradedPage(root: string, name: string, fields = ''): void {
+  writeFile(
+    root,
+    `pages/01-section/01-lesson/${name}.svelte`,
+    `<script module>
+export const pageConfig = { title: "${name}", graded: true${fields ? `, ${fields}` : ''} };
+</script>
+<h1>${name}</h1>`,
+  );
 }
 
 beforeEach(() => {

@@ -190,9 +190,7 @@ export function generateCMI5Xml(
   // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
   // the AU. Wherever the course sends a verdict, that verdict can be Failed and
   // a failed learner should not receive credit. A course that sends none has to
-  // satisfy on Completed alone, or nothing ever satisfies the AU. A quiz
-  // verdict needs a required page: one a learner may skip judges nobody who
-  // skips it, and CompletedAndPassed would strand them.
+  // satisfy on Completed alone, or nothing ever satisfies the AU.
   const moveOn = sendsVerdict(config, hasRequiredGradedPage)
     ? 'CompletedAndPassed'
     : 'Completed';

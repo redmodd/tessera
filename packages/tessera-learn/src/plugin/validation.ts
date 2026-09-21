@@ -44,6 +44,7 @@ import {
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type ManualCompletion,
@@ -1098,7 +1099,10 @@ function validatePageFile(
   );
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
-  const requiredGraded = graded && declaresRequired !== false;
+  const requiredGraded = isRequiredGradedPage({
+    graded,
+    required: declaresRequired,
+  });
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
@@ -1917,22 +1921,19 @@ function reportEffectiveWeights(
 ): void {
   const graded = pageResults.pages.filter((p) => p.graded);
   if (!graded.some((p) => p.weight !== undefined)) return;
-  // The required pages are the whole rollup for a learner who takes nothing
-  // optional, so they are the denominator every share is quoted against.
+  const weightOf = (p: PageInfo) => p.weight ?? 1;
   const required = graded.filter((p) => p.requiredGraded);
   const optional = graded.filter((p) => !p.requiredGraded);
-  const total = required.reduce((sum, p) => sum + (p.weight ?? 1), 0);
+  const total = required.reduce((sum, p) => sum + weightOf(p), 0);
   if (required.length > 0) {
     const shares = required
-      .map(
-        (p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`,
-      )
+      .map((p) => `${p.fileRel} ${((weightOf(p) / total) * 100).toFixed(1)}%`)
       .join(', ');
     d.info(`course score weighting: ${shares}`);
   }
   if (optional.length > 0) {
     const list = optional
-      .map((p) => `${p.fileRel} weight ${p.weight ?? 1}`)
+      .map((p) => `${p.fileRel} weight ${weightOf(p)}`)
       .join(', ');
     d.info(
       required.length > 0
@@ -1955,7 +1956,7 @@ function reportEffectiveWeights(
   if (graded.length < 2 || required.length === 0) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
-  const weights = graded.map((p) => p.weight ?? 1);
+  const weights = graded.map(weightOf);
   const scale = weights.some((w) => w >= 5)
     ? 100
     : weights.every((w) => w < 1)
@@ -1983,11 +1984,10 @@ function crossValidate(
   // criterion. With nothing graded there is no average and nothing reads it.
   const judgesScore =
     pageResults.hasGraded && resolveSuccess(config).from === 'quiz';
+  const quizVerdict = config.success?.from === 'quiz';
+  const hasRequiredGraded = pageResults.pages.some((p) => p.requiredGraded);
 
-  if (
-    !pageResults.pages.some((p) => p.requiredGraded) &&
-    !pageResults.hasParseErrors
-  ) {
+  if (!hasRequiredGraded && !pageResults.hasParseErrors) {
     if (quizMode) {
       d.error(
         pageResults.hasGraded
@@ -2002,6 +2002,10 @@ function crossValidate(
           'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
           'course reports, or drop required from the page that gates credit.',
       );
+    } else if (quizVerdict) {
+      d.warn(
+        'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
+      );
     }
   }
 
@@ -2011,18 +2015,6 @@ function crossValidate(
   if (config.scoring?.passingScore === undefined && (quizMode || judgesScore)) {
     d.warn(
       `${quizMode ? 'completion.mode is "quiz"' : 'the course judges pass/fail on the graded average'} but scoring.passingScore is not set, so it defaults to 70%. Set it explicitly to be sure.`,
-    );
-  }
-
-  const quizVerdict = config.success?.from === 'quiz';
-  if (
-    quizVerdict &&
-    !quizMode &&
-    !pageResults.hasGraded &&
-    !pageResults.hasParseErrors
-  ) {
-    d.warn(
-      'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
     );
   }
 

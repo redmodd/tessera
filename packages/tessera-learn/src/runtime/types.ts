@@ -72,11 +72,6 @@ export function isGradedPage(page: {
   return !!(page.quiz?.graded || page.graded);
 }
 
-/**
- * Whether an unattempted page still counts, as a 0. Optional pages join the
- * rollup only once they have a score, so skipping one neither depresses the
- * course score nor decides the verdict.
- */
 export function isRequiredGradedPage(page: {
   quiz?: QuizConfig | null;
   graded?: boolean;

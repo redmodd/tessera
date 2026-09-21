@@ -295,13 +295,10 @@ export class ProgressState {
 
   #changed() {
     this.version++;
-    if (!this.#gradedScoreDecided && untrack(() => this.gradedScoreFinal))
-      this.#gradedScoreDecided = true;
-    if (
-      !this.#completionReached &&
-      untrack(() => this.completionStatus) === 'complete'
-    )
-      this.#completionReached = true;
+    this.#gradedScoreDecided ||= untrack(() => this.gradedScoreFinal);
+    this.#completionReached ||= untrack(
+      () => this.completionStatus === 'complete',
+    );
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -324,12 +321,7 @@ export class ProgressState {
       : 'incomplete';
   });
 
-  /**
-   * What the LMS is told. `completionStatus` follows the score both ways, so a
-   * course re-graded below its threshold reads incomplete again; the LMS keeps
-   * the completion it was given.
-   */
-  reportedCompletionStatus = $derived.by<CompletionStatus>(() =>
+  reportedCompletionStatus = $derived<CompletionStatus>(
     this.#completionReached ? 'complete' : this.completionStatus,
   );
 
