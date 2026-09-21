@@ -226,6 +226,7 @@
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
+      ...(progress.completionReached ? { k: 1 } : {}),
     };
   }
 
@@ -272,6 +273,9 @@
     }
     if (saved.s === 1) {
       progress.restoreGradedScoreDecided();
+    }
+    if (saved.k === 1) {
+      progress.restoreCompletionReached();
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
@@ -347,10 +351,9 @@
 
   let prevCompletionStatus = 'incomplete';
   $effect(() => {
-    const status = progress.completionStatus;
+    const status = progress.reportedCompletionStatus;
     if (!persistenceReady) return;
-    if (prevCompletionStatus === 'complete' || status === prevCompletionStatus)
-      return;
+    if (status === prevCompletionStatus) return;
     prevCompletionStatus = status;
     untrack(() => {
       adapter.setCompletionStatus(status);
@@ -383,7 +386,7 @@
     // exit. cmi5/web adapters no-op. Must come before terminate() so the
     // value is committed in the same flush.
     adapter.setExit(
-      progress.completionStatus === 'complete' ? 'normal' : 'suspend',
+      progress.reportedCompletionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
     xapiClient?.markUnloading();
@@ -444,14 +447,14 @@
       const saved = adapter.getState();
       if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
         restoreState(saved);
-        prevCompletionStatus = progress.completionStatus;
+        prevCompletionStatus = progress.reportedCompletionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
           ? progress.gradedScore.average
           : null;
         if (
           adapter.seedLifecycle(
-            progress.completionStatus,
+            progress.reportedCompletionStatus,
             progress.successStatus,
             seededScore,
           )
@@ -484,7 +487,7 @@
     // Push initial completion + success status to the adapter so LMSes never
     // see the SCORM default ("unknown") on Terminate — SCORM Cloud rolls that
     // up to "completed"/"passed" during status rollup.
-    adapter.setCompletionStatus(progress.completionStatus);
+    adapter.setCompletionStatus(progress.reportedCompletionStatus);
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 

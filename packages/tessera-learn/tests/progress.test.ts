@@ -996,6 +996,49 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('failed');
     });
 
+    it('keeps the reported completion once a re-grade undoes it', () => {
+      const manifest = createManifest(4, {
+        0: { graded: true },
+        1: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(0, 100);
+
+      expect(progress.reportedCompletionStatus).toBe('complete');
+
+      progress.quizCompleted(1, 0);
+
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.reportedCompletionStatus).toBe('complete');
+    });
+
+    it('keeps a fixed verdict once a re-grade undoes the completion', () => {
+      const manifest = createManifest(4, {
+        0: { graded: true },
+        1: { graded: true, required: false },
+      });
+      const progress = new ProgressState(
+        manifest,
+        createConfig({
+          completion: { mode: 'quiz' },
+          success: { from: 'fixed', status: 'passed' },
+        }),
+      );
+
+      progress.quizCompleted(0, 100);
+
+      expect(progress.successStatus).toBe('passed');
+
+      progress.quizCompleted(1, 0);
+
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('passed');
+    });
+
     it('cannot complete on the quiz average with no required page to judge', () => {
       const manifest = createManifest(5, {
         1: { graded: true, required: false },

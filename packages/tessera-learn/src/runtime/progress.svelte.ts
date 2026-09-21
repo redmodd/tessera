@@ -287,10 +287,25 @@ export class ProgressState {
     this.#gradedScoreDecided = true;
   }
 
+  #completionReached = $state(false);
+
+  get completionReached(): boolean {
+    return this.#completionReached;
+  }
+
+  restoreCompletionReached(): void {
+    this.#completionReached = true;
+  }
+
   #changed() {
     this.version++;
     if (!this.#gradedScoreDecided && untrack(() => this.gradedScoreFinal))
       this.#gradedScoreDecided = true;
+    if (
+      !this.#completionReached &&
+      untrack(() => this.completionStatus) === 'complete'
+    )
+      this.#completionReached = true;
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -312,6 +327,15 @@ export class ProgressState {
       ? 'complete'
       : 'incomplete';
   });
+
+  /**
+   * What the LMS is told. `completionStatus` follows the score both ways, so a
+   * course re-graded below its threshold reads incomplete again; the LMS keeps
+   * the completion it was given.
+   */
+  reportedCompletionStatus = $derived.by<CompletionStatus>(() =>
+    this.#completionReached ? 'complete' : this.completionStatus,
+  );
 
   completedPages = $derived.by<number>(() => {
     let count = 0;
@@ -338,7 +362,9 @@ export class ProgressState {
     const success = this.#success;
     if (success.from === 'none') return 'unknown';
     if (success.from === 'fixed')
-      return this.completionStatus === 'complete' ? success.status : 'unknown';
+      return this.reportedCompletionStatus === 'complete'
+        ? success.status
+        : 'unknown';
     if (!this.gradedScoreFinal) return 'unknown';
     const { average } = this.#graded;
     return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
