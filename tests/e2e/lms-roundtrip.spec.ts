@@ -509,9 +509,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(tokenRequests).toBeGreaterThanOrEqual(1);
 
     // Find an Initialized statement
-    const initStmt = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-    );
+    const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
@@ -750,9 +748,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(500);
 
-    const initStmt = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-    );
+    const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
@@ -837,13 +833,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await exitCourse(page);
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/terminated',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
+      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+      .toBeTruthy();
   });
 });
