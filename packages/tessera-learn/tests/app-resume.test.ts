@@ -165,25 +165,24 @@ describe('App restore gate honours config.resume', () => {
       setCompletionStatus,
       saveState,
       unmount,
-    } = await mountApp('auto', { saved: savedWith({ k: 1, p: 1 }) });
+    } = await mountApp('auto', { saved: savedWith({ s: 1, k: 1, p: 90 }) });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(seedLifecycle.mock.calls[0].slice(0, 2)).toEqual([
-      'complete',
-      'passed',
-    ]);
+    expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
     expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 1 });
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 90 });
   });
 
-  it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
-    const saved = savedWith({ g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } } });
+  it('round-trips a weighted standalone question as [score, weight, graded], and the questions left unanswered', async () => {
+    const saved = savedWith({
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
+    });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
     });
   });
 

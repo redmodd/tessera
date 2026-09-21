@@ -42,7 +42,9 @@ const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   ('s' in value ? isNumber(value.s) : true) &&
   (value.a == null || isNumber(value.a)) &&
-  (value.q == null || isQuestionRecord(value.q));
+  (value.q == null || isQuestionRecord(value.q)) &&
+  (value.w == null ||
+    (Array.isArray(value.w) && value.w.every((id) => typeof id === 'string')));
 
 // Rejected whole: a shape restoreState() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.

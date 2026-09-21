@@ -146,7 +146,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         navCtx.manifest.pages[navCtx.nav.currentPageIndex].slug,
       );
     }
-    navCtx.progress.refreshStandaloneQuestion(
+    navCtx.progress.registerStandaloneQuestion(
       navCtx.nav.currentPageIndex,
       opts.id,
       !!opts.graded,

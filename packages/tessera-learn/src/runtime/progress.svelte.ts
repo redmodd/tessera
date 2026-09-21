@@ -189,24 +189,70 @@ export class ProgressState {
   }
 
   /**
-   * Correct a restored answer's `graded` flag and weight from the mounted
-   * component, which outranks what the save was written with.
-   * ponytail: only pages the learner reopens are corrected; a full sweep needs
+   * Record a mounted question, so its page counts as answered only once every
+   * graded question on it is, and correct a restored answer's `graded` flag
+   * and weight from it, which outranks what the save was written with.
+   * ponytail: only pages the learner opens are registered and corrected, and a
+   * question behind a reveal registers once shown; a full sweep needs
    * build-time extraction, which can't see custom question components.
    */
-  refreshStandaloneQuestion(
+  registerStandaloneQuestion(
     pageIndex: number,
     questionId: string,
     graded: boolean,
     weight?: number,
   ) {
+    const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
-    if (!questions || !result) return;
     const next = normalizeWeight(weight);
-    if (next === result.weight && graded === result.graded) return;
-    questions.set(questionId, { ...result, weight: next, graded });
-    this.#writeQuestions(pageIndex, questions);
+    if (
+      questions &&
+      result &&
+      (next !== result.weight || graded !== result.graded)
+    ) {
+      questions.set(questionId, { ...result, weight: next, graded });
+      this.#writeQuestions(pageIndex, questions);
+    } else if (expectedChanged) {
+      this.#changed();
+    }
+  }
+
+  restoreUnanswered(pageIndex: number, questionIds: string[]) {
+    if (this.#expect(pageIndex, questionIds, true)) this.#changed();
+  }
+
+  unansweredQuestions(pageIndex: number): string[] {
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    return [...(this.#expected.get(pageIndex) ?? [])].filter(
+      (id) => !questions?.get(id)?.graded,
+    );
+  }
+
+  #expected = new SvelteMap<number, ReadonlySet<string>>();
+
+  #expect(pageIndex: number, questionIds: string[], graded: boolean): boolean {
+    const before = this.#expected.get(pageIndex);
+    const ids = new Set(before);
+    for (const id of questionIds) {
+      if (graded) ids.add(id);
+      else ids.delete(id);
+    }
+    if (ids.size === (before?.size ?? 0)) return false;
+    this.#expected.set(pageIndex, ids);
+    return true;
+  }
+
+  #answered(pageIndex: number): boolean {
+    if (
+      this.#quizGradedIndices.has(pageIndex) &&
+      this.quizScore(pageIndex) !== undefined
+    )
+      return true;
+    return (
+      this.#gradedResults(pageIndex).length > 0 &&
+      this.unansweredQuestions(pageIndex).length === 0
+    );
   }
 
   pageScore(pageIndex: number): number | undefined {
@@ -250,7 +296,9 @@ export class ProgressState {
     let attempted = false;
     let allScored = true;
     for (const pageIndex of this.#declaredGradedIndices) {
-      const score = this.pageScore(pageIndex);
+      const score = this.#answered(pageIndex)
+        ? this.pageScore(pageIndex)
+        : undefined;
       if (score !== undefined) attempted = true;
       else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
       else continue;
@@ -293,10 +341,10 @@ export class ProgressState {
     this.#completionReached = true;
   }
 
-  #passReached = $state(false);
+  #passScore = $state<number | null>(null);
 
-  restorePassReached(): void {
-    this.#passReached = true;
+  restorePass(score: number): void {
+    this.#passScore = Math.max(this.#passScore ?? score, score);
   }
 
   #replaying = false;
@@ -321,7 +369,11 @@ export class ProgressState {
     this.#completionReached ||= untrack(
       () => this.completionStatus === 'complete',
     );
-    this.#passReached ||= untrack(() => this.#verdict === 'passed');
+    const average = untrack(() => this.#graded.average);
+    if (this.#passScore !== null)
+      this.#passScore = Math.max(this.#passScore, average);
+    else if (untrack(() => this.#verdict === 'passed'))
+      this.#passScore = average;
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -364,8 +416,7 @@ export class ProgressState {
     )
       return true;
     return (
-      this.#declaredGradedIndices.has(pageIndex) &&
-      this.pageScore(pageIndex) === undefined
+      this.#declaredGradedIndices.has(pageIndex) && !this.#answered(pageIndex)
     );
   }
 
@@ -383,8 +434,15 @@ export class ProgressState {
   });
 
   successStatus = $derived<SuccessStatus>(
-    this.#passReached ? 'passed' : this.#verdict,
+    this.#passScore !== null ? 'passed' : this.#verdict,
   );
+
+  get reportedScore(): number {
+    const { average } = this.#graded;
+    return this.#passScore === null
+      ? average
+      : Math.max(average, this.#passScore);
+  }
 
   /**
    * Effective graded score for LMS reporting. Same union and averaging as

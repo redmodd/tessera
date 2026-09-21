@@ -214,6 +214,8 @@
         }
         entry.q = questions;
       }
+      const unanswered = progress.unansweredQuestions(pageIndex);
+      if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
@@ -227,7 +229,9 @@
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
       ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
-      ...(progress.successStatus === 'passed' ? { p: 1 } : {}),
+      ...(progress.successStatus === 'passed'
+        ? { p: progress.reportedScore }
+        : {}),
     };
   }
 
@@ -250,6 +254,7 @@
           if (unit.s !== undefined) {
             progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
           }
+          if (unit.w) progress.restoreUnanswered(pageIndex, unit.w);
           for (const [qid, entry] of Object.entries(unit.q ?? {})) {
             const [score, weight, graded] = Array.isArray(entry)
               ? entry
@@ -280,8 +285,8 @@
     if (saved.k === 1) {
       progress.restoreCompletionReached();
     }
-    if (saved.p === 1) {
-      progress.restorePassReached();
+    if (typeof saved.p === 'number') {
+      progress.restorePass(saved.p);
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
@@ -340,12 +345,12 @@
 
     if (!progress.gradedScoreFinal) return;
 
-    const { average } = progress.gradedScore;
-    if (average === prevReportedScore) return;
-    prevReportedScore = average;
+    const score = progress.reportedScore;
+    if (score === prevReportedScore) return;
+    prevReportedScore = score;
 
     untrack(() => {
-      adapter.setScore(average);
+      adapter.setScore(score);
       // Before the commit, so a verdict this score decides carries it and
       // xAPI/cmi5 send one statement rather than a Scored and a Passed.
       prevSuccessStatus = progress.successStatus;
@@ -456,7 +461,7 @@
         prevCompletionStatus = progress.reportedCompletionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
-          ? progress.gradedScore.average
+          ? progress.reportedScore
           : null;
         if (
           adapter.seedLifecycle(

@@ -17,6 +17,8 @@ export interface GradedUnitState {
    * question of weight 1, else [score, weight, graded].
    */
   q?: Record<string, number | [number, number, 0 | 1]>;
+  /** Graded standalone questions on the page not yet answered, omitted when none */
+  w?: string[];
 }
 
 /**
@@ -46,8 +48,8 @@ export interface SavedState {
   s?: 1;
   /** Completion latch. 1 once the course reached complete. Absent otherwise. */
   k?: 1;
-  /** Pass latch. 1 once the course reported passed. Absent otherwise. */
-  p?: 1;
+  /** Pass latch. The best course score since the course reported passed. Absent until then. */
+  p?: number;
   /** Structure fingerprint (FNV-1a over ordered page slugs) at save time.
    * On resume, anything but an exact match discards the blob. */
   f?: string;

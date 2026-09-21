@@ -339,7 +339,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await answerCheckQuiz(page, optionIndex);
   }
 
-  test('weights the exam 75 to the quiz 25, and holds the pass when a later optional page drags the score down', async ({
+  test('weights the exam 75 to the quiz 25, and holds the pass and its score when a later optional page drags the average down', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -353,7 +353,13 @@ test.describe.serial('per-page weights in the course rollup', () => {
 
     await answerPractice(page, 0);
 
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');
+    const saved = async () =>
+      JSON.parse((await scormData(page))['cmi.suspend_data']);
+    await expect
+      .poll(async () => (await saved()).g?.['2']?.s, { timeout: 5000 })
+      .toBe(0);
+    expect((await saved()).p).toBe(75);
+    expect(await courseScore(page)).toBe('75');
     expect(await lessonStatus(page)).toBe('passed');
   });
 

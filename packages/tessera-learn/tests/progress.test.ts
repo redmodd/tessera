@@ -593,12 +593,12 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('refreshStandaloneQuestion', () => {
+  describe('registerStandaloneQuestion', () => {
     it('reweights a restored answer without changing its score', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      progress.refreshStandaloneQuestion(3, 'q1', true, 1);
+      progress.registerStandaloneQuestion(3, 'q1', true, 1);
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
         score: 100,
@@ -613,14 +613,14 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneQuestion(3, 'q1', true, 3);
+      progress.registerStandaloneQuestion(3, 'q1', true, 3);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
     });
 
     it('corrects a graded flag that drifted since the answer was saved', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 1);
-      progress.refreshStandaloneQuestion(3, 'q1', false, 1);
+      progress.registerStandaloneQuestion(3, 'q1', false, 1);
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.graded).toBe(
         false,
@@ -631,15 +631,66 @@ describe('ProgressState', () => {
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
-      progress.refreshStandaloneQuestion(3, 'q1', true, -2);
+      progress.registerStandaloneQuestion(3, 'q1', true, -2);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneQuestion(3, 'unanswered', true, 5);
-      progress.refreshStandaloneQuestion(9, 'q1', true, 5);
+      progress.registerStandaloneQuestion(3, 'unanswered', true, 5);
+      progress.registerStandaloneQuestion(9, 'q1', true, 5);
       expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
         false,
       );
       expect(progress.gradedUnits.has(9)).toBe(false);
+    });
+  });
+
+  describe('pages answered question by question', () => {
+    const onePage = () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
+      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
+      progress.registerStandaloneQuestion(0, 'q-practice', false);
+      progress.markVisited(0);
+      return progress;
+    };
+
+    it('holds completion, the score and the pass until every graded question is answered', () => {
+      const progress = onePage();
+
+      progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+
+      expect(progress.pageScore(0)).toBe(100);
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.successStatus).toBe('passed');
+      expect(progress.reportedScore).toBe(75);
+    });
+
+    it('carries the unanswered questions across a resume', () => {
+      const saved = onePage();
+      saved.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      expect(saved.unansweredQuestions(0)).toEqual(['q-light']);
+
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.replay(() => {
+        progress.markVisited(0);
+        progress.restoreUnanswered(0, ['q-light']);
+        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      });
+
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.completionStatus).toBe('incomplete');
     });
   });
 
@@ -913,7 +964,33 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 0, true);
 
       expect(progress.gradedScore.average).toBe(42.86);
+      expect(progress.reportedScore).toBe(100);
       expect(progress.successStatus).toBe('passed');
+    });
+
+    it('reports the best score from the pass on, and still a higher one', () => {
+      const manifest = createManifest(
+        5,
+        {},
+        {
+          1: { graded: true, weight: 75 },
+          3: { graded: true, required: false, weight: 100 },
+        },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.markStandaloneQuestion(1, 'q1', 80, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(34.29);
+      expect(progress.reportedScore).toBe(80);
+
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+
+      expect(progress.reportedScore).toBe(91.43);
     });
 
     it('keeps a fixed verdict once a re-grade undoes the completion', () => {
