@@ -219,11 +219,13 @@ export async function finishFreeCourse(page: Page): Promise<void> {
   await openQuiz(page, 'Practice Quiz');
   await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
 
+  const heading = page.locator('.tessera-content h1');
   const nav = page.locator('.tessera-nav-page');
   const count = await nav.count();
   for (let i = 0; i < count; i++) {
+    const previous = await heading.textContent();
     await nav.nth(i).click();
-    await waitForTesseraContent(page);
+    await expect(heading).not.toHaveText(previous ?? '');
   }
 }
 

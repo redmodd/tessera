@@ -13,7 +13,7 @@ async function waitForContent(page) {
 
 async function navigateToPage(page, pageTitle: string) {
   await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForContent(page);
+  await expect(page.locator('.tessera-content h1')).toContainText(pageTitle);
 }
 
 test.describe('Persistence — localStorage', () => {
@@ -29,9 +29,6 @@ test.describe('Persistence — localStorage', () => {
   }) => {
     // Navigate to "Callouts & Images" (should be page index ~2)
     await navigateToPage(page, 'Callouts & Images');
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Callouts & Images',
-    );
 
     // Reload
     await page.reload();
@@ -46,27 +43,18 @@ test.describe('Persistence — localStorage', () => {
   test('visited pages survive reload — progress bar preserved', async ({
     page,
   }) => {
-    // Visit several pages
     await navigateToPage(page, 'Objectives');
     await navigateToPage(page, 'Callouts & Images');
     await navigateToPage(page, 'Accordion & Carousel');
 
-    // Read progress
+    // Welcome plus the three visited pages
     const progressLabel = page.locator('.tessera-progress-label');
-    const textBefore = await progressLabel.textContent();
-    const matchBefore = textBefore?.match(/(\d+) of (\d+)/);
-    const visitedBefore = Number(matchBefore?.[1] || 0);
-    expect(visitedBefore).toBeGreaterThanOrEqual(3); // welcome + visited pages
+    await expect(progressLabel).toContainText(/4 of \d+ pages/);
 
-    // Reload
     await page.reload();
     await waitForContent(page);
 
-    // Progress should be preserved
-    const textAfter = await progressLabel.textContent();
-    const matchAfter = textAfter?.match(/(\d+) of (\d+)/);
-    const visitedAfter = Number(matchAfter?.[1] || 0);
-    expect(visitedAfter).toBeGreaterThanOrEqual(visitedBefore);
+    await expect(progressLabel).toContainText(/4 of \d+ pages/);
   });
 
   test('clear localStorage → course starts fresh on new page load', async ({
