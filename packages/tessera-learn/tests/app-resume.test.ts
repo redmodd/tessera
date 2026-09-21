@@ -229,10 +229,11 @@ describe('App restore gate honours config.resume', () => {
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
     cleanup = () => unmount(component);
-    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: [100, 1, 0] } } },
-    });
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({
+        g: { '1': { q: { q1: [100, 1, 0] } } },
+      }),
+    );
   });
 
   const scoredSave = savedWith({
