@@ -232,36 +232,38 @@
 
   function restoreState(saved) {
     if (!saved) return;
-    // Restore visited pages
-    for (const idx of saved.v) {
-      progress.markVisited(idx);
-    }
-    // Restore chunk progress (absent when no page reveals content in stages)
-    if (saved.c) {
-      for (const [key, chunkIndex] of Object.entries(saved.c)) {
-        progress.markChunk(Number(key), chunkIndex);
+    progress.replay(() => {
+      // Restore visited pages
+      for (const idx of saved.v) {
+        progress.markVisited(idx);
       }
-    }
-    if (saved.g) {
-      for (const [key, unit] of Object.entries(saved.g)) {
-        const pageIndex = Number(key);
-        if (unit.s !== undefined) {
-          progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
-        }
-        for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          const [score, weight, graded] = Array.isArray(entry)
-            ? entry
-            : [entry, 1, 1];
-          progress.markStandaloneQuestion(
-            pageIndex,
-            qid,
-            score,
-            graded === 1,
-            weight,
-          );
+      // Restore chunk progress (absent when no page reveals content in stages)
+      if (saved.c) {
+        for (const [key, chunkIndex] of Object.entries(saved.c)) {
+          progress.markChunk(Number(key), chunkIndex);
         }
       }
-    }
+      if (saved.g) {
+        for (const [key, unit] of Object.entries(saved.g)) {
+          const pageIndex = Number(key);
+          if (unit.s !== undefined) {
+            progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
+          }
+          for (const [qid, entry] of Object.entries(unit.q ?? {})) {
+            const [score, weight, graded] = Array.isArray(entry)
+              ? entry
+              : [entry, 1, 1];
+            progress.markStandaloneQuestion(
+              pageIndex,
+              qid,
+              score,
+              graded === 1,
+              weight,
+            );
+          }
+        }
+      }
+    });
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
       userState = { ...userState, ...saved.u };

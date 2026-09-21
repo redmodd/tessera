@@ -293,8 +293,24 @@ export class ProgressState {
     this.#completionReached = true;
   }
 
+  #replaying = false;
+
+  replay(apply: () => void): void {
+    this.#replaying = true;
+    try {
+      apply();
+    } finally {
+      this.#replaying = false;
+    }
+    this.#latch();
+  }
+
   #changed() {
     this.version++;
+    if (!this.#replaying) this.#latch();
+  }
+
+  #latch() {
     this.#gradedScoreDecided ||= untrack(() => this.gradedScoreFinal);
     this.#completionReached ||= untrack(
       () => this.completionStatus === 'complete',

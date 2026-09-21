@@ -930,6 +930,30 @@ describe('ProgressState', () => {
       expect(progress.completionStatus).toBe('incomplete');
       expect(progress.successStatus).toBe('passed');
     });
+
+    it('latches nothing on the partial totals a replay passes through', () => {
+      const manifest = createManifest(
+        3,
+        { 0: { graded: true }, 1: { graded: true }, 2: { graded: true } },
+        {
+          0: { weight: 50 },
+          1: { required: false, weight: 100 },
+          2: { weight: 10 },
+        },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.replay(() => {
+        progress.restoreQuiz(0, 100, 1);
+        progress.restoreQuiz(1, 0, 1);
+      });
+
+      expect(progress.reportedCompletionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(false);
+    });
   });
 
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {
