@@ -226,7 +226,7 @@
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
-      ...(progress.completionReached ? { k: 1 } : {}),
+      ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
     };
   }
 

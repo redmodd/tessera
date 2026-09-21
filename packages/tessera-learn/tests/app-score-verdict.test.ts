@@ -115,8 +115,10 @@ describe('a graded submit that decides the verdict', () => {
 
   it('holds the completion a later optional page would take back', async () => {
     const setCompletionStatus = vi.fn();
+    const setExit = vi.fn();
+    const saveState = vi.fn();
     const mounted = await mountApp(
-      stubAdapter({ setCompletionStatus }),
+      stubAdapter({ setCompletionStatus, setExit, saveState }),
       createManifest(
         2,
         { 0: { graded: true }, 1: { graded: true } },
@@ -137,5 +139,10 @@ describe('a graded submit that decides the verdict', () => {
       'incomplete',
       'complete',
     ]);
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(setExit).toHaveBeenCalledWith('normal');
+    expect(saveState.mock.calls.at(-1)![0]).toMatchObject({ k: 1 });
   });
 });

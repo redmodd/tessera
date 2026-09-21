@@ -158,6 +158,22 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
+  it('keeps a saved completion the course has since fallen below', async () => {
+    const {
+      component,
+      seedLifecycle,
+      setCompletionStatus,
+      saveState,
+      unmount,
+    } = await mountApp('auto', { saved: savedWith({ k: 1 }) });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(seedLifecycle.mock.calls[0][0]).toBe('complete');
+    expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1 });
+  });
+
   it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
     const saved = savedWith({ g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } } });
     const { component, saveState, unmount } = await mountApp('auto', { saved });

@@ -289,10 +289,6 @@ export class ProgressState {
 
   #completionReached = $state(false);
 
-  get completionReached(): boolean {
-    return this.#completionReached;
-  }
-
   restoreCompletionReached(): void {
     this.#completionReached = true;
   }
