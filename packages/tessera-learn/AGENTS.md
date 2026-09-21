@@ -1108,7 +1108,7 @@ Author-facing consequences:
 
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5. Read it via `useQuiz().passingScore`.
-- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict and a required graded page to judge.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
+- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel — never a silent degradation.
 
 ### Local testing

@@ -55,12 +55,10 @@ afterEach(() => {
 const scormXml = (
   standard: 'scorm12' | 'scorm2004',
   config: Parameters<typeof mergeCourseConfig>[0],
-  hasRequiredGradedPage = true,
 ) =>
   LMS_BUILD[standard].generate(
     mergeCourseConfig(config),
     createDistDir(testRoot),
-    hasRequiredGradedPage,
   );
 
 // ---- SCORM 1.2 Manifest ----
@@ -612,34 +610,5 @@ describe('pass mark follows success.from, not completion.mode', () => {
       ...config,
     });
     expect(xml).not.toContain(MARK[standard]);
-  });
-
-  it.each(['scorm12', 'scorm2004'] as const)(
-    '%s declares none when every graded page is optional',
-    (standard) => {
-      const xml = scormXml(
-        standard,
-        {
-          title: 'Test',
-          scoring: { passingScore: 80 },
-          completion: { mode: 'quiz' },
-        },
-        false,
-      );
-      expect(xml).not.toContain(MARK[standard]);
-    },
-  );
-
-  it('cmi5 declares no masteryScore when every graded page is optional', () => {
-    const xml = generateCMI5Xml(
-      mergeCourseConfig({
-        title: 'Test',
-        scoring: { passingScore: 80 },
-        completion: { mode: 'quiz' },
-      }),
-      false,
-    );
-    expect(xml).not.toContain('masteryScore');
-    expect(xml).toContain('moveOn="Completed"');
   });
 });

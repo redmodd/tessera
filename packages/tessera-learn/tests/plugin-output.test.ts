@@ -253,7 +253,7 @@ describe('export packaging gate', () => {
   async function cmi5XmlFor(pageConfig: string): Promise<string> {
     writeFileSync(
       resolve(projectRoot, 'course.config.js'),
-      'export default { title: "Course", completion: { mode: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } };',
+      'export default { title: "Course", success: { from: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } };',
       'utf-8',
     );
     mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
@@ -278,9 +278,7 @@ describe('export packaging gate', () => {
   });
 
   it('satisfies on Completed when every graded page is optional', async () => {
-    const xml = await cmi5XmlFor(
-      '{ required: false, quiz: { graded: true } }',
-    );
+    const xml = await cmi5XmlFor('{ required: false, quiz: { graded: true } }');
     expect(xml).toContain('moveOn="Completed"');
   });
 
