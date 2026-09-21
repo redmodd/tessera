@@ -158,20 +158,23 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('keeps a saved completion the course has since fallen below', async () => {
+  it('keeps a saved completion and pass the course has since fallen below', async () => {
     const {
       component,
       seedLifecycle,
       setCompletionStatus,
       saveState,
       unmount,
-    } = await mountApp('auto', { saved: savedWith({ k: 1 }) });
+    } = await mountApp('auto', { saved: savedWith({ k: 1, p: 1 }) });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(seedLifecycle.mock.calls[0][0]).toBe('complete');
+    expect(seedLifecycle.mock.calls[0].slice(0, 2)).toEqual([
+      'complete',
+      'passed',
+    ]);
     expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1 });
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 1 });
   });
 
   it('round-trips a weighted standalone question as [score, weight, graded]', async () => {

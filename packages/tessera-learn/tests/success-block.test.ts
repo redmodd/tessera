@@ -78,12 +78,15 @@ describe('success.from: "quiz" under manual completion', () => {
     return new ProgressState(manifest, config);
   };
 
-  it('judges the score as soon as it is final, before the trigger', () => {
+  it('fails as soon as the score is final, but holds a pass for the trigger', () => {
     const progress = build();
 
-    progress.quizCompleted(2, 90);
+    progress.quizCompleted(2, 40);
     expect(progress.completionStatus).toBe('incomplete');
-    expect(progress.successStatus).toBe('passed');
+    expect(progress.successStatus).toBe('failed');
+
+    progress.quizCompleted(2, 90);
+    expect(progress.successStatus).toBe('unknown');
 
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('passed');

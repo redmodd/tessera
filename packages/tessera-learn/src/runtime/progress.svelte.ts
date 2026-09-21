@@ -293,6 +293,12 @@ export class ProgressState {
     this.#completionReached = true;
   }
 
+  #passReached = $state(false);
+
+  restorePassReached(): void {
+    this.#passReached = true;
+  }
+
   #replaying = false;
 
   replay(apply: () => void): void {
@@ -315,6 +321,7 @@ export class ProgressState {
     this.#completionReached ||= untrack(
       () => this.completionStatus === 'complete',
     );
+    this.#passReached ||= untrack(() => this.#verdict === 'passed');
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -362,7 +369,7 @@ export class ProgressState {
     );
   }
 
-  successStatus = $derived.by<SuccessStatus>(() => {
+  #verdict = $derived.by<SuccessStatus>(() => {
     const success = this.#success;
     if (success.from === 'none') return 'unknown';
     if (success.from === 'fixed')
@@ -370,9 +377,14 @@ export class ProgressState {
         ? success.status
         : 'unknown';
     if (!this.gradedScoreFinal) return 'unknown';
-    const { average } = this.#graded;
-    return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
+    if (this.#graded.average < this.#config.scoring.passingScore)
+      return 'failed';
+    return this.reportedCompletionStatus === 'complete' ? 'passed' : 'unknown';
   });
+
+  successStatus = $derived<SuccessStatus>(
+    this.#passReached ? 'passed' : this.#verdict,
+  );
 
   /**
    * Effective graded score for LMS reporting. Same union and averaging as

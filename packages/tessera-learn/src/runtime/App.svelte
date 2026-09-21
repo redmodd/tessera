@@ -227,6 +227,7 @@
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
       ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
+      ...(progress.successStatus === 'passed' ? { p: 1 } : {}),
     };
   }
 
@@ -278,6 +279,9 @@
     }
     if (saved.k === 1) {
       progress.restoreCompletionReached();
+    }
+    if (saved.p === 1) {
+      progress.restorePassReached();
     }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {

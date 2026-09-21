@@ -204,7 +204,10 @@ test.describe.serial('completion.mode quiz', () => {
 
     await expect
       .poll(() => scormData(page))
-      .toMatchObject({ 'cmi.completion_status': 'completed' });
+      .toMatchObject({
+        'cmi.completion_status': 'completed',
+        'cmi.success_status': 'passed',
+      });
 
     const data = await scormData(page);
     const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
@@ -336,7 +339,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await answerCheckQuiz(page, optionIndex);
   }
 
-  test('weights the exam 75 to the quiz 25, and leaves the optional page out until taken', async ({
+  test('weights the exam 75 to the quiz 25, and holds the pass when a later optional page drags the score down', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -351,7 +354,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await answerPractice(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');
-    expect(await lessonStatus(page)).toBe('failed');
+    expect(await lessonStatus(page)).toBe('passed');
   });
 
   test('the score reaches the LMS once every required page is scored', async ({

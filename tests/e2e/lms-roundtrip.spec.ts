@@ -11,6 +11,7 @@ import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
   exitCourse,
+  finishFreeCourse,
   interactionField,
   interactionWrites,
   openQuiz,
@@ -353,7 +354,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     );
   });
 
-  test('Graded quiz writes split completion_status and success_status', async ({
+  test('Graded quiz writes the score and holds passed until the course completes', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -368,10 +369,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       .toMatchObject({
         'cmi.score.raw': '100',
         'cmi.score.scaled': '1',
-        // SCORM 2004 keeps completion and success as separate fields. This course
-        // completes on percentage, so passing the quiz sets success only; the
-        // completion-quiz variant in lms-variants.spec.ts is the contrast.
-        'cmi.success_status': 'passed',
+        // This course completes on percentage, so the pass waits; the
+        // completion-quiz variant in lms-variants.spec.ts completes on it.
+        'cmi.success_status': 'unknown',
         'cmi.completion_status': 'incomplete',
       });
 
@@ -417,6 +417,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       await openQuiz(page, 'Graded Assessment');
 
       await answerGradedQuiz(page, { q1Correct: false });
+      await finishFreeCourse(page);
 
       await expect
         .poll(() => scormData(page))
@@ -516,7 +517,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(initStmt.context?.registration).toBe('test-registration-123');
   });
 
-  test('passing a graded quiz sends a Passed statement', async ({ page }) => {
+  test('passing a graded quiz sends a Passed statement once the course completes', async ({
+    page,
+  }) => {
     const statements: any[] = [];
 
     await page.route('http://cmi5-mock.test/**', async (route) => {
@@ -557,7 +560,24 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await answerGradedQuiz(page);
 
-    // Wait for the Passed statement to land
+    await expect
+      .poll(
+        () =>
+          statements.some(
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
+          ),
+        { timeout: 5000 },
+      )
+      .toBe(true);
+    expect(
+      statements.some(
+        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+      ),
+    ).toBe(false);
+
+    const beforeFinish = statements.length;
+    await finishFreeCourse(page);
+
     await expect
       .poll(
         () =>
@@ -576,9 +596,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = statements
+      .slice(0, beforeFinish)
+      .filter((s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered');
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -767,7 +787,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     ).toBe(true);
   });
 
-  test('passing a graded quiz sends Passed + Answered, and pagehide sends Terminated', async ({
+  test('passing a graded quiz sends Passed + Answered once the course completes, and pagehide sends Terminated', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -809,6 +829,24 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect
       .poll(
         () =>
+          statements.some(
+            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
+          ),
+        { timeout: 5000 },
+      )
+      .toBe(true);
+    expect(
+      statements.some(
+        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
+      ),
+    ).toBe(false);
+
+    const beforeFinish = statements.length;
+    await finishFreeCourse(page);
+
+    await expect
+      .poll(
+        () =>
           statements.find(
             (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
           ) != null,
@@ -826,7 +864,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
 
-    const answered = answeredSoFar();
+    const answered = statements
+      .slice(0, beforeFinish)
+      .filter((s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered');
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',

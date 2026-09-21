@@ -192,7 +192,7 @@ describe('useQuestion — standalone mode', () => {
   it('registers a graded score when graded is true', () => {
     const progress = new ProgressState(
       createManifest(4, {}, { 3: { graded: true } }),
-      createConfig(),
+      createConfig({ completion: { mode: 'quiz' } }),
     );
     const adapter = makeAdapter();
     const ctx = makeNavCtx(progress, 3);
