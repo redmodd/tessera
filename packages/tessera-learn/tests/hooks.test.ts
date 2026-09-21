@@ -43,6 +43,7 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     isPageLocked: vi.fn(() => false),
     prefetch: vi.fn(),
   };
+  ctxStore.set('tessera-page', { index: currentIndex });
   return { nav, manifest, progress, config };
 }
 
@@ -210,6 +211,27 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.pageScore(3)).toBe(100);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
+  });
+
+  it('records against the page it renders on while the next page loads', () => {
+    const progress = new ProgressState(
+      createManifest(3, {}, { 1: { graded: true }, 2: { graded: true } }),
+      createConfig(),
+    );
+    const ctx = makeNavCtx(progress, 1);
+    ctxStore.set('tessera-nav', ctx);
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+    ctx.nav.currentPageIndex = 2;
+
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    }).submit();
+
+    expect(progress.pageScore(1)).toBe(100);
+    expect(progress.gradedUnits.has(2)).toBe(false);
+    expect(progress.unansweredQuestions(2)).toEqual([]);
   });
 
   it('uses score override when provided', () => {

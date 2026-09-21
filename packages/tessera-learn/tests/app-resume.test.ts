@@ -58,17 +58,20 @@ function makeAdapter(saved: unknown, seeds: boolean) {
   const setCompletionStatus = vi.fn();
   const saveState = vi.fn();
   const setScore = vi.fn();
+  const setSuccessStatus = vi.fn();
   return {
     seedLifecycle,
     setCompletionStatus,
     saveState,
     setScore,
+    setSuccessStatus,
     adapter: stubAdapter({
       getState: () => saved as SavedState | null,
       seedLifecycle,
       saveState,
       setScore,
       setCompletionStatus,
+      setSuccessStatus,
     }),
   };
 }
@@ -81,8 +84,14 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
+  const {
+    adapter,
+    seedLifecycle,
+    setCompletionStatus,
+    saveState,
+    setScore,
+    setSuccessStatus,
+  } = makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -107,6 +116,7 @@ async function mountApp(
     setCompletionStatus,
     saveState,
     setScore,
+    setSuccessStatus,
     unmount,
   };
 }
@@ -174,8 +184,35 @@ describe('App restore gate honours config.resume', () => {
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 90 });
   });
 
-  it('round-trips a weighted standalone question as [score, weight, graded], and the questions left unanswered', async () => {
+  it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {
+    const { component, seedLifecycle, setSuccessStatus, saveState, unmount } =
+      await mountApp('auto', {
+        saved: savedWith({ v: [1], k: 1, g: { '1': { q: { q1: 90 } } } }),
+        pageModule: () => import('./fixtures/app-page-graded.svelte'),
+      });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0].g['1'].w).toEqual(['q2']),
+    );
+    expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
+    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ p: 90 });
+  });
+
+  it('drops a saved unanswered question the page no longer renders', async () => {
+    const saved = savedWith({ g: { '1': { q: { q1: 100 }, w: ['q3'] } } });
+    const { component, saveState, unmount } = await mountApp('auto', { saved });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0].g).toEqual({
+        '1': { q: { q1: 100 } },
+      }),
+    );
+  });
+
+  it('round-trips a weighted standalone question as [score, weight, graded], and the questions left unanswered on a page not reopened', async () => {
     const saved = savedWith({
+      b: 0,
       g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
     });
     const { component, saveState, unmount } = await mountApp('auto', { saved });

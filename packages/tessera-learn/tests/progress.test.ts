@@ -692,6 +692,27 @@ describe('ProgressState', () => {
       expect(progress.awaitingScore(0)).toBe(true);
       expect(progress.completionStatus).toBe('incomplete');
     });
+
+    it('drops a restored question the page no longer registers once it mounts', () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.replay(() => {
+        progress.markVisited(0);
+        progress.restoreUnanswered(0, ['q-light', 'q-removed']);
+        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      });
+      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
+      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
+      progress.pageMounted(0);
+
+      expect(progress.unansweredQuestions(0)).toEqual(['q-light']);
+
+      progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
+
+      expect(progress.completionStatus).toBe('complete');
+    });
   });
 
   describe('recalculateSuccess — standalone graded questions', () => {

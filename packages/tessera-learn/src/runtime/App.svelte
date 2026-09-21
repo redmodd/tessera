@@ -5,7 +5,7 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import courseRuntime from 'virtual:tessera-course-runtime';
-  import { onMount, onDestroy, setContext, untrack } from 'svelte';
+  import { onMount, onDestroy, setContext, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
@@ -86,6 +86,9 @@
     get passingScore() {
       return config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE;
     },
+    get index() {
+      return renderedPageIndex;
+    },
   });
   setContext(TESSERA_PAGE, pageContext);
 
@@ -164,6 +167,7 @@
         pageLoading = false;
         renderedPageIndex = index;
         progress.markVisited(index);
+        tick().then(() => progress.pageMounted(index));
         if (
           manifest.pages[index].completesOn === 'view' &&
           config.completion.mode === 'manual'
@@ -269,6 +273,18 @@
           }
         }
       }
+      if (saved.m === 1) {
+        progress.markCompleteManually();
+      }
+      if (saved.s === 1) {
+        progress.restoreGradedScoreDecided();
+      }
+      if (saved.k === 1) {
+        progress.restoreCompletionReached();
+      }
+      if (typeof saved.p === 'number') {
+        progress.restorePass(saved.p);
+      }
     });
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
@@ -276,18 +292,6 @@
     }
     // Restore duration
     duration = new DurationTracker(saved.d);
-    if (saved.m === 1) {
-      progress.markCompleteManually();
-    }
-    if (saved.s === 1) {
-      progress.restoreGradedScoreDecided();
-    }
-    if (saved.k === 1) {
-      progress.restoreCompletionReached();
-    }
-    if (typeof saved.p === 'number') {
-      progress.restorePass(saved.p);
-    }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
       nav.goToPage(saved.b);

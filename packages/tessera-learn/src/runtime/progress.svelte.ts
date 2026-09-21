@@ -202,6 +202,7 @@ export class ProgressState {
     graded: boolean,
     weight?: number,
   ) {
+    this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
@@ -219,7 +220,15 @@ export class ProgressState {
   }
 
   restoreUnanswered(pageIndex: number, questionIds: string[]) {
+    this.#unconfirmed.set(pageIndex, new Set(questionIds));
     if (this.#expect(pageIndex, questionIds, true)) this.#changed();
+  }
+
+  pageMounted(pageIndex: number) {
+    const stale = this.#unconfirmed.get(pageIndex);
+    if (!stale) return;
+    this.#unconfirmed.delete(pageIndex);
+    if (this.#expect(pageIndex, [...stale], false)) this.#changed();
   }
 
   unansweredQuestions(pageIndex: number): string[] {
@@ -230,6 +239,7 @@ export class ProgressState {
   }
 
   #expected = new SvelteMap<number, ReadonlySet<string>>();
+  #unconfirmed = new Map<number, Set<string>>();
 
   #expect(pageIndex: number, questionIds: string[], graded: boolean): boolean {
     const before = this.#expected.get(pageIndex);
@@ -243,16 +253,14 @@ export class ProgressState {
     return true;
   }
 
-  #answered(pageIndex: number): boolean {
-    if (
-      this.#quizGradedIndices.has(pageIndex) &&
-      this.quizScore(pageIndex) !== undefined
-    )
-      return true;
-    return (
-      this.#gradedResults(pageIndex).length > 0 &&
-      this.unansweredQuestions(pageIndex).length === 0
-    );
+  #answeredScore(pageIndex: number): number | undefined {
+    const quizScore = this.#quizGradedIndices.has(pageIndex)
+      ? this.quizScore(pageIndex)
+      : undefined;
+    if (quizScore !== undefined) return quizScore;
+    return this.unansweredQuestions(pageIndex).length === 0
+      ? this.pageScore(pageIndex)
+      : undefined;
   }
 
   pageScore(pageIndex: number): number | undefined {
@@ -296,9 +304,7 @@ export class ProgressState {
     let attempted = false;
     let allScored = true;
     for (const pageIndex of this.#declaredGradedIndices) {
-      const score = this.#answered(pageIndex)
-        ? this.pageScore(pageIndex)
-        : undefined;
+      const score = this.#answeredScore(pageIndex);
       if (score !== undefined) attempted = true;
       else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
       else continue;
@@ -416,7 +422,8 @@ export class ProgressState {
     )
       return true;
     return (
-      this.#declaredGradedIndices.has(pageIndex) && !this.#answered(pageIndex)
+      this.#declaredGradedIndices.has(pageIndex) &&
+      this.#answeredScore(pageIndex) === undefined
     );
   }
 
@@ -445,9 +452,9 @@ export class ProgressState {
   }
 
   /**
-   * Effective graded score for LMS reporting. Same union and averaging as
-   * successStatus, so a reported score and a reported verdict agree on the
-   * pages they cover.
+   * Live course average that successStatus judges: every required graded page,
+   * plus the optional ones answered. The LMS gets reportedScore, which keeps
+   * the best score from a pass on.
    */
   get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;

@@ -139,15 +139,16 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     });
   }
 
-  if (navCtx) {
+  const pageIndex = getPageContext()?.index;
+  if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
-        navCtx.nav.currentPageIndex,
-        navCtx.manifest.pages[navCtx.nav.currentPageIndex].slug,
+        pageIndex,
+        navCtx.manifest.pages[pageIndex].slug,
       );
     }
     navCtx.progress.registerStandaloneQuestion(
-      navCtx.nav.currentPageIndex,
+      pageIndex,
       opts.id,
       !!opts.graded,
       opts.weight,
@@ -184,9 +185,9 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
       committed = true;
     }
-    if (navCtx) {
+    if (navCtx && pageIndex !== undefined) {
       navCtx.progress.markStandaloneQuestion(
-        navCtx.nav.currentPageIndex,
+        pageIndex,
         opts.id,
         score,
         !!opts.graded,
@@ -481,12 +482,13 @@ export function useQuiz(
 ): UseQuizHandle {
   const pageCtx = getPageContext();
   const adapterCtx = getAdapterContext();
-  const { nav, progress } = requireNavContext('useQuiz()');
+  const { progress } = requireNavContext('useQuiz()');
   if (!pageCtx?.quiz) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).',
     );
   }
+  const pageIndex = pageCtx.index;
 
   // A second useQuiz on the same page silently overwrites the first quiz's
   // pageIndex-keyed score; warn but don't prevent (some pages compose hosts).
@@ -503,7 +505,7 @@ export function useQuiz(
     passingScore: () => pageCtx.passingScore,
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
-    onComplete: (score) => progress.quizCompleted(nav.currentPageIndex, score),
+    onComplete: (score) => progress.quizCompleted(pageIndex, score),
     notify: (name, detail) => {
       opts
         .element?.()
