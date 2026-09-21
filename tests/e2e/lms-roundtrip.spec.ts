@@ -571,16 +571,6 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     const answered = statements.filter(
       (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
     );
-    await finishFreeCourse(page);
-
-    await expect
-      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
-      .toBeDefined();
-
-    const passed = findStatement(statements, 'passed');
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
-
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -593,6 +583,16 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       );
       expect(s.result?.response).toBeTruthy();
     }
+
+    await finishFreeCourse(page);
+
+    await expect
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toBeDefined();
+
+    const passed = findStatement(statements, 'passed');
+    expect(passed.result?.success).toBe(true);
+    expect(passed.result?.score?.scaled).toBe(1);
   });
 });
 
@@ -814,6 +814,13 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = answeredSoFar();
+    expect(answered).toHaveLength(3);
+    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
+      'choice',
+      'fill-in',
+      'matching',
+    ]);
+
     await finishFreeCourse(page);
 
     await expect
@@ -827,13 +834,6 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     // Statement context (no cmi5/moveOn Category Activity).
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
-
-    expect(answered).toHaveLength(3);
-    expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
-      'choice',
-      'fill-in',
-      'matching',
-    ]);
 
     await exitCourse(page);
     await expect

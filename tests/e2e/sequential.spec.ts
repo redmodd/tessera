@@ -1,15 +1,12 @@
 import { test, expect } from '@playwright/test';
-
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-}
+import { waitForTesseraContent } from './helpers.js';
 
 test.describe('Navigation — Sequential Mode', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('first page loads normally', async ({ page }) => {
@@ -47,7 +44,7 @@ test.describe('Navigation — Sequential Mode', () => {
     // Navigate to Page Two (already unlocked since Page One was visited)
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page Two');
 
     // Now Page Three should be unlocked
@@ -59,12 +56,12 @@ test.describe('Navigation — Sequential Mode', () => {
 
     // Navigate to Page Two
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page Two');
 
     // Page Three should now be unlockable (Page Two was visited)
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Page Three',
     );
@@ -88,11 +85,11 @@ test.describe('Navigation — Sequential Mode', () => {
 
     // Go forward
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // Go back to page one
     await prevBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page One');
 
     // Page One should still be clickable in sidebar

@@ -1,9 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { answerMatching } from './helpers.js';
-
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-}
+import { answerMatching, waitForTesseraContent } from './helpers.js';
 
 async function navigateToPage(page, pageTitle: string) {
   await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
@@ -15,7 +11,7 @@ test.describe('Persistence — localStorage', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('navigate to a page, reload → resumes on same page', async ({
@@ -26,7 +22,7 @@ test.describe('Persistence — localStorage', () => {
 
     // Reload
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // Should resume on the same page
     await expect(page.locator('.tessera-content h1')).toContainText(
@@ -46,7 +42,7 @@ test.describe('Persistence — localStorage', () => {
     await expect(progressLabel).toContainText(/4 of \d+ pages/);
 
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     await expect(progressLabel).toContainText(/4 of \d+ pages/);
   });
@@ -58,11 +54,11 @@ test.describe('Persistence — localStorage', () => {
     const ctx1 = await browser.newContext();
     const page1 = await ctx1.newPage();
     await page1.goto('/');
-    await waitForContent(page1);
+    await waitForTesseraContent(page1);
     await page1
       .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
       .click();
-    await waitForContent(page1);
+    await waitForTesseraContent(page1);
     await page1.close();
     await ctx1.close();
 
@@ -72,7 +68,7 @@ test.describe('Persistence — localStorage', () => {
     await page2.goto('/');
     await page2.evaluate(() => localStorage.clear());
     await page2.goto('/');
-    await waitForContent(page2);
+    await waitForTesseraContent(page2);
 
     // Should be on first page (Welcome) since no saved state
     await expect(page2.locator('.tessera-content h1')).toContainText(
@@ -159,7 +155,7 @@ test.describe('Persistence — localStorage', () => {
 
     // Reload and verify state is restored
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     const restoredData = await page.evaluate(() => {
       const keys = Object.keys(localStorage);

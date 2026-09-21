@@ -6,15 +6,12 @@ import {
   answerMultipleChoice,
   completePracticeQuiz,
   primaryBtn,
+  waitForTesseraContent,
 } from './helpers.js';
-
-async function waitForContent(page: Page) {
-  await page.waitForSelector('.tessera-content');
-}
 
 async function navigateToPage(page: Page, pageTitle: string) {
   await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForContent(page);
+  await waitForTesseraContent(page);
 }
 
 async function readSavedState(page: Page) {
@@ -85,7 +82,7 @@ test.describe('Quiz — Graded Assessment', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
   });
@@ -206,7 +203,7 @@ test.describe('Quiz — Graded Assessment', () => {
     // Attempts are persisted, so reopening the course doesn't hand back a
     // fresh allowance.
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
     await expect(
       page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
@@ -227,7 +224,7 @@ test.describe('Quiz — Graded Assessment', () => {
     expect(await readSavedState(page)).not.toHaveProperty('qa');
 
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
@@ -251,7 +248,7 @@ test.describe('Quiz — Gating', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('failing gated quiz locks the page after it', async ({ page }) => {
@@ -299,7 +296,7 @@ test.describe('Quiz — Gating', () => {
     await expect(nextBtn).toBeEnabled();
 
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Congratulations',
     );
@@ -311,7 +308,7 @@ test.describe('Quiz — Accessibility', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('graded quiz initial render passes axe audit', async ({ page }) => {
@@ -343,7 +340,7 @@ test.describe('Quiz — adjacent quiz pages', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     await navigateToPage(page, 'Practice Quiz');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
@@ -369,7 +366,7 @@ test.describe('Quiz — Practice', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await navigateToPage(page, 'Practice Quiz');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
   });
@@ -401,7 +398,7 @@ test.describe('Quiz — Practice', () => {
     await expect(retryBtn).toBeVisible();
 
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
     await expect(
       page.locator('.tessera-quiz-btn', { hasText: 'Retry' }),
@@ -430,7 +427,7 @@ test.describe('Quiz — Practice', () => {
 
     // Only the best attempt is persisted, so that is what comes back.
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
     await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
   });

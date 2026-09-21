@@ -1,17 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { waitForTesseraContent } from './helpers.js';
 
 // Mobile viewport is set by playwright project config (375x667)
-
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-}
 
 test.describe('Mobile Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('hamburger button is visible on mobile', async ({ page }) => {
@@ -41,7 +38,7 @@ test.describe('Mobile Navigation', () => {
 
     // Click a page
     await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // Sidebar should close
     const sidebar = page.locator('.tessera-sidebar');
@@ -57,7 +54,7 @@ test.describe('Mobile Navigation', () => {
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await expect(nextBtn).toBeVisible();
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
@@ -66,7 +63,7 @@ test.describe('Mobile Navigation', () => {
       hasText: 'Previous',
     });
     await prevBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
@@ -84,7 +81,7 @@ test.describe('Mobile Navigation', () => {
     await page
       .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
       .click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await page.waitForSelector('.tessera-carousel');
 
     // First dot should be active (slide 1)
@@ -145,7 +142,7 @@ test.describe('Mobile Navigation', () => {
     await page
       .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
       .click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await page.waitForSelector('.tessera-callout');
 
     // All callouts should be visible

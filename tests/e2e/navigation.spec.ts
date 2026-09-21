@@ -1,15 +1,11 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-
-// Helper: wait for page content to load after navigation
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-}
+import { waitForTesseraContent } from './helpers.js';
 
 // Helper: navigate via sidebar
 async function clickSidebarPage(page, pageTitle: string) {
   await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForContent(page);
+  await waitForTesseraContent(page);
 }
 
 test.describe('Navigation — Free Mode', () => {
@@ -18,7 +14,7 @@ test.describe('Navigation — Free Mode', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('loads first page on initial visit', async ({ page }) => {
@@ -68,7 +64,7 @@ test.describe('Navigation — Free Mode', () => {
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await expect(nextBtn).toBeEnabled();
     await nextBtn.click();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
@@ -82,16 +78,16 @@ test.describe('Navigation — Free Mode', () => {
 
     // Navigate forward a few pages
     await nextBtn.click(); // Page 2
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await nextBtn.click(); // Page 3
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Callouts & Images',
     );
 
     // Navigate back
     await prevBtn.click(); // Page 2
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
@@ -142,12 +138,12 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('ArrowRight navigates to next page', async ({ page }) => {
     await page.keyboard.press('ArrowRight');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
@@ -156,17 +152,17 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
   test('ArrowLeft navigates to previous page', async ({ page }) => {
     // Go to page 2 first
     await page.keyboard.press('ArrowRight');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // Go back
     await page.keyboard.press('ArrowLeft');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
   test('ArrowLeft does nothing on first page', async ({ page }) => {
     await page.keyboard.press('ArrowLeft');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     // Should still be on page 1
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
@@ -174,7 +170,7 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
   test('arrow keys are ignored when focus is in an input', async ({ page }) => {
     // Navigate to inline questions page which has inputs
     await clickSidebarPage(page, 'Graded Assessment');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // The quiz page should be visible - find a text input if any
     // Focus on an input element — FillInTheBlank has text input
@@ -201,7 +197,7 @@ test.describe('Navigation — Accessibility', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('sidebar passes axe audit', async ({ page }) => {

@@ -1,13 +1,10 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-}
+import { waitForTesseraContent } from './helpers.js';
 
 async function navigateToPage(page, pageTitle: string) {
   await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForContent(page);
+  await waitForTesseraContent(page);
 }
 
 test.describe('Component — Accordion', () => {
@@ -15,7 +12,7 @@ test.describe('Component — Accordion', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await navigateToPage(page, 'Accordion & Carousel');
     await page.waitForSelector('.tessera-accordion');
   });
@@ -65,7 +62,7 @@ test.describe('Component — Carousel', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await navigateToPage(page, 'Accordion & Carousel');
     await page.waitForSelector('.tessera-carousel');
   });
@@ -112,7 +109,7 @@ test.describe('Component — RevealModal', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
     await navigateToPage(page, 'Modal, Video & Audio');
     await page.waitForSelector('.tessera-reveal-trigger');
   });
@@ -161,7 +158,7 @@ test.describe('Component Accessibility', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('Callout & Image page passes axe audit', async ({ page }) => {
