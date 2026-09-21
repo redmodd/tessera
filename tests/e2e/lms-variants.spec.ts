@@ -367,7 +367,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     expect(await lessonStatus(page)).toBe('failed');
   });
 
-  test('no score reaches the LMS until every graded page is scored', async ({
+  test('the score reaches the LMS once every required page is scored', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -384,10 +384,8 @@ test.describe.serial('per-page weights in the course rollup', () => {
       .nth(0)
       .check();
 
-    // 25 of the course is scored and 75 failed, but the optional page can
-    // still join the rollup, so nothing is final and nothing is sent.
-    await page.waitForTimeout(1000);
-    expect(await courseScore(page)).toBeFalsy();
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
+    expect(await lessonStatus(page)).toBe('failed');
 
     await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
     await page.waitForSelector('.tessera-quiz-question-wrapper.active');

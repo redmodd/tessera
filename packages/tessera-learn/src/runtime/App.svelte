@@ -349,7 +349,8 @@
   $effect(() => {
     const status = progress.completionStatus;
     if (!persistenceReady) return;
-    if (status === prevCompletionStatus) return;
+    if (prevCompletionStatus === 'complete' || status === prevCompletionStatus)
+      return;
     prevCompletionStatus = status;
     untrack(() => {
       adapter.setCompletionStatus(status);

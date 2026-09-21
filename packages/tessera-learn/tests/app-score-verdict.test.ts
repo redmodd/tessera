@@ -21,14 +21,14 @@ const config = {
   export: { standard: 'xapi' },
 };
 
-async function mountApp(adapter: BaseAdapter) {
+async function mountApp(adapter: BaseAdapter, course = manifest) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
     config,
-    manifest,
+    manifest: course,
     pageModules: Object.fromEntries(
-      manifest.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
+      course.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
     ),
     adapter,
     layout: (await import('./fixtures/mastery-layout.svelte')).default,
@@ -110,6 +110,31 @@ describe('a graded submit that decides the verdict', () => {
     expect(setSuccessStatus.mock.calls.map(([status]) => status)).toEqual([
       'unknown',
       'passed',
+    ]);
+  });
+
+  it('holds the completion a later optional page would take back', async () => {
+    const setCompletionStatus = vi.fn();
+    const mounted = await mountApp(
+      stubAdapter({ setCompletionStatus }),
+      createManifest(2, {
+        0: { graded: true },
+        1: { graded: true, required: false },
+      }),
+    );
+    cleanup = mounted.cleanup;
+    await flush();
+
+    mounted.progress.quizCompleted(0, 90);
+    await flush();
+
+    mounted.progress.quizCompleted(1, 0);
+    await flush();
+
+    expect(mounted.progress.completionStatus).toBe('incomplete');
+    expect(setCompletionStatus.mock.calls.map(([status]) => status)).toEqual([
+      'incomplete',
+      'complete',
     ]);
   });
 });

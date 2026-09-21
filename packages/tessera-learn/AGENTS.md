@@ -390,7 +390,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
+Declared graded pages count as 0 until answered, so a skipped exam sinks the course score. The LMS gets no score and no passed/failed until every required graded page has a score or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
 
 **`required: false` makes a graded page optional: it counts when attempted, and is absent from the rollup when not.** It leaves both halves of the average, so skipping it does not drag the course score down, and it is what expresses practice quizzes beside a final exam:
 
@@ -404,11 +404,11 @@ Declared graded pages count as 0 until answered, so a skipped exam sinks the cou
 </script>
 ```
 
-Scoring and verdict only. Gating stays with `quiz.gatesProgress`, and under `completion.mode: "percentage"` an optional page the learner opens still has to be answered before it counts as completed, the same as any other graded page. `tessera validate` quotes each weight's share against the required pages alone and lists the optional ones separately, since the required set is what a learner who takes nothing optional is scored on. `required` on a page that isn't graded warns: nothing reads it, and so does `quiz.required` on an ungraded quiz. Setting both `pageConfig.required` and `quiz.required` to different values errors: either one set to `false` makes the page optional, so the other is discarded.
+Scoring and verdict only. Gating stays with `quiz.gatesProgress`: an optional page the learner opens still has to be answered before it counts as completed under `completion.mode: "percentage"`, or unlocks the next page under `navigation.mode: "sequential"`, the same as any other graded page. `tessera validate` quotes each weight's share against the required pages alone and lists the optional ones separately, since the required set is what a learner who takes nothing optional is scored on. `required` on a page that isn't graded warns: nothing reads it, and so does `quiz.required` on an ungraded quiz. Setting both `pageConfig.required` and `quiz.required` to different values errors: either one set to `false` makes the page optional, so the other is discarded.
 
-**An untaken optional page still holds the score back. It just doesn't sink it.** The score and the verdict reach the LMS once every graded page has a score or the course completes, so an optional page nobody has taken keeps both waiting. Two consequences worth designing around:
+**An untaken optional page holds nothing back.** The score and the verdict reach the LMS once every required graded page has a score or the course completes, so a learner who skips every optional page is still scored and still judged. Two consequences worth designing around:
 
-- **Graded work taken after the course completes re-grades it, optional or not.** A learner who completes on the exam alone, is sent `passed`, then goes back and fails the optional practice is re-scored across both and sent `failed`. Keep an optional page out of the rollup entirely (`graded: false`) if its score should never move the verdict.
+- **Graded work taken after the score is reported re-grades it, optional or not.** A learner who is sent `passed` on the exam, then goes back and fails the optional practice, is re-scored across both and sent `failed`. The completion stands: once a course reports complete it never reports incomplete again, so a re-grade moves the score and the verdict and leaves credit for finishing. Keep an optional page out of the rollup entirely (`graded: false`) if its score should never move the verdict.
 - **`completion.mode: "quiz"` needs a required graded page.** With every graded page optional there is no average to judge, so the course can never complete on its score. `tessera validate` errors.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
@@ -514,11 +514,11 @@ By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed
 | `"percentage"`    | `{ from: "quiz" }`                                                                  |
 | `"manual"`        | `{ from: "fixed", status: requireSuccessStatus }` when set, else `{ from: "none" }` |
 
-| `success.from` | Verdict                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------- |
-| `"quiz"`       | graded average vs `scoring.passingScore`, once every graded page has a score or the course completes |
-| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                                 |
-| `"none"`       | never sends a verdict; completion and score still report                                             |
+| `success.from` | Verdict                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `"quiz"`       | graded average vs `scoring.passingScore`, once every required graded page has a score or the course completes |
+| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                                          |
+| `"none"`       | never sends a verdict; completion and score still report                                                      |
 
 ```js
 completion: { mode: 'manual' },
@@ -936,7 +936,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every declared graded page, quiz or standalone, minus the optional ones still unanswered, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `success.from: "fixed"`, which sets it when the course completes. An unattempted course that completes reads `failed`, not `unknown`, unless its graded pages are all optional.
+`gradedScore` averages every declared graded page, quiz or standalone, minus the optional ones still unanswered, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page has a score. The LMS is sent the score only once every required graded page has one or the course is complete. `successStatus` stays `"unknown"` until then too, except under `success.from: "fixed"`, which sets it when the course completes. An unattempted course that completes reads `failed`, not `unknown`, unless its graded pages are all optional.
 
 Three rules for displaying it:
 

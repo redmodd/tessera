@@ -252,10 +252,8 @@ export class ProgressState {
     for (const pageIndex of this.#declaredGradedIndices) {
       const score = this.pageScore(pageIndex);
       if (score !== undefined) attempted = true;
-      else {
-        allScored = false;
-        if (!this.#requiredGradedIndices.has(pageIndex)) continue;
-      }
+      else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
+      else continue;
       entries.push({
         score: score ?? 0,
         weight: this.#pageWeights.get(pageIndex) ?? 1,
