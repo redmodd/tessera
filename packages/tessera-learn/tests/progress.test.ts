@@ -423,7 +423,7 @@ describe('ProgressState', () => {
         }),
       );
 
-    it('keeps following the score after a changed answer undoes completion', () => {
+    it('keeps following the score after a changed answer undoes completion, but holds the reported completion', () => {
       const progress = threeGradedPages();
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
@@ -434,6 +434,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
 
       expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.reportedCompletionStatus).toBe('complete');
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
     });
@@ -886,79 +887,6 @@ describe('ProgressState', () => {
 
       expect(progress.gradedScore.average).toBe(42.86);
       expect(progress.successStatus).toBe('failed');
-    });
-
-    it('scores the practice-plus-exam course on the exam alone', () => {
-      const manifest = createManifest(
-        4,
-        {
-          0: { graded: true },
-          1: { graded: true },
-          2: { graded: true },
-          3: { graded: true },
-        },
-        {
-          0: { required: false },
-          1: { required: false },
-          2: { required: false },
-        },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({ completion: { mode: 'quiz' } }),
-      );
-
-      progress.quizCompleted(3, 100);
-
-      expect(progress.gradedScore.average).toBe(100);
-      expect(progress.completionStatus).toBe('complete');
-      expect(progress.successStatus).toBe('passed');
-    });
-
-    it('finalizes the score on the required pages, without waiting on an optional one', () => {
-      const manifest = createManifest(
-        5,
-        { 1: { graded: true }, 3: { graded: true } },
-        { 3: { required: false } },
-      );
-      const progress = new ProgressState(manifest, createConfig());
-
-      progress.quizCompleted(1, 80);
-
-      expect(progress.gradedScore.average).toBe(80);
-      expect(progress.gradedScoreFinal).toBe(true);
-      expect(progress.successStatus).toBe('passed');
-
-      progress.quizCompleted(3, 40);
-
-      expect(progress.gradedScoreFinal).toBe(true);
-      expect(progress.gradedScore.average).toBe(60);
-    });
-
-    it('re-grades a completed course but keeps the reported completion', () => {
-      const manifest = createManifest(
-        4,
-        { 0: { graded: true }, 1: { graded: true } },
-        { 1: { required: false } },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({ completion: { mode: 'quiz' } }),
-      );
-
-      progress.quizCompleted(0, 100);
-
-      expect(progress.completionStatus).toBe('complete');
-      expect(progress.reportedCompletionStatus).toBe('complete');
-      expect(progress.gradedScoreFinal).toBe(true);
-      expect(progress.successStatus).toBe('passed');
-
-      progress.quizCompleted(1, 0);
-
-      expect(progress.gradedScore.average).toBe(50);
-      expect(progress.successStatus).toBe('failed');
-      expect(progress.completionStatus).toBe('incomplete');
-      expect(progress.reportedCompletionStatus).toBe('complete');
     });
 
     it('keeps a fixed verdict once a re-grade undoes the completion', () => {

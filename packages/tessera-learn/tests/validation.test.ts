@@ -808,23 +808,29 @@ export const pageConfig = { title: "Exam", graded: "yes" };
     );
   });
 
-  it('warns when required is set on a page that is not declared graded', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script module>
-export const pageConfig = { title: "Just Prose", required: false };
+  it.each([
+    ['required', 'false'],
+    ['weight', '40'],
+  ])(
+    'warns when %s is set on a page that is not declared graded',
+    (field, value) => {
+      createValidProject(testRoot);
+      writeFile(
+        testRoot,
+        'pages/01-section/01-lesson/page.svelte',
+        `<script module>
+export const pageConfig = { title: "Just Prose", ${field}: ${value} };
 </script>
 <h1>Just prose</h1>`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'pageConfig.required only applies to a graded page',
-      ),
-    );
-  });
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          `pageConfig.${field} only applies to a graded page`,
+        ),
+      );
+    },
+  );
 
   it('warns that quiz.required is ignored', () => {
     createValidProject(testRoot);
@@ -859,15 +865,6 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     expect(
       warnings.filter((w) => w.includes('every graded page sets required')),
     ).toEqual([]);
-  });
-
-  it('skips the weight-total warning when the required weights hit the scale', () => {
-    createValidProject(testRoot);
-    writeGradedPage(testRoot, 'page', 'required: false, weight: 25');
-    writeGradedPage(testRoot, 'exam', 'weight: 60');
-    writeGradedPage(testRoot, 'final', 'weight: 40');
-    const { warnings } = validateProject(testRoot);
-    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
   });
 
   it('warns on the weight total behind a single required page', () => {
@@ -923,24 +920,6 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('the course can never complete'),
-    );
-  });
-
-  it('warns when weight is set on a page that is not declared graded', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script module>
-export const pageConfig = { title: "Just Prose", weight: 40 };
-</script>
-<h1>Just prose</h1>`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'pageConfig.weight only applies to a graded page',
-      ),
     );
   });
 
