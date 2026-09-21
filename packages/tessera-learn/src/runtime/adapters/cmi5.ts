@@ -230,10 +230,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   override terminate(): void {
-    if (this.#heldFailed && !this.terminated) {
-      this.#heldFailed = false;
-      super.setSuccessStatus('failed');
-    }
+    if (this.#heldFailed) super.setSuccessStatus('failed');
     super.terminate();
   }
 

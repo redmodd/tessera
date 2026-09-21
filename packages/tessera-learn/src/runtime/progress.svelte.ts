@@ -254,12 +254,10 @@ export class ProgressState {
   }
 
   #answeredScore(pageIndex: number): number | undefined {
-    const quizScore = this.#quizGradedIndices.has(pageIndex)
+    if (this.unansweredQuestions(pageIndex).length === 0)
+      return this.pageScore(pageIndex);
+    return this.#quizGradedIndices.has(pageIndex)
       ? this.quizScore(pageIndex)
-      : undefined;
-    if (quizScore !== undefined) return quizScore;
-    return this.unansweredQuestions(pageIndex).length === 0
-      ? this.pageScore(pageIndex)
       : undefined;
   }
 
@@ -350,7 +348,7 @@ export class ProgressState {
   #passScore = $state<number | null>(null);
 
   restorePass(score: number): void {
-    this.#passScore = Math.max(this.#passScore ?? score, score);
+    this.#passScore = score;
   }
 
   #replaying = false;
@@ -371,15 +369,13 @@ export class ProgressState {
   }
 
   #latch() {
-    this.#gradedScoreDecided ||= untrack(() => this.gradedScoreFinal);
-    this.#completionReached ||= untrack(
-      () => this.completionStatus === 'complete',
-    );
-    const average = untrack(() => this.#graded.average);
-    if (this.#passScore !== null)
-      this.#passScore = Math.max(this.#passScore, average);
-    else if (untrack(() => this.#verdict === 'passed'))
-      this.#passScore = average;
+    untrack(() => {
+      this.#gradedScoreDecided ||= this.gradedScoreFinal;
+      this.#completionReached ||= this.completionStatus === 'complete';
+      const { average } = this.#graded;
+      if (this.#passScore !== null || this.#verdict === 'passed')
+        this.#passScore = Math.max(this.#passScore ?? average, average);
+    });
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -445,10 +441,7 @@ export class ProgressState {
   );
 
   get reportedScore(): number {
-    const { average } = this.#graded;
-    return this.#passScore === null
-      ? average
-      : Math.max(average, this.#passScore);
+    return this.#passScore ?? this.#graded.average;
   }
 
   /**
