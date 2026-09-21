@@ -10,4 +10,4 @@ The LMS never loses a completion or a `passed` when the score later drops, and k
 
 A page of standalone graded questions counts as answered once every graded question on it is, even ones behind a reveal, rather than after the first.
 
-`tessera validate` warns on unknown `quiz` fields.
+`tessera validate` warns on unknown `pageConfig` and `quiz` fields, and on graded questions split across `{#if}` branches.

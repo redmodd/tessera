@@ -832,6 +832,50 @@ export const pageConfig = { title: "Just Prose", ${field}: ${value} };
     },
   );
 
+  it('warns on pageConfig fields it ignores', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'practice', 'requried: false');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('unknown field pageConfig.requried is ignored'),
+    );
+  });
+
+  it('warns when graded questions sit in different branches of one {#if}', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/branch.svelte',
+      `<script module>
+export const pageConfig = { title: "Branch", graded: true };
+</script>
+<h1>Branch</h1>
+{#if pathA}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:else if pathB}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/if}`,
+    );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/reveal.svelte',
+      `<script module>
+export const pageConfig = { title: "Reveal", graded: true };
+</script>
+<h1>Reveal</h1>
+<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />
+{#if shown}
+  <MultipleChoice graded id="q2" question="B?" options={['x', 'y']} correct={0} />
+{:else}
+  <MultipleChoice id="practice" question="C?" options={['x', 'y']} correct={0} />
+{/if}`,
+    );
+    const branchWarnings = validateProject(testRoot).warnings.filter((w) =>
+      w.includes('different branches of one {#if}'),
+    );
+    expect(branchWarnings).toEqual([expect.stringContaining('branch.svelte')]);
+  });
+
   it('warns on quiz fields it ignores, pointing page-level ones to pageConfig', () => {
     createValidProject(testRoot);
     writeFile(

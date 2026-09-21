@@ -10,6 +10,7 @@ import {
   orderPageFiles,
   walkPages,
   isLiterallyGradedQuestion,
+  listedGradedQuestions,
   staticQuestionId,
   QUESTION_COMPONENT_NAMES,
   type WalkedLesson,
@@ -1130,6 +1131,18 @@ function validatePageFile(
       );
     }
   }
+  if (
+    declaresGraded &&
+    !isQuiz &&
+    splitsAcrossBranches(listedGradedQuestions(content))
+  ) {
+    d.warn(
+      `${fileRel}: graded questions sit in different branches of one {#if}. ` +
+        'The page counts as answered only once every graded question on it is, ' +
+        'so a learner shown only one branch can never finish it. ' +
+        'Put each branch on its own page, or drop graded from the branch questions.',
+    );
+  }
   const gradesUndeclared =
     !declaresGraded &&
     !isQuiz &&
@@ -1349,13 +1362,41 @@ function validatePageConfig(
     );
   }
   const result = parsePageConfigFromSource(content);
-  if (result.kind === 'ok') return result.value;
+  if (result.kind === 'ok') {
+    for (const key of Object.keys(result.value)) {
+      if (!KNOWN_PAGE_FIELDS.has(key))
+        d.warn(`${fileRel}: unknown field pageConfig.${key} is ignored`);
+    }
+    return result.value;
+  }
   if (result.kind === 'invalid') {
     d.error(
       `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
     );
   }
   return null;
+}
+
+const KNOWN_PAGE_FIELDS = new Set(
+  Object.keys({
+    title: true,
+    quiz: true,
+    graded: true,
+    required: true,
+    weight: true,
+    completesOn: true,
+  } satisfies Record<keyof PageConfig, true>),
+);
+
+function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
+  const seen = new Map<number, string>();
+  for (const { branches } of questions) {
+    for (const [block, branch] of branches) {
+      if ((seen.get(block) ?? branch) !== branch) return true;
+      seen.set(block, branch);
+    }
+  }
+  return false;
 }
 
 function validateCompletesOn(

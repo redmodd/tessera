@@ -21,7 +21,11 @@ export interface ComponentMatch {
   name: string;
   props: Map<string, PropValue>;
   hasSpread: boolean;
+  /** The branch it sits in of each enclosing `{#if}`, keyed by that block's offset. */
+  branches: ReadonlyMap<number, IfBranch>;
 }
+
+type IfBranch = 'consequent' | 'alternate';
 
 export type NamedObjectLiteral =
   { kind: 'none' } | { kind: 'invalid' } | { kind: 'literal'; text: string };
@@ -65,8 +69,12 @@ function parseRoot(source: string): CacheEntry {
   return entry;
 }
 
-function walkNodes(root: Node, visit: (node: Node) => void): void {
+function walkNodes(
+  root: Node,
+  visit: (node: Node, path: readonly [Node, string][]) => void,
+): void {
   const seen = new Set<object>();
+  const path: [Node, string][] = [];
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
     if (seen.has(value)) return;
@@ -76,26 +84,41 @@ function walkNodes(root: Node, visit: (node: Node) => void): void {
       return;
     }
     const node = value as Node;
-    visit(node);
+    visit(node, path);
     for (const key of Object.keys(node)) {
       if (key === 'type') continue;
+      path.push([node, key]);
       walk(node[key]);
+      path.pop();
     }
   };
   walk(root);
 }
 
-function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
-  const found: Node[] = [];
-  walkNodes(root, (node) => {
-    if (node.type === 'Component' && names.has(node.name as string)) {
-      found.push(node);
+function collectComponents(
+  root: Node,
+  names: ReadonlySet<string>,
+): { node: Node; branches: Map<number, IfBranch> }[] {
+  const found: { node: Node; branches: Map<number, IfBranch> }[] = [];
+  walkNodes(root, (node, path) => {
+    if (node.type !== 'Component' || !names.has(node.name as string)) return;
+    const branches = new Map<number, IfBranch>();
+    for (const [ancestor, key] of path) {
+      if (
+        ancestor.type === 'IfBlock' &&
+        (key === 'consequent' || key === 'alternate')
+      )
+        branches.set(ancestor.start, key);
     }
+    found.push({ node, branches });
   });
-  return found.sort((a, b) => a.start - b.start);
+  return found.sort((a, b) => a.node.start - b.node.start);
 }
 
-function readProps(source: string, node: Node): ComponentMatch {
+function readProps(
+  source: string,
+  node: Node,
+): Omit<ComponentMatch, 'branches'> {
   const props = new Map<string, PropValue>();
   let hasSpread = false;
   const attributes = (node.attributes as Node[]) ?? [];
@@ -166,7 +189,10 @@ export function findComponents(
 ): ComponentMatch[] | null {
   const { root } = parseRoot(source);
   if (!root) return null;
-  return collectComponents(root, names).map((node) => readProps(source, node));
+  return collectComponents(root, names).map(({ node, branches }) => ({
+    ...readProps(source, node),
+    branches,
+  }));
 }
 
 const TsParser = Parser.extend(
