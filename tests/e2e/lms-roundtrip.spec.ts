@@ -11,6 +11,7 @@ import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
   exitCourse,
+  findStatement,
   finishFreeCourse,
   interactionField,
   interactionWrites,
@@ -561,44 +562,25 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await answerGradedQuiz(page);
 
     await expect
-      .poll(
-        () =>
-          statements.some(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
-          ),
-        { timeout: 5000 },
-      )
-      .toBe(true);
-    expect(
-      statements.some(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-      ),
-    ).toBe(false);
-
-    const beforeFinish = statements.length;
-    await finishFreeCourse(page);
-
-    await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
-
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
+      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
+      .toBeDefined();
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answered = statements
-      .slice(0, beforeFinish)
-      .filter((s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered');
+    const answered = statements.filter(
+      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
+    );
+    await finishFreeCourse(page);
+
+    await expect
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toBeDefined();
+
+    const passed = findStatement(statements, 'passed');
+    expect(passed.result?.success).toBe(true);
+    expect(passed.result?.score?.scaled).toBe(1);
+
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -827,36 +809,18 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
     await expect
-      .poll(
-        () =>
-          statements.some(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
-          ),
-        { timeout: 5000 },
-      )
-      .toBe(true);
-    expect(
-      statements.some(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-      ),
-    ).toBe(false);
+      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
+      .toBeDefined();
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
-    const beforeFinish = statements.length;
+    const answered = answeredSoFar();
     await finishFreeCourse(page);
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toBeDefined();
 
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
+    const passed = findStatement(statements, 'passed');
     expect(passed.result?.success).toBe(true);
     expect(passed.result?.score?.scaled).toBe(1);
     // Plain xAPI carries the launch registration but none of cmi5's Defined-
@@ -864,9 +828,6 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(passed.context?.registration).toBe('test-registration-xapi');
     expect(passed.context?.contextActivities?.category).toBeUndefined();
 
-    const answered = statements
-      .slice(0, beforeFinish)
-      .filter((s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered');
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',

@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { answerMatching } from './helpers.js';
+import {
+  answerFillInTheBlank,
+  answerMatching,
+  answerMultipleChoice,
+  completePracticeQuiz,
+  primaryBtn,
+} from './helpers.js';
 
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content');
@@ -24,23 +30,6 @@ async function readSavedState(page: Page) {
     const key = Object.keys(localStorage).find((k) => k.startsWith('tessera-'));
     return JSON.parse(localStorage.getItem(key!)!);
   });
-}
-
-const primaryBtn = (page: Page) =>
-  page.locator('.tessera-quiz-nav .tessera-btn-primary');
-
-async function answerMultipleChoice(page: Page, optionIndex: number) {
-  const radios = page.locator(
-    '.tessera-quiz-question-wrapper.active .tessera-mc-option',
-  );
-  await radios.nth(optionIndex).click();
-}
-
-async function answerFillInTheBlank(page: Page, text: string) {
-  const input = page.locator(
-    '.tessera-quiz-question-wrapper.active input[type="text"]',
-  );
-  await input.fill(text);
 }
 
 /**
@@ -95,23 +84,6 @@ async function completeGradedQuiz(
   await checkThenContinue(page, true);
 
   // Submit and wait for the results panel.
-  await page.locator('.tessera-quiz-btn-submit').click();
-  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
-}
-
-async function completePracticeQuiz(
-  page: Page,
-  { mc, fill }: { mc: number; fill: string },
-) {
-  const progress = page.locator('.tessera-quiz-progress-desktop').first();
-
-  await expect(progress).toContainText('Question 1 of 2');
-  await answerMultipleChoice(page, mc);
-  await primaryBtn(page).click();
-
-  await expect(progress).toContainText('Question 2 of 2');
-  await answerFillInTheBlank(page, fill);
-
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 }

@@ -8,6 +8,7 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  findStatement,
   interactionField,
   scormData,
   startPreview,
@@ -223,19 +224,11 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     await answerCustomQuizCorrectly(page);
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
-          )?.result?.score?.scaled,
-        { timeout: 5000 },
-      )
+      .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {
+        timeout: 5000,
+      })
       .toBe(1);
-    expect(
-      statements.some(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-      ),
-    ).toBe(false);
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = statements.filter(
       (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
@@ -303,19 +296,11 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
     await answerCustomQuizCorrectly(page);
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/scored',
-          )?.result?.score?.scaled,
-        { timeout: 5000 },
-      )
+      .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {
+        timeout: 5000,
+      })
       .toBe(1);
-    expect(
-      statements.some(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-      ),
-    ).toBe(false);
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = statements.filter(
       (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',

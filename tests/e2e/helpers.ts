@@ -175,18 +175,49 @@ export async function answerGradedQuizAfterQ1(page: Page): Promise<void> {
   await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
 }
 
-export async function finishFreeCourse(page: Page): Promise<void> {
-  await openQuiz(page, 'Practice Quiz');
-  await page
-    .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-    .nth(1)
-    .click();
-  await page.locator('.tessera-quiz-nav .tessera-btn-primary').click();
-  await page
-    .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-    .fill('H2O');
+export const primaryBtn = (page: Page) =>
+  page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
+export async function answerMultipleChoice(
+  page: Page,
+  optionIndex: number,
+): Promise<void> {
+  const radios = page.locator(
+    '.tessera-quiz-question-wrapper.active .tessera-mc-option',
+  );
+  await radios.nth(optionIndex).click();
+}
+
+export async function answerFillInTheBlank(
+  page: Page,
+  text: string,
+): Promise<void> {
+  const input = page.locator(
+    '.tessera-quiz-question-wrapper.active input[type="text"]',
+  );
+  await input.fill(text);
+}
+
+export async function completePracticeQuiz(
+  page: Page,
+  { mc, fill }: { mc: number; fill: string },
+): Promise<void> {
+  const progress = page.locator('.tessera-quiz-progress-desktop').first();
+
+  await expect(progress).toContainText('Question 1 of 2');
+  await answerMultipleChoice(page, mc);
+  await primaryBtn(page).click();
+
+  await expect(progress).toContainText('Question 2 of 2');
+  await answerFillInTheBlank(page, fill);
+
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
+export async function finishFreeCourse(page: Page): Promise<void> {
+  await openQuiz(page, 'Practice Quiz');
+  await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
 
   const nav = page.locator('.tessera-nav-page');
   const count = await nav.count();
@@ -194,4 +225,10 @@ export async function finishFreeCourse(page: Page): Promise<void> {
     await nav.nth(i).click();
     await waitForTesseraContent(page);
   }
+}
+
+export function findStatement(statements: any[], verb: string): any {
+  return statements.find(
+    (s) => s?.verb?.id === `http://adlnet.gov/expapi/verbs/${verb}`,
+  );
 }

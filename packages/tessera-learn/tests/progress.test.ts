@@ -963,19 +963,21 @@ describe('ProgressState', () => {
   });
 
   describe('optional graded pages (required: false)', () => {
-    it('counts an optional page once scored, but never takes back a pass', () => {
-      const manifest = createManifest(
-        5,
-        {},
-        {
-          1: { graded: true, weight: 75 },
-          3: { graded: true, required: false, weight: 100 },
-        },
-      );
-      const progress = new ProgressState(
-        manifest,
+    const examWithOptionalPractice = () =>
+      new ProgressState(
+        createManifest(
+          5,
+          {},
+          {
+            1: { graded: true, weight: 75 },
+            3: { graded: true, required: false, weight: 100 },
+          },
+        ),
         createConfig({ completion: { mode: 'quiz' } }),
       );
+
+    it('counts an optional page once scored, but never takes back a pass', () => {
+      const progress = examWithOptionalPractice();
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
 
@@ -990,18 +992,7 @@ describe('ProgressState', () => {
     });
 
     it('reports the best score from the pass on, and still a higher one', () => {
-      const manifest = createManifest(
-        5,
-        {},
-        {
-          1: { graded: true, weight: 75 },
-          3: { graded: true, required: false, weight: 100 },
-        },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({ completion: { mode: 'quiz' } }),
-      );
+      const progress = examWithOptionalPractice();
 
       progress.markStandaloneQuestion(1, 'q1', 80, true);
       progress.markStandaloneQuestion(3, 'q1', 0, true);
