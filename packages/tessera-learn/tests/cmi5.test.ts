@@ -461,7 +461,7 @@ describe('CMI5Adapter', () => {
       .map((b: any) => b.verb.id);
   }
 
-  it('seedLifecycle suppresses duplicate Failed when resuming an already-failed session', async () => {
+  it('holds a resumed failure for its own Terminated, since the last session may have ended without one', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -473,11 +473,13 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
-    adapter.terminate();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sentVerbs()).not.toContain(FAILED);
 
+    adapter.terminate();
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(sentVerbs()).not.toContain(FAILED);
+    expect(sentVerbs().filter((id) => id === FAILED)).toHaveLength(1);
   });
 
   it('holds Failed for Terminated and drops it when the session passes', async () => {

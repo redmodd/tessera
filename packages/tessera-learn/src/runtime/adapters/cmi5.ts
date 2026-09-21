@@ -1,7 +1,7 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { STANDARDS } from '../standards.js';
-import type { SuccessStatus } from '../persistence.js';
+import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -207,6 +207,18 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   #heldFailed = false;
+
+  override seedLifecycle(
+    completion: CompletionStatus,
+    success: SuccessStatus,
+    score?: number | null,
+  ): boolean {
+    return super.seedLifecycle(
+      completion,
+      success === 'failed' ? 'unknown' : success,
+      score,
+    );
+  }
 
   override setSuccessStatus(status: SuccessStatus): void {
     if (status === 'failed') {
