@@ -11,6 +11,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30000,
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI ? 'dot' : 'list',
   // Pre-builds the five export-standard variants of tests/fixtures/free into
   // tests/.e2e-variants/{web,scorm12,scorm2004,cmi5,xapi} so the export and lms
