@@ -45,7 +45,8 @@ export interface PageContext {
   quiz: QuizConfig | null;
   quizState: QuizPageState | null;
   passingScore: number;
-  readonly index: number;
+  /** The rendered page, or undefined before the first one renders. */
+  readonly index: number | undefined;
 }
 
 export interface UserStateStore {

@@ -21,7 +21,11 @@ const config = {
   export: { standard: 'xapi' },
 };
 
-async function mountApp(adapter: BaseAdapter, course = manifest) {
+async function mountApp(
+  adapter: BaseAdapter,
+  course = manifest,
+  loadLayout = () => import('./fixtures/mastery-layout.svelte'),
+) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
@@ -31,7 +35,7 @@ async function mountApp(adapter: BaseAdapter, course = manifest) {
       course.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
     ),
     adapter,
-    layout: (await import('./fixtures/mastery-layout.svelte')).default,
+    layout: (await loadLayout()).default,
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
@@ -111,6 +115,19 @@ describe('a graded submit that decides the verdict', () => {
       'unknown',
       'passed',
     ]);
+  });
+
+  it('records a graded question in the layout against no page', async () => {
+    const mounted = await mountApp(
+      stubAdapter(),
+      createManifest(1, {}, { 0: { graded: true } }),
+      () => import('./fixtures/question-layout.svelte'),
+    );
+    cleanup = mounted.cleanup;
+    await flush();
+
+    expect(mounted.progress.gradedUnits.size).toBe(0);
+    expect(mounted.progress.successStatus).toBe('unknown');
   });
 
   it('holds the completion a later optional page would take back', async () => {

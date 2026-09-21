@@ -87,7 +87,7 @@
       return config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE;
     },
     get index() {
-      return renderedPageIndex;
+      return renderedPageIndex < 0 ? undefined : renderedPageIndex;
     },
   });
   setContext(TESSERA_PAGE, pageContext);

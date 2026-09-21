@@ -486,7 +486,7 @@ export function useQuiz(
   const pageCtx = getPageContext();
   const adapterCtx = getAdapterContext();
   const { progress } = requireNavContext('useQuiz()');
-  if (!pageCtx?.quiz) {
+  if (!pageCtx?.quiz || pageCtx.index === undefined) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).',
     );
