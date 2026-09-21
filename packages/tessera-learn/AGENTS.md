@@ -962,7 +962,7 @@ Active under `completion.mode: "manual"`; in any other mode `markComplete()` is 
 ```ts
 function useCompletion(): {
   markComplete(): void; // idempotent — only the first call per session has an effect
-  readonly completionStatus: 'incomplete' | 'complete';
+  readonly completionStatus: 'incomplete' | 'complete'; // live, same as useProgress().completionStatus
 };
 ```
 
