@@ -685,10 +685,11 @@ describe('ProgressState', () => {
       );
       progress.replay(() => {
         progress.markVisited(0);
-        progress.restoreUnanswered(0, ['q-light']);
+        progress.restoreUnanswered(0, saved.unansweredQuestions(0));
         progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
       });
 
+      expect(progress.unansweredQuestions(0)).toEqual(['q-light']);
       expect(progress.awaitingScore(0)).toBe(true);
       expect(progress.completionStatus).toBe('incomplete');
     });

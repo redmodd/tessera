@@ -54,24 +54,18 @@ function makeConfig(resume: 'auto' | 'never') {
 }
 
 function makeAdapter(saved: unknown, seeds: boolean) {
-  const seedLifecycle = vi.fn(() => seeds);
-  const setCompletionStatus = vi.fn();
-  const saveState = vi.fn();
-  const setScore = vi.fn();
-  const setSuccessStatus = vi.fn();
+  const spies = {
+    seedLifecycle: vi.fn(() => seeds),
+    setCompletionStatus: vi.fn(),
+    saveState: vi.fn(),
+    setScore: vi.fn(),
+    setSuccessStatus: vi.fn(),
+  };
   return {
-    seedLifecycle,
-    setCompletionStatus,
-    saveState,
-    setScore,
-    setSuccessStatus,
+    spies,
     adapter: stubAdapter({
       getState: () => saved as SavedState | null,
-      seedLifecycle,
-      saveState,
-      setScore,
-      setCompletionStatus,
-      setSuccessStatus,
+      ...spies,
     }),
   };
 }
@@ -84,14 +78,10 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const {
-    adapter,
-    seedLifecycle,
-    setCompletionStatus,
-    saveState,
-    setScore,
-    setSuccessStatus,
-  } = makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
+  const { adapter, spies } = makeAdapter(
+    options.saved ?? savedWith({}),
+    options.seeds ?? true,
+  );
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -110,15 +100,7 @@ async function mountApp(
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return {
-    component,
-    seedLifecycle,
-    setCompletionStatus,
-    saveState,
-    setScore,
-    setSuccessStatus,
-    unmount,
-  };
+  return { component, unmount, ...spies };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
