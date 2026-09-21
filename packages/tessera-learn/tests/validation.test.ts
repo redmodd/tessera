@@ -972,9 +972,10 @@ export const pageConfig = { title: "Practice", graded: true, required: false, we
 <MultipleChoice id="q3" question="?" options={["a","b"]} correct={0} graded />`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('weights sum to 95, not 100'),
-    );
+    const sum = warnings.find((w) => w.includes('weights sum to'));
+    expect(sum).toContain('weights sum to 95, not 100');
+    expect(sum).toContain('leaves out the optional pages: ');
+    expect(sum).toContain('practice.svelte');
   });
 
   it('errors when pageConfig.required contradicts quiz.required', () => {

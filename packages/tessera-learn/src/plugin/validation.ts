@@ -1452,7 +1452,7 @@ function validateQuizConfig(
     }
   }
 
-  if (cfg.required !== undefined && cfg.graded !== true) {
+  if (typeof cfg.required === 'boolean' && cfg.graded !== true) {
     d.warn(
       `${fileRel}: quiz.required only applies to a graded quiz. ` +
         'Without `graded: true` the page never joins the rollup, so nothing reads it.',
@@ -1990,10 +1990,14 @@ function reportEffectiveWeights(
       ? 1
       : undefined;
   if (scale !== undefined && Math.abs(total - scale) > scale * 1e-6) {
+    const excluded =
+      optional.length > 0
+        ? ` The total leaves out the optional pages: ${optional.map((p) => p.fileRel).join(', ')}.`
+        : '';
     d.warn(
       `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +
         `Add up to ${scale} to make each weight the page's percentage of the course score, ` +
-        'or ignore this if the weights are meant as bare ratios.',
+        `or ignore this if the weights are meant as bare ratios.${excluded}`,
     );
   }
 }
