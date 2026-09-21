@@ -330,8 +330,8 @@ describe('generateCMI5Xml', () => {
 
   it('drops to Completed when a quiz criterion has nothing to judge', () => {
     // An informational course, or one whose graded pages are all optional:
-    // the criterion resolves to "quiz", but nothing the runtime is sure to
-    // judge means CompletedAndPassed leaves the AU unsatisfiable.
+    // the criterion resolves to "quiz", but the runtime may never send a
+    // verdict, so CompletedAndPassed could leave the AU unsatisfiable.
     const xml = cmi5Xml(
       { title: 'Test', completion: { mode: 'percentage' } },
       false,

@@ -100,7 +100,7 @@ function declaresPassMark(config: ExportConfig): boolean {
   );
 }
 
-function sendsVerdict(
+function guaranteesVerdict(
   config: ExportConfig,
   hasRequiredGradedPage: boolean,
 ): boolean {
@@ -188,10 +188,11 @@ export function generateCMI5Xml(
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
-  // the AU. Wherever the course sends a verdict, that verdict can be Failed and
-  // a failed learner should not receive credit. A course that sends none has to
-  // satisfy on Completed alone, or nothing ever satisfies the AU.
-  const moveOn = sendsVerdict(config, hasRequiredGradedPage)
+  // the AU. Wherever the course is sure to send a verdict, that verdict can be
+  // Failed and a failed learner should not receive credit. A course that may
+  // send none has to satisfy on Completed alone, or nothing may ever satisfy
+  // the AU.
+  const moveOn = guaranteesVerdict(config, hasRequiredGradedPage)
     ? 'CompletedAndPassed'
     : 'Completed';
 

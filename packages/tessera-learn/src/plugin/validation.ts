@@ -1937,7 +1937,7 @@ function reportEffectiveWeights(
       .join(', ');
     d.info(
       required.length > 0
-        ? `course score weighting: these pages are optional, so each joins that total ` +
+        ? `course score weighting: these pages are optional, so each joins the rollup ` +
             `only when the learner takes it: ${list}`
         : `course score weighting: no graded page is required, so the course score covers ` +
             `only the pages the learner takes: ${list}`,
@@ -1991,8 +1991,7 @@ function crossValidate(
     if (quizMode) {
       d.error(
         pageResults.hasGraded
-          ? 'completion.mode is "quiz" but every graded page sets required: false, so the course ' +
-              'score has no required page to judge and the course can never complete. ' +
+          ? 'completion.mode is "quiz" but every graded page sets required: false, so the course can never complete. ' +
               'Drop required from the page that decides the course, or complete on something else.'
           : 'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
       );

@@ -887,7 +887,7 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     const weighting = infos.filter((i) => i.includes('score weighting'));
     expect(weighting).toHaveLength(1);
     expect(weighting[0]).toContain('no graded page is required');
-    expect(weighting[0]).not.toContain('that total');
+    expect(weighting[0]).not.toContain('%');
     expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
   });
 
