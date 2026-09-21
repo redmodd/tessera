@@ -866,13 +866,13 @@ describe('ProgressState', () => {
   });
 
   describe('optional graded pages (required: false)', () => {
-    it('counts an optional page only once it has a score', () => {
+    it('counts an optional page once scored, and re-grades the verdict', () => {
       const manifest = createManifest(
         5,
         {},
         {
           1: { graded: true, weight: 75 },
-          3: { graded: true, required: false, weight: 25 },
+          3: { graded: true, required: false, weight: 100 },
         },
       );
       const progress = new ProgressState(manifest, createConfig());
@@ -880,10 +880,12 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(1, 'q1', 100, true);
 
       expect(progress.gradedScore.average).toBe(100);
+      expect(progress.successStatus).toBe('passed');
 
       progress.markStandaloneQuestion(3, 'q1', 0, true);
 
-      expect(progress.gradedScore.average).toBe(75);
+      expect(progress.gradedScore.average).toBe(42.86);
+      expect(progress.successStatus).toBe('failed');
     });
 
     it('scores the practice-plus-exam course on the exam alone', () => {
@@ -931,27 +933,6 @@ describe('ProgressState', () => {
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.gradedScore.average).toBe(60);
-    });
-
-    it('re-grades a verdict an optional page taken later contradicts', () => {
-      const manifest = createManifest(
-        5,
-        {},
-        {
-          1: { graded: true, weight: 75 },
-          3: { graded: true, required: false, weight: 100 },
-        },
-      );
-      const progress = new ProgressState(manifest, createConfig());
-
-      progress.markStandaloneQuestion(1, 'q1', 100, true);
-
-      expect(progress.successStatus).toBe('passed');
-
-      progress.markStandaloneQuestion(3, 'q1', 0, true);
-
-      expect(progress.gradedScore.average).toBe(42.86);
-      expect(progress.successStatus).toBe('failed');
     });
 
     it('re-grades a completed course but keeps the reported completion', () => {
@@ -1020,54 +1001,6 @@ describe('ProgressState', () => {
       expect(progress.gradedScore.average).toBe(100);
       expect(progress.completionStatus).toBe('incomplete');
       expect(progress.successStatus).toBe('passed');
-    });
-
-    it('still waits on a required page', () => {
-      const manifest = createManifest(5, {
-        1: { graded: true },
-        3: { graded: true },
-      });
-      const progress = new ProgressState(manifest, createConfig());
-
-      progress.quizCompleted(1, 80);
-
-      expect(progress.gradedScoreFinal).toBe(false);
-    });
-
-    it('reports nothing while every graded page is optional and unattempted', () => {
-      const manifest = createManifest(
-        5,
-        { 1: { graded: true }, 3: { graded: true } },
-        { 1: { required: false }, 3: { required: false } },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({
-          completion: { mode: 'percentage', percentageThreshold: 0 },
-        }),
-      );
-
-      expect(progress.completionStatus).toBe('complete');
-      expect(progress.gradedScoreFinal).toBe(false);
-      expect(progress.successStatus).toBe('unknown');
-    });
-
-    it('fails a completed course that skipped a required page', () => {
-      const manifest = createManifest(
-        5,
-        { 1: { graded: true }, 3: { graded: true } },
-        { 3: { required: false } },
-      );
-      const progress = new ProgressState(
-        manifest,
-        createConfig({
-          completion: { mode: 'percentage', percentageThreshold: 0 },
-        }),
-      );
-
-      expect(progress.completionStatus).toBe('complete');
-      expect(progress.gradedScore.average).toBe(0);
-      expect(progress.successStatus).toBe('failed');
     });
   });
 

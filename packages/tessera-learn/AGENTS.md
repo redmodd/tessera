@@ -404,11 +404,9 @@ Required graded pages count as 0 until answered, so a skipped exam sinks the cou
 ```
 
 - **Scoring and verdict only.** Under `completion.mode: "percentage"` and `navigation.mode: "sequential"` it behaves like any graded page: it counts as completed, and unlocks the next page, only once answered.
-- **Optional pages never hold the score back.** The score and verdict reach the LMS once every required graded page has a score, or the course completes.
 - **An optional page answered later re-grades the course.** A learner sent `passed` who then fails the practice is re-scored and sent `failed`. Use `graded: false` if a page's score should never move the verdict.
 - **Completion never goes backwards.** Once the LMS is told complete it stays complete, across sessions. `useProgress().completionStatus` is the live reading and can drop below the threshold again.
 - **`completion.mode: "quiz"` needs a required graded page.** `tessera validate` errors without one.
-- `tessera validate` quotes weight shares against the required pages and lists optional pages separately. `required` on an ungraded page warns. `quiz.required` is ignored and warns.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
 

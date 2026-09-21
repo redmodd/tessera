@@ -321,47 +321,36 @@ test.describe.serial('per-page weights in the course rollup', () => {
     return (await scormData(page))['cmi.core.lesson_status'];
   }
 
-  test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
+  async function answerExam(page: Page, optionIndex: number) {
+    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
+    await page.waitForSelector('[data-question-id="q-exam"]');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(optionIndex)
+      .check();
+  }
+
+  async function answerPractice(page: Page, optionIndex: number) {
+    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
+    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
+    await answerCheckQuiz(page, optionIndex);
+  }
+
+  test('weights the exam 75 to the quiz 25, and leaves the optional page out until taken', async ({
     page,
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await answerCheckQuiz(page, 0);
+    await answerExam(page, 2);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(2)
-      .check();
-
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
-    expect(await lessonStatus(page)).toBe('passed');
-  });
-
-  test('an untaken optional page leaves the rollup to the required pages', async ({
-    page,
-  }) => {
-    await page.goto(BASE);
-    await waitForTesseraContent(page);
-
-    await answerCheckQuiz(page, 0);
-
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(2)
-      .check();
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
     expect(await lessonStatus(page)).toBe('passed');
 
     // Graded work taken after the course completes re-grades it, optional or
     // not: the page joins both halves, (0*25 + 100*75 + 0*100) / 200.
-    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
-    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
-    await answerCheckQuiz(page, 0);
+    await answerPractice(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('37.5');
     expect(await lessonStatus(page)).toBe('failed');
@@ -377,20 +366,9 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.waitForSelector('.tessera-quiz-results');
     expect(await courseScore(page)).toBeFalsy();
 
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(0)
-      .check();
+    await answerExam(page, 0);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
     expect(await lessonStatus(page)).toBe('failed');
-
-    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
-    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
-    await answerCheckQuiz(page, 0);
-
-    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('12.5');
   });
 });

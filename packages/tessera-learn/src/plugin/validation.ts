@@ -44,7 +44,6 @@ import {
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
-  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type ManualCompletion,
@@ -1099,10 +1098,7 @@ function validatePageFile(
   );
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
-  const requiredGraded = isRequiredGradedPage({
-    graded,
-    required: declaresRequired,
-  });
+  const requiredGraded = graded && declaresRequired !== false;
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
@@ -1115,19 +1111,17 @@ function validatePageFile(
         'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
-  if (declaresRequired !== undefined && !graded) {
-    d.warn(
-      `${fileRel}: pageConfig.required only applies to a graded page. ` +
-        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
-        'so nothing reads it.',
-    );
-  }
-  if (weight !== undefined && !graded) {
-    d.warn(
-      `${fileRel}: pageConfig.weight only applies to a page that counts toward the course score. ` +
-        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
-        'so the weight is ignored.',
-    );
+  for (const [field, value] of [
+    ['required', declaresRequired],
+    ['weight', weight],
+  ] as const) {
+    if (value !== undefined && !graded) {
+      d.warn(
+        `${fileRel}: pageConfig.${field} only applies to a graded page. ` +
+          'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+          'so it is ignored.',
+      );
+    }
   }
   const gradesUndeclared =
     !declaresGraded &&
@@ -1373,7 +1367,7 @@ function validateCompletesOn(
 }
 
 function validatePageBoolean(
-  pageConfig: { graded?: unknown; required?: unknown } | null,
+  pageConfig: Partial<Record<keyof PageConfig, unknown>> | null,
   field: 'graded' | 'required',
   fileRel: string,
   d: Diagnostics,
@@ -1983,17 +1977,6 @@ function crossValidate(
   pageResults: PagesValidationResult,
   d: Diagnostics,
 ): void {
-  // completion.mode "quiz" but nothing declared graded
-  if (
-    config.completion?.mode === 'quiz' &&
-    !pageResults.hasGraded &&
-    !pageResults.hasParseErrors
-  ) {
-    d.error(
-      'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
-    );
-  }
-
   const quizMode = config.completion?.mode === 'quiz';
   // A quiz verdict judges the graded average against the threshold whether
   // `success` names it or `completion.mode` implies it, so read the resolved
@@ -2001,30 +1984,33 @@ function crossValidate(
   const judgesScore =
     pageResults.hasGraded && resolveSuccess(config).from === 'quiz';
 
+  if (
+    !pageResults.pages.some((p) => p.requiredGraded) &&
+    !pageResults.hasParseErrors
+  ) {
+    if (quizMode) {
+      d.error(
+        pageResults.hasGraded
+          ? 'completion.mode is "quiz" but every graded page sets required: false, so the course ' +
+              'score has no required page to judge and the course can never complete. ' +
+              'Drop required from the page that decides the course, or complete on something else.'
+          : 'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
+      );
+    } else if (judgesScore) {
+      d.warn(
+        'every graded page sets required: false, so a learner who skips them all is never judged ' +
+          'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
+          'course reports, or drop required from the page that gates credit.',
+      );
+    }
+  }
+
   // A threshold something reads with nothing set: the merge defaults to 70, so
   // this is a nudge, not an error. Quiz mode always reads it for completion,
   // whatever judges success.
   if (config.scoring?.passingScore === undefined && (quizMode || judgesScore)) {
     d.warn(
       `${quizMode ? 'completion.mode is "quiz"' : 'the course judges pass/fail on the graded average'} but scoring.passingScore is not set, so it defaults to 70%. Set it explicitly to be sure.`,
-    );
-  }
-
-  const noRequiredGraded =
-    pageResults.hasGraded &&
-    !pageResults.pages.some((p) => p.requiredGraded) &&
-    !pageResults.hasParseErrors;
-  if (quizMode && noRequiredGraded) {
-    d.error(
-      'completion.mode is "quiz" but every graded page sets required: false, so the course ' +
-        'score has no required page to judge and the course can never complete. ' +
-        'Drop required from the page that decides the course, or complete on something else.',
-    );
-  } else if (judgesScore && noRequiredGraded) {
-    d.warn(
-      'every graded page sets required: false, so a learner who skips them all is never judged ' +
-        'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
-        'course reports, or drop required from the page that gates credit.',
     );
   }
 
