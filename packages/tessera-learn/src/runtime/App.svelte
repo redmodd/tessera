@@ -233,9 +233,7 @@
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
       ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
-      ...(progress.successStatus === 'passed'
-        ? { p: progress.reportedScore }
-        : {}),
+      ...(progress.passScore !== null ? { p: progress.passScore } : {}),
     };
   }
 
@@ -276,15 +274,11 @@
       if (saved.m === 1) {
         progress.markCompleteManually();
       }
-      if (saved.s === 1) {
-        progress.restoreGradedScoreDecided();
-      }
-      if (saved.k === 1) {
-        progress.restoreCompletionReached();
-      }
-      if (typeof saved.p === 'number') {
-        progress.restorePass(saved.p);
-      }
+      progress.restoreLatches({
+        decided: saved.s === 1,
+        completed: saved.k === 1,
+        passScore: typeof saved.p === 'number' ? saved.p : null,
+      });
     });
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {

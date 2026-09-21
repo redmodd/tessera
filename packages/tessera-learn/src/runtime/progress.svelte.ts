@@ -335,20 +335,21 @@ export class ProgressState {
     );
   }
 
-  restoreGradedScoreDecided(): void {
-    this.#gradedScoreDecided = true;
-  }
-
   #completionReached = $state(false);
-
-  restoreCompletionReached(): void {
-    this.#completionReached = true;
-  }
-
   #passScore = $state<number | null>(null);
 
-  restorePass(score: number): void {
-    this.#passScore = score;
+  get passScore(): number | null {
+    return this.#passScore;
+  }
+
+  restoreLatches(saved: {
+    decided: boolean;
+    completed: boolean;
+    passScore: number | null;
+  }): void {
+    this.#gradedScoreDecided = saved.decided;
+    this.#completionReached = saved.completed;
+    this.#passScore = saved.passScore;
   }
 
   #replaying = false;
