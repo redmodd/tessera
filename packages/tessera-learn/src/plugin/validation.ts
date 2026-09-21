@@ -1100,7 +1100,7 @@ function validatePageFile(
   const required = isRequiredGradedPage({
     graded,
     required: declaresRequired,
-    quiz: { required: quizRequired },
+    quiz: { graded: isGradedQuiz, required: quizRequired },
   });
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
@@ -1130,6 +1130,12 @@ function validatePageFile(
       `${fileRel}: pageConfig.required only applies to a graded page. ` +
         'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
         'so nothing reads it.',
+    );
+  }
+  if (quizRequired !== undefined && !graded) {
+    d.warn(
+      `${fileRel}: quiz.required only applies to a graded quiz. ` +
+        'Without `graded: true` the page never joins the rollup, so nothing reads it.',
     );
   }
   if (weight !== undefined && !graded) {
@@ -1450,13 +1456,6 @@ function validateQuizConfig(
         `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`,
       );
     }
-  }
-
-  if (typeof cfg.required === 'boolean' && cfg.graded !== true) {
-    d.warn(
-      `${fileRel}: quiz.required only applies to a graded quiz. ` +
-        'Without `graded: true` the page never joins the rollup, so nothing reads it.',
-    );
   }
 
   for (const field of ['graded', 'required', 'gatesProgress']) {
@@ -1963,11 +1962,15 @@ function reportEffectiveWeights(
     d.info(`course score weighting: ${shares}`);
   }
   if (optional.length > 0) {
+    const list = optional
+      .map((p) => `${p.fileRel} weight ${p.weight ?? 1}`)
+      .join(', ');
     d.info(
-      `course score weighting: these pages are optional, so each joins that total ` +
-        `only when the learner takes it: ${optional
-          .map((p) => `${p.fileRel} weight ${p.weight ?? 1}`)
-          .join(', ')}`,
+      required.length > 0
+        ? `course score weighting: these pages are optional, so each joins that total ` +
+            `only when the learner takes it: ${list}`
+        : `course score weighting: no graded page is required, so the course score covers ` +
+            `only the pages the learner takes: ${list}`,
     );
   }
 
@@ -1980,10 +1983,10 @@ function reportEffectiveWeights(
     );
   }
 
-  if (required.length < 2) return;
+  if (graded.length < 2) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
-  const weights = required.map((p) => p.weight ?? 1);
+  const weights = graded.map((p) => p.weight ?? 1);
   const scale = weights.some((w) => w >= 5)
     ? 100
     : weights.every((w) => w < 1)

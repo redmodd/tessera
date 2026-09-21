@@ -881,7 +881,7 @@ export const pageConfig = { title: "Exam", graded: true };
     ).toEqual([]);
   });
 
-  it('skips the weight-total warning when a graded page is optional', () => {
+  it('skips the weight-total warning when the required weights hit the scale', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
@@ -896,13 +896,93 @@ export const pageConfig = { title: "Practice", graded: true, required: false, we
       testRoot,
       'pages/01-section/01-lesson/exam.svelte',
       `<script module>
-export const pageConfig = { title: "Exam", graded: true, weight: 100 };
+export const pageConfig = { title: "Exam", graded: true, weight: 60 };
 </script>
 <h1>Exam</h1>
 <MultipleChoice id="q2" question="?" options={["a","b"]} correct={0} graded />`,
     );
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/final.svelte',
+      `<script module>
+export const pageConfig = { title: "Final", graded: true, weight: 40 };
+</script>
+<h1>Final</h1>
+<MultipleChoice id="q3" question="?" options={["a","b"]} correct={0} graded />`,
+    );
     const { warnings } = validateProject(testRoot);
     expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('warns on the weight total behind a single required page', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true, weight: 40 };
+</script>
+<h1>Exam</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    for (const name of ['p1', 'p2']) {
+      writeFile(
+        testRoot,
+        `pages/01-section/01-lesson/${name}.svelte`,
+        `<script module>
+export const pageConfig = { title: "${name}", graded: true, required: false, weight: 30 };
+</script>
+<h1>${name}</h1>
+<MultipleChoice id="q${name}" question="?" options={["a","b"]} correct={0} graded />`,
+      );
+    }
+    const { warnings } = validateProject(testRoot);
+    const sum = warnings.filter((w) => w.includes('weights sum to'));
+    expect(sum).toHaveLength(1);
+    expect(sum[0]).toContain('sum to 40, not 100');
+    expect(sum[0]).toContain('leaves out the optional pages');
+    expect(sum[0]).toContain('p1.svelte');
+    expect(sum[0]).toContain('p2.svelte');
+  });
+
+  it('does not quote a total when no graded page is required', () => {
+    createValidProject(testRoot);
+    for (const [name, weight] of [
+      ['a', 25],
+      ['b', 75],
+    ] as const) {
+      writeFile(
+        testRoot,
+        `pages/01-section/01-lesson/${name}.svelte`,
+        `<script module>
+export const pageConfig = { title: "${name}", graded: true, required: false, weight: ${weight} };
+</script>
+<h1>${name}</h1>
+<MultipleChoice id="q${name}" question="?" options={["a","b"]} correct={0} graded />`,
+      );
+    }
+    const { infos } = validateProject(testRoot);
+    const weighting = infos.filter((i) => i.includes('score weighting'));
+    expect(weighting).toHaveLength(1);
+    expect(weighting[0]).toContain('no graded page is required');
+    expect(weighting[0]).not.toContain('that total');
+  });
+
+  it('does not call a graded page optional when quiz.required opts out', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/exam.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true, quiz: { required: false } };
+</script>
+<h1>Exam</h1>
+<MultipleChoice id="q" question="?" options={["a","b"]} correct={0} graded />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('never joins the rollup')),
+    ).toEqual([]);
   });
 
   it('quotes each weight share against the required pages alone', () => {
