@@ -932,7 +932,7 @@ A standalone-question page renders no score on its own, so read `pageScore` and 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
 
-`gradedScore` averages every declared graded page, quiz or standalone, so it matches the score reported to the LMS. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page is answered. The LMS is sent the score only once every required graded page is answered or the course is complete. `successStatus` stays `"unknown"` until then too, and `passed` also waits for the course to complete. Under `success.from: "fixed"` it is set when the course completes.
+`gradedScore` averages the graded pages, quiz or standalone, the same way as the score reported to the LMS, and matches it until the course passes; from then the LMS keeps the best score reached. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page is answered. The LMS is sent the score only once every required graded page is answered or the course is complete. `successStatus` stays `"unknown"` until then too, and `passed` also waits for the course to complete. Under `success.from: "fixed"` it is set when the course completes.
 
 Three rules for displaying it:
 
