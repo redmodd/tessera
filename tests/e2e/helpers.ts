@@ -39,12 +39,6 @@ export async function waitForServer(page: Page, url: string): Promise<void> {
 
 export async function waitForTesseraContent(page: Page): Promise<void> {
   await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
 }
 
 /** Every call the SCORM mock has logged so far, as `[method, ...args]`. */

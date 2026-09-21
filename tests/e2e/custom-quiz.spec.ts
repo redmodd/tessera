@@ -13,14 +13,6 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      {
-        timeout: 5000,
-      },
-    )
-    .catch(() => {});
 }
 
 async function navigateToExam(page: Page) {

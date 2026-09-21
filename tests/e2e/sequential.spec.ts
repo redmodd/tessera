@@ -2,12 +2,6 @@ import { test, expect } from '@playwright/test';
 
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
 }
 
 test.describe('Navigation — Sequential Mode', () => {

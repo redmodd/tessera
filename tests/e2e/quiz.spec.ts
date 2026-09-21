@@ -10,14 +10,6 @@ import {
 
 async function waitForContent(page: Page) {
   await page.waitForSelector('.tessera-content');
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      {
-        timeout: 5000,
-      },
-    )
-    .catch(() => {});
 }
 
 async function navigateToPage(page: Page, pageTitle: string) {

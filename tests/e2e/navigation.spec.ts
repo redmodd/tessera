@@ -4,13 +4,6 @@ import AxeBuilder from '@axe-core/playwright';
 // Helper: wait for page content to load after navigation
 async function waitForContent(page) {
   await page.waitForSelector('.tessera-content');
-  // Wait for loading skeleton to disappear
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
 }
 
 // Helper: navigate via sidebar
