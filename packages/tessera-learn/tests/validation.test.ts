@@ -832,19 +832,27 @@ export const pageConfig = { title: "Just Prose", ${field}: ${value} };
     },
   );
 
-  it('warns that quiz.required is ignored', () => {
+  it('warns on quiz fields it ignores, pointing page-level ones to pageConfig', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
       `<script module>
-export const pageConfig = { title: "Practice", quiz: { graded: true, required: false } };
+export const pageConfig = { title: "Practice", quiz: { graded: true, required: false, weight: 50, attempts: 2 } };
 </script>
 <h1>Practice</h1>`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('quiz.required is ignored'),
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'quiz.required is ignored. Set required on pageConfig',
+        ),
+        expect.stringContaining(
+          'quiz.weight is ignored. Set weight on pageConfig',
+        ),
+        expect.stringContaining('unknown field quiz.attempts'),
+      ]),
     );
   });
 

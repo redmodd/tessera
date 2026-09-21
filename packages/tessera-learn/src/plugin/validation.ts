@@ -1405,6 +1405,15 @@ function validatePageWeight(
 
 // ---------- Quiz Config Validation ----------
 
+const KNOWN_QUIZ_FIELDS = new Set([
+  'graded',
+  'gatesProgress',
+  'maxAttempts',
+  'feedbackMode',
+  'retryMode',
+]);
+const PAGE_LEVEL_FIELDS = new Set(['required', 'weight', 'completesOn']);
+
 function validateQuizConfig(
   quiz: unknown,
   fileRel: string,
@@ -1433,9 +1442,12 @@ function validateQuizConfig(
     }
   }
 
-  if (cfg.required !== undefined) {
+  for (const key of Object.keys(cfg)) {
+    if (KNOWN_QUIZ_FIELDS.has(key)) continue;
     d.warn(
-      `${fileRel}: quiz.required is ignored. Set required on pageConfig, beside quiz.`,
+      PAGE_LEVEL_FIELDS.has(key)
+        ? `${fileRel}: quiz.${key} is ignored. Set ${key} on pageConfig, beside quiz.`
+        : `${fileRel}: unknown field quiz.${key} — will be ignored`,
     );
   }
 
