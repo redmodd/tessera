@@ -527,7 +527,7 @@ success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
 - Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
 - **A verdict never stands in for completion.** `successStatus` is judged as soon as the score is final, whatever the completion mode. SCORM 1.2 has one `lesson_status`, where `"passed"` reads as finished, so its adapter holds `passed` back until the course completes and writes `incomplete` meanwhile. `failed` reports straight away.
 - **A skipped required page is a 0 and reads `failed`.** A skipped optional one leaves the average instead, so a course whose graded pages are all optional and all skipped has nothing to judge and stays `"unknown"`.
-- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course can send a verdict: a fixed one, or a quiz one with at least one **required** graded page. `success.from: "none"`, a quiz verdict with nothing graded, and a quiz verdict whose graded pages are all optional satisfy on `Completed` alone, since a learner who skips them is never judged and would otherwise strand the AU.
+- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course can send a verdict: a fixed one, or a quiz one with at least one **required** graded page. Otherwise it is `Completed`.
 - Set `success: { from: "none" }` for a graded quiz that reports a score but should not gate credit at all; `required: false` is the per-page version of the same idea, for a course whose other pages do gate it. `tessera validate` warns when a quiz verdict has no required page to judge.
 
 ---

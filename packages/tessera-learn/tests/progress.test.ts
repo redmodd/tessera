@@ -865,7 +865,7 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('required: false — optional graded pages', () => {
+  describe('optional graded pages (required: false)', () => {
     it('counts an optional page only once it has a score', () => {
       const manifest = createManifest(
         5,
