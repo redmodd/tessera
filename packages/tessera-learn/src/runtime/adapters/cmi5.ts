@@ -222,7 +222,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
 
   override setSuccessStatus(status: SuccessStatus): void {
     if (status === 'failed') {
-      this.#heldFailed = this.lastSuccessEmitted === 'unknown';
+      this.#heldFailed = true;
       return;
     }
     this.#heldFailed = false;

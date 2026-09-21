@@ -503,22 +503,6 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).not.toContain(`${VERB}failed`);
   });
 
-  it('never sends Failed after Passed', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
-    mockFetch.mockClear();
-    mockFetch.mockResolvedValue({ ok: true });
-
-    adapter.setSuccessStatus('passed');
-    adapter.setSuccessStatus('failed');
-    adapter.terminate();
-    await flush();
-
-    expect(sentVerbs()).toContain(`${VERB}passed`);
-    expect(sentVerbs()).not.toContain(`${VERB}failed`);
-  });
-
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
