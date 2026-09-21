@@ -9,6 +9,9 @@ import {
   readCourseConfig,
   orderPageFiles,
   walkPages,
+  isLiterallyGradedQuestion,
+  staticQuestionId,
+  QUESTION_COMPONENT_NAMES,
   type WalkedLesson,
   type PageConfig,
 } from './manifest.js';
@@ -38,7 +41,6 @@ import {
   standardProfile,
   type StandardId,
 } from '../runtime/standards.js';
-import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
@@ -1475,18 +1477,6 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   Sorting: ['question', 'items', 'targets', 'correct'],
 };
 
-const QUESTION_COMPONENT_NAMES = new Set(
-  Object.keys(QUESTION_COMPONENT_REQUIRED),
-);
-
-/** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
-const QUESTION_ID_PREFIX: Record<string, string> = {
-  MultipleChoice: 'mc',
-  FillInTheBlank: 'fitb',
-  Matching: 'matching',
-  Sorting: 'sorting',
-};
-
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   try {
@@ -1522,7 +1512,8 @@ function validateQuestionComponents(
       : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
-  for (const { name, props, hasSpread } of components) {
+  for (const match of components) {
+    const { name, props, hasSpread } = match;
     for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
       if (!hasSpread && !props.has(req)) {
         d.error(`${fileRel}: <${name}> is missing required prop "${req}"`);
@@ -1542,17 +1533,10 @@ function validateQuestionComponents(
       }
     }
 
-    const idProp = props.get('id');
-    const questionProp = props.get('question');
+    const resolvedId = staticQuestionId(match);
     // With no `id`, the widget derives one from the prompt text, so two
     // identically worded questions collide on one page.
-    const derived = !hasSpread && !idProp && questionProp?.kind === 'string';
-    const resolvedId =
-      idProp?.kind === 'string'
-        ? idProp.value
-        : derived
-          ? `${QUESTION_ID_PREFIX[name]}-${slugFromQuestion((questionProp as { value: string }).value)}`
-          : null;
+    const derived = resolvedId !== null && !props.has('id');
 
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
@@ -1851,14 +1835,6 @@ function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
   if (hasSpread) return true;
   const graded = props.get('graded');
   return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
-}
-
-function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
-  const graded = props.get('graded');
-  return (
-    graded?.kind === 'bool' ||
-    (graded?.kind === 'expr' && graded.raw === 'true')
-  );
 }
 
 /**

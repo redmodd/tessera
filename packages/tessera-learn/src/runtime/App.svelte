@@ -218,7 +218,7 @@
         }
         entry.q = questions;
       }
-      const unanswered = progress.unansweredQuestions(pageIndex);
+      const unanswered = progress.unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }

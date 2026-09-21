@@ -456,6 +456,42 @@ export const pageConfig = { graded: true, required: true }
     expect(manifest.pages[1].required).toBeUndefined();
   });
 
+  it('lists the graded questions a standalone page fixes, including ones behind an {#if}', () => {
+    createFile(
+      '01-s/01-l/_meta.js',
+      'export default { title: "L", pages: ["check", "quiz", "ungraded"] };',
+    );
+    createFile(
+      '01-s/01-l/check.svelte',
+      `<script module>
+export const pageConfig = { graded: true }
+</script>
+<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />
+{#if shown}
+  <FillInTheBlank graded={true} question="Name it?" answers={['z']} />
+{/if}
+<MultipleChoice id="practice" question="B?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded id={dynamicId} question="C?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded {...props} id="spread" />`,
+    );
+    createFile(
+      '01-s/01-l/quiz.svelte',
+      `<script module>
+export const pageConfig = { graded: true, quiz: { graded: true } }
+</script>
+<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />`,
+    );
+    createFile(
+      '01-s/01-l/ungraded.svelte',
+      `<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />`,
+    );
+    const manifest = generateManifest(TMP);
+
+    expect(manifest.pages[0].questions).toEqual(['q1', 'fitb-name-it']);
+    expect(manifest.pages[1].questions).toBeUndefined();
+    expect(manifest.pages[2].questions).toBeUndefined();
+  });
+
   it('carries a non-positive weight through verbatim (the runtime treats it as 1)', () => {
     createFile(
       '01-s/01-l/_meta.js',

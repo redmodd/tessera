@@ -699,7 +699,7 @@ describe('ProgressState', () => {
     it('carries the unanswered questions across a resume', () => {
       const saved = onePage();
       saved.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      expect(saved.unansweredQuestions(0)).toEqual(['q-light']);
+      expect(saved.unlistedUnanswered(0)).toEqual(['q-light']);
 
       const progress = new ProgressState(
         createManifest(1, {}, { 0: { graded: true } }),
@@ -707,11 +707,11 @@ describe('ProgressState', () => {
       );
       progress.replay(() => {
         progress.markVisited(0);
-        progress.restoreUnanswered(0, saved.unansweredQuestions(0));
+        progress.restoreUnanswered(0, saved.unlistedUnanswered(0));
         progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
       });
 
-      expect(progress.unansweredQuestions(0)).toEqual(['q-light']);
+      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
       expect(progress.awaitingScore(0)).toBe(true);
       expect(progress.completionStatus).toBe('incomplete');
     });
@@ -730,11 +730,53 @@ describe('ProgressState', () => {
       progress.registerStandaloneQuestion(0, 'q-light', true, 1);
       progress.pageMounted(0);
 
-      expect(progress.unansweredQuestions(0)).toEqual(['q-light']);
+      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
 
       progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
 
       expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('holds a page open for a listed question that has not rendered yet', () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true, questions: ['q1', 'q2'] } }),
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+      progress.markVisited(0);
+      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.markStandaloneQuestion(0, 'q1', 100, true);
+
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.reportedCompletionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.registerStandaloneQuestion(0, 'q2', true);
+      progress.markStandaloneQuestion(0, 'q2', 0, true);
+
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.reportedScore).toBe(50);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('keeps a listed question expected when a resumed page mounts without it', () => {
+      const manifest = createManifest(
+        1,
+        {},
+        { 0: { graded: true, questions: ['q1', 'q2'] } },
+      );
+      const saved = new ProgressState(manifest, createConfig());
+      saved.markStandaloneQuestion(0, 'q1', 100, true);
+      expect(saved.unlistedUnanswered(0)).toEqual([]);
+
+      const progress = new ProgressState(manifest, createConfig());
+      progress.replay(() => {
+        progress.restoreUnanswered(0, ['q2']);
+        progress.markStandaloneQuestion(0, 'q1', 100, true);
+      });
+      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.pageMounted(0);
+
+      expect(progress.awaitingScore(0)).toBe(true);
     });
   });
 

@@ -8,6 +8,6 @@ Add `pageConfig.required` (default `true`). `required: false` makes a graded pag
 
 The LMS never loses a completion or a `passed` when the score later drops, and keeps the best score from the pass on. cmi5 sends a Failed when the session ends.
 
-A page of standalone graded questions counts as answered once every graded question on it is, not after the first.
+A page of standalone graded questions counts as answered once every graded question on it is, even ones behind a reveal, rather than after the first.
 
 `tessera validate` warns on unknown `quiz` fields.

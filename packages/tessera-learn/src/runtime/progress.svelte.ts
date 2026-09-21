@@ -59,6 +59,7 @@ export class ProgressState {
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
+  #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
   #canPass: boolean;
   #undeclaredWarned = new Set<number>();
 
@@ -78,6 +79,13 @@ export class ProgressState {
     this.#pageWeights = new Map(
       manifest.pages.map((p) => [p.index, normalizeWeight(p.weight)]),
     );
+    this.#listedQuestions = new Map(
+      manifest.pages.flatMap((p) =>
+        p.questions ? [[p.index, new Set(p.questions)] as const] : [],
+      ),
+    );
+    for (const [pageIndex, ids] of this.#listedQuestions)
+      this.#expected.set(pageIndex, ids);
     this.#totalPages = manifest.totalPages;
     this.#config = config;
     this.#success = resolveSuccess(config);
@@ -195,10 +203,11 @@ export class ProgressState {
   /**
    * Record a mounted question, so its page counts as answered only once every
    * graded question on it is, and correct a restored answer's `graded` flag
-   * and weight from it, which outranks what the save was written with.
-   * ponytail: only pages the learner opens are registered and corrected, and a
-   * question behind a reveal registers once shown; a full sweep needs
-   * build-time extraction, which can't see custom question components.
+   * and weight from it, which outranks what the save was written with. The
+   * manifest lists the built-in questions the source fixes, so only a custom
+   * or dynamically identified one behind a reveal waits to register.
+   * ponytail: only pages the learner opens are corrected; a full sweep needs
+   * each question's weight at build time, which custom question components hide.
    */
   registerStandaloneQuestion(
     pageIndex: number,
@@ -232,14 +241,26 @@ export class ProgressState {
     const stale = this.#unconfirmed.get(pageIndex);
     if (!stale) return;
     this.#unconfirmed.delete(pageIndex);
-    if (this.#expect(pageIndex, [...stale], false)) this.#changed();
+    const listed = this.#listedQuestions.get(pageIndex);
+    const unlisted = [...stale].filter((id) => !listed?.has(id));
+    if (this.#expect(pageIndex, unlisted, false)) this.#changed();
   }
 
-  unansweredQuestions(pageIndex: number): string[] {
+  /** Unanswered graded questions the manifest doesn't list, which a save carries until they register again. */
+  unlistedUnanswered(pageIndex: number): string[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
+    const listed = this.#listedQuestions.get(pageIndex);
     return [...(this.#expected.get(pageIndex) ?? [])].filter(
-      (id) => !questions?.get(id)?.graded,
+      (id) => !questions?.get(id)?.graded && !listed?.has(id),
     );
+  }
+
+  #allAnswered(pageIndex: number): boolean {
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    for (const id of this.#expected.get(pageIndex) ?? []) {
+      if (!questions?.get(id)?.graded) return false;
+    }
+    return true;
   }
 
   #expected = new SvelteMap<number, ReadonlySet<string>>();
@@ -258,8 +279,7 @@ export class ProgressState {
   }
 
   #answeredScore(pageIndex: number): number | undefined {
-    if (this.unansweredQuestions(pageIndex).length === 0)
-      return this.pageScore(pageIndex);
+    if (this.#allAnswered(pageIndex)) return this.pageScore(pageIndex);
     return this.#quizGradedIndices.has(pageIndex)
       ? this.quizScore(pageIndex)
       : undefined;

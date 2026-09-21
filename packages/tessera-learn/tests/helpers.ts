@@ -67,7 +67,12 @@ export function createManifest(
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
   pageOpts: Record<
     number,
-    { graded?: boolean; required?: boolean; weight?: number }
+    {
+      graded?: boolean;
+      required?: boolean;
+      weight?: number;
+      questions?: string[];
+    }
   > = {},
 ): Manifest {
   const pages = Array.from({ length: pageCount }, (_, i) => ({
@@ -87,6 +92,7 @@ export function createManifest(
     ...(pageOpts[i]?.weight !== undefined
       ? { weight: pageOpts[i].weight }
       : {}),
+    ...(pageOpts[i]?.questions ? { questions: pageOpts[i].questions } : {}),
   }));
 
   return {
