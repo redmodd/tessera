@@ -49,6 +49,7 @@ import {
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
+  type QuizConfig,
 } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isCspOverrides } from './csp.js';
@@ -1405,14 +1406,20 @@ function validatePageWeight(
 
 // ---------- Quiz Config Validation ----------
 
-const KNOWN_QUIZ_FIELDS = new Set([
-  'graded',
-  'gatesProgress',
-  'maxAttempts',
-  'feedbackMode',
-  'retryMode',
-]);
-const PAGE_LEVEL_FIELDS = new Set(['required', 'weight', 'completesOn']);
+const KNOWN_QUIZ_FIELDS = new Set(
+  Object.keys({
+    graded: true,
+    gatesProgress: true,
+    maxAttempts: true,
+    feedbackMode: true,
+    retryMode: true,
+  } satisfies Record<keyof QuizConfig, true>),
+);
+const PAGE_LEVEL_FIELDS = new Set<string>([
+  'required',
+  'weight',
+  'completesOn',
+] satisfies (keyof PageConfig)[]);
 
 function validateQuizConfig(
   quiz: unknown,
