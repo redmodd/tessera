@@ -1035,7 +1035,6 @@ interface PageInfo {
 interface PagesValidationResult {
   totalPages: number;
   totalQuizzes: number;
-  hasGraded: boolean;
   hasParseErrors: boolean;
   pages: PageInfo[];
 }
@@ -1091,10 +1090,11 @@ function validatePageFile(
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
   const declaresGraded =
-    validatePageBoolean(pageConfig, 'graded', fileRel, d) ?? false;
-  const declaresRequired = validatePageBoolean(
-    pageConfig,
-    'required',
+    validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
+    false;
+  const declaresRequired = validateBoolean(
+    pageConfig?.required,
+    'pageConfig.required',
     fileRel,
     d,
   );
@@ -1196,7 +1196,6 @@ function validatePages(
   const pages: PageInfo[] = [];
   let totalPages = 0;
   let totalQuizzes = 0;
-  let hasGraded = false;
   let hasParseErrors = false;
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
@@ -1205,7 +1204,7 @@ function validatePages(
     d.error(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
+    return { totalPages, totalQuizzes, hasParseErrors, pages };
   };
 
   if (!existsSync(pagesDir)) return noPages();
@@ -1261,7 +1260,6 @@ function validatePages(
       );
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
-      if (result.page.graded) hasGraded = true;
       if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
@@ -1295,7 +1293,7 @@ function validatePages(
 
   if (totalPages === 0) return noPages();
 
-  return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
+  return { totalPages, totalQuizzes, hasParseErrors, pages };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1371,21 +1369,17 @@ function validateCompletesOn(
   return false;
 }
 
-function validatePageBoolean(
-  pageConfig: Partial<Record<keyof PageConfig, unknown>> | null,
-  field: 'graded' | 'required',
+function validateBoolean(
+  value: unknown,
+  label: string,
   fileRel: string,
   d: Diagnostics,
 ): boolean | undefined {
-  const value = pageConfig?.[field];
-  if (value === undefined) return undefined;
-  if (typeof value !== 'boolean') {
-    d.error(
-      `${fileRel}: pageConfig.${field} must be a boolean, got ${JSON.stringify(value)}`,
-    );
-    return undefined;
-  }
-  return value;
+  if (value === undefined || typeof value === 'boolean') return value;
+  d.error(
+    `${fileRel}: ${label} must be a boolean, got ${JSON.stringify(value)}`,
+  );
+  return undefined;
 }
 
 function validatePageWeight(
@@ -1442,11 +1436,7 @@ function validateQuizConfig(
   }
 
   for (const field of ['graded', 'gatesProgress']) {
-    if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
-      d.error(
-        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
-      );
-    }
+    validateBoolean(cfg[field], `quiz.${field}`, fileRel, d);
   }
 
   for (const key of Object.keys(cfg)) {
@@ -1454,7 +1444,7 @@ function validateQuizConfig(
     d.warn(
       PAGE_LEVEL_FIELDS.has(key)
         ? `${fileRel}: quiz.${key} is ignored. Set ${key} on pageConfig, beside quiz.`
-        : `${fileRel}: unknown field quiz.${key} — will be ignored`,
+        : `${fileRel}: unknown field quiz.${key} is ignored`,
     );
   }
 
@@ -1998,18 +1988,18 @@ function crossValidate(
   d: Diagnostics,
 ): void {
   const quizMode = config.completion?.mode === 'quiz';
+  const hasGraded = pageResults.pages.some((p) => p.graded);
+  const hasRequiredGraded = pageResults.pages.some((p) => p.requiredGraded);
   // A quiz verdict judges the graded average against the threshold whether
   // `success` names it or `completion.mode` implies it, so read the resolved
   // criterion. With nothing graded there is no average and nothing reads it.
-  const judgesScore =
-    pageResults.hasGraded && resolveSuccess(config).from === 'quiz';
+  const judgesScore = hasGraded && resolveSuccess(config).from === 'quiz';
   const quizVerdict = config.success?.from === 'quiz';
-  const hasRequiredGraded = pageResults.pages.some((p) => p.requiredGraded);
 
   if (!hasRequiredGraded && !pageResults.hasParseErrors) {
     if (quizMode) {
       d.error(
-        pageResults.hasGraded
+        hasGraded
           ? 'completion.mode is "quiz" but every graded page sets required: false, so the course can never complete. ' +
               'Drop required from the page that decides the course, or complete on something else.'
           : 'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',

@@ -1197,7 +1197,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.graded must be a boolean, got string'),
+      expect.stringContaining('quiz.graded must be a boolean, got "yes"'),
     );
   });
 
@@ -1214,7 +1214,7 @@ export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'quiz.gatesProgress must be a boolean, got string',
+        'quiz.gatesProgress must be a boolean, got "yes"',
       ),
     );
   });
