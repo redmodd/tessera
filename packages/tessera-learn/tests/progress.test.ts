@@ -445,6 +445,24 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('passed');
     });
 
+    it('drops a saved pass the course can no longer give', () => {
+      const progress = new ProgressState(
+        createManifest(1, { 0: { graded: true } }),
+        createConfig({
+          completion: { mode: 'quiz' },
+          success: { from: 'none' },
+        }),
+      );
+      progress.replay(() => progress.restoreQuiz(0, 40, 1), {
+        decided: true,
+        completed: true,
+        passScore: 75,
+      });
+
+      expect(progress.successStatus).toBe('unknown');
+      expect(progress.reportedScore).toBe(40);
+    });
+
     it('restores a final graded score from a previous session', () => {
       const progress = threeGradedPages();
 
@@ -452,7 +470,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.restoreLatches({
+      progress.replay(() => {}, {
         decided: true,
         completed: false,
         passScore: null,

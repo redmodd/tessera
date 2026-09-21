@@ -59,6 +59,7 @@ export class ProgressState {
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
+  #canPass: boolean;
   #undeclaredWarned = new Set<number>();
 
   constructor(manifest: Manifest, config: CourseConfig) {
@@ -80,6 +81,9 @@ export class ProgressState {
     this.#totalPages = manifest.totalPages;
     this.#config = config;
     this.#success = resolveSuccess(config);
+    this.#canPass =
+      this.#success.from === 'quiz' ||
+      (this.#success.from === 'fixed' && this.#success.status === 'passed');
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -342,24 +346,30 @@ export class ProgressState {
     return this.#passScore;
   }
 
-  restoreLatches(saved: {
-    decided: boolean;
-    completed: boolean;
-    passScore: number | null;
-  }): void {
-    this.#gradedScoreDecided = saved.decided;
-    this.#completionReached = saved.completed;
-    this.#passScore = saved.passScore;
-  }
-
   #replaying = false;
 
-  replay(apply: () => void): void {
+  /**
+   * Apply saved progress without latching partway, then restore the saved
+   * latches. A saved pass the course can no longer give is dropped.
+   */
+  replay(
+    apply: () => void,
+    latches?: {
+      decided: boolean;
+      completed: boolean;
+      passScore: number | null;
+    },
+  ): void {
     this.#replaying = true;
     try {
       apply();
     } finally {
       this.#replaying = false;
+    }
+    if (latches) {
+      this.#gradedScoreDecided = latches.decided;
+      this.#completionReached = latches.completed;
+      this.#passScore = this.#canPass ? latches.passScore : null;
     }
     this.#latch();
   }

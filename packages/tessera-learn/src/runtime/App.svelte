@@ -239,6 +239,11 @@
 
   function restoreState(saved) {
     if (!saved) return;
+    const latches = {
+      decided: saved.s === 1,
+      completed: saved.k === 1,
+      passScore: typeof saved.p === 'number' ? saved.p : null,
+    };
     progress.replay(() => {
       // Restore visited pages
       for (const idx of saved.v) {
@@ -274,12 +279,7 @@
       if (saved.m === 1) {
         progress.markCompleteManually();
       }
-      progress.restoreLatches({
-        decided: saved.s === 1,
-        completed: saved.k === 1,
-        passScore: typeof saved.p === 'number' ? saved.p : null,
-      });
-    });
+    }, latches);
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
       userState = { ...userState, ...saved.u };
