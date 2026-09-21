@@ -864,7 +864,7 @@ describe('useProgress', () => {
     expect(h.gradedScore).toEqual({ average: 80, attempted: true });
   });
 
-  it('pageScore defaults to the current page', () => {
+  it('pageScore defaults to the page it renders on while the next page loads', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     progress.markStandaloneQuestion(2, 'q1', 40, true);
     const ctx = makeNavCtx(progress, 2);
@@ -873,9 +873,9 @@ describe('useProgress', () => {
     const h = useProgress();
     expect(h.pageScore()).toBe(40);
 
-    ctx.nav.currentPageIndex = 1;
-    expect(h.pageScore()).toBeUndefined();
-    expect(h.pageScore(2)).toBe(40);
+    ctx.nav.currentPageIndex = 3;
+    expect(h.pageScore()).toBe(40);
+    expect(h.pageScore(3)).toBeUndefined();
   });
 
   it('markVisited and markChunk delegate to ProgressState', () => {

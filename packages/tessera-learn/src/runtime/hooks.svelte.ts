@@ -305,7 +305,8 @@ export function useNavigation() {
 }
 
 export function useProgress() {
-  const { progress, nav } = requireNavContext('useProgress()');
+  const { progress } = requireNavContext('useProgress()');
+  const pageCtx = getPageContext();
   return {
     get visitedPages() {
       return progress.visitedPages;
@@ -316,8 +317,10 @@ export function useProgress() {
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
     },
-    pageScore(pageIndex: number = nav.currentPageIndex) {
-      return progress.pageScore(pageIndex);
+    pageScore(pageIndex = pageCtx?.index) {
+      return pageIndex === undefined
+        ? undefined
+        : progress.pageScore(pageIndex);
     },
     get gradedScore() {
       return progress.gradedScore;
