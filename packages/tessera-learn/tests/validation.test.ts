@@ -955,6 +955,15 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     expect(sum[0]).toContain('leaves out the optional pages');
   });
 
+  it('reads the weight scale off the required pages alone', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'a', 'weight: 2');
+    writeGradedPage(testRoot, 'b', 'weight: 3');
+    writeGradedPage(testRoot, 'practice', 'required: false, weight: 10');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
   it('does not quote a total when no graded page is required', () => {
     createValidProject(testRoot);
     writeGradedPage(testRoot, 'a', 'required: false, weight: 25');

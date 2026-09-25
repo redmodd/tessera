@@ -1987,7 +1987,7 @@ function reportEffectiveWeights(
   if (graded.length < 2 || required.length === 0) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
-  const weights = graded.map(weightOf);
+  const weights = required.map(weightOf);
   const scale = weights.some((w) => w >= 5)
     ? 100
     : weights.every((w) => w < 1)
