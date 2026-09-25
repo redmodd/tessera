@@ -8,21 +8,12 @@ import type { Interaction } from '../interaction.js';
 import type { XAPIAgent } from '../xapi/types.js';
 import type { XAPIPublisher } from '../xapi/publisher.js';
 
-/** What the LMS already holds for this attempt. */
-export interface RecordedLifecycle {
-  completed: boolean;
-  passed: boolean;
-  /** 0-100, or null when the LMS holds no score. */
-  score: number | null;
-}
-
 /** Every adapter's optional capabilities default to no-ops, so callers never probe. */
 export abstract class BaseAdapter {
   /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
   readonly connected: boolean = true;
   protected state: SavedState | null = null;
   protected masteryScore: number | null = null;
-  protected recorded: RecordedLifecycle | null = null;
 
   /**
    * Connect to the LMS. Failure is fatal: nothing can be reported, so the
@@ -47,11 +38,6 @@ export abstract class BaseAdapter {
   /** LMS-supplied pass threshold in [0, 1], overriding `scoring.passingScore`; null when absent. */
   getMasteryScore(): number | null {
     return this.masteryScore;
-  }
-
-  /** The completion, pass and score the LMS holds from earlier sessions; null where the course can't read them back. */
-  recordedLifecycle(): RecordedLifecycle | null {
-    return this.recorded;
   }
 
   /**

@@ -125,33 +125,6 @@ describe('SCORM12Adapter', () => {
     });
   });
 
-  describe('the status the LMS records', () => {
-    async function recordedFrom(values: Record<string, string>) {
-      api = scorm12Api(values);
-      adapter = new SCORM12Adapter(api);
-      await adapter.init();
-      return adapter.recordedLifecycle();
-    }
-
-    it.each([
-      ['passed', { completed: true, passed: true }],
-      ['completed', { completed: true, passed: false }],
-      ['failed', { completed: false, passed: false }],
-      ['incomplete', { completed: false, passed: false }],
-    ])('reads lesson_status %j', async (status, expected) => {
-      expect(
-        await recordedFrom({
-          'cmi.core.lesson_status': status,
-          'cmi.core.score.raw': '85.5',
-        }),
-      ).toEqual({ ...expected, score: 85.5 });
-    });
-
-    it('reads a blank score as none', async () => {
-      expect((await recordedFrom({}))?.score).toBeNull();
-    });
-  });
-
   describe('LMS-supplied mastery_score', () => {
     async function masteryFrom(value: string) {
       api = scorm12Api({ 'cmi.student_data.mastery_score': value });

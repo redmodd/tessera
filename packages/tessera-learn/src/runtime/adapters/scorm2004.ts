@@ -29,7 +29,6 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   sessionTimeKey: 'cmi.session_time',
   masteryKey: 'cmi.scaled_passing_score',
   masteryRange: [-1, 1],
-  scoreKey: 'cmi.score.raw',
   formatDuration: formatISO8601Duration,
   interactionFields: {
     responseField: 'learner_response',
@@ -81,13 +80,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
     super.saveState(state);
     // §4.2.1.4 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.location', String(state.b));
-  }
-
-  protected readRecordedStatus() {
-    return {
-      completed: this.read('cmi.completion_status') === 'completed',
-      passed: this.read('cmi.success_status') === 'passed',
-    };
   }
 
   setScore(score: number): void {
