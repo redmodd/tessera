@@ -62,6 +62,8 @@ export class ProgressState {
   #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
   #canPass: boolean;
   #undeclaredWarned = new Set<number>();
+  #expected: SvelteMap<number, ReadonlySet<string>>;
+  #unconfirmed = new Map<number, Set<string>>();
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
@@ -84,8 +86,7 @@ export class ProgressState {
         p.questions ? [[p.index, new Set(p.questions)] as const] : [],
       ),
     );
-    for (const [pageIndex, ids] of this.#listedQuestions)
-      this.#expected.set(pageIndex, ids);
+    this.#expected = new SvelteMap(this.#listedQuestions);
     this.#totalPages = manifest.totalPages;
     this.#config = config;
     this.#success = resolveSuccess(config);
@@ -263,14 +264,15 @@ export class ProgressState {
     return true;
   }
 
-  #expected = new SvelteMap<number, ReadonlySet<string>>();
-  #unconfirmed = new Map<number, Set<string>>();
-
-  #expect(pageIndex: number, questionIds: string[], graded: boolean): boolean {
+  #expect(
+    pageIndex: number,
+    questionIds: string[],
+    expected: boolean,
+  ): boolean {
     const before = this.#expected.get(pageIndex);
     const ids = new Set(before);
     for (const id of questionIds) {
-      if (graded) ids.add(id);
+      if (expected) ids.add(id);
       else ids.delete(id);
     }
     if (ids.size === (before?.size ?? 0)) return false;
@@ -374,7 +376,7 @@ export class ProgressState {
    */
   replay(
     apply: () => void,
-    latches?: {
+    latches: {
       decided: boolean;
       completed: boolean;
       passScore: number | null;
@@ -386,11 +388,9 @@ export class ProgressState {
     } finally {
       this.#replaying = false;
     }
-    if (latches) {
-      this.#gradedScoreDecided = latches.decided;
-      this.#completionReached = latches.completed;
-      this.#passScore = this.#canPass ? latches.passScore : null;
-    }
+    this.#gradedScoreDecided = latches.decided;
+    this.#completionReached = latches.completed;
+    this.#passScore = this.#canPass ? latches.passScore : null;
     this.#latch();
   }
 

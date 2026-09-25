@@ -5,6 +5,8 @@ import {
 } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
+const NO_LATCHES = { decided: false, completed: false, passScore: null };
+
 describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
@@ -709,7 +711,7 @@ describe('ProgressState', () => {
         progress.markVisited(0);
         progress.restoreUnanswered(0, saved.unlistedUnanswered(0));
         progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      });
+      }, NO_LATCHES);
 
       expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
       expect(progress.awaitingScore(0)).toBe(true);
@@ -725,7 +727,7 @@ describe('ProgressState', () => {
         progress.markVisited(0);
         progress.restoreUnanswered(0, ['q-light', 'q-removed']);
         progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      });
+      }, NO_LATCHES);
       progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
       progress.registerStandaloneQuestion(0, 'q-light', true, 1);
       progress.pageMounted(0);
@@ -772,7 +774,7 @@ describe('ProgressState', () => {
       progress.replay(() => {
         progress.restoreUnanswered(0, ['q2']);
         progress.markStandaloneQuestion(0, 'q1', 100, true);
-      });
+      }, NO_LATCHES);
       progress.registerStandaloneQuestion(0, 'q1', true);
       progress.pageMounted(0);
 
@@ -1130,7 +1132,7 @@ describe('ProgressState', () => {
       progress.replay(() => {
         progress.restoreQuiz(0, 100, 1);
         progress.restoreQuiz(1, 0, 1);
-      });
+      }, NO_LATCHES);
 
       expect(progress.reportedCompletionStatus).toBe('incomplete');
       expect(progress.gradedScoreFinal).toBe(false);
