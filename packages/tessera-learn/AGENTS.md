@@ -389,7 +389,11 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 </script>
 ```
 
-Required graded pages count as 0 until answered, so a skipped exam sinks the course score. A page of standalone questions is answered once every graded question on it is, including ones behind a reveal or `{#if}`. A custom question component, or a built-in one with a spread or with `{…}` in its `graded`, `id` or (without an `id`) `question`, counts only once it renders. Don't split graded questions across the branches of an `{#if}`, `{#each}`/`{:else}` or `{#await}`: a learner shown only one branch can never finish the page, and `tessera validate` warns. The LMS gets no score until every required graded page is answered or the course is complete. Under `completion.mode: "percentage"` visiting one doesn't complete it. A graded question on a page without `graded: true` never reaches the course score or passed/failed; `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
+- **Required graded pages count as 0 until answered**, so a skipped exam sinks the course score. The LMS gets no score until every required graded page is answered or the course is complete.
+- **A page of standalone questions is answered once every graded question on it is**, including ones behind a reveal or `{#if}`. Until then, visiting it doesn't complete it under `completion.mode: "percentage"`.
+- **A question the build can't read counts only once it renders**: a custom question component, or a built-in one with a spread or with `{…}` in `graded`, `id`, or `question` when there is no `id`.
+- **Don't split graded questions across the branches of an `{#if}`, `{#each}`/`{:else}` or `{#await}`.** A learner shown only one branch can never finish the page. `tessera validate` warns.
+- **A graded question on a page without `graded: true` never reaches the course score or passed/failed.** `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
 
 **`required: false` makes a graded page optional.** Use it for practice quizzes beside a required exam:
 
@@ -404,7 +408,7 @@ Required graded pages count as 0 until answered, so a skipped exam sinks the cou
 ```
 
 - **`required` doesn't change page completion.** Under `completion.mode: "percentage"` and `navigation.mode: "sequential"` an optional page counts as completed, and unlocks the next page, only once answered, like any graded page.
-- **An optional page answered after a pass never lowers what the LMS has.** Once the course has passed, the LMS keeps `passed` and the best score it reached, even across sessions; `gradedScore` still reads live. A completion is never taken back either. Use `graded: false` if a page's score should never move the course score.
+- **An optional page answered after a pass never lowers what the LMS has**; see [Success criterion](#success-criterion). Use `graded: false` if a page's score should never move the course score.
 - **`completion.mode: "quiz"` needs a required graded page.** `tessera validate` errors without one.
 
 A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, so it never completes under `completion.mode: "percentage"` and never unlocks the next page under `navigation.mode: "sequential"`. `tessera validate` warns.
@@ -522,7 +526,7 @@ success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
 ```
 
 - Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
-- **A `passed` is never taken back**, even when the score later drops. A `failed` can still turn into `passed`.
+- **A `passed` is never taken back**, even when the score later drops or the learner resumes. From the pass on the LMS keeps the best score reached, and a completion is never taken back either. A `failed` can still turn into `passed`.
 - **A skipped required page counts as 0**, so a learner who completes without attempting anything reads `failed`. A skipped optional one leaves the average instead, so a course whose graded pages are all optional and all skipped has nothing to judge and stays `"unknown"`.
 - **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course is sure to send a verdict: a fixed one, or a quiz one with at least one **required** graded page. Otherwise it is `Completed`, so a verdict sent off optional pages alone never gates credit.
 - Set `success: { from: "none" }` for a graded quiz that reports a score but should not gate credit. `tessera validate` warns when a quiz verdict has no required page to judge.
