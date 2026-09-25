@@ -1,15 +1,15 @@
 <script>
-  import { useQuestion } from '../../src/runtime/hooks.svelte.js';
   import { getNavContext } from '../../src/runtime/contexts.js';
+  import LayoutCheck from './layout-check.svelte';
 
   let { page } = $props();
+  let late = $state(false);
   globalThis.__tesseraNavCtx = getNavContext();
-
-  useQuestion({
-    id: 'layout-check',
-    graded: true,
-    response: () => ({ type: 'true-false', response: true, correct: true }),
-  }).submit();
+  globalThis.__showLateCheck = () => (late = true);
 </script>
 
+<LayoutCheck id="layout-check" />
 {@render page()}
+{#if late}
+  <LayoutCheck id="late-check" />
+{/if}

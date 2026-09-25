@@ -8,6 +8,7 @@
   import { onMount, onDestroy, setContext, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
+  import PageHost from './PageHost.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
@@ -541,15 +542,17 @@
   {#if pageError}
     <ErrorPage error={pageError} onretry={retryPage} />
   {:else if PageComponent}
-    {#if pageContext.quiz}
-      {#key renderedPageIndex}
-        <Quiz>
-          <PageComponent />
-        </Quiz>
-      {/key}
-    {:else}
-      <PageComponent />
-    {/if}
+    <PageHost>
+      {#if pageContext.quiz}
+        {#key renderedPageIndex}
+          <Quiz>
+            <PageComponent />
+          </Quiz>
+        {/key}
+      {:else}
+        <PageComponent />
+      {/if}
+    </PageHost>
   {/if}
 {/snippet}
 

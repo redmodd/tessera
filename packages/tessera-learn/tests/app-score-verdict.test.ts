@@ -25,6 +25,7 @@ async function mountApp(
   adapter: BaseAdapter,
   course = manifest,
   loadLayout = () => import('./fixtures/mastery-layout.svelte'),
+  loadPage: () => Promise<unknown> = () => new Promise(() => {}),
 ) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
@@ -32,7 +33,7 @@ async function mountApp(
     config,
     manifest: course,
     pageModules: Object.fromEntries(
-      course.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
+      course.pages.map((p) => [p.importPath, loadPage]),
     ),
     adapter,
     layout: (await loadLayout()).default,
@@ -85,6 +86,7 @@ describe('a graded submit that decides the verdict', () => {
     document.body.innerHTML = '';
     delete (globalThis as any).__tesseraTest;
     delete (globalThis as any).__tesseraNavCtx;
+    delete (globalThis as any).__showLateCheck;
     window.history.replaceState({}, '', '/');
   });
 
@@ -122,8 +124,14 @@ describe('a graded submit that decides the verdict', () => {
       stubAdapter(),
       createManifest(1, {}, { 0: { graded: true } }),
       () => import('./fixtures/question-layout.svelte'),
+      () => import('./fixtures/app-page.svelte'),
     );
     cleanup = mounted.cleanup;
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+
+    (globalThis as any).__showLateCheck();
     await flush();
 
     expect(mounted.progress.gradedUnits.size).toBe(0);

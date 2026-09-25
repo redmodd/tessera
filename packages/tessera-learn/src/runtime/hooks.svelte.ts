@@ -8,6 +8,7 @@ import {
   getNavContext,
   getAdapterContext,
   getPageContext,
+  isInPage,
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
@@ -139,7 +140,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     });
   }
 
-  const pageIndex = getPageContext()?.index;
+  const pageIndex = isInPage() ? getPageContext()?.index : undefined;
   if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(

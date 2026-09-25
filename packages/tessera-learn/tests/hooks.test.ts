@@ -44,6 +44,7 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     prefetch: vi.fn(),
   };
   ctxStore.set('tessera-page', { index: currentIndex });
+  ctxStore.set('tessera-in-page', true);
   return { nav, manifest, progress, config };
 }
 

@@ -20,6 +20,7 @@ import type { BaseAdapter } from './adapters/base.js';
 export const TESSERA_NAV = 'tessera-nav' as const;
 export const TESSERA_ADAPTER = 'tessera-adapter' as const;
 export const TESSERA_PAGE = 'tessera-page' as const;
+export const TESSERA_IN_PAGE = 'tessera-in-page' as const;
 export const TESSERA_USER_STATE = 'tessera-user-state' as const;
 
 // ---- Shapes ----
@@ -76,6 +77,11 @@ export function getAdapterContext(): AdapterContext | undefined {
 
 export function getPageContext(): PageContext | undefined {
   return getContext<PageContext | undefined>(TESSERA_PAGE);
+}
+
+/** True inside the rendered page, false in the layout around it. */
+export function isInPage(): boolean {
+  return getContext<boolean | undefined>(TESSERA_IN_PAGE) === true;
 }
 
 export function requireUserStateStore(name: string): UserStateStore {
