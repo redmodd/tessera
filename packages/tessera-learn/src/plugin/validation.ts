@@ -23,6 +23,7 @@ import {
   type ComponentMatch,
   getParseError,
   readCourseRuntimeExports,
+  scriptImports,
   useQuestionGrading,
   usesLegacyModuleContext,
   type PropValue,
@@ -1512,7 +1513,7 @@ function validateQuizConfig(
 
 // ---------- Question Component Validation ----------
 
-const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
+const QUESTION_COMPONENT_REQUIRED = {
   MultipleChoice: ['question', 'options', 'correct'],
   FillInTheBlank: ['question', 'answers'],
   Matching: ['question', 'pairs'],
@@ -1554,7 +1555,8 @@ function validateQuestionComponents(
   const seenSanitized = new Set<string>();
   for (const match of components) {
     const { name, props, hasSpread } = match;
-    for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
+    const required = QUESTION_COMPONENT_REQUIRED[name as QuestionComponentName];
+    for (const req of required) {
       if (!hasSpread && !props.has(req)) {
         d.error(`${fileRel}: <${name}> is missing required prop "${req}"`);
       }
@@ -1864,17 +1866,15 @@ function validateHeadingOrder(
 const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
-const IMPORT_SOURCE_RE = /from\s+['"]([^'"]+)['"]/g;
 
 // A local import may wrap useQuestion, so its presence suppresses the "no
 // questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
-  for (const [, source] of content.matchAll(IMPORT_SOURCE_RE)) {
-    if (!/^(?:\.{1,2}\/|\$)/.test(source)) continue;
-    const file = source.slice(source.lastIndexOf('/') + 1);
-    if (!file.includes('.') || /\.(?:svelte|js|ts)$/.test(file)) return true;
-  }
-  return false;
+  return scriptImports(content).some(({ from }) => {
+    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
+    const file = from.slice(from.lastIndexOf('/') + 1);
+    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+  });
 }
 
 function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {

@@ -1916,6 +1916,23 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     );
   });
 
+  it('warns on a quiz page that shows a local import only as text', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Empty quiz</h1>
+<pre><code>import Widget from "./Widget.svelte"</code></pre>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'quiz page has no question components or useQuestion() calls',
+      ),
+    );
+  });
+
   it('warns when a declared graded page has only practice questions', () => {
     createValidProject(testRoot);
     writePage(

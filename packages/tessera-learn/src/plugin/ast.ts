@@ -101,9 +101,10 @@ function walkNodes(
 }
 
 function collectComponents(
+  source: string,
   root: Node,
   names: ReadonlySet<string>,
-): { node: Node; branches: Map<number, string> }[] {
+): ComponentMatch[] {
   const found: { node: Node; branches: Map<number, string> }[] = [];
   walkNodes(root, (node, path) => {
     if (node.type !== 'Component' || !names.has(node.name as string)) return;
@@ -114,13 +115,16 @@ function collectComponents(
     }
     found.push({ node, branches });
   });
-  return found.sort((a, b) => a.node.start - b.node.start);
+  return found
+    .sort((a, b) => a.node.start - b.node.start)
+    .map(({ node, branches }) => readProps(source, node, branches));
 }
 
 function readProps(
   source: string,
   node: Node,
-): Omit<ComponentMatch, 'branches'> {
+  branches: ReadonlyMap<number, string>,
+): ComponentMatch {
   const props = new Map<string, PropValue>();
   let hasSpread = false;
   const attributes = (node.attributes as Node[]) ?? [];
@@ -166,7 +170,7 @@ function readProps(
       if (source[attr.start] === '{') hasSpread = true;
     }
   }
-  return { name: node.name as string, props, hasSpread };
+  return { name: node.name as string, props, hasSpread, branches };
 }
 
 /**
@@ -191,28 +195,49 @@ export function findComponents(
   if (!root) return null;
   const local = locallyImportedNames(root);
   const builtIns = new Set([...names].filter((name) => !local.has(name)));
-  return collectComponents(root, builtIns).map(({ node, branches }) => ({
-    ...readProps(source, node),
-    branches,
-  }));
+  return collectComponents(source, root, builtIns);
 }
 
 /** Names a page binds from its own modules, which shadow the built-in components. */
 function locallyImportedNames(root: Node): Set<string> {
-  const names = new Set<string>();
+  return new Set(
+    importsOf(root)
+      .filter(
+        ({ from }) =>
+          from !== 'tessera-learn' && !from.startsWith('tessera-learn/'),
+      )
+      .flatMap(({ locals }) => locals),
+  );
+}
+
+export interface ScriptImport {
+  from: string;
+  locals: string[];
+}
+
+/** Every `import` in a component's instance and module scripts, or none if it doesn't parse. */
+export function scriptImports(source: string): ScriptImport[] {
+  const { root } = parseRoot(source);
+  return root ? importsOf(root) : [];
+}
+
+function importsOf(root: Node): ScriptImport[] {
+  const imports: ScriptImport[] = [];
   for (const script of [root.instance, root.module]) {
     const body = (script as { content?: Node } | null)?.content?.body;
     for (const node of (body as Node[] | undefined) ?? []) {
       const from = (node.source as Node | undefined)?.value;
       if (node.type !== 'ImportDeclaration' || typeof from !== 'string')
         continue;
-      if (from === 'tessera-learn' || from.startsWith('tessera-learn/'))
-        continue;
-      for (const specifier of (node.specifiers as Node[]) ?? [])
-        names.add((specifier.local as Node).name as string);
+      imports.push({
+        from,
+        locals: ((node.specifiers as Node[]) ?? []).map(
+          (specifier) => (specifier.local as Node).name as string,
+        ),
+      });
     }
   }
-  return names;
+  return imports;
 }
 
 const TsParser = Parser.extend(

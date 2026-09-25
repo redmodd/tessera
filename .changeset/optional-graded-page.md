@@ -10,4 +10,4 @@ The LMS never loses a completion or a `passed` when the score later drops, and k
 
 A page of standalone graded questions counts as answered once every graded question on it is, including built-in ones behind a reveal, rather than after the first.
 
-`tessera validate` warns on unknown `pageConfig` and `quiz` fields, and on graded questions split across the branches of an `{#if}`, `{#each}` or `{#await}`. It treats an attribute with `{…}` in it as computed rather than literal, and no longer checks a page's own component as a built-in when the names match.
+`tessera validate` warns on unknown `pageConfig` and `quiz` fields, and on graded questions split across the branches of an `{#if}`, `{#each}` or `{#await}`. It treats an attribute with `{…}` in it as computed rather than literal, and no longer checks a page's own component as a built-in when the names match. Import text in a page's markup no longer hides the warning that a page has nothing to score.
