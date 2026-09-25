@@ -240,10 +240,16 @@
 
   function restoreState(saved) {
     if (!saved) return;
+    const recorded = adapter.recordedLifecycle();
     const latches = {
       decided: saved.s === 1,
-      completed: saved.k === 1,
-      passScore: typeof saved.p === 'number' ? saved.p : null,
+      completed: saved.k === 1 || recorded?.completed === true,
+      passScore:
+        typeof saved.p === 'number'
+          ? saved.p
+          : recorded?.passed
+            ? (recorded.score ?? 0)
+            : null,
     };
     progress.replay(() => {
       // Restore visited pages

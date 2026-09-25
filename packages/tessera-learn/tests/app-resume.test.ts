@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { stubAdapter } from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import type { RecordedLifecycle } from '../src/runtime/adapters/base.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const page = {
@@ -53,7 +54,11 @@ function makeConfig(resume: 'auto' | 'never') {
   };
 }
 
-function makeAdapter(saved: unknown, seeds: boolean) {
+function makeAdapter(
+  saved: unknown,
+  seeds: boolean,
+  recorded: RecordedLifecycle | null,
+) {
   const spies = {
     seedLifecycle: vi.fn(() => seeds),
     setCompletionStatus: vi.fn(),
@@ -65,6 +70,7 @@ function makeAdapter(saved: unknown, seeds: boolean) {
     spies,
     adapter: stubAdapter({
       getState: () => saved as SavedState | null,
+      recordedLifecycle: () => recorded,
       ...spies,
     }),
   };
@@ -76,11 +82,14 @@ async function mountApp(
     saved?: unknown;
     pageModule?: () => Promise<unknown>;
     seeds?: boolean;
+    course?: typeof manifest;
+    recorded?: RecordedLifecycle;
   } = {},
 ) {
   const { adapter, spies } = makeAdapter(
     options.saved ?? savedWith({}),
     options.seeds ?? true,
+    options.recorded ?? null,
   );
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
@@ -90,7 +99,7 @@ async function mountApp(
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
     config: makeConfig(resume),
-    manifest,
+    manifest: options.course ?? manifest,
     pageModules: {
       [page.importPath]:
         options.pageModule ?? (() => import('./fixtures/app-page.svelte')),
@@ -164,6 +173,26 @@ describe('App restore gate honours config.resume', () => {
     expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
     expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 90 });
+  });
+
+  it('keeps the completion and pass the LMS records beside a save that carries neither', async () => {
+    const listed = { ...secondPage, questions: ['q1', 'q2'] };
+    const {
+      component,
+      seedLifecycle,
+      setCompletionStatus,
+      setSuccessStatus,
+      unmount,
+    } = await mountApp('auto', {
+      saved: savedWith({ s: 1, g: { '1': { q: { q1: 90 } } } }),
+      course: { ...manifest, pages: [page, listed] },
+      recorded: { completed: true, passed: true, score: 90 },
+    });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(setSuccessStatus).toHaveBeenCalled());
+    expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
+    expect(setCompletionStatus.mock.calls).toEqual([['complete']]);
+    expect(setSuccessStatus.mock.calls).toEqual([['passed']]);
   });
 
   it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {

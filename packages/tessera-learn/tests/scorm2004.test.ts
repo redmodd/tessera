@@ -278,6 +278,37 @@ describe('SCORM2004Adapter', () => {
     });
   });
 
+  describe('the status the LMS records', () => {
+    it('reads completion, success and score', async () => {
+      api = scorm2004Api({
+        'cmi.completion_status': 'completed',
+        'cmi.success_status': 'passed',
+        'cmi.score.raw': '90',
+      });
+      adapter = new SCORM2004Adapter(api);
+      await adapter.init();
+      expect(adapter.recordedLifecycle()).toEqual({
+        completed: true,
+        passed: true,
+        score: 90,
+      });
+    });
+
+    it('reads a failed attempt as neither completed nor passed', async () => {
+      api = scorm2004Api({
+        'cmi.completion_status': 'incomplete',
+        'cmi.success_status': 'failed',
+      });
+      adapter = new SCORM2004Adapter(api);
+      await adapter.init();
+      expect(adapter.recordedLifecycle()).toEqual({
+        completed: false,
+        passed: false,
+        score: null,
+      });
+    });
+  });
+
   describe('LMS-supplied thresholds', () => {
     async function masteryFrom(value: string) {
       api = scorm2004Api({ 'cmi.scaled_passing_score': value });

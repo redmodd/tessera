@@ -28,6 +28,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   sessionTimeKey: 'cmi.core.session_time',
   masteryKey: 'cmi.student_data.mastery_score',
   masteryRange: [0, 100],
+  scoreKey: 'cmi.core.score.raw',
   formatDuration: formatHHMMSS,
   interactionFields: {
     responseField: 'student_response',
@@ -69,6 +70,14 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     super.saveState(state);
     // §3.4.5.3 — bookmark for LMS "Resume from page N" affordances.
     this.set('cmi.core.lesson_location', String(state.b));
+  }
+
+  protected readRecordedStatus() {
+    const status = this.read('cmi.core.lesson_status');
+    return {
+      completed: status === 'completed' || status === 'passed',
+      passed: status === 'passed',
+    };
   }
 
   setScore(score: number): void {

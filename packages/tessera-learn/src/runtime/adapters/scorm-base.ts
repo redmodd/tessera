@@ -28,6 +28,7 @@ export interface ScormDialect<TApi> {
   sessionTimeKey: string;
   masteryKey: string;
   masteryRange: readonly [number, number];
+  scoreKey: string;
   formatDuration(seconds: number): string;
   interactionFields: {
     responseField: 'student_response' | 'learner_response';
@@ -123,12 +124,17 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       return;
     }
 
-    const { masteryKey, masteryRange } = this.dialect;
+    const { masteryKey, masteryRange, scoreKey } = this.dialect;
     this.masteryScore = parseMastery(
       this.read(masteryKey),
       masteryKey,
       masteryRange,
     );
+    const score = Number.parseFloat(this.read(scoreKey));
+    this.recorded = {
+      ...this.readRecordedStatus(),
+      score: Number.isFinite(score) ? score : null,
+    };
 
     let raw = '';
     try {
@@ -242,6 +248,10 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     );
   }
 
+  protected abstract readRecordedStatus(): {
+    completed: boolean;
+    passed: boolean;
+  };
   abstract override setScore(score: number): void;
   abstract override setCompletionStatus(status: CompletionStatus): void;
   abstract override setSuccessStatus(status: SuccessStatus): void;
