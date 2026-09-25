@@ -17,10 +17,7 @@ function trackStatuses(progress: ProgressState) {
 }
 
 describe('standalone question rescoring re-derives course status', () => {
-  const config = createConfig({
-    completion: { mode: 'quiz' },
-    scoring: { passingScore: 70 },
-  });
+  const config = createConfig({ completion: { mode: 'quiz' } });
 
   it('promotes a page whose only question is retried correctly', () => {
     const progress = new ProgressState(

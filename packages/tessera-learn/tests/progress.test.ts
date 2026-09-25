@@ -218,10 +218,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       expect(progress.completionStatus).toBe('incomplete');
@@ -232,10 +229,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -248,10 +242,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -262,10 +253,7 @@ describe('ProgressState', () => {
 
     it('incomplete when no graded quizzes exist', () => {
       const manifest = createManifest(5);
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       expect(progress.completionStatus).toBe('incomplete');
@@ -275,7 +263,7 @@ describe('ProgressState', () => {
   describe('recalculateSuccess', () => {
     it('is unknown when no graded quizzes exist', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       expect(progress.successStatus).toBe('unknown');
@@ -283,7 +271,7 @@ describe('ProgressState', () => {
 
     it('is unknown when graded quizzes exist but none attempted', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       expect(progress.successStatus).toBe('unknown');
@@ -294,10 +282,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -311,7 +296,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -325,7 +310,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -342,7 +327,6 @@ describe('ProgressState', () => {
       });
       const config = createConfig({
         completion: { mode: 'percentage', percentageThreshold: 80 },
-        scoring: { passingScore: 70 },
       });
       const progress = new ProgressState(manifest, config);
 
@@ -388,10 +372,7 @@ describe('ProgressState', () => {
         1: { graded: false },
         3: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(1, 100);
@@ -406,7 +387,7 @@ describe('ProgressState', () => {
         5: { graded: true },
         8: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 95);
@@ -785,10 +766,7 @@ describe('ProgressState', () => {
   describe('recalculateSuccess — standalone graded questions', () => {
     it('includes pages with graded standalone questions', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);
@@ -798,7 +776,7 @@ describe('ProgressState', () => {
 
     it('uses the page average for standalone questions', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 60, true);
@@ -809,7 +787,7 @@ describe('ProgressState', () => {
 
     it('non-graded standalone questions do not affect success', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 100, false);
@@ -823,10 +801,7 @@ describe('ProgressState', () => {
         { 1: { graded: true } },
         { 3: { graded: true } },
       );
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(1, 100);
@@ -838,10 +813,7 @@ describe('ProgressState', () => {
 
     it('pageConfig quiz score takes precedence on a page that also has standalone questions', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -853,10 +825,7 @@ describe('ProgressState', () => {
 
     it('graded standalone page does not double-count when also a graded pageConfig quiz', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -1142,10 +1111,7 @@ describe('ProgressState', () => {
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {
     it('graded standalone pages count toward completion in quiz mode', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);

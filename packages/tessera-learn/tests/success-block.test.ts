@@ -56,7 +56,6 @@ describe('success.from: "none"', () => {
     const config = createConfig({
       completion: { mode: 'percentage', percentageThreshold: 100 },
       success: { from: 'none' },
-      scoring: { passingScore: 70 },
     });
     const progress = new ProgressState(manifest, config);
 
@@ -73,7 +72,6 @@ describe('success.from: "quiz" under manual completion', () => {
     const config = createConfig({
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
-      scoring: { passingScore: 70 },
     });
     return new ProgressState(manifest, config);
   };
