@@ -60,7 +60,6 @@ export class ProgressState {
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
   #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
-  #canPass: boolean;
   #undeclaredWarned = new Set<number>();
   #expected: SvelteMap<number, ReadonlySet<string>>;
   #unconfirmed = new Map<number, Set<string>>();
@@ -90,9 +89,6 @@ export class ProgressState {
     this.#totalPages = manifest.totalPages;
     this.#config = config;
     this.#success = resolveSuccess(config);
-    this.#canPass =
-      this.#success.from === 'quiz' ||
-      (this.#success.from === 'fixed' && this.#success.status === 'passed');
   }
 
   visitedPages = $state(new SvelteSet<number>());
@@ -390,7 +386,10 @@ export class ProgressState {
     }
     this.#gradedScoreDecided = latches.decided;
     this.#completionReached = latches.completed;
-    this.#passScore = this.#canPass ? latches.passScore : null;
+    const canPass =
+      this.#success.from === 'quiz' ||
+      (this.#success.from === 'fixed' && this.#success.status === 'passed');
+    this.#passScore = canPass ? latches.passScore : null;
     this.#latch();
   }
 

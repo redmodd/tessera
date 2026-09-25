@@ -9,7 +9,11 @@ import {
   type ComponentMatch,
 } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
-import { QUESTION_ID_PREFIX, questionId } from '../components/util.js';
+import {
+  QUESTION_ID_PREFIX,
+  questionId,
+  type QuestionComponentName,
+} from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -210,7 +214,11 @@ export function staticQuestionId({
   if (id?.kind === 'string') return id.value;
   const question = props.get('question');
   if (hasSpread || id || question?.kind !== 'string') return null;
-  return questionId(undefined, QUESTION_ID_PREFIX[name], question.value);
+  return questionId(
+    undefined,
+    QUESTION_ID_PREFIX[name as QuestionComponentName],
+    question.value,
+  );
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {

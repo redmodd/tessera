@@ -246,7 +246,6 @@
       passScore: typeof saved.p === 'number' ? saved.p : null,
     };
     progress.replay(() => {
-      // Restore visited pages
       for (const idx of saved.v) {
         progress.markVisited(idx);
       }

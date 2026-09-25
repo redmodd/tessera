@@ -71,6 +71,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   #launchData: CMI5LaunchData | null = null;
   /** cmi5 §10.2.2 — Browse/Review forbid every Defined Statement except Initialized/Terminated. */
   #launchMode: CMI5LaunchMode = 'Normal';
+  #heldFailed = false;
 
   async init(): Promise<void> {
     this.version = '1.0.3';
@@ -205,8 +206,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // period".
     this.sendInitialized();
   }
-
-  #heldFailed = false;
 
   override seedLifecycle(
     completion: CompletionStatus,

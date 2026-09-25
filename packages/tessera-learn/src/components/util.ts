@@ -26,12 +26,14 @@ export function slugFromQuestion(text: unknown): string {
     .slice(0, 40);
 }
 
-export const QUESTION_ID_PREFIX: Record<string, string> = {
+export const QUESTION_ID_PREFIX = {
   MultipleChoice: 'mc',
   FillInTheBlank: 'fitb',
   Matching: 'matching',
   Sorting: 'sorting',
-};
+} as const satisfies Record<string, string>;
+
+export type QuestionComponentName = keyof typeof QUESTION_ID_PREFIX;
 
 /** Author-supplied `id`, or a `prefix-<slug>` fallback derived from the prompt. */
 export function questionId(

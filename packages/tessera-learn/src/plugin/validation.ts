@@ -57,6 +57,7 @@ import {
 import { contrastRatio } from './a11y/contrast.js';
 import { isCspOverrides } from './csp.js';
 import { isVideoEmbed } from '../components/video-embed.js';
+import type { QuestionComponentName } from '../components/util.js';
 
 // ---------- Types ----------
 
@@ -1516,7 +1517,7 @@ const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
   FillInTheBlank: ['question', 'answers'],
   Matching: ['question', 'pairs'],
   Sorting: ['question', 'items', 'targets', 'correct'],
-};
+} satisfies Record<QuestionComponentName, string[]>;
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
