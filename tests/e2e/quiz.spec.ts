@@ -5,14 +5,10 @@ import {
   answerMatching,
   answerMultipleChoice,
   completePracticeQuiz,
+  navigateToPage,
   primaryBtn,
   waitForTesseraContent,
 } from './helpers.js';
-
-async function navigateToPage(page: Page, pageTitle: string) {
-  await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForTesseraContent(page);
-}
 
 async function readSavedState(page: Page) {
   return page.evaluate(() => {
@@ -296,7 +292,6 @@ test.describe('Quiz — Gating', () => {
     await expect(nextBtn).toBeEnabled();
 
     await nextBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Congratulations',
     );

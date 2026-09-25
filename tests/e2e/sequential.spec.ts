@@ -44,7 +44,6 @@ test.describe('Navigation — Sequential Mode', () => {
     // Navigate to Page Two (already unlocked since Page One was visited)
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await nextBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page Two');
 
     // Now Page Three should be unlocked
@@ -56,12 +55,10 @@ test.describe('Navigation — Sequential Mode', () => {
 
     // Navigate to Page Two
     await nextBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page Two');
 
     // Page Three should now be unlockable (Page Two was visited)
     await nextBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Page Three',
     );
@@ -85,11 +82,10 @@ test.describe('Navigation — Sequential Mode', () => {
 
     // Go forward
     await nextBtn.click();
-    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-content h1')).toContainText('Page Two');
 
     // Go back to page one
     await prevBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Page One');
 
     // Page One should still be clickable in sidebar

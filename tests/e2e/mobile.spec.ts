@@ -38,7 +38,6 @@ test.describe('Mobile Navigation', () => {
 
     // Click a page
     await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
 
     // Sidebar should close
     const sidebar = page.locator('.tessera-sidebar');
@@ -54,7 +53,6 @@ test.describe('Mobile Navigation', () => {
     const nextBtn = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await expect(nextBtn).toBeVisible();
     await nextBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
@@ -63,7 +61,6 @@ test.describe('Mobile Navigation', () => {
       hasText: 'Previous',
     });
     await prevBtn.click();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
@@ -81,7 +78,6 @@ test.describe('Mobile Navigation', () => {
     await page
       .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
       .click();
-    await waitForTesseraContent(page);
     await page.waitForSelector('.tessera-carousel');
 
     // First dot should be active (slide 1)
@@ -142,7 +138,6 @@ test.describe('Mobile Navigation', () => {
     await page
       .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
       .click();
-    await waitForTesseraContent(page);
     await page.waitForSelector('.tessera-callout');
 
     // All callouts should be visible

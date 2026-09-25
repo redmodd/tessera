@@ -9,6 +9,7 @@ import {
 } from './lms-mocks.js';
 import {
   findStatement,
+  findStatements,
   interactionField,
   scormData,
   startPreview,
@@ -230,9 +231,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
       .toBe(1);
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(2);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -302,9 +301,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
       .toBe(1);
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(2);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',

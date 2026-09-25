@@ -12,9 +12,11 @@ import {
   answerGradedQuizAfterQ1,
   exitCourse,
   findStatement,
+  findStatements,
   finishFreeCourse,
   interactionField,
   interactionWrites,
+  navigateToPage,
   openQuiz,
   reportedQuestionCount,
   scormData,
@@ -81,12 +83,8 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
-      .click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
+    await navigateToPage(page, 'Callouts & Images');
 
     // Poll suspend_data until all three visits are reflected — the writeQueue is
     // async and the final `markVisited` may land after the navigation completes.
@@ -118,13 +116,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
-      .click();
-    await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Callouts & Images',
-    );
+    await navigateToPage(page, 'Callouts & Images');
 
     await expect
       .poll(() => scormLog(page))
@@ -209,8 +201,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(1100); // accumulate at least one whole second
 
     await exitCourse(page);
@@ -336,13 +327,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Accordion & Carousel',
-    );
+    await navigateToPage(page, 'Accordion & Carousel');
 
     await expect
       .poll(() => scormLog(page))
@@ -394,8 +379,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(1100);
 
     await exitCourse(page);
@@ -566,9 +550,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -699,10 +681,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
     await expect
       .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
       .toBeGreaterThan(0);
@@ -731,8 +710,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
 
     // Navigating is what normally triggers a save.
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(500);
     expect(statePuts).toHaveLength(0);
   });
@@ -782,10 +760,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .nth(1)
       .click();
 
-    const answeredSoFar = () =>
-      statements.filter(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-      );
+    const answeredSoFar = () => findStatements(statements, 'answered');
     await page.waitForTimeout(300);
     expect(answeredSoFar()).toEqual([]);
 

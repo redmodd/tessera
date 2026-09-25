@@ -41,6 +41,11 @@ export async function waitForTesseraContent(page: Page): Promise<void> {
   await page.waitForSelector('.tessera-content', { timeout: 15000 });
 }
 
+export async function navigateToPage(page: Page, title: string): Promise<void> {
+  await page.locator('.tessera-nav-page', { hasText: title }).click();
+  await expect(page.locator('.tessera-content h1')).toContainText(title);
+}
+
 /** Every call the SCORM mock has logged so far, as `[method, ...args]`. */
 export async function scormLog(page: Page): Promise<string[][]> {
   return page.evaluate(() => (window as any).__scormLog);
@@ -223,8 +228,12 @@ export async function finishFreeCourse(page: Page): Promise<void> {
   }
 }
 
-export function findStatement(statements: any[], verb: string): any {
-  return statements.find(
+export function findStatements(statements: any[], verb: string): any[] {
+  return statements.filter(
     (s) => s?.verb?.id === `http://adlnet.gov/expapi/verbs/${verb}`,
   );
+}
+
+export function findStatement(statements: any[], verb: string): any {
+  return findStatements(statements, verb)[0];
 }

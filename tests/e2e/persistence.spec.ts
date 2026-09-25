@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { answerMatching, waitForTesseraContent } from './helpers.js';
-
-async function navigateToPage(page, pageTitle: string) {
-  await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await expect(page.locator('.tessera-content h1')).toContainText(pageTitle);
-}
+import {
+  answerMatching,
+  navigateToPage,
+  waitForTesseraContent,
+} from './helpers.js';
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
@@ -55,10 +54,7 @@ test.describe('Persistence — localStorage', () => {
     const page1 = await ctx1.newPage();
     await page1.goto('/');
     await waitForTesseraContent(page1);
-    await page1
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForTesseraContent(page1);
+    await navigateToPage(page1, 'Accordion & Carousel');
     await page1.close();
     await ctx1.close();
 

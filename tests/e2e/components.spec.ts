@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { waitForTesseraContent } from './helpers.js';
-
-async function navigateToPage(page, pageTitle: string) {
-  await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForTesseraContent(page);
-}
+import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
 test.describe('Component — Accordion', () => {
   test.beforeEach(async ({ page }) => {
