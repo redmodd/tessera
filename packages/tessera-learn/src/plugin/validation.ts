@@ -1157,7 +1157,7 @@ function validatePageFile(
   }
 
   validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
-  validateQuestionComponents(content, fileRel, d, exportStandard);
+  validateQuestionComponents(questionComponents, fileRel, d, exportStandard);
   validateMediaComponents(content, fileRel, d);
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
@@ -1539,13 +1539,11 @@ function staticNumber(prop: PropValue | undefined): number | null {
 }
 
 function validateQuestionComponents(
-  content: string,
+  components: ComponentMatch[],
   fileRel: string,
   d: Diagnostics,
   exportStandard?: string,
 ): void {
-  const components = findComponents(content, QUESTION_COMPONENT_NAMES);
-  if (!components) return;
   const profile = standardProfile(exportStandard);
   const format =
     profile && 'interactionFormat' in profile
