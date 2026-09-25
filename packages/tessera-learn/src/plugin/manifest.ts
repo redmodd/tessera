@@ -9,7 +9,7 @@ import {
   type ComponentMatch,
 } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
-import { questionId } from '../components/util.js';
+import { QUESTION_ID_PREFIX, questionId } from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -195,14 +195,6 @@ export function readMetaFile(metaPath: string): {
     return {};
   }
 }
-
-/** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
-export const QUESTION_ID_PREFIX: Record<string, string> = {
-  MultipleChoice: 'mc',
-  FillInTheBlank: 'fitb',
-  Matching: 'matching',
-  Sorting: 'sorting',
-};
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
   Object.keys(QUESTION_ID_PREFIX),

@@ -26,6 +26,13 @@ export function slugFromQuestion(text: unknown): string {
     .slice(0, 40);
 }
 
+export const QUESTION_ID_PREFIX: Record<string, string> = {
+  MultipleChoice: 'mc',
+  FillInTheBlank: 'fitb',
+  Matching: 'matching',
+  Sorting: 'sorting',
+};
+
 /** Author-supplied `id`, or a `prefix-<slug>` fallback derived from the prompt. */
 export function questionId(
   id: string | undefined,
