@@ -9,6 +9,10 @@ import {
   readCourseConfig,
   orderPageFiles,
   walkPages,
+  isLiterallyGradedQuestion,
+  listedGradedQuestions,
+  staticQuestionId,
+  QUESTION_COMPONENT_NAMES,
   type WalkedLesson,
   type PageConfig,
 } from './manifest.js';
@@ -19,6 +23,7 @@ import {
   type ComponentMatch,
   getParseError,
   readCourseRuntimeExports,
+  scriptImports,
   useQuestionGrading,
   usesLegacyModuleContext,
   type PropValue,
@@ -38,20 +43,22 @@ import {
   standardProfile,
   type StandardId,
 } from '../runtime/standards.js';
-import { slugFromQuestion } from '../components/util.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
   SUCCESS_SOURCES,
   courseIdentity,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
+  type QuizConfig,
 } from '../runtime/types.js';
 import { contrastRatio } from './a11y/contrast.js';
 import { isCspOverrides } from './csp.js';
 import { isVideoEmbed } from '../components/video-embed.js';
+import type { QuestionComponentName } from '../components/util.js';
 
 // ---------- Types ----------
 
@@ -1024,6 +1031,7 @@ interface PageInfo {
   fileRel: string;
   navIndex: number;
   graded: boolean;
+  requiredGraded: boolean;
   hasQuiz: boolean;
   weight?: number;
   completesOnView: boolean;
@@ -1032,7 +1040,6 @@ interface PageInfo {
 interface PagesValidationResult {
   totalPages: number;
   totalQuizzes: number;
-  hasGraded: boolean;
   hasParseErrors: boolean;
   pages: PageInfo[];
 }
@@ -1066,6 +1073,7 @@ function validatePageFile(
         fileRel,
         navIndex,
         graded: false,
+        requiredGraded: false,
         hasQuiz: false,
         completesOnView: false,
       },
@@ -1086,9 +1094,21 @@ function validatePageFile(
   }
 
   const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
-  const declaresGraded = validatePageGraded(pageConfig, fileRel, d);
+  const declaresGraded =
+    validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
+    false;
+  const declaresRequired = validateBoolean(
+    pageConfig?.required,
+    'pageConfig.required',
+    fileRel,
+    d,
+  );
   const weight = validatePageWeight(pageConfig, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
+  const requiredGraded = isRequiredGradedPage({
+    graded,
+    required: declaresRequired,
+  });
   const hasCustomWidget = hasLocalModuleImport(content);
   const questionComponents =
     findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
@@ -1101,11 +1121,28 @@ function validatePageFile(
         'Use quiz: { graded: true }, or drop graded: true.',
     );
   }
-  if (weight !== undefined && !graded) {
+  for (const [field, value] of [
+    ['required', declaresRequired],
+    ['weight', weight],
+  ] as const) {
+    if (value !== undefined && !graded) {
+      d.warn(
+        `${fileRel}: pageConfig.${field} only applies to a graded page. ` +
+          'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+          'so it is ignored.',
+      );
+    }
+  }
+  if (
+    declaresGraded &&
+    !isQuiz &&
+    splitsAcrossBranches(listedGradedQuestions(questionComponents))
+  ) {
     d.warn(
-      `${fileRel}: pageConfig.weight only applies to a page that counts toward the course score. ` +
-        'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
-        'so the weight is ignored.',
+      `${fileRel}: graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
+        'The page counts as answered only once every graded question on it is, ' +
+        'so a learner shown only one branch can never finish it. ' +
+        'Put each branch on its own page, or drop graded from the branch questions.',
     );
   }
   const gradesUndeclared =
@@ -1122,7 +1159,7 @@ function validatePageFile(
   }
 
   validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
-  validateQuestionComponents(content, fileRel, d, exportStandard);
+  validateQuestionComponents(questionComponents, fileRel, d, exportStandard);
   validateMediaComponents(content, fileRel, d);
   validateHeadingOrder(content, fileRel, d);
   validateContractBypass(content, fileRel, d);
@@ -1156,6 +1193,7 @@ function validatePageFile(
       fileRel,
       navIndex,
       graded,
+      requiredGraded,
       hasQuiz: isQuiz,
       ...(weight !== undefined ? { weight } : {}),
       completesOnView,
@@ -1175,7 +1213,6 @@ function validatePages(
   const pages: PageInfo[] = [];
   let totalPages = 0;
   let totalQuizzes = 0;
-  let hasGraded = false;
   let hasParseErrors = false;
   // One existsSync per unique asset for the whole pass.
   const assetExistsCache = new Map<string, boolean>();
@@ -1184,7 +1221,7 @@ function validatePages(
     d.error(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
+    return { totalPages, totalQuizzes, hasParseErrors, pages };
   };
 
   if (!existsSync(pagesDir)) return noPages();
@@ -1240,7 +1277,6 @@ function validatePages(
       );
       totalPages++;
       if (result.isQuiz) totalQuizzes++;
-      if (result.page.graded) hasGraded = true;
       if (result.parseError) hasParseErrors = true;
       pages.push(result.page);
     }
@@ -1274,7 +1310,7 @@ function validatePages(
 
   if (totalPages === 0) return noPages();
 
-  return { totalPages, totalQuizzes, hasGraded, hasParseErrors, pages };
+  return { totalPages, totalQuizzes, hasParseErrors, pages };
 }
 
 // ---------- _meta.js Validation ----------
@@ -1328,13 +1364,41 @@ function validatePageConfig(
     );
   }
   const result = parsePageConfigFromSource(content);
-  if (result.kind === 'ok') return result.value;
+  if (result.kind === 'ok') {
+    for (const key of Object.keys(result.value)) {
+      if (!KNOWN_PAGE_FIELDS.has(key))
+        d.warn(`${fileRel}: unknown field pageConfig.${key} is ignored`);
+    }
+    return result.value;
+  }
   if (result.kind === 'invalid') {
     d.error(
       `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
     );
   }
   return null;
+}
+
+const KNOWN_PAGE_FIELDS = new Set(
+  Object.keys({
+    title: true,
+    quiz: true,
+    graded: true,
+    required: true,
+    weight: true,
+    completesOn: true,
+  } satisfies Record<keyof PageConfig, true>),
+);
+
+function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
+  const seen = new Map<number, string>();
+  for (const { branches } of questions) {
+    for (const [block, branch] of branches) {
+      if ((seen.get(block) ?? branch) !== branch) return true;
+      seen.set(block, branch);
+    }
+  }
+  return false;
 }
 
 function validateCompletesOn(
@@ -1350,20 +1414,17 @@ function validateCompletesOn(
   return false;
 }
 
-function validatePageGraded(
-  pageConfig: { graded?: unknown } | null,
+function validateBoolean(
+  value: unknown,
+  label: string,
   fileRel: string,
   d: Diagnostics,
-): boolean {
-  const graded = pageConfig?.graded;
-  if (graded === undefined) return false;
-  if (typeof graded !== 'boolean') {
-    d.error(
-      `${fileRel}: pageConfig.graded must be a boolean, got ${JSON.stringify(graded)}`,
-    );
-    return false;
-  }
-  return graded;
+): boolean | undefined {
+  if (value === undefined || typeof value === 'boolean') return value;
+  d.error(
+    `${fileRel}: ${label} must be a boolean, got ${JSON.stringify(value)}`,
+  );
+  return undefined;
 }
 
 function validatePageWeight(
@@ -1383,6 +1444,21 @@ function validatePageWeight(
 }
 
 // ---------- Quiz Config Validation ----------
+
+const KNOWN_QUIZ_FIELDS = new Set(
+  Object.keys({
+    graded: true,
+    gatesProgress: true,
+    maxAttempts: true,
+    feedbackMode: true,
+    retryMode: true,
+  } satisfies Record<keyof QuizConfig, true>),
+);
+const PAGE_LEVEL_FIELDS = new Set<string>([
+  'required',
+  'weight',
+  'completesOn',
+] satisfies (keyof PageConfig)[]);
 
 function validateQuizConfig(
   quiz: unknown,
@@ -1405,11 +1481,16 @@ function validateQuizConfig(
   }
 
   for (const field of ['graded', 'gatesProgress']) {
-    if (cfg[field] !== undefined && typeof cfg[field] !== 'boolean') {
-      d.error(
-        `${fileRel}: quiz.${field} must be a boolean, got ${typeof cfg[field]}`,
-      );
-    }
+    validateBoolean(cfg[field], `quiz.${field}`, fileRel, d);
+  }
+
+  for (const key of Object.keys(cfg)) {
+    if (KNOWN_QUIZ_FIELDS.has(key)) continue;
+    d.warn(
+      PAGE_LEVEL_FIELDS.has(key)
+        ? `${fileRel}: quiz.${key} is ignored. Set ${key} on pageConfig, beside quiz.`
+        : `${fileRel}: unknown field quiz.${key} is ignored`,
+    );
   }
 
   if (
@@ -1432,24 +1513,12 @@ function validateQuizConfig(
 
 // ---------- Question Component Validation ----------
 
-const QUESTION_COMPONENT_REQUIRED: Record<string, string[]> = {
+const QUESTION_COMPONENT_REQUIRED = {
   MultipleChoice: ['question', 'options', 'correct'],
   FillInTheBlank: ['question', 'answers'],
   Matching: ['question', 'pairs'],
   Sorting: ['question', 'items', 'targets', 'correct'],
-};
-
-const QUESTION_COMPONENT_NAMES = new Set(
-  Object.keys(QUESTION_COMPONENT_REQUIRED),
-);
-
-/** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
-const QUESTION_ID_PREFIX: Record<string, string> = {
-  MultipleChoice: 'mc',
-  FillInTheBlank: 'fitb',
-  Matching: 'matching',
-  Sorting: 'sorting',
-};
+} satisfies Record<QuestionComponentName, string[]>;
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
@@ -1472,13 +1541,11 @@ function staticNumber(prop: PropValue | undefined): number | null {
 }
 
 function validateQuestionComponents(
-  content: string,
+  components: ComponentMatch[],
   fileRel: string,
   d: Diagnostics,
   exportStandard?: string,
 ): void {
-  const components = findComponents(content, QUESTION_COMPONENT_NAMES);
-  if (!components) return;
   const profile = standardProfile(exportStandard);
   const format =
     profile && 'interactionFormat' in profile
@@ -1486,8 +1553,10 @@ function validateQuestionComponents(
       : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
-  for (const { name, props, hasSpread } of components) {
-    for (const req of QUESTION_COMPONENT_REQUIRED[name]) {
+  for (const match of components) {
+    const { name, props, hasSpread } = match;
+    const required = QUESTION_COMPONENT_REQUIRED[name as QuestionComponentName];
+    for (const req of required) {
       if (!hasSpread && !props.has(req)) {
         d.error(`${fileRel}: <${name}> is missing required prop "${req}"`);
       }
@@ -1506,17 +1575,10 @@ function validateQuestionComponents(
       }
     }
 
-    const idProp = props.get('id');
-    const questionProp = props.get('question');
+    const resolvedId = staticQuestionId(match);
     // With no `id`, the widget derives one from the prompt text, so two
     // identically worded questions collide on one page.
-    const derived = !hasSpread && !idProp && questionProp?.kind === 'string';
-    const resolvedId =
-      idProp?.kind === 'string'
-        ? idProp.value
-        : derived
-          ? `${QUESTION_ID_PREFIX[name]}-${slugFromQuestion((questionProp as { value: string }).value)}`
-          : null;
+    const derived = resolvedId !== null && !props.has('id');
 
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
@@ -1719,7 +1781,13 @@ function validateMediaComponents(
       );
     }
     const src = props.get('src');
-    const isEmbed = src?.kind === 'string' && isVideoEmbed(src.value);
+    const srcText =
+      src?.kind === 'string'
+        ? src.value
+        : src?.kind === 'template'
+          ? src.raw
+          : undefined;
+    const isEmbed = srcText !== undefined && isVideoEmbed(srcText);
     if (
       name === 'Video' &&
       !hasSpread &&
@@ -1736,7 +1804,7 @@ function validateMediaComponents(
     if (
       name === 'Video' &&
       !hasSpread &&
-      src?.kind === 'string' &&
+      srcText !== undefined &&
       !isEmbed &&
       props.get('tracks') === undefined &&
       props.get('transcript') === undefined
@@ -1798,31 +1866,21 @@ function validateHeadingOrder(
 const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
-const IMPORT_SOURCE_RE = /from\s+['"]([^'"]+)['"]/g;
 
 // A local import may wrap useQuestion, so its presence suppresses the "no
 // questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
-  for (const [, source] of content.matchAll(IMPORT_SOURCE_RE)) {
-    if (!/^(?:\.{1,2}\/|\$)/.test(source)) continue;
-    const file = source.slice(source.lastIndexOf('/') + 1);
-    if (!file.includes('.') || /\.(?:svelte|js|ts)$/.test(file)) return true;
-  }
-  return false;
+  return scriptImports(content).some(({ from }) => {
+    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
+    const file = from.slice(from.lastIndexOf('/') + 1);
+    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+  });
 }
 
 function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
   if (hasSpread) return true;
   const graded = props.get('graded');
   return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
-}
-
-function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
-  const graded = props.get('graded');
-  return (
-    graded?.kind === 'bool' ||
-    (graded?.kind === 'expr' && graded.raw === 'true')
-  );
 }
 
 /**
@@ -1894,11 +1952,28 @@ function reportEffectiveWeights(
 ): void {
   const graded = pageResults.pages.filter((p) => p.graded);
   if (!graded.some((p) => p.weight !== undefined)) return;
-  const total = graded.reduce((sum, p) => sum + (p.weight ?? 1), 0);
-  const shares = graded
-    .map((p) => `${p.fileRel} ${(((p.weight ?? 1) / total) * 100).toFixed(1)}%`)
-    .join(', ');
-  d.info(`course score weighting: ${shares}`);
+  const weightOf = (p: PageInfo) => p.weight ?? 1;
+  const required = graded.filter((p) => p.requiredGraded);
+  const optional = graded.filter((p) => !p.requiredGraded);
+  const total = required.reduce((sum, p) => sum + weightOf(p), 0);
+  if (required.length > 0) {
+    const shares = required
+      .map((p) => `${p.fileRel} ${((weightOf(p) / total) * 100).toFixed(1)}%`)
+      .join(', ');
+    d.info(`course score weighting: ${shares}`);
+  }
+  if (optional.length > 0) {
+    const list = optional
+      .map((p) => `${p.fileRel} weight ${weightOf(p)}`)
+      .join(', ');
+    d.info(
+      required.length > 0
+        ? `course score weighting: these pages are optional, so each joins the rollup ` +
+            `only when the learner takes it: ${list}`
+        : `course score weighting: no graded page is required, so the course score covers ` +
+            `only the pages the learner takes: ${list}`,
+    );
+  }
 
   const unweighted = graded.filter((p) => p.weight === undefined);
   if (unweighted.length > 0) {
@@ -1909,20 +1984,22 @@ function reportEffectiveWeights(
     );
   }
 
-  if (graded.length < 2) return;
+  if (graded.length < 2 || required.length === 0) return;
   // Percentage-style or all-fractional weights imply a scale to land on; bare
   // ratios like 2 and 3 imply none, so their total is never a typo.
-  const weights = graded.map((p) => p.weight ?? 1);
+  const weights = required.map(weightOf);
   const scale = weights.some((w) => w >= 5)
     ? 100
     : weights.every((w) => w < 1)
       ? 1
       : undefined;
   if (scale !== undefined && Math.abs(total - scale) > scale * 1e-6) {
+    const excluded =
+      optional.length > 0 ? ' The total leaves out the optional pages.' : '';
     d.warn(
       `course score weights sum to ${Number(total.toFixed(4))}, not ${scale}, and are scaled to that total. ` +
         `Add up to ${scale} to make each weight the page's percentage of the course score, ` +
-        'or ignore this if the weights are meant as bare ratios.',
+        `or ignore this if the weights are meant as bare ratios.${excluded}`,
     );
   }
 }
@@ -1932,23 +2009,35 @@ function crossValidate(
   pageResults: PagesValidationResult,
   d: Diagnostics,
 ): void {
-  // completion.mode "quiz" but nothing declared graded
-  if (
-    config.completion?.mode === 'quiz' &&
-    !pageResults.hasGraded &&
-    !pageResults.hasParseErrors
-  ) {
-    d.error(
-      'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
-    );
-  }
-
   const quizMode = config.completion?.mode === 'quiz';
+  const hasGraded = pageResults.pages.some((p) => p.graded);
+  const hasRequiredGraded = pageResults.pages.some((p) => p.requiredGraded);
   // A quiz verdict judges the graded average against the threshold whether
   // `success` names it or `completion.mode` implies it, so read the resolved
   // criterion. With nothing graded there is no average and nothing reads it.
-  const judgesScore =
-    pageResults.hasGraded && resolveSuccess(config).from === 'quiz';
+  const judgesScore = hasGraded && resolveSuccess(config).from === 'quiz';
+  const quizVerdict = config.success?.from === 'quiz';
+
+  if (!hasRequiredGraded && !pageResults.hasParseErrors) {
+    if (quizMode) {
+      d.error(
+        hasGraded
+          ? 'completion.mode is "quiz" but every graded page sets required: false, so the course can never complete. ' +
+              'Drop required from the page that decides the course, or complete on something else.'
+          : 'completion.mode is "quiz" but no pages declare quiz: { graded: true } or graded: true',
+      );
+    } else if (judgesScore) {
+      d.warn(
+        'every graded page sets required: false, so a learner who skips them all is never judged ' +
+          'and the verdict stays "unknown". Use success: { from: "none" } if the score is all the ' +
+          'course reports, or drop required from the page that gates credit.',
+      );
+    } else if (quizVerdict) {
+      d.warn(
+        'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
+      );
+    }
+  }
 
   // A threshold something reads with nothing set: the merge defaults to 70, so
   // this is a nudge, not an error. Quiz mode always reads it for completion,
@@ -1956,18 +2045,6 @@ function crossValidate(
   if (config.scoring?.passingScore === undefined && (quizMode || judgesScore)) {
     d.warn(
       `${quizMode ? 'completion.mode is "quiz"' : 'the course judges pass/fail on the graded average'} but scoring.passingScore is not set, so it defaults to 70%. Set it explicitly to be sure.`,
-    );
-  }
-
-  const quizVerdict = config.success?.from === 'quiz';
-  if (
-    quizVerdict &&
-    !quizMode &&
-    !pageResults.hasGraded &&
-    !pageResults.hasParseErrors
-  ) {
-    d.warn(
-      'success.from is "quiz" but no pages declare quiz: { graded: true } or graded: true, so the LMS will never get a passed/failed.',
     );
   }
 

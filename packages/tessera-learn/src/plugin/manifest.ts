@@ -4,9 +4,16 @@ import JSON5 from 'json5';
 import {
   clearParseCache,
   defaultExportObjectLiteral,
+  findComponents,
   pageConfigLiteral,
+  type ComponentMatch,
 } from './ast.js';
 import type { CourseConfig, QuizConfig } from '../runtime/types.js';
+import {
+  QUESTION_ID_PREFIX,
+  questionId,
+  type QuestionComponentName,
+} from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -25,14 +32,18 @@ export interface ManifestPage {
   importPath: string;
   quiz: QuizConfig | null;
   graded?: boolean;
+  required?: boolean;
   weight?: number;
   completesOn?: 'view';
+  /** Graded built-in questions on a standalone graded page whose ids the source fixes. */
+  questions?: string[];
 }
 
 export interface PageConfig {
   title?: string;
   quiz?: QuizConfig;
   graded?: boolean;
+  required?: boolean;
   weight?: number;
   completesOn?: 'view';
 }
@@ -187,6 +198,48 @@ export function readMetaFile(metaPath: string): {
   } catch {
     return {};
   }
+}
+
+export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
+  Object.keys(QUESTION_ID_PREFIX),
+);
+
+/** The id a built-in question renders with, or null when the source doesn't fix it. */
+export function staticQuestionId({
+  name,
+  props,
+  hasSpread,
+}: ComponentMatch): string | null {
+  const id = props.get('id');
+  if (id?.kind === 'string') return id.value;
+  const question = props.get('question');
+  if (hasSpread || id || question?.kind !== 'string') return null;
+  return questionId(
+    undefined,
+    QUESTION_ID_PREFIX[name as QuestionComponentName],
+    question.value,
+  );
+}
+
+export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
+  const graded = props.get('graded');
+  return (
+    graded?.kind === 'bool' ||
+    (graded?.kind === 'expr' && graded.raw === 'true')
+  );
+}
+
+/** Graded built-in questions whose ids the source fixes, wherever they render. */
+export function listedGradedQuestions(
+  components: ComponentMatch[],
+): (ComponentMatch & { id: string })[] {
+  const listed = new Map<string, ComponentMatch & { id: string }>();
+  for (const match of components) {
+    if (match.hasSpread || !isLiterallyGradedQuestion(match)) continue;
+    const id = staticQuestionId(match);
+    if (id !== null && !listed.has(id)) listed.set(id, { ...match, id });
+  }
+  return [...listed.values()];
 }
 
 /** Result of parsing a `.svelte` source for its `pageConfig` module-script export. */
@@ -357,6 +410,15 @@ export function generateManifest(
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
 
+        const questions =
+          pageConfig.graded === true && !pageConfig.quiz
+            ? listedGradedQuestions(
+                findComponents(
+                  readSourceFileCached(filePath),
+                  QUESTION_COMPONENT_NAMES,
+                ) ?? [],
+              ).map((q) => q.id)
+            : [];
         const page: ManifestPage = {
           index: pageIndex,
           title: pageConfig.title || titleCase(pageSlug),
@@ -364,12 +426,14 @@ export function generateManifest(
           importPath: `${relDir}/${fileName}`,
           quiz: pageConfig.quiz || null,
           ...(pageConfig.graded === true ? { graded: true } : {}),
+          ...(pageConfig.required === false ? { required: false } : {}),
           ...(pageConfig.weight !== undefined
             ? { weight: pageConfig.weight }
             : {}),
           ...(pageConfig.completesOn === 'view'
             ? { completesOn: 'view' as const }
             : {}),
+          ...(questions.length > 0 ? { questions } : {}),
         };
 
         lesson.pages.push(page);

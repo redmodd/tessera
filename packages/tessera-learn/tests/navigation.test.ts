@@ -56,10 +56,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         new ProgressState(manifest, createConfig()),
-        createConfig({
-          navigation: { mode: 'free' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'free' } }),
       );
       nav.goToPage(4); // locked behind quiz gate at index 2
       expect(nav.currentPageIndex).toBe(0);
@@ -83,10 +80,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         progress,
-        createConfig({
-          navigation: { mode: 'free' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'free' } }),
       );
 
       nav.goToPage(4);
@@ -146,10 +140,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         new ProgressState(manifest, createConfig()),
-        createConfig({
-          navigation: { mode: 'free' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'free' } }),
       );
 
       nav.goToPage(0);
@@ -167,10 +158,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         progress,
-        createConfig({
-          navigation: { mode: 'free' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'free' } }),
       );
 
       progress.quizCompleted(1, 80);
@@ -208,10 +196,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         progress,
-        createConfig({
-          navigation: { mode: 'sequential' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'sequential' } }),
       );
       progress.quizCompleted(0, 50);
       expect(nav.canGoNext).toBe(false);
@@ -225,10 +210,7 @@ describe('NavigationState', () => {
       const nav = new NavigationState(
         manifest,
         progress,
-        createConfig({
-          navigation: { mode: 'sequential' },
-          scoring: { passingScore: 70 },
-        }),
+        createConfig({ navigation: { mode: 'sequential' } }),
       );
       progress.quizCompleted(0, 75);
       expect(nav.canGoNext).toBe(true);

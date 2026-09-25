@@ -232,12 +232,23 @@ describe('export packaging gate', () => {
     ).toHaveLength(1);
   });
 
-  it('packages a manual-mode cmi5 course with no masteryScore', async () => {
+  async function exportCmi5(
+    config: string,
+    pageConfig?: string,
+  ): Promise<string> {
     writeFileSync(
       resolve(projectRoot, 'course.config.js'),
-      'export default { title: "Course", completion: { mode: "manual" }, export: { standard: "cmi5" } };',
+      `export default ${config};`,
       'utf-8',
     );
+    if (pageConfig) {
+      mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
+      writeFileSync(
+        resolve(projectRoot, 'pages', '01-quiz', 'check.svelte'),
+        `<script module>\nexport const pageConfig = ${pageConfig}\n</script>\n<h1>Check</h1>`,
+        'utf-8',
+      );
+    }
     seedStaleDist();
 
     const { entry, exporter } = buildPlugins();
@@ -245,8 +256,33 @@ describe('export packaging gate', () => {
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
 
-    const xml = readFileSync(resolve(projectRoot, 'dist', 'cmi5.xml'), 'utf-8');
+    return readFileSync(resolve(projectRoot, 'dist', 'cmi5.xml'), 'utf-8');
+  }
+
+  it('packages a manual-mode cmi5 course with no masteryScore', async () => {
+    const xml = await exportCmi5(
+      '{ title: "Course", completion: { mode: "manual" }, export: { standard: "cmi5" } }',
+    );
     expect(xml).not.toContain('masteryScore');
+    expect(xml).toContain('moveOn="Completed"');
+  });
+
+  const quizVerdictConfig =
+    '{ title: "Course", success: { from: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } }';
+
+  it('asks for a Passed when a graded page is required', async () => {
+    const xml = await exportCmi5(
+      quizVerdictConfig,
+      '{ quiz: { graded: true } }',
+    );
+    expect(xml).toContain('moveOn="CompletedAndPassed"');
+  });
+
+  it('satisfies on Completed when every graded page is optional', async () => {
+    const xml = await exportCmi5(
+      quizVerdictConfig,
+      '{ required: false, quiz: { graded: true } }',
+    );
     expect(xml).toContain('moveOn="Completed"');
   });
 

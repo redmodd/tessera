@@ -14,6 +14,7 @@ import { parse } from 'svelte/compiler';
 
 export type PropValue =
   | { kind: 'string'; value: string }
+  | { kind: 'template'; raw: string }
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
@@ -21,7 +22,15 @@ export interface ComponentMatch {
   name: string;
   props: Map<string, PropValue>;
   hasSpread: boolean;
+  /** The branch it sits in of each enclosing `{#if}`, `{#each}` or `{#await}`, keyed by that block's offset. */
+  branches: ReadonlyMap<number, string>;
 }
+
+const BRANCH_KEYS: Record<string, ReadonlySet<string>> = {
+  IfBlock: new Set(['consequent', 'alternate']),
+  EachBlock: new Set(['body', 'fallback']),
+  AwaitBlock: new Set(['pending', 'then', 'catch']),
+};
 
 export type NamedObjectLiteral =
   { kind: 'none' } | { kind: 'invalid' } | { kind: 'literal'; text: string };
@@ -65,8 +74,12 @@ function parseRoot(source: string): CacheEntry {
   return entry;
 }
 
-function walkNodes(root: Node, visit: (node: Node) => void): void {
+function walkNodes(
+  root: Node,
+  visit: (node: Node, path: readonly [Node, string][]) => void,
+): void {
   const seen = new Set<object>();
+  const path: [Node, string][] = [];
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
     if (seen.has(value)) return;
@@ -76,26 +89,42 @@ function walkNodes(root: Node, visit: (node: Node) => void): void {
       return;
     }
     const node = value as Node;
-    visit(node);
+    visit(node, path);
     for (const key of Object.keys(node)) {
       if (key === 'type') continue;
+      path.push([node, key]);
       walk(node[key]);
+      path.pop();
     }
   };
   walk(root);
 }
 
-function collectComponents(root: Node, names: ReadonlySet<string>): Node[] {
-  const found: Node[] = [];
-  walkNodes(root, (node) => {
-    if (node.type === 'Component' && names.has(node.name as string)) {
-      found.push(node);
+function collectComponents(
+  source: string,
+  root: Node,
+  names: ReadonlySet<string>,
+): ComponentMatch[] {
+  const found: { node: Node; branches: Map<number, string> }[] = [];
+  walkNodes(root, (node, path) => {
+    if (node.type !== 'Component' || !names.has(node.name as string)) return;
+    const branches = new Map<number, string>();
+    for (const [ancestor, key] of path) {
+      if (BRANCH_KEYS[ancestor.type]?.has(key))
+        branches.set(ancestor.start, key);
     }
+    found.push({ node, branches });
   });
-  return found.sort((a, b) => a.start - b.start);
+  return found
+    .sort((a, b) => a.node.start - b.node.start)
+    .map(({ node, branches }) => readProps(source, node, branches));
 }
 
-function readProps(source: string, node: Node): ComponentMatch {
+function readProps(
+  source: string,
+  node: Node,
+  branches: ReadonlyMap<number, string>,
+): ComponentMatch {
   const props = new Map<string, PropValue>();
   let hasSpread = false;
   const attributes = (node.attributes as Node[]) ?? [];
@@ -117,25 +146,23 @@ function readProps(source: string, node: Node): ComponentMatch {
     if (attr.type !== 'Attribute') continue;
     const name = attr.name as string;
     const value = attr.value;
+    const parts = Array.isArray(value) ? (value as Node[]) : null;
     if (value === true) {
       props.set(name, { kind: 'bool' });
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        props.set(name, { kind: 'string', value: '' });
-      } else {
-        const first = value[0] as Node;
-        const last = value[value.length - 1] as Node;
-        props.set(name, {
-          kind: 'string',
-          value: source.slice(first.start, last.end),
-        });
-      }
-    } else if (
-      value &&
-      typeof value === 'object' &&
-      (value as Node).type === 'ExpressionTag'
-    ) {
-      const expr = (value as { expression: Node }).expression;
+    } else if (parts?.every((part) => part.type === 'Text')) {
+      props.set(name, {
+        kind: 'string',
+        value: parts.map((part) => part.data as string).join(''),
+      });
+    } else if (parts && parts.length > 1) {
+      props.set(name, {
+        kind: 'template',
+        raw: source.slice(parts[0].start, parts[parts.length - 1].end),
+      });
+    } else {
+      const tag = (parts ? parts[0] : value) as Node | null;
+      if (tag?.type !== 'ExpressionTag') continue;
+      const expr = tag.expression as Node;
       props.set(name, {
         kind: 'expr',
         raw: source.slice(expr.start, expr.end).trim(),
@@ -143,7 +170,7 @@ function readProps(source: string, node: Node): ComponentMatch {
       if (source[attr.start] === '{') hasSpread = true;
     }
   }
-  return { name: node.name as string, props, hasSpread };
+  return { name: node.name as string, props, hasSpread, branches };
 }
 
 /**
@@ -166,7 +193,51 @@ export function findComponents(
 ): ComponentMatch[] | null {
   const { root } = parseRoot(source);
   if (!root) return null;
-  return collectComponents(root, names).map((node) => readProps(source, node));
+  const local = locallyImportedNames(root);
+  const builtIns = new Set([...names].filter((name) => !local.has(name)));
+  return collectComponents(source, root, builtIns);
+}
+
+/** Names a page binds from its own modules, which shadow the built-in components. */
+function locallyImportedNames(root: Node): Set<string> {
+  return new Set(
+    importsOf(root)
+      .filter(
+        ({ from }) =>
+          from !== 'tessera-learn' && !from.startsWith('tessera-learn/'),
+      )
+      .flatMap(({ locals }) => locals),
+  );
+}
+
+export interface ScriptImport {
+  from: string;
+  locals: string[];
+}
+
+/** Every `import` in a component's instance and module scripts, or none if it doesn't parse. */
+export function scriptImports(source: string): ScriptImport[] {
+  const { root } = parseRoot(source);
+  return root ? importsOf(root) : [];
+}
+
+function importsOf(root: Node): ScriptImport[] {
+  const imports: ScriptImport[] = [];
+  for (const script of [root.instance, root.module]) {
+    const body = (script as { content?: Node } | null)?.content?.body;
+    for (const node of (body as Node[] | undefined) ?? []) {
+      const from = (node.source as Node | undefined)?.value;
+      if (node.type !== 'ImportDeclaration' || typeof from !== 'string')
+        continue;
+      imports.push({
+        from,
+        locals: ((node.specifiers as Node[]) ?? []).map(
+          (specifier) => (specifier.local as Node).name as string,
+        ),
+      });
+    }
+  }
+  return imports;
 }
 
 const TsParser = Parser.extend(

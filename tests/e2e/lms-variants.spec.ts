@@ -6,6 +6,7 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
+  navigateToPage,
   openQuiz,
   reportedQuestionCount,
   scormData,
@@ -204,7 +205,10 @@ test.describe.serial('completion.mode quiz', () => {
 
     await expect
       .poll(() => scormData(page))
-      .toMatchObject({ 'cmi.completion_status': 'completed' });
+      .toMatchObject({
+        'cmi.completion_status': 'completed',
+        'cmi.success_status': 'passed',
+      });
 
     const data = await scormData(page);
     const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
@@ -317,25 +321,60 @@ test.describe.serial('per-page weights in the course rollup', () => {
     return (await scormData(page))['cmi.core.score.raw'];
   }
 
-  test('a weight-75 exam outweighs a weight-25 quiz page: 75, not 50', async ({
+  async function lessonStatus(page: Page) {
+    return (await scormData(page))['cmi.core.lesson_status'];
+  }
+
+  async function answerFirstExamQuestion(page: Page, optionIndex: number) {
+    await navigateToPage(page, 'Final Exam');
+    await page
+      .locator('[data-question-id="q-exam"] input[type="radio"]')
+      .nth(optionIndex)
+      .check();
+  }
+
+  async function answerRevealedExamQuestion(page: Page, optionIndex: number) {
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.locator('.tessera-mc-option').nth(optionIndex).click();
+  }
+
+  async function answerExam(page: Page, correct: boolean) {
+    await answerFirstExamQuestion(page, correct ? 2 : 0);
+    await answerRevealedExamQuestion(page, correct ? 1 : 0);
+  }
+
+  async function saved(page: Page) {
+    return JSON.parse((await scormData(page))['cmi.suspend_data']);
+  }
+
+  async function answerPractice(page: Page, optionIndex: number) {
+    await navigateToPage(page, 'Practice');
+    await answerCheckQuiz(page, optionIndex);
+  }
+
+  test('weights the exam 75 to the quiz 25, and holds the pass and its score when a later optional page drags the average down', async ({
     page,
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await answerCheckQuiz(page, 0);
-
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(2)
-      .check();
+    await answerExam(page, true);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('75');
+    expect(await lessonStatus(page)).toBe('passed');
+
+    await answerPractice(page, 0);
+
+    await expect
+      .poll(async () => (await saved(page)).g?.['2']?.s, { timeout: 5000 })
+      .toBe(0);
+    expect((await saved(page)).p).toBe(75);
+    expect(await courseScore(page)).toBe('75');
+    expect(await lessonStatus(page)).toBe('passed');
   });
 
-  test('no score reaches the LMS until every graded page is scored', async ({
+  test('the score reaches the LMS once every required page is scored', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -345,13 +384,32 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await page.waitForSelector('.tessera-quiz-results');
     expect(await courseScore(page)).toBeFalsy();
 
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
-    await page
-      .locator('[data-question-id="q-exam"] input[type="radio"]')
-      .nth(0)
-      .check();
+    await answerExam(page, false);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
+    expect(await lessonStatus(page)).toBe('failed');
+  });
+
+  test('a graded question behind a reveal holds the exam open until answered', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await answerCheckQuiz(page, 1);
+    await answerFirstExamQuestion(page, 2);
+
+    await expect
+      .poll(async () => (await saved(page)).g?.['1']?.q?.['q-exam'], {
+        timeout: 5000,
+      })
+      .toBeTruthy();
+    expect(await courseScore(page)).toBeFalsy();
+    expect(await lessonStatus(page)).not.toBe('passed');
+
+    await answerRevealedExamQuestion(page, 1);
+
+    await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('100');
+    expect(await lessonStatus(page)).toBe('passed');
   });
 });

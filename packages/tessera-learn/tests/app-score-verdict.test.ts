@@ -21,17 +21,28 @@ const config = {
   export: { standard: 'xapi' },
 };
 
-async function mountApp(adapter: BaseAdapter) {
+async function mountApp(
+  adapter: BaseAdapter,
+  {
+    course = manifest,
+    loadLayout = () => import('./fixtures/mastery-layout.svelte'),
+    loadPage = () => new Promise(() => {}),
+  }: {
+    course?: typeof manifest;
+    loadLayout?: () => Promise<{ default: unknown }>;
+    loadPage?: () => Promise<unknown>;
+  } = {},
+) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   (globalThis as any).__tesseraTest = {
     config,
-    manifest,
+    manifest: course,
     pageModules: Object.fromEntries(
-      manifest.pages.map((p) => [p.importPath, () => new Promise(() => {})]),
+      course.pages.map((p) => [p.importPath, loadPage]),
     ),
     adapter,
-    layout: (await import('./fixtures/mastery-layout.svelte')).default,
+    layout: (await loadLayout()).default,
   };
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
@@ -81,6 +92,7 @@ describe('a graded submit that decides the verdict', () => {
     document.body.innerHTML = '';
     delete (globalThis as any).__tesseraTest;
     delete (globalThis as any).__tesseraNavCtx;
+    delete (globalThis as any).__showLateCheck;
     window.history.replaceState({}, '', '/');
   });
 
@@ -111,5 +123,58 @@ describe('a graded submit that decides the verdict', () => {
       'unknown',
       'passed',
     ]);
+  });
+
+  it('records a graded question in the layout against no page', async () => {
+    const mounted = await mountApp(stubAdapter(), {
+      course: createManifest(1, {}, { 0: { graded: true } }),
+      loadLayout: () => import('./fixtures/question-layout.svelte'),
+      loadPage: () => import('./fixtures/app-page.svelte'),
+    });
+    cleanup = mounted.cleanup;
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+
+    (globalThis as any).__showLateCheck();
+    await flush();
+
+    expect(mounted.progress.gradedUnits.size).toBe(0);
+    expect(mounted.progress.successStatus).toBe('unknown');
+  });
+
+  it('holds the completion a later optional page would take back', async () => {
+    const setCompletionStatus = vi.fn();
+    const setExit = vi.fn();
+    const saveState = vi.fn();
+    const mounted = await mountApp(
+      stubAdapter({ setCompletionStatus, setExit, saveState }),
+      {
+        course: createManifest(
+          2,
+          { 0: { graded: true }, 1: { graded: true } },
+          { 1: { required: false } },
+        ),
+      },
+    );
+    cleanup = mounted.cleanup;
+    await flush();
+
+    mounted.progress.quizCompleted(0, 90);
+    await flush();
+
+    mounted.progress.quizCompleted(1, 0);
+    await flush();
+
+    expect(mounted.progress.completionStatus).toBe('incomplete');
+    expect(setCompletionStatus.mock.calls.map(([status]) => status)).toEqual([
+      'incomplete',
+      'complete',
+    ]);
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(setExit).toHaveBeenCalledWith('normal');
+    expect(saveState.mock.calls.at(-1)![0]).toMatchObject({ k: 1 });
   });
 });

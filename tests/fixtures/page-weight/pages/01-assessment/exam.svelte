@@ -7,7 +7,10 @@
 </script>
 
 <script>
+  import { MultipleChoice } from 'tessera-learn';
   import WeightedChoice from '../../components/WeightedChoice.svelte';
+
+  let revealed = $state(false);
 </script>
 
 <h1>Final Exam</h1>
@@ -19,3 +22,15 @@
   options={['Atlantic', 'Indian', 'Pacific']}
   correct={2}
 />
+
+{#if revealed}
+  <MultipleChoice
+    graded
+    id="q-exam-reveal"
+    question="Which planet is the largest?"
+    options={['Mars', 'Jupiter', 'Venus']}
+    correct={1}
+  />
+{:else}
+  <button onclick={() => (revealed = true)}>Continue</button>
+{/if}

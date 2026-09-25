@@ -8,6 +8,7 @@ import {
   getNavContext,
   getAdapterContext,
   getPageContext,
+  isInPage,
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
@@ -139,15 +140,16 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     });
   }
 
-  if (navCtx) {
+  const pageIndex = isInPage() ? getPageContext()?.index : undefined;
+  if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
-        navCtx.nav.currentPageIndex,
-        navCtx.manifest.pages[navCtx.nav.currentPageIndex].slug,
+        pageIndex,
+        navCtx.manifest.pages[pageIndex].slug,
       );
     }
-    navCtx.progress.refreshStandaloneQuestion(
-      navCtx.nav.currentPageIndex,
+    navCtx.progress.registerStandaloneQuestion(
+      pageIndex,
       opts.id,
       !!opts.graded,
       opts.weight,
@@ -184,9 +186,9 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
       committed = true;
     }
-    if (navCtx) {
+    if (navCtx && pageIndex !== undefined) {
       navCtx.progress.markStandaloneQuestion(
-        navCtx.nav.currentPageIndex,
+        pageIndex,
         opts.id,
         score,
         !!opts.graded,
@@ -304,7 +306,8 @@ export function useNavigation() {
 }
 
 export function useProgress() {
-  const { progress, nav } = requireNavContext('useProgress()');
+  const { progress } = requireNavContext('useProgress()');
+  const pageCtx = getPageContext();
   return {
     get visitedPages() {
       return progress.visitedPages;
@@ -315,8 +318,10 @@ export function useProgress() {
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
     },
-    pageScore(pageIndex: number = nav.currentPageIndex) {
-      return progress.pageScore(pageIndex);
+    pageScore(pageIndex = pageCtx?.index) {
+      return pageIndex === undefined
+        ? undefined
+        : progress.pageScore(pageIndex);
     },
     get gradedScore() {
       return progress.gradedScore;
@@ -481,12 +486,13 @@ export function useQuiz(
 ): UseQuizHandle {
   const pageCtx = getPageContext();
   const adapterCtx = getAdapterContext();
-  const { nav, progress } = requireNavContext('useQuiz()');
-  if (!pageCtx?.quiz) {
+  const { progress } = requireNavContext('useQuiz()');
+  if (!pageCtx?.quiz || pageCtx.index === undefined) {
     throw new Error(
       'useQuiz() must be called on a page with a quiz config (export const pageConfig = { quiz: { ... } }).',
     );
   }
+  const pageIndex = pageCtx.index;
 
   // A second useQuiz on the same page silently overwrites the first quiz's
   // pageIndex-keyed score; warn but don't prevent (some pages compose hosts).
@@ -503,7 +509,7 @@ export function useQuiz(
     passingScore: () => pageCtx.passingScore,
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
-    onComplete: (score) => progress.quizCompleted(nav.currentPageIndex, score),
+    onComplete: (score) => progress.quizCompleted(pageIndex, score),
     notify: (name, detail) => {
       opts
         .element?.()

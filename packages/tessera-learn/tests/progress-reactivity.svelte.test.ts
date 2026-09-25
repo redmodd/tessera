@@ -17,10 +17,7 @@ function trackStatuses(progress: ProgressState) {
 }
 
 describe('standalone question rescoring re-derives course status', () => {
-  const config = createConfig({
-    completion: { mode: 'quiz' },
-    scoring: { passingScore: 70 },
-  });
+  const config = createConfig({ completion: { mode: 'quiz' } });
 
   it('promotes a page whose only question is retried correctly', () => {
     const progress = new ProgressState(
@@ -42,7 +39,7 @@ describe('standalone question rescoring re-derives course status', () => {
     cleanup();
   });
 
-  it('demotes a page when a second question on it fails', () => {
+  it('holds the pass when a second question on the page fails', () => {
     const progress = new ProgressState(
       createManifest(3, {}, { 0: { graded: true } }),
       config,
@@ -56,7 +53,7 @@ describe('standalone question rescoring re-derives course status', () => {
     progress.markStandaloneQuestion(0, 'q2', 0, true);
     flushSync();
     expect(progress.gradedScore.average).toBe(50);
-    expect(progress.successStatus).toBe('failed');
+    expect(progress.successStatus).toBe('passed');
     expect(progress.completionStatus).toBe('incomplete');
 
     cleanup();
@@ -69,7 +66,7 @@ describe('standalone question rescoring re-derives course status', () => {
     );
     const { cleanup } = trackStatuses(progress);
 
-    for (const score of [0, 100, 40, 90]) {
+    for (const score of [0, 40, 60, 90]) {
       progress.markStandaloneQuestion(0, 'q1', score, true);
       flushSync();
       const passing = progress.gradedScore.average >= 70;

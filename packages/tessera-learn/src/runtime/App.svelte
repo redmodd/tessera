@@ -5,9 +5,10 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import courseRuntime from 'virtual:tessera-course-runtime';
-  import { onMount, onDestroy, setContext, untrack } from 'svelte';
+  import { onMount, onDestroy, setContext, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
+  import PageHost from './PageHost.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
@@ -85,6 +86,9 @@
     quizState: null,
     get passingScore() {
       return config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE;
+    },
+    get index() {
+      return renderedPageIndex < 0 ? undefined : renderedPageIndex;
     },
   });
   setContext(TESSERA_PAGE, pageContext);
@@ -164,6 +168,7 @@
         pageLoading = false;
         renderedPageIndex = index;
         progress.markVisited(index);
+        tick().then(() => progress.pageMounted(index));
         if (
           manifest.pages[index].completesOn === 'view' &&
           config.completion.mode === 'manual'
@@ -214,6 +219,8 @@
         }
         entry.q = questions;
       }
+      const unanswered = progress.unlistedUnanswered(pageIndex);
+      if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
     return {
@@ -226,53 +233,59 @@
       ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
+      ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
+      ...(progress.passScore !== null ? { p: progress.passScore } : {}),
     };
   }
 
   function restoreState(saved) {
     if (!saved) return;
-    // Restore visited pages
-    for (const idx of saved.v) {
-      progress.markVisited(idx);
-    }
-    // Restore chunk progress (absent when no page reveals content in stages)
-    if (saved.c) {
-      for (const [key, chunkIndex] of Object.entries(saved.c)) {
-        progress.markChunk(Number(key), chunkIndex);
+    const latches = {
+      decided: saved.s === 1,
+      completed: saved.k === 1,
+      passScore: typeof saved.p === 'number' ? saved.p : null,
+    };
+    progress.replay(() => {
+      for (const idx of saved.v) {
+        progress.markVisited(idx);
       }
-    }
-    if (saved.g) {
-      for (const [key, unit] of Object.entries(saved.g)) {
-        const pageIndex = Number(key);
-        if (unit.s !== undefined) {
-          progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
-        }
-        for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-          const [score, weight, graded] = Array.isArray(entry)
-            ? entry
-            : [entry, 1, 1];
-          progress.markStandaloneQuestion(
-            pageIndex,
-            qid,
-            score,
-            graded === 1,
-            weight,
-          );
+      // Restore chunk progress (absent when no page reveals content in stages)
+      if (saved.c) {
+        for (const [key, chunkIndex] of Object.entries(saved.c)) {
+          progress.markChunk(Number(key), chunkIndex);
         }
       }
-    }
+      if (saved.g) {
+        for (const [key, unit] of Object.entries(saved.g)) {
+          const pageIndex = Number(key);
+          if (unit.s !== undefined) {
+            progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
+          }
+          if (unit.w) progress.restoreUnanswered(pageIndex, unit.w);
+          for (const [qid, entry] of Object.entries(unit.q ?? {})) {
+            const [score, weight, graded] = Array.isArray(entry)
+              ? entry
+              : [entry, 1, 1];
+            progress.markStandaloneQuestion(
+              pageIndex,
+              qid,
+              score,
+              graded === 1,
+              weight,
+            );
+          }
+        }
+      }
+      if (saved.m === 1) {
+        progress.markCompleteManually();
+      }
+    }, latches);
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
       userState = { ...userState, ...saved.u };
     }
     // Restore duration
     duration = new DurationTracker(saved.d);
-    if (saved.m === 1) {
-      progress.markCompleteManually();
-    }
-    if (saved.s === 1) {
-      progress.restoreGradedScoreDecided();
-    }
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
       nav.goToPage(saved.b);
@@ -330,12 +343,12 @@
 
     if (!progress.gradedScoreFinal) return;
 
-    const { average } = progress.gradedScore;
-    if (average === prevReportedScore) return;
-    prevReportedScore = average;
+    const score = progress.reportedScore;
+    if (score === prevReportedScore) return;
+    prevReportedScore = score;
 
     untrack(() => {
-      adapter.setScore(average);
+      adapter.setScore(score);
       // Before the commit, so a verdict this score decides carries it and
       // xAPI/cmi5 send one statement rather than a Scored and a Passed.
       prevSuccessStatus = progress.successStatus;
@@ -347,7 +360,7 @@
 
   let prevCompletionStatus = 'incomplete';
   $effect(() => {
-    const status = progress.completionStatus;
+    const status = progress.reportedCompletionStatus;
     if (!persistenceReady) return;
     if (status === prevCompletionStatus) return;
     prevCompletionStatus = status;
@@ -382,7 +395,7 @@
     // exit. cmi5/web adapters no-op. Must come before terminate() so the
     // value is committed in the same flush.
     adapter.setExit(
-      progress.completionStatus === 'complete' ? 'normal' : 'suspend',
+      progress.reportedCompletionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
     xapiClient?.markUnloading();
@@ -443,14 +456,14 @@
       const saved = adapter.getState();
       if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
         restoreState(saved);
-        prevCompletionStatus = progress.completionStatus;
+        prevCompletionStatus = progress.reportedCompletionStatus;
         prevSuccessStatus = progress.successStatus;
         const seededScore = progress.gradedScoreFinal
-          ? progress.gradedScore.average
+          ? progress.reportedScore
           : null;
         if (
           adapter.seedLifecycle(
-            progress.completionStatus,
+            progress.reportedCompletionStatus,
             progress.successStatus,
             seededScore,
           )
@@ -483,7 +496,7 @@
     // Push initial completion + success status to the adapter so LMSes never
     // see the SCORM default ("unknown") on Terminate — SCORM Cloud rolls that
     // up to "completed"/"passed" during status rollup.
-    adapter.setCompletionStatus(progress.completionStatus);
+    adapter.setCompletionStatus(progress.reportedCompletionStatus);
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
@@ -528,15 +541,17 @@
   {#if pageError}
     <ErrorPage error={pageError} onretry={retryPage} />
   {:else if PageComponent}
-    {#if pageContext.quiz}
-      {#key renderedPageIndex}
-        <Quiz>
-          <PageComponent />
-        </Quiz>
-      {/key}
-    {:else}
-      <PageComponent />
-    {/if}
+    <PageHost>
+      {#if pageContext.quiz}
+        {#key renderedPageIndex}
+          <Quiz>
+            <PageComponent />
+          </Quiz>
+        {/key}
+      {:else}
+        <PageComponent />
+      {/if}
+    </PageHost>
   {/if}
 {/snippet}
 

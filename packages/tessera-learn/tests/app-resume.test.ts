@@ -54,21 +54,18 @@ function makeConfig(resume: 'auto' | 'never') {
 }
 
 function makeAdapter(saved: unknown, seeds: boolean) {
-  const seedLifecycle = vi.fn(() => seeds);
-  const setCompletionStatus = vi.fn();
-  const saveState = vi.fn();
-  const setScore = vi.fn();
+  const spies = {
+    seedLifecycle: vi.fn(() => seeds),
+    setCompletionStatus: vi.fn(),
+    saveState: vi.fn(),
+    setScore: vi.fn(),
+    setSuccessStatus: vi.fn(),
+  };
   return {
-    seedLifecycle,
-    setCompletionStatus,
-    saveState,
-    setScore,
+    spies,
     adapter: stubAdapter({
       getState: () => saved as SavedState | null,
-      seedLifecycle,
-      saveState,
-      setScore,
-      setCompletionStatus,
+      ...spies,
     }),
   };
 }
@@ -81,8 +78,10 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const { adapter, seedLifecycle, setCompletionStatus, saveState, setScore } =
-    makeAdapter(options.saved ?? savedWith({}), options.seeds ?? true);
+  const { adapter, spies } = makeAdapter(
+    options.saved ?? savedWith({}),
+    options.seeds ?? true,
+  );
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for the second mount to see a different resume mode. Svelte and the page
   // come from that same fresh registry or every $effect is orphaned against a
@@ -101,14 +100,7 @@ async function mountApp(
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return {
-    component,
-    seedLifecycle,
-    setCompletionStatus,
-    saveState,
-    setScore,
-    unmount,
-  };
+  return { component, unmount, ...spies };
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
@@ -158,13 +150,58 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('round-trips a weighted standalone question as [score, weight, graded]', async () => {
-    const saved = savedWith({ g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } } });
+  it('keeps a saved completion and pass the course has since fallen below', async () => {
+    const {
+      component,
+      seedLifecycle,
+      setCompletionStatus,
+      saveState,
+      unmount,
+    } = await mountApp('auto', { saved: savedWith({ s: 1, k: 1, p: 90 }) });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
+    expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 90 });
+  });
+
+  it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {
+    const { component, seedLifecycle, setSuccessStatus, saveState, unmount } =
+      await mountApp('auto', {
+        saved: savedWith({ v: [1], k: 1, g: { '1': { q: { q1: 90 } } } }),
+        pageModule: () => import('./fixtures/app-page-graded.svelte'),
+      });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0].g['1'].w).toEqual(['q2']),
+    );
+    expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
+    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
+    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ p: 90 });
+  });
+
+  it('drops a saved unanswered question the page no longer renders', async () => {
+    const saved = savedWith({ g: { '1': { q: { q1: 100 }, w: ['q3'] } } });
+    const { component, saveState, unmount } = await mountApp('auto', { saved });
+    cleanup = () => unmount(component);
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0].g).toEqual({
+        '1': { q: { q1: 100 } },
+      }),
+    );
+  });
+
+  it('round-trips a weighted standalone question as [score, weight, graded], and the questions left unanswered on a page not reopened', async () => {
+    const saved = savedWith({
+      b: 0,
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
+    });
     const { component, saveState, unmount } = await mountApp('auto', { saved });
     cleanup = () => unmount(component);
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: 100, q2: [40, 3, 1] } } },
+      g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
     });
   });
 
@@ -174,10 +211,11 @@ describe('App restore gate honours config.resume', () => {
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
     cleanup = () => unmount(component);
-    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
-      g: { '1': { q: { q1: [100, 1, 0] } } },
-    });
+    await vi.waitFor(() =>
+      expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({
+        g: { '1': { q: { q1: [100, 1, 0] } } },
+      }),
+    );
   });
 
   const scoredSave = savedWith({

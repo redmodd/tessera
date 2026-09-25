@@ -17,6 +17,7 @@
     adapter = null,
     quizState = null,
     navCtx = null,
+    pageIndex = 0,
   } = $props();
 
   const refSnap = untrack(() => ref);
@@ -35,6 +36,7 @@
     quiz: untrack(() => quizConfig),
     quizState: untrack(() => quizState),
     passingScore: 70,
+    index: untrack(() => pageIndex),
   });
   if (adapterSnap) {
     setContext('tessera-adapter', {

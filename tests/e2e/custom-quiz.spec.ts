@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForTesseraContent } from './helpers.js';
 
 /**
  * End-to-end fixture for Phase 5 Task 2 — proves a project-supplied
@@ -10,18 +11,6 @@ import { test, expect, type Page } from '@playwright/test';
  * no built-in `.tessera-quiz-*` markup) — if the data contract holds for
  * something this different, it holds for any custom shell.
  */
-
-async function waitForContent(page: Page) {
-  await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      {
-        timeout: 5000,
-      },
-    )
-    .catch(() => {});
-}
 
 async function navigateToExam(page: Page) {
   await page.locator('.tessera-nav-page', { hasText: /^\s*Exam\s*$/ }).click();
@@ -40,7 +29,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('virtual:tessera-quiz resolves to the project-supplied shell, not the built-in', async ({
@@ -181,7 +170,7 @@ test.describe('Custom quiz.svelte — inline layout', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('page prose and inline widgets render interleaved, in document order', async ({

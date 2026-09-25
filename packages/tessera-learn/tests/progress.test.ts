@@ -5,6 +5,8 @@ import {
 } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
+const NO_LATCHES = { decided: false, completed: false, passScore: null };
+
 describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
@@ -216,10 +218,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       expect(progress.completionStatus).toBe('incomplete');
@@ -230,10 +229,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -246,10 +242,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -260,10 +253,7 @@ describe('ProgressState', () => {
 
     it('incomplete when no graded quizzes exist', () => {
       const manifest = createManifest(5);
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       expect(progress.completionStatus).toBe('incomplete');
@@ -273,7 +263,7 @@ describe('ProgressState', () => {
   describe('recalculateSuccess', () => {
     it('is unknown when no graded quizzes exist', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       expect(progress.successStatus).toBe('unknown');
@@ -281,7 +271,7 @@ describe('ProgressState', () => {
 
     it('is unknown when graded quizzes exist but none attempted', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       expect(progress.successStatus).toBe('unknown');
@@ -292,7 +282,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -306,7 +296,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -320,7 +310,7 @@ describe('ProgressState', () => {
         2: { graded: true },
         4: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -337,7 +327,6 @@ describe('ProgressState', () => {
       });
       const config = createConfig({
         completion: { mode: 'percentage', percentageThreshold: 80 },
-        scoring: { passingScore: 70 },
       });
       const progress = new ProgressState(manifest, config);
 
@@ -366,15 +355,15 @@ describe('ProgressState', () => {
       expect(progress.successStatus).toBe('unknown');
     });
 
-    it('runs independently of completion mode', () => {
+    it('holds a pass until the course completes', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'percentage', percentageThreshold: 100 },
-        scoring: { passingScore: 70 },
-      });
-      const progress = new ProgressState(manifest, config);
+      const progress = new ProgressState(manifest, createConfig());
 
       progress.quizCompleted(2, 90);
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.successStatus).toBe('unknown');
+
+      for (let i = 0; i < 5; i++) progress.markVisited(i);
       expect(progress.successStatus).toBe('passed');
     });
 
@@ -383,7 +372,7 @@ describe('ProgressState', () => {
         1: { graded: false },
         3: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(1, 100);
@@ -398,7 +387,7 @@ describe('ProgressState', () => {
         5: { graded: true },
         8: { graded: true },
       });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 95);
@@ -423,7 +412,7 @@ describe('ProgressState', () => {
         }),
       );
 
-    it('keeps following the score after a changed answer undoes completion', () => {
+    it('keeps following the score after a changed answer undoes completion, but holds the reported completion and pass', () => {
       const progress = threeGradedPages();
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
@@ -434,8 +423,27 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
 
       expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.reportedCompletionStatus).toBe('complete');
       expect(progress.gradedScoreFinal).toBe(true);
-      expect(progress.successStatus).toBe('failed');
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('drops a saved pass the course can no longer give', () => {
+      const progress = new ProgressState(
+        createManifest(1, { 0: { graded: true } }),
+        createConfig({
+          completion: { mode: 'quiz' },
+          success: { from: 'none' },
+        }),
+      );
+      progress.replay(() => progress.restoreQuiz(0, 40, 1), {
+        decided: true,
+        completed: true,
+        passScore: 75,
+      });
+
+      expect(progress.successStatus).toBe('unknown');
+      expect(progress.reportedScore).toBe(40);
     });
 
     it('restores a final graded score from a previous session', () => {
@@ -445,7 +453,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.restoreGradedScoreDecided();
+      progress.replay(() => {}, { ...NO_LATCHES, decided: true });
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
@@ -586,12 +594,12 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('refreshStandaloneQuestion', () => {
+  describe('registerStandaloneQuestion', () => {
     it('reweights a restored answer without changing its score', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      progress.refreshStandaloneQuestion(3, 'q1', true, 1);
+      progress.registerStandaloneQuestion(3, 'q1', true, 1);
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
         score: 100,
@@ -606,14 +614,14 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneQuestion(3, 'q1', true, 3);
+      progress.registerStandaloneQuestion(3, 'q1', true, 3);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
     });
 
     it('corrects a graded flag that drifted since the answer was saved', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 1);
-      progress.refreshStandaloneQuestion(3, 'q1', false, 1);
+      progress.registerStandaloneQuestion(3, 'q1', false, 1);
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.graded).toBe(
         false,
@@ -624,11 +632,11 @@ describe('ProgressState', () => {
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
-      progress.refreshStandaloneQuestion(3, 'q1', true, -2);
+      progress.registerStandaloneQuestion(3, 'q1', true, -2);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.refreshStandaloneQuestion(3, 'unanswered', true, 5);
-      progress.refreshStandaloneQuestion(9, 'q1', true, 5);
+      progress.registerStandaloneQuestion(3, 'unanswered', true, 5);
+      progress.registerStandaloneQuestion(9, 'q1', true, 5);
       expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
         false,
       );
@@ -636,10 +644,125 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('pages answered question by question', () => {
+    const onePage = () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
+      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
+      progress.registerStandaloneQuestion(0, 'q-practice', false);
+      progress.markVisited(0);
+      return progress;
+    };
+
+    it('holds completion, the score and the pass until every graded question is answered', () => {
+      const progress = onePage();
+
+      progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+
+      expect(progress.pageScore(0)).toBe(100);
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(false);
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
+
+      expect(progress.completionStatus).toBe('complete');
+      expect(progress.successStatus).toBe('passed');
+      expect(progress.reportedScore).toBe(75);
+    });
+
+    it('carries the unanswered questions across a resume', () => {
+      const saved = onePage();
+      saved.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      expect(saved.unlistedUnanswered(0)).toEqual(['q-light']);
+
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.replay(() => {
+        progress.markVisited(0);
+        progress.restoreUnanswered(0, saved.unlistedUnanswered(0));
+        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      }, NO_LATCHES);
+
+      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.completionStatus).toBe('incomplete');
+    });
+
+    it('drops a restored question the page no longer registers once it mounts', () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.replay(() => {
+        progress.markVisited(0);
+        progress.restoreUnanswered(0, ['q-light', 'q-removed']);
+        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
+      }, NO_LATCHES);
+      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
+      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
+      progress.pageMounted(0);
+
+      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
+
+      progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
+
+      expect(progress.completionStatus).toBe('complete');
+    });
+
+    it('holds a page open for a listed question that has not rendered yet', () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true, questions: ['q1', 'q2'] } }),
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+      progress.markVisited(0);
+      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.markStandaloneQuestion(0, 'q1', 100, true);
+
+      expect(progress.awaitingScore(0)).toBe(true);
+      expect(progress.reportedCompletionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('unknown');
+
+      progress.registerStandaloneQuestion(0, 'q2', true);
+      progress.markStandaloneQuestion(0, 'q2', 0, true);
+
+      expect(progress.gradedScoreFinal).toBe(true);
+      expect(progress.reportedScore).toBe(50);
+      expect(progress.successStatus).toBe('failed');
+    });
+
+    it('keeps a listed question expected when a resumed page mounts without it', () => {
+      const manifest = createManifest(
+        1,
+        {},
+        { 0: { graded: true, questions: ['q1', 'q2'] } },
+      );
+      const saved = new ProgressState(manifest, createConfig());
+      saved.markStandaloneQuestion(0, 'q1', 100, true);
+      expect(saved.unlistedUnanswered(0)).toEqual([]);
+
+      const progress = new ProgressState(manifest, createConfig());
+      progress.replay(() => {
+        progress.restoreUnanswered(0, ['q2']);
+        progress.markStandaloneQuestion(0, 'q1', 100, true);
+      }, NO_LATCHES);
+      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.pageMounted(0);
+
+      expect(progress.awaitingScore(0)).toBe(true);
+    });
+  });
+
   describe('recalculateSuccess — standalone graded questions', () => {
     it('includes pages with graded standalone questions', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);
@@ -649,7 +772,7 @@ describe('ProgressState', () => {
 
     it('uses the page average for standalone questions', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 60, true);
@@ -660,7 +783,7 @@ describe('ProgressState', () => {
 
     it('non-graded standalone questions do not affect success', () => {
       const manifest = createManifest(5);
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig();
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 100, false);
@@ -674,7 +797,7 @@ describe('ProgressState', () => {
         { 1: { graded: true } },
         { 3: { graded: true } },
       );
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(1, 100);
@@ -686,7 +809,7 @@ describe('ProgressState', () => {
 
     it('pageConfig quiz score takes precedence on a page that also has standalone questions', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 90);
@@ -698,7 +821,7 @@ describe('ProgressState', () => {
 
     it('graded standalone page does not double-count when also a graded pageConfig quiz', () => {
       const manifest = createManifest(5, { 2: { graded: true } });
-      const config = createConfig({ scoring: { passingScore: 70 } });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.quizCompleted(2, 80);
@@ -814,7 +937,10 @@ describe('ProgressState', () => {
         {},
         { 1: { graded: true, weight: 90 }, 3: { weight: 10 } },
       );
-      const progress = new ProgressState(manifest, createConfig());
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
 
       progress.markStandaloneQuestion(1, 'q1', 100, true);
       progress.markStandaloneQuestion(3, 'q1', 0, true);
@@ -842,7 +968,10 @@ describe('ProgressState', () => {
     it('judges pass/fail on the 2-decimal average it reports', () => {
       const progress = new ProgressState(
         threeGradedQuizzes,
-        createConfig({ scoring: { passingScore: 66.66667 } }),
+        createConfig({
+          completion: { mode: 'quiz' },
+          scoring: { passingScore: 66.66667 },
+        }),
       );
 
       progress.quizCompleted(0, 100);
@@ -865,13 +994,120 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('optional graded pages (required: false)', () => {
+    const examWithOptionalPractice = () =>
+      new ProgressState(
+        createManifest(
+          5,
+          {},
+          {
+            1: { graded: true, weight: 75 },
+            3: { graded: true, required: false, weight: 100 },
+          },
+        ),
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+    it('counts an optional page once scored, but never takes back a pass', () => {
+      const progress = examWithOptionalPractice();
+
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+
+      expect(progress.gradedScore.average).toBe(100);
+      expect(progress.successStatus).toBe('passed');
+
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(42.86);
+      expect(progress.reportedScore).toBe(100);
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('reports the best score from the pass on, and still a higher one', () => {
+      const progress = examWithOptionalPractice();
+
+      progress.markStandaloneQuestion(1, 'q1', 80, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      expect(progress.gradedScore.average).toBe(34.29);
+      expect(progress.reportedScore).toBe(80);
+
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+
+      expect(progress.reportedScore).toBe(91.43);
+    });
+
+    it('keeps a fixed verdict once a re-grade undoes the completion', () => {
+      const manifest = createManifest(
+        4,
+        { 0: { graded: true }, 1: { graded: true } },
+        { 1: { required: false } },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({
+          completion: { mode: 'quiz' },
+          success: { from: 'fixed', status: 'passed' },
+        }),
+      );
+
+      progress.quizCompleted(0, 100);
+
+      expect(progress.successStatus).toBe('passed');
+
+      progress.quizCompleted(1, 0);
+
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('passed');
+    });
+
+    it('cannot complete on the quiz average with no required page to judge', () => {
+      const manifest = createManifest(
+        5,
+        { 1: { graded: true }, 3: { graded: true } },
+        { 1: { required: false }, 3: { required: false } },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.quizCompleted(1, 100);
+
+      expect(progress.gradedScore.average).toBe(100);
+      expect(progress.completionStatus).toBe('incomplete');
+      expect(progress.successStatus).toBe('unknown');
+    });
+
+    it('latches nothing on the partial totals a replay passes through', () => {
+      const manifest = createManifest(
+        3,
+        { 0: { graded: true }, 1: { graded: true }, 2: { graded: true } },
+        {
+          0: { weight: 50 },
+          1: { required: false, weight: 100 },
+          2: { weight: 10 },
+        },
+      );
+      const progress = new ProgressState(
+        manifest,
+        createConfig({ completion: { mode: 'quiz' } }),
+      );
+
+      progress.replay(() => {
+        progress.restoreQuiz(0, 100, 1);
+        progress.restoreQuiz(1, 0, 1);
+      }, NO_LATCHES);
+
+      expect(progress.reportedCompletionStatus).toBe('incomplete');
+      expect(progress.gradedScoreFinal).toBe(false);
+    });
+  });
+
   describe('recalculateCompletion — quiz mode includes graded standalone', () => {
     it('graded standalone pages count toward completion in quiz mode', () => {
       const manifest = createManifest(5, {}, { 2: { graded: true } });
-      const config = createConfig({
-        completion: { mode: 'quiz' },
-        scoring: { passingScore: 70 },
-      });
+      const config = createConfig({ completion: { mode: 'quiz' } });
       const progress = new ProgressState(manifest, config);
 
       progress.markStandaloneQuestion(2, 'q1', 80, true);

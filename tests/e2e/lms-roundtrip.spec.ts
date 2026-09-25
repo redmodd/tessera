@@ -11,8 +11,12 @@ import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
   exitCourse,
+  findStatement,
+  findStatements,
+  finishFreeCourse,
   interactionField,
   interactionWrites,
+  navigateToPage,
   openQuiz,
   reportedQuestionCount,
   scormData,
@@ -79,12 +83,8 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
-      .click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
+    await navigateToPage(page, 'Callouts & Images');
 
     // Poll suspend_data until all three visits are reflected — the writeQueue is
     // async and the final `markVisited` may land after the navigation completes.
@@ -116,13 +116,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Callouts & Images' })
-      .click();
-    await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Callouts & Images',
-    );
+    await navigateToPage(page, 'Callouts & Images');
 
     await expect
       .poll(() => scormLog(page))
@@ -207,8 +201,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(1100); // accumulate at least one whole second
 
     await exitCourse(page);
@@ -334,13 +327,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForTesseraContent(page);
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Accordion & Carousel',
-    );
+    await navigateToPage(page, 'Accordion & Carousel');
 
     await expect
       .poll(() => scormLog(page))
@@ -353,7 +340,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     );
   });
 
-  test('Graded quiz writes split completion_status and success_status', async ({
+  test('Graded quiz writes the score and holds passed until the course completes', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -368,10 +355,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       .toMatchObject({
         'cmi.score.raw': '100',
         'cmi.score.scaled': '1',
-        // SCORM 2004 keeps completion and success as separate fields. This course
-        // completes on percentage, so passing the quiz sets success only; the
-        // completion-quiz variant in lms-variants.spec.ts is the contrast.
-        'cmi.success_status': 'passed',
+        // This course completes on percentage, so the pass waits; the
+        // completion-quiz variant in lms-variants.spec.ts completes on it.
+        'cmi.success_status': 'unknown',
         'cmi.completion_status': 'incomplete',
       });
 
@@ -393,8 +379,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(1100);
 
     await exitCourse(page);
@@ -417,6 +402,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       await openQuiz(page, 'Graded Assessment');
 
       await answerGradedQuiz(page, { q1Correct: false });
+      await finishFreeCourse(page);
 
       await expect
         .poll(() => scormData(page))
@@ -507,16 +493,16 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(tokenRequests).toBeGreaterThanOrEqual(1);
 
     // Find an Initialized statement
-    const initStmt = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-    );
+    const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
     expect(initStmt.context?.registration).toBe('test-registration-123');
   });
 
-  test('passing a graded quiz sends a Passed statement', async ({ page }) => {
+  test('passing a graded quiz sends a Passed statement once the course completes', async ({
+    page,
+  }) => {
     const statements: any[] = [];
 
     await page.route('http://cmi5-mock.test/**', async (route) => {
@@ -557,28 +543,14 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await answerGradedQuiz(page);
 
-    // Wait for the Passed statement to land
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
-
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
+      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
+      .toBeDefined();
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
     // SCORM interaction vocabulary on the activity definition.
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -591,6 +563,12 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       );
       expect(s.result?.response).toBeTruthy();
     }
+
+    await finishFreeCourse(page);
+
+    await expect
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toMatchObject({ result: { success: true, score: { scaled: 1 } } });
   });
 });
 
@@ -699,10 +677,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
-    await page
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
     await expect
       .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
       .toBeGreaterThan(0);
@@ -731,8 +706,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
 
     // Navigating is what normally triggers a save.
-    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
-    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Objectives');
     await page.waitForTimeout(500);
     expect(statePuts).toHaveLength(0);
   });
@@ -748,9 +722,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await waitForTesseraContent(page);
     await page.waitForTimeout(500);
 
-    const initStmt = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-    );
+    const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
@@ -767,7 +739,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     ).toBe(true);
   });
 
-  test('passing a graded quiz sends Passed + Answered, and pagehide sends Terminated', async ({
+  test('passing a graded quiz sends Passed + Answered once the course completes, and pagehide sends Terminated', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -784,10 +756,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .nth(1)
       .click();
 
-    const answeredSoFar = () =>
-      statements.filter(
-        (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-      );
+    const answeredSoFar = () => findStatements(statements, 'answered');
     await page.waitForTimeout(300);
     expect(answeredSoFar()).toEqual([]);
 
@@ -807,24 +776,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
-
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
-    // Plain xAPI carries the launch registration but none of cmi5's Defined-
-    // Statement context (no cmi5/moveOn Category Activity).
-    expect(passed.context?.registration).toBe('test-registration-xapi');
-    expect(passed.context?.contextActivities?.category).toBeUndefined();
+      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
+      .toBeDefined();
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = answeredSoFar();
     expect(answered).toHaveLength(3);
@@ -834,15 +788,23 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'matching',
     ]);
 
+    await finishFreeCourse(page);
+
+    // Plain xAPI carries the launch registration but none of cmi5's Defined-
+    // Statement context (no cmi5/moveOn Category Activity).
+    await expect
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toMatchObject({
+        result: { success: true, score: { scaled: 1 } },
+        context: { registration: 'test-registration-xapi' },
+      });
+    expect(
+      findStatement(statements, 'passed').context?.contextActivities?.category,
+    ).toBeUndefined();
+
     await exitCourse(page);
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/terminated',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
+      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+      .toBeTruthy();
   });
 });

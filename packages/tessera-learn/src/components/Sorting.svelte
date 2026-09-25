@@ -2,7 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { questionId, shuffle } from './util.js';
+  import { QUESTION_ID_PREFIX, questionId, shuffle } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -43,7 +43,7 @@
   // pairs as stringified ids.
   const q = useQuestion({
     get id() {
-      return questionId(id, 'sorting', question);
+      return questionId(id, QUESTION_ID_PREFIX.Sorting, question);
     },
     graded: untrack(() => graded),
     weight: untrack(() => weight),
