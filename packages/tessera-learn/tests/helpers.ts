@@ -1,5 +1,5 @@
 import { vi, type Mocked } from 'vitest';
-import type { Manifest } from '../src/plugin/manifest.js';
+import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
@@ -67,12 +67,7 @@ export function createManifest(
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
   pageOpts: Record<
     number,
-    {
-      graded?: boolean;
-      required?: boolean;
-      weight?: number;
-      questions?: string[];
-    }
+    Partial<Pick<ManifestPage, 'graded' | 'required' | 'weight' | 'questions'>>
   > = {},
 ): Manifest {
   const pages = Array.from({ length: pageCount }, (_, i) => ({
@@ -87,12 +82,7 @@ export function createManifest(
           maxAttempts: 3,
         }
       : null,
-    ...(pageOpts[i]?.graded ? { graded: true } : {}),
-    ...(pageOpts[i]?.required === false ? { required: false } : {}),
-    ...(pageOpts[i]?.weight !== undefined
-      ? { weight: pageOpts[i].weight }
-      : {}),
-    ...(pageOpts[i]?.questions ? { questions: pageOpts[i].questions } : {}),
+    ...pageOpts[i],
   }));
 
   return {

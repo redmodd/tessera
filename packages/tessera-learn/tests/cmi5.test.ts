@@ -723,14 +723,7 @@ describe('CMI5Adapter', () => {
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
     // Nothing with a "suspended" verb.
-    const verbs = statementCalls.map((c: any[]) => {
-      try {
-        return JSON.parse(c[1].body).verb.id;
-      } catch {
-        return null;
-      }
-    });
-    expect(verbs).not.toContain(`${VERB}suspended`);
+    expect(sentVerbs()).not.toContain(`${VERB}suspended`);
   });
 
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {

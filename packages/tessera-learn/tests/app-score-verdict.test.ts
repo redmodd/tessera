@@ -23,9 +23,15 @@ const config = {
 
 async function mountApp(
   adapter: BaseAdapter,
-  course = manifest,
-  loadLayout = () => import('./fixtures/mastery-layout.svelte'),
-  loadPage: () => Promise<unknown> = () => new Promise(() => {}),
+  {
+    course = manifest,
+    loadLayout = () => import('./fixtures/mastery-layout.svelte'),
+    loadPage = () => new Promise(() => {}),
+  }: {
+    course?: typeof manifest;
+    loadLayout?: () => Promise<{ default: unknown }>;
+    loadPage?: () => Promise<unknown>;
+  } = {},
 ) {
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
@@ -120,12 +126,11 @@ describe('a graded submit that decides the verdict', () => {
   });
 
   it('records a graded question in the layout against no page', async () => {
-    const mounted = await mountApp(
-      stubAdapter(),
-      createManifest(1, {}, { 0: { graded: true } }),
-      () => import('./fixtures/question-layout.svelte'),
-      () => import('./fixtures/app-page.svelte'),
-    );
+    const mounted = await mountApp(stubAdapter(), {
+      course: createManifest(1, {}, { 0: { graded: true } }),
+      loadLayout: () => import('./fixtures/question-layout.svelte'),
+      loadPage: () => import('./fixtures/app-page.svelte'),
+    });
     cleanup = mounted.cleanup;
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),
@@ -144,11 +149,13 @@ describe('a graded submit that decides the verdict', () => {
     const saveState = vi.fn();
     const mounted = await mountApp(
       stubAdapter({ setCompletionStatus, setExit, saveState }),
-      createManifest(
-        2,
-        { 0: { graded: true }, 1: { graded: true } },
-        { 1: { required: false } },
-      ),
+      {
+        course: createManifest(
+          2,
+          { 0: { graded: true }, 1: { graded: true } },
+          { 1: { required: false } },
+        ),
+      },
     );
     cleanup = mounted.cleanup;
     await flush();
