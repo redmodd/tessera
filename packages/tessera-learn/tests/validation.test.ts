@@ -870,10 +870,40 @@ export const pageConfig = { title: "Reveal", graded: true };
   <MultipleChoice id="practice" question="C?" options={['x', 'y']} correct={0} />
 {/if}`,
     );
-    const branchWarnings = validateProject(testRoot).warnings.filter((w) =>
-      w.includes('different branches of one {#if}'),
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/fallback.svelte',
+      `<script module>
+export const pageConfig = { title: "Fallback", graded: true };
+</script>
+<h1>Fallback</h1>
+{#each items as item}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:else}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/each}`,
     );
-    expect(branchWarnings).toEqual([expect.stringContaining('branch.svelte')]);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/loaded.svelte',
+      `<script module>
+export const pageConfig = { title: "Loaded", graded: true };
+</script>
+<h1>Loaded</h1>
+{#await load() then data}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:catch error}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/await}`,
+    );
+    const branchWarnings = validateProject(testRoot).warnings.filter((w) =>
+      w.includes('different branches of one {#if}, {#each} or {#await}'),
+    );
+    expect(branchWarnings).toEqual([
+      expect.stringContaining('branch.svelte'),
+      expect.stringContaining('fallback.svelte'),
+      expect.stringContaining('loaded.svelte'),
+    ]);
   });
 
   it('warns on quiz fields it ignores, pointing page-level ones to pageConfig', () => {

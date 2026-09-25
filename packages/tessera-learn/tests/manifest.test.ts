@@ -492,6 +492,32 @@ export const pageConfig = { graded: true, quiz: { graded: true } }
     expect(manifest.pages[2].questions).toBeUndefined();
   });
 
+  it('lists a question by the id it renders with, and skips a local component of the same name', () => {
+    createFile('01-s/01-l/_meta.js', 'export default { title: "L" };');
+    createFile(
+      '01-s/01-l/check.svelte',
+      `<script module>
+export const pageConfig = { graded: true }
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+  import Sorting from '../../components/Sorting.svelte';
+</script>
+{#each items as item, i}
+  <MultipleChoice graded id="q-{i}" question="A?" options={['x', 'y']} correct={0} />
+{/each}
+<MultipleChoice graded question="What is {term}?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded question="Tom &amp; Jerry?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded="{true}" id="quoted" question="B?" options={['x', 'y']} correct={0} />
+<Sorting graded id="custom" question="C?" />`,
+    );
+
+    expect(generateManifest(TMP).pages[0].questions).toEqual([
+      'mc-tom-jerry',
+      'quoted',
+    ]);
+  });
+
   it('carries a non-positive weight through verbatim (the runtime treats it as 1)', () => {
     createFile(
       '01-s/01-l/_meta.js',

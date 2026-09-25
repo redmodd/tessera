@@ -196,7 +196,6 @@ export function readMetaFile(metaPath: string): {
   }
 }
 
-/** Result of parsing a `.svelte` source for its `pageConfig` module-script export. */
 /** Mirrors the `questionId(id, prefix, question)` prefix each widget passes. */
 export const QUESTION_ID_PREFIX: Record<string, string> = {
   MultipleChoice: 'mc',
@@ -232,10 +231,10 @@ export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
 
 /** Graded built-in questions whose ids the source fixes, wherever they render. */
 export function listedGradedQuestions(
-  content: string,
+  components: ComponentMatch[],
 ): (ComponentMatch & { id: string })[] {
   const listed = new Map<string, ComponentMatch & { id: string }>();
-  for (const match of findComponents(content, QUESTION_COMPONENT_NAMES) ?? []) {
+  for (const match of components) {
     if (match.hasSpread || !isLiterallyGradedQuestion(match)) continue;
     const id = staticQuestionId(match);
     if (id !== null && !listed.has(id)) listed.set(id, { ...match, id });
@@ -243,6 +242,7 @@ export function listedGradedQuestions(
   return [...listed.values()];
 }
 
+/** Result of parsing a `.svelte` source for its `pageConfig` module-script export. */
 export type PageConfigParseResult =
   /** No module script, or no `pageConfig =` export. Treat as "no config". */
   | { kind: 'none' }
@@ -412,9 +412,12 @@ export function generateManifest(
 
         const questions =
           pageConfig.graded === true && !pageConfig.quiz
-            ? listedGradedQuestions(readSourceFileCached(filePath)).map(
-                (q) => q.id,
-              )
+            ? listedGradedQuestions(
+                findComponents(
+                  readSourceFileCached(filePath),
+                  QUESTION_COMPONENT_NAMES,
+                ) ?? [],
+              ).map((q) => q.id)
             : [];
         const page: ManifestPage = {
           index: pageIndex,

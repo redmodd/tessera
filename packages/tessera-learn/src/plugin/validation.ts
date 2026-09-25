@@ -1134,10 +1134,10 @@ function validatePageFile(
   if (
     declaresGraded &&
     !isQuiz &&
-    splitsAcrossBranches(listedGradedQuestions(content))
+    splitsAcrossBranches(listedGradedQuestions(questionComponents))
   ) {
     d.warn(
-      `${fileRel}: graded questions sit in different branches of one {#if}. ` +
+      `${fileRel}: graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
         'The page counts as answered only once every graded question on it is, ' +
         'so a learner shown only one branch can never finish it. ' +
         'Put each branch on its own page, or drop graded from the branch questions.',
@@ -1780,7 +1780,13 @@ function validateMediaComponents(
       );
     }
     const src = props.get('src');
-    const isEmbed = src?.kind === 'string' && isVideoEmbed(src.value);
+    const srcText =
+      src?.kind === 'string'
+        ? src.value
+        : src?.kind === 'template'
+          ? src.raw
+          : undefined;
+    const isEmbed = srcText !== undefined && isVideoEmbed(srcText);
     if (
       name === 'Video' &&
       !hasSpread &&
@@ -1797,7 +1803,7 @@ function validateMediaComponents(
     if (
       name === 'Video' &&
       !hasSpread &&
-      src?.kind === 'string' &&
+      srcText !== undefined &&
       !isEmbed &&
       props.get('tracks') === undefined &&
       props.get('transcript') === undefined
