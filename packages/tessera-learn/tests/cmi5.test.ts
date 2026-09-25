@@ -22,10 +22,11 @@ function sentStatements(): any[] {
   });
 }
 
-const statementFor = (verbId: string): any =>
-  sentStatements().find((b: any) => b?.verb?.id === verbId);
+const statementFor = (verb: string): any =>
+  sentStatements().find((b: any) => b?.verb?.id === `${VERB}${verb}`);
 
-const sentVerbs = (): string[] => sentStatements().map((b: any) => b?.verb?.id);
+const sentVerbs = (): string[] =>
+  sentStatements().map((b: any) => b?.verb?.id?.replace(VERB, ''));
 
 function isRunningStateGet(url: string, options?: RequestInit): boolean {
   return (
@@ -456,11 +457,9 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    expect(statementFor(`${VERB}failed`).result.success).toBe(false);
+    expect(statementFor('failed').result.success).toBe(false);
     const ids = sentVerbs();
-    expect(ids.indexOf(`${VERB}failed`)).toBeLessThan(
-      ids.indexOf(`${VERB}terminated`),
-    );
+    expect(ids.indexOf('failed')).toBeLessThan(ids.indexOf('terminated'));
   });
 
   it('holds a resumed failure for its own Terminated, since the last session may have ended without one', async () => {
@@ -476,12 +475,12 @@ describe('CMI5Adapter', () => {
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
     await flush();
-    expect(sentVerbs()).not.toContain(`${VERB}failed`);
+    expect(sentVerbs()).not.toContain('failed');
 
     adapter.terminate();
     await flush();
 
-    expect(sentVerbs().filter((id) => id === `${VERB}failed`)).toHaveLength(1);
+    expect(sentVerbs().filter((id) => id === 'failed')).toHaveLength(1);
   });
 
   it('holds Failed for Terminated and drops it when the session passes', async () => {
@@ -493,14 +492,14 @@ describe('CMI5Adapter', () => {
 
     adapter.setSuccessStatus('failed');
     await flush();
-    expect(sentVerbs()).not.toContain(`${VERB}failed`);
+    expect(sentVerbs()).not.toContain('failed');
 
     adapter.setSuccessStatus('passed');
     adapter.terminate();
     await flush();
 
-    expect(sentVerbs()).toContain(`${VERB}passed`);
-    expect(sentVerbs()).not.toContain(`${VERB}failed`);
+    expect(sentVerbs()).toContain('passed');
+    expect(sentVerbs()).not.toContain('failed');
   });
 
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
@@ -519,8 +518,8 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    expect(sentVerbs()).toContain(`${VERB}passed`);
-    expect(sentVerbs()).toContain(`${VERB}completed`);
+    expect(sentVerbs()).toContain('passed');
+    expect(sentVerbs()).toContain('completed');
   });
 
   it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
@@ -585,7 +584,7 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const initialized = statementFor(`${VERB}initialized`);
+    const initialized = statementFor('initialized');
     expect(initialized).toBeDefined();
     expect(
       initialized.context.extensions[
@@ -604,7 +603,7 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const initialized = statementFor(`${VERB}initialized`);
+    const initialized = statementFor('initialized');
     const sid =
       initialized?.context?.extensions?.[
         'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
@@ -723,7 +722,7 @@ describe('CMI5Adapter', () => {
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
     // Nothing with a "suspended" verb.
-    expect(sentVerbs()).not.toContain(`${VERB}suspended`);
+    expect(sentVerbs()).not.toContain('suspended');
   });
 
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
@@ -896,7 +895,7 @@ describe('CMI5Adapter', () => {
       adapter.setCompletionStatus('complete');
       await flush();
 
-      const completed = statementFor(`${VERB}completed`);
+      const completed = statementFor('completed');
       expect(completed).toBeDefined();
       const ext = completed?.context?.extensions ?? {};
       expect(
@@ -917,7 +916,7 @@ describe('CMI5Adapter', () => {
       adapter.terminate();
       await flush();
 
-      const failed = statementFor(`${VERB}failed`);
+      const failed = statementFor('failed');
       expect(
         failed.context.extensions[
           'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
@@ -936,7 +935,7 @@ describe('CMI5Adapter', () => {
       adapter.setCompletionStatus('complete');
       await flush();
 
-      const completed = statementFor(`${VERB}completed`);
+      const completed = statementFor('completed');
       const ext = completed?.context?.extensions ?? {};
       expect(
         ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
@@ -996,7 +995,7 @@ describe('CMI5Adapter', () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
-      const initialized = statementFor(`${VERB}initialized`);
+      const initialized = statementFor('initialized');
       expect(categoryIds(initialized)).toEqual([CMI5_CAT]);
     });
 
@@ -1008,7 +1007,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await flush();
-      const completed = statementFor(`${VERB}completed`);
+      const completed = statementFor('completed');
       expect(categoryIds(completed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
@@ -1020,7 +1019,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setSuccessStatus('passed');
       await flush();
-      const passed = statementFor(`${VERB}passed`);
+      const passed = statementFor('passed');
       expect(categoryIds(passed)).toEqual([CMI5_CAT, MOVEON_CAT]);
 
       const adapter2 = new CMI5Adapter();
@@ -1031,7 +1030,7 @@ describe('CMI5Adapter', () => {
       adapter2.setSuccessStatus('failed');
       adapter2.terminate();
       await flush();
-      const failed = statementFor(`${VERB}failed`);
+      const failed = statementFor('failed');
       expect(categoryIds(failed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
@@ -1044,7 +1043,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
       await flush();
-      const terminated = statementFor(`${VERB}terminated`);
+      const terminated = statementFor('terminated');
       expect(categoryIds(terminated)).toEqual([CMI5_CAT]);
     });
 
@@ -1060,7 +1059,7 @@ describe('CMI5Adapter', () => {
         true,
       );
       await flush();
-      const answered = statementFor(`${VERB}answered`);
+      const answered = statementFor('answered');
       expect(categoryIds(answered)).not.toContain(CMI5_CAT);
       expect(categoryIds(answered)).not.toContain(MOVEON_CAT);
     });
@@ -1244,7 +1243,7 @@ describe('CMI5Adapter', () => {
 
       release({ ok: true });
       await exiting;
-      expect(statementFor(`${VERB}terminated`)).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
@@ -1262,7 +1261,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       await adapter.exit();
-      expect(statementFor(`${VERB}terminated`)).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });
   });
@@ -1282,7 +1281,7 @@ describe('CMI5Adapter', () => {
         mockFetch.mockResolvedValue({ ok: true });
         adapter.setCompletionStatus('complete');
         await flush();
-        expect(statementFor(`${VERB}completed`)).toBeDefined();
+        expect(statementFor('completed')).toBeDefined();
       },
     );
 
@@ -1317,7 +1316,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await flush();
-      expect(statementFor(`${VERB}completed`)).toBeUndefined();
+      expect(statementFor('completed')).toBeUndefined();
     });
 
     it('does NOT emit Passed or Failed under launchMode=Review (§10.2.2)', async () => {
@@ -1329,8 +1328,8 @@ describe('CMI5Adapter', () => {
       adapter.setScore(95);
       adapter.setSuccessStatus('passed');
       await flush();
-      expect(statementFor(`${VERB}passed`)).toBeUndefined();
-      expect(statementFor(`${VERB}failed`)).toBeUndefined();
+      expect(statementFor('passed')).toBeUndefined();
+      expect(statementFor('failed')).toBeUndefined();
     });
 
     it('does NOT emit Suspended under launchMode=Browse on terminate (§10.2.2)', async () => {
@@ -1342,9 +1341,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
       await flush();
-      expect(statementFor(`${VERB}suspended`)).toBeUndefined();
+      expect(statementFor('suspended')).toBeUndefined();
       // Terminated is always allowed.
-      expect(statementFor(`${VERB}terminated`)).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
     });
 
     it('fetches Learner Preferences BEFORE sending Initialized (§11)', async () => {
@@ -1402,7 +1401,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
       await flush();
-      const completed = statementFor(`${VERB}completed`);
+      const completed = statementFor('completed');
       const ids = completed.context.contextActivities.category.map(
         (c: any) => c.id,
       );
@@ -1429,7 +1428,7 @@ describe('CMI5Adapter', () => {
       adapter.setScore(150);
       adapter.setSuccessStatus('passed');
       await flush();
-      const passed = statementFor(`${VERB}passed`);
+      const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(1);
     });
 
@@ -1444,7 +1443,7 @@ describe('CMI5Adapter', () => {
       adapter.setScore(50); // scaled = 0.5, below mastery 0.8
       adapter.setSuccessStatus('passed');
       await flush();
-      const passed = statementFor(`${VERB}passed`);
+      const passed = statementFor('passed');
       expect(passed).toBeDefined();
       // The Passed verb is still emitted (author asserted it) but
       // without a score that would make the statement non-conformant.
@@ -1462,7 +1461,7 @@ describe('CMI5Adapter', () => {
       adapter.setScore(53.3);
       adapter.setSuccessStatus('passed');
       await flush();
-      const passed = statementFor(`${VERB}passed`);
+      const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(0.533);
     });
 
@@ -1477,7 +1476,7 @@ describe('CMI5Adapter', () => {
       adapter.setSuccessStatus('failed');
       adapter.terminate();
       await flush();
-      const failed = statementFor(`${VERB}failed`);
+      const failed = statementFor('failed');
       expect(failed.result.score.scaled).toBeCloseTo(0.4);
     });
 
@@ -1495,7 +1494,7 @@ describe('CMI5Adapter', () => {
       adapter.setSuccessStatus('failed');
       adapter.terminate();
       await flush();
-      const failed = statementFor(`${VERB}failed`);
+      const failed = statementFor('failed');
       expect(failed).toBeDefined();
       expect(failed.result.score).toBeUndefined();
       warn.mockRestore();
@@ -1512,7 +1511,7 @@ describe('CMI5Adapter', () => {
       adapter.setSuccessStatus('failed');
       adapter.terminate();
       await flush();
-      const failed = statementFor(`${VERB}failed`);
+      const failed = statementFor('failed');
       expect(failed).toBeDefined();
       expect(failed.result.score.scaled).toBeCloseTo(0.85);
     });
@@ -1532,10 +1531,10 @@ describe('CMI5Adapter', () => {
       adapter.commit();
       await flush();
 
-      const scored = statementFor(`${VERB}scored`);
+      const scored = statementFor('scored');
       expect(scored.result.score.scaled).toBeCloseTo(0.95);
       expect(scored.context?.contextActivities?.category).toBeUndefined();
-      expect(statementFor(`${VERB}passed`)).toBeUndefined();
+      expect(statementFor('passed')).toBeUndefined();
     });
 
     it('sends Scored under launchMode=Browse, where Defined Statements are barred (§10.2.2)', async () => {
@@ -1550,10 +1549,8 @@ describe('CMI5Adapter', () => {
       adapter.terminate();
       await flush();
 
-      expect(statementFor(`${VERB}failed`)).toBeUndefined();
-      expect(statementFor(`${VERB}scored`).result.score.scaled).toBeCloseTo(
-        0.6,
-      );
+      expect(statementFor('failed')).toBeUndefined();
+      expect(statementFor('scored').result.score.scaled).toBeCloseTo(0.6);
     });
   });
 });

@@ -6,6 +6,7 @@ import {
   answerMatching,
   interactionField,
   interactionWrites,
+  navigateToPage,
   openQuiz,
   reportedQuestionCount,
   scormData,
@@ -325,8 +326,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
   }
 
   async function answerFirstExamQuestion(page: Page, optionIndex: number) {
-    await page.locator('.tessera-nav-page', { hasText: 'Final Exam' }).click();
-    await page.waitForSelector('[data-question-id="q-exam"]');
+    await navigateToPage(page, 'Final Exam');
     await page
       .locator('[data-question-id="q-exam"] input[type="radio"]')
       .nth(optionIndex)
@@ -348,8 +348,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
   }
 
   async function answerPractice(page: Page, optionIndex: number) {
-    await page.locator('.tessera-nav-page', { hasText: 'Practice' }).click();
-    await page.waitForSelector('.tessera-quiz-question-wrapper.active');
+    await navigateToPage(page, 'Practice');
     await answerCheckQuiz(page, optionIndex);
   }
 

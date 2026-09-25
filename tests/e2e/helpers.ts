@@ -38,7 +38,9 @@ export async function waitForServer(page: Page, url: string): Promise<void> {
 }
 
 export async function waitForTesseraContent(page: Page): Promise<void> {
-  await page.waitForSelector('.tessera-content', { timeout: 15000 });
+  await expect(page.locator('.tessera-content')).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 export async function navigateToPage(page: Page, title: string): Promise<void> {

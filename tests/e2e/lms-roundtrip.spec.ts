@@ -568,11 +568,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await expect
       .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
-      .toBeDefined();
-
-    const passed = findStatement(statements, 'passed');
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
+      .toMatchObject({ result: { success: true, score: { scaled: 1 } } });
   });
 });
 
@@ -794,17 +790,17 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await finishFreeCourse(page);
 
-    await expect
-      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
-      .toBeDefined();
-
-    const passed = findStatement(statements, 'passed');
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
     // Plain xAPI carries the launch registration but none of cmi5's Defined-
     // Statement context (no cmi5/moveOn Category Activity).
-    expect(passed.context?.registration).toBe('test-registration-xapi');
-    expect(passed.context?.contextActivities?.category).toBeUndefined();
+    await expect
+      .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
+      .toMatchObject({
+        result: { success: true, score: { scaled: 1 } },
+        context: { registration: 'test-registration-xapi' },
+      });
+    expect(
+      findStatement(statements, 'passed').context?.contextActivities?.category,
+    ).toBeUndefined();
 
     await exitCourse(page);
     await expect

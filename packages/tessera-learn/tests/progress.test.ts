@@ -453,11 +453,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.replay(() => {}, {
-        decided: true,
-        completed: false,
-        passScore: null,
-      });
+      progress.replay(() => {}, { ...NO_LATCHES, decided: true });
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
