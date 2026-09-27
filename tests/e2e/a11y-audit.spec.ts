@@ -25,6 +25,16 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     expect(report.pagesAudited).toBe(report.totalPages);
   });
 
+  test('leaves no SIGTERM handler behind', async () => {
+    test.setTimeout(120_000);
+    const dir = variantDir('free', 'web');
+    const before = process.listenerCount('SIGTERM');
+
+    await runAudit(dir, dir, { threshold: 'serious' });
+
+    expect(process.listenerCount('SIGTERM')).toBe(before);
+  });
+
   // A custom layout.svelte renders no default-layout sidebar, so enumeration
   // must come from the manifest, not clicked DOM buttons.
   test('audits every page of a custom-layout course (no sidebar)', async () => {

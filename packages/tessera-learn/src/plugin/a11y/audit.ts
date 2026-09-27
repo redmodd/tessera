@@ -2,6 +2,7 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import type { PreviewServer } from 'vite';
 import { generateManifest } from '../manifest.js';
 import { readA11ySettings, type A11ySettings } from '../validation.js';
 
@@ -378,8 +379,7 @@ export async function runAudit(
   const prevEnv = process.env[AUDIT_ENV_FLAG];
   process.env[AUDIT_ENV_FLAG] = '1';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let server: any;
+  let server: PreviewServer | undefined;
   try {
     console.log('[tessera a11y] Building course…');
     await vite.build(
@@ -389,14 +389,14 @@ export async function runAudit(
       }),
     );
 
-    server = await vite.preview({
+    server = (await vite.preview({
       root: projectRoot,
       base: auditBaseConfig.base,
       build: { outDir: auditDist },
       preview: { port: 0, host: '127.0.0.1' },
       logLevel: 'warn',
-    });
-    const baseUrl: string | undefined = server.resolvedUrls?.local?.[0];
+    })) as PreviewServer;
+    const baseUrl = server.resolvedUrls?.local?.[0];
     if (!baseUrl) {
       console.error('[tessera a11y] Could not determine preview server URL.');
       return 1;
@@ -513,7 +513,7 @@ export async function runAudit(
     );
     return 1;
   } finally {
-    server?.httpServer?.close?.();
+    await server?.close();
     if (prevEnv === undefined) delete process.env[AUDIT_ENV_FLAG];
     else process.env[AUDIT_ENV_FLAG] = prevEnv;
   }
