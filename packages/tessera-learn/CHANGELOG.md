@@ -1,5 +1,51 @@
 # tessera-learn
 
+## 0.7.0
+
+### Minor Changes
+
+- dc3ed30: **Breaking:** `tessera dev`, `new` and `duplicate` now reject flags and extra arguments they used to ignore. To upgrade, remove them from any scripts that call these commands.
+  
+  Every `tessera` subcommand now parses arguments the same way: `--help` works on all of them and prints the full command list, flags can come before or after the course name and accept `--flag=value`, and unknown flags, missing arguments and extra arguments are rejected with the same `[tessera <command>]` prefix.
+- 31909ea: **Breaking:** each xAPI destination with its own endpoint now needs a unique `id`. To upgrade, add one to each. Custom page access rules (`canAccess`) and xAPI `auth`/`actor` resolvers now go in a new optional `course.runtime.js` as named exports, with resolvers keyed by that `id`. Functions in `course.config.js` never worked, and validation now names them and points at `course.runtime.js`. The authoring guide (`node_modules/tessera-learn/AGENTS.md`) has examples under "Custom access rules" and "Custom xAPI statements".
+- dd6e7ee: **Behavior change:** a score that drops later no longer takes back a completion or a `passed` the LMS already has, and once the learner passes, the LMS keeps their best score. cmi5 holds a Failed until the session ends, so a retake that passes in the same session sends only Passed.
+- dd6e7ee: **Behavior change:** under `completion.mode: "quiz"` with a quiz verdict, SCORM packages declare `scoring.passingScore` in `imsmanifest.xml`, so the LMS judges pass/fail from the score without an admin entering a pass mark. SCORM 1.2 declares it as `adlcp:masteryscore`, which the LMS can use to set `lesson_status` itself. SCORM 2004 declares it as the primary objective's `minNormalizedMeasure` with `satisfiedByMeasure`, so the LMS takes satisfaction from `cmi.score.scaled`. cmi5 now declares `masteryScore` only in the same case, so Passed and Failed statements in other courses keep their score instead of being sent without it.
+- d4531bd: Add `pageConfig.required` (default `true`). A graded page with `required: false` stays out of the course score until the learner takes it, instead of counting as 0. `completion.mode: "quiz"` needs at least one required graded page.
+- a89bed2: **Behavior change:** SCORM 1.2 courses take the pass mark from `cmi.student_data.mastery_score` when the LMS supplies one, overriding `scoring.passingScore`, as SCORM 2004 and cmi5 already do. If an admin set a mastery score for the course in the LMS, clear it or make it match `scoring.passingScore`. A malformed LMS mastery score, including a cmi5 `LMS.LaunchData` `masteryScore`, logs a warning and is ignored.
+  
+  A whitespace-only SCORM 2004 `cmi.scaled_passing_score` no longer sets the pass mark to 0, and a negative one, which SCORM 2004 allows, now sets it to 0 instead of being ignored.
+  
+  An LMS pass mark such as 55 no longer lands a fraction above the mark, so a learner who scores exactly the mark passes.
+- dd6e7ee: **Behavior change:** a page of standalone graded questions now counts as complete and scored once every graded question on it is answered, including built-in ones not yet revealed, rather than after the first.
+- 22059a7: Add a `success` block that sets what makes a course passed, independently of what `completion.mode` makes it complete. `success.from` is `"quiz"`, `"fixed"` (with `status`) or `"none"`; omit it and `completion.mode` supplies the verdict. `requireSuccessStatus` stays as an alias for the manual plus fixed case.
+  
+  **Behavior change:** `passed` now waits for the course to complete, in every standard; `failed` is still reported as soon as the score is final. A learner who passed an early quiz in a percentage course used to be reported `passed` while the course was incomplete, which a SCORM 1.2 LMS grants credit for.
+  
+  **Behavior change:** cmi5 `moveOn` is `CompletedAndPassed` whenever the course is sure to send a verdict: a quiz verdict with at least one required graded page, or a fixed status, including a manual course with `requireSuccessStatus`. It used to be `CompletedAndPassed` only under `completion.mode: "quiz"`. In a percentage course, a learner who fails no longer satisfies the AU, as SCORM already did, and under `requireSuccessStatus: "failed"` no learner does. If the verdict should not gate credit, set `success: { from: "none" }`.
+- 484d9ab: **Behavior change:** quiz, page and course scores are now kept to 2 decimal places, and pass/fail is judged on the same score the LMS is sent. Quiz scores were rounded to whole numbers, so 2 of 3 correct scored 67 and met a pass mark of 67; it now scores 66.67 and fails. If a single quiz is the whole course score, lower a whole-number `scoring.passingScore` by 0.5 (67 to 66.5) to pass the same scores as before. Averages across pages were already judged unrounded, so leave the pass mark alone for those. A course average of 69.67 against a pass mark of 70 now reports 69.67 with `failed`, instead of 70 with `failed`.
+
+### Patch Changes
+
+- 82f3bf0: cmi5 and xAPI builds, and any build with an explicit xAPI destination, now bundle only their own adapter.
+  
+  An explicit xAPI destination whose learner actor can't be derived from the SCORM LMS is skipped with a warning that says why, instead of failing on a missing `xapi.actor`.
+  
+  In dev without launch parameters, a send to a cmi5 or xAPI explicit destination with no actor now fails with an error, as it already did under SCORM, instead of the destination being skipped.
+- 929a7a4: Export packages the configured `build.outDir` instead of always `dist/`, and a build now fails if `outDir` is or contains the project root.
+- dd6e7ee: `course.config.js` validation rejects `NaN` for `scoring.passingScore` and `completion.percentageThreshold`.
+- 5a56290: - `vite` 8.2.2 → 8.3.0
+- 9b4cc82: - `@types/node` 26.4.1 → 26.6.2
+  - `@vitest/coverage-v8` 4.1.11 → 5.0.0
+  - `jsdom` 30.0.1 → 30.1.0
+  - `scorm-again` 3.3.2 → 3.3.7
+  - `svelte` 5.57.0 → 5.57.1
+  - `vitest` 4.1.11 → 5.0.0
+- 037a703: The build-time suspend-data warning now covers SCORM 2004, and suspend-data advice lists every larger-limit standard.
+- dd6e7ee: `tesseraPlugin()` throws on an unknown `standardOverride` instead of reporting it as a validation error.
+- 0e85421: cmi5 and xAPI courses now send Terminated and pending statements when the course closes, and download or mailto links no longer end the session.
+- dd6e7ee: `tessera validate` warns on unknown `pageConfig` and `quiz` fields and on graded questions split across `{#if}`, `{#each}` or `{#await}` branches. It no longer flags `id="q-{i}"` as a duplicate, checks a page's own component as the built-in it shares a name with, or treats import text in the markup as an import.
+- 6b2068a: In dev, the page manifest reloads only when a change under `pages/` alters it, and adding or removing a stylesheet in `styles/` reloads. Edits to pages, stylesheets, `layout.svelte`, `quiz.svelte` and `course.runtime.js` stay on HMR.
+
 ## 0.6.0
 
 ### Minor Changes
