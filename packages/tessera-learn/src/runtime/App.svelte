@@ -413,13 +413,20 @@
       progress.reportedCompletionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
-    xapiClient?.markUnloading();
     return true;
   }
 
   function handlePagehide() {
     endSession();
+    xapiClient?.markUnloading();
     adapter.terminate();
+  }
+
+  let courseUnmounted = Promise.resolve();
+  function trackCourseUnmount() {
+    let resolve;
+    courseUnmounted = new Promise((r) => (resolve = r));
+    return () => resolve();
   }
 
   async function exit() {
@@ -427,7 +434,7 @@
     exitPhase = 'ending';
     loadGeneration++;
     pageLoading = false;
-    await tick();
+    await courseUnmounted;
     const returned =
       endSession() &&
       (await adapter.exit().catch((err) => {
@@ -602,11 +609,14 @@
   <LoadingBar active={pageLoading} />
   {#if exitPhase}
     <SessionEnded ended={exitPhase === 'ended'} />
-  {:else if UserLayout}
-    <UserLayout {page} />
-  {:else if chromeMode === 'custom'}
-    {@render page()}
   {:else}
-    <DefaultLayout {page} />
+    <span hidden {@attach trackCourseUnmount}></span>
+    {#if UserLayout}
+      <UserLayout {page} />
+    {:else if chromeMode === 'custom'}
+      {@render page()}
+    {:else}
+      <DefaultLayout {page} />
+    {/if}
   {/if}
 </div>

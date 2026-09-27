@@ -935,6 +935,48 @@ describe('CMI5Adapter', () => {
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
+    it('saves the final state once, without keepalive', async () => {
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      adapter.saveState({ b: 1 } as never);
+      await adapter.exit();
+
+      const puts = stateWrites();
+      expect(puts).toHaveLength(1);
+      expect(new URL(puts[0][0]).searchParams.get('stateId')).toBe(
+        'tessera-state',
+      );
+      expect(puts[0][1].keepalive).toBeUndefined();
+    });
+
+    it('stops waiting on a stalled LRS and still redirects', async () => {
+      const returnURL = 'https://lms.example.com/learner/done';
+      const adapter = await initAdapter({ launchData: { returnURL } });
+      await adapter.loadState();
+
+      const assign = stubLocationAssign();
+      mockFetch.mockClear();
+      mockFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
+      adapter.saveState({ b: 1 } as never);
+      vi.useFakeTimers();
+      try {
+        const exiting = adapter.exit();
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(await exiting).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(assign).toHaveBeenCalledWith(returnURL);
+      expect(statementFor('terminated')).toBeDefined();
+      const exitPut = stateWrites().find(([url]: any[]) =>
+        url.includes('tessera-state-exit'),
+      );
+      expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
     it.each(['javascript:alert(1)', '/lms/course/42'])(
       'warns and ignores a returnURL that is not absolute http(s): %s',
       async (returnURL) => {

@@ -176,7 +176,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
     this.state = state;
-    const json = JSON.stringify(state);
+    let json: string;
+    try {
+      json = JSON.stringify(state);
+    } catch (err) {
+      console.warn('Tessera: Failed to serialize cmi.suspend_data', err);
+      return;
+    }
     const { name, suspendDataLimit } = this.dialect.profile;
     if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
       this.#suspendOverflowWarned = true;

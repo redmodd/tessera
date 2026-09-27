@@ -114,7 +114,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   override exit(): Promise<boolean> {
     const request = this.#exit === 'suspend' ? 'suspendAll' : 'exitAll';
     this.queue.enqueue(
-      () => this.api.SetValue('adl.nav.request', request),
+      () => this.dialect.setValue(this.api, 'adl.nav.request', request),
       'adl.nav.request',
     );
     return super.exit();

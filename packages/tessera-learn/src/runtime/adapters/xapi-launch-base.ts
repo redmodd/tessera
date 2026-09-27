@@ -76,6 +76,8 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
+const EXIT_TIMEOUT_MS = 10_000;
+
 /**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
  * adapters. Subclasses set the protected fields in init() and may override
@@ -268,11 +270,17 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override terminate(): void {
+    this.#terminate(true);
+  }
+
+  #terminate(unloading: boolean): void {
     if (this.terminated) return;
     this.terminated = true;
     if (!this.publisher) return;
-    this.publisher.markUnloading();
-    if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
+    if (unloading) {
+      this.publisher.markUnloading();
+      if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
+    }
     const duration = formatISO8601Duration(this.durationSeconds);
     this.#finalSend = this.#report(
       'Terminated',
@@ -285,9 +293,23 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override async exit(): Promise<boolean> {
-    if (!this.terminated) await this.publisher?.chainTask(async () => {});
-    this.terminate();
-    await this.#finalSend;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<false>((resolve) => {
+      timer = setTimeout(resolve, EXIT_TIMEOUT_MS, false);
+    });
+    const settles = (task: Promise<unknown>) =>
+      Promise.race([task.then(() => true), deadline]);
+    try {
+      if (!this.terminated) {
+        const saved =
+          !this.publisher ||
+          (await settles(this.publisher.chainTask(async () => {})));
+        this.#terminate(!saved);
+      }
+      if (this.#finalSend) await settles(this.#finalSend);
+    } finally {
+      clearTimeout(timer);
+    }
     if (!this.returnURL || typeof window === 'undefined') return false;
     window.location.assign(this.returnURL);
     return true;

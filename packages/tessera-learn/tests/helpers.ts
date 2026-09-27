@@ -11,6 +11,7 @@ import {
 import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { NavContext } from '../src/runtime/contexts.js';
+import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
@@ -176,12 +177,14 @@ export async function mountApp({
   adapter,
   loadPage = () => import('./fixtures/app-page.svelte'),
   loadLayout,
+  xapiClient,
 }: {
   config: CourseConfig;
   manifest: Manifest;
   adapter: BaseAdapter;
   loadPage?: () => Promise<unknown>;
   loadLayout?: (() => Promise<{ default: unknown }>) | null;
+  xapiClient?: Pick<XAPIClient, 'markUnloading'>;
 }) {
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for each mount. Svelte and the layout come from that same fresh registry or
@@ -196,6 +199,7 @@ export async function mountApp({
       manifest.pages.map((p) => [p.importPath, loadPage]),
     ),
     layout: loadLayout && (await loadLayout()).default,
+    xapiClient,
   });
   vi.stubGlobal('__tesseraNavCtx', undefined);
   const App = (await import('../src/runtime/App.svelte')).default;

@@ -5,6 +5,7 @@ import {
   expect,
   vi,
   beforeEach,
+  onTestFinished,
   type MockInstance,
 } from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
@@ -40,14 +41,23 @@ async function mount(
     manifest = createManifest(2),
     loadLayout,
     loadPage,
+    xapiClient,
   }: {
     config?: CourseConfig;
     manifest?: ReturnType<typeof createManifest>;
     loadLayout?: () => Promise<{ default: unknown }>;
     loadPage?: () => Promise<unknown>;
+    xapiClient?: { markUnloading(): void };
   } = {},
 ) {
-  await mountApp({ config, manifest, adapter, loadLayout, loadPage });
+  await mountApp({
+    config,
+    manifest,
+    adapter,
+    loadLayout,
+    loadPage,
+    xapiClient,
+  });
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain('Test page'),
   );
@@ -124,6 +134,32 @@ describe('exiting a course', () => {
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Session ended'),
     );
+    expect(mountedAtSave.at(-1)).toBe(false);
+  });
+
+  it('waits for a layout outro before the final save', async () => {
+    Element.prototype.animate = () => {
+      const animation = {
+        onfinish: null as (() => void) | null,
+        cancel() {},
+      };
+      setTimeout(() => animation.onfinish?.(), 0);
+      return animation as unknown as Animation;
+    };
+    onTestFinished(() => {
+      delete (Element.prototype as Partial<Element>).animate;
+    });
+    const mountedAtSave: boolean[] = [];
+    const { adapter } = recordingAdapter({
+      saveState: () =>
+        mountedAtSave.push(!!document.querySelector('.fading-layout')),
+    });
+    await mount(adapter, {
+      loadLayout: () => import('./fixtures/fading-layout.svelte'),
+    });
+
+    await navCtx().exit();
+
     expect(mountedAtSave.at(-1)).toBe(false);
   });
 
@@ -210,6 +246,21 @@ describe('exiting a course', () => {
 
     expect(calls.slice(launched)).toEqual(EXIT_SEQUENCE);
     expect(exit).not.toHaveBeenCalled();
+  });
+
+  it('switches xAPI sends to keepalive on pagehide but not on exit', async () => {
+    const markUnloading = vi.fn();
+    const { adapter } = recordingAdapter();
+    await mount(adapter, {
+      loadLayout: masteryLayout,
+      xapiClient: { markUnloading },
+    });
+
+    await navCtx().exit();
+    expect(markUnloading).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event('pagehide'));
+    expect(markUnloading).toHaveBeenCalled();
   });
 
   it('withdraws the Exit button once pagehide ends the session', async () => {

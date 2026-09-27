@@ -9,10 +9,10 @@
   {@attach (el) => el.focus()}
 >
   {#if ended}
-    <h2>Session ended</h2>
+    <h1>Session ended</h1>
     <p>You can close this window.</p>
   {:else}
-    <h2>Ending session…</h2>
+    <h1>Ending session…</h1>
     <p>Saving your progress.</p>
   {/if}
 </div>
