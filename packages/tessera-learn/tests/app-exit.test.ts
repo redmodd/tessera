@@ -54,6 +54,21 @@ const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
 const exitButton = () =>
   document.querySelector<HTMLButtonElement>('.tessera-exit-btn');
 
+const exitDialog = () =>
+  document.querySelector<HTMLDialogElement>('.tessera-exit-dialog')!;
+
+function confirmExit() {
+  exitButton()!.click();
+  document.querySelector<HTMLButtonElement>('.tessera-exit-confirm')!.click();
+}
+
+HTMLDialogElement.prototype.showModal = function () {
+  this.open = true;
+};
+HTMLDialogElement.prototype.close = function () {
+  this.open = false;
+};
+
 const EXIT_SEQUENCE = [
   'saveState',
   'setDuration:0',
@@ -74,7 +89,7 @@ describe('exiting a course', () => {
     await mount(adapter);
     const launched = calls.length;
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Session ended'),
@@ -84,11 +99,40 @@ describe('exiting a course', () => {
     expect(close).toHaveBeenCalled();
   });
 
+  it('asks for confirmation before ending the session', async () => {
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter);
+    const launched = calls.length;
+
+    exitButton()!.click();
+    await flush();
+
+    expect(exitDialog().open).toBe(true);
+    expect(calls.slice(launched)).toEqual([]);
+    expect(document.querySelector('.tessera-content')).not.toBeNull();
+  });
+
+  it('keeps the session when the learner cancels the exit', async () => {
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter);
+    const launched = calls.length;
+
+    exitButton()!.click();
+    [...exitDialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Cancel')!
+      .click();
+    await flush();
+
+    expect(exitDialog().open).toBe(false);
+    expect(calls.slice(launched)).toEqual([]);
+    expect(document.querySelector('.tessera-content')).not.toBeNull();
+  });
+
   it('moves focus to the exit screen', async () => {
     const { adapter } = recordingAdapter();
     await mount(adapter);
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() =>
       expect(document.activeElement?.className).toBe('tessera-session-ended'),
@@ -114,7 +158,7 @@ describe('exiting a course', () => {
     });
     await mount(adapter);
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Session ended'),
@@ -191,7 +235,7 @@ describe('exiting a course', () => {
     await mount(adapter);
     const launched = calls.length;
 
-    exitButton()!.click();
+    confirmExit();
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Ending session'),
     );
@@ -209,7 +253,7 @@ describe('exiting a course', () => {
     });
     await mount(adapter);
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Session ended'),
@@ -240,7 +284,7 @@ describe('exiting a course', () => {
     await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
     const launched = calls.length;
 
-    exitButton()!.click();
+    confirmExit();
     await vi.waitFor(() => expect(flush).toHaveBeenCalled());
     expect(calls.slice(launched)).toEqual([]);
 
@@ -256,7 +300,7 @@ describe('exiting a course', () => {
     const { adapter } = recordingAdapter({ exit });
     await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() =>
       expect(exit).toHaveBeenCalledWith(flush.mock.calls[0][0]),
@@ -293,7 +337,7 @@ describe('exiting a course', () => {
     const { adapter } = recordingAdapter({ exit });
     await mount(adapter);
 
-    exitButton()!.click();
+    confirmExit();
 
     await vi.waitFor(() => expect(exit).toHaveReturned());
     await flush();

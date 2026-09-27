@@ -11,6 +11,7 @@ import {
 import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
+  clickExitCourse,
   exitCourse,
   findStatement,
   findStatements,
@@ -224,7 +225,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-exit-btn').click();
+    await clickExitCourse(page);
     await expect(page.locator('.tessera-session-ended')).toContainText(
       'Session ended',
     );
@@ -415,7 +416,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-exit-btn').click();
+    await clickExitCourse(page);
     await expect(page.locator('.tessera-session-ended')).toContainText(
       'Session ended',
     );
@@ -559,7 +560,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
 
-    await page.locator('.tessera-exit-btn').click();
+    await clickExitCourse(page);
     await page.waitForURL(RETURN_URL);
 
     expect(terminatedBeforeReturn).toBe(true);

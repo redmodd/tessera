@@ -125,6 +125,15 @@ export async function exitCourse(page: Page): Promise<void> {
   });
 }
 
+/** Click the default layout's Exit course button and confirm. */
+export async function clickExitCourse(page: Page): Promise<void> {
+  await page.locator('.tessera-exit-btn').click();
+  await page
+    .getByRole('dialog', { name: 'Exit the course?' })
+    .getByRole('button', { name: 'Exit course' })
+    .click();
+}
+
 /** Open a quiz page from the sidebar by its title. */
 export async function openQuiz(page: Page, title: string): Promise<void> {
   await page.locator('.tessera-nav-page', { hasText: title }).click();
