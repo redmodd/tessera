@@ -103,4 +103,28 @@ export class XAPIClient {
   markUnloading(): void {
     for (const p of this.#publishers) p.markUnloading();
   }
+
+  /**
+   * Resolves once every destination except `skip` has sent what it has
+   * queued, or after `timeoutMs`. The launch adapter drains its own publisher
+   * on exit, so App passes it as `skip`.
+   */
+  async flush(timeoutMs: number, skip?: XAPIPublisher | null): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const drained = Promise.all(
+      this.#publishers
+        .filter((p) => p !== skip)
+        .map((p) => p.chainTask(async () => {})),
+    );
+    try {
+      await Promise.race([
+        drained,
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, timeoutMs);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }

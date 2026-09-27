@@ -723,6 +723,43 @@ describe('XAPIClient — fan-out', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('flush waits for queued sends on every destination but the skipped one', async () => {
+    const launchPub = makePub('https://cmi5.example.com/xapi/');
+    const independentPub = makePub('https://analytics.example.com/xapi/');
+    await launchPub.init();
+    await independentPub.init();
+    const client = new XAPIClient([launchPub, independentPub]);
+    const sending = Promise.withResolvers<Response>();
+    mockFetch.mockImplementation((url: string) =>
+      url.includes('analytics') ? sending.promise : new Promise(() => {}),
+    );
+    void client.sendStatement({ verb: { id: 'http://verb/closing' } });
+
+    let flushed = false;
+    const flushing = client
+      .flush(10_000, launchPub)
+      .then(() => (flushed = true));
+    await flush();
+    expect(flushed).toBe(false);
+
+    sending.resolve(respond(204));
+    await flushing;
+    expect(flushed).toBe(true);
+  });
+
+  it('flush gives up on a stalled destination after the timeout', async () => {
+    useFakeTimers();
+    const pub = makePub('https://analytics.example.com/xapi/');
+    await pub.init();
+    const client = new XAPIClient([pub]);
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    void client.sendStatement({ verb: { id: 'http://verb/closing' } });
+
+    const flushing = client.flush(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushing;
+  });
+
   it('after the shared launch publisher sends Terminated, drops author sends to it but still sends to independent destinations', async () => {
     mockFetch.mockResolvedValue(respond(204));
     const launchPub = new XAPIPublisher({

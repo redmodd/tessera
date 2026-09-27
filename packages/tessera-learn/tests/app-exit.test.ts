@@ -233,12 +233,29 @@ describe('exiting a course', () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it("waits for the course's xAPI destinations before ending the session", async () => {
+    const drained = Promise.withResolvers<void>();
+    const flush = vi.fn(() => drained.promise);
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+    const launched = calls.length;
+
+    exitButton()!.click();
+    await vi.waitFor(() => expect(flush).toHaveBeenCalled());
+    expect(calls.slice(launched)).toEqual([]);
+
+    drained.resolve();
+    await vi.waitFor(() =>
+      expect(calls.slice(launched)).toEqual(EXIT_SEQUENCE),
+    );
+  });
+
   it('switches xAPI sends to keepalive on pagehide but not on exit', async () => {
     const markUnloading = vi.fn();
     const { adapter } = recordingAdapter();
     await mount(adapter, {
       loadLayout: masteryLayout,
-      xapiClient: { markUnloading },
+      xapiClient: { markUnloading, flush: async () => {} },
     });
 
     await navCtx().exit();
@@ -267,7 +284,7 @@ describe('exiting a course', () => {
 
     await vi.waitFor(() => expect(exit).toHaveReturned());
     await flush();
-    expect(document.body.textContent).toContain('Ending session');
+    expect(document.body.textContent).toContain('Session ended');
     expect(close).not.toHaveBeenCalled();
   });
 

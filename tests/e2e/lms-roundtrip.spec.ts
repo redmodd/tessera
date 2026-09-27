@@ -483,6 +483,10 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     page,
   }) => {
     const statements = await installCmi5Mock(page);
+    let tokenRequests = 0;
+    page.on('request', (req) => {
+      if (req.url() === 'http://cmi5-mock.test/fetch') tokenRequests++;
+    });
 
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -496,6 +500,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
     expect(initStmt.context?.registration).toBe('test-registration-123');
+    expect(tokenRequests).toBe(1);
   });
 
   test('passing a graded quiz sends a Passed statement once the course completes', async ({
