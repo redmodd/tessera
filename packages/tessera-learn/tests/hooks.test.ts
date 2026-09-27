@@ -1,15 +1,28 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// ---- getContext mock ----
-// The hooks read context via Svelte's `getContext`. Tests provide a per-test
-// context map, then the mock looks up the name in that map.
-const ctxStore = new Map<string, unknown>();
+// ---- createContext mock ----
+// The hooks run outside a component here, so each context reads and writes a
+// per-test map instead. `get` throws on a missing context, as Svelte's does.
+const ctxStore = new Map<object, unknown>();
 
 vi.mock('svelte', async () => {
   const actual = await vi.importActual<typeof import('svelte')>('svelte');
   return {
     ...actual,
-    getContext: (name: string) => ctxStore.get(name),
+    createContext: () => {
+      const key = {};
+      return [
+        () => {
+          if (!ctxStore.has(key)) throw new Error('missing_context');
+          return ctxStore.get(key);
+        },
+        (value: unknown) => {
+          ctxStore.set(key, value);
+          return value;
+        },
+        () => ctxStore.has(key),
+      ];
+    },
   };
 });
 
@@ -20,10 +33,12 @@ import {
   usePersistence,
   useCourse,
   useCompletion,
+  setQuizContext,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
+import * as runtimeContexts from '../src/runtime/contexts.js';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import {
@@ -37,7 +52,13 @@ function provideNavCtx({
   manifest = createManifest(5),
   config = createConfig(),
   pageIndex = 0,
-}: { manifest?: Manifest; config?: CourseConfig; pageIndex?: number } = {}) {
+  contexts = runtimeContexts,
+}: {
+  manifest?: Manifest;
+  config?: CourseConfig;
+  pageIndex?: number;
+  contexts?: typeof runtimeContexts;
+} = {}) {
   const progress = new ProgressState(manifest, config);
   const nav: any = {
     currentPageIndex: pageIndex,
@@ -53,10 +74,15 @@ function provideNavCtx({
   };
   const ctx = { nav, manifest, progress, config };
   const adapter = stubAdapter({ reportInteraction: vi.fn() });
-  ctxStore.set('tessera-nav', ctx);
-  ctxStore.set('tessera-adapter', { adapter });
-  ctxStore.set('tessera-page', { index: pageIndex });
-  ctxStore.set('tessera-in-page', true);
+  contexts.setNavContext(ctx);
+  contexts.setAdapterContext({ adapter });
+  contexts.setPageContext({
+    quiz: null,
+    quizState: null,
+    passingScore: 70,
+    index: pageIndex,
+  });
+  contexts.setInPage(true);
   return { ...ctx, adapter };
 }
 
@@ -422,7 +448,7 @@ function provideQuizCtx() {
   const quiz = {
     registerQuestion: vi.fn((api: UseQuizQuestionApi) => ({ id: api.id })),
   };
-  ctxStore.set('tessera-quiz', quiz);
+  setQuizContext(quiz as any);
   return quiz;
 }
 
@@ -726,8 +752,9 @@ describe('useCompletion', () => {
   it('markComplete is a no-op outside manual mode and warns once per session', async () => {
     vi.resetModules();
     const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
+    const contexts = await import('../src/runtime/contexts.js');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { progress } = provideNavCtx();
+    const { progress } = provideNavCtx({ contexts });
 
     const handle = useCompletion();
     handle.markComplete();
@@ -775,19 +802,19 @@ describe('usePersistence', () => {
   });
 
   it('get returns null before any set', () => {
-    ctxStore.set('tessera-user-state', makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     expect(usePersistence('foo').get()).toBe(null);
   });
 
   it('set stores under the namespaced key; get returns it', () => {
-    ctxStore.set('tessera-user-state', makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     const p = usePersistence<{ x: number }>('foo');
     p.set({ x: 42 });
     expect(p.get()).toEqual({ x: 42 });
   });
 
   it('keys are isolated between callers', () => {
-    ctxStore.set('tessera-user-state', makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     const a = usePersistence<number>('a');
     const b = usePersistence<number>('b');
     a.set(1);
@@ -797,7 +824,7 @@ describe('usePersistence', () => {
   });
 
   it('values survive across hook calls (reads from shared store)', () => {
-    ctxStore.set('tessera-user-state', makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     usePersistence<string>('greeting').set('hello');
     // simulating a later remount of a widget binding to the same key
     expect(usePersistence<string>('greeting').get()).toBe('hello');

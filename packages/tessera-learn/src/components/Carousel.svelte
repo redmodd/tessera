@@ -1,3 +1,11 @@
+<script module>
+  import { createContext } from 'svelte';
+
+  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number }>>} */
+  const [getCarouselContext, setCarouselContext] = createContext();
+  export { getCarouselContext };
+</script>
+
 <script>
   /**
    * @component Carousel
@@ -5,8 +13,6 @@
    *
    * @prop {import('svelte').Snippet} [children] - CarouselSlide children
    */
-  import { setContext } from 'svelte';
-
   let { children } = $props();
   let currentSlide = $state(0);
   let totalSlides = $state(0);
@@ -24,7 +30,7 @@
     },
   };
 
-  setContext('tessera-carousel', ctx);
+  setCarouselContext(ctx);
 
   function prev() {
     if (currentSlide > 0) currentSlide--;

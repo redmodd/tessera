@@ -5,7 +5,7 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import courseRuntime from 'virtual:tessera-course-runtime';
-  import { onMount, onDestroy, setContext, tick, untrack } from 'svelte';
+  import { onMount, onDestroy, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import PageHost from './PageHost.svelte';
@@ -20,10 +20,10 @@
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
   import { registerXAPIClient } from './xapi/registry.js';
   import {
-    TESSERA_PAGE,
-    TESSERA_NAV,
-    TESSERA_ADAPTER,
-    TESSERA_USER_STATE,
+    setPageContext,
+    setNavContext,
+    setAdapterContext,
+    setUserStateStore,
   } from './contexts.js';
 
   // ---- Persistence ----
@@ -91,15 +91,15 @@
       return renderedPageIndex < 0 ? undefined : renderedPageIndex;
     },
   });
-  setContext(TESSERA_PAGE, pageContext);
+  setPageContext(pageContext);
 
   // ---- Navigation context (read by custom chrome components) ----
   // Exposes nav/manifest/progress/config so courses can build custom top bars,
   // menus, tables of contents, etc. that can navigate to specific pages.
-  setContext(TESSERA_NAV, { nav, manifest, progress, config });
+  setNavContext({ nav, manifest, progress, config });
 
-  // ---- Adapter context (read by useQuestion / usePersistence) ----
-  setContext(TESSERA_ADAPTER, {
+  // ---- Adapter context (read by useQuestion / useQuiz) ----
+  setAdapterContext({
     get adapter() {
       return adapter;
     },
@@ -108,7 +108,7 @@
   // ---- User-scoped state (read/written by usePersistence) ----
   // Each call site namespaces under its own key. Persisted to SavedState.u.
   let userState = $state({});
-  setContext(TESSERA_USER_STATE, {
+  setUserStateStore({
     get(key) {
       return key in userState ? userState[key] : null;
     },

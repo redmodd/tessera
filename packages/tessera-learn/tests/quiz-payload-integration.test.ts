@@ -7,6 +7,8 @@ import Sorting from '../src/components/Sorting.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { flush } from './helpers.js';
 import { mountInBody } from './helpers/mount.js';
+import { setAdapterContext } from '../src/runtime/contexts.js';
+import { setQuizContext } from '../src/runtime/hooks.svelte.js';
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
@@ -45,11 +47,11 @@ function makeQuizCtx() {
 function mountInQuiz(
   Component: any,
   props: Record<string, unknown>,
-  quiz: unknown,
+  quiz: any,
 ) {
   return mountInBody(Component, {
     props,
-    context: new Map([['tessera-quiz', quiz]]),
+    setup: () => setQuizContext(quiz),
   });
 }
 
@@ -214,7 +216,7 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     };
     const { target } = mountInBody(FillInTheBlank, {
       props: { question: 'Sky colour', answers: ['blue', 'Blue'] },
-      context: new Map([['tessera-adapter', { adapter }]]),
+      setup: () => setAdapterContext({ adapter } as any),
     });
 
     const input = target.querySelector('input') as HTMLInputElement;

@@ -5,11 +5,20 @@ import HarnessSvelte from '../fixtures/use-quiz-harness.svelte';
 
 export function mountInBody<Props extends Record<string, any>>(
   component: Component<Props>,
-  options: Omit<MountOptions<Props>, 'target'>,
+  {
+    setup,
+    ...options
+  }: Omit<MountOptions<Props>, 'target'> & { setup?: () => void },
 ) {
   const target = document.createElement('div');
   document.body.appendChild(target);
-  const instance = mount(component, {
+  const root: Component<Props> = setup
+    ? (internals, props) => {
+        setup();
+        return component(internals, props);
+      }
+    : component;
+  const instance = mount(root, {
     ...options,
     target,
   } as MountOptions<Props>);

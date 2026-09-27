@@ -761,18 +761,18 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect((m.ref.thrown as Error).message).toMatch(/quiz config/i);
   });
 
-  it('publishes tessera-quiz context that question widgets read via useQuestion', () => {
-    // The context shape (registerQuestion / setAnswer / feedbackVisible / etc.)
-    // is what built-ins depend on. The component-level integration is covered by
+  it('publishes the quiz context that question widgets read via useQuestion', () => {
+    // Built-ins register through the context's registerQuestion. The
+    // component-level integration is covered by
     // quiz-payload-integration.test.ts; this just checks the context handle is
     // published from inside useQuiz.
     const m = mountHarness({ graded: true });
     expect(m.ref.handle).not.toBeNull();
   });
 
-  it('reads quiz config from tessera-page context — proves context flow holds for custom quiz.svelte', () => {
+  it('reads quiz config from the page context, so a custom quiz.svelte still gets it', () => {
     // A custom quiz.svelte rendered through virtual:tessera-quiz must still
-    // receive tessera-page from App.svelte. A non-default maxAttempts proves the
+    // receive the page context from App.svelte. A non-default maxAttempts proves the
     // read goes through pageCtx, not a baked-in default.
     const m = mountHarness({ graded: true, maxAttempts: 1 });
     const q = m.ref.handle!;
@@ -782,7 +782,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect(q.canRetry).toBe(false);
   });
 
-  it('seeds the engine from the saved quiz state on tessera-page context', () => {
+  it('seeds the engine from the saved quiz state on the page context', () => {
     const m = mountHarness(
       { graded: true, maxAttempts: 2 },
       { quizState: { attempts: 2, score: 60 } },

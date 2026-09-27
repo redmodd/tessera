@@ -1,3 +1,11 @@
+<script module>
+  import { createContext } from 'svelte';
+
+  /** @type {ReturnType<typeof createContext<{ readonly openId: string | null; toggle(id: string): void }>>} */
+  const [getAccordionContext, setAccordionContext] = createContext();
+  export { getAccordionContext };
+</script>
+
 <script>
   /**
    * @component Accordion
@@ -5,12 +13,10 @@
    *
    * @prop {import('svelte').Snippet} [children] - AccordionItem children
    */
-  import { setContext } from 'svelte';
-
   let { children } = $props();
   let openId = $state(null);
 
-  setContext('tessera-accordion', {
+  setAccordionContext({
     get openId() {
       return openId;
     },

@@ -1,6 +1,11 @@
 <script>
-  import { setContext, onDestroy, untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { useQuiz } from '../../src/runtime/hooks.svelte.js';
+  import {
+    setNavContext,
+    setPageContext,
+    setAdapterContext,
+  } from '../../src/runtime/contexts.js';
 
   // Test harness for use-quiz.test.ts. The test passes a pre-created `host`
   // element (already in document.body) so the hook's element() getter resolves
@@ -30,16 +35,16 @@
     progress: { quizCompleted() {} },
   };
 
-  setContext('tessera-nav', navSnap);
+  setNavContext(navSnap);
 
-  setContext('tessera-page', {
+  setPageContext({
     quiz: untrack(() => quizConfig),
     quizState: untrack(() => quizState),
     passingScore: 70,
     index: untrack(() => pageIndex),
   });
   if (adapterSnap) {
-    setContext('tessera-adapter', {
+    setAdapterContext({
       get adapter() {
         return adapterSnap;
       },
