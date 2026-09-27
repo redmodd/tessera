@@ -397,7 +397,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
     onLog(_level, log) {
       if (log.code !== 'IMPORT_IS_UNDEFINED') return;
-      if (!projectFileRel(log.id, ctx.root)) return;
+      if (projectFileRel(log.id, ctx.root) === null) return;
       written = false;
       for (const file of emitted) rmSync(file, { force: true });
       emitted = [];
