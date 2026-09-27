@@ -779,8 +779,11 @@ function mountHarness(
   const destroy = () => {
     if (!mounted) return;
     mounted = false;
-    unmount(component);
-    target.remove();
+    try {
+      unmount(component);
+    } finally {
+      target.remove();
+    }
   };
   onTestFinished(destroy);
   return { target, ref, unmount: destroy };

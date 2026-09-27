@@ -139,8 +139,11 @@ export async function mountApp({
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   onTestFinished(() => {
-    unmount(component);
-    document.body.innerHTML = '';
+    try {
+      unmount(component);
+    } finally {
+      document.body.innerHTML = '';
+    }
   });
 }
 

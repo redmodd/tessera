@@ -19,6 +19,7 @@ async function mount(
 ) {
   const setCompletionStatus = vi.fn();
   const setSuccessStatus = vi.fn();
+  const saveState = vi.fn();
   await mountApp({
     config: {
       title: 'Demo',
@@ -39,17 +40,15 @@ async function mount(
       getState: () => saved,
       setCompletionStatus,
       setSuccessStatus,
+      saveState,
     }),
     loadLayout,
   });
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain('Test page'),
   );
-  return {
-    progress: (globalThis as any).__tesseraNavCtx?.progress,
-    setCompletionStatus,
-    setSuccessStatus,
-  };
+  const { nav, progress } = (globalThis as any).__tesseraNavCtx ?? {};
+  return { nav, progress, setCompletionStatus, setSuccessStatus, saveState };
 }
 
 const completesOnFirstPage = createManifest(
@@ -59,16 +58,28 @@ const completesOnFirstPage = createManifest(
 );
 
 describe('manual completion in App', () => {
-  it('completes when a completesOn: "view" page loads', async () => {
-    const { progress, setCompletionStatus } = await mount(
-      { mode: 'manual' },
-      { manifest: completesOnFirstPage },
-    );
+  it('completes when a completesOn: "view" page loads mid-session', async () => {
+    const { nav, progress, setCompletionStatus, setSuccessStatus, saveState } =
+      await mount(
+        { mode: 'manual', requireSuccessStatus: 'passed' },
+        { manifest: createManifest(2, {}, { 1: { completesOn: 'view' } }) },
+      );
+    await vi.waitFor(() => {
+      expect(setCompletionStatus).toHaveBeenCalledWith('incomplete');
+      expect(saveState).toHaveBeenCalled();
+    });
+    expect(progress.completionStatus).toBe('incomplete');
+    expect(setSuccessStatus).not.toHaveBeenCalledWith('passed');
+    expect(saveState.mock.lastCall![0].m).toBeUndefined();
 
+    nav.goToPage(1);
+
+    await vi.waitFor(() => {
+      expect(setCompletionStatus).toHaveBeenCalledWith('complete');
+      expect(setSuccessStatus).toHaveBeenCalledWith('passed');
+      expect(saveState.mock.lastCall![0].m).toBe(1);
+    });
     expect(progress.manuallyCompleted).toBe(true);
-    await vi.waitFor(() =>
-      expect(setCompletionStatus).toHaveBeenCalledWith('complete'),
-    );
   });
 
   it('ignores completesOn outside manual mode', async () => {

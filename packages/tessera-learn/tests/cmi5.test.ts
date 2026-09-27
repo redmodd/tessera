@@ -19,7 +19,10 @@ const VERB = 'http://adlnet.gov/expapi/verbs/';
 const sentStatements = () => postedStatements(mockFetch);
 
 const stateWrites = () =>
-  mockFetch.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  mockFetch.mock.calls.filter(
+    ([url, init]) =>
+      String(url).includes('activities/state') && init?.method === 'PUT',
+  );
 
 const statementFor = (verb: string): any =>
   sentStatements().find((b: any) => b?.verb?.id === `${VERB}${verb}`);
