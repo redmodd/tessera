@@ -84,7 +84,10 @@ export function createReal12Lms(): RealLms12 {
 }
 
 export function createReal2004Lms(): RealLms2004 {
-  const raw = new Scorm2004API({ ...SETTINGS });
+  const raw = new Scorm2004API({
+    ...SETTINGS,
+    accumulateSessionTimeOnTerminate: true,
+  });
   const errors: CapturedError[] = [];
   const log: string[][] = [];
 
