@@ -6,6 +6,6 @@
   globalThis.__tesseraNavCtx = getNavContext();
 </script>
 
-<div class="fading-layout" transition:fade={{ duration: 50 }}>
+<div class="fading-layout" transition:fade|global={{ duration: 50 }}>
   {@render page()}
 </div>

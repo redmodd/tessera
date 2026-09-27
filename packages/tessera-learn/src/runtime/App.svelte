@@ -212,6 +212,26 @@
   }
 
   // ---- Persistence: serialize / restore ----
+  const unsavableKeys = new Set();
+
+  function savableUserState() {
+    const u = {};
+    for (const [key, value] of Object.entries(userState)) {
+      try {
+        JSON.stringify(value);
+        u[key] = value;
+      } catch (err) {
+        if (unsavableKeys.has(key)) continue;
+        unsavableKeys.add(key);
+        console.warn(
+          `Tessera: usePersistence('${key}') holds a value that is not JSON-serializable; it is left out of the save`,
+          err,
+        );
+      }
+    }
+    return u;
+  }
+
   function serializeState() {
     const c = {};
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
@@ -234,6 +254,7 @@
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
+    const u = savableUserState();
     return {
       b: nav.currentPageIndex,
       f: currentFingerprint,
@@ -241,7 +262,7 @@
       d: duration.totalSeconds,
       ...(Object.keys(g).length > 0 ? { g } : {}),
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
-      ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
+      ...(Object.keys(u).length > 0 ? { u } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
       ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
@@ -304,7 +325,7 @@
   }
 
   function persistState() {
-    if (!persistenceReady) return;
+    if (!persistenceReady || exitPhase) return;
     adapter.saveState(serializeState());
   }
 
@@ -431,10 +452,10 @@
     exitPhase = 'ending';
     loadGeneration++;
     pageLoading = false;
-    await courseUnmounted;
     const deadline = new Promise((resolve) =>
       setTimeout(resolve, EXIT_TIMEOUT_MS),
     );
+    await Promise.race([courseUnmounted, deadline]);
     await xapiClient?.flush(deadline);
     const returned =
       endSession() &&

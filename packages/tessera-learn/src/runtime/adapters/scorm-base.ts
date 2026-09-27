@@ -53,7 +53,6 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly errorReporter: LMSErrorReporter;
   #terminated = false;
   #suspendOverflowWarned = false;
-  #serializeWarned = false;
   protected interactionCount = 0;
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
@@ -177,16 +176,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
     this.state = state;
-    let json: string;
-    try {
-      json = JSON.stringify(state);
-    } catch (err) {
-      if (!this.#serializeWarned) {
-        this.#serializeWarned = true;
-        console.warn('Tessera: Failed to serialize cmi.suspend_data', err);
-      }
-      return;
-    }
+    const json = JSON.stringify(state);
     const { name, suspendDataLimit } = this.dialect.profile;
     if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
       this.#suspendOverflowWarned = true;

@@ -972,7 +972,7 @@ function useCompletion(): {
 
 ### `usePersistence<T>(key)`
 
-Per-widget persistent state, JSON-serializable only. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Mind the SCORM 1.2 ~4 KB suspend-data cap (see [LMS behaviour](#lms-behaviour)).
+Per-widget persistent state, JSON-serializable only: a value that isn't (a `BigInt`, a cycle) lasts the session but is left out of the save, with a console warning. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Mind the SCORM 1.2 ~4 KB suspend-data cap (see [LMS behaviour](#lms-behaviour)).
 
 ```ts
 function usePersistence<T>(key: string): {

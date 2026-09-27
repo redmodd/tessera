@@ -77,24 +77,6 @@ describe('SCORM12Adapter', () => {
     );
   });
 
-  it('warns once and skips suspend_data when the state cannot be serialized', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await adapter.init();
-    adapter.saveState({ b: 0, v: [], d: 0, u: { big: 1n } });
-    adapter.saveState({ b: 1, v: [], d: 0, u: { big: 1n } });
-    adapter.terminate();
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith(
-      'Tessera: Failed to serialize cmi.suspend_data',
-      expect.any(TypeError),
-    );
-    expect(api.LMSSetValue).not.toHaveBeenCalledWith(
-      'cmi.suspend_data',
-      expect.anything(),
-    );
-    expect(api.LMSFinish).toHaveBeenCalled();
-  });
-
   it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
     await adapter.init();
     adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], d: 50 });

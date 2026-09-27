@@ -9,6 +9,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
+import type { SavedState } from '../src/runtime/persistence.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import {
   createConfig,
@@ -18,7 +19,9 @@ import {
   mountApp,
   navCtx,
   stubAdapter,
+  useFakeTimers,
 } from './helpers.js';
+import type { UserStateStore } from '../src/runtime/contexts.js';
 
 function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
   const calls: string[] = [];
@@ -50,6 +53,23 @@ async function mount(
 }
 
 const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
+
+const userState = (): UserStateStore =>
+  (globalThis as { __tesseraUserState?: UserStateStore }).__tesseraUserState!;
+
+function stubAnimate(finishes: boolean) {
+  Element.prototype.animate = () => {
+    const animation = {
+      onfinish: null as (() => void) | null,
+      cancel() {},
+    };
+    if (finishes) setTimeout(() => animation.onfinish?.(), 0);
+    return animation as unknown as Animation;
+  };
+  onTestFinished(() => {
+    delete (Element.prototype as Partial<Element>).animate;
+  });
+}
 
 const exitButton = () =>
   document.querySelector<HTMLButtonElement>('.tessera-exit-btn');
@@ -170,17 +190,7 @@ describe('exiting a course', () => {
   });
 
   it('waits for a layout outro before the final save', async () => {
-    Element.prototype.animate = () => {
-      const animation = {
-        onfinish: null as (() => void) | null,
-        cancel() {},
-      };
-      setTimeout(() => animation.onfinish?.(), 0);
-      return animation as unknown as Animation;
-    };
-    onTestFinished(() => {
-      delete (Element.prototype as Partial<Element>).animate;
-    });
+    stubAnimate(true);
     const mountedAtSave: boolean[] = [];
     const { adapter } = recordingAdapter({
       saveState: () =>
@@ -193,6 +203,63 @@ describe('exiting a course', () => {
     await navCtx().exit();
 
     expect(mountedAtSave.at(-1)).toBe(false);
+  });
+
+  it('ends the session at the deadline when a layout outro never finishes', async () => {
+    stubAnimate(false);
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter, {
+      loadLayout: () => import('./fixtures/fading-layout.svelte'),
+    });
+    const launched = calls.length;
+    useFakeTimers();
+
+    const exiting = navCtx().exit();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await exiting;
+
+    expect(calls.slice(launched)).toEqual([
+      'saveState',
+      'setDuration:10',
+      'setExit:suspend',
+      'commit',
+      'terminate',
+    ]);
+  });
+
+  it('stops saving once the session has ended', async () => {
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter, { loadLayout: masteryLayout });
+    const store = userState();
+    await navCtx().exit();
+    const exited = calls.length;
+
+    store.set('late-note', 'written after exit');
+    await flush();
+
+    expect(calls.slice(exited)).toEqual([]);
+  });
+
+  it('leaves a value that is not JSON-serializable out of the save', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const saved: SavedState[] = [];
+    const { adapter } = recordingAdapter({
+      saveState: (state) => saved.push(state),
+    });
+    await mount(adapter, { loadLayout: masteryLayout });
+
+    userState().set('note', 'kept');
+    userState().set('big', 1n);
+    await flush();
+    await navCtx().exit();
+
+    expect(saved.at(-2)!.u).toEqual({ note: 'kept' });
+    expect(saved.at(-1)!.u).toEqual({ note: 'kept' });
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      "Tessera: usePersistence('big') holds a value that is not JSON-serializable; it is left out of the save",
+      expect.any(TypeError),
+    );
   });
 
   it('drops a page that finishes loading after the exit', async () => {

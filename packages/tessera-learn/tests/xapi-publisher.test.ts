@@ -206,6 +206,21 @@ describe('XAPIPublisher — sendStatement validation', () => {
       }),
     ).rejects.toThrow(XAPIStatementError);
   });
+  it('rejects a statement that is not JSON-serializable and keeps sending', async () => {
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    await expect(
+      pub.sendStatement({
+        verb: { id: 'http://verb/a' },
+        result: { extensions: { 'http://ext/big': 1n } },
+      }),
+    ).rejects.toThrow(XAPIStatementError);
+
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/b' } });
+
+    expect(r.destinations[0].ok).toBe(true);
+    await expect(pub.drained()).resolves.toBeUndefined();
+  });
   it('accepts score.scaled in [-1, 1]', async () => {
     mockFetch.mockResolvedValue(respond(204));
     const pub = await initPublisher();
