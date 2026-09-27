@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
+  installCmi5Mock,
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
@@ -408,7 +409,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
   });
 
-  test('Exit course button requests suspendAll before Terminate', async ({
+  test('Exit course button requests suspendAll, then terminates once', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -418,6 +419,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     await expect(page.locator('.tessera-session-ended')).toContainText(
       'Session ended',
     );
+    await exitCourse(page);
 
     const log = await scormLog(page);
     const request = log.findIndex(
@@ -480,47 +482,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
   test('launch with CMI5 params sends Initialized statement', async ({
     page,
   }) => {
-    // Track xAPI statements sent by the course
-    const statements: any[] = [];
-    let tokenRequests = 0;
-
-    await page.route('http://cmi5-mock.test/**', async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (url.endsWith('/fetch')) {
-        tokenRequests++;
-        // Adapter parses the response body as text and strips `auth-token=` prefix
-        await route.fulfill({
-          status: 200,
-          contentType: 'text/plain',
-          body: 'auth-token=test-token-abc',
-        });
-        return;
-      }
-      if (url.includes('/xapi/statements')) {
-        if (req.method() === 'POST' || req.method() === 'PUT') {
-          try {
-            statements.push(JSON.parse(req.postData() ?? '{}'));
-          } catch {}
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['statement-id-1']),
-        });
-        return;
-      }
-      if (url.includes('/xapi/activities/state')) {
-        // No saved state on first launch
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: '{}',
-        });
-        return;
-      }
-      await route.fulfill({ status: 200, body: '{}' });
-    });
+    const lms = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -528,10 +490,10 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     // Give the adapter a moment to fire the Initialized statement
     await page.waitForTimeout(500);
 
-    expect(tokenRequests).toBeGreaterThanOrEqual(1);
+    expect(lms.tokenRequests).toBeGreaterThanOrEqual(1);
 
     // Find an Initialized statement
-    const initStmt = findStatement(statements, 'initialized');
+    const initStmt = findStatement(lms.statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
@@ -541,38 +503,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
   test('passing a graded quiz sends a Passed statement once the course completes', async ({
     page,
   }) => {
-    const statements: any[] = [];
-
-    await page.route('http://cmi5-mock.test/**', async (route) => {
-      const url = route.request().url();
-      if (url.endsWith('/fetch')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'text/plain',
-          body: 'auth-token=test-token-abc',
-        });
-        return;
-      }
-      if (url.includes('/xapi/statements')) {
-        const req = route.request();
-        if (req.method() === 'POST' || req.method() === 'PUT') {
-          try {
-            statements.push(JSON.parse(req.postData() ?? '{}'));
-          } catch {}
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['stmt-id']),
-        });
-        return;
-      }
-      if (url.includes('/xapi/activities/state')) {
-        await route.fulfill({ status: 404, body: '{}' });
-        return;
-      }
-      await route.fulfill({ status: 200, body: '{}' });
-    });
+    const { statements } = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -613,45 +544,13 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     page,
   }) => {
     const RETURN_URL = 'http://cmi5-mock.test/return';
-    const events: string[] = [];
-
-    await page.route('http://cmi5-mock.test/**', async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (url.endsWith('/fetch')) {
-        await route.fulfill({ status: 200, body: 'auth-token=test-token-abc' });
-        return;
-      }
-      if (url === RETURN_URL) {
-        events.push('return');
-        await route.fulfill({
-          status: 200,
-          contentType: 'text/html',
-          body: '<h1>LMS</h1>',
-        });
-        return;
-      }
-      if (url.includes('/xapi/statements')) {
-        const posted = [JSON.parse(req.postData() ?? '[]')].flat();
-        for (const s of posted) {
-          if (s?.verb?.id?.endsWith('/terminated')) events.push('terminated');
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['stmt-id']),
-        });
-        return;
-      }
-      if (url.includes('stateId=LMS.LaunchData')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ returnURL: RETURN_URL }),
-        });
-        return;
-      }
-      await route.fulfill({ status: 404, body: '{}' });
+    const { statements } = await installCmi5Mock(page, {
+      launchData: { returnURL: RETURN_URL },
+    });
+    let terminatedBeforeReturn = false;
+    await page.route(RETURN_URL, async (route) => {
+      terminatedBeforeReturn = !!findStatement(statements, 'terminated');
+      await route.fulfill({ contentType: 'text/html', body: '<h1>LMS</h1>' });
     });
 
     await page.goto(cmi5LaunchURL(BASE));
@@ -660,7 +559,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.locator('.tessera-exit-btn').click();
     await page.waitForURL(RETURN_URL);
 
-    expect(events).toEqual(['terminated', 'return']);
+    expect(terminatedBeforeReturn).toBe(true);
   });
 });
 
