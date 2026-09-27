@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { flushSync } from 'svelte';
 import Sidebar from '../src/components/Sidebar.svelte';
 import { mountInBody } from './helpers/mount.js';
+import { setNavContext } from '../src/runtime/contexts.js';
 
 function mountSidebar({
   slugs = ['welcome'],
@@ -38,7 +39,7 @@ function mountSidebar({
   };
   return mountInBody(Sidebar, {
     props: {},
-    context: new Map([['tessera-nav', { nav, manifest, config }]]),
+    setup: () => setNavContext({ nav, manifest, config } as any),
   }).target;
 }
 

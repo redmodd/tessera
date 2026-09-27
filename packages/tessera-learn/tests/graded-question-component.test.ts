@@ -1,19 +1,22 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { mount, flushSync } from 'svelte';
+import { flushSync } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { isPageComplete } from '../src/runtime/navigation.svelte.js';
+import {
+  setNavContext,
+  setPageContext,
+  setInPage,
+} from '../src/runtime/contexts.js';
 import { createManifest, createConfig } from './helpers.js';
+import { mountInBody } from './helpers/mount.js';
 
 function answer(graded: boolean | undefined) {
   const manifest = createManifest(2, {}, { 0: { graded: true } });
   const config = createConfig();
   const progress = new ProgressState(manifest, config);
-  const target = document.createElement('div');
-  document.body.appendChild(target);
-  mount(MultipleChoice, {
-    target,
+  const { target } = mountInBody(MultipleChoice, {
     props: {
       id: 'q1',
       question: 'Pick one',
@@ -21,14 +24,16 @@ function answer(graded: boolean | undefined) {
       correct: 0,
       graded,
     },
-    context: new Map<string, unknown>([
-      [
-        'tessera-nav',
-        { nav: { currentPageIndex: 0 }, manifest, progress, config },
-      ],
-      ['tessera-page', { index: 0 }],
-      ['tessera-in-page', true],
-    ]),
+    setup: () => {
+      setNavContext({
+        nav: { currentPageIndex: 0 },
+        manifest,
+        progress,
+        config,
+      } as any);
+      setPageContext({ index: 0 } as any);
+      setInPage(true);
+    },
   });
   const radio = target.querySelector('input[type="radio"]') as HTMLInputElement;
   radio.checked = true;

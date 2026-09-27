@@ -1,27 +1,20 @@
 /**
- * Typed Svelte context keys used by the Tessera runtime. All cross-cutting
- * contexts (set by App.svelte, read by hooks and built-in components) live
- * here so the shape is declared once and consumers don't have to spell out
- * `getContext<...>('tessera-...')` casts.
+ * Typed Svelte contexts used by the Tessera runtime. Contexts shared across
+ * the runtime (set by App.svelte, PageHost.svelte and useQuiz, read by hooks
+ * and built-in components) live here so each shape is declared once, at its
+ * `createContext` call.
  *
- * Component-internal contexts (e.g. tessera-quiz, tessera-accordion) stay
- * with their owning component — they are not shared across the runtime.
+ * Component-internal contexts (e.g. Accordion, Carousel) stay with their
+ * owning component.
  */
 
-import { getContext } from 'svelte';
+import { createContext } from 'svelte';
 import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { Manifest } from '../plugin/manifest.js';
 import type { CourseConfig, QuizConfig } from './types.js';
 import type { BaseAdapter } from './adapters/base.js';
-
-// ---- Keys ----
-
-export const TESSERA_NAV = 'tessera-nav' as const;
-export const TESSERA_ADAPTER = 'tessera-adapter' as const;
-export const TESSERA_PAGE = 'tessera-page' as const;
-export const TESSERA_IN_PAGE = 'tessera-in-page' as const;
-export const TESSERA_USER_STATE = 'tessera-user-state' as const;
+import type { UseQuestionHandle, UseQuizQuestionApi } from './hooks.svelte.js';
 
 // ---- Shapes ----
 
@@ -55,6 +48,31 @@ export interface UserStateStore {
   set(key: string, value: unknown): void;
 }
 
+export interface QuizContext {
+  registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
+}
+
+// ---- Contexts ----
+
+// Svelte's `get` throws when no ancestor set the context; these readers
+// return undefined instead.
+function optionalContext<T>() {
+  const [get, set, has] = createContext<T>();
+  return [(): T | undefined => (has() ? get() : undefined), set] as const;
+}
+
+export const [getNavContext, setNavContext] = optionalContext<NavContext>();
+export const [getAdapterContext, setAdapterContext] =
+  optionalContext<AdapterContext>();
+export const [getPageContext, setPageContext] = optionalContext<PageContext>();
+export const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
+const [getUserStateStore, setUserStateStore] =
+  optionalContext<UserStateStore>();
+export { setUserStateStore };
+
+/** `isInPage()` is true inside the rendered page, false in the layout around it. */
+export const [, setInPage, isInPage] = createContext<true>();
+
 // ---- Required-getter helpers ----
 
 function notInCourse(name: string): never {
@@ -62,30 +80,9 @@ function notInCourse(name: string): never {
 }
 
 export function requireNavContext(name: string): NavContext {
-  const ctx = getContext<NavContext | undefined>(TESSERA_NAV);
-  if (!ctx) notInCourse(name);
-  return ctx;
-}
-
-export function getNavContext(): NavContext | undefined {
-  return getContext<NavContext | undefined>(TESSERA_NAV);
-}
-
-export function getAdapterContext(): AdapterContext | undefined {
-  return getContext<AdapterContext | undefined>(TESSERA_ADAPTER);
-}
-
-export function getPageContext(): PageContext | undefined {
-  return getContext<PageContext | undefined>(TESSERA_PAGE);
-}
-
-/** True inside the rendered page, false in the layout around it. */
-export function isInPage(): boolean {
-  return getContext<boolean | undefined>(TESSERA_IN_PAGE) === true;
+  return getNavContext() ?? notInCourse(name);
 }
 
 export function requireUserStateStore(name: string): UserStateStore {
-  const store = getContext<UserStateStore | undefined>(TESSERA_USER_STATE);
-  if (!store) notInCourse(name);
-  return store;
+  return getUserStateStore() ?? notInCourse(name);
 }

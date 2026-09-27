@@ -1,10 +1,9 @@
 <script>
-  import { setContext } from 'svelte';
-  import { TESSERA_IN_PAGE } from './contexts.js';
+  import { setInPage } from './contexts.js';
 
   let { children } = $props();
 
-  setContext(TESSERA_IN_PAGE, true);
+  setInPage(true);
 </script>
 
 {@render children()}

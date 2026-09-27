@@ -6,14 +6,14 @@
    * @prop {string} title - Header text
    * @prop {import('svelte').Snippet} [children] - Panel content
    */
-  import { getContext } from 'svelte';
+  import { getAccordionContext } from './Accordion.svelte';
 
   let { title, children } = $props();
   const id = $props.id();
   const headerId = `tessera-accordion-header-${id}`;
   const panelId = `tessera-accordion-panel-${id}`;
 
-  const accordion = getContext('tessera-accordion');
+  const accordion = getAccordionContext();
   let isOpen = $derived(accordion.openId === id);
 
   function toggle() {

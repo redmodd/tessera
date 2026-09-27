@@ -5,10 +5,10 @@
    *
    * @prop {import('svelte').Snippet} [children] - Slide content
    */
-  import { getContext } from 'svelte';
+  import { getCarouselContext } from './Carousel.svelte';
 
   let { children } = $props();
-  const carousel = getContext('tessera-carousel');
+  const carousel = getCarouselContext();
   const index = carousel.register();
 
   let isCurrent = $derived(carousel.currentSlide === index);

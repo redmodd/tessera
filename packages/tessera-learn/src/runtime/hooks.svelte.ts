@@ -1,4 +1,4 @@
-import { getContext, setContext, onDestroy, onMount, tick } from 'svelte';
+import { onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import type { QuizConfig } from './types.js';
@@ -8,6 +8,8 @@ import {
   getNavContext,
   getAdapterContext,
   getPageContext,
+  getQuizContext,
+  setQuizContext,
   isInPage,
   requireUserStateStore,
 } from './contexts.js';
@@ -101,12 +103,6 @@ export interface UseQuestionHandle extends Question {
   setRender(render: unknown): void;
 }
 
-const TESSERA_QUIZ = 'tessera-quiz' as const;
-
-interface QuizContextValue {
-  registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
-}
-
 /**
  * Register a question widget with the Tessera runtime. Works outside a quiz
  * for inline practice, and inside a quiz host — the same hook drives both
@@ -114,7 +110,7 @@ interface QuizContextValue {
  * submission) and `submitted`/`correct` mirror the quiz's state.
  */
 export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
-  const quizCtx = getContext<QuizContextValue | undefined>(TESSERA_QUIZ);
+  const quizCtx = getQuizContext();
   const navCtx = getNavContext();
   const adapterCtx = getAdapterContext();
 
@@ -492,8 +488,7 @@ export function useQuiz(
 
   // A second useQuiz on the same page silently overwrites the first quiz's
   // pageIndex-keyed score; warn but don't prevent (some pages compose hosts).
-  const existing = getContext<unknown>(TESSERA_QUIZ);
-  if (existing) {
+  if (getQuizContext()) {
     console.warn(
       '[tessera] useQuiz: a second quiz registered on this page; ' +
         'quiz scores are keyed by pageIndex and the later submit will overwrite the earlier one.',
@@ -514,7 +509,7 @@ export function useQuiz(
     restore: pageCtx.quizState ?? undefined,
   });
 
-  setContext<QuizContextValue>(TESSERA_QUIZ, {
+  setQuizContext({
     registerQuestion: (api) => engine.registerQuestion(api),
   });
 
