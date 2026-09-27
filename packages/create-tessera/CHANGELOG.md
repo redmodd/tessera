@@ -1,5 +1,13 @@
 # create-tessera
 
+## 0.7.0
+
+### Patch Changes
+
+- 9b4cc82: - `@types/node` 26.4.1 → 26.6.2
+  - `@vitest/coverage-v8` 4.1.11 → 5.0.0
+  - `vitest` 4.1.11 → 5.0.0
+
 ## 0.6.0
 
 ### Patch Changes
