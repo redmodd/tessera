@@ -451,6 +451,11 @@ export class XAPIPublisher {
     return this.#queue;
   }
 
+  /** Resolves once every task queued so far has run. */
+  drained(): Promise<void> {
+    return this.#queue;
+  }
+
   /**
    * Switch the publisher to "page is unloading" mode. Subsequent fetches
    * use `keepalive: true` so they survive the unload. The launch adapters

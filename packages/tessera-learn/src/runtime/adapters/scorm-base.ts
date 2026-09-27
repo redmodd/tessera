@@ -102,11 +102,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   // SCORM 2004 overrides this to block writes in browse/review mode (§4.2.1.5).
   protected canWrite(): boolean {
-    return true;
+    return !this.#terminated;
   }
 
   protected set(key: string, value: string): void {
-    if (this.#terminated || !this.canWrite()) return;
+    if (!this.canWrite()) return;
     this.queue.enqueue(() => this.dialect.setValue(this.api, key, value), key);
   }
 

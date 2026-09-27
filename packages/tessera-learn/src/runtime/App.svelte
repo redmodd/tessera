@@ -31,7 +31,6 @@
   // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
   // have no deadline of their own, and the first page waits on all three.
   const INIT_TIMEOUT_MS = 15_000;
-  const EXIT_TIMEOUT_MS = 10_000;
 
   const config = $state(rawConfig);
 
@@ -39,9 +38,9 @@
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
   let launched = $state(false);
-  // Holds the resolved xAPI client for unload-time markUnloading. Set
-  // after adapter.init() resolves and registered globally so useXAPI()
-  // can reach it.
+  // Holds the resolved xAPI client for the exit flush and unload-time
+  // markUnloading. Set after adapter.init() resolves and registered globally
+  // so useXAPI() can reach it.
   let xapiClient = null;
 
   // ---- State classes ----
@@ -395,6 +394,7 @@
   });
 
   // ---- Exit / Terminate lifecycle ----
+  const EXIT_TIMEOUT_MS = 10_000;
   let terminated = $state(false);
   let exitPhase = $state(null);
   let manualWatchdog = null;
@@ -423,12 +423,8 @@
     adapter.terminate();
   }
 
-  let courseUnmounted;
-  function trackCourseUnmount() {
-    let resolve;
-    courseUnmounted = new Promise((r) => (resolve = r));
-    return resolve;
-  }
+  let unmountCourse;
+  const courseUnmounted = new Promise((r) => (unmountCourse = r));
 
   async function exit() {
     if (!canExit) return;
@@ -614,7 +610,7 @@
   {#if exitPhase}
     <SessionEnded ended={exitPhase === 'ended'} />
   {:else}
-    <span hidden {@attach trackCourseUnmount}></span>
+    <span hidden {@attach () => unmountCourse}></span>
     {#if UserLayout}
       <UserLayout {page} />
     {:else if chromeMode === 'custom'}

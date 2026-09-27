@@ -297,8 +297,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (!this.terminated) {
       const saved =
         !this.publisher ||
-        ((await settles(this.publisher.chainTask(async () => {}))) &&
-          this.#stateSaved);
+        ((await settles(this.publisher.drained())) && this.#stateSaved);
       this.terminate(!saved);
     }
     if (this.#finalSend) await settles(this.#finalSend);

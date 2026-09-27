@@ -996,13 +996,17 @@ function useCourse(): {
 };
 ```
 
-`exit()` saves progress and ends the LMS session; it does nothing while `canExit` is false. Under cmi5 with a `returnURL`, it sends the learner back to that URL. Otherwise the course shows a "Session ended" screen and tries to close the window; under SCORM 2004 it also asks the LMS to suspend the course (`suspendAll`), or exit it once complete (`exitAll`). The default layout renders an **Exit course** button when `canExit` is true and asks the learner to confirm first. `exit()` itself does not confirm and the learner cannot return to the session, so a custom layout confirms in a `<dialog>`. Don't use `window.confirm()`: LMS players often sandbox the course iframe without `allow-modals`, where it returns false without asking.
+`exit()`:
+
+- Saves progress and ends the LMS session. Does nothing while `canExit` is false.
+- Sends the learner to the cmi5 `returnURL` when there is one; otherwise shows a "Session ended" screen.
+- Does not confirm, and the session cannot resume. The default layout's **Exit course** button confirms first; a custom layout must confirm in a `<dialog>`, never `window.confirm()` (sandboxed LMS iframes make it return false without asking).
 
 ```svelte
 <script>
   import { useCourse } from 'tessera-learn';
   const course = useCourse();
-  let confirmExit;
+  let confirmExit = $state();
 </script>
 
 {#if course.canExit}

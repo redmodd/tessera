@@ -13,7 +13,7 @@
   const course = useCourse();
 
   let sidebarOpen = $state(false);
-  let exitDialog;
+  let exitDialog = $state();
 
   let progressPercent = $derived(
     nav.pages.length > 0
@@ -111,7 +111,7 @@
             Cancel
           </button>
           <button
-            class="tessera-page-nav-btn tessera-exit-confirm"
+            class="tessera-page-nav-btn tessera-btn-primary"
             onclick={() => {
               exitDialog.close();
               course.exit();

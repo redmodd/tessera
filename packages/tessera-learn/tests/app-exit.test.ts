@@ -57,9 +57,14 @@ const exitButton = () =>
 const exitDialog = () =>
   document.querySelector<HTMLDialogElement>('.tessera-exit-dialog')!;
 
+const dialogButton = (label: string) =>
+  [...exitDialog().querySelectorAll('button')].find(
+    (b) => b.textContent?.trim() === label,
+  )!;
+
 function confirmExit() {
   exitButton()!.click();
-  document.querySelector<HTMLButtonElement>('.tessera-exit-confirm')!.click();
+  dialogButton('Exit course').click();
 }
 
 HTMLDialogElement.prototype.showModal = function () {
@@ -118,9 +123,7 @@ describe('exiting a course', () => {
     const launched = calls.length;
 
     exitButton()!.click();
-    [...exitDialog().querySelectorAll('button')]
-      .find((b) => b.textContent?.trim() === 'Cancel')!
-      .click();
+    dialogButton('Cancel').click();
     await flush();
 
     expect(exitDialog().open).toBe(false);

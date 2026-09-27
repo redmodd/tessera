@@ -107,7 +107,7 @@ export class XAPIClient {
   /** Resolves once every destination has sent what it has queued, or at `deadline`. */
   async flush(deadline: Promise<unknown>): Promise<void> {
     await Promise.race([
-      Promise.all(this.#publishers.map((p) => p.chainTask(async () => {}))),
+      Promise.all(this.#publishers.map((p) => p.drained())),
       deadline,
     ]);
   }
