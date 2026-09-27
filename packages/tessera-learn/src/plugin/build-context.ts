@@ -12,6 +12,27 @@ export function isInside(parent: string, child: string): boolean {
   return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
+// Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
+// in build and may be absolute or a virtual id elsewhere. Return the
+// project-relative path for a real author file, or null to skip framework,
+// node_modules and virtual modules. Tier 0 owns the framework's own warnings.
+export function projectFileRel(
+  filename: string | undefined,
+  projectRoot: string,
+): string | null {
+  if (
+    !filename ||
+    filename.startsWith('\0') ||
+    filename.startsWith('virtual:')
+  ) {
+    return null;
+  }
+  const rel = relative(projectRoot, resolve(projectRoot, filename));
+  const segments = rel.split(sep);
+  if (isAbsolute(rel) || segments[0] === '..') return null;
+  return segments.includes('node_modules') ? null : rel;
+}
+
 export class BuildContext {
   root = '';
   outDir = '';

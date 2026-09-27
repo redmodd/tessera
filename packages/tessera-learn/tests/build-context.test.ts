@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
-import { BuildContext, isInside } from '../src/plugin/build-context.js';
+import { join, resolve } from 'node:path';
+import {
+  BuildContext,
+  isInside,
+  projectFileRel,
+} from '../src/plugin/build-context.js';
 import { resolvedConfig } from './helpers/plugin.js';
 
 const root = resolve('/project');
@@ -30,5 +34,36 @@ describe('isInside', () => {
   it('treats a ..-prefixed directory name as inside', () => {
     expect(isInside(root, resolve(root, '..foo', 'page.svelte'))).toBe(true);
     expect(isInside(root, resolve(root, '..', 'page.svelte'))).toBe(false);
+  });
+});
+
+describe('projectFileRel', () => {
+  const page = join('pages', 'welcome.svelte');
+
+  it('returns the project-relative path for an author file', () => {
+    expect(projectFileRel('pages/welcome.svelte', root)).toBe(page);
+    expect(projectFileRel(resolve(root, page), root)).toBe(page);
+    expect(projectFileRel(resolve(root, '..foo', 'x.svelte'), root)).toBe(
+      join('..foo', 'x.svelte'),
+    );
+  });
+
+  it.each([
+    ['a missing filename', undefined],
+    ['a \\0 virtual id', '\0virtual:tessera-pages'],
+    ['a bare virtual id', 'virtual:tessera-main'],
+    ['a file outside the project', resolve(root, '..', 'other', 'x.svelte')],
+    ['a dependency', resolve(root, 'node_modules', 'lib', 'x.svelte')],
+  ])('skips %s', (_label, filename) => {
+    expect(projectFileRel(filename, root)).toBeNull();
+  });
+
+  it.each([
+    ['whose name contains node_modules', 'node_modules-demo'],
+    ['named node_modules', 'node_modules'],
+    ['whose name contains virtual:', 'virtual:labs'],
+  ])('checks a project under a folder %s', (_label, folder) => {
+    const nested = resolve('/work', folder, 'course');
+    expect(projectFileRel(resolve(nested, page), nested)).toBe(page);
   });
 });
