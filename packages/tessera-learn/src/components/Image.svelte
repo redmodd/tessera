@@ -12,6 +12,7 @@
    */
   import { resolveAsset } from './util.js';
 
+  /** @type {{ src: string; alt?: string; decorative?: boolean; caption?: string }} */
   let { src, alt, decorative = false, caption = '' } = $props();
   let resolvedSrc = $derived(resolveAsset(src));
 </script>
