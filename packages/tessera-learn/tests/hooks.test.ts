@@ -105,21 +105,17 @@ describe('useQuestion — standalone mode', () => {
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      progress.markStandaloneQuestion(0, 'q0', 100, true);
-      expect(warn).not.toHaveBeenCalled();
+    progress.markStandaloneQuestion(0, 'q0', 100, true);
+    expect(warn).not.toHaveBeenCalled();
 
-      const response = () =>
-        ({ type: 'true-false', response: true, correct: true }) as Interaction;
-      useQuestion({ id: 'q1', graded: true, response }).submit();
-      useQuestion({ id: 'q2', graded: true, response }).submit();
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain('page "page-0"');
-      expect(warn.mock.calls[0][0]).toContain('does not declare');
-      expect(progress.pageScore(0)).toBe(100);
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    const response = () =>
+      ({ type: 'true-false', response: true, correct: true }) as Interaction;
+    useQuestion({ id: 'q1', graded: true, response }).submit();
+    useQuestion({ id: 'q2', graded: true, response }).submit();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('page "page-0"');
+    expect(warn.mock.calls[0][0]).toContain('does not declare');
+    expect(progress.pageScore(0)).toBe(100);
   });
 
   it('does not throw for a graded question on a declared page', () => {
@@ -703,17 +699,14 @@ describe('useQuestion — inside a <Quiz>', () => {
     ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      useQuestion({
-        id: 'q1',
-        graded: true,
-        maxRetries: 3,
-        response: () => ({ type: 'true-false', response: true }),
-      });
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
-    } finally {
-    }
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      maxRetries: 3,
+      response: () => ({ type: 'true-false', response: true }),
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
   });
 
   it('retry() is a no-op inside a quiz; canRetry is always false', () => {

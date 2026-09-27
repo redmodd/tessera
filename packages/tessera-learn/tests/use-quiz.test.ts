@@ -654,76 +654,62 @@ describe('QuizEngine', () => {
     // The shell keys its {#each} on the id, and Svelte throws on a duplicate key
     // in production as well as dev, so a collision has to be made unique.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { engine } = makeEngine();
-      engine.registerQuestion(tfQuestion('dup', true, true));
-      engine.registerQuestion(tfQuestion('dup', false, true));
-      engine.registerQuestion(tfQuestion('dup', true, true));
-      expect(engine.questions.map((q) => q.id)).toEqual([
-        'dup',
-        'dup-2',
-        'dup-3',
-      ]);
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) => typeof a === 'string' && /duplicate question id/i.test(a),
-        ),
-      );
-      expect(matched).toBe(true);
-    } finally {
-    }
+    const { engine } = makeEngine();
+    engine.registerQuestion(tfQuestion('dup', true, true));
+    engine.registerQuestion(tfQuestion('dup', false, true));
+    engine.registerQuestion(tfQuestion('dup', true, true));
+    expect(engine.questions.map((q) => q.id)).toEqual([
+      'dup',
+      'dup-2',
+      'dup-3',
+    ]);
+    const matched = warn.mock.calls.some((args) =>
+      args.some(
+        (a) => typeof a === 'string' && /duplicate question id/i.test(a),
+      ),
+    );
+    expect(matched).toBe(true);
   });
 
   it('warns that a rewritten id took an id a later question owns', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { engine } = makeEngine();
-      engine.registerQuestion(tfQuestion('dup', true, true));
-      engine.registerQuestion(tfQuestion('dup', false, true));
-      engine.registerQuestion(tfQuestion('dup-2', true, true));
-      expect(engine.questions.map((q) => q.id)).toEqual([
-        'dup',
-        'dup-2',
-        'dup-2-2',
-      ]);
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) =>
-            typeof a === 'string' && /is already taken by an earlier/.test(a),
-        ),
-      );
-      expect(matched).toBe(true);
-    } finally {
-    }
+    const { engine } = makeEngine();
+    engine.registerQuestion(tfQuestion('dup', true, true));
+    engine.registerQuestion(tfQuestion('dup', false, true));
+    engine.registerQuestion(tfQuestion('dup-2', true, true));
+    expect(engine.questions.map((q) => q.id)).toEqual([
+      'dup',
+      'dup-2',
+      'dup-2-2',
+    ]);
+    const matched = warn.mock.calls.some((args) =>
+      args.some(
+        (a) =>
+          typeof a === 'string' && /is already taken by an earlier/.test(a),
+      ),
+    );
+    expect(matched).toBe(true);
   });
 
   it('reports a rewritten duplicate id under its unique id', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { engine, reports } = makeEngine();
-      engine.registerQuestion(tfQuestion('dup', true, true));
-      engine.registerQuestion(tfQuestion('dup', true, true));
-      engine.setAnswer(0, true);
-      engine.setAnswer(1, true);
-      engine.submit();
-      expect(reports.map((r) => r.id)).toEqual(['dup', 'dup-2']);
-    } finally {
-    }
+    const { engine, reports } = makeEngine();
+    engine.registerQuestion(tfQuestion('dup', true, true));
+    engine.registerQuestion(tfQuestion('dup', true, true));
+    engine.setAnswer(0, true);
+    engine.setAnswer(1, true);
+    engine.submit();
+    expect(reports.map((r) => r.id)).toEqual(['dup', 'dup-2']);
   });
 
   it('stays quiet about incomplete answers when no question registered', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { engine } = makeEngine();
-      engine.submit();
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) => typeof a === 'string' && /nothing was scored/i.test(a),
-        ),
-      );
-      expect(matched).toBe(false);
-    } finally {
-    }
+    const { engine } = makeEngine();
+    engine.submit();
+    const matched = warn.mock.calls.some((args) =>
+      args.some((a) => typeof a === 'string' && /nothing was scored/i.test(a)),
+    );
+    expect(matched).toBe(false);
   });
 
   it('scores and reports with no element bound', () => {
@@ -894,17 +880,14 @@ describe('useQuiz (Svelte wrapper)', () => {
     // The runtime keys quiz scores by pageIndex — a second quiz on the same page
     // silently overwrites the first. Surface that as a dev warning.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const m = mountHarness({ graded: true }, { secondQuiz: true });
-      mountings.push(m);
-      expect(m.ref.handle).not.toBeNull();
-      expect(m.ref.secondHandle).not.toBeNull();
-      const matched = warn.mock.calls.some((args) =>
-        args.some((a) => typeof a === 'string' && /second quiz/i.test(a)),
-      );
-      expect(matched).toBe(true);
-    } finally {
-    }
+    const m = mountHarness({ graded: true }, { secondQuiz: true });
+    mountings.push(m);
+    expect(m.ref.handle).not.toBeNull();
+    expect(m.ref.secondHandle).not.toBeNull();
+    const matched = warn.mock.calls.some((args) =>
+      args.some((a) => typeof a === 'string' && /second quiz/i.test(a)),
+    );
+    expect(matched).toBe(true);
   });
 
   it('warns when submit() unmounts without ever firing (custom shell forgot to call it)', async () => {
@@ -913,37 +896,33 @@ describe('useQuiz (Svelte wrapper)', () => {
     // Exercised via the exported helper — the onDestroy call site is covered by
     // the e2e custom-quiz suite.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { __warnUnsubmittedQuiz } =
-        await import('../src/runtime/hooks.svelte.js');
-      __warnUnsubmittedQuiz({
-        questionsCount: 2,
-        answersCount: 1,
-        submitCalled: false,
-      });
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) =>
-            typeof a === 'string' && /submit\(\) was never called/i.test(a),
-        ),
-      );
-      expect(matched).toBe(true);
+    const { __warnUnsubmittedQuiz } =
+      await import('../src/runtime/hooks.svelte.js');
+    __warnUnsubmittedQuiz({
+      questionsCount: 2,
+      answersCount: 1,
+      submitCalled: false,
+    });
+    const matched = warn.mock.calls.some((args) =>
+      args.some(
+        (a) => typeof a === 'string' && /submit\(\) was never called/i.test(a),
+      ),
+    );
+    expect(matched).toBe(true);
 
-      // Inverse: nothing answered, or already submitted → no warning.
-      warn.mockClear();
-      __warnUnsubmittedQuiz({
-        questionsCount: 2,
-        answersCount: 0,
-        submitCalled: false,
-      });
-      __warnUnsubmittedQuiz({
-        questionsCount: 2,
-        answersCount: 1,
-        submitCalled: true,
-      });
-      expect(warn.mock.calls.length).toBe(0);
-    } finally {
-    }
+    // Inverse: nothing answered, or already submitted → no warning.
+    warn.mockClear();
+    __warnUnsubmittedQuiz({
+      questionsCount: 2,
+      answersCount: 0,
+      submitCalled: false,
+    });
+    __warnUnsubmittedQuiz({
+      questionsCount: 2,
+      answersCount: 1,
+      submitCalled: true,
+    });
+    expect(warn.mock.calls.length).toBe(0);
   });
 
   it('warns when a quiz mounts with no registered questions', async () => {
@@ -951,22 +930,18 @@ describe('useQuiz (Svelte wrapper)', () => {
     // to score or report. Exercised directly via the exported helper for the same
     // onMount timing reasons as the unmount warning above.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const { __warnEmptyQuiz } =
-        await import('../src/runtime/hooks.svelte.js');
-      __warnEmptyQuiz(0);
-      const matched = warn.mock.calls.some((args) =>
-        args.some(
-          (a) => typeof a === 'string' && /no registered questions/i.test(a),
-        ),
-      );
-      expect(matched).toBe(true);
+    const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
+    __warnEmptyQuiz(0);
+    const matched = warn.mock.calls.some((args) =>
+      args.some(
+        (a) => typeof a === 'string' && /no registered questions/i.test(a),
+      ),
+    );
+    expect(matched).toBe(true);
 
-      // Inverse: any registered question → no warning.
-      warn.mockClear();
-      __warnEmptyQuiz(1);
-      expect(warn.mock.calls.length).toBe(0);
-    } finally {
-    }
+    // Inverse: any registered question → no warning.
+    warn.mockClear();
+    __warnEmptyQuiz(1);
+    expect(warn.mock.calls.length).toBe(0);
   });
 });

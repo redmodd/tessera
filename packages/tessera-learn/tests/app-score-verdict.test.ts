@@ -88,7 +88,6 @@ describe('a graded submit that decides the verdict', () => {
   afterEach(() => {
     cleanup?.();
     cleanup = null;
-    vi.unstubAllGlobals();
     document.body.innerHTML = '';
     delete (globalThis as any).__tesseraTest;
     delete (globalThis as any).__tesseraNavCtx;

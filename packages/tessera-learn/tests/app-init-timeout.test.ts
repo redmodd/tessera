@@ -101,9 +101,7 @@ describe('App bounds adapter.init()', () => {
         throw new Error('LRS unreachable');
       },
     );
-    cleanup = () => {
-      unmount(component);
-    };
+    cleanup = () => unmount(component);
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),
@@ -118,9 +116,7 @@ describe('App bounds adapter.init()', () => {
       undefined,
       () => ({ d: 0 }),
     );
-    cleanup = () => {
-      unmount(component);
-    };
+    cleanup = () => unmount(component);
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),

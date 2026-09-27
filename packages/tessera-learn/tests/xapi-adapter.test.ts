@@ -19,7 +19,6 @@ describe('XAPIAdapter', () => {
     vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
     window.history.replaceState({}, '', '/');
   });
 

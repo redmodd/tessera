@@ -125,9 +125,7 @@ describe('App restore gate honours config.resume', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, seedLifecycle, setCompletionStatus, unmount } =
       await mountApp('auto', { saved: savedWith({ g: [] }) });
-    cleanup = () => {
-      unmount(component);
-    };
+    cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     expect(seedLifecycle).not.toHaveBeenCalled();
     expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');

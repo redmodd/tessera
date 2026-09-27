@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createAdapter,
   LMSAdapterError,
@@ -22,14 +22,15 @@ function makeConfig(standard: string): CourseConfig {
   };
 }
 
-// Mock localStorage for WebAdapter
-vi.stubGlobal('localStorage', {
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-});
-
 describe('createAdapter', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    });
+  });
+
   afterEach(() => {
     // Clean up any window.API stubs
     delete (window as any).API;

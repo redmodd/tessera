@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Restore test spies automatically between unit tests.
+Internal test cleanup only: unit tests now restore spies, stubbed globals and env vars automatically. No runtime changes.
