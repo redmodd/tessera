@@ -9,6 +9,7 @@ import {
 } from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
+import { flush, tick } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -462,7 +463,7 @@ describe('XAPIPublisher — queue ordering', () => {
     pub.sendStatement({ verb: { id: 'http://verb/1' } });
     pub.sendStatement({ verb: { id: 'http://verb/2' } });
     pub.sendStatement({ verb: { id: 'http://verb/3' } });
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
     expect(order).toEqual(['http://verb/1', 'http://verb/2', 'http://verb/3']);
   });
 });
@@ -480,7 +481,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
       order.push('task');
     });
     pub.sendStatement({ verb: { id: 'http://verb/2' } });
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
     expect(order).toEqual(['send', 'task', 'send']);
   });
 
@@ -500,7 +501,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const inflight = pub.sendStatement({
       verb: { id: 'http://verb/in-flight' },
     });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const queued = pub.sendStatement({ verb: { id: 'http://verb/queued' } });
 
     const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
@@ -579,7 +580,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     });
     const pub = await initPublisher();
     void pub.sendStatement({ verb: { id: 'http://verb/head' } });
-    await new Promise((r) => setTimeout(r, 0));
+    await tick();
     const good = pub.sendStatement({ verb: { id: 'http://verb/good' } });
     const bad = pub.sendStatement({ verb: { id: 'http://verb/bad' } });
 

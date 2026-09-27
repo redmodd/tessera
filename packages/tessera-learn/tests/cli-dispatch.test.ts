@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/plugin/cli.js';
 import { makeWorkspace, printed } from './helpers.js';
@@ -25,10 +25,8 @@ const stderr = () => printed(vi.mocked(console.error));
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
-  ws = makeWorkspace();
+  ws = makeWorkspace(['getting-started']);
   course = join(ws, 'courses', 'getting-started');
-  mkdirSync(course);
-  writeFileSync(join(course, 'course.config.js'), 'export default {};');
 });
 
 describe('main dispatch', () => {

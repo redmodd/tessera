@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { setLaunchParams, tick } from './helpers.js';
 
@@ -57,9 +57,6 @@ describe('XAPIAdapter', () => {
       async () => new Response('{}', { status: 404 }),
     );
     vi.stubGlobal('fetch', fetchMock);
-  });
-  afterEach(() => {
-    window.history.replaceState({}, '', '/');
   });
 
   it('parses snake_case Tin Can launch params and sends the version header', async () => {

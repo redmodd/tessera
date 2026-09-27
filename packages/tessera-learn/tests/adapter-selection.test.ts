@@ -72,7 +72,6 @@ describe('createAdapter', () => {
   });
 
   it('falls back to WebAdapter for cmi5 when launch params not found (dev)', () => {
-    setLaunchParams();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(WebAdapter);
@@ -126,14 +125,12 @@ describe('createAdapter', () => {
     });
 
     it('throws LMSAdapterError for cmi5 when launch params missing', () => {
-      setLaunchParams();
       expect(() =>
         createAdapter(makeConfig('cmi5'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
     });
 
     it('throws LMSAdapterError for xapi when launch params missing', () => {
-      setLaunchParams();
       expect(() =>
         createAdapter(makeConfig('xapi'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);

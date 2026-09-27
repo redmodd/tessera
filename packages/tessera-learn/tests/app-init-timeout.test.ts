@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { createManifest, mountApp, stubAdapter } from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 
@@ -38,12 +38,9 @@ function mount(
 // The first page is held until adapter.init() resolves, and the LMS handshake
 // it performs has no deadline of its own.
 describe('App bounds adapter.init()', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('surfaces an error page when init never resolves', async () => {
     vi.useFakeTimers();
+    onTestFinished(() => vi.useRealTimers());
     await mount(() => new Promise(() => {}));
 
     expect(document.body.textContent).not.toContain('This page failed to load');
@@ -55,6 +52,7 @@ describe('App bounds adapter.init()', () => {
 
   it('renders the page when init resolves inside the deadline', async () => {
     vi.useFakeTimers();
+    onTestFinished(() => vi.useRealTimers());
     await mount(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     await vi.advanceTimersByTimeAsync(20_000);

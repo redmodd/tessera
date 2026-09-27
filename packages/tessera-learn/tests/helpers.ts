@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -74,7 +74,9 @@ export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 export const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
 export function setLaunchParams(params: Record<string, string> = {}): void {
-  window.history.replaceState({}, '', `/?${new URLSearchParams(params)}`);
+  const { history } = window;
+  history.replaceState({}, '', `/?${new URLSearchParams(params)}`);
+  onTestFinished(() => history.replaceState({}, '', '/'));
 }
 
 export function setValuesFor(
@@ -90,9 +92,14 @@ export function printed(spy: MockInstance): string {
   return spy.mock.calls.flat().join('\n');
 }
 
-export function makeWorkspace(): string {
+export function makeWorkspace(courses: string[] = []): string {
   const root = mkdtempSync(join(tmpdir(), 'tessera-test-'));
   mkdirSync(join(root, 'courses'));
+  for (const name of courses) {
+    const dir = join(root, 'courses', name);
+    mkdirSync(join(dir, 'pages'), { recursive: true });
+    writeFileSync(join(dir, 'course.config.js'), 'export default {};');
+  }
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }

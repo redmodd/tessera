@@ -73,7 +73,7 @@ describe('hasCMI5LaunchParams', () => {
   });
 
   it('returns false with empty search', () => {
-    vi.stubGlobal('location', { ...window.location, search: '' });
+    setLaunchParams();
     expect(hasCMI5LaunchParams()).toBe(false);
   });
 });
@@ -661,7 +661,7 @@ describe('CMI5Adapter', () => {
     adapter.setScore(85);
     adapter.setDuration(60);
     adapter.setCompletionStatus('complete');
-    await new Promise((r) => setTimeout(r, 20));
+    await flush();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -682,7 +682,7 @@ describe('CMI5Adapter', () => {
     adapter = await initAdapter();
 
     adapter.setCompletionStatus('complete');
-    await new Promise((r) => setTimeout(r, 20));
+    await flush();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -734,7 +734,7 @@ describe('CMI5Adapter', () => {
     adapter.saveState({ b: 1 } as never);
     adapter.terminate();
     adapter.saveState({ b: 2 } as never);
-    await new Promise((r) => setTimeout(r, 20));
+    await flush();
 
     const puts = mockFetch.mock.calls
       .filter(([, init]: any[]) => init?.method === 'PUT')

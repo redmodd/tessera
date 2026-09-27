@@ -85,7 +85,6 @@ describe('a graded submit that decides the verdict', () => {
   afterEach(() => {
     delete (globalThis as any).__tesseraNavCtx;
     delete (globalThis as any).__showLateCheck;
-    window.history.replaceState({}, '', '/');
   });
 
   it('reports the score on the verdict instead of a statement of its own', async () => {

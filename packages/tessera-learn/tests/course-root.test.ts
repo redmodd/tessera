@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   resolveCourse,
@@ -8,34 +8,12 @@ import {
   listCourses,
   listMalformedCourses,
 } from '../src/plugin/course-root.js';
+import { makeWorkspace } from './helpers.js';
 
 let ws: string;
-let counter = 0;
-
-// Build a workspace dir tree: courses/<name>/course.config.js for each name.
-function makeWorkspace(courses: string[]): string {
-  counter++;
-  const root = resolve(
-    tmpdir(),
-    `tessera-course-root-${Date.now()}-${counter}`,
-  );
-  mkdirSync(join(root, 'courses'), { recursive: true });
-  for (const name of courses) {
-    const dir = join(root, 'courses', name);
-    mkdirSync(join(dir, 'pages'), { recursive: true });
-    writeFileSync(join(dir, 'course.config.js'), 'export default {};');
-  }
-  return root;
-}
 
 beforeEach(() => {
   ws = makeWorkspace(['getting-started', 'advanced']);
-});
-
-afterEach(() => {
-  try {
-    rmSync(ws, { recursive: true, force: true });
-  } catch {}
 });
 
 describe('findWorkspaceRoot', () => {
@@ -136,7 +114,6 @@ describe('resolveCourse', () => {
     expect(resolveCourse(one).ok).toBe(false);
     // ...and still errors with two — never silently picks a course.
     expect(resolveCourse(ws).ok).toBe(false);
-    rmSync(one, { recursive: true, force: true });
   });
 
   it('rejects a path-traversing or otherwise invalid course name before resolving', () => {

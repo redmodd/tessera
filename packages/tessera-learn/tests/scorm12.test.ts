@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  onTestFinished,
+  type Mocked,
+} from 'vitest';
 import {
   SCORM12Adapter,
   type SCORM12API,
@@ -313,8 +321,11 @@ describe('SCORM12Adapter', () => {
       return callCount >= 3 ? 'true' : 'false';
     });
 
+    vi.useFakeTimers();
+    onTestFinished(() => vi.useRealTimers());
     adapter.setScore(85);
-    await vi.waitFor(() => expect(callCount).toBeGreaterThanOrEqual(3));
+    await vi.runAllTimersAsync();
+    expect(callCount).toBeGreaterThanOrEqual(3);
   });
 
   // ---- interactions ----
@@ -613,12 +624,10 @@ describe('SCORM12Adapter', () => {
       api.LMSGetDiagnostic.mockReturnValue(
         'student_response invalid CMIFeedback',
       );
+      vi.useFakeTimers();
+      onTestFinished(() => vi.useRealTimers());
       adapter.setScore(85);
-      await vi.waitFor(() =>
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(/cmi\.core\.score\.raw/),
-        ),
-      );
+      await vi.runAllTimersAsync();
       const messages = printed(warn);
       expect(messages).toMatch(/cmi\.core\.score\.raw/);
       expect(messages).toMatch(/405/);
