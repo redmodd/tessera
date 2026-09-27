@@ -284,13 +284,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     );
   }
 
-  async exit(): Promise<void> {
+  override async exit(): Promise<boolean> {
     if (!this.terminated) await this.publisher?.chainTask(async () => {});
     this.terminate();
     await this.#finalSend;
-    if (this.returnURL && typeof window !== 'undefined') {
-      window.location.assign(this.returnURL);
-    }
+    if (!this.returnURL || typeof window === 'undefined') return false;
+    window.location.assign(this.returnURL);
+    return true;
   }
 
   /** Parse the launch `actor` param into an Identified Agent, failing loud on malformed JSON. */

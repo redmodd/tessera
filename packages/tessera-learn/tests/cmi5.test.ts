@@ -930,9 +930,20 @@ describe('CMI5Adapter', () => {
       expect(assign).not.toHaveBeenCalled();
 
       sending.resolve(respond(204));
-      await exiting;
+      expect(await exiting).toBe(true);
       expect(statementFor('terminated')).toBeDefined();
       expect(assign).toHaveBeenCalledWith(returnURL);
+    });
+
+    it('ignores a returnURL that is not http(s)', async () => {
+      const adapter = await initAdapter({
+        launchData: { returnURL: 'javascript:alert(1)' },
+      });
+
+      const assign = stubLocationAssign();
+
+      expect(await adapter.exit()).toBe(false);
+      expect(assign).not.toHaveBeenCalled();
     });
 
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
@@ -941,7 +952,7 @@ describe('CMI5Adapter', () => {
       const assign = stubLocationAssign();
       mockFetch.mockClear();
 
-      await adapter.exit();
+      expect(await adapter.exit()).toBe(false);
       expect(statementFor('terminated')).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });

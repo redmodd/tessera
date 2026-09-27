@@ -396,15 +396,21 @@ export function usePersistence<T = unknown>(
 export function useCourse(): {
   readonly title: string;
   readonly logo: string | undefined;
+  readonly canExit: boolean;
+  exit(): Promise<void>;
 } {
-  const { config } = requireNavContext('useCourse()');
+  const ctx = requireNavContext('useCourse()');
   return {
     get title() {
-      return config.title;
+      return ctx.config.title;
     },
     get logo() {
-      return resolveAsset(config.branding?.logo ?? '') || undefined;
+      return resolveAsset(ctx.config.branding?.logo ?? '') || undefined;
     },
+    get canExit() {
+      return ctx.canExit;
+    },
+    exit: ctx.exit,
   };
 }
 

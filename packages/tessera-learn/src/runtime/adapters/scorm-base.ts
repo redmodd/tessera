@@ -105,7 +105,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   }
 
   protected set(key: string, value: string): void {
-    if (!this.canWrite()) return;
+    if (this.#terminated || !this.canWrite()) return;
     this.queue.enqueue(() => this.dialect.setValue(this.api, key, value), key);
   }
 
@@ -222,6 +222,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   }
 
   override commit(): void {
+    if (this.#terminated) return;
     this.queue.enqueue(() => this.dialect.commit(this.api), 'Commit');
   }
 

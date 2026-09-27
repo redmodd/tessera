@@ -46,6 +46,17 @@
   padding: var(--tessera-spacing-md) 0;
 }
 
+.tessera-sidebar-footer {
+  padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+  border-top: 1px solid var(--tessera-border);
+  flex-shrink: 0;
+}
+
+.tessera-exit-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* Sidebar section */
 .tessera-nav-section {
   margin-bottom: var(--tessera-spacing-sm);
@@ -380,6 +391,16 @@
   padding: var(--tessera-spacing-sm) var(--tessera-spacing-lg);
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+/* ---- Session Ended ---- */
+.tessera-session-ended {
+  text-align: center;
+  padding: var(--tessera-spacing-xl) var(--tessera-spacing-md);
+}
+
+.tessera-session-ended p {
+  color: var(--tessera-text-light);
 }
 
 /* ---- Responsive: Tablet (max-width: 1024px) ---- */

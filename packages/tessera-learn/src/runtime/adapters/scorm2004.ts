@@ -57,6 +57,7 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
  */
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
+  #exit: ExitMode = 'suspend';
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);
@@ -106,6 +107,16 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setExit(mode: ExitMode): void {
+    this.#exit = mode;
     this.set('cmi.exit', mode);
+  }
+
+  override exit(): Promise<boolean> {
+    const request = this.#exit === 'suspend' ? 'suspendAll' : 'exitAll';
+    this.queue.enqueue(
+      () => this.api.SetValue('adl.nav.request', request),
+      'adl.nav.request',
+    );
+    return super.exit();
   }
 }

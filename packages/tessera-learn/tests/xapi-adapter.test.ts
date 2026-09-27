@@ -259,4 +259,16 @@ describe('XAPIAdapter', () => {
 
     expect(posted()).toHaveLength(0);
   });
+
+  it('exit sends Terminated and stays on the page', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await flush();
+
+    expect(await adapter.exit()).toBe(false);
+    expect(posted().map((s) => s.verb.id)).toContain(
+      'http://adlnet.gov/expapi/verbs/terminated',
+    );
+  });
 });

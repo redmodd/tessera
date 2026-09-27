@@ -72,7 +72,14 @@ function provideNavCtx({
     isPageLocked: vi.fn(() => false),
     prefetch: vi.fn(),
   };
-  const ctx = { nav, manifest, progress, config };
+  const ctx = {
+    nav,
+    manifest,
+    progress,
+    config,
+    canExit: true,
+    exit: vi.fn(async () => {}),
+  };
   const adapter = stubAdapter({ reportInteraction: vi.fn() });
   contexts.setNavContext(ctx);
   contexts.setAdapterContext({ adapter });
@@ -732,6 +739,15 @@ describe('useCourse', () => {
 
     ctx.config.branding = { logo: '$assets/logo.svg' };
     expect(h.logo).toBe('./assets/logo.svg');
+  });
+
+  it('ends the session through the course', async () => {
+    const ctx = provideNavCtx();
+
+    const h = useCourse();
+    expect(h.canExit).toBe(true);
+    await h.exit();
+    expect(ctx.exit).toHaveBeenCalledOnce();
   });
 });
 

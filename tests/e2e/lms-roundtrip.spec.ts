@@ -217,6 +217,23 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
   });
 
+  test('Exit course button suspends, finishes once, and ends the session', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await page.locator('.tessera-exit-btn').click();
+    await expect(page.locator('.tessera-session-ended')).toContainText(
+      'Session ended',
+    );
+    await exitCourse(page);
+
+    const log = await scormLog(page);
+    expect(log).toContainEqual(['LMSSetValue', 'cmi.core.exit', 'suspend']);
+    expect(log.filter((entry) => entry[0] === 'LMSFinish')).toHaveLength(1);
+  });
+
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
@@ -389,6 +406,27 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
     const log = await scormLog(page);
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
+  });
+
+  test('Exit course button requests suspendAll before Terminate', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await page.locator('.tessera-exit-btn').click();
+    await expect(page.locator('.tessera-session-ended')).toContainText(
+      'Session ended',
+    );
+
+    const log = await scormLog(page);
+    const request = log.findIndex(
+      ([fn, key]) => fn === 'SetValue' && key === 'adl.nav.request',
+    );
+    expect(log[request]).toEqual(['SetValue', 'adl.nav.request', 'suspendAll']);
+    expect(
+      log.slice(request).filter(([fn]) => fn === 'Terminate'),
+    ).toHaveLength(1);
   });
 
   test.describe('LMS scaled_passing_score', () => {
@@ -569,6 +607,60 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expect
       .poll(() => findStatement(statements, 'passed'), { timeout: 5000 })
       .toMatchObject({ result: { success: true, score: { scaled: 1 } } });
+  });
+
+  test('Exit course sends Terminated, then returns to the LaunchData returnURL', async ({
+    page,
+  }) => {
+    const RETURN_URL = 'http://cmi5-mock.test/return';
+    const events: string[] = [];
+
+    await page.route('http://cmi5-mock.test/**', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (url.endsWith('/fetch')) {
+        await route.fulfill({ status: 200, body: 'auth-token=test-token-abc' });
+        return;
+      }
+      if (url === RETURN_URL) {
+        events.push('return');
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: '<h1>LMS</h1>',
+        });
+        return;
+      }
+      if (url.includes('/xapi/statements')) {
+        const posted = [JSON.parse(req.postData() ?? '[]')].flat();
+        for (const s of posted) {
+          if (s?.verb?.id?.endsWith('/terminated')) events.push('terminated');
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(['stmt-id']),
+        });
+        return;
+      }
+      if (url.includes('stateId=LMS.LaunchData')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ returnURL: RETURN_URL }),
+        });
+        return;
+      }
+      await route.fulfill({ status: 404, body: '{}' });
+    });
+
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+
+    await page.locator('.tessera-exit-btn').click();
+    await page.waitForURL(RETURN_URL);
+
+    expect(events).toEqual(['terminated', 'return']);
   });
 });
 

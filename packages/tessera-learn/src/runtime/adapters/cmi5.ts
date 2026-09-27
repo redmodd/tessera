@@ -1,6 +1,6 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
-import { STANDARDS } from '../standards.js';
+import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
 const CMI5_MASTERYSCORE_EXT =
@@ -181,7 +181,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
       if (
         typeof this.#launchData.returnURL === 'string' &&
-        this.#launchData.returnURL
+        httpOrigin(this.#launchData.returnURL)
       ) {
         this.returnURL = this.#launchData.returnURL;
       }

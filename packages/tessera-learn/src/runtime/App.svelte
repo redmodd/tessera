@@ -8,6 +8,7 @@
   import { onMount, onDestroy, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
+  import SessionEnded from './SessionEnded.svelte';
   import PageHost from './PageHost.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
@@ -96,7 +97,16 @@
   // ---- Navigation context (read by custom chrome components) ----
   // Exposes nav/manifest/progress/config so courses can build custom top bars,
   // menus, tables of contents, etc. that can navigate to specific pages.
-  setNavContext({ nav, manifest, progress, config });
+  setNavContext({
+    nav,
+    manifest,
+    progress,
+    config,
+    get canExit() {
+      return adapter.connected && persistenceReady;
+    },
+    exit,
+  });
 
   // ---- Adapter context (read by useQuestion / useQuiz) ----
   setAdapterContext({
@@ -293,7 +303,7 @@
   }
 
   function persistState() {
-    if (!persistenceReady) return;
+    if (!persistenceReady || terminated) return;
     adapter.saveState(serializeState());
   }
 
@@ -384,10 +394,11 @@
 
   // ---- Exit / Terminate lifecycle ----
   let terminated = false;
+  let exitPhase = $state(null);
   let manualWatchdog = null;
 
-  function handleExit() {
-    if (terminated) return;
+  function endSession() {
+    if (terminated) return false;
     terminated = true;
     adapter.saveState(serializeState());
     adapter.setDuration(duration.sessionSeconds);
@@ -399,7 +410,24 @@
     );
     adapter.commit();
     xapiClient?.markUnloading();
+    return true;
+  }
+
+  function handlePagehide() {
+    endSession();
     adapter.terminate();
+  }
+
+  async function exit() {
+    if (!persistenceReady || !endSession()) return;
+    exitPhase = 'ending';
+    const returned = await adapter.exit().catch((err) => {
+      console.warn('Tessera: exit failed', err);
+      return false;
+    });
+    if (returned) return;
+    exitPhase = 'ended';
+    window.close();
   }
 
   // ---- Lifecycle ----
@@ -500,7 +528,7 @@
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('pagehide', handleExit);
+    window.addEventListener('pagehide', handlePagehide);
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn
@@ -526,7 +554,7 @@
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    window.removeEventListener('pagehide', handleExit);
+    window.removeEventListener('pagehide', handlePagehide);
     if (manualWatchdog !== null) {
       clearTimeout(manualWatchdog);
       manualWatchdog = null;
@@ -562,7 +590,9 @@
   data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
 >
   <LoadingBar active={pageLoading} />
-  {#if UserLayout}
+  {#if exitPhase}
+    <SessionEnded ended={exitPhase === 'ended'} />
+  {:else if UserLayout}
     <UserLayout {page} />
   {:else if chromeMode === 'custom'}
     {@render page()}

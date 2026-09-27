@@ -1,11 +1,16 @@
 <script>
   import { onMount } from 'svelte';
-  import { useNavigation, useProgress } from '../runtime/hooks.svelte.js';
+  import {
+    useCourse,
+    useNavigation,
+    useProgress,
+  } from '../runtime/hooks.svelte.js';
   import Sidebar from './Sidebar.svelte';
 
   let { page } = $props();
   const nav = useNavigation();
   const progress = useProgress();
+  const course = useCourse();
 
   let sidebarOpen = $state(false);
 
@@ -81,6 +86,16 @@
     aria-label="Course sidebar"
   >
     <Sidebar onclose={closeSidebar} />
+    {#if course.canExit}
+      <div class="tessera-sidebar-footer">
+        <button
+          class="tessera-page-nav-btn tessera-exit-btn"
+          onclick={() => course.exit()}
+        >
+          Exit course
+        </button>
+      </div>
+    {/if}
   </aside>
 
   <main class="tessera-main">

@@ -181,6 +181,39 @@ describe('SCORM2004Adapter', () => {
     expect(api.Terminate).toHaveBeenCalledTimes(1);
   });
 
+  it('exit terminates the session without leaving the page', async () => {
+    await adapter.init();
+    expect(await adapter.exit()).toBe(false);
+    expect(api.Terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['suspend', 'suspendAll'],
+    ['normal', 'exitAll'],
+  ] as const)(
+    'exit with cmi.exit=%s asks the LMS for %s before Terminate',
+    async (mode, request) => {
+      await adapter.init();
+      const order: string[] = [];
+      api.SetValue.mockImplementation((key, value) => {
+        order.push(`${key}=${value}`);
+        return 'true';
+      });
+      api.Terminate.mockImplementation(() => {
+        order.push('Terminate');
+        return 'true';
+      });
+
+      adapter.setExit(mode);
+      await adapter.exit();
+
+      expect(order.slice(-2)).toEqual([
+        `adl.nav.request=${request}`,
+        'Terminate',
+      ]);
+    },
+  );
+
   it('operations are queued sequentially', async () => {
     const order: string[] = [];
     api.SetValue.mockImplementation((key) => {

@@ -985,13 +985,28 @@ Usage in [Recipe 1](#recipe-1-custom-draw-a-line-question) (persists partial pro
 
 ### `useCourse`
 
-Course identity from `course.config.js`, for layouts and headers. Use it instead of importing the config file.
+Course identity from `course.config.js`, for layouts and headers, and the session's exit. Use it instead of importing the config file.
 
 ```ts
 function useCourse(): {
   readonly title: string;
   readonly logo: string | undefined; // branding.logo with $assets/ resolved, ready for <img src>; undefined when unset or empty
+  readonly canExit: boolean; // true under an LMS once the launch finishes; false on the web
+  exit(): Promise<void>;
 };
+```
+
+`exit()` saves progress and ends the LMS session. Under cmi5 with a `returnURL`, it sends the learner back to that URL. Otherwise the course shows a "Session ended" screen and tries to close the window; under SCORM 2004 it also asks the LMS to suspend the course (`suspendAll`), or exit it once complete (`exitAll`). The default layout renders an **Exit course** button when `canExit` is true; a custom layout renders its own:
+
+```svelte
+<script>
+  import { useCourse } from 'tessera-learn';
+  const course = useCourse();
+</script>
+
+{#if course.canExit}
+  <button onclick={() => course.exit()}>Exit course</button>
+{/if}
 ```
 
 ### `isCorrect(interaction)`
@@ -1152,6 +1167,8 @@ Drop `layout.svelte` at the project root to replace the default chrome. The cont
   <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next</button>
 </footer>
 ```
+
+A custom layout gets no Exit button; add one with [`useCourse()`](#usecourse).
 
 To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` and compose around it.
 
