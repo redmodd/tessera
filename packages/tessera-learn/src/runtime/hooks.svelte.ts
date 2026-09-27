@@ -106,7 +106,8 @@ interface QuizContext {
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
 }
 
-export const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
+const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
+export { setQuizContext };
 
 /**
  * Register a question widget with the Tessera runtime. Works outside a quiz

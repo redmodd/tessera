@@ -762,8 +762,8 @@ describe('useQuiz (Svelte wrapper)', () => {
   });
 
   it('publishes the quiz context that question widgets read via useQuestion', () => {
-    // The context shape (registerQuestion / setAnswer / feedbackVisible / etc.)
-    // is what built-ins depend on. The component-level integration is covered by
+    // Built-ins register through the context's registerQuestion. The
+    // component-level integration is covered by
     // quiz-payload-integration.test.ts; this just checks the context handle is
     // published from inside useQuiz.
     const m = mountHarness({ graded: true });

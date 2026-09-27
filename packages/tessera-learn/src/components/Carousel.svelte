@@ -2,7 +2,8 @@
   import { createContext } from 'svelte';
 
   /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number }>>} */
-  export const [getCarouselContext, setCarouselContext] = createContext();
+  const [getCarouselContext, setCarouselContext] = createContext();
+  export { getCarouselContext };
 </script>
 
 <script>

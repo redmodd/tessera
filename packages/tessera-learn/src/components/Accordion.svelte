@@ -2,7 +2,8 @@
   import { createContext } from 'svelte';
 
   /** @type {ReturnType<typeof createContext<{ readonly openId: string | null; toggle(id: string): void }>>} */
-  export const [getAccordionContext, setAccordionContext] = createContext();
+  const [getAccordionContext, setAccordionContext] = createContext();
+  export { getAccordionContext };
 </script>
 
 <script>
