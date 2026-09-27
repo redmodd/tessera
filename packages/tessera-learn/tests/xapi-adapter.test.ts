@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import {
   flush,
+  noDeadline,
   postedStatements,
   requests,
   respond,
@@ -266,7 +267,7 @@ describe('XAPIAdapter', () => {
     await adapter.init();
     await flush();
 
-    expect(await adapter.exit()).toBe(false);
+    expect(await adapter.exit(noDeadline)).toBe(false);
     expect(posted().map((s) => s.verb.id)).toContain(
       'http://adlnet.gov/expapi/verbs/terminated',
     );

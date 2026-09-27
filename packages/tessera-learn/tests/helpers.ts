@@ -69,6 +69,8 @@ export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
 /** Let an adapter's async write queue drain. */
 export const flush = () => new Promise<void>((r) => setTimeout(r));
 
+export const noDeadline = new Promise<never>(() => {});
+
 export function useFakeTimers(): void {
   vi.useFakeTimers();
   onTestFinished(() => {

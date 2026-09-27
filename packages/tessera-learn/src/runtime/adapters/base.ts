@@ -84,8 +84,11 @@ export abstract class BaseAdapter {
   commit(): void {}
   terminate(): void {}
 
-  /** End the session from the course. Resolves true when it sent the learner back to the LMS. */
-  async exit(): Promise<boolean> {
+  /**
+   * End the session from the course, waiting on the LMS no longer than the
+   * deadline. Resolves true when it sent the learner back to the LMS.
+   */
+  async exit(_deadline: Promise<unknown>): Promise<boolean> {
     this.terminate();
     return false;
   }

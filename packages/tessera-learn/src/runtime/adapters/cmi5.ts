@@ -230,9 +230,9 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     super.setSuccessStatus(status);
   }
 
-  override terminate(): void {
+  override terminate(unloading?: boolean): void {
     if (this.#heldFailed) super.setSuccessStatus('failed');
-    super.terminate();
+    super.terminate(unloading);
   }
 
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */

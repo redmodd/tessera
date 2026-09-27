@@ -8,12 +8,12 @@ import {
   CMI5_LAUNCH,
   cmi5Fetch,
   flush,
+  noDeadline,
   postedStatements,
   requests,
   respond,
   setLaunchParams,
   statementRequests,
-  useFakeTimers,
 } from './helpers.js';
 
 const mockFetch = vi.fn();
@@ -925,7 +925,7 @@ describe('CMI5Adapter', () => {
       adapter.setCompletionStatus('complete');
       await flush();
 
-      const exiting = adapter.exit();
+      const exiting = adapter.exit(noDeadline);
       await flush();
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(assign).not.toHaveBeenCalled();
@@ -936,13 +936,26 @@ describe('CMI5Adapter', () => {
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
+    it('sends a held Failed before Terminated', async () => {
+      const adapter = await initAdapter();
+      mockFetch.mockClear();
+
+      adapter.setScore(40);
+      adapter.setSuccessStatus('failed');
+      await adapter.exit(noDeadline);
+
+      const ids = sentVerbs();
+      expect(ids).toContain('failed');
+      expect(ids.indexOf('failed')).toBeLessThan(ids.indexOf('terminated'));
+    });
+
     it('saves the final state once, without keepalive', async () => {
       const adapter = await initAdapter();
       await adapter.loadState();
 
       mockFetch.mockClear();
       adapter.saveState({ b: 1 } as never);
-      await adapter.exit();
+      await adapter.exit(noDeadline);
 
       const puts = stateWrites();
       expect(puts).toHaveLength(1);
@@ -960,7 +973,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValueOnce(respond(500));
       adapter.saveState({ b: 1 } as never);
-      await adapter.exit();
+      await adapter.exit(noDeadline);
 
       const exitPut = stateWrites().find(([url]: any[]) =>
         url.includes('tessera-state-exit'),
@@ -977,9 +990,11 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
       adapter.saveState({ b: 1 } as never);
-      useFakeTimers();
-      const exiting = adapter.exit();
-      await vi.advanceTimersByTimeAsync(10_000);
+      const deadline = Promise.withResolvers<void>();
+      const exiting = adapter.exit(deadline.promise);
+      await flush();
+      expect(assign).not.toHaveBeenCalled();
+      deadline.resolve();
       expect(await exiting).toBe(true);
 
       expect(assign).toHaveBeenCalledWith(returnURL);
@@ -998,7 +1013,7 @@ describe('CMI5Adapter', () => {
 
         const assign = stubLocationAssign();
 
-        expect(await adapter.exit()).toBe(false);
+        expect(await adapter.exit(noDeadline)).toBe(false);
         expect(assign).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining(`returnURL "${returnURL}"`),
@@ -1012,7 +1027,7 @@ describe('CMI5Adapter', () => {
       const assign = stubLocationAssign();
       mockFetch.mockClear();
 
-      expect(await adapter.exit()).toBe(false);
+      expect(await adapter.exit(noDeadline)).toBe(false);
       expect(statementFor('terminated')).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });

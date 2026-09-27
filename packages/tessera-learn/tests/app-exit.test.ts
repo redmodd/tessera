@@ -250,6 +250,19 @@ describe('exiting a course', () => {
     );
   });
 
+  it('bounds the xAPI flush and the adapter exit by one deadline', async () => {
+    const flush = vi.fn(async (_deadline: Promise<unknown>) => {});
+    const exit = vi.fn(async () => false);
+    const { adapter } = recordingAdapter({ exit });
+    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+
+    exitButton()!.click();
+
+    await vi.waitFor(() =>
+      expect(exit).toHaveBeenCalledWith(flush.mock.calls[0][0]),
+    );
+  });
+
   it('switches xAPI sends to keepalive on pagehide but not on exit', async () => {
     const markUnloading = vi.fn();
     const { adapter } = recordingAdapter();

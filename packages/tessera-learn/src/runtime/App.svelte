@@ -31,7 +31,7 @@
   // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
   // have no deadline of their own, and the first page waits on all three.
   const INIT_TIMEOUT_MS = 15_000;
-  const EXIT_FLUSH_TIMEOUT_MS = 10_000;
+  const EXIT_TIMEOUT_MS = 10_000;
 
   const config = $state(rawConfig);
 
@@ -436,10 +436,13 @@
     loadGeneration++;
     pageLoading = false;
     await courseUnmounted;
-    await xapiClient?.flush(EXIT_FLUSH_TIMEOUT_MS, adapter.launchPublisher());
+    const deadline = new Promise((resolve) =>
+      setTimeout(resolve, EXIT_TIMEOUT_MS),
+    );
+    await xapiClient?.flush(deadline);
     const returned =
       endSession() &&
-      (await adapter.exit().catch((err) => {
+      (await adapter.exit(deadline).catch((err) => {
         console.warn('Tessera: exit failed', err);
         return false;
       }));

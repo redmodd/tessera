@@ -4,7 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, scorm2004Api, valuesUnder } from './helpers.js';
+import { flush, noDeadline, scorm2004Api, valuesUnder } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -199,7 +199,7 @@ describe('SCORM2004Adapter', () => {
       });
 
       adapter.setExit(mode);
-      expect(await adapter.exit()).toBe(false);
+      expect(await adapter.exit(noDeadline)).toBe(false);
 
       expect(order.slice(-2)).toEqual([
         `adl.nav.request=${request}`,
