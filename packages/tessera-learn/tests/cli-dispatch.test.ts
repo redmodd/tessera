@@ -1,14 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  mkdirSync,
-  writeFileSync,
-  rmSync,
-  existsSync,
-  readdirSync,
-} from 'node:fs';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mkdirSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { main } from '../src/plugin/cli.js';
+import { makeWorkspace, printed } from './helpers.js';
 
 const { runAudit, runBuild, runDev, runValidate } = vi.hoisted(() => ({
   runAudit: vi.fn(async () => 0),
@@ -25,36 +19,16 @@ vi.mock('../src/plugin/validate-cli.js', () => ({ runValidate }));
 
 let ws: string;
 let course: string;
-let counter = 0;
 
-function makeWorkspace(courses: string[]): string {
-  counter++;
-  const root = resolve(tmpdir(), `tessera-cli-disp-${Date.now()}-${counter}`);
-  mkdirSync(join(root, 'courses'), { recursive: true });
-  for (const name of courses) {
-    const dir = join(root, 'courses', name);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'course.config.js'), 'export default {};');
-  }
-  return root;
-}
-
-function stderr(): string {
-  return vi.mocked(console.error).mock.calls.flat().join('\n');
-}
+const stderr = () => printed(vi.mocked(console.error));
 
 beforeEach(() => {
-  vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
-  ws = makeWorkspace(['getting-started']);
+  ws = makeWorkspace();
   course = join(ws, 'courses', 'getting-started');
-});
-
-afterEach(() => {
-  try {
-    rmSync(ws, { recursive: true, force: true });
-  } catch {}
+  mkdirSync(course);
+  writeFileSync(join(course, 'course.config.js'), 'export default {};');
 });
 
 describe('main dispatch', () => {

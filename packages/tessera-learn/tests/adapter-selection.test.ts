@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createAdapter,
   LMSAdapterError,
@@ -10,7 +10,7 @@ import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import { scorm12Api, scorm2004Api } from './helpers.js';
+import { scorm12Api, scorm2004Api, setLaunchParams } from './helpers.js';
 
 function makeConfig(standard: string): CourseConfig {
   return {
@@ -23,14 +23,6 @@ function makeConfig(standard: string): CourseConfig {
 }
 
 describe('createAdapter', () => {
-  beforeEach(() => {
-    vi.stubGlobal('localStorage', {
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-    });
-  });
-
   afterEach(() => {
     // Clean up any window.API stubs
     delete (window as any).API;
@@ -80,11 +72,7 @@ describe('createAdapter', () => {
   });
 
   it('falls back to WebAdapter for cmi5 when launch params not found (dev)', () => {
-    Object.defineProperty(window, 'location', {
-      value: new URL('http://localhost/'),
-      writable: true,
-      configurable: true,
-    });
+    setLaunchParams();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(WebAdapter);
@@ -94,34 +82,26 @@ describe('createAdapter', () => {
   });
 
   it('returns CMI5Adapter when launch params are present', () => {
-    const params = new URLSearchParams({
+    const params = {
       fetch: 'https://lms.example.com/fetch',
       endpoint: 'https://lms.example.com/xapi/',
       activityId: 'https://example.com/course/1',
       actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
       registration: 'reg-123',
-    });
-    Object.defineProperty(window, 'location', {
-      value: new URL(`http://localhost/?${params.toString()}`),
-      writable: true,
-      configurable: true,
-    });
+    };
+    setLaunchParams(params);
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(CMI5Adapter);
   });
 
   it('returns XAPIAdapter when xapi launch params are present', () => {
-    const params = new URLSearchParams({
+    const params = {
       endpoint: 'https://lrs.example.com/xapi/',
       auth: 'Zm9vOmJhcg==',
       actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
       activity_id: 'urn:tessera:au:abc',
-    });
-    Object.defineProperty(window, 'location', {
-      value: new URL(`http://localhost/?${params.toString()}`),
-      writable: true,
-      configurable: true,
-    });
+    };
+    setLaunchParams(params);
     const adapter = createAdapter(makeConfig('xapi'));
     expect(adapter).toBeInstanceOf(XAPIAdapter);
   });
@@ -130,14 +110,13 @@ describe('createAdapter', () => {
     it('throws LMSAdapterError for scorm12 when API missing', () => {
       expect(() =>
         createAdapter(makeConfig('scorm12'), { allowFallback: false }),
-      ).toThrow(LMSAdapterError);
-      try {
-        createAdapter(makeConfig('scorm12'), { allowFallback: false });
-      } catch (err: any) {
-        expect(err).toBeInstanceOf(LMSAdapterError);
-        expect(err.standard).toBe('scorm12');
-        expect(err.message).toContain('SCORM 1.2');
-      }
+      ).toThrow(
+        expect.objectContaining({
+          constructor: LMSAdapterError,
+          standard: 'scorm12',
+          message: expect.stringContaining('SCORM 1.2'),
+        }),
+      );
     });
 
     it('throws LMSAdapterError for scorm2004 when API missing', () => {
@@ -147,22 +126,14 @@ describe('createAdapter', () => {
     });
 
     it('throws LMSAdapterError for cmi5 when launch params missing', () => {
-      Object.defineProperty(window, 'location', {
-        value: new URL('http://localhost/'),
-        writable: true,
-        configurable: true,
-      });
+      setLaunchParams();
       expect(() =>
         createAdapter(makeConfig('cmi5'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);
     });
 
     it('throws LMSAdapterError for xapi when launch params missing', () => {
-      Object.defineProperty(window, 'location', {
-        value: new URL('http://localhost/'),
-        writable: true,
-        configurable: true,
-      });
+      setLaunchParams();
       expect(() =>
         createAdapter(makeConfig('xapi'), { allowFallback: false }),
       ).toThrow(LMSAdapterError);

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
 import { mount, unmount } from 'svelte';
 import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
@@ -663,12 +663,9 @@ describe('QuizEngine', () => {
       'dup-2',
       'dup-3',
     ]);
-    const matched = warn.mock.calls.some((args) =>
-      args.some(
-        (a) => typeof a === 'string' && /duplicate question id/i.test(a),
-      ),
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/duplicate question id/i),
     );
-    expect(matched).toBe(true);
   });
 
   it('warns that a rewritten id took an id a later question owns', () => {
@@ -682,13 +679,9 @@ describe('QuizEngine', () => {
       'dup-2',
       'dup-2-2',
     ]);
-    const matched = warn.mock.calls.some((args) =>
-      args.some(
-        (a) =>
-          typeof a === 'string' && /is already taken by an earlier/.test(a),
-      ),
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/is already taken by an earlier/),
     );
-    expect(matched).toBe(true);
   });
 
   it('reports a rewritten duplicate id under its unique id', () => {
@@ -706,10 +699,9 @@ describe('QuizEngine', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine();
     engine.submit();
-    const matched = warn.mock.calls.some((args) =>
-      args.some((a) => typeof a === 'string' && /nothing was scored/i.test(a)),
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringMatching(/nothing was scored/i),
     );
-    expect(matched).toBe(false);
   });
 
   it('scores and reports with no element bound', () => {
@@ -782,29 +774,17 @@ function mountHarness(
       pageIndex: opts.pageIndex ?? 0,
     },
   });
+  onTestFinished(() => unmount(component));
   return { component, target, ref };
 }
 
 describe('useQuiz (Svelte wrapper)', () => {
-  let mountings: ReturnType<typeof mountHarness>[] = [];
-
   beforeEach(() => {
-    mountings = [];
-    document.body.innerHTML = '';
-  });
-
-  afterEach(() => {
-    for (const m of mountings) {
-      try {
-        unmount(m.component);
-      } catch {}
-    }
     document.body.innerHTML = '';
   });
 
   it('throws when called on a page with no quiz config', () => {
     const m = mountHarness(null);
-    mountings.push(m);
     expect(m.ref.thrown).toBeInstanceOf(Error);
     expect((m.ref.thrown as Error).message).toMatch(/quiz config/i);
   });
@@ -815,7 +795,6 @@ describe('useQuiz (Svelte wrapper)', () => {
     // quiz-payload-integration.test.ts; this just checks the context handle is
     // published from inside useQuiz.
     const m = mountHarness({ graded: true });
-    mountings.push(m);
     expect(m.ref.handle).not.toBeNull();
   });
 
@@ -824,7 +803,6 @@ describe('useQuiz (Svelte wrapper)', () => {
     // receive tessera-page from App.svelte. A non-default maxAttempts proves the
     // read goes through pageCtx, not a baked-in default.
     const m = mountHarness({ graded: true, maxAttempts: 1 });
-    mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
@@ -837,7 +815,6 @@ describe('useQuiz (Svelte wrapper)', () => {
       { graded: true, maxAttempts: 2 },
       { quizState: { attempts: 2, score: 60 } },
     );
-    mountings.push(m);
     const q = m.ref.handle!;
     expect(q.state).toBe('submitted');
     expect(q.score).toBe(60);
@@ -857,7 +834,6 @@ describe('useQuiz (Svelte wrapper)', () => {
       { graded: true },
       { nullElement: true, navCtx, pageIndex: 3 },
     );
-    mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
@@ -868,7 +844,6 @@ describe('useQuiz (Svelte wrapper)', () => {
 
   it('dispatches tessera-quiz-complete on the element when one is supplied', () => {
     const m = mountHarness({ graded: true });
-    mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
@@ -881,13 +856,9 @@ describe('useQuiz (Svelte wrapper)', () => {
     // silently overwrites the first. Surface that as a dev warning.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = mountHarness({ graded: true }, { secondQuiz: true });
-    mountings.push(m);
     expect(m.ref.handle).not.toBeNull();
     expect(m.ref.secondHandle).not.toBeNull();
-    const matched = warn.mock.calls.some((args) =>
-      args.some((a) => typeof a === 'string' && /second quiz/i.test(a)),
-    );
-    expect(matched).toBe(true);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/second quiz/i));
   });
 
   it('warns when submit() unmounts without ever firing (custom shell forgot to call it)', async () => {
@@ -903,12 +874,9 @@ describe('useQuiz (Svelte wrapper)', () => {
       answersCount: 1,
       submitCalled: false,
     });
-    const matched = warn.mock.calls.some((args) =>
-      args.some(
-        (a) => typeof a === 'string' && /submit\(\) was never called/i.test(a),
-      ),
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/submit\(\) was never called/i),
     );
-    expect(matched).toBe(true);
 
     // Inverse: nothing answered, or already submitted → no warning.
     warn.mockClear();
@@ -922,7 +890,7 @@ describe('useQuiz (Svelte wrapper)', () => {
       answersCount: 1,
       submitCalled: true,
     });
-    expect(warn.mock.calls.length).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('warns when a quiz mounts with no registered questions', async () => {
@@ -932,16 +900,13 @@ describe('useQuiz (Svelte wrapper)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
     __warnEmptyQuiz(0);
-    const matched = warn.mock.calls.some((args) =>
-      args.some(
-        (a) => typeof a === 'string' && /no registered questions/i.test(a),
-      ),
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/no registered questions/i),
     );
-    expect(matched).toBe(true);
 
     // Inverse: any registered question → no warning.
     warn.mockClear();
     __warnEmptyQuiz(1);
-    expect(warn.mock.calls.length).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

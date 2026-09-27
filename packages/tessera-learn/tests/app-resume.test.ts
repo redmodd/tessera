@@ -1,35 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { stubAdapter } from './helpers.js';
+import { describe, it, expect, vi } from 'vitest';
+import { createManifest, mountApp, stubAdapter } from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
-const page = {
-  index: 0,
-  title: 'Welcome',
-  slug: 'welcome',
-  importPath: '/pages/01-intro/01-lesson/welcome.svelte',
-  quiz: null,
-};
-const secondPage = {
-  ...page,
-  index: 1,
-  title: 'Next',
-  slug: 'next',
-  graded: true,
-};
-
-const manifest = {
-  sections: [
-    {
-      title: 'Intro',
-      slug: 'intro',
-      lessons: [{ title: 'Lesson', slug: 'lesson', pages: [page, secondPage] }],
-    },
-  ],
-  pages: [page, secondPage],
-  totalPages: 2,
-};
+const manifest = createManifest(2, {}, { 1: { graded: true } });
 
 function savedWith(fields: object) {
   return {
@@ -53,24 +28,7 @@ function makeConfig(resume: 'auto' | 'never') {
   };
 }
 
-function makeAdapter(saved: unknown, seeds: boolean) {
-  const spies = {
-    seedLifecycle: vi.fn(() => seeds),
-    setCompletionStatus: vi.fn(),
-    saveState: vi.fn(),
-    setScore: vi.fn(),
-    setSuccessStatus: vi.fn(),
-  };
-  return {
-    spies,
-    adapter: stubAdapter({
-      getState: () => saved as SavedState | null,
-      ...spies,
-    }),
-  };
-}
-
-async function mountApp(
+async function mount(
   resume: 'auto' | 'never',
   options: {
     saved?: unknown;
@@ -78,54 +36,44 @@ async function mountApp(
     seeds?: boolean;
   } = {},
 ) {
-  const { adapter, spies } = makeAdapter(
-    options.saved ?? savedWith({}),
-    options.seeds ?? true,
-  );
-  // App.svelte imports config at module scope, so the stubs need re-evaluating
-  // for the second mount to see a different resume mode. Svelte and the page
-  // come from that same fresh registry or every $effect is orphaned against a
-  // second runtime instance.
-  vi.resetModules();
-  const { mount, unmount } = await import('svelte');
-  (globalThis as any).__tesseraTest = {
+  const saved = options.saved ?? savedWith({});
+  const spies = {
+    seedLifecycle: vi.fn(() => options.seeds ?? true),
+    setCompletionStatus: vi.fn(),
+    saveState: vi.fn(),
+    setScore: vi.fn(),
+    setSuccessStatus: vi.fn(),
+  };
+  const pageModule =
+    options.pageModule ?? (() => import('./fixtures/app-page.svelte'));
+  await mountApp({
     config: makeConfig(resume),
     manifest,
-    pageModules: {
-      [page.importPath]:
-        options.pageModule ?? (() => import('./fixtures/app-page.svelte')),
-    },
-    adapter,
-  };
-  const App = (await import('../src/runtime/App.svelte')).default;
-  const component = mount(App, { target: document.body });
+    pageModules: Object.fromEntries(
+      manifest.pages.map((p) => [p.importPath, pageModule]),
+    ),
+    adapter: stubAdapter({
+      getState: () => saved as SavedState | null,
+      ...spies,
+    }),
+  });
   await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
-  return { component, unmount, ...spies };
+  return spies;
 }
 
 // shouldRestore itself is covered in fingerprint.test.ts. This covers the
 // argument App.svelte passes into it: config.resume, not a hardcoded mode.
 describe('App restore gate honours config.resume', () => {
-  let cleanup: (() => void) | null = null;
-
-  afterEach(() => {
-    cleanup?.();
-    cleanup = null;
-    document.body.innerHTML = '';
-    delete (globalThis as any).__tesseraTest;
-  });
-
   it('restores saved state when resume is "auto"', async () => {
-    const { component, seedLifecycle, unmount } = await mountApp('auto');
-    cleanup = () => unmount(component);
+    const { seedLifecycle } = await mount('auto');
     await vi.waitFor(() => expect(seedLifecycle).toHaveBeenCalled());
   });
 
   it('leaves a malformed saved record untouched', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { component, seedLifecycle, setCompletionStatus, unmount } =
-      await mountApp('auto', { saved: savedWith({ g: [] }) });
-    cleanup = () => unmount(component);
+    const { seedLifecycle, setCompletionStatus } = await mount('auto', {
+      saved: savedWith({ g: [] }),
+    });
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     expect(seedLifecycle).not.toHaveBeenCalled();
     expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');
@@ -136,8 +84,7 @@ describe('App restore gate honours config.resume', () => {
       c: { '1': 2 },
       g: { '0': { s: 80, a: 3 }, '1': { q: { q1: 100 } } },
     });
-    const { component, saveState, unmount } = await mountApp('auto', { saved });
-    cleanup = () => unmount(component);
+    const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
       v: [0, 1],
@@ -148,14 +95,10 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('keeps a saved completion and pass the course has since fallen below', async () => {
-    const {
-      component,
-      seedLifecycle,
-      setCompletionStatus,
-      saveState,
-      unmount,
-    } = await mountApp('auto', { saved: savedWith({ s: 1, k: 1, p: 90 }) });
-    cleanup = () => unmount(component);
+    const { seedLifecycle, setCompletionStatus, saveState } = await mount(
+      'auto',
+      { saved: savedWith({ s: 1, k: 1, p: 90 }) },
+    );
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
@@ -164,12 +107,10 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {
-    const { component, seedLifecycle, setSuccessStatus, saveState, unmount } =
-      await mountApp('auto', {
-        saved: savedWith({ v: [1], k: 1, g: { '1': { q: { q1: 90 } } } }),
-        pageModule: () => import('./fixtures/app-page-graded.svelte'),
-      });
-    cleanup = () => unmount(component);
+    const { seedLifecycle, setSuccessStatus, saveState } = await mount('auto', {
+      saved: savedWith({ v: [1], k: 1, g: { '1': { q: { q1: 90 } } } }),
+      pageModule: () => import('./fixtures/app-page-graded.svelte'),
+    });
     await vi.waitFor(() =>
       expect(saveState.mock.calls.at(-1)?.[0].g['1'].w).toEqual(['q2']),
     );
@@ -180,8 +121,7 @@ describe('App restore gate honours config.resume', () => {
 
   it('drops a saved unanswered question the page no longer renders', async () => {
     const saved = savedWith({ g: { '1': { q: { q1: 100 }, w: ['q3'] } } });
-    const { component, saveState, unmount } = await mountApp('auto', { saved });
-    cleanup = () => unmount(component);
+    const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() =>
       expect(saveState.mock.calls.at(-1)?.[0].g).toEqual({
         '1': { q: { q1: 100 } },
@@ -194,8 +134,7 @@ describe('App restore gate honours config.resume', () => {
       b: 0,
       g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
     });
-    const { component, saveState, unmount } = await mountApp('auto', { saved });
-    cleanup = () => unmount(component);
+    const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
       g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
@@ -203,11 +142,10 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('saves a restored answer whose question is no longer graded as ungraded', async () => {
-    const { component, saveState, unmount } = await mountApp('auto', {
+    const { saveState } = await mount('auto', {
       saved: savedWith({ g: { '1': { q: { q1: 100 } } } }),
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
-    cleanup = () => unmount(component);
     await vi.waitFor(() =>
       expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({
         g: { '1': { q: { q1: [100, 1, 0] } } },
@@ -220,27 +158,24 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('reports no score for a resume that only restores what was saved', async () => {
-    const { component, saveState, seedLifecycle, setScore, unmount } =
-      await mountApp('auto', { saved: scoredSave });
-    cleanup = () => unmount(component);
+    const { saveState, seedLifecycle, setScore } = await mount('auto', {
+      saved: scoredSave,
+    });
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(seedLifecycle).toHaveBeenCalledWith('complete', 'failed', 33.33);
     expect(setScore).not.toHaveBeenCalled();
   });
 
   it('re-reports the restored score to an adapter that does not seed', async () => {
-    const { component, setScore, unmount } = await mountApp('auto', {
+    const { setScore } = await mount('auto', {
       saved: scoredSave,
       seeds: false,
     });
-    cleanup = () => unmount(component);
     await vi.waitFor(() => expect(setScore).toHaveBeenCalledWith(33.33));
   });
 
   it('ignores saved state when resume is "never"', async () => {
-    const { component, seedLifecycle, setCompletionStatus, unmount } =
-      await mountApp('never');
-    cleanup = () => unmount(component);
+    const { seedLifecycle, setCompletionStatus } = await mount('never');
     // App pushes completion status unconditionally just past the restore gate,
     // so waiting on it proves the gate ran and declined rather than that init
     // is still in flight.

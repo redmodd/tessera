@@ -2,7 +2,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
-import { createManifest, flush, stubAdapter } from './helpers.js';
+import {
+  createManifest,
+  flush,
+  mountApp,
+  setLaunchParams,
+  stubAdapter,
+} from './helpers.js';
 
 const ACTOR = {
   objectType: 'Agent',
@@ -21,7 +27,7 @@ const config = {
   export: { standard: 'xapi' },
 };
 
-async function mountApp(
+async function mount(
   adapter: BaseAdapter,
   {
     course = manifest,
@@ -33,25 +39,19 @@ async function mountApp(
     loadPage?: () => Promise<unknown>;
   } = {},
 ) {
-  vi.resetModules();
-  const { mount, unmount } = await import('svelte');
-  (globalThis as any).__tesseraTest = {
+  await mountApp({
     config,
     manifest: course,
     pageModules: Object.fromEntries(
       course.pages.map((p) => [p.importPath, loadPage]),
     ),
     adapter,
-    layout: (await loadLayout()).default,
-  };
-  const App = (await import('../src/runtime/App.svelte')).default;
-  const component = mount(App, { target: document.body });
-
+    loadLayout,
+  });
   await vi.waitFor(() =>
     expect((globalThis as any).__tesseraNavCtx).toBeTruthy(),
   );
-  const { progress } = (globalThis as any).__tesseraNavCtx;
-  return { cleanup: () => unmount(component), progress };
+  return (globalThis as any).__tesseraNavCtx.progress;
 }
 
 async function mountLaunched() {
@@ -70,52 +70,43 @@ async function mountLaunched() {
     }),
   );
 
-  const params = new URLSearchParams({
+  setLaunchParams({
     endpoint: 'https://lrs.example/xapi',
     auth: 'Basic Zm9vOmJhcg==',
     actor: JSON.stringify(ACTOR),
     activity_id: 'urn:tessera:au:abc',
     registration: '2d8b1e1e-0000-4000-8000-000000000000',
   });
-  window.history.replaceState({}, '', `/?${params}`);
 
-  return { ...(await mountApp(new XAPIAdapter())), verbs };
+  return { progress: await mount(new XAPIAdapter()), verbs };
 }
 
 describe('a graded submit that decides the verdict', () => {
-  let cleanup: (() => void) | null = null;
-
   afterEach(() => {
-    cleanup?.();
-    cleanup = null;
-    document.body.innerHTML = '';
-    delete (globalThis as any).__tesseraTest;
     delete (globalThis as any).__tesseraNavCtx;
     delete (globalThis as any).__showLateCheck;
     window.history.replaceState({}, '', '/');
   });
 
   it('reports the score on the verdict instead of a statement of its own', async () => {
-    const mounted = await mountLaunched();
-    cleanup = mounted.cleanup;
-    await vi.waitFor(() => expect(mounted.verbs).toContain('initialized'));
-    mounted.verbs.length = 0;
+    const { progress, verbs } = await mountLaunched();
+    await vi.waitFor(() => expect(verbs).toContain('initialized'));
+    verbs.length = 0;
 
-    mounted.progress.quizCompleted(0, 90);
+    progress.quizCompleted(0, 90);
 
-    await vi.waitFor(() => expect(mounted.verbs).toContain('passed'));
+    await vi.waitFor(() => expect(verbs).toContain('passed'));
     await flush();
 
-    expect(mounted.verbs).not.toContain('scored');
+    expect(verbs).not.toContain('scored');
   });
 
   it('sends the verdict once, not again from the success effect', async () => {
     const setSuccessStatus = vi.fn();
-    const mounted = await mountApp(stubAdapter({ setSuccessStatus }));
-    cleanup = mounted.cleanup;
+    const progress = await mount(stubAdapter({ setSuccessStatus }));
     await flush();
 
-    mounted.progress.quizCompleted(0, 90);
+    progress.quizCompleted(0, 90);
     await flush();
 
     expect(setSuccessStatus.mock.calls.map(([status]) => status)).toEqual([
@@ -125,12 +116,11 @@ describe('a graded submit that decides the verdict', () => {
   });
 
   it('records a graded question in the layout against no page', async () => {
-    const mounted = await mountApp(stubAdapter(), {
+    const progress = await mount(stubAdapter(), {
       course: createManifest(1, {}, { 0: { graded: true } }),
       loadLayout: () => import('./fixtures/question-layout.svelte'),
       loadPage: () => import('./fixtures/app-page.svelte'),
     });
-    cleanup = mounted.cleanup;
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),
     );
@@ -138,15 +128,15 @@ describe('a graded submit that decides the verdict', () => {
     (globalThis as any).__showLateCheck();
     await flush();
 
-    expect(mounted.progress.gradedUnits.size).toBe(0);
-    expect(mounted.progress.successStatus).toBe('unknown');
+    expect(progress.gradedUnits.size).toBe(0);
+    expect(progress.successStatus).toBe('unknown');
   });
 
   it('holds the completion a later optional page would take back', async () => {
     const setCompletionStatus = vi.fn();
     const setExit = vi.fn();
     const saveState = vi.fn();
-    const mounted = await mountApp(
+    const progress = await mount(
       stubAdapter({ setCompletionStatus, setExit, saveState }),
       {
         course: createManifest(
@@ -156,16 +146,15 @@ describe('a graded submit that decides the verdict', () => {
         ),
       },
     );
-    cleanup = mounted.cleanup;
     await flush();
 
-    mounted.progress.quizCompleted(0, 90);
+    progress.quizCompleted(0, 90);
     await flush();
 
-    mounted.progress.quizCompleted(1, 0);
+    progress.quizCompleted(1, 0);
     await flush();
 
-    expect(mounted.progress.completionStatus).toBe('incomplete');
+    expect(progress.completionStatus).toBe('incomplete');
     expect(setCompletionStatus.mock.calls.map(([status]) => status)).toEqual([
       'incomplete',
       'complete',

@@ -6,7 +6,7 @@ import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import { scorm12Api } from './helpers.js';
+import { scorm12Api, setLaunchParams } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -20,15 +20,6 @@ const baseLaunchParams = {
     name: 'Learner',
   }),
 };
-
-function setSearchParams(params: Record<string, string>) {
-  const url = `http://localhost/?${new URLSearchParams(params).toString()}`;
-  Object.defineProperty(window, 'location', {
-    value: new URL(url),
-    writable: true,
-    configurable: true,
-  });
-}
 
 function setupLMSMocks() {
   mockFetch.mockImplementation(async (url: string, _options?: RequestInit) => {
@@ -57,19 +48,21 @@ function baseConfig(): CourseConfig {
   } as CourseConfig;
 }
 
-describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
-  let adapter: CMI5Adapter;
+async function initCMI5Adapter() {
+  const adapter = new CMI5Adapter();
+  await adapter.init();
+  return adapter;
+}
 
+describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
-    setSearchParams(baseLaunchParams);
+    vi.stubGlobal('fetch', mockFetch);
+    setLaunchParams(baseLaunchParams);
     setupLMSMocks();
   });
 
   it("fan-outs a useXAPI() sendStatement through the cmi5 publisher (endpoint: 'lms')", async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
 
     const config = baseConfig();
     config.xapi = { endpoint: 'lms' };
@@ -107,8 +100,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it('explicit cmi5 destination inherits the launch actor when xapi.actor is omitted', async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
 
     const config = baseConfig();
     config.xapi = {
@@ -127,8 +119,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it('explicit destination takes auth and actor resolvers from course.runtime.js by id', async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
 
     const config = baseConfig();
     config.xapi = {
@@ -159,8 +150,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it('explicit destination with auth in neither file rejects sends instead of going unauthenticated', async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
 
     const config = baseConfig();
     config.xapi = {
@@ -189,8 +179,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it("mixed destinations: 'lms' + explicit both materialize and fan-out", async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
 
     const config = baseConfig();
     config.xapi = [
@@ -225,8 +214,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it('skips a destination the publisher rejects without dropping the others', async () => {
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    const adapter = await initCMI5Adapter();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const config = baseConfig();
@@ -262,7 +250,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 
   it("dev fallback: 'lms' under cmi5 with no launch params surfaces a clear error on send", async () => {
     // No launch params: createAdapter's dev fallback is a WebAdapter.
-    setSearchParams({});
+    setLaunchParams({});
 
     const config = baseConfig();
     config.xapi = { endpoint: 'lms' };
@@ -280,7 +268,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
   });
 
   it('dev fallback: an explicit destination with no actor under cmi5 rejects sends', async () => {
-    setSearchParams({});
+    setLaunchParams({});
 
     const config = baseConfig();
     config.xapi = {
@@ -313,9 +301,8 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
   };
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
-    setSearchParams(xapiLaunch);
+    vi.stubGlobal('fetch', mockFetch);
+    setLaunchParams(xapiLaunch);
     mockFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('activities/state')) {
         return { ok: false, status: 404 };
@@ -367,7 +354,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
   });
 
   it("dev fallback: 'lms' under xapi with no launch params surfaces an xAPI-specific error", async () => {
-    setSearchParams({});
+    setLaunchParams({});
 
     const config = {
       ...baseConfig(),

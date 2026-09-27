@@ -1,9 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   withRetry,
   callSync,
   WriteQueue,
 } from '../src/runtime/adapters/retry.js';
+import { flush } from './helpers.js';
 
 describe('withRetry', () => {
   it('returns true on first success', async () => {
@@ -61,12 +62,6 @@ describe('withRetry', () => {
       expect.stringContaining('LMS call failed after retries'),
     );
   });
-
-  it('logs warning on exhausted retries', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await withRetry(() => false, 1);
-    expect(warnSpy).toHaveBeenCalled();
-  });
 });
 
 describe('callSync', () => {
@@ -92,6 +87,10 @@ describe('callSync', () => {
 });
 
 describe('WriteQueue', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('flushes operations sequentially', async () => {
     const order: number[] = [];
     const queue = new WriteQueue();
@@ -109,13 +108,13 @@ describe('WriteQueue', () => {
       return 'true';
     });
 
-    // Let async flush complete
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
     expect(order).toEqual([1, 2, 3]);
     expect(queue.pending).toBe(0);
   });
 
   it('stops on failure and retries on next trigger', async () => {
+    vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
     let failFirst = true;
@@ -136,8 +135,7 @@ describe('WriteQueue', () => {
       return 'true';
     });
 
-    // Let async flush complete (with retries)
-    await new Promise((r) => setTimeout(r, 2000));
+    await vi.runAllTimersAsync();
 
     // 'a' succeeded, 'b' failed after retries, 'c' never ran
     expect(calls.filter((c) => c === 'a').length).toBe(1);
@@ -153,7 +151,7 @@ describe('WriteQueue', () => {
       return 'true';
     });
 
-    await new Promise((r) => setTimeout(r, 200));
+    await vi.runAllTimersAsync();
 
     // b, c, d should all succeed now
     expect(calls).toContain('b-attempt');

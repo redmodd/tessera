@@ -1,14 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
-import {
-  useCompletion,
-  __resetUseCompletionWarning,
-} from '../src/runtime/hooks.svelte.js';
+import { useCompletion } from '../src/runtime/hooks.svelte.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
@@ -32,113 +29,75 @@ import type { ManifestPage } from '../src/plugin/manifest.js';
 // 1. Validation
 // ============================================================================
 
-let testRoot: string;
-let counter = 0;
-
-function createTestDir(): string {
-  counter++;
-  const dir = resolve(tmpdir(), `tessera-manual-${Date.now()}-${counter}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function writeFile(root: string, relPath: string, content: string): void {
-  const fullPath = resolve(root, relPath);
-  mkdirSync(resolve(fullPath, '..'), { recursive: true });
-  writeFileSync(fullPath, content, 'utf-8');
-}
-
-function writeConfig(root: string, content: string): void {
-  writeFileSync(resolve(root, 'course.config.js'), content, 'utf-8');
-}
-
-function mkdirp(...parts: string[]): void {
-  mkdirSync(join(...parts), { recursive: true });
-}
-
-/** Project with no completesOn pages. */
-function createBareProject(root: string, configBody: string): void {
-  writeConfig(root, configBody);
-  mkdirp(root, 'assets');
-  mkdirp(root, 'pages', '01-section', '01-lesson');
-  writeFile(
-    root,
-    'pages/01-section/_meta.js',
-    'export default { title: "S" };',
-  );
-  writeFile(
-    root,
-    'pages/01-section/01-lesson/_meta.js',
-    'export default { title: "L" };',
-  );
-  writeFile(root, 'pages/01-section/01-lesson/intro.svelte', '<h1>Intro</h1>');
-  writeFile(root, 'pages/01-section/01-lesson/outro.svelte', '<h1>Outro</h1>');
-}
-
-/** Project where the second page declares completesOn: "view". */
-function createProjectWithCompletesOn(root: string, configBody: string): void {
-  writeConfig(root, configBody);
-  mkdirp(root, 'assets');
-  mkdirp(root, 'pages', '01-section', '01-lesson');
-  writeFile(
-    root,
-    'pages/01-section/_meta.js',
-    'export default { title: "S" };',
-  );
-  writeFile(
-    root,
-    'pages/01-section/01-lesson/_meta.js',
-    'export default { title: "L" };',
-  );
-  writeFile(root, 'pages/01-section/01-lesson/intro.svelte', '<h1>Intro</h1>');
-  writeFile(
-    root,
-    'pages/01-section/01-lesson/finale.svelte',
-    `<script module>
-  export const pageConfig = { title: "Finale", completesOn: "view" };
-</script>
-<h1>Finale</h1>`,
-  );
-}
-
-beforeEach(() => {
-  testRoot = createTestDir();
-});
-
-afterEach(() => {
-  try {
-    rmSync(testRoot, { recursive: true, force: true });
-  } catch {
-    // best-effort cleanup
-  }
-});
-
-const MANUAL_CONFIG = `export default {
+function courseConfig(
+  completion: string,
+  navigation = 'free',
+  extra = '',
+): string {
+  return `export default {
   title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual" },
+  navigation: { mode: "${navigation}" },
+  completion: { ${completion} },${extra}
   export: { standard: "web" },
 };`;
+}
+
+const MANUAL_CONFIG = courseConfig('mode: "manual"');
+
+function page(pageConfig: string, heading = 'Page'): string {
+  return `<script module>
+  export const pageConfig = ${pageConfig};
+</script>
+<h1>${heading}</h1>`;
+}
 
 describe('manual completion — validation', () => {
-  it('accepts completion.mode: "manual"', () => {
-    createBareProject(testRoot, MANUAL_CONFIG);
-    const { errors } = validateProject(testRoot);
-    expect(errors).toHaveLength(0);
+  let testRoot: string;
+
+  beforeEach(() => {
+    testRoot = mkdtempSync(join(tmpdir(), 'tessera-manual-'));
+    onTestFinished(() => rmSync(testRoot, { recursive: true, force: true }));
+  });
+
+  function writeFile(relPath: string, content: string): void {
+    const fullPath = join(testRoot, relPath);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+
+  function createProject(
+    configBody: string,
+    pages: Record<string, string> = {
+      'intro.svelte': '<h1>Intro</h1>',
+      'outro.svelte': '<h1>Outro</h1>',
+    },
+    lessonMeta = 'export default { title: "L" };',
+  ): void {
+    writeFile('course.config.js', configBody);
+    mkdirSync(join(testRoot, 'assets'));
+    writeFile('pages/01-section/_meta.js', 'export default { title: "S" };');
+    writeFile('pages/01-section/01-lesson/_meta.js', lessonMeta);
+    for (const [name, source] of Object.entries(pages)) {
+      writeFile(`pages/01-section/01-lesson/${name}`, source);
+    }
+  }
+
+  const errorsFor = (...args: Parameters<typeof createProject>) => {
+    createProject(...args);
+    return validateProject(testRoot).errors;
+  };
+
+  const warningsFor = (...args: Parameters<typeof createProject>) => {
+    createProject(...args);
+    return validateProject(testRoot).warnings;
+  };
+
+  it('accepts completion.mode: "manual" with no scoring block', () => {
+    expect(errorsFor(MANUAL_CONFIG)).toHaveLength(0);
   });
 
   it('rejects unknown completion.mode values', () => {
-    createBareProject(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "bogus" },
-  export: { standard: "web" },
-};`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
+    expect(errorsFor(courseConfig('mode: "bogus"'))).toContainEqual(
       expect.stringContaining(
         '"completion.mode" must be "quiz", "percentage", or "manual"',
       ),
@@ -146,31 +105,18 @@ describe('manual completion — validation', () => {
   });
 
   it('accepts completion.trigger: "page" with a completesOn page present', () => {
-    createProjectWithCompletesOn(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", trigger: "page" },
-  export: { standard: "web" },
-};`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toHaveLength(0);
+    expect(
+      errorsFor(courseConfig('mode: "manual", trigger: "page"'), {
+        'intro.svelte': '<h1>Intro</h1>',
+        'finale.svelte': page('{ title: "Finale", completesOn: "view" }'),
+      }),
+    ).toHaveLength(0);
   });
 
   it('errors on completion.trigger: "page" when no completesOn page exists', () => {
-    createBareProject(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", trigger: "page" },
-  export: { standard: "web" },
-};`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
+    expect(
+      errorsFor(courseConfig('mode: "manual", trigger: "page"')),
+    ).toContainEqual(
       expect.stringContaining(
         'completion.mode is "manual" with trigger: "page", but no page declares pageConfig.completesOn: "view"',
       ),
@@ -178,62 +124,32 @@ describe('manual completion — validation', () => {
   });
 
   it('errors on invalid completion.trigger values under manual', () => {
-    createBareProject(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", trigger: "scroll" },
-  export: { standard: "web" },
-};`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
+    expect(
+      errorsFor(courseConfig('mode: "manual", trigger: "scroll"')),
+    ).toContainEqual(
       expect.stringContaining(
         '"completion.trigger" must be "page" or omitted, got "scroll"',
       ),
     );
   });
 
-  it('passes when completion.trigger is omitted regardless of completesOn presence', () => {
-    createBareProject(testRoot, MANUAL_CONFIG);
-    const { errors } = validateProject(testRoot);
-    expect(errors).toHaveLength(0);
-  });
-
-  it('accepts requireSuccessStatus: "passed" / "failed"', () => {
-    for (const v of ['passed', 'failed']) {
-      const dir = createTestDir();
-      try {
-        createBareProject(
-          dir,
-          `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", requireSuccessStatus: "${v}" },
-  export: { standard: "web" },
-};`,
-        );
-        const { errors } = validateProject(dir);
-        expect(errors).toHaveLength(0);
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    }
-  });
+  it.each(['passed', 'failed'])(
+    'accepts requireSuccessStatus: "%s"',
+    (status) => {
+      expect(
+        errorsFor(
+          courseConfig(`mode: "manual", requireSuccessStatus: "${status}"`),
+        ),
+      ).toHaveLength(0);
+    },
+  );
 
   it('rejects requireSuccessStatus: "unknown"', () => {
-    createBareProject(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", requireSuccessStatus: "unknown" },
-  export: { standard: "web" },
-};`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
+    expect(
+      errorsFor(
+        courseConfig('mode: "manual", requireSuccessStatus: "unknown"'),
+      ),
+    ).toContainEqual(
       expect.stringContaining(
         '"completion.requireSuccessStatus" must be "passed" or "failed"',
       ),
@@ -241,240 +157,98 @@ describe('manual completion — validation', () => {
   });
 
   it('warns (not errors) when a page has quiz.graded:true under manual mode', () => {
-    writeConfig(testRoot, MANUAL_CONFIG);
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/check.svelte',
-      `<script module>
-  export const pageConfig = { quiz: { graded: true, gatesProgress: false, maxAttempts: 3 } };
-</script>
-<h1>Check</h1>`,
-    );
+    createProject(MANUAL_CONFIG, {
+      'check.svelte': page(
+        '{ quiz: { graded: true, gatesProgress: false, maxAttempts: 3 } }',
+      ),
+    });
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toHaveLength(0);
-    expect(
-      warnings.some((w) =>
-        /the page is graded under completion\.mode: "manual"/.test(w),
+    expect(warnings).toContainEqual(
+      expect.stringMatching(
+        /the page is graded under completion\.mode: "manual"/,
       ),
-    ).toBe(true);
+    );
   });
 
   it('errors when pageConfig.completesOn is not "view"', () => {
-    writeConfig(testRoot, MANUAL_CONFIG);
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/finale.svelte',
-      `<script module>
-  export const pageConfig = { completesOn: "scroll" };
-</script>
-<h1>Finale</h1>`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
+    expect(
+      errorsFor(MANUAL_CONFIG, {
+        'finale.svelte': page('{ completesOn: "scroll" }'),
+      }),
+    ).toContainEqual(
       expect.stringContaining('pageConfig.completesOn must be "view"'),
     );
   });
 
   it('warns when percentageThreshold is set under manual', () => {
-    createBareProject(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual", percentageThreshold: 80 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) =>
-        /"completion\.percentageThreshold" is ignored/.test(w),
-      ),
-    ).toBe(true);
+      warningsFor(courseConfig('mode: "manual", percentageThreshold: 80')),
+    ).toContainEqual(
+      expect.stringMatching(/"completion\.percentageThreshold" is ignored/),
+    );
   });
 
   it('warns when completesOn is set under non-manual mode', () => {
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/finale.svelte',
-      `<script module>
-  export const pageConfig = { completesOn: "view" };
-</script>
-<h1>F</h1>`,
-    );
-    const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) => /pageConfig\.completesOn is ignored/.test(w)),
-    ).toBe(true);
+      warningsFor(
+        courseConfig(
+          'mode: "percentage", percentageThreshold: 100',
+          'free',
+          '\n  scoring: { passingScore: 70 },',
+        ),
+        { 'finale.svelte': page('{ completesOn: "view" }') },
+      ),
+    ).toContainEqual(
+      expect.stringMatching(/pageConfig\.completesOn is ignored/),
+    );
   });
 
   it('warns when a page has both completesOn:"view" and a quiz block', () => {
-    writeConfig(testRoot, MANUAL_CONFIG);
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "L" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/intro.svelte',
-      '<h1>Intro</h1>',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/finale.svelte',
-      `<script module>
-  export const pageConfig = { completesOn: "view", quiz: { graded: false, maxAttempts: 1 } };
-</script>
-<h1>F</h1>`,
-    );
-    const { warnings } = validateProject(testRoot);
     expect(
-      warnings.some((w) =>
-        /completion fires on view, before the quiz can be answered/.test(w),
+      warningsFor(MANUAL_CONFIG, {
+        'intro.svelte': '<h1>Intro</h1>',
+        'finale.svelte': page(
+          '{ completesOn: "view", quiz: { graded: false, maxAttempts: 1 } }',
+        ),
+      }),
+    ).toContainEqual(
+      expect.stringMatching(
+        /completion fires on view, before the quiz can be answered/,
       ),
-    ).toBe(true);
+    );
   });
 
-  it('warns when first nav-ordered page has completesOn:"view" (sequential)', () => {
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "sequential" },
-  completion: { mode: "manual" },
-  export: { standard: "web" },
-};`,
-    );
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
+  it.each([
+    [
+      'sequential',
+      {
+        'intro.svelte': page('{ completesOn: "view" }'),
+        'outro.svelte': '<h1>Outro</h1>',
+      },
       'export default { title: "L", pages: ["intro", "outro"] };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/intro.svelte',
-      `<script module>
-  export const pageConfig = { completesOn: "view" };
-</script>
-<h1>Intro</h1>`,
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/outro.svelte',
-      '<h1>Outro</h1>',
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.some((w) =>
-        /first page — the course will complete immediately on launch/.test(w),
-      ),
-    ).toBe(true);
-  });
-
-  it('warns when first nav-ordered page has completesOn:"view" (free)', () => {
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "T",
-  navigation: { mode: "free" },
-  completion: { mode: "manual" },
-  export: { standard: "web" },
-};`,
-    );
-    mkdirp(testRoot, 'assets');
-    mkdirp(testRoot, 'pages', '01-section', '01-lesson');
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "S" };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/_meta.js',
+    ],
+    [
+      'free',
+      { 'a.svelte': page('{ completesOn: "view" }') },
       'export default { title: "L", pages: ["a"] };',
-    );
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/a.svelte',
-      `<script module>
-  export const pageConfig = { completesOn: "view" };
-</script>
-<h1>A</h1>`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.some((w) =>
-        /first page — the course will complete immediately on launch/.test(w),
-      ),
-    ).toBe(true);
-  });
-
-  it('scoring may be omitted under manual; runtime defaults passingScore to 0', () => {
-    createBareProject(testRoot, MANUAL_CONFIG);
-    const { errors } = validateProject(testRoot);
-    expect(errors).toHaveLength(0);
-  });
+    ],
+  ])(
+    'warns when first nav-ordered page has completesOn:"view" (%s)',
+    (navigation, pages, lessonMeta) => {
+      expect(
+        warningsFor(
+          courseConfig('mode: "manual"', navigation),
+          pages,
+          lessonMeta,
+        ),
+      ).toContainEqual(
+        expect.stringMatching(
+          /first page — the course will complete immediately on launch/,
+        ),
+      );
+    },
+  );
 });
 
 // ============================================================================
@@ -505,31 +279,27 @@ describe('manual completion — ProgressState', () => {
     expect(progress.version).toBe(versionAfterFirst);
   });
 
-  it('recalculateCompletion is a no-op once manuallyCompleted is true', () => {
-    const manifest = createManifest(4);
-    // Configure as percentage so recalc would normally flip back to incomplete;
-    // the manuallyCompleted latch must override that.
-    const config = createConfig({
-      completion: { mode: 'percentage', percentageThreshold: 100 },
-    });
-    const progress = new ProgressState(manifest, config);
+  it('keeps a manual completion when percentage mode would call it incomplete', () => {
+    const progress = new ProgressState(
+      createManifest(4),
+      createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 100 },
+      }),
+    );
 
     progress.markCompleteManually();
-    expect(progress.completionStatus).toBe('complete');
-
-    // Visit nothing — percentage recalc would normally set to "incomplete".
+    progress.markVisited(0);
     expect(progress.completionStatus).toBe('complete');
   });
 
-  it('recalculateCompletion under manual mode never sets status', () => {
-    const manifest = createManifest(4);
-    const config = manualConfig();
-    const progress = new ProgressState(manifest, config);
+  it('stays incomplete under manual mode after every page is visited', () => {
+    const progress = new ProgressState(createManifest(4), manualConfig());
 
+    for (let i = 0; i < 4; i++) progress.markVisited(i);
     expect(progress.completionStatus).toBe('incomplete');
   });
 
-  it('recalculateSuccess honors requireSuccessStatus only after manual mark', () => {
+  it('successStatus honors requireSuccessStatus only after manual mark', () => {
     const manifest = createManifest(2);
     const config = manualConfig({ requireSuccessStatus: 'passed' });
     const progress = new ProgressState(manifest, config);
@@ -541,7 +311,7 @@ describe('manual completion — ProgressState', () => {
     expect(progress.successStatus).toBe('passed');
   });
 
-  it('recalculateSuccess stays unknown when requireSuccessStatus is omitted', () => {
+  it('successStatus stays unknown when requireSuccessStatus is omitted', () => {
     const manifest = createManifest(2);
     const config = manualConfig();
     const progress = new ProgressState(manifest, config);
@@ -581,7 +351,6 @@ function makeNavCtx(progress: ProgressState, config: CourseConfig) {
 describe('manual completion — useCompletion hook', () => {
   beforeEach(() => {
     ctxStore.clear();
-    __resetUseCompletionWarning();
   });
 
   it('markComplete flips progress and reflects completionStatus', () => {
@@ -597,7 +366,9 @@ describe('manual completion — useCompletion hook', () => {
     expect(handle.completionStatus).toBe('complete');
   });
 
-  it('markComplete is a no-op outside manual mode and warns once per session', () => {
+  it('markComplete is a no-op outside manual mode and warns once per session', async () => {
+    vi.resetModules();
+    const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const progress = new ProgressState(createManifest(0), createConfig());
     // percentage mode (the helper default)

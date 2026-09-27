@@ -4,7 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, scorm2004Api } from './helpers.js';
+import { flush, scorm2004Api, setValuesFor } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -44,9 +44,10 @@ describe('SCORM2004Adapter', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
-    expect(
-      warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
-    ).toBe(true);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/not valid JSON/),
+      expect.any(Error),
+    );
   });
 
   it('saves state to suspend_data via queue', async () => {
@@ -303,14 +304,6 @@ describe('SCORM2004Adapter', () => {
   });
 
   describe('reportInteraction', () => {
-    function setValuesFor(prefix: string): Record<string, string> {
-      const result: Record<string, string> = {};
-      for (const call of api.SetValue.mock.calls) {
-        if (call[0].startsWith(prefix)) result[call[0]] = call[1];
-      }
-      return result;
-    }
-
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(
         'q1',
@@ -318,7 +311,7 @@ describe('SCORM2004Adapter', () => {
         false,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.id']).toBe('q1');
       expect(v['cmi.interactions.0.type']).toBe('choice');
       expect(v['cmi.interactions.0.learner_response']).toBe('a[,]b');
@@ -337,7 +330,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('true-false');
       expect(v['cmi.interactions.0.learner_response']).toBe('true');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('true');
@@ -351,7 +344,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('fill-in');
       expect(v['cmi.interactions.0.learner_response']).toBe('Paris');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
@@ -370,7 +363,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
         '{case_matters=true}Paris',
       );
@@ -391,7 +384,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
       expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
     });
@@ -407,7 +400,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
         'answer one',
       );
@@ -428,7 +421,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.correct_responses.9.pattern']).toBe('a9');
       expect(
         v['cmi.interactions.0.correct_responses.10.pattern'],
@@ -455,7 +448,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('matching');
       expect(v['cmi.interactions.0.learner_response']).toBe('a[.]1[,]b[.]2');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
@@ -474,7 +467,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('sequencing');
       expect(v['cmi.interactions.0.learner_response']).toBe('x[,]y[,]z');
     });
@@ -490,7 +483,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.learner_response']).toBe(
         'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
       );
@@ -511,7 +504,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.learner_response']).toBe('speed-limit');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
         'speed-limit',
@@ -525,7 +518,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('numeric');
       expect(v['cmi.interactions.0.learner_response']).toBe('7');
       expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
@@ -550,7 +543,7 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(v['cmi.interactions.0.type']).toBe('performance');
       expect(v['cmi.interactions.0.learner_response']).toBe(
         'stepA[.]1[,]stepB[.]x',
@@ -564,7 +557,7 @@ describe('SCORM2004Adapter', () => {
         null,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
+      const v = setValuesFor(api.SetValue, 'cmi.interactions.0');
       expect(
         v['cmi.interactions.0.correct_responses.0.pattern'],
       ).toBeUndefined();

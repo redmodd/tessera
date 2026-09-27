@@ -1,27 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { stubAdapter } from './helpers.js';
+import { createManifest, mountApp, stubAdapter } from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 
-const page = {
-  index: 0,
-  title: 'Welcome',
-  slug: 'welcome',
-  importPath: '/pages/01-intro/01-lesson/welcome.svelte',
-  quiz: null,
-};
-
-const manifest = {
-  sections: [
-    {
-      title: 'Intro',
-      slug: 'intro',
-      lessons: [{ title: 'Lesson', slug: 'lesson', pages: [page] }],
-    },
-  ],
-  pages: [page],
-  totalPages: 1,
-};
+const manifest = createManifest(1);
 
 const config = {
   title: 'Demo',
@@ -33,47 +15,36 @@ const config = {
   export: { standard: 'web' },
 };
 
-async function mountApp(
+function mount(
   init: () => Promise<void>,
   loadState?: () => Promise<void>,
   getState?: () => unknown,
 ) {
-  vi.resetModules();
-  const { mount, unmount } = await import('svelte');
-  (globalThis as any).__tesseraTest = {
+  return mountApp({
     config,
     manifest,
     pageModules: {
-      [page.importPath]: () => import('./fixtures/app-page.svelte'),
+      [manifest.pages[0].importPath]: () =>
+        import('./fixtures/app-page.svelte'),
     },
     adapter: stubAdapter({
       init,
       loadState,
       getState: getState as (() => SavedState | null) | undefined,
     }),
-  };
-  const App = (await import('../src/runtime/App.svelte')).default;
-  const component = mount(App, { target: document.body });
-  return { component, unmount };
+  });
 }
 
 // The first page is held until adapter.init() resolves, and the LMS handshake
 // it performs has no deadline of its own.
 describe('App bounds adapter.init()', () => {
-  let cleanup: (() => void) | null = null;
-
   afterEach(() => {
-    cleanup?.();
-    cleanup = null;
     vi.useRealTimers();
-    document.body.innerHTML = '';
-    delete (globalThis as any).__tesseraTest;
   });
 
   it('surfaces an error page when init never resolves', async () => {
     vi.useFakeTimers();
-    const { component, unmount } = await mountApp(() => new Promise(() => {}));
-    cleanup = () => unmount(component);
+    await mount(() => new Promise(() => {}));
 
     expect(document.body.textContent).not.toContain('This page failed to load');
 
@@ -84,10 +55,7 @@ describe('App bounds adapter.init()', () => {
 
   it('renders the page when init resolves inside the deadline', async () => {
     vi.useFakeTimers();
-    const { component, unmount } = await mountApp(
-      () => new Promise((resolve) => setTimeout(resolve, 100)),
-    );
-    cleanup = () => unmount(component);
+    await mount(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     await vi.advanceTimersByTimeAsync(20_000);
     expect(document.body.textContent).not.toContain('This page failed to load');
@@ -95,13 +63,12 @@ describe('App bounds adapter.init()', () => {
 
   it('renders the page when loadState rejects', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { component, unmount } = await mountApp(
+    await mount(
       async () => {},
       async () => {
         throw new Error('LRS unreachable');
       },
     );
-    cleanup = () => unmount(component);
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),
@@ -111,12 +78,11 @@ describe('App bounds adapter.init()', () => {
 
   it('renders the page when the saved state is malformed', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { component, unmount } = await mountApp(
+    await mount(
       async () => {},
       undefined,
       () => ({ d: 0 }),
     );
-    cleanup = () => unmount(component);
 
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Test page'),

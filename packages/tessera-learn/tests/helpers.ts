@@ -1,4 +1,13 @@
-import { vi, type Mocked } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  onTestFinished,
+  vi,
+  type Mock,
+  type MockInstance,
+  type Mocked,
+} from 'vitest';
 import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
@@ -61,6 +70,59 @@ export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
 
 /** Let an adapter's async write queue drain. */
 export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
+
+export const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+export function setLaunchParams(params: Record<string, string> = {}): void {
+  window.history.replaceState({}, '', `/?${new URLSearchParams(params)}`);
+}
+
+export function setValuesFor(
+  setValue: Mock<(key: string, value: string) => string>,
+  prefix: string,
+): Record<string, string> {
+  return Object.fromEntries(
+    setValue.mock.calls.filter(([key]) => key.startsWith(prefix)),
+  );
+}
+
+export function printed(spy: MockInstance): string {
+  return spy.mock.calls.flat().join('\n');
+}
+
+export function makeWorkspace(): string {
+  const root = mkdtempSync(join(tmpdir(), 'tessera-test-'));
+  mkdirSync(join(root, 'courses'));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  return root;
+}
+
+export async function mountApp({
+  loadLayout,
+  ...testGlobals
+}: {
+  config: unknown;
+  manifest: unknown;
+  pageModules: Record<string, () => Promise<unknown>>;
+  adapter: BaseAdapter;
+  loadLayout?: () => Promise<{ default: unknown }>;
+}) {
+  // App.svelte imports config at module scope, so the stubs need re-evaluating
+  // for each mount. Svelte and the layout come from that same fresh registry or
+  // every $effect is orphaned against a second runtime instance.
+  vi.resetModules();
+  const { mount, unmount } = await import('svelte');
+  vi.stubGlobal('__tesseraTest', {
+    ...testGlobals,
+    layout: loadLayout && (await loadLayout()).default,
+  });
+  const App = (await import('../src/runtime/App.svelte')).default;
+  const component = mount(App, { target: document.body });
+  onTestFinished(() => {
+    unmount(component);
+    document.body.innerHTML = '';
+  });
+}
 
 export function createManifest(
   pageCount: number,

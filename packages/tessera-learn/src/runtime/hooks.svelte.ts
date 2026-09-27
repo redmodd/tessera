@@ -349,10 +349,6 @@ export function useProgress() {
 
 let warnedNonManualCompletion = false;
 
-export function __resetUseCompletionWarning(): void {
-  warnedNonManualCompletion = false;
-}
-
 export function useCompletion(): {
   markComplete(): void;
   readonly completionStatus: CompletionStatus;

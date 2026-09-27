@@ -4,11 +4,9 @@ import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
-import { flush } from './helpers.js';
+import { flush, setLaunchParams, tick } from './helpers.js';
 
 const mockFetch = vi.fn();
-
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 const VERB = 'http://adlnet.gov/expapi/verbs/';
 
@@ -36,16 +34,6 @@ function isRunningStateGet(url: string, options?: RequestInit): boolean {
   );
 }
 
-function setSearchParams(params: Record<string, string>) {
-  const searchString = new URLSearchParams(params).toString();
-  const url = `http://localhost/?${searchString}`;
-  Object.defineProperty(window, 'location', {
-    value: new URL(url),
-    writable: true,
-    configurable: true,
-  });
-}
-
 const baseLaunchParams = {
   fetch: 'https://lms.example.com/fetch-token',
   endpoint: 'https://lms.example.com/xapi/',
@@ -56,31 +44,31 @@ const baseLaunchParams = {
 
 describe('hasCMI5LaunchParams', () => {
   it('returns true when all params present', () => {
-    setSearchParams(baseLaunchParams);
+    setLaunchParams(baseLaunchParams);
     expect(hasCMI5LaunchParams()).toBe(true);
   });
 
   it('returns false when fetch is missing', () => {
     const { fetch: _, ...rest } = baseLaunchParams;
-    setSearchParams(rest);
+    setLaunchParams(rest);
     expect(hasCMI5LaunchParams()).toBe(false);
   });
 
   it('returns false when endpoint is missing', () => {
     const { endpoint: _, ...rest } = baseLaunchParams;
-    setSearchParams(rest);
+    setLaunchParams(rest);
     expect(hasCMI5LaunchParams()).toBe(false);
   });
 
   it('returns false when activityId is missing', () => {
     const { activityId: _, ...rest } = baseLaunchParams;
-    setSearchParams(rest);
+    setLaunchParams(rest);
     expect(hasCMI5LaunchParams()).toBe(false);
   });
 
   it('returns false when actor is missing', () => {
     const { actor: _, ...rest } = baseLaunchParams;
-    setSearchParams(rest);
+    setLaunchParams(rest);
     expect(hasCMI5LaunchParams()).toBe(false);
   });
 
@@ -94,9 +82,8 @@ describe('CMI5Adapter', () => {
   let adapter: CMI5Adapter;
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
-    setSearchParams(baseLaunchParams);
+    vi.stubGlobal('fetch', mockFetch);
+    setLaunchParams(baseLaunchParams);
   });
 
   function setupInitMocks(
@@ -133,10 +120,18 @@ describe('CMI5Adapter', () => {
     });
   }
 
-  it('fetches auth token on init', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
+  async function initAdapter(
+    savedState?: SavedState,
+    launchData?: Record<string, unknown> | null,
+  ) {
+    setupInitMocks(savedState, launchData);
+    const adapter = new CMI5Adapter();
     await adapter.init();
+    return adapter;
+  }
+
+  it('fetches auth token on init', async () => {
+    adapter = await initAdapter();
     expect(mockFetch).toHaveBeenCalledWith(
       baseLaunchParams.fetch,
       expect.objectContaining({ method: 'POST' }),
@@ -144,22 +139,12 @@ describe('CMI5Adapter', () => {
   });
 
   it('sends Initialized statement on init', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
-
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
-    );
-    expect(statementCalls.length).toBeGreaterThanOrEqual(1);
-    const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe(`${VERB}initialized`);
+    adapter = await initAdapter();
+    expect(sentVerbs()[0]).toBe('initialized');
   });
 
   it('does not fetch resume state during init', async () => {
-    setupInitMocks({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
     const resumeGets = mockFetch.mock.calls.filter(
       ([url, options]: any[]) =>
         String(url).includes('activities/state') &&
@@ -180,9 +165,7 @@ describe('CMI5Adapter', () => {
 
   it('retries a transient resume GET failure and restores on success', async () => {
     const saved: SavedState = { b: 2, v: [0, 1, 2], q: {}, d: 5 };
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
@@ -211,9 +194,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('does not retry a 404, which is a definitive empty answer', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
@@ -228,9 +209,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('treats an empty 2xx body as no state, leaving saving enabled', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
@@ -257,9 +236,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('refuses to save after a failed resume GET, so it cannot clobber', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (isRunningStateGet(url, options)) {
@@ -283,9 +260,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('still saves when the resume GET legitimately 404s', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     await adapter.loadState();
     expect(adapter.getState()).toBeNull();
 
@@ -300,9 +275,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('overwrites an unparseable saved document instead of locking saves out', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     let resumeGets = 0;
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (isRunningStateGet(url, options)) {
@@ -330,25 +303,19 @@ describe('CMI5Adapter', () => {
 
   it('restores state from xAPI State API', async () => {
     const saved: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
-    setupInitMocks(saved);
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter(saved);
     await adapter.loadState();
     expect(adapter.getState()).toEqual(saved);
   });
 
   it('returns null state when no saved state', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     await adapter.loadState();
     expect(adapter.getState()).toBeNull();
   });
 
   it('saves state via PUT to State API', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -368,9 +335,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('sends Completed statement when completion is set to complete', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -394,9 +359,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('does not send Completed when status is incomplete', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -412,9 +375,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('sends Passed statement on success', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -435,9 +396,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('sends Failed statement on failure', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
@@ -454,9 +413,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('holds a resumed failure for its own Terminated, since the last session may have ended without one', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     adapter.seedLifecycle('incomplete', 'failed');
 
@@ -475,9 +432,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('holds Failed for Terminated and drops it when the session passes', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     mockFetch.mockClear();
     mockFetch.mockResolvedValue({ ok: true });
 
@@ -494,9 +449,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     adapter.seedLifecycle('incomplete', 'failed');
 
@@ -514,9 +467,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     adapter.seedLifecycle('complete', 'passed');
 
@@ -536,9 +487,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('includes auth header on xAPI requests', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     // Check that statements call includes auth header
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
@@ -562,7 +511,7 @@ describe('CMI5Adapter', () => {
     // request context").
     const lmsSession = '11111111-2222-3333-4444-555555555555';
     const publisherActivity = 'https://lms.example.com/courses/abc';
-    setupInitMocks(undefined, {
+    adapter = await initAdapter(undefined, {
       contextTemplate: {
         contextActivities: {
           grouping: [{ id: publisherActivity }],
@@ -572,8 +521,6 @@ describe('CMI5Adapter', () => {
         },
       },
     });
-    adapter = new CMI5Adapter();
-    await adapter.init();
 
     const initialized = statementFor('initialized');
     expect(initialized).toBeDefined();
@@ -590,9 +537,7 @@ describe('CMI5Adapter', () => {
   it('falls back to a minted UUID when LMS.LaunchData has no session id', async () => {
     // When the LMS doesn't pre-populate sessionid (non-conformant or
     // dev fixtures), the publisher mints a UUID — the cmi5 v1 fallback.
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     const initialized = statementFor('initialized');
     const sid =
@@ -659,9 +604,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('includes registration and context in statements', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0].includes('statements'),
@@ -676,9 +619,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('commit is a no-op', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     mockFetch.mockClear();
 
     adapter.commit();
@@ -691,9 +632,7 @@ describe('CMI5Adapter', () => {
     // is not among them. An incomplete-exit signal is conveyed by the
     // *absence* of Completed before Terminated; the LMS handles
     // resume / Abandoned itself from the registration state.
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     await tick();
 
     mockFetch.mockClear();
@@ -717,9 +656,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     adapter.setScore(85);
     adapter.setDuration(60);
@@ -742,9 +679,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('terminate is idempotent', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
 
     adapter.setCompletionStatus('complete');
     await new Promise((r) => setTimeout(r, 20));
@@ -764,9 +699,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     await tick();
 
     mockFetch.mockClear();
@@ -793,9 +726,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('writes the final state to the exit document and keeps saving after terminate', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     await adapter.loadState();
 
     mockFetch.mockClear();
@@ -818,9 +749,7 @@ describe('CMI5Adapter', () => {
   });
 
   it('resumes from the state document with the higher write sequence', async () => {
-    setupInitMocks();
-    adapter = new CMI5Adapter();
-    await adapter.init();
+    adapter = await initAdapter();
     mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
       if (url.includes('activities/state') && options?.method === 'GET') {
         const doc = url.includes('tessera-state-exit')
@@ -844,26 +773,20 @@ describe('CMI5Adapter', () => {
 
   describe('LMS launch params: masteryScore + moveOn (cmi5 §8, §9.5.3)', () => {
     it('parses masteryScore and exposes it via getMasteryScore()', async () => {
-      setSearchParams({ ...baseLaunchParams, masteryScore: '0.8' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '0.8' });
+      adapter = await initAdapter();
       expect(adapter.getMasteryScore()).toBe(0.8);
     });
 
     it('returns null when no masteryScore is present', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       expect(adapter.getMasteryScore()).toBeNull();
     });
 
     it('rejects masteryScore outside [0, 1] and warns', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setSearchParams({ ...baseLaunchParams, masteryScore: '1.5' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '1.5' });
+      adapter = await initAdapter();
       expect(adapter.getMasteryScore()).toBeNull();
       expect(
         warn.mock.calls.some((c: any[]) =>
@@ -873,10 +796,8 @@ describe('CMI5Adapter', () => {
     });
 
     it('does NOT attach masteryscore extension to Completed (§9.6.3.2 scopes it to Passed/Failed)', async () => {
-      setSearchParams({ ...baseLaunchParams, masteryScore: '0.7' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '0.7' });
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -894,10 +815,8 @@ describe('CMI5Adapter', () => {
     });
 
     it('attaches masteryscore extension to Passed and Failed', async () => {
-      setSearchParams({ ...baseLaunchParams, masteryScore: '0.6' });
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '0.6' });
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -915,9 +834,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('omits the extension entirely when masteryScore is absent', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -946,10 +863,8 @@ describe('CMI5Adapter', () => {
         'CompletedAndPassed',
         'CompletedOrPassed',
       ]) {
-        setSearchParams({ ...baseLaunchParams, moveOn, masteryScore: '0.7' });
-        setupInitMocks();
-        adapter = new CMI5Adapter();
-        await adapter.init();
+        setLaunchParams({ ...baseLaunchParams, moveOn, masteryScore: '0.7' });
+        adapter = await initAdapter();
         mockFetch.mockClear();
         mockFetch.mockResolvedValue({ ok: true });
 
@@ -982,17 +897,13 @@ describe('CMI5Adapter', () => {
     }
 
     it('tags Initialized with the cmi5 category', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       const initialized = statementFor('initialized');
       expect(categoryIds(initialized)).toEqual([CMI5_CAT]);
     });
 
     it('tags Completed with cmi5 + moveOn categories', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
@@ -1002,9 +913,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('tags Passed and Failed with cmi5 + moveOn categories', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setSuccessStatus('passed');
@@ -1012,9 +921,7 @@ describe('CMI5Adapter', () => {
       const passed = statementFor('passed');
       expect(categoryIds(passed)).toEqual([CMI5_CAT, MOVEON_CAT]);
 
-      const adapter2 = new CMI5Adapter();
-      setupInitMocks();
-      await adapter2.init();
+      const adapter2 = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter2.setSuccessStatus('failed');
@@ -1025,9 +932,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('tags Terminated with the cmi5 category only', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       await tick();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
@@ -1038,9 +943,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('does NOT tag Answered with the cmi5 category (it is an Allowed Statement, not Defined)', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.reportInteraction(
@@ -1061,9 +964,7 @@ describe('CMI5Adapter', () => {
       interaction: any,
       correct: boolean | null,
     ): Promise<any> {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.reportInteraction(questionId, interaction, correct);
@@ -1208,9 +1109,7 @@ describe('CMI5Adapter', () => {
   describe('exit() — returnURL redirect (cmi5 §10.2.6)', () => {
     it('waits for a statement already sending before Terminated and the redirect', async () => {
       const returnURL = 'https://lms.example.com/learner/done';
-      setupInitMocks(undefined, { returnURL });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { returnURL });
       await tick();
 
       const assign = vi.fn();
@@ -1238,9 +1137,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
 
       const assign = vi.fn();
       vi.stubGlobal('window', {
@@ -1264,9 +1161,7 @@ describe('CMI5Adapter', () => {
       'launches in Normal mode and emits Completed when %s',
       async (_, data) => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
-        setupInitMocks(undefined, data);
-        adapter = new CMI5Adapter();
-        await adapter.init();
+        adapter = await initAdapter(undefined, data);
         mockFetch.mockClear();
         mockFetch.mockResolvedValue({ ok: true });
         adapter.setCompletionStatus('complete');
@@ -1278,19 +1173,15 @@ describe('CMI5Adapter', () => {
     it('prefers LaunchData.masteryScore over the URL launch param (§10.2.4)', async () => {
       // URL says 0.5, LaunchData says 0.8 — LaunchData is the authoritative
       // source per the spec (§10.2.4). The URL form is non-standard.
-      setSearchParams({ ...baseLaunchParams, masteryScore: '0.5' });
-      setupInitMocks(undefined, { masteryScore: 0.8 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '0.5' });
+      adapter = await initAdapter(undefined, { masteryScore: 0.8 });
       expect(adapter.getMasteryScore()).toBe(0.8);
     });
 
     it('keeps the URL masteryScore and warns when LaunchData.masteryScore is out of range', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setSearchParams({ ...baseLaunchParams, masteryScore: '0.5' });
-      setupInitMocks(undefined, { masteryScore: 1.5 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      setLaunchParams({ ...baseLaunchParams, masteryScore: '0.5' });
+      adapter = await initAdapter(undefined, { masteryScore: 1.5 });
       expect(adapter.getMasteryScore()).toBe(0.5);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('LaunchData masteryScore'),
@@ -1298,9 +1189,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('does NOT emit Completed under launchMode=Browse (§10.2.2)', async () => {
-      setupInitMocks(undefined, { launchMode: 'Browse' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { launchMode: 'Browse' });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
@@ -1309,9 +1198,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('does NOT emit Passed or Failed under launchMode=Review (§10.2.2)', async () => {
-      setupInitMocks(undefined, { launchMode: 'Review' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { launchMode: 'Review' });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setScore(95);
@@ -1322,9 +1209,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('does NOT emit Suspended under launchMode=Browse on terminate (§10.2.2)', async () => {
-      setupInitMocks(undefined, { launchMode: 'Browse' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { launchMode: 'Browse' });
       await tick();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
@@ -1342,9 +1227,7 @@ describe('CMI5Adapter', () => {
       // the Agent Profile" if the AU hits /statements before
       // /agents/profile. The order matters even when the prefs doc
       // itself 404s (no preferences set is a valid state).
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
 
       const callOrder = mockFetch.mock.calls.map((c: any[]) => c[0] as string);
       const profileIdx = callOrder.findIndex((u) =>
@@ -1379,13 +1262,11 @@ describe('CMI5Adapter', () => {
         id: 'https://lms.example.com/cat/custom',
         objectType: 'Activity',
       };
-      setupInitMocks(undefined, {
+      adapter = await initAdapter(undefined, {
         contextTemplate: {
           contextActivities: { category: [lmsCategory] },
         },
       });
-      adapter = new CMI5Adapter();
-      await adapter.init();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
@@ -1408,9 +1289,7 @@ describe('CMI5Adapter', () => {
     it('clamps setScore to [0, 100] so scaled stays in [0, 1] (xAPI)', async () => {
       // Score is asserted on Passed (not Completed) because cmi5 §9.5.1
       // forbids score on Completed.
-      setupInitMocks();
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter();
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1423,9 +1302,7 @@ describe('CMI5Adapter', () => {
 
     it('omits scaled score on Passed when below masteryScore (§9.3.4)', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setupInitMocks(undefined, { masteryScore: 0.8 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { masteryScore: 0.8 });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1440,9 +1317,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('keeps scaled score on Passed when at or above masteryScore', async () => {
-      setupInitMocks(undefined, { masteryScore: 0.533 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { masteryScore: 0.533 });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1454,9 +1329,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('keeps scaled score on Failed when below mastery', async () => {
-      setupInitMocks(undefined, { masteryScore: 0.7 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { masteryScore: 0.7 });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1472,9 +1345,7 @@ describe('CMI5Adapter', () => {
       // Symmetric to the Passed/§9.3.4 invariant: a Failed statement
       // carrying a score MUST have scaled < masteryScore.
       vi.spyOn(console, 'warn').mockImplementation(() => {});
-      setupInitMocks(undefined, { masteryScore: 0.7 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { masteryScore: 0.7 });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1488,9 +1359,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('keeps the score on Failed when the AU declares no masteryScore', async () => {
-      setupInitMocks(undefined, { launchMode: 'Normal' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { launchMode: 'Normal' });
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
 
@@ -1504,9 +1373,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('sends Scored when a retry raises the score without flipping Passed', async () => {
-      setupInitMocks(undefined, { masteryScore: 0.7 });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { masteryScore: 0.7 });
       adapter.setScore(85);
       adapter.setSuccessStatus('passed');
       adapter.commit();
@@ -1525,9 +1392,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('sends Scored under launchMode=Browse, where Defined Statements are barred (§10.2.2)', async () => {
-      setupInitMocks(undefined, { launchMode: 'Browse' });
-      adapter = new CMI5Adapter();
-      await adapter.init();
+      adapter = await initAdapter(undefined, { launchMode: 'Browse' });
       mockFetch.mockClear();
 
       adapter.setScore(60);
