@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import {
@@ -82,11 +82,6 @@ async function mountLaunched() {
 }
 
 describe('a graded submit that decides the verdict', () => {
-  afterEach(() => {
-    delete (globalThis as any).__tesseraNavCtx;
-    delete (globalThis as any).__showLateCheck;
-  });
-
   it('reports the score on the verdict instead of a statement of its own', async () => {
     const { progress, verbs } = await mountLaunched();
     await vi.waitFor(() => expect(verbs).toContain('initialized'));
@@ -115,6 +110,7 @@ describe('a graded submit that decides the verdict', () => {
   });
 
   it('records a graded question in the layout against no page', async () => {
+    vi.stubGlobal('__showLateCheck', undefined);
     const progress = await mount(stubAdapter(), {
       course: createManifest(1, {}, { 0: { graded: true } }),
       loadLayout: () => import('./fixtures/question-layout.svelte'),

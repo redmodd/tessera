@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createAdapter,
   LMSAdapterError,
@@ -10,25 +10,20 @@ import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import { scorm12Api, scorm2004Api, setLaunchParams } from './helpers.js';
+import {
+  createConfig,
+  scorm12Api,
+  scorm2004Api,
+  setLaunchParams,
+} from './helpers.js';
 
 function makeConfig(standard: string): CourseConfig {
-  return {
-    title: 'Test Course',
-    navigation: { mode: 'free' },
-    completion: { mode: 'percentage' },
-    scoring: { passingScore: 70 },
-    export: { standard } as any,
-  };
+  return createConfig({
+    export: { standard } as CourseConfig['export'],
+  });
 }
 
 describe('createAdapter', () => {
-  afterEach(() => {
-    // Clean up any window.API stubs
-    delete (window as any).API;
-    delete (window as any).API_1484_11;
-  });
-
   it('returns WebAdapter for standard "web"', () => {
     const adapter = createAdapter(makeConfig('web'));
     expect(adapter).toBeInstanceOf(WebAdapter);
@@ -42,7 +37,7 @@ describe('createAdapter', () => {
   });
 
   it('returns SCORM12Adapter when API is found', () => {
-    (window as any).API = scorm12Api();
+    vi.stubGlobal('API', scorm12Api());
     const adapter = createAdapter(makeConfig('scorm12'));
     expect(adapter).toBeInstanceOf(SCORM12Adapter);
   });
@@ -57,7 +52,7 @@ describe('createAdapter', () => {
   });
 
   it('returns SCORM2004Adapter when API_1484_11 is found', () => {
-    (window as any).API_1484_11 = scorm2004Api();
+    vi.stubGlobal('API_1484_11', scorm2004Api());
     const adapter = createAdapter(makeConfig('scorm2004'));
     expect(adapter).toBeInstanceOf(SCORM2004Adapter);
   });
@@ -81,26 +76,24 @@ describe('createAdapter', () => {
   });
 
   it('returns CMI5Adapter when launch params are present', () => {
-    const params = {
+    setLaunchParams({
       fetch: 'https://lms.example.com/fetch',
       endpoint: 'https://lms.example.com/xapi/',
       activityId: 'https://example.com/course/1',
       actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
       registration: 'reg-123',
-    };
-    setLaunchParams(params);
+    });
     const adapter = createAdapter(makeConfig('cmi5'));
     expect(adapter).toBeInstanceOf(CMI5Adapter);
   });
 
   it('returns XAPIAdapter when xapi launch params are present', () => {
-    const params = {
+    setLaunchParams({
       endpoint: 'https://lrs.example.com/xapi/',
       auth: 'Zm9vOmJhcg==',
       actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
       activity_id: 'urn:tessera:au:abc',
-    };
-    setLaunchParams(params);
+    });
     const adapter = createAdapter(makeConfig('xapi'));
     expect(adapter).toBeInstanceOf(XAPIAdapter);
   });
@@ -144,7 +137,7 @@ describe('createAdapter', () => {
     });
 
     it('returns SCORM12Adapter when API is present', () => {
-      (window as any).API = scorm12Api();
+      vi.stubGlobal('API', scorm12Api());
       const adapter = createAdapter(makeConfig('scorm12'), {
         allowFallback: false,
       });

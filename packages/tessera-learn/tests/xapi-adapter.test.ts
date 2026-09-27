@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import { setLaunchParams, tick } from './helpers.js';
+import { postedStatements, setLaunchParams, tick } from './helpers.js';
 
 const ACTOR = {
   objectType: 'Agent',
@@ -25,11 +25,7 @@ function calls(path: string) {
   return fetchMock.mock.calls.filter(([u]) => String(u).includes(path));
 }
 
-function posted(): any[] {
-  return calls('/statements')
-    .filter(([, o]) => o?.method === 'POST')
-    .map(([, o]) => JSON.parse(o.body));
-}
+const posted = () => postedStatements(fetchMock);
 
 async function sentActor(actor: unknown) {
   launch({ actor: JSON.stringify(actor) });

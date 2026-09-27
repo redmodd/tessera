@@ -1,73 +1,35 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { stubAdapter } from './helpers.js';
+import { describe, it, expect, vi } from 'vitest';
+import { createManifest, mountApp, stubAdapter } from './helpers.js';
 
-const pages = [0].map((index) => ({
-  index,
-  title: `Page ${index}`,
-  slug: `page-${index}`,
-  importPath: `/pages/01-intro/01-lesson/page-${index}.svelte`,
-  quiz: { graded: true },
-}));
+const manifest = createManifest(1, { 0: { graded: true } });
 
-const manifest = {
-  sections: [
-    {
-      title: 'Intro',
-      slug: 'intro',
-      lessons: [{ title: 'Lesson', slug: 'lesson', pages }],
-    },
-  ],
-  pages,
-  totalPages: pages.length,
+const config = {
+  title: 'Demo',
+  resume: 'auto',
+  branding: {},
+  navigation: { mode: 'free' },
+  scoring: { passingScore: 70 },
+  completion: { mode: 'quiz' },
+  export: { standard: 'cmi5' },
 };
 
-async function mountWithMastery(masteryScore: number | undefined) {
-  const config = {
-    title: 'Demo',
-    resume: 'auto',
-    branding: {},
-    navigation: { mode: 'free' },
-    scoring: { passingScore: 70 },
-    completion: { mode: 'quiz' },
-    export: { standard: 'cmi5' },
-  };
-  const adapter = stubAdapter({
-    getMasteryScore: () => masteryScore ?? null,
-  });
-
-  vi.resetModules();
-  const { mount, unmount } = await import('svelte');
-  (globalThis as any).__tesseraSeenPassingScore = [];
-  (globalThis as any).__tesseraTest = {
+function mountWithMastery(masteryScore: number | undefined) {
+  vi.stubGlobal('__tesseraSeenPassingScore', []);
+  return mountApp({
     config,
     manifest,
-    pageModules: Object.fromEntries(
-      pages.map((p) => [p.importPath, () => new Promise(() => {})]),
-    ),
-    adapter,
-    layout: (await import('./fixtures/mastery-layout.svelte')).default,
-  };
-  const App = (await import('../src/runtime/App.svelte')).default;
-  const component = mount(App, { target: document.body });
-  return { component, unmount };
+    pageModules: {
+      [manifest.pages[0].importPath]: () => new Promise(() => {}),
+    },
+    adapter: stubAdapter({ getMasteryScore: () => masteryScore ?? null }),
+    loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+  });
 }
 
 describe('an LMS mastery override reaches a custom layout', () => {
-  let cleanup: (() => void) | null = null;
-
-  afterEach(() => {
-    cleanup?.();
-    cleanup = null;
-    document.body.innerHTML = '';
-    delete (globalThis as any).__tesseraTest;
-    delete (globalThis as any).__tesseraSeenPassingScore;
-    delete (globalThis as any).__tesseraNavCtx;
-  });
-
   it('re-renders useProgress().passingScore when the override lands', async () => {
-    const { component, unmount } = await mountWithMastery(0.9);
-    cleanup = () => unmount(component);
+    await mountWithMastery(0.9);
 
     await vi.waitFor(() => {
       expect((globalThis as any).__tesseraSeenPassingScore).toContain(90);
@@ -75,8 +37,7 @@ describe('an LMS mastery override reaches a custom layout', () => {
   });
 
   it('re-derives course status against the overridden threshold', async () => {
-    const { component, unmount } = await mountWithMastery(0.9);
-    cleanup = () => unmount(component);
+    await mountWithMastery(0.9);
 
     await vi.waitFor(() => {
       expect((globalThis as any).__tesseraSeenPassingScore).toContain(90);
@@ -93,8 +54,7 @@ describe('an LMS mastery override reaches a custom layout', () => {
   });
 
   it('converts the mastery score to a pass mark without float drift', async () => {
-    const { component, unmount } = await mountWithMastery(0.55);
-    cleanup = () => unmount(component);
+    await mountWithMastery(0.55);
 
     await vi.waitFor(() => {
       expect((globalThis as any).__tesseraSeenPassingScore).toContain(55);
@@ -106,8 +66,7 @@ describe('an LMS mastery override reaches a custom layout', () => {
   });
 
   it('keeps every decimal of the mastery score in the pass mark', async () => {
-    const { component, unmount } = await mountWithMastery(0.5500000001);
-    cleanup = () => unmount(component);
+    await mountWithMastery(0.5500000001);
 
     await vi.waitFor(() => {
       expect((globalThis as any).__tesseraSeenPassingScore).toContain(
@@ -121,8 +80,7 @@ describe('an LMS mastery override reaches a custom layout', () => {
   });
 
   it('keeps the course threshold when the LMS supplies none', async () => {
-    const { component, unmount } = await mountWithMastery(undefined);
-    cleanup = () => unmount(component);
+    await mountWithMastery(undefined);
 
     await vi.waitFor(() => {
       expect(

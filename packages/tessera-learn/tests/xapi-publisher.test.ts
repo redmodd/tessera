@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
 import {
   XAPIConfigError,
@@ -9,7 +9,7 @@ import {
 } from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
-import { flush, tick } from './helpers.js';
+import { flush, tick, useFakeTimers } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -38,10 +38,6 @@ async function initPublisher(overrides: Parameters<typeof basicOpts>[0] = {}) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', mockFetch);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
 });
 
 describe('validateAgent', () => {
@@ -525,7 +521,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal takes a statement waiting to retry into its batch', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     mockFetch
       .mockResolvedValueOnce({ ok: false, status: 503 })
       .mockResolvedValue({ ok: true });
@@ -556,7 +552,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal retries a 5xx', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     mockFetch
       .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
       .mockResolvedValue({ ok: true });
@@ -610,7 +606,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal resends each statement, then the final one alone, when a batch carrying an earlier statement gets a 409', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     let calls = 0;
     mockFetch.mockImplementation((_url: string, init: RequestInit) => {
       if (++calls === 1) return Promise.reject(new TypeError('reset'));

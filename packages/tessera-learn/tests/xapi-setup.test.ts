@@ -6,7 +6,7 @@ import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import { scorm12Api, setLaunchParams } from './helpers.js';
+import { createConfig, scorm12Api, setLaunchParams } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -40,12 +40,7 @@ function setupLMSMocks() {
 }
 
 function baseConfig(): CourseConfig {
-  return {
-    title: 'Custom xAPI Smoke',
-    completion: { mode: 'percentage' },
-    scoring: { passingScore: 70 },
-    export: { standard: 'cmi5' },
-  } as CourseConfig;
+  return createConfig({ export: { standard: 'cmi5' } });
 }
 
 async function initCMI5Adapter() {

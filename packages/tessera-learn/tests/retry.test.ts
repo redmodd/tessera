@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   withRetry,
   callSync,
   WriteQueue,
 } from '../src/runtime/adapters/retry.js';
-import { flush } from './helpers.js';
+import { flush, useFakeTimers } from './helpers.js';
 
 describe('withRetry', () => {
   it('returns true on first success', async () => {
@@ -87,10 +87,6 @@ describe('callSync', () => {
 });
 
 describe('WriteQueue', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('flushes operations sequentially', async () => {
     const order: number[] = [];
     const queue = new WriteQueue();
@@ -114,7 +110,7 @@ describe('WriteQueue', () => {
   });
 
   it('stops on failure and retries on next trigger', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
     let failFirst = true;

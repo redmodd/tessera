@@ -24,10 +24,6 @@ import type { Interaction } from '../src/runtime/interaction.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig, stubAdapter } from './helpers.js';
 
-function makeAdapter() {
-  return stubAdapter({ reportInteraction: vi.fn() });
-}
-
 function provideNavCtx(progress: ProgressState, currentIndex = 0) {
   const manifest = createManifest(5);
   const config = createConfig();
@@ -44,10 +40,12 @@ function provideNavCtx(progress: ProgressState, currentIndex = 0) {
     prefetch: vi.fn(),
   };
   const ctx = { nav, manifest, progress, config };
+  const adapter = stubAdapter({ reportInteraction: vi.fn() });
   ctxStore.set('tessera-nav', ctx);
+  ctxStore.set('tessera-adapter', { adapter });
   ctxStore.set('tessera-page', { index: currentIndex });
   ctxStore.set('tessera-in-page', true);
-  return ctx;
+  return { ...ctx, adapter };
 }
 
 beforeEach(() => {
@@ -59,9 +57,7 @@ beforeEach(() => {
 describe('useQuestion — standalone mode', () => {
   it('reports the interaction through the adapter on submit', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const interaction: Interaction = {
       type: 'choice',
@@ -83,7 +79,6 @@ describe('useQuestion — standalone mode', () => {
   it('throws in dev when a graded question registers on an undeclared page', () => {
     const progress = new ProgressState(createManifest(2), createConfig());
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     expect(() =>
       useQuestion({
@@ -104,7 +99,6 @@ describe('useQuestion — standalone mode', () => {
     vi.stubEnv('DEV', false);
     const progress = new ProgressState(createManifest(2), createConfig());
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     progress.markStandaloneQuestion(0, 'q0', 100, true);
@@ -126,7 +120,6 @@ describe('useQuestion — standalone mode', () => {
       createConfig(),
     );
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     expect(() =>
       useQuestion({
@@ -140,7 +133,6 @@ describe('useQuestion — standalone mode', () => {
   it('is not answerComplete until an answer is set, with no complete callback', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const q = useQuestion({
       id: 'q1',
@@ -154,9 +146,7 @@ describe('useQuestion — standalone mode', () => {
 
   it('flags incorrect when response does not match', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const q = useQuestion({
       id: 'q1',
@@ -174,9 +164,7 @@ describe('useQuestion — standalone mode', () => {
 
   it('does not register a graded score when graded is false', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
     provideNavCtx(progress, 2);
-    ctxStore.set('tessera-adapter', { adapter });
 
     const q = useQuestion({
       id: 'q1',
@@ -193,9 +181,7 @@ describe('useQuestion — standalone mode', () => {
       createManifest(4, {}, { 3: { graded: true } }),
       createConfig({ completion: { mode: 'quiz' } }),
     );
-    const adapter = makeAdapter();
     provideNavCtx(progress, 3);
-    ctxStore.set('tessera-adapter', { adapter });
 
     const q = useQuestion({
       id: 'q1',
@@ -216,7 +202,6 @@ describe('useQuestion — standalone mode', () => {
       createConfig(),
     );
     const ctx = provideNavCtx(progress, 1);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
     ctx.nav.currentPageIndex = 2;
 
     useQuestion({
@@ -235,9 +220,7 @@ describe('useQuestion — standalone mode', () => {
       createManifest(2, {}, { 0: { graded: true } }),
       createConfig(),
     );
-    const adapter = makeAdapter();
     provideNavCtx(progress, 0);
-    ctxStore.set('tessera-adapter', { adapter });
 
     const q = useQuestion({
       id: 'q1',
@@ -255,9 +238,7 @@ describe('useQuestion — standalone mode', () => {
       createManifest(2, {}, { 1: { graded: true } }),
       createConfig(),
     );
-    const adapter = makeAdapter();
     provideNavCtx(progress, 1);
-    ctxStore.set('tessera-adapter', { adapter });
 
     useQuestion({
       id: 'q1',
@@ -274,9 +255,7 @@ describe('useQuestion — standalone mode', () => {
       createManifest(2, {}, { 1: { graded: true } }),
       createConfig(),
     );
-    const adapter = makeAdapter();
     provideNavCtx(progress, 1);
-    ctxStore.set('tessera-adapter', { adapter });
     progress.markStandaloneQuestion(1, 'q1', 100, true, 3);
 
     useQuestion({
@@ -295,9 +274,7 @@ describe('useQuestion — standalone mode', () => {
 
   it('submit is idempotent — calling twice does not double-report', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const q = useQuestion({
       id: 'q1',
@@ -310,10 +287,8 @@ describe('useQuestion — standalone mode', () => {
 
   it('reset clears submitted/correct and re-enables submit', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
     const userReset = vi.fn();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const q = useQuestion({
       id: 'q1',
@@ -335,7 +310,6 @@ describe('useQuestion — standalone mode', () => {
   it('mode is "standalone" outside a Quiz', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const q = useQuestion({
       id: 'q1',
@@ -346,9 +320,7 @@ describe('useQuestion — standalone mode', () => {
 
   it('reports correct=null when interaction has no correct answer', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const q = useQuestion({
       id: 'q1',
@@ -370,9 +342,7 @@ describe('useQuestion — standalone mode', () => {
 describe('useQuestion — standalone retry', () => {
   function setupCtx() {
     const progress = new ProgressState(createManifest(0), createConfig());
-    const adapter = makeAdapter();
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
     return { progress, adapter };
   }
 
@@ -517,7 +487,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const q = useQuestion({
       id: 'q1',
@@ -537,7 +506,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const a = useQuestion({
       id: 'a',
@@ -557,7 +525,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     let current: Interaction = {
       type: 'true-false',
@@ -585,7 +552,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     let current: Interaction = {
       type: 'true-false',
@@ -605,7 +571,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const userReset = vi.fn();
     useQuestion({
@@ -621,10 +586,8 @@ describe('useQuestion — inside a <Quiz>', () => {
   it('handle.submit() is a no-op when nested in a quiz', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     const quiz = makeQuizCtx();
-    const adapter = makeAdapter();
     ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter });
+    const { adapter } = provideNavCtx(progress);
 
     const q = useQuestion({
       id: 'q1',
@@ -642,7 +605,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress, 3);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const q = useQuestion({
       id: 'q1',
@@ -659,7 +621,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const q = useQuestion({
       id: 'q1',
@@ -678,7 +639,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const userReset = vi.fn();
     const q = useQuestion({
@@ -696,7 +656,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     useQuestion({
@@ -714,7 +673,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = makeQuizCtx();
     ctxStore.set('tessera-quiz', quiz);
     provideNavCtx(progress);
-    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
 
     const userReset = vi.fn();
     const q = useQuestion({

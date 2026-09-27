@@ -454,7 +454,7 @@ export interface UseQuizHandle {
   revealFeedback(q: Question): void;
 }
 
-export function __warnUnsubmittedQuiz(stats: {
+function warnUnsubmittedQuiz(stats: {
   questionsCount: number;
   answersCount: number;
   submitCalled: boolean;
@@ -468,7 +468,7 @@ export function __warnUnsubmittedQuiz(stats: {
   );
 }
 
-export function __warnEmptyQuiz(questionsCount: number): void {
+function warnEmptyQuiz(questionsCount: number): void {
   if (questionsCount > 0) return;
   console.warn(
     '[tessera] useQuiz: quiz mounted with no registered questions. Question widgets ' +
@@ -520,11 +520,11 @@ export function useQuiz(
 
   onMount(() => {
     if (!import.meta.env?.DEV) return;
-    void tick().then(() => __warnEmptyQuiz(engine.questions.length));
+    void tick().then(() => warnEmptyQuiz(engine.questions.length));
   });
 
   onDestroy(() => {
-    __warnUnsubmittedQuiz(engine.stats);
+    warnUnsubmittedQuiz(engine.stats);
   });
 
   return engine;

@@ -59,19 +59,20 @@ class StubAdapter extends BaseAdapter {
   saveState(): void {}
 }
 
-/**
- * A connected adapter whose members all no-op, for mounting App without an
- * LMS. An override left undefined keeps the default member.
- */
+/** A connected adapter whose members all no-op, for mounting App without an LMS. */
 export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
-  const defined = Object.entries(overrides).filter(([, v]) => v !== undefined);
-  return Object.assign(new StubAdapter(), Object.fromEntries(defined));
+  return Object.assign(new StubAdapter(), overrides);
 }
 
 /** Let an adapter's async write queue drain. */
 export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
 
 export const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+export function useFakeTimers(): void {
+  vi.useFakeTimers();
+  onTestFinished(() => vi.useRealTimers());
+}
 
 export function setLaunchParams(params: Record<string, string> = {}): void {
   const { history } = window;
@@ -86,6 +87,17 @@ export function setValuesFor(
   return Object.fromEntries(
     setValue.mock.calls.filter(([key]) => key.startsWith(prefix)),
   );
+}
+
+export function statementRequests(fetch: Mock) {
+  return fetch.mock.calls.filter(
+    ([url, init]) =>
+      String(url).includes('/statements') && init?.method === 'POST',
+  );
+}
+
+export function postedStatements(fetch: Mock): any[] {
+  return statementRequests(fetch).flatMap(([, init]) => JSON.parse(init.body));
 }
 
 export function printed(spy: MockInstance): string {
@@ -123,6 +135,7 @@ export async function mountApp({
     ...testGlobals,
     layout: loadLayout && (await loadLayout()).default,
   });
+  vi.stubGlobal('__tesseraNavCtx', undefined);
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   onTestFinished(() => {
@@ -136,7 +149,12 @@ export function createManifest(
   quizPages: Record<number, { graded?: boolean; gatesProgress?: boolean }> = {},
   pageOpts: Record<
     number,
-    Partial<Pick<ManifestPage, 'graded' | 'required' | 'weight' | 'questions'>>
+    Partial<
+      Pick<
+        ManifestPage,
+        'graded' | 'required' | 'weight' | 'questions' | 'completesOn'
+      >
+    >
   > = {},
 ): Manifest {
   const pages = Array.from({ length: pageCount }, (_, i) => ({

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { mount, unmount } from 'svelte';
 import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
+import { tick } from './helpers.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
 // directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
@@ -774,15 +775,18 @@ function mountHarness(
       pageIndex: opts.pageIndex ?? 0,
     },
   });
-  onTestFinished(() => unmount(component));
-  return { component, target, ref };
+  let mounted = true;
+  const destroy = () => {
+    if (!mounted) return;
+    mounted = false;
+    unmount(component);
+    target.remove();
+  };
+  onTestFinished(destroy);
+  return { target, ref, unmount: destroy };
 }
 
 describe('useQuiz (Svelte wrapper)', () => {
-  beforeEach(() => {
-    document.body.innerHTML = '';
-  });
-
   it('throws when called on a page with no quiz config', () => {
     const m = mountHarness(null);
     expect(m.ref.thrown).toBeInstanceOf(Error);
@@ -861,52 +865,58 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/second quiz/i));
   });
 
-  it('warns when submit() unmounts without ever firing (custom shell forgot to call it)', async () => {
-    // A custom quiz shell that forgets to route through useQuiz().submit() never
-    // reaches the LMS adapter. Catch it on unmount so the bug stays local to dev.
-    // Exercised via the exported helper — the onDestroy call site is covered by
-    // the e2e custom-quiz suite.
+  it('warns on unmount when answers were never submitted', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { __warnUnsubmittedQuiz } =
-      await import('../src/runtime/hooks.svelte.js');
-    __warnUnsubmittedQuiz({
-      questionsCount: 2,
-      answersCount: 1,
-      submitCalled: false,
-    });
+    const m = mountHarness({ graded: true });
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    q.setAnswer(0, true);
+    await tick();
+    m.unmount();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/submit\(\) was never called/i),
     );
+  });
 
-    // Inverse: nothing answered, or already submitted → no warning.
-    warn.mockClear();
-    __warnUnsubmittedQuiz({
-      questionsCount: 2,
-      answersCount: 0,
-      submitCalled: false,
-    });
-    __warnUnsubmittedQuiz({
-      questionsCount: 2,
-      answersCount: 1,
-      submitCalled: true,
-    });
-    expect(warn).not.toHaveBeenCalled();
+  it.each([
+    ['nothing was answered', () => {}],
+    [
+      'the quiz was submitted',
+      (q: QuizEngine) => {
+        q.setAnswer(0, true);
+        q.submit();
+      },
+    ],
+  ])('does not warn on unmount when %s', async (_, act) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = mountHarness({ graded: true });
+    const q = m.ref.handle!;
+    q.registerQuestion(tfQuestion('a', true, true));
+    act(q);
+    await tick();
+    m.unmount();
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringMatching(/submit\(\) was never called/i),
+    );
   });
 
   it('warns when a quiz mounts with no registered questions', async () => {
-    // A quiz page wrapped by a shell but with no useQuestion() widgets has nothing
-    // to score or report. Exercised directly via the exported helper for the same
-    // onMount timing reasons as the unmount warning above.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { __warnEmptyQuiz } = await import('../src/runtime/hooks.svelte.js');
-    __warnEmptyQuiz(0);
-    expect(warn).toHaveBeenCalledWith(
+    mountHarness({ graded: true });
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/no registered questions/i),
+      ),
+    );
+  });
+
+  it('does not warn about an empty quiz once a question registers', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = mountHarness({ graded: true });
+    m.ref.handle!.registerQuestion(tfQuestion('a', true, true));
+    await tick();
+    expect(warn).not.toHaveBeenCalledWith(
       expect.stringMatching(/no registered questions/i),
     );
-
-    // Inverse: any registered question → no warning.
-    warn.mockClear();
-    __warnEmptyQuiz(1);
-    expect(warn).not.toHaveBeenCalled();
   });
 });
