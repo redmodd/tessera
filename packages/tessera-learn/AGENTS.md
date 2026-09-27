@@ -991,7 +991,7 @@ Course identity from `course.config.js`, for layouts and headers, and the sessio
 function useCourse(): {
   readonly title: string;
   readonly logo: string | undefined; // branding.logo with $assets/ resolved, ready for <img src>; undefined when unset or empty
-  readonly canExit: boolean; // true under an LMS once the launch finishes; false on the web
+  readonly canExit: boolean; // true under an LMS once the launch finishes, until the session ends; false on the web
   exit(): Promise<void>;
 };
 ```

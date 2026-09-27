@@ -37,7 +37,7 @@
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
-  const canExit = $derived(adapter.connected && persistenceReady);
+  let launched = $state(false);
   // Holds the resolved xAPI client for unload-time markUnloading. Set
   // after adapter.init() resolves and registered globally so useXAPI()
   // can reach it.
@@ -394,9 +394,12 @@
   });
 
   // ---- Exit / Terminate lifecycle ----
-  let terminated = false;
+  let terminated = $state(false);
   let exitPhase = $state(null);
   let manualWatchdog = null;
+  const canExit = $derived(
+    adapter.connected && launched && !terminated && !exitPhase,
+  );
 
   function endSession() {
     if (terminated) return false;
@@ -420,12 +423,17 @@
   }
 
   async function exit() {
-    if (!canExit || !endSession()) return;
+    if (!canExit) return;
     exitPhase = 'ending';
-    const returned = await adapter.exit().catch((err) => {
-      console.warn('Tessera: exit failed', err);
-      return false;
-    });
+    loadGeneration++;
+    pageLoading = false;
+    await tick();
+    const returned =
+      endSession() &&
+      (await adapter.exit().catch((err) => {
+        console.warn('Tessera: exit failed', err);
+        return false;
+      }));
     if (returned) return;
     exitPhase = 'ended';
     window.close();
@@ -530,6 +538,7 @@
     adapter.commit();
 
     window.addEventListener('pagehide', handlePagehide);
+    launched = true;
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn

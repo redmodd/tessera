@@ -935,16 +935,21 @@ describe('CMI5Adapter', () => {
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
-    it('ignores a returnURL that is not http(s)', async () => {
-      const adapter = await initAdapter({
-        launchData: { returnURL: 'javascript:alert(1)' },
-      });
+    it.each(['javascript:alert(1)', '/lms/course/42'])(
+      'warns and ignores a returnURL that is not absolute http(s): %s',
+      async (returnURL) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const adapter = await initAdapter({ launchData: { returnURL } });
 
-      const assign = stubLocationAssign();
+        const assign = stubLocationAssign();
 
-      expect(await adapter.exit()).toBe(false);
-      expect(assign).not.toHaveBeenCalled();
-    });
+        expect(await adapter.exit()).toBe(false);
+        expect(assign).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(`returnURL "${returnURL}"`),
+        );
+      },
+    );
 
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
       const adapter = await initAdapter();

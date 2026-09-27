@@ -39,13 +39,15 @@ async function mount(
     config = createConfig(),
     manifest = createManifest(2),
     loadLayout,
+    loadPage,
   }: {
     config?: CourseConfig;
     manifest?: ReturnType<typeof createManifest>;
     loadLayout?: () => Promise<{ default: unknown }>;
+    loadPage?: () => Promise<unknown>;
   } = {},
 ) {
-  await mountApp({ config, manifest, adapter, loadLayout });
+  await mountApp({ config, manifest, adapter, loadLayout, loadPage });
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain('Test page'),
   );
@@ -85,6 +87,64 @@ describe('exiting a course', () => {
     expect(calls.slice(launched)).toEqual(EXIT_SEQUENCE);
     expect(document.querySelector('.tessera-content')).toBeNull();
     expect(close).toHaveBeenCalled();
+  });
+
+  it('moves focus to the exit screen', async () => {
+    const { adapter } = recordingAdapter();
+    await mount(adapter);
+
+    exitButton()!.click();
+
+    await vi.waitFor(() =>
+      expect(document.activeElement?.className).toBe('tessera-session-ended'),
+    );
+  });
+
+  it('offers no exit until the launch finishes', async () => {
+    const canExitAtLaunch: boolean[] = [];
+    const { adapter } = recordingAdapter({
+      setCompletionStatus: () => canExitAtLaunch.push(navCtx().canExit),
+    });
+    await mount(adapter, { loadLayout: masteryLayout });
+
+    expect(canExitAtLaunch[0]).toBe(false);
+    expect(navCtx().canExit).toBe(true);
+  });
+
+  it('unmounts the course before the final save', async () => {
+    const mountedAtSave: boolean[] = [];
+    const { adapter } = recordingAdapter({
+      saveState: () =>
+        mountedAtSave.push(!!document.querySelector('.tessera-content')),
+    });
+    await mount(adapter);
+
+    exitButton()!.click();
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Session ended'),
+    );
+    expect(mountedAtSave.at(-1)).toBe(false);
+  });
+
+  it('drops a page that finishes loading after the exit', async () => {
+    let release!: () => void;
+    const page = () => import('./fixtures/app-page.svelte');
+    let loads = 0;
+    const loadPage = () =>
+      loads++ === 0
+        ? page()
+        : new Promise((resolve) => (release = () => resolve(page())));
+    const { adapter } = recordingAdapter();
+    await mount(adapter, { loadLayout: masteryLayout, loadPage });
+
+    navCtx().nav.goToPage(1);
+    await flush();
+    await navCtx().exit();
+    release();
+    await flush();
+
+    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
   });
 
   it('exits normally once the course is complete', async () => {
@@ -150,6 +210,16 @@ describe('exiting a course', () => {
 
     expect(calls.slice(launched)).toEqual(EXIT_SEQUENCE);
     expect(exit).not.toHaveBeenCalled();
+  });
+
+  it('withdraws the Exit button once pagehide ends the session', async () => {
+    const { adapter } = recordingAdapter();
+    await mount(adapter);
+
+    window.dispatchEvent(new Event('pagehide'));
+    await flush();
+
+    expect(exitButton()).toBeNull();
   });
 
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {

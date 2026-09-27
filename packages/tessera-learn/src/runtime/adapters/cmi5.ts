@@ -179,11 +179,13 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       ) {
         this.#launchMode = this.#launchData.launchMode;
       }
-      if (
-        typeof this.#launchData.returnURL === 'string' &&
-        httpOrigin(this.#launchData.returnURL)
-      ) {
-        this.returnURL = this.#launchData.returnURL;
+      const { returnURL } = this.#launchData;
+      if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
+        this.returnURL = returnURL;
+      } else if (returnURL) {
+        console.warn(
+          `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
+        );
       }
       const launchMastery = parseMastery(
         this.#launchData.masteryScore,
