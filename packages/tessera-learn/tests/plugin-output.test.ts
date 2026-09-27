@@ -317,6 +317,21 @@ describe('export packaging gate', () => {
     );
   });
 
+  it('fails the build on an undefined import when a parent folder name contains node_modules', () => {
+    projectRoot = resolve(projectRoot, 'node_modules-demo', 'course');
+    mkdirSync(resolve(projectRoot, 'pages'), { recursive: true });
+    writeConfig('scorm12');
+
+    const { exporter } = buildPlugins();
+    expect(() =>
+      (exporter.onLog as any).call(
+        throwingCtx,
+        'warn',
+        undefinedImportLog(resolve(projectRoot, 'pages', 'welcome.svelte')),
+      ),
+    ).toThrow(/notReal/);
+  });
+
   it('lets an undefined import inside node_modules through as a warning', async () => {
     writeConfig('scorm12');
     seedStaleDist();

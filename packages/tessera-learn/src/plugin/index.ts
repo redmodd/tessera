@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute, dirname, join } from 'node:path';
+import { resolve, relative, isAbsolute, dirname, join, sep } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -64,16 +64,13 @@ function projectFileRel(
   filename: string | undefined,
   projectRoot: string,
 ): string | null {
-  if (!filename) return null;
-  if (
-    filename.startsWith('\0') ||
-    filename.includes('virtual:') ||
-    filename.includes('node_modules')
-  ) {
+  if (!filename || filename.startsWith('\0') || filename.includes('virtual:')) {
     return null;
   }
   const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
-  return isInside(projectRoot, abs) ? relative(projectRoot, abs) : null;
+  if (!isInside(projectRoot, abs)) return null;
+  const rel = relative(projectRoot, abs);
+  return rel.split(sep).includes('node_modules') ? null : rel;
 }
 
 export function tesseraPlugin(options: { standardOverride?: string } = {}) {
