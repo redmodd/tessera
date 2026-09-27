@@ -952,6 +952,22 @@ describe('CMI5Adapter', () => {
       expect(puts[0][1].keepalive).toBeUndefined();
     });
 
+    it('writes the exit state when the final save fails', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValueOnce(respond(500));
+      adapter.saveState({ b: 1 } as never);
+      await adapter.exit();
+
+      const exitPut = stateWrites().find(([url]: any[]) =>
+        url.includes('tessera-state-exit'),
+      );
+      expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
     it('stops waiting on a stalled LRS and still redirects', async () => {
       const returnURL = 'https://lms.example.com/learner/done';
       const adapter = await initAdapter({ launchData: { returnURL } });

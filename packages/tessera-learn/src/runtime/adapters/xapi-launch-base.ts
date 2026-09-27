@@ -107,6 +107,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected returnURL: string | undefined;
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
+  #stateSaved = true;
 
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
@@ -140,10 +141,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (this.stateLoadFailed) return;
     this.state = state;
     if (!this.publisher) return;
-    void this.publisher.chainTask(() => this.#putState(state));
+    void this.publisher.chainTask(async () => {
+      this.#stateSaved = await this.#putState(state);
+    });
   }
 
-  async #putState(state: SavedState, stateId?: string): Promise<void> {
+  async #putState(state: SavedState, stateId?: string): Promise<boolean> {
     try {
       const resp = await this.xapiFetch(this.buildStateUrl(stateId), {
         method: 'PUT',
@@ -155,8 +158,10 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
           `Tessera ${this.logName}: State API PUT returned ${resp.status}; learner progress did not persist.`,
         );
       }
+      return resp.ok;
     } catch (err) {
       console.warn(`Tessera ${this.logName}: Failed to save state`, err);
+      return false;
     }
   }
 
@@ -303,7 +308,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       if (!this.terminated) {
         const saved =
           !this.publisher ||
-          (await settles(this.publisher.chainTask(async () => {})));
+          ((await settles(this.publisher.chainTask(async () => {}))) &&
+            this.#stateSaved);
         this.#terminate(!saved);
       }
       if (this.#finalSend) await settles(this.#finalSend);
