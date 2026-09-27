@@ -1,18 +1,11 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
-
-let root: string;
-let counter = 0;
+import { tempDir } from './helpers.js';
 
 function makeCourse(): string {
-  counter++;
-  root = resolve(
-    tmpdir(),
-    `tessera-validation-shared-${Date.now()}-${counter}`,
-  );
+  const root = tempDir();
   const lesson = join(root, 'pages', '01-section', '01-lesson');
   mkdirSync(lesson, { recursive: true });
   mkdirSync(join(root, 'assets'), { recursive: true });
@@ -37,12 +30,6 @@ function makeCourse(): string {
   );
   return root;
 }
-
-afterEach(() => {
-  try {
-    rmSync(root, { recursive: true, force: true });
-  } catch {}
-});
 
 describe('validation with $shared imports', () => {
   it('does not flag a page that imports from $shared', () => {

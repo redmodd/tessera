@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, onTestFinished, vi } from 'vitest';
-import { mount, unmount } from 'svelte';
-import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
+import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
+import type { UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 import { flush } from './helpers.js';
+import { mountHarness } from './helpers/mount.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
 // directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
@@ -755,63 +755,6 @@ describe('QuizEngine', () => {
 
 // ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
 
-interface HarnessRef {
-  handle: QuizEngine | null;
-  secondHandle?: QuizEngine | null;
-  element: HTMLElement | null;
-  events: Array<{ score: number }>;
-  thrown: unknown;
-}
-
-function mountHarness(
-  quizConfig: unknown,
-  opts: {
-    secondQuiz?: boolean;
-    nullElement?: boolean;
-    adapter?: unknown;
-    quizState?: { attempts: number; score: number };
-    navCtx?: unknown;
-    pageIndex?: number;
-  } = {},
-) {
-  const ref: HarnessRef = {
-    handle: null,
-    element: null,
-    events: [],
-    thrown: null,
-  };
-  const target = document.createElement('div');
-  const host = document.createElement('div');
-  target.appendChild(host);
-  document.body.appendChild(target);
-  const component = mount(HarnessSvelte, {
-    target,
-    props: {
-      ref,
-      quizConfig,
-      host,
-      secondQuiz: opts.secondQuiz ?? false,
-      nullElement: opts.nullElement ?? false,
-      adapter: opts.adapter ?? null,
-      quizState: opts.quizState ?? null,
-      navCtx: opts.navCtx ?? null,
-      pageIndex: opts.pageIndex ?? 0,
-    },
-  });
-  let mounted = true;
-  const destroy = () => {
-    if (!mounted) return;
-    mounted = false;
-    try {
-      unmount(component);
-    } finally {
-      target.remove();
-    }
-  };
-  onTestFinished(destroy);
-  return { target, ref, unmount: destroy };
-}
-
 describe('useQuiz (Svelte wrapper)', () => {
   it('throws when called on a page with no quiz config', () => {
     const m = mountHarness(null);
@@ -908,7 +851,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     ['nothing was answered', () => {}],
     [
       'the quiz was submitted',
-      (q: QuizEngine) => {
+      (q: UseQuizHandle) => {
         q.setAnswer(0, true);
         q.submit();
       },

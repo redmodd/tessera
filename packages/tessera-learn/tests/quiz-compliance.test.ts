@@ -16,23 +16,10 @@
  * Uses one of every SCORM 2004 4th Edition interaction type (RTE §4.2.7) so
  * the gate covers the full vocabulary.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount, unmount } from 'svelte';
-import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
+import { describe, it, expect } from 'vitest';
 import { ALL_INTERACTION_FIXTURES } from './fixtures/all-interactions.js';
 import type { Interaction } from '../src/runtime/interaction.js';
-import type { UseQuizHandle } from '../src/runtime/hooks.svelte.js';
-
-interface CompletionEvent {
-  score: number;
-}
-
-interface HarnessRef {
-  handle: UseQuizHandle | null;
-  element: HTMLElement | null;
-  events: CompletionEvent[];
-  thrown: unknown;
-}
+import { mountHarness } from './helpers/mount.js';
 
 type ReportCall = ['reportInteraction', string, Interaction, boolean];
 
@@ -49,44 +36,9 @@ function recordingAdapter(): {
   };
 }
 
-function mountHarness(quizConfig: unknown, adapter: unknown) {
-  const ref: HarnessRef = {
-    handle: null,
-    element: null,
-    events: [],
-    thrown: null,
-  };
-  const target = document.createElement('div');
-  const host = document.createElement('div');
-  target.appendChild(host);
-  document.body.appendChild(target);
-  const component = mount(HarnessSvelte, {
-    target,
-    props: { ref, quizConfig, host, adapter },
-  });
-  return { component, target, ref };
-}
-
 describe('Quiz orchestration → LMS bridge compliance', () => {
-  const mountings: ReturnType<typeof mountHarness>[] = [];
-
-  beforeEach(() => {
-    mountings.length = 0;
-    document.body.innerHTML = '';
-  });
-
-  afterEach(() => {
-    for (const m of mountings) {
-      try {
-        unmount(m.component);
-      } catch {}
-    }
-    document.body.innerHTML = '';
-  });
-
   function answerEveryFixture(adapter: ReturnType<typeof recordingAdapter>) {
-    const m = mountHarness({ graded: true }, adapter);
-    mountings.push(m);
+    const m = mountHarness({ graded: true }, { adapter });
     const q = m.ref.handle!;
     for (const f of ALL_INTERACTION_FIXTURES) {
       q.registerQuestion({
@@ -280,8 +232,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     // contract is "every retry reports identically to the first attempt for
     // the same answers."
     const adapter = recordingAdapter();
-    const m = mountHarness({ graded: true }, adapter);
-    mountings.push(m);
+    const m = mountHarness({ graded: true }, { adapter });
     const q = m.ref.handle!;
     for (const f of ALL_INTERACTION_FIXTURES) {
       q.registerQuestion({
@@ -311,8 +262,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
   it('default weights (=1) produce byte-identical adapter calls to the unweighted baseline', () => {
     // Locks in the "weight=1 is a no-op" promise.
     const adapter = recordingAdapter();
-    const m = mountHarness({ graded: true }, adapter);
-    mountings.push(m);
+    const m = mountHarness({ graded: true }, { adapter });
     const q = m.ref.handle!;
     for (const f of ALL_INTERACTION_FIXTURES) {
       q.registerQuestion({
@@ -342,8 +292,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     // pass/fail to the LMS regardless of its rollup weight. Only the rolled-up
     // score reflects the weighted formula.
     const adapter = recordingAdapter();
-    const m = mountHarness({ graded: true }, adapter);
-    mountings.push(m);
+    const m = mountHarness({ graded: true }, { adapter });
     const q = m.ref.handle!;
     const weights: Record<string, number> = { 'q-long-fill-in': 9 };
     for (const f of ALL_INTERACTION_FIXTURES) {

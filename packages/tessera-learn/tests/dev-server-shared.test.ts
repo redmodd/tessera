@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect, onTestFinished } from 'vitest';
+import { mkdirSync, writeFileSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
 import { buildInlineConfig } from '../src/plugin/inline-config.js';
+import { tempDir } from './helpers.js';
 
 // Unlike dev-server-fs.test.ts (hand-rolled config), this boots the real
 // buildInlineConfig and serves a $shared asset from outside the course root.
@@ -13,7 +13,6 @@ import { buildInlineConfig } from '../src/plugin/inline-config.js';
 let ws: string;
 let courseRoot: string;
 let sharedCss: string;
-let servers: ViteDevServer[] = [];
 
 function write(path: string, content: string): void {
   mkdirSync(join(path, '..'), { recursive: true });
@@ -21,14 +20,9 @@ function write(path: string, content: string): void {
 }
 
 function setupWorkspace(): void {
-  const raw = resolve(
-    tmpdir(),
-    `tessera-shared-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(raw, { recursive: true });
   // Vite canonicalizes its root, so fs.allow (workspaceRoot) must be canonical
-  // too — otherwise /tmp vs /private/tmp on macOS trips the fs gate.
-  ws = realpathSync(raw);
+  // too, otherwise /tmp vs /private/tmp on macOS trips the fs gate.
+  ws = realpathSync(tempDir());
   courseRoot = join(ws, 'courses', 'demo');
   mkdirSync(courseRoot, { recursive: true });
 
@@ -62,16 +56,10 @@ async function serve(fs?: { allow: string[] }): Promise<ViteDevServer> {
     logLevel: 'silent',
     server: fs ? { ...base.server, fs } : base.server,
   });
-  servers.push(server);
+  onTestFinished(() => server.close());
   await server.listen();
   return server;
 }
-
-afterEach(async () => {
-  await Promise.all(servers.map((s) => s.close()));
-  servers = [];
-  rmSync(ws, { recursive: true, force: true });
-});
 
 describe('dev server $shared serving (real buildInlineConfig)', () => {
   it('serves a $shared asset from outside the course root', async () => {

@@ -1,24 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { readResolvedConfig } from '../src/plugin/manifest.js';
 import { validateProject } from '../src/plugin/validation.js';
 import { tesseraPlugin } from '../src/plugin/index.js';
+import { tempDir } from './helpers.js';
 
 let projectRoot: string;
 
 beforeEach(() => {
-  projectRoot = resolve(
-    tmpdir(),
-    `tessera-resolve-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(projectRoot, { recursive: true });
-});
-
-afterEach(() => {
-  if (existsSync(projectRoot))
-    rmSync(projectRoot, { recursive: true, force: true });
+  projectRoot = tempDir();
 });
 
 function writeConfig(body: string) {

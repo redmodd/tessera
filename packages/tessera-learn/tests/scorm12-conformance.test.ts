@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
@@ -8,7 +8,7 @@ import {
   writtenValues,
   type RealLms12,
 } from './helpers/real-lms.js';
-import { flush } from './helpers.js';
+import { flush, useFakeTimers } from './helpers.js';
 
 describe('SCORM12Adapter against scorm-again', () => {
   let lms: RealLms12;
@@ -19,8 +19,6 @@ describe('SCORM12Adapter against scorm-again', () => {
     adapter = new SCORM12Adapter(lms.api);
     return adapter.init();
   }
-
-  afterEach(() => lms?.dispose());
 
   it('a full happy-path session produces no rejected writes', async () => {
     await start();
@@ -120,8 +118,8 @@ describe('SCORM12Adapter against scorm-again', () => {
         await flush();
         expect(lms.errors).toEqual([]);
         const written = writtenValues(lms.log, 'cmi.interactions.0');
-        expect(written['cmi.interactions.0.id']).toBe('q1');
-        expect(written['cmi.interactions.0.type']).toBeDefined();
+        expect(written.id).toBe('q1');
+        expect(written.type).toBeDefined();
       },
     );
   });
@@ -155,16 +153,17 @@ describe('SCORM12Adapter against scorm-again', () => {
     await flush();
     expect(lms.errors).toEqual([]);
     const written = writtenValues(lms.log, 'cmi.interactions.1');
-    expect(written['cmi.interactions.1.id']).toBe('q2');
+    expect(written.id).toBe('q2');
   });
 
   it('the wrapper has teeth: an out-of-range score is flagged', async () => {
     await start();
     // The adapter does not clamp score.raw to 0..100; 150 is out of the SCORM
     // 1.2 range and a real LMS rejects it (405). The always-true mock never
-    // would. We await the retry queue draining before asserting.
+    // would.
+    useFakeTimers();
     adapter.setScore(150);
-    await new Promise((r) => setTimeout(r, 400));
+    await vi.runAllTimersAsync();
     expect(lms.errors.some((e) => e.key === 'cmi.core.score.raw')).toBe(true);
     expect(lms.errors[0].code).toBe('405');
   });

@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
+import { describe, it, expect } from 'vitest';
+import { flushSync } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
+import { mountInBody } from './helpers/mount.js';
 
-const flush = async () => {
+const settle = async () => {
   flushSync();
   await Promise.resolve();
 };
@@ -46,39 +47,25 @@ function makeQuizCtx() {
   return { quiz, registrations };
 }
 
-function mountWithContext(
+function mountInQuiz(
   Component: any,
   props: Record<string, unknown>,
-  ctx: unknown,
+  quiz: unknown,
 ) {
-  const target = document.createElement('div');
-  document.body.appendChild(target);
-  const context = new Map<string, unknown>([['tessera-quiz', ctx]]);
-  const component = mount(Component, { target, props, context });
-  return { component, target };
+  return mountInBody(Component, {
+    props,
+    context: new Map([['tessera-quiz', quiz]]),
+  });
 }
 
 describe('Built-in question components emit Interaction payloads in quiz mode', () => {
-  let toUnmount: any[] = [];
-
-  beforeEach(() => {
-    toUnmount = [];
-  });
-
-  afterEach(() => {
-    for (const c of toUnmount) unmount(c);
-    toUnmount = [];
-    document.body.innerHTML = '';
-  });
-
   it('MultipleChoice → { type: "choice", response, correct: [correctIndex] }', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const { component } = mountWithContext(
+    mountInQuiz(
       MultipleChoice,
       { question: 'Pick one', options: ['a', 'b', 'c'], correct: 1 },
       quiz,
     );
-    toUnmount.push(component);
 
     expect(registrations).toHaveLength(1);
     const reg = registrations[0];
@@ -93,7 +80,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 
   it('FillInTheBlank → { type: "fill-in", response, correct, caseMatters }', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const { component } = mountWithContext(
+    mountInQuiz(
       FillInTheBlank,
       {
         question: 'Capital of France',
@@ -102,7 +89,6 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
       quiz,
     );
-    toUnmount.push(component);
 
     expect(registrations).toHaveLength(1);
     const reg = registrations[0];
@@ -117,7 +103,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 
   it('Matching → { type: "matching", response: pairs, correct: pairs }', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const { component } = mountWithContext(
+    mountInQuiz(
       Matching,
       {
         question: 'Match these',
@@ -128,7 +114,6 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
       quiz,
     );
-    toUnmount.push(component);
 
     expect(registrations).toHaveLength(1);
     const reg = registrations[0];
@@ -147,7 +132,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 
   it('Sorting → { type: "matching", response: [item,target] pairs, correct: pairs }', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const { component } = mountWithContext(
+    mountInQuiz(
       Sorting,
       {
         question: 'Sort these',
@@ -157,7 +142,6 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
       quiz,
     );
-    toUnmount.push(component);
 
     expect(registrations).toHaveLength(1);
     const reg = registrations[0];
@@ -176,7 +160,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 
   it('Sorting maps each item to its own target, not to its own index', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const { component } = mountWithContext(
+    mountInQuiz(
       Sorting,
       {
         question: 'Sort these',
@@ -186,7 +170,6 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
       quiz,
     );
-    toUnmount.push(component);
 
     const ix = registrations[0].interaction();
     expect(ix).toMatchObject({
@@ -202,34 +185,22 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 
   it('A Quiz-like round-trip: four built-ins all register with useful interaction payloads', () => {
     const { quiz, registrations } = makeQuizCtx();
-    const mountings = [
-      mountWithContext(
-        MultipleChoice,
-        { question: 'Pick', options: ['a'], correct: 0 },
-        quiz,
-      ),
-      mountWithContext(
-        FillInTheBlank,
-        { question: 'Fill', answers: ['x'] },
-        quiz,
-      ),
-      mountWithContext(
-        Matching,
-        { question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
-        quiz,
-      ),
-      mountWithContext(
-        Sorting,
-        {
-          question: 'Sort',
-          items: ['x'],
-          targets: ['T'],
-          correct: [0],
-        },
-        quiz,
-      ),
-    ];
-    toUnmount.push(...mountings.map((m) => m.component));
+    mountInQuiz(
+      MultipleChoice,
+      { question: 'Pick', options: ['a'], correct: 0 },
+      quiz,
+    );
+    mountInQuiz(FillInTheBlank, { question: 'Fill', answers: ['x'] }, quiz);
+    mountInQuiz(
+      Matching,
+      { question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
+      quiz,
+    );
+    mountInQuiz(
+      Sorting,
+      { question: 'Sort', items: ['x'], targets: ['T'], correct: [0] },
+      quiz,
+    );
 
     expect(registrations).toHaveLength(4);
     expect(registrations[0].interaction().type).toBe('choice');
@@ -240,38 +211,23 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 });
 
 describe('FillInTheBlank normalizes the response at the boundary', () => {
-  let toUnmount: any[] = [];
-
-  beforeEach(() => {
-    toUnmount = [];
-  });
-
-  afterEach(() => {
-    for (const c of toUnmount) unmount(c);
-    document.body.innerHTML = '';
-  });
-
   it('a trailing space scores correct and reports the trimmed response', async () => {
     const reports: Array<[string, Interaction, boolean | null]> = [];
     const adapter = {
       reportInteraction: (id: string, i: Interaction, c: boolean | null) =>
         reports.push([id, i, c]),
     };
-    const target = document.createElement('div');
-    document.body.appendChild(target);
-    const component = mount(FillInTheBlank, {
-      target,
+    const { target } = mountInBody(FillInTheBlank, {
       props: { question: 'Sky colour', answers: ['blue', 'Blue'] },
-      context: new Map<string, unknown>([['tessera-adapter', { adapter }]]),
+      context: new Map([['tessera-adapter', { adapter }]]),
     });
-    toUnmount.push(component);
 
     const input = target.querySelector('input') as HTMLInputElement;
     input.value = 'blue ';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    await flush();
+    await settle();
     (target.querySelector('button') as HTMLButtonElement).click();
-    await flush();
+    await settle();
 
     expect(reports).toHaveLength(1);
     const [, interaction, correct] = reports[0];

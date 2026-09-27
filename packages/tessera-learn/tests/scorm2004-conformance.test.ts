@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
@@ -18,8 +18,6 @@ describe('SCORM2004Adapter against scorm-again', () => {
     adapter = new SCORM2004Adapter(lms.api);
     return adapter.init();
   }
-
-  afterEach(() => lms?.dispose());
 
   it('a full happy-path session produces no rejected writes', async () => {
     await start();

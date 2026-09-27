@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   generateManifest,
@@ -13,8 +13,9 @@ import {
   deriveSlug,
 } from '../src/plugin/manifest.js';
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
+import { tempDir } from './helpers.js';
 
-const TMP = resolve(__dirname, '__test_pages__');
+let TMP: string;
 
 function createFile(relativePath: string, content: string) {
   const fullPath = resolve(TMP, relativePath);
@@ -56,11 +57,7 @@ export const pageConfig = { title: "Welcome to the Course" }
 }
 
 beforeEach(() => {
-  mkdirSync(TMP, { recursive: true });
-});
-
-afterEach(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  TMP = tempDir();
 });
 
 // ---------- Helper Tests ----------
@@ -243,12 +240,10 @@ export const pageConfig = { title: 'X', quiz: { graded: true } };
 </script>
 <h1>page</h1>
 {#if `;
-    const result = parsePageConfigFromSource(source);
-    expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') {
-      expect(result.value.title).toBe('X');
-      expect(result.value.quiz).toEqual({ graded: true });
-    }
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: { title: 'X', quiz: { graded: true } },
+    });
   });
 });
 

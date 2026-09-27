@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   existsSync,
   readFileSync,
   readdirSync,
   mkdirSync,
+  mkdtempSync,
   rmSync,
   copyFileSync,
   cpSync,
@@ -13,17 +14,6 @@ import { tmpdir } from 'node:os';
 import { execFileSync, execSync } from 'node:child_process';
 
 let testDir: string;
-let counter = 0;
-
-function createTestDir(): string {
-  counter++;
-  const dir = resolve(
-    tmpdir(),
-    `tessera-scaffold-test-${Date.now()}-${counter}`,
-  );
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
 
 // Path to the built CLI
 const CLI_PATH = resolve(__dirname, '..', 'dist', 'index.js');
@@ -57,13 +47,8 @@ function runCLI(
 }
 
 beforeEach(() => {
-  testDir = createTestDir();
-});
-
-afterEach(() => {
-  try {
-    rmSync(testDir, { recursive: true, force: true });
-  } catch {}
+  testDir = mkdtempSync(join(tmpdir(), 'tessera-scaffold-test-'));
+  return () => rmSync(testDir, { recursive: true, force: true });
 });
 
 // Build CLI (and sync templates) before tests run.
