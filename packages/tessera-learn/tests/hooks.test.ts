@@ -33,12 +33,12 @@ import {
   usePersistence,
   useCourse,
   useCompletion,
+  setQuizContext,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import * as runtimeContexts from '../src/runtime/contexts.js';
-import { setQuizContext, setUserStateStore } from '../src/runtime/contexts.js';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import {
@@ -802,19 +802,19 @@ describe('usePersistence', () => {
   });
 
   it('get returns null before any set', () => {
-    setUserStateStore(makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     expect(usePersistence('foo').get()).toBe(null);
   });
 
   it('set stores under the namespaced key; get returns it', () => {
-    setUserStateStore(makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     const p = usePersistence<{ x: number }>('foo');
     p.set({ x: 42 });
     expect(p.get()).toEqual({ x: 42 });
   });
 
   it('keys are isolated between callers', () => {
-    setUserStateStore(makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     const a = usePersistence<number>('a');
     const b = usePersistence<number>('b');
     a.set(1);
@@ -824,7 +824,7 @@ describe('usePersistence', () => {
   });
 
   it('values survive across hook calls (reads from shared store)', () => {
-    setUserStateStore(makeStore());
+    runtimeContexts.setUserStateStore(makeStore());
     usePersistence<string>('greeting').set('hello');
     // simulating a later remount of a widget binding to the same key
     expect(usePersistence<string>('greeting').get()).toBe('hello');

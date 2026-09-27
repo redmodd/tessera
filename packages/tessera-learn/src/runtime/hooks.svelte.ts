@@ -8,9 +8,8 @@ import {
   getNavContext,
   getAdapterContext,
   getPageContext,
-  getQuizContext,
-  setQuizContext,
   isInPage,
+  optionalContext,
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
@@ -102,6 +101,12 @@ export interface UseQuestionHandle extends Question {
    */
   setRender(render: unknown): void;
 }
+
+interface QuizContext {
+  registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
+}
+
+export const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
 
 /**
  * Register a question widget with the Tessera runtime. Works outside a quiz

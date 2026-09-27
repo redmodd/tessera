@@ -7,7 +7,8 @@ import Sorting from '../src/components/Sorting.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import { flush } from './helpers.js';
 import { mountInBody } from './helpers/mount.js';
-import { setAdapterContext, setQuizContext } from '../src/runtime/contexts.js';
+import { setAdapterContext } from '../src/runtime/contexts.js';
+import { setQuizContext } from '../src/runtime/hooks.svelte.js';
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
