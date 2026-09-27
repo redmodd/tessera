@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'node:path';
-import { BuildContext, isInside } from '../src/plugin/build-context.js';
+import { describe, it, expect, vi } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import {
+  BuildContext,
+  isInside,
+  projectFileRel,
+} from '../src/plugin/build-context.js';
 import { resolvedConfig } from './helpers/plugin.js';
+import { tempDir } from './helpers.js';
 
 const root = resolve('/project');
 
@@ -30,5 +36,59 @@ describe('isInside', () => {
   it('treats a ..-prefixed directory name as inside', () => {
     expect(isInside(root, resolve(root, '..foo', 'page.svelte'))).toBe(true);
     expect(isInside(root, resolve(root, '..', 'page.svelte'))).toBe(false);
+  });
+});
+
+describe('projectFileRel', () => {
+  const page = join('pages', 'welcome.svelte');
+
+  it('returns the project-relative path for an author file', () => {
+    expect(projectFileRel(resolve(root, page), root)).toBe(page);
+    expect(projectFileRel(resolve(root, '..foo', 'x.svelte'), root)).toBe(
+      join('..foo', 'x.svelte'),
+    );
+  });
+
+  it('resolves a relative filename against the cwd, as Svelte reports it', () => {
+    const ws = tempDir();
+    vi.spyOn(process, 'cwd').mockReturnValue(ws);
+    const course = join('courses', 'intro');
+    const courseRoot = resolve(ws, course);
+
+    expect(projectFileRel(join(course, page), courseRoot)).toBe(page);
+    expect(projectFileRel(join('shared', 'Button.svelte'), courseRoot)).toBe(
+      null,
+    );
+  });
+
+  it.each([
+    ['a missing filename', undefined],
+    ['a \\0 virtual id', '\0virtual:tessera-pages'],
+    ['a bare virtual id', 'virtual:tessera-main'],
+    ['a file outside the project', resolve(root, '..', 'other', 'x.svelte')],
+    ['a dependency', resolve(root, 'node_modules', 'lib', 'x.svelte')],
+  ])('skips %s', (_label, filename) => {
+    vi.spyOn(process, 'cwd').mockReturnValue(root);
+    expect(projectFileRel(filename, root)).toBeNull();
+  });
+
+  it.each([
+    ['whose name contains node_modules', 'node_modules-demo'],
+    ['named node_modules', 'node_modules'],
+    ['whose name contains virtual:', 'virtual:labs'],
+  ])('checks a project under a folder %s', (_label, folder) => {
+    const nested = resolve('/work', folder, 'course');
+    expect(projectFileRel(resolve(nested, page), nested)).toBe(page);
+  });
+
+  it('checks a file under a virtual:-named folder reported relative to the cwd', () => {
+    const ws = tempDir();
+    vi.spyOn(process, 'cwd').mockReturnValue(ws);
+    const course = join('virtual:labs', 'course');
+    const courseRoot = resolve(ws, course);
+    mkdirSync(resolve(courseRoot, 'pages'), { recursive: true });
+    writeFileSync(resolve(courseRoot, page), '');
+
+    expect(projectFileRel(join(course, page), courseRoot)).toBe(page);
   });
 });

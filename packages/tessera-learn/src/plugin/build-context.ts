@@ -1,4 +1,5 @@
 import type { ResolvedConfig } from 'vite';
+import { existsSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   readResolvedConfig,
@@ -10,6 +11,23 @@ import type { StandardId } from '../runtime/standards.js';
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+// Svelte's onwarn filename is relative to process.cwd() (Svelte's default
+// rootDir) when the file sits under it, and absolute otherwise; Rollup log ids
+// are absolute. Return the project-relative path for a real author file, or
+// null to skip framework, node_modules and virtual modules. Tier 0 owns the
+// framework's own warnings.
+export function projectFileRel(
+  filename: string | undefined,
+  projectRoot: string,
+): string | null {
+  if (!filename || filename.startsWith('\0')) return null;
+  const abs = resolve(filename);
+  if (!isInside(projectRoot, abs)) return null;
+  if (filename.startsWith('virtual:') && !existsSync(abs)) return null;
+  const rel = relative(projectRoot, abs);
+  return rel.split(sep).includes('node_modules') ? null : rel;
 }
 
 export class BuildContext {

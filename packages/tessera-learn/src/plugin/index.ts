@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, relative, isAbsolute, dirname, join } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -45,7 +45,7 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
-import { BuildContext, isInside } from './build-context.js';
+import { BuildContext, projectFileRel } from './build-context.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -54,26 +54,6 @@ export type { AuditOptions, ImpactLevel } from './a11y/audit.js';
 
 function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
-}
-
-// Svelte's onwarn filename is relative to the vite root (e.g. `pages/x.svelte`)
-// in build and may be absolute or a virtual id elsewhere. Return the
-// project-relative path for a real author file, or null to skip framework /
-// node_modules / virtual modules — Tier 0 owns the framework's own warnings.
-function projectFileRel(
-  filename: string | undefined,
-  projectRoot: string,
-): string | null {
-  if (!filename) return null;
-  if (
-    filename.startsWith('\0') ||
-    filename.includes('virtual:') ||
-    filename.includes('node_modules')
-  ) {
-    return null;
-  }
-  const abs = isAbsolute(filename) ? filename : resolve(projectRoot, filename);
-  return isInside(projectRoot, abs) ? relative(projectRoot, abs) : null;
 }
 
 export function tesseraPlugin(options: { standardOverride?: string } = {}) {
@@ -417,7 +397,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
     onLog(_level, log) {
       if (log.code !== 'IMPORT_IS_UNDEFINED') return;
-      if (!projectFileRel(log.id, ctx.root)) return;
+      if (projectFileRel(log.id, ctx.root) === null) return;
       written = false;
       for (const file of emitted) rmSync(file, { force: true });
       emitted = [];
