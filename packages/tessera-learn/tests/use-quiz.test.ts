@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
-import type { UseQuizHandle } from '../src/runtime/hooks.svelte.js';
 import { flush } from './helpers.js';
 import { mountHarness } from './helpers/mount.js';
 
@@ -851,7 +850,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     ['nothing was answered', () => {}],
     [
       'the quiz was submitted',
-      (q: UseQuizHandle) => {
+      (q: QuizEngine) => {
         q.setAnswer(0, true);
         q.submit();
       },

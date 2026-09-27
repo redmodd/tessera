@@ -1,17 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { flushSync } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
+import { flush } from './helpers.js';
 import { mountInBody } from './helpers/mount.js';
-
-const settle = async () => {
-  flushSync();
-  await Promise.resolve();
-};
 
 // Each built-in now registers with the parent `<Quiz>` via useQuestion. This
 // suite mounts each one under a stub Quiz context, captures the registration
@@ -225,9 +220,9 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     const input = target.querySelector('input') as HTMLInputElement;
     input.value = 'blue ';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle();
+    await flush();
     (target.querySelector('button') as HTMLButtonElement).click();
-    await settle();
+    await flush();
 
     expect(reports).toHaveLength(1);
     const [, interaction, correct] = reports[0];

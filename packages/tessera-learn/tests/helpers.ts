@@ -70,7 +70,9 @@ export const flush = () => new Promise<void>((r) => setTimeout(r));
 
 export function useFakeTimers(): void {
   vi.useFakeTimers();
-  onTestFinished(() => vi.useRealTimers());
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
 }
 
 export function setLaunchParams(params: Record<string, string> = {}): void {
@@ -107,16 +109,14 @@ export function cmi5Fetch({
   };
 }
 
-export const XAPI_ACTOR = {
-  objectType: 'Agent',
-  account: { homePage: 'https://lms', name: 'learner-1' },
-};
-
 export function setXAPILaunch(params: Record<string, string> = {}): void {
   setLaunchParams({
     endpoint: 'https://lrs.example/xapi',
     auth: 'Basic Zm9vOmJhcg==',
-    actor: JSON.stringify(XAPI_ACTOR),
+    actor: JSON.stringify({
+      objectType: 'Agent',
+      account: { homePage: 'https://lms', name: 'learner-1' },
+    }),
     activity_id: 'urn:tessera:au:abc',
     ...params,
   });
@@ -179,7 +179,7 @@ export async function mountApp({
   manifest: Manifest;
   adapter: BaseAdapter;
   loadPage?: () => Promise<unknown>;
-  loadLayout?: () => Promise<{ default: unknown }>;
+  loadLayout?: (() => Promise<{ default: unknown }>) | null;
 }) {
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for each mount. Svelte and the layout come from that same fresh registry or
@@ -265,4 +265,13 @@ export function createConfig(
     export: { standard: 'web' as const },
     ...overrides,
   };
+}
+
+export function manualConfig(
+  overrides: Partial<CourseConfig['completion']> = {},
+): CourseConfig {
+  return createConfig({
+    completion: { mode: 'manual', ...overrides } as CourseConfig['completion'],
+    scoring: { passingScore: 0 },
+  });
 }

@@ -1,6 +1,6 @@
 import { onTestFinished } from 'vitest';
 import { mount, unmount } from 'svelte';
-import type { UseQuizHandle } from '../../src/runtime/hooks.svelte.js';
+import type { QuizEngine } from '../../src/runtime/quiz-engine.svelte.js';
 import HarnessSvelte from '../fixtures/use-quiz-harness.svelte';
 
 type MountOptions = Omit<Parameters<typeof mount>[1], 'target'>;
@@ -27,8 +27,8 @@ export function mountInBody(
 }
 
 export interface HarnessRef {
-  handle: UseQuizHandle | null;
-  secondHandle?: UseQuizHandle | null;
+  handle: QuizEngine | null;
+  secondHandle?: QuizEngine | null;
   element: HTMLElement | null;
   events: Array<{ score: number }>;
   thrown: unknown;

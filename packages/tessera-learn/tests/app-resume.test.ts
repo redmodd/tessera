@@ -24,8 +24,8 @@ function savedWith(fields: object) {
 async function mount(
   resume: 'auto' | 'never',
   options: {
-    saved?: unknown;
-    pageModule?: () => Promise<unknown>;
+    saved?: Partial<SavedState>;
+    loadPage?: () => Promise<unknown>;
     seeds?: boolean;
   } = {},
 ) {
@@ -41,10 +41,10 @@ async function mount(
     config: createConfig({ resume, scoring: { passingScore: 80 } }),
     manifest,
     adapter: stubAdapter({
-      getState: () => saved as SavedState | null,
+      getState: () => saved as SavedState,
       ...spies,
     }),
-    loadPage: options.pageModule,
+    loadPage: options.loadPage,
   });
   return spies;
 }
@@ -97,7 +97,7 @@ describe('App restore gate honours config.resume', () => {
   it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {
     const { seedLifecycle, setSuccessStatus, saveState } = await mount('auto', {
       saved: savedWith({ v: [1], k: 1, g: { '1': { q: { q1: 90 } } } }),
-      pageModule: () => import('./fixtures/app-page-graded.svelte'),
+      loadPage: () => import('./fixtures/app-page-graded.svelte'),
     });
     await vi.waitFor(() =>
       expect(saveState.mock.lastCall?.[0].g['1'].w).toEqual(['q2']),
@@ -132,7 +132,7 @@ describe('App restore gate honours config.resume', () => {
   it('saves a restored answer whose question is no longer graded as ungraded', async () => {
     const { saveState } = await mount('auto', {
       saved: savedWith({ g: { '1': { q: { q1: 100 } } } }),
-      pageModule: () => import('./fixtures/app-page-practice.svelte'),
+      loadPage: () => import('./fixtures/app-page-practice.svelte'),
     });
     await vi.waitFor(() =>
       expect(saveState.mock.lastCall?.[0]).toMatchObject({

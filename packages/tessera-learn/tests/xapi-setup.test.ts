@@ -6,10 +6,13 @@ import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import {
   CMI5_LAUNCH,
   cmi5Fetch,
   createConfig,
+  postedStatements,
+  requests,
   respond,
   scorm12Api,
   setLaunchParams,
@@ -17,6 +20,11 @@ import {
 } from './helpers.js';
 
 const mockFetch = vi.fn();
+
+const ANALYTICS = 'https://analytics.example.com/';
+
+const sendOnce = (client: XAPIClient) =>
+  client.sendStatement({ verb: { id: 'http://verb/exp' } }, { retry: false });
 
 function cmi5Config(xapi: CourseConfig['xapi']): CourseConfig {
   return createConfig({ export: { standard: 'cmi5' }, xapi });
@@ -60,13 +68,11 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     expect(result.destinations[0].endpoint).toBe(CMI5_LAUNCH.endpoint);
 
     // POST went to the LMS-launch endpoint with the launch auth token.
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls.length).toBeGreaterThan(0);
-    const [, init] = statementCalls[0];
-    const headers = new Headers((init as RequestInit).headers);
-    expect(headers.get('Authorization')).toBe('Basic test-auth-token');
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.actor.mbox).toBe('mailto:test@example.com');
+    const [[, init]] = statementRequests(mockFetch);
+    expect(init.headers.get('Authorization')).toBe('Basic test-auth-token');
+    expect(postedStatements(mockFetch)[0].actor.mbox).toBe(
+      'mailto:test@example.com',
+    );
   });
 
   it('explicit cmi5 destination inherits the launch actor when xapi.actor is omitted', async () => {
@@ -108,12 +114,8 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     await client!.sendStatement({
       verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
     });
-    const send = mockFetch.mock.calls.find(([url]) =>
-      String(url).startsWith('https://analytics.example.com/'),
-    );
-    expect((send![1].headers as Headers).get('Authorization')).toBe(
-      'Basic resolved-token',
-    );
+    const [[, init]] = requests(mockFetch, ANALYTICS);
+    expect(init.headers.get('Authorization')).toBe('Basic resolved-token');
   });
 
   it('explicit destination with auth in neither file rejects sends instead of going unauthenticated', async () => {
@@ -131,17 +133,10 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     expect(client).not.toBeNull();
 
     mockFetch.mockClear();
-    await expect(
-      client!.sendStatement(
-        { verb: { id: 'http://verb/exp' } },
-        { retry: false },
-      ),
-    ).rejects.toThrow(/xapi\["analytics"\]\.auth/);
-    expect(
-      mockFetch.mock.calls.some(([url]) =>
-        String(url).startsWith('https://analytics.example.com/'),
-      ),
-    ).toBe(false);
+    await expect(sendOnce(client!)).rejects.toThrow(
+      /xapi\["analytics"\]\.auth/,
+    );
+    expect(requests(mockFetch, ANALYTICS)).toHaveLength(0);
   });
 
   it("mixed destinations: 'lms' + explicit both materialize and fan-out", async () => {
@@ -220,12 +215,9 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     expect(client).not.toBeNull();
 
     // sendStatement is Promise.all-fail-fast — the whole call rejects.
-    await expect(
-      client!.sendStatement(
-        { verb: { id: 'http://verb/exp' } },
-        { retry: false },
-      ),
-    ).rejects.toThrow(/no cmi5 launch parameters/);
+    await expect(sendOnce(client!)).rejects.toThrow(
+      /no cmi5 launch parameters/,
+    );
   });
 
   it('dev fallback: an explicit destination with no actor under cmi5 rejects sends', async () => {
@@ -239,12 +231,9 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     });
 
     const client = await buildXAPIClient(config, new WebAdapter(config));
-    await expect(
-      client!.sendStatement(
-        { verb: { id: 'http://verb/exp' } },
-        { retry: false },
-      ),
-    ).rejects.toThrow(/no cmi5 launch parameters/);
+    await expect(sendOnce(client!)).rejects.toThrow(
+      /no cmi5 launch parameters/,
+    );
   });
 });
 
@@ -299,14 +288,12 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     expect(result.destinations[0].ok).toBe(true);
     expect(result.destinations[0].endpoint).toBe(xapiLaunch.endpoint);
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls.length).toBeGreaterThan(0);
-    const [, init] = statementCalls[0];
-    const headers = new Headers((init as RequestInit).headers);
-    expect(headers.get('Authorization')).toBe('Basic eGFwaS1hdXRo');
-    expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.actor.mbox).toBe('mailto:plain@example.com');
+    const [[, init]] = statementRequests(mockFetch);
+    expect(init.headers.get('Authorization')).toBe('Basic eGFwaS1hdXRo');
+    expect(init.headers.get('X-Experience-API-Version')).toBe('1.0.3');
+    expect(postedStatements(mockFetch)[0].actor.mbox).toBe(
+      'mailto:plain@example.com',
+    );
   });
 
   it("dev fallback: 'lms' under xapi with no launch params surfaces an xAPI-specific error", async () => {
@@ -320,12 +307,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     const client = await buildXAPIClient(config, new WebAdapter(config));
     expect(client).not.toBeNull();
 
-    await expect(
-      client!.sendStatement(
-        { verb: { id: 'http://verb/exp' } },
-        { retry: false },
-      ),
-    ).rejects.toThrow(
+    await expect(sendOnce(client!)).rejects.toThrow(
       /xAPI launch parameters \(endpoint \/ auth \/ actor \/ activity_id\)/,
     );
   });
@@ -367,11 +349,8 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
   it('dev fallback: rejects sends because no SCORM API was found', async () => {
     const config = scormConfig();
     const client = await buildXAPIClient(config, new WebAdapter(config));
-    await expect(
-      client!.sendStatement(
-        { verb: { id: 'http://verb/exp' } },
-        { retry: false },
-      ),
-    ).rejects.toThrow(/no SCORM 1.2 API object found/);
+    await expect(sendOnce(client!)).rejects.toThrow(
+      /no SCORM 1.2 API object found/,
+    );
   });
 });

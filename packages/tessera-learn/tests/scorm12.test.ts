@@ -338,13 +338,14 @@ describe('SCORM12Adapter', () => {
         false,
       );
       await flush();
-      const v = interaction0();
-      expect(v.id).toBe('q1');
-      expect(v.type).toBe('choice');
-      expect(v.student_response).toBe('a,b');
-      expect(v['correct_responses.0.pattern']).toBe('a');
-      expect(v.result).toBe('wrong');
-      expect(v.time).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+      expect(interaction0()).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        student_response: 'a,b',
+        'correct_responses.0.pattern': 'a',
+        result: 'wrong',
+        time: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
+      });
     });
 
     it('slugs non-alphanumeric choice identifiers (SCORM 1.2 CMIIdentifier)', async () => {
@@ -358,9 +359,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('88_Earth_days,Iron_rich_dust');
-      expect(v['correct_responses.0.pattern']).toBe('88_Earth_days');
+      expect(interaction0()).toMatchObject({
+        student_response: '88_Earth_days,Iron_rich_dust',
+        'correct_responses.0.pattern': '88_Earth_days',
+      });
     });
 
     it('encodes true-false as t/f per SCORM 1.2', async () => {
@@ -370,9 +372,10 @@ describe('SCORM12Adapter', () => {
         false,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('t');
-      expect(v['correct_responses.0.pattern']).toBe('f');
+      expect(interaction0()).toMatchObject({
+        student_response: 't',
+        'correct_responses.0.pattern': 'f',
+      });
     });
 
     it('uses plain . and , delimiters for matching pairs', async () => {
@@ -392,11 +395,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('Phobos.Mars,Europa.Jupiter');
-      expect(v['correct_responses.0.pattern']).toBe(
-        'Phobos.Mars,Europa.Jupiter',
-      );
+      expect(interaction0()).toMatchObject({
+        student_response: 'Phobos.Mars,Europa.Jupiter',
+        'correct_responses.0.pattern': 'Phobos.Mars,Europa.Jupiter',
+      });
     });
 
     it('maps choice response/correct to option indexes when options is supplied', async () => {
@@ -411,9 +413,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('2');
-      expect(v['correct_responses.0.pattern']).toBe('2');
+      expect(interaction0()).toMatchObject({
+        student_response: '2',
+        'correct_responses.0.pattern': '2',
+      });
     });
 
     it('maps matching pairs to indexes via optionPairs', async () => {
@@ -431,9 +434,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('0.0');
-      expect(v['correct_responses.0.pattern']).toBe('0.0');
+      expect(interaction0()).toMatchObject({
+        student_response: '0.0',
+        'correct_responses.0.pattern': '0.0',
+      });
     });
 
     it('falls back to slugging when options is not supplied', async () => {
@@ -443,9 +447,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.student_response).toBe('speed_limit');
-      expect(v['correct_responses.0.pattern']).toBe('speed_limit');
+      expect(interaction0()).toMatchObject({
+        student_response: 'speed_limit',
+        'correct_responses.0.pattern': 'speed_limit',
+      });
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
@@ -480,9 +485,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v['correct_responses.0.pattern']).toBe('blue');
-      expect(v['correct_responses.1.pattern']).toBe('Blue');
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': 'blue',
+        'correct_responses.1.pattern': 'Blue',
+      });
     });
 
     it('emits no case_matters prefix (SCORM 1.2 has no such syntax)', async () => {

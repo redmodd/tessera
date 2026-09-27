@@ -3,8 +3,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig, tempDir } from './helpers.js';
-import type { CourseConfig } from '../src/runtime/types.js';
+import {
+  createManifest,
+  createConfig,
+  manualConfig,
+  tempDir,
+} from './helpers.js';
 
 function courseConfig(
   completion: string,
@@ -218,15 +222,6 @@ describe('manual completion — validation', () => {
     },
   );
 });
-
-function manualConfig(
-  overrides: Partial<CourseConfig['completion']> = {},
-): CourseConfig {
-  return createConfig({
-    completion: { mode: 'manual', ...overrides } as CourseConfig['completion'],
-    scoring: { passingScore: 0 },
-  });
-}
 
 describe('manual completion — ProgressState', () => {
   it('markCompleteManually flips status once and is idempotent', () => {

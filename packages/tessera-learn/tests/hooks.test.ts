@@ -26,7 +26,12 @@ import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-import { createManifest, createConfig, stubAdapter } from './helpers.js';
+import {
+  createManifest,
+  createConfig,
+  manualConfig,
+  stubAdapter,
+} from './helpers.js';
 
 function provideNavCtx({
   manifest = createManifest(5),
@@ -468,13 +473,13 @@ describe('useQuestion — inside a <Quiz>', () => {
     useQuestion({ id: 'q1', response: () => current });
 
     const arg = quiz.registerQuestion.mock.calls[0][0];
-    expect(arg.interaction()).toEqual({
+    expect(arg.interaction!()).toEqual({
       type: 'true-false',
       response: false,
       correct: true,
     });
     current = { type: 'true-false', response: true, correct: true };
-    expect(arg.interaction()).toEqual({
+    expect(arg.interaction!()).toEqual({
       type: 'true-false',
       response: true,
       correct: true,
@@ -707,17 +712,6 @@ describe('useCourse', () => {
 // ============ useCompletion ============
 
 describe('useCompletion', () => {
-  const manualConfig = (
-    overrides: Partial<CourseConfig['completion']> = {},
-  ): CourseConfig =>
-    createConfig({
-      completion: {
-        mode: 'manual',
-        ...overrides,
-      } as CourseConfig['completion'],
-      scoring: { passingScore: 0 },
-    });
-
   it('markComplete flips progress and reflects completionStatus', () => {
     const { progress } = provideNavCtx({ config: manualConfig() });
 

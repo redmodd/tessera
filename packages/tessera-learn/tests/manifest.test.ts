@@ -15,10 +15,10 @@ import {
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
 import { tempDir } from './helpers.js';
 
-let TMP: string;
+let root: string;
 
 function createFile(relativePath: string, content: string) {
-  const fullPath = resolve(TMP, relativePath);
+  const fullPath = resolve(root, relativePath);
   const dir = resolve(fullPath, '..');
   mkdirSync(dir, { recursive: true });
   writeFileSync(fullPath, content, 'utf-8');
@@ -57,7 +57,7 @@ export const pageConfig = { title: "Welcome to the Course" }
 }
 
 beforeEach(() => {
-  TMP = tempDir();
+  root = tempDir();
 });
 
 // ---------- Helper Tests ----------
@@ -374,7 +374,7 @@ export const pageConfig = { title: 'Single Quotes' }
 describe('generateManifest', () => {
   it('generates correct manifest for standard course structure', () => {
     setupStandardCourse();
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.totalPages).toBe(3);
     expect(manifest.sections).toHaveLength(2);
@@ -418,7 +418,7 @@ export const pageConfig = { graded: true, weight: 75 }
 <h1>Exam</h1>`,
     );
     createFile('01-s/01-l/plain.svelte', '<h1>Plain</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].graded).toBe(true);
     expect(manifest.pages[0].weight).toBe(75);
@@ -445,7 +445,7 @@ export const pageConfig = { graded: true, required: true }
 </script>
 <h1>Exam</h1>`,
     );
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].required).toBe(false);
     expect(manifest.pages[1].required).toBeUndefined();
@@ -480,7 +480,7 @@ export const pageConfig = { graded: true, quiz: { graded: true } }
       '01-s/01-l/ungraded.svelte',
       `<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />`,
     );
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].questions).toEqual(['q1', 'fitb-name-it']);
     expect(manifest.pages[1].questions).toBeUndefined();
@@ -507,7 +507,7 @@ export const pageConfig = { graded: true }
 <Sorting graded id="custom" question="C?" />`,
     );
 
-    expect(generateManifest(TMP).pages[0].questions).toEqual([
+    expect(generateManifest(root).pages[0].questions).toEqual([
       'mc-tom-jerry',
       'quoted',
     ]);
@@ -525,7 +525,7 @@ export const pageConfig = { graded: true, weight: 0 }
 </script>
 <h1>A</h1>`,
     );
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].weight).toBe(0);
     expect(normalizeWeight(manifest.pages[0].weight)).toBe(1);
@@ -533,7 +533,7 @@ export const pageConfig = { graded: true, weight: 0 }
 
   it('uses title-case fallback when _meta.js missing', () => {
     createFile('01-my-section/01-my-lesson/page.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.sections[0].title).toBe('My Section');
     expect(manifest.sections[0].lessons[0].title).toBe('My Lesson');
@@ -545,7 +545,7 @@ export const pageConfig = { graded: true, weight: 0 }
       'export default { title: "L", pages: ["my-page"] };',
     );
     createFile('01-s/01-l/my-page.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].title).toBe('My Page');
   });
@@ -558,7 +558,7 @@ export const pageConfig = { graded: true, weight: 0 }
     createFile('01-s/01-l/second.svelte', '<h1>Second</h1>');
     createFile('01-s/01-l/alpha.svelte', '<h1>Alpha</h1>');
     createFile('01-s/01-l/beta.svelte', '<h1>Beta</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages.map((p) => p.slug)).toEqual([
       'second',
@@ -568,14 +568,14 @@ export const pageConfig = { graded: true, weight: 0 }
   });
 
   it('handles empty pages directory', () => {
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
     expect(manifest.totalPages).toBe(0);
     expect(manifest.sections).toEqual([]);
     expect(manifest.pages).toEqual([]);
   });
 
   it('handles nonexistent pages directory', () => {
-    const manifest = generateManifest(resolve(TMP, 'nonexistent'));
+    const manifest = generateManifest(resolve(root, 'nonexistent'));
     expect(manifest.totalPages).toBe(0);
   });
 
@@ -591,7 +591,7 @@ export const pageConfig = { graded: true, weight: 0 }
       'export default { title: "L2", pages: ["p3"] };',
     );
     createFile('02-b/01-l/p3.svelte', '<h1>P3</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].index).toBe(0);
     expect(manifest.pages[1].index).toBe(1);
@@ -600,7 +600,7 @@ export const pageConfig = { graded: true, weight: 0 }
 
   it('flat pages array matches nested structure', () => {
     setupStandardCourse();
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     const nestedPages = manifest.sections.flatMap((s) =>
       s.lessons.flatMap((l) => l.pages),
@@ -622,7 +622,7 @@ export const pageConfig = {
 }
 </script>`,
     );
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].quiz).toEqual({
       graded: true,
@@ -637,7 +637,7 @@ export const pageConfig = {
       'export default { title: "L", pages: ["page"] };',
     );
     createFile('01-s/01-l/page.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].quiz).toBeNull();
   });
@@ -646,7 +646,7 @@ export const pageConfig = {
     createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
     createFile('01-intro/welcome.svelte', '<h1>Welcome</h1>');
 
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.totalPages).toBe(1);
     expect(manifest.pages[0].slug).toBe('welcome');
@@ -669,7 +669,7 @@ export const pageConfig = {
     );
     createFile('01-intro/01-deep/c.svelte', '<h1>C</h1>');
 
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages.map((p) => p.slug)).toEqual(['b', 'a', 'c']);
     expect(manifest.pages.map((p) => p.index)).toEqual([0, 1, 2]);
@@ -687,7 +687,7 @@ export const pageConfig = { title: "Exam", quiz: { graded: true } }
 </script>`,
     );
 
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].title).toBe('Exam');
     expect(manifest.pages[0].quiz).toEqual({ graded: true });
@@ -699,7 +699,7 @@ export const pageConfig = { title: "Exam", quiz: { graded: true } }
       'export default { title: "W", pages: ["hello"] };',
     );
     createFile('01-intro/01-welcome/hello.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(TMP);
+    const manifest = generateManifest(root);
 
     expect(manifest.pages[0].importPath).toBe(
       '/pages/01-intro/01-welcome/hello.svelte',

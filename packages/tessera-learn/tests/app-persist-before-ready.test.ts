@@ -38,7 +38,7 @@ async function mountWithSlowInit(
       commit,
     }),
     loadPage: () => new Promise(() => {}),
-    loadLayout: loadLayout ?? undefined,
+    loadLayout,
   });
   return { saveState, commit, releaseInit: init.resolve };
 }

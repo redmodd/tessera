@@ -146,10 +146,7 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    // b, c, d should all succeed now
-    expect(calls).toContain('b-attempt');
-    expect(calls).toContain('c');
-    expect(calls).toContain('d');
+    expect(calls).toEqual(['b-attempt', 'c', 'd']);
     expect(queue.pending).toBe(0);
   });
 

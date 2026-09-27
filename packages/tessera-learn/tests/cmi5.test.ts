@@ -18,6 +18,12 @@ import {
 const mockFetch = vi.fn();
 
 const VERB = 'http://adlnet.gov/expapi/verbs/';
+const SESSION_ID_EXT =
+  'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
+const MASTERY_EXT =
+  'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
+const CMI5_CAT = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+const MOVEON_CAT = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
 
 const sentStatements = () => postedStatements(mockFetch);
 
@@ -43,29 +49,14 @@ describe('hasCMI5LaunchParams', () => {
     expect(hasCMI5LaunchParams()).toBe(true);
   });
 
-  it('returns false when fetch is missing', () => {
-    const { fetch: _, ...rest } = CMI5_LAUNCH;
-    setLaunchParams(rest);
-    expect(hasCMI5LaunchParams()).toBe(false);
-  });
-
-  it('returns false when endpoint is missing', () => {
-    const { endpoint: _, ...rest } = CMI5_LAUNCH;
-    setLaunchParams(rest);
-    expect(hasCMI5LaunchParams()).toBe(false);
-  });
-
-  it('returns false when activityId is missing', () => {
-    const { activityId: _, ...rest } = CMI5_LAUNCH;
-    setLaunchParams(rest);
-    expect(hasCMI5LaunchParams()).toBe(false);
-  });
-
-  it('returns false when actor is missing', () => {
-    const { actor: _, ...rest } = CMI5_LAUNCH;
-    setLaunchParams(rest);
-    expect(hasCMI5LaunchParams()).toBe(false);
-  });
+  it.each(['fetch', 'endpoint', 'activityId', 'actor'] as const)(
+    'returns false when %s is missing',
+    (param) => {
+      const { [param]: _, ...rest } = CMI5_LAUNCH;
+      setLaunchParams(rest);
+      expect(hasCMI5LaunchParams()).toBe(false);
+    },
+  );
 
   it('returns false with empty search', () => {
     setLaunchParams();
@@ -84,6 +75,15 @@ describe('CMI5Adapter', () => {
     const adapter = new CMI5Adapter();
     await adapter.init();
     return adapter;
+  }
+
+  function stubLocationAssign() {
+    const assign = vi.fn();
+    vi.stubGlobal('window', {
+      ...globalThis.window,
+      location: { ...globalThis.window.location, assign },
+    });
+    return assign;
   }
 
   function routeResumeGet(resumeGet: Mock<() => Promise<Response>>): void {
@@ -110,13 +110,7 @@ describe('CMI5Adapter', () => {
     const adapter = await initAdapter({
       saved: { b: 3, v: [0, 1, 2, 3], q: {}, d: 100 },
     });
-    const resumeGets = mockFetch.mock.calls.filter(
-      ([url, options]: any[]) =>
-        String(url).includes('activities/state') &&
-        !String(url).includes('stateId=LMS.LaunchData') &&
-        (!options || options.method === 'GET'),
-    );
-    expect(resumeGets).toHaveLength(0);
+    expect(requests(mockFetch, 'stateId=tessera-state', 'GET')).toHaveLength(0);
     expect(adapter.getState()).toBeNull();
 
     await adapter.loadState();
@@ -242,12 +236,9 @@ describe('CMI5Adapter', () => {
     // Allow fire-and-forget PUT to settle
     await flush();
 
-    const putCalls = mockFetch.mock.calls.filter(
-      ([, init]) => init?.method === 'PUT',
-    );
-    expect(putCalls).toHaveLength(1);
-    expect(putCalls[0][0]).toContain('activities/state');
-    expect(JSON.parse(putCalls[0][1].body)).toEqual({ ...state, n: 1 });
+    const puts = stateWrites();
+    expect(puts).toHaveLength(1);
+    expect(JSON.parse(puts[0][1].body)).toEqual({ ...state, n: 1 });
   });
 
   it('sends Completed statement when completion is set to complete', async () => {
@@ -261,9 +252,7 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls.length).toBeGreaterThanOrEqual(1);
-    const body = JSON.parse(statementCalls[0][1].body);
+    const [body] = sentStatements();
     expect(body.verb.id).toBe(`${VERB}completed`);
     expect(body.result.completion).toBe(true);
     // cmi5 §9.5.1: Completed MUST NOT include `score`. The score (when
@@ -280,8 +269,7 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls).toHaveLength(0);
+    expect(statementRequests(mockFetch)).toHaveLength(0);
   });
 
   it('sends Passed statement on success', async () => {
@@ -295,8 +283,7 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    const body = JSON.parse(statementCalls[0][1].body);
+    const [body] = sentStatements();
     expect(body.verb.id).toBe(`${VERB}passed`);
     expect(body.result.success).toBe(true);
     expect(body.result.score.scaled).toBe(0.9);
@@ -382,8 +369,7 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls).toHaveLength(0);
+    expect(statementRequests(mockFetch)).toHaveLength(0);
   });
 
   it('includes auth header on xAPI requests', async () => {
@@ -416,8 +402,7 @@ describe('CMI5Adapter', () => {
             grouping: [{ id: publisherActivity }],
           },
           extensions: {
-            'https://w3id.org/xapi/cmi5/context/extensions/sessionid':
-              lmsSession,
+            [SESSION_ID_EXT]: lmsSession,
           },
         },
       },
@@ -425,11 +410,7 @@ describe('CMI5Adapter', () => {
 
     const initialized = statementFor('initialized');
     expect(initialized).toBeDefined();
-    expect(
-      initialized.context.extensions[
-        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
-      ],
-    ).toBe(lmsSession);
+    expect(initialized.context.extensions[SESSION_ID_EXT]).toBe(lmsSession);
     expect(initialized.context.contextActivities.grouping).toEqual([
       { id: publisherActivity },
     ]);
@@ -441,10 +422,7 @@ describe('CMI5Adapter', () => {
     await initAdapter();
 
     const initialized = statementFor('initialized');
-    const sid =
-      initialized?.context?.extensions?.[
-        'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
-      ];
+    const sid = initialized?.context?.extensions?.[SESSION_ID_EXT];
     expect(sid).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
@@ -475,8 +453,7 @@ describe('CMI5Adapter', () => {
   it('includes registration and context in statements', async () => {
     await initAdapter();
 
-    const statementCalls = statementRequests(mockFetch);
-    const body = JSON.parse(statementCalls[0][1].body);
+    const [body] = sentStatements();
     expect(body.context.registration).toBe('reg-123');
     expect(body.object.id).toBe('https://example.com/course/1');
     expect(body.actor).toEqual({
@@ -509,9 +486,9 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls).toHaveLength(1);
-    const terminated = JSON.parse(statementCalls[0][1].body);
+    const sent = sentStatements();
+    expect(sent).toHaveLength(1);
+    const [terminated] = sent;
     expect(terminated.verb.id).toBe(`${VERB}terminated`);
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
@@ -532,11 +509,10 @@ describe('CMI5Adapter', () => {
     adapter.terminate();
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls).toHaveLength(1);
-    const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe(`${VERB}terminated`);
-    expect(body.result.duration).toBe('PT1M');
+    const sent = sentStatements();
+    expect(sent).toHaveLength(1);
+    expect(sent[0].verb.id).toBe(`${VERB}terminated`);
+    expect(sent[0].result.duration).toBe('PT1M');
   });
 
   it('terminate is idempotent', async () => {
@@ -552,8 +528,7 @@ describe('CMI5Adapter', () => {
 
     await flush();
 
-    const statementCalls = statementRequests(mockFetch);
-    expect(statementCalls).toHaveLength(1);
+    expect(statementRequests(mockFetch)).toHaveLength(1);
   });
 
   it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
@@ -656,9 +631,7 @@ describe('CMI5Adapter', () => {
       const completed = statementFor('completed');
       expect(completed).toBeDefined();
       const ext = completed?.context?.extensions ?? {};
-      expect(
-        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
-      ).toBeUndefined();
+      expect(ext[MASTERY_EXT]).toBeUndefined();
     });
 
     it('attaches masteryscore extension to Passed and Failed', async () => {
@@ -672,11 +645,7 @@ describe('CMI5Adapter', () => {
       await flush();
 
       const failed = statementFor('failed');
-      expect(
-        failed.context.extensions[
-          'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
-        ],
-      ).toBe(0.6);
+      expect(failed.context.extensions[MASTERY_EXT]).toBe(0.6);
     });
 
     it('omits the extension entirely when masteryScore is absent', async () => {
@@ -689,9 +658,7 @@ describe('CMI5Adapter', () => {
 
       const completed = statementFor('completed');
       const ext = completed?.context?.extensions ?? {};
-      expect(
-        ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
-      ).toBeUndefined();
+      expect(ext[MASTERY_EXT]).toBeUndefined();
     });
 
     it('NEVER emits Satisfied — that statement is LMS-only (cmi5 §9.3.9)', async () => {
@@ -730,8 +697,6 @@ describe('CMI5Adapter', () => {
     // are present. Without them, the LMS accepts the POST but treats the
     // statement as an opaque xAPI verb — the learner never registers as
     // having finished the course.
-    const CMI5_CAT = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
-    const MOVEON_CAT = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
 
     function categoryIds(body: any): string[] {
       const cats = body?.context?.contextActivities?.category ?? [];
@@ -807,9 +772,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       adapter.reportInteraction(questionId, interaction, correct);
       await flush();
-      const statementCalls = statementRequests(mockFetch);
-      expect(statementCalls).toHaveLength(1);
-      return JSON.parse(statementCalls[0][1].body);
+      const sent = sentStatements();
+      expect(sent).toHaveLength(1);
+      return sent[0];
     }
 
     it('sends xAPI answered statement for choice', async () => {
@@ -948,11 +913,7 @@ describe('CMI5Adapter', () => {
       const adapter = await initAdapter({ launchData: { returnURL } });
       await flush();
 
-      const assign = vi.fn();
-      vi.stubGlobal('window', {
-        ...globalThis.window,
-        location: { ...globalThis.window.location, assign },
-      });
+      const assign = stubLocationAssign();
       mockFetch.mockClear();
       const sending = Promise.withResolvers<Response>();
       mockFetch.mockReturnValueOnce(sending.promise);
@@ -973,11 +934,7 @@ describe('CMI5Adapter', () => {
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
       const adapter = await initAdapter();
 
-      const assign = vi.fn();
-      vi.stubGlobal('window', {
-        ...globalThis.window,
-        location: { ...globalThis.window.location, assign },
-      });
+      const assign = stubLocationAssign();
       mockFetch.mockClear();
 
       await adapter.exit();
@@ -1095,12 +1052,8 @@ describe('CMI5Adapter', () => {
         (c: any) => c.id,
       );
       expect(ids).toContain(lmsCategory.id);
-      expect(ids).toContain(
-        'https://w3id.org/xapi/cmi5/context/categories/cmi5',
-      );
-      expect(ids).toContain(
-        'https://w3id.org/xapi/cmi5/context/categories/moveon',
-      );
+      expect(ids).toContain(CMI5_CAT);
+      expect(ids).toContain(MOVEON_CAT);
     });
   });
 

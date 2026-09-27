@@ -309,14 +309,17 @@ describe('SCORM2004Adapter', () => {
         false,
       );
       await flush();
-      const v = interaction0();
-      expect(v.id).toBe('q1');
-      expect(v.type).toBe('choice');
-      expect(v.learner_response).toBe('a[,]b');
-      expect(v['correct_responses.0.pattern']).toBe('a');
-      expect(v.result).toBe('incorrect');
-      // Zone-free, second-resolution — see formatISO8601Timestamp tests.
-      expect(v.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+      expect(interaction0()).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        learner_response: 'a[,]b',
+        'correct_responses.0.pattern': 'a',
+        result: 'incorrect',
+        // Zone-free, second-resolution, see formatISO8601Timestamp tests.
+        timestamp: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
+        ),
+      });
     });
 
     it('writes true-false interaction', async () => {
@@ -326,11 +329,12 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('true-false');
-      expect(v.learner_response).toBe('true');
-      expect(v['correct_responses.0.pattern']).toBe('true');
-      expect(v.result).toBe('correct');
+      expect(interaction0()).toMatchObject({
+        type: 'true-false',
+        learner_response: 'true',
+        'correct_responses.0.pattern': 'true',
+        result: 'correct',
+      });
     });
 
     it('writes fill-in interaction', async () => {
@@ -340,11 +344,12 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('fill-in');
-      expect(v.learner_response).toBe('Paris');
-      expect(v['correct_responses.0.pattern']).toBe('Paris');
-      expect(v['correct_responses.1.pattern']).toBe('paris');
+      expect(interaction0()).toMatchObject({
+        type: 'fill-in',
+        learner_response: 'Paris',
+        'correct_responses.0.pattern': 'Paris',
+        'correct_responses.1.pattern': 'paris',
+      });
     });
 
     it('prefixes fill-in patterns with case_matters when set', async () => {
@@ -359,9 +364,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v['correct_responses.0.pattern']).toBe('{case_matters=true}Paris');
-      expect(v['correct_responses.1.pattern']).toBe('{case_matters=true}paris');
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': '{case_matters=true}Paris',
+        'correct_responses.1.pattern': '{case_matters=true}paris',
+      });
     });
 
     it('omits the prefix when caseMatters is false', async () => {
@@ -376,9 +382,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v['correct_responses.0.pattern']).toBe('Paris');
-      expect(v['correct_responses.1.pattern']).toBe('paris');
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': 'Paris',
+        'correct_responses.1.pattern': 'paris',
+      });
     });
 
     it('writes a single pattern for long-fill-in (2004 allows only one)', async () => {
@@ -434,10 +441,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('matching');
-      expect(v.learner_response).toBe('a[.]1[,]b[.]2');
-      expect(v['correct_responses.0.pattern']).toBe('a[.]1[,]b[.]2');
+      expect(interaction0()).toMatchObject({
+        type: 'matching',
+        learner_response: 'a[.]1[,]b[.]2',
+        'correct_responses.0.pattern': 'a[.]1[,]b[.]2',
+      });
     });
 
     it('writes sequencing interaction', async () => {
@@ -451,9 +459,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('sequencing');
-      expect(v.learner_response).toBe('x[,]y[,]z');
+      expect(interaction0()).toMatchObject({
+        type: 'sequencing',
+        learner_response: 'x[,]y[,]z',
+      });
     });
 
     it('passes response and correct identifiers through unchanged', async () => {
@@ -467,13 +476,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.learner_response).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
-      );
-      expect(v['correct_responses.0.pattern']).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
-      );
+      expect(interaction0()).toMatchObject({
+        learner_response: 'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
+        'correct_responses.0.pattern':
+          'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
+      });
     });
 
     it('ignores `options` and keeps named identifiers (no index mapping for SCORM 2004)', async () => {
@@ -488,9 +495,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.learner_response).toBe('speed-limit');
-      expect(v['correct_responses.0.pattern']).toBe('speed-limit');
+      expect(interaction0()).toMatchObject({
+        learner_response: 'speed-limit',
+        'correct_responses.0.pattern': 'speed-limit',
+      });
     });
 
     it('writes numeric interaction', async () => {
@@ -500,10 +508,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('numeric');
-      expect(v.learner_response).toBe('7');
-      expect(v['correct_responses.0.pattern']).toBe('5[:]10');
+      expect(interaction0()).toMatchObject({
+        type: 'numeric',
+        learner_response: '7',
+        'correct_responses.0.pattern': '5[:]10',
+      });
     });
 
     it('writes performance interaction', async () => {
@@ -523,9 +532,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = interaction0();
-      expect(v.type).toBe('performance');
-      expect(v.learner_response).toBe('stepA[.]1[,]stepB[.]x');
+      expect(interaction0()).toMatchObject({
+        type: 'performance',
+        learner_response: 'stepA[.]1[,]stepB[.]x',
+      });
     });
 
     it('omits correct_responses when no correct provided', async () => {
