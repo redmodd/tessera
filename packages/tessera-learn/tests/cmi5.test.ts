@@ -4,10 +4,29 @@ import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
+import { flush } from './helpers.js';
 
 const mockFetch = vi.fn();
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+
+const VERB = 'http://adlnet.gov/expapi/verbs/';
+
+function sentStatements(): any[] {
+  return mockFetch.mock.calls.flatMap((c: any[]) => {
+    try {
+      return JSON.parse(c[1]?.body);
+    } catch {
+      return [];
+    }
+  });
+}
+
+const statementFor = (verb: string): any =>
+  sentStatements().find((b: any) => b?.verb?.id === `${VERB}${verb}`);
+
+const sentVerbs = (): string[] =>
+  sentStatements().map((b: any) => b?.verb?.id?.replace(VERB, ''));
 
 function isRunningStateGet(url: string, options?: RequestInit): boolean {
   return (
@@ -142,7 +161,7 @@ describe('CMI5Adapter', () => {
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/initialized');
+    expect(body.verb.id).toBe(`${VERB}initialized`);
   });
 
   it('does not fetch resume state during init', async () => {
@@ -347,7 +366,7 @@ describe('CMI5Adapter', () => {
     adapter.saveState(state);
 
     // Allow fire-and-forget PUT to settle
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const putCalls = mockFetch.mock.calls.filter(
       (c: any[]) => c[1]?.method === 'PUT',
@@ -369,14 +388,14 @@ describe('CMI5Adapter', () => {
     adapter.setDuration(3600);
     adapter.setCompletionStatus('complete');
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0].includes('statements'),
     );
     expect(statementCalls.length).toBeGreaterThanOrEqual(1);
     const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/completed');
+    expect(body.verb.id).toBe(`${VERB}completed`);
     expect(body.result.completion).toBe(true);
     // cmi5 §9.5.1: Completed MUST NOT include `score`. The score (when
     // present) belongs on Passed/Failed only.
@@ -393,7 +412,7 @@ describe('CMI5Adapter', () => {
 
     adapter.setCompletionStatus('incomplete');
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0].includes('statements'),
@@ -413,13 +432,13 @@ describe('CMI5Adapter', () => {
     adapter.setDuration(1800);
     adapter.setSuccessStatus('passed');
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0].includes('statements'),
     );
     const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/passed');
+    expect(body.verb.id).toBe(`${VERB}passed`);
     expect(body.result.success).toBe(true);
     expect(body.result.score.scaled).toBe(0.9);
   });
@@ -434,18 +453,16 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
+    adapter.terminate();
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
-    const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
-      c[0].includes('statements'),
-    );
-    const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/failed');
-    expect(body.result.success).toBe(false);
+    expect(statementFor('failed').result.success).toBe(false);
+    const ids = sentVerbs();
+    expect(ids.indexOf('failed')).toBeLessThan(ids.indexOf('terminated'));
   });
 
-  it('seedLifecycle suppresses duplicate Failed when resuming an already-failed session', async () => {
+  it('holds a resumed failure for its own Terminated, since the last session may have ended without one', async () => {
     setupInitMocks();
     adapter = new CMI5Adapter();
     await adapter.init();
@@ -457,13 +474,32 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
+    await flush();
+    expect(sentVerbs()).not.toContain('failed');
 
-    await new Promise((r) => setTimeout(r, 50));
+    adapter.terminate();
+    await flush();
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
-    );
-    expect(statementCalls).toHaveLength(0);
+    expect(sentVerbs().filter((id) => id === 'failed')).toHaveLength(1);
+  });
+
+  it('holds Failed for Terminated and drops it when the session passes', async () => {
+    setupInitMocks();
+    adapter = new CMI5Adapter();
+    await adapter.init();
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({ ok: true });
+
+    adapter.setSuccessStatus('failed');
+    await flush();
+    expect(sentVerbs()).not.toContain('failed');
+
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    expect(sentVerbs()).toContain('passed');
+    expect(sentVerbs()).not.toContain('failed');
   });
 
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
@@ -480,16 +516,10 @@ describe('CMI5Adapter', () => {
     adapter.setSuccessStatus('passed');
     adapter.setCompletionStatus('complete');
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
-    const statementCalls = mockFetch.mock.calls.filter(
-      (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
-    );
-    const verbs = statementCalls.map(
-      (c: any[]) => JSON.parse(c[1].body).verb.id,
-    );
-    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/passed');
-    expect(verbs).toContain('http://adlnet.gov/expapi/verbs/completed');
+    expect(sentVerbs()).toContain('passed');
+    expect(sentVerbs()).toContain('completed');
   });
 
   it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
@@ -506,7 +536,7 @@ describe('CMI5Adapter', () => {
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter(
       (c: any[]) => c[0].includes('statements') && c[1]?.method === 'POST',
@@ -554,18 +584,7 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const initialized = mockFetch.mock.calls
-      .map((c: any[]) => {
-        try {
-          return JSON.parse(c[1]?.body);
-        } catch {
-          return null;
-        }
-      })
-      .find(
-        (b: any) =>
-          b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-      );
+    const initialized = statementFor('initialized');
     expect(initialized).toBeDefined();
     expect(
       initialized.context.extensions[
@@ -584,18 +603,7 @@ describe('CMI5Adapter', () => {
     adapter = new CMI5Adapter();
     await adapter.init();
 
-    const initialized = mockFetch.mock.calls
-      .map((c: any[]) => {
-        try {
-          return JSON.parse(c[1]?.body);
-        } catch {
-          return null;
-        }
-      })
-      .find(
-        (b: any) =>
-          b?.verb?.id === 'http://adlnet.gov/expapi/verbs/initialized',
-      );
+    const initialized = statementFor('initialized');
     const sid =
       initialized?.context?.extensions?.[
         'https://w3id.org/xapi/cmi5/context/extensions/sessionid'
@@ -703,27 +711,18 @@ describe('CMI5Adapter', () => {
     adapter.setDuration(120);
     adapter.terminate();
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0]?.includes('statements'),
     );
     expect(statementCalls.length).toBe(1);
     const terminated = JSON.parse(statementCalls[0][1].body);
-    expect(terminated.verb.id).toBe(
-      'http://adlnet.gov/expapi/verbs/terminated',
-    );
+    expect(terminated.verb.id).toBe(`${VERB}terminated`);
     // cmi5 §9.5.4.1 — Terminated must include result.duration.
     expect(terminated.result.duration).toBe('PT2M');
     // Nothing with a "suspended" verb.
-    const verbs = statementCalls.map((c: any[]) => {
-      try {
-        return JSON.parse(c[1].body).verb.id;
-      } catch {
-        return null;
-      }
-    });
-    expect(verbs).not.toContain('http://adlnet.gov/expapi/verbs/suspended');
+    expect(sentVerbs()).not.toContain('suspended');
   });
 
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
@@ -740,14 +739,14 @@ describe('CMI5Adapter', () => {
     mockFetch.mockResolvedValue({ ok: true });
 
     adapter.terminate();
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0]?.includes('statements'),
     );
     expect(statementCalls.length).toBe(1);
     const body = JSON.parse(statementCalls[0][1].body);
-    expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/terminated');
+    expect(body.verb.id).toBe(`${VERB}terminated`);
     expect(body.result.duration).toBe('PT1M');
   });
 
@@ -765,7 +764,7 @@ describe('CMI5Adapter', () => {
     adapter.terminate();
     adapter.terminate();
 
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
 
     const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
       c[0]?.includes('statements'),
@@ -797,8 +796,8 @@ describe('CMI5Adapter', () => {
     ).toEqual(['PUT /xapi/activities/state', 'POST /xapi/statements']);
     expect(sent.every(([, init]: any[]) => init.keepalive)).toBe(true);
     expect(JSON.parse(sent[1][1].body).map((s: any) => s.verb.id)).toEqual([
-      'http://adlnet.gov/expapi/verbs/completed',
-      'http://adlnet.gov/expapi/verbs/terminated',
+      `${VERB}completed`,
+      `${VERB}terminated`,
     ]);
   });
 
@@ -894,20 +893,9 @@ describe('CMI5Adapter', () => {
       adapter.setScore(85);
       adapter.setDuration(60);
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
+      await flush();
 
-      const completed = mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find(
-          (b: any) =>
-            b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed',
-        );
+      const completed = statementFor('completed');
       expect(completed).toBeDefined();
       const ext = completed?.context?.extensions ?? {};
       expect(
@@ -925,19 +913,10 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(40);
       adapter.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
+      adapter.terminate();
+      await flush();
 
-      const failed = mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find(
-          (b: any) => b?.verb?.id === 'http://adlnet.gov/expapi/verbs/failed',
-        );
+      const failed = statementFor('failed');
       expect(
         failed.context.extensions[
           'https://w3id.org/xapi/cmi5/context/extensions/masteryscore'
@@ -954,20 +933,9 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
+      await flush();
 
-      const completed = mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find(
-          (b: any) =>
-            b?.verb?.id === 'http://adlnet.gov/expapi/verbs/completed',
-        );
+      const completed = statementFor('completed');
       const ext = completed?.context?.extensions ?? {};
       expect(
         ext['https://w3id.org/xapi/cmi5/context/extensions/masteryscore'],
@@ -998,16 +966,9 @@ describe('CMI5Adapter', () => {
         adapter.setScore(90);
         adapter.setCompletionStatus('complete');
         adapter.setSuccessStatus('passed');
-        await new Promise((r) => setTimeout(r, 50));
+        await flush();
 
-        const verbs = mockFetch.mock.calls.map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body)?.verb?.id;
-          } catch {
-            return null;
-          }
-        });
-        expect(verbs).not.toContain(
+        expect(sentVerbs()).not.toContain(
           'https://w3id.org/xapi/adl/verbs/satisfied',
         );
       }
@@ -1030,25 +991,11 @@ describe('CMI5Adapter', () => {
         .filter((id: any) => typeof id === 'string');
     }
 
-    function statementFor(verbId: string): any {
-      return mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find((b: any) => b?.verb?.id === verbId);
-    }
-
     it('tags Initialized with the cmi5 category', async () => {
       setupInitMocks();
       adapter = new CMI5Adapter();
       await adapter.init();
-      const initialized = statementFor(
-        'http://adlnet.gov/expapi/verbs/initialized',
-      );
+      const initialized = statementFor('initialized');
       expect(categoryIds(initialized)).toEqual([CMI5_CAT]);
     });
 
@@ -1059,10 +1006,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
-      const completed = statementFor(
-        'http://adlnet.gov/expapi/verbs/completed',
-      );
+      await flush();
+      const completed = statementFor('completed');
       expect(categoryIds(completed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
@@ -1073,8 +1018,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-      const passed = statementFor('http://adlnet.gov/expapi/verbs/passed');
+      await flush();
+      const passed = statementFor('passed');
       expect(categoryIds(passed)).toEqual([CMI5_CAT, MOVEON_CAT]);
 
       const adapter2 = new CMI5Adapter();
@@ -1083,8 +1028,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter2.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
-      const failed = statementFor('http://adlnet.gov/expapi/verbs/failed');
+      adapter2.terminate();
+      await flush();
+      const failed = statementFor('failed');
       expect(categoryIds(failed)).toEqual([CMI5_CAT, MOVEON_CAT]);
     });
 
@@ -1096,10 +1042,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
-      await new Promise((r) => setTimeout(r, 50));
-      const terminated = statementFor(
-        'http://adlnet.gov/expapi/verbs/terminated',
-      );
+      await flush();
+      const terminated = statementFor('terminated');
       expect(categoryIds(terminated)).toEqual([CMI5_CAT]);
     });
 
@@ -1114,8 +1058,8 @@ describe('CMI5Adapter', () => {
         { type: 'choice', response: ['a'], correct: ['a'] },
         true,
       );
-      await new Promise((r) => setTimeout(r, 50));
-      const answered = statementFor('http://adlnet.gov/expapi/verbs/answered');
+      await flush();
+      const answered = statementFor('answered');
       expect(categoryIds(answered)).not.toContain(CMI5_CAT);
       expect(categoryIds(answered)).not.toContain(MOVEON_CAT);
     });
@@ -1133,7 +1077,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.reportInteraction(questionId, interaction, correct);
-      await new Promise((r) => setTimeout(r, 50));
+      await flush();
       const statementCalls = mockFetch.mock.calls.filter((c: any[]) =>
         c[0]?.includes('statements'),
       );
@@ -1147,7 +1091,7 @@ describe('CMI5Adapter', () => {
         { type: 'choice', response: ['a', 'b'], correct: ['a'] },
         false,
       );
-      expect(body.verb.id).toBe('http://adlnet.gov/expapi/verbs/answered');
+      expect(body.verb.id).toBe(`${VERB}answered`);
       expect(body.object.id).toBe('https://example.com/course/1#q1');
       expect(body.object.definition.type).toBe(
         'http://adlnet.gov/expapi/activities/cmi.interaction',
@@ -1272,18 +1216,6 @@ describe('CMI5Adapter', () => {
   });
 
   describe('exit() — returnURL redirect (cmi5 §10.2.6)', () => {
-    function findStatement(verbId: string): any {
-      return mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find((b: any) => b?.verb?.id === verbId);
-    }
-
     it('waits for a statement already sending before Terminated and the redirect', async () => {
       const returnURL = 'https://lms.example.com/learner/done';
       setupInitMocks(undefined, { returnURL });
@@ -1311,9 +1243,7 @@ describe('CMI5Adapter', () => {
 
       release({ ok: true });
       await exiting;
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
-      ).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
@@ -1331,26 +1261,12 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       await adapter.exit();
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
-      ).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });
   });
 
   describe('LMS.LaunchData fields (cmi5 §10.2)', () => {
-    function findStatement(verbId: string): any {
-      return mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find((b: any) => b?.verb?.id === verbId);
-    }
-
     it.each([
       ['LaunchData is absent', undefined],
       ['launchMode is invalid', { launchMode: 'NotARealMode' }],
@@ -1364,10 +1280,8 @@ describe('CMI5Adapter', () => {
         mockFetch.mockClear();
         mockFetch.mockResolvedValue({ ok: true });
         adapter.setCompletionStatus('complete');
-        await new Promise((r) => setTimeout(r, 50));
-        expect(
-          findStatement('http://adlnet.gov/expapi/verbs/completed'),
-        ).toBeDefined();
+        await flush();
+        expect(statementFor('completed')).toBeDefined();
       },
     );
 
@@ -1401,10 +1315,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/completed'),
-      ).toBeUndefined();
+      await flush();
+      expect(statementFor('completed')).toBeUndefined();
     });
 
     it('does NOT emit Passed or Failed under launchMode=Review (§10.2.2)', async () => {
@@ -1415,13 +1327,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setScore(95);
       adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/passed'),
-      ).toBeUndefined();
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/failed'),
-      ).toBeUndefined();
+      await flush();
+      expect(statementFor('passed')).toBeUndefined();
+      expect(statementFor('failed')).toBeUndefined();
     });
 
     it('does NOT emit Suspended under launchMode=Browse on terminate (§10.2.2)', async () => {
@@ -1432,14 +1340,10 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.terminate();
-      await new Promise((r) => setTimeout(r, 50));
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/suspended'),
-      ).toBeUndefined();
+      await flush();
+      expect(statementFor('suspended')).toBeUndefined();
       // Terminated is always allowed.
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/terminated'),
-      ).toBeDefined();
+      expect(statementFor('terminated')).toBeDefined();
     });
 
     it('fetches Learner Preferences BEFORE sending Initialized (§11)', async () => {
@@ -1464,7 +1368,7 @@ describe('CMI5Adapter', () => {
             try {
               return (
                 JSON.parse(mockFetch.mock.calls[i][1]?.body)?.verb?.id ===
-                'http://adlnet.gov/expapi/verbs/initialized'
+                `${VERB}initialized`
               );
             } catch {
               return false;
@@ -1478,18 +1382,6 @@ describe('CMI5Adapter', () => {
   });
 
   describe('contextTemplate merge (cmi5 §10.2.1)', () => {
-    function findStatement(verbId: string): any {
-      return mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find((b: any) => b?.verb?.id === verbId);
-    }
-
     it('concats LMS-supplied template categories with cmi5 + moveOn instead of overwriting', async () => {
       // cmi5 §10.2.1 — the AU MUST NOT overwrite contextTemplate values.
       // If the LMS pre-populates `category`, the AU must merge (concat
@@ -1508,10 +1400,8 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockResolvedValue({ ok: true });
       adapter.setCompletionStatus('complete');
-      await new Promise((r) => setTimeout(r, 50));
-      const completed = findStatement(
-        'http://adlnet.gov/expapi/verbs/completed',
-      );
+      await flush();
+      const completed = statementFor('completed');
       const ids = completed.context.contextActivities.category.map(
         (c: any) => c.id,
       );
@@ -1526,18 +1416,6 @@ describe('CMI5Adapter', () => {
   });
 
   describe('score validation (cmi5 §9.5.1, §9.3.4)', () => {
-    function findStatement(verbId: string): any {
-      return mockFetch.mock.calls
-        .map((c: any[]) => {
-          try {
-            return JSON.parse(c[1]?.body);
-          } catch {
-            return null;
-          }
-        })
-        .find((b: any) => b?.verb?.id === verbId);
-    }
-
     it('clamps setScore to [0, 100] so scaled stays in [0, 1] (xAPI)', async () => {
       // Score is asserted on Passed (not Completed) because cmi5 §9.5.1
       // forbids score on Completed.
@@ -1549,8 +1427,8 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(150);
       adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      await flush();
+      const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(1);
     });
 
@@ -1564,8 +1442,8 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(50); // scaled = 0.5, below mastery 0.8
       adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      await flush();
+      const passed = statementFor('passed');
       expect(passed).toBeDefined();
       // The Passed verb is still emitted (author asserted it) but
       // without a score that would make the statement non-conformant.
@@ -1582,8 +1460,8 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(53.3);
       adapter.setSuccessStatus('passed');
-      await new Promise((r) => setTimeout(r, 50));
-      const passed = findStatement('http://adlnet.gov/expapi/verbs/passed');
+      await flush();
+      const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(0.533);
     });
 
@@ -1596,8 +1474,9 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(40);
       adapter.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
-      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      adapter.terminate();
+      await flush();
+      const failed = statementFor('failed');
       expect(failed.result.score.scaled).toBeCloseTo(0.4);
     });
 
@@ -1613,8 +1492,9 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85); // scaled = 0.85, above mastery 0.7
       adapter.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
-      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      adapter.terminate();
+      await flush();
+      const failed = statementFor('failed');
       expect(failed).toBeDefined();
       expect(failed.result.score).toBeUndefined();
       warn.mockRestore();
@@ -1629,8 +1509,9 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85);
       adapter.setSuccessStatus('failed');
-      await new Promise((r) => setTimeout(r, 50));
-      const failed = findStatement('http://adlnet.gov/expapi/verbs/failed');
+      adapter.terminate();
+      await flush();
+      const failed = statementFor('failed');
       expect(failed).toBeDefined();
       expect(failed.result.score.scaled).toBeCloseTo(0.85);
     });
@@ -1642,20 +1523,18 @@ describe('CMI5Adapter', () => {
       adapter.setScore(85);
       adapter.setSuccessStatus('passed');
       adapter.commit();
-      await new Promise((r) => setTimeout(r, 50));
+      await flush();
       mockFetch.mockClear();
 
       adapter.setScore(95);
       adapter.setSuccessStatus('passed');
       adapter.commit();
-      await new Promise((r) => setTimeout(r, 50));
+      await flush();
 
-      const scored = findStatement('http://adlnet.gov/expapi/verbs/scored');
+      const scored = statementFor('scored');
       expect(scored.result.score.scaled).toBeCloseTo(0.95);
       expect(scored.context?.contextActivities?.category).toBeUndefined();
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/passed'),
-      ).toBeUndefined();
+      expect(statementFor('passed')).toBeUndefined();
     });
 
     it('sends Scored under launchMode=Browse, where Defined Statements are barred (§10.2.2)', async () => {
@@ -1667,15 +1546,11 @@ describe('CMI5Adapter', () => {
       adapter.setScore(60);
       adapter.setSuccessStatus('failed');
       adapter.commit();
-      await new Promise((r) => setTimeout(r, 50));
+      adapter.terminate();
+      await flush();
 
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/failed'),
-      ).toBeUndefined();
-      expect(
-        findStatement('http://adlnet.gov/expapi/verbs/scored').result.score
-          .scaled,
-      ).toBeCloseTo(0.6);
+      expect(statementFor('failed')).toBeUndefined();
+      expect(statementFor('scored').result.score.scaled).toBeCloseTo(0.6);
     });
   });
 });

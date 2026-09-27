@@ -56,7 +56,6 @@ describe('success.from: "none"', () => {
     const config = createConfig({
       completion: { mode: 'percentage', percentageThreshold: 100 },
       success: { from: 'none' },
-      scoring: { passingScore: 70 },
     });
     const progress = new ProgressState(manifest, config);
 
@@ -68,22 +67,24 @@ describe('success.from: "none"', () => {
 });
 
 describe('success.from: "quiz" under manual completion', () => {
-  const build = () => {
-    const manifest = createManifest(5, { 2: { graded: true } });
+  const build = (pageOpts?: Parameters<typeof createManifest>[2]) => {
+    const manifest = createManifest(5, { 2: { graded: true } }, pageOpts);
     const config = createConfig({
       completion: { mode: 'manual' },
       success: { from: 'quiz' },
-      scoring: { passingScore: 70 },
     });
     return new ProgressState(manifest, config);
   };
 
-  it('judges the score as soon as it is final, before the trigger', () => {
+  it('fails as soon as the score is final, but holds a pass for the trigger', () => {
     const progress = build();
 
-    progress.quizCompleted(2, 90);
+    progress.quizCompleted(2, 40);
     expect(progress.completionStatus).toBe('incomplete');
-    expect(progress.successStatus).toBe('passed');
+    expect(progress.successStatus).toBe('failed');
+
+    progress.quizCompleted(2, 90);
+    expect(progress.successStatus).toBe('unknown');
 
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('passed');
@@ -99,8 +100,18 @@ describe('success.from: "quiz" under manual completion', () => {
     expect(progress.successStatus).toBe('failed');
   });
 
-  it('reports no verdict for a learner who triggers completion without attempting', () => {
+  it('fails a learner who triggers completion without attempting a required page', () => {
     const progress = build();
+
+    progress.markCompleteManually();
+
+    expect(progress.completionStatus).toBe('complete');
+    expect(progress.gradedScore.attempted).toBe(false);
+    expect(progress.successStatus).toBe('failed');
+  });
+
+  it('reports no verdict when the only graded page was optional', () => {
+    const progress = build({ 2: { required: false } });
 
     progress.markCompleteManually();
 

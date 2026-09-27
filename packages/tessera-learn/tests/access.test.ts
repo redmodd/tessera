@@ -36,7 +36,7 @@ describe('freeAccess', () => {
       2: { graded: true, gatesProgress: true },
     });
     const progress = new ProgressState(manifest, createConfig());
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(false);
   });
 
@@ -46,7 +46,7 @@ describe('freeAccess', () => {
     });
     const progress = new ProgressState(manifest, createConfig());
     progress.quizCompleted(2, 80);
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
   });
 
@@ -58,7 +58,7 @@ describe('freeAccess', () => {
     const progress = new ProgressState(manifest, createConfig());
     progress.quizCompleted(3, 90);
     // Page 1 quiz is unattempted but irrelevant — page 3's gate is the nearest.
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
     expect(freeAccess(ctx(5, manifest, progress, config))).toBe(true);
   });
 
@@ -67,7 +67,7 @@ describe('freeAccess', () => {
       2: { graded: true, gatesProgress: false },
     });
     const progress = new ProgressState(manifest, createConfig());
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
     expect(freeAccess(ctx(4, manifest, progress, config))).toBe(true);
   });
 });
@@ -100,7 +100,7 @@ describe('sequentialAccess', () => {
     const manifest = createManifest(4, { 1: { graded: true } });
     const progress = new ProgressState(manifest, createConfig());
     progress.markVisited(0);
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
 
     expect(sequentialAccess(ctx(2, manifest, progress, config))).toBe(false);
     progress.quizCompleted(1, 50);

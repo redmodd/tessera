@@ -43,6 +43,8 @@ function makeNavCtx(progress: ProgressState, currentIndex = 0) {
     isPageLocked: vi.fn(() => false),
     prefetch: vi.fn(),
   };
+  ctxStore.set('tessera-page', { index: currentIndex });
+  ctxStore.set('tessera-in-page', true);
   return { nav, manifest, progress, config };
 }
 
@@ -192,7 +194,7 @@ describe('useQuestion — standalone mode', () => {
   it('registers a graded score when graded is true', () => {
     const progress = new ProgressState(
       createManifest(4, {}, { 3: { graded: true } }),
-      createConfig(),
+      createConfig({ completion: { mode: 'quiz' } }),
     );
     const adapter = makeAdapter();
     const ctx = makeNavCtx(progress, 3);
@@ -210,6 +212,27 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.pageScore(3)).toBe(100);
     // Graded path also recalculates
     expect(progress.successStatus).toBe('passed');
+  });
+
+  it('records against the page it renders on while the next page loads', () => {
+    const progress = new ProgressState(
+      createManifest(3, {}, { 1: { graded: true }, 2: { graded: true } }),
+      createConfig(),
+    );
+    const ctx = makeNavCtx(progress, 1);
+    ctxStore.set('tessera-nav', ctx);
+    ctxStore.set('tessera-adapter', { adapter: makeAdapter() });
+    ctx.nav.currentPageIndex = 2;
+
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({ type: 'true-false', response: true, correct: true }),
+    }).submit();
+
+    expect(progress.pageScore(1)).toBe(100);
+    expect(progress.gradedUnits.has(2)).toBe(false);
+    expect(progress.unlistedUnanswered(2)).toEqual([]);
   });
 
   it('uses score override when provided', () => {
@@ -842,7 +865,7 @@ describe('useProgress', () => {
     expect(h.gradedScore).toEqual({ average: 80, attempted: true });
   });
 
-  it('pageScore defaults to the current page', () => {
+  it('pageScore defaults to the page it renders on while the next page loads', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     progress.markStandaloneQuestion(2, 'q1', 40, true);
     const ctx = makeNavCtx(progress, 2);
@@ -851,9 +874,9 @@ describe('useProgress', () => {
     const h = useProgress();
     expect(h.pageScore()).toBe(40);
 
-    ctx.nav.currentPageIndex = 1;
-    expect(h.pageScore()).toBeUndefined();
-    expect(h.pageScore(2)).toBe(40);
+    ctx.nav.currentPageIndex = 3;
+    expect(h.pageScore()).toBe(40);
+    expect(h.pageScore(3)).toBeUndefined();
   });
 
   it('markVisited and markChunk delegate to ProgressState', () => {

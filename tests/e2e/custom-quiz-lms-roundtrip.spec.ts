@@ -8,6 +8,8 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  findStatement,
+  findStatements,
   interactionField,
   scormData,
   startPreview,
@@ -141,7 +143,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Custom quiz writes per-question cmi.interactions and split status', async ({
+  test('Custom quiz writes per-question cmi.interactions and holds passed for completion', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -152,7 +154,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
       .toMatchObject({
         'cmi.score.raw': '100',
         'cmi.score.scaled': '1',
-        'cmi.success_status': 'passed',
+        'cmi.success_status': 'unknown',
       });
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
@@ -184,7 +186,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     preview?.kill('SIGTERM');
   });
 
-  test('Custom quiz emits xAPI Passed and per-question Answered statements', async ({
+  test('Custom quiz emits xAPI Scored and per-question Answered statements, holding Passed for completion', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -223,24 +225,13 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     await answerCustomQuizCorrectly(page);
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
+      .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {
+        timeout: 5000,
+      })
+      .toBe(1);
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
-
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(2);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
@@ -273,7 +264,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
     preview?.kill('SIGTERM');
   });
 
-  test('Custom quiz emits xAPI Passed and per-question Answered statements', async ({
+  test('Custom quiz emits xAPI Scored and per-question Answered statements, holding Passed for completion', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -304,24 +295,13 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
     await answerCustomQuizCorrectly(page);
 
     await expect
-      .poll(
-        () =>
-          statements.find(
-            (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-          ) != null,
-        { timeout: 5000 },
-      )
-      .toBe(true);
+      .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {
+        timeout: 5000,
+      })
+      .toBe(1);
+    expect(findStatement(statements, 'passed')).toBeUndefined();
 
-    const passed = statements.find(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/passed',
-    );
-    expect(passed.result?.success).toBe(true);
-    expect(passed.result?.score?.scaled).toBe(1);
-
-    const answered = statements.filter(
-      (s) => s?.verb?.id === 'http://adlnet.gov/expapi/verbs/answered',
-    );
+    const answered = findStatements(statements, 'answered');
     expect(answered).toHaveLength(2);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',

@@ -26,6 +26,8 @@ function answer(graded: boolean | undefined) {
         'tessera-nav',
         { nav: { currentPageIndex: 0 }, manifest, progress, config },
       ],
+      ['tessera-page', { index: 0 }],
+      ['tessera-in-page', true],
     ]),
   });
   const radio = target.querySelector('input[type="radio"]') as HTMLInputElement;

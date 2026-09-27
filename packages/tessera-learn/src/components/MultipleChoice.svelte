@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { questionId } from './util.js';
+  import { QUESTION_ID_PREFIX, questionId } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -25,7 +25,7 @@
 
   const q = useQuestion({
     get id() {
-      return questionId(id, 'mc', question);
+      return questionId(id, QUESTION_ID_PREFIX.MultipleChoice, question);
     },
     graded: untrack(() => graded),
     weight: untrack(() => weight),

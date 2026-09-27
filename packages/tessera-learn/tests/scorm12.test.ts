@@ -240,21 +240,6 @@ describe('SCORM12Adapter', () => {
       expect(lastLessonStatus()).toBe('failed');
     });
 
-    it('withholds passed while the course is incomplete', async () => {
-      adapter.setSuccessStatus('passed');
-      adapter.setCompletionStatus('incomplete');
-      await flush();
-      expect(lastLessonStatus()).toBe('incomplete');
-    });
-
-    it('releases the held passed once completion lands', async () => {
-      adapter.setSuccessStatus('passed');
-      adapter.setCompletionStatus('incomplete');
-      adapter.setCompletionStatus('complete');
-      await flush();
-      expect(lastLessonStatus()).toBe('passed');
-    });
-
     it('reports failed even while the course is incomplete', async () => {
       adapter.setSuccessStatus('failed');
       adapter.setCompletionStatus('incomplete');

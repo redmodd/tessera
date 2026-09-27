@@ -17,7 +17,7 @@ import {
   type ResolvedConfigRead,
 } from './manifest.js';
 import {
-  isGradedPage,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
@@ -466,7 +466,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         ctx.root,
         ctx.outDir,
         mergeCourseConfig(read.config),
-        ctx.manifest.pages.some(isGradedPage),
+        ctx.manifest.pages.some(isRequiredGradedPage),
       );
     },
   };

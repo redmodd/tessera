@@ -233,8 +233,8 @@ describe('SCORM 2004 manifest', () => {
 describe('generateCMI5Xml', () => {
   const cmi5Xml = (
     config: Parameters<typeof mergeCourseConfig>[0],
-    hasGradedPages = true,
-  ) => generateCMI5Xml(mergeCourseConfig(config), hasGradedPages);
+    hasRequiredGradedPage = true,
+  ) => generateCMI5Xml(mergeCourseConfig(config), hasRequiredGradedPage);
 
   it('generates valid XML with course structure', () => {
     const xml = cmi5Xml({
@@ -329,9 +329,9 @@ describe('generateCMI5Xml', () => {
   });
 
   it('drops to Completed when a quiz criterion has nothing to judge', () => {
-    // An informational course: the criterion resolves to "quiz", but with no
-    // graded page the runtime never sends a verdict, and CompletedAndPassed
-    // would leave the AU unsatisfiable for the whole attempt.
+    // An informational course, or one whose graded pages are all optional:
+    // the criterion resolves to "quiz", but the runtime may never send a
+    // verdict, so CompletedAndPassed could leave the AU unsatisfiable.
     const xml = cmi5Xml(
       { title: 'Test', completion: { mode: 'percentage' } },
       false,

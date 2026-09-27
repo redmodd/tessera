@@ -773,6 +773,7 @@ function mountHarness(
     adapter?: unknown;
     quizState?: { attempts: number; score: number };
     navCtx?: unknown;
+    pageIndex?: number;
   } = {},
 ) {
   const ref: HarnessRef = {
@@ -796,6 +797,7 @@ function mountHarness(
       adapter: opts.adapter ?? null,
       quizState: opts.quizState ?? null,
       navCtx: opts.navCtx ?? null,
+      pageIndex: opts.pageIndex ?? 0,
     },
   });
   return { component, target, ref };
@@ -860,16 +862,19 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect(q.canRetry).toBe(false);
   });
 
-  it('records the submitted score against the current page, with no element bound', () => {
+  it('records the submitted score against the page it renders on, with no element bound', () => {
     const scored: Array<[number, number]> = [];
     const navCtx = {
-      nav: { currentPageIndex: 3 },
+      nav: { currentPageIndex: 4 },
       progress: {
         quizCompleted: (pageIndex: number, score: number) =>
           scored.push([pageIndex, score]),
       },
     };
-    const m = mountHarness({ graded: true }, { nullElement: true, navCtx });
+    const m = mountHarness(
+      { graded: true },
+      { nullElement: true, navCtx, pageIndex: 3 },
+    );
     mountings.push(m);
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));

@@ -61,6 +61,23 @@ function createValidProject(root: string): void {
   writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hello</h1>');
 }
 
+function writeGradedPage(
+  root: string,
+  name: string,
+  fields = '',
+  body = '',
+): void {
+  writeFile(
+    root,
+    `pages/01-section/01-lesson/${name}.svelte`,
+    `<script module>
+export const pageConfig = { title: "${name}", graded: true${fields ? `, ${fields}` : ''} };
+</script>
+<h1>${name}</h1>
+${body}`,
+  );
+}
+
 beforeEach(() => {
   testRoot = createTestDir();
 });
@@ -788,21 +805,206 @@ export const pageConfig = { title: "Exam", graded: "yes" };
     );
   });
 
-  it('warns when weight is set on a page that is not declared graded', () => {
+  it('errors on a non-boolean pageConfig.required', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'page', 'required: "no"');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('pageConfig.required must be a boolean'),
+    );
+  });
+
+  it.each([
+    ['required', 'false'],
+    ['weight', '40'],
+  ])(
+    'warns when %s is set on a page that is not declared graded',
+    (field, value) => {
+      createValidProject(testRoot);
+      writeFile(
+        testRoot,
+        'pages/01-section/01-lesson/page.svelte',
+        `<script module>
+export const pageConfig = { title: "Just Prose", ${field}: ${value} };
+</script>
+<h1>Just prose</h1>`,
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          `pageConfig.${field} only applies to a graded page`,
+        ),
+      );
+    },
+  );
+
+  it('warns on pageConfig fields it ignores', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'practice', 'requried: false');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('unknown field pageConfig.requried is ignored'),
+    );
+  });
+
+  it('warns when graded questions sit in different branches of one {#if}', () => {
+    createValidProject(testRoot);
+    writeGradedPage(
+      testRoot,
+      'branch',
+      '',
+      `{#if pathA}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:else if pathB}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/if}`,
+    );
+    writeGradedPage(
+      testRoot,
+      'reveal',
+      '',
+      `<MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />
+{#if shown}
+  <MultipleChoice graded id="q2" question="B?" options={['x', 'y']} correct={0} />
+{:else}
+  <MultipleChoice id="practice" question="C?" options={['x', 'y']} correct={0} />
+{/if}`,
+    );
+    writeGradedPage(
+      testRoot,
+      'fallback',
+      '',
+      `{#each items as item}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:else}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/each}`,
+    );
+    writeGradedPage(
+      testRoot,
+      'loaded',
+      '',
+      `{#await load() then data}
+  <MultipleChoice graded id="qa" question="A?" options={['x', 'y']} correct={0} />
+{:catch error}
+  <MultipleChoice graded id="qb" question="B?" options={['x', 'y']} correct={0} />
+{/await}`,
+    );
+    const branchWarnings = validateProject(testRoot).warnings.filter((w) =>
+      w.includes('different branches of one {#if}, {#each} or {#await}'),
+    );
+    expect(branchWarnings).toEqual([
+      expect.stringContaining('branch.svelte'),
+      expect.stringContaining('fallback.svelte'),
+      expect.stringContaining('loaded.svelte'),
+    ]);
+  });
+
+  it('warns on quiz fields it ignores, pointing page-level ones to pageConfig', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/page.svelte',
       `<script module>
-export const pageConfig = { title: "Just Prose", weight: 40 };
+export const pageConfig = { title: "Practice", quiz: { graded: true, required: false, weight: 50, attempts: 2 } };
 </script>
-<h1>Just prose</h1>`,
+<h1>Practice</h1>`,
     );
     const { warnings } = validateProject(testRoot);
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'quiz.required is ignored. Set required on pageConfig',
+        ),
+        expect.stringContaining(
+          'quiz.weight is ignored. Set weight on pageConfig',
+        ),
+        expect.stringContaining('unknown field quiz.attempts'),
+      ]),
+    );
+  });
+
+  it('warns when every graded page is optional under a quiz verdict', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'page', 'required: false');
+    const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'pageConfig.weight only applies to a page that counts toward the course score',
-      ),
+      expect.stringContaining('every graded page sets required: false'),
+    );
+  });
+
+  it('stays quiet when one graded page is required', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'page', 'required: false');
+    writeGradedPage(testRoot, 'exam');
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('every graded page sets required')),
+    ).toEqual([]);
+  });
+
+  it('warns on the weight total behind a single required page', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'exam', 'weight: 40');
+    writeGradedPage(testRoot, 'p1', 'required: false, weight: 30');
+    writeGradedPage(testRoot, 'p2', 'required: false, weight: 30');
+    const { warnings } = validateProject(testRoot);
+    const sum = warnings.filter((w) => w.includes('weights sum to'));
+    expect(sum).toHaveLength(1);
+    expect(sum[0]).toContain('sum to 40, not 100');
+    expect(sum[0]).toContain('leaves out the optional pages');
+  });
+
+  it('reads the weight scale off the required pages alone', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'a', 'weight: 2');
+    writeGradedPage(testRoot, 'b', 'weight: 3');
+    writeGradedPage(testRoot, 'practice', 'required: false, weight: 10');
+    const { warnings } = validateProject(testRoot);
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('does not quote a total when no graded page is required', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'a', 'required: false, weight: 25');
+    writeGradedPage(testRoot, 'b', 'required: false, weight: 75');
+    const { infos, warnings } = validateProject(testRoot);
+    const weighting = infos.filter((i) => i.includes('score weighting'));
+    expect(weighting).toHaveLength(1);
+    expect(weighting[0]).toContain('no graded page is required');
+    expect(weighting[0]).not.toContain('%');
+    expect(warnings.filter((w) => w.includes('weights sum to'))).toEqual([]);
+  });
+
+  it('quotes each weight share against the required pages alone', () => {
+    createValidProject(testRoot);
+    writeGradedPage(testRoot, 'page', 'weight: 25');
+    writeGradedPage(testRoot, 'exam', 'weight: 75');
+    writeGradedPage(testRoot, 'practice', 'required: false, weight: 100');
+    const { infos } = validateProject(testRoot);
+    expect(infos).toContainEqual(expect.stringContaining('page.svelte 25.0%'));
+    expect(infos).toContainEqual(expect.stringContaining('exam.svelte 75.0%'));
+    expect(infos).toContainEqual(
+      expect.stringContaining('practice.svelte weight 100'),
+    );
+  });
+
+  it('errors when quiz completion has no required graded page to judge', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "quiz" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    writeGradedPage(testRoot, 'page', 'required: false');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('the course can never complete'),
     );
   });
 
@@ -1072,7 +1274,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: "yes" } };
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('quiz.graded must be a boolean, got string'),
+      expect.stringContaining('quiz.graded must be a boolean, got "yes"'),
     );
   });
 
@@ -1089,7 +1291,7 @@ export const pageConfig = { title: "Quiz", quiz: { gatesProgress: "yes" } };
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'quiz.gatesProgress must be a boolean, got string',
+        'quiz.gatesProgress must be a boolean, got "yes"',
       ),
     );
   });
@@ -1714,6 +1916,23 @@ describe('contract bypass detection', () => {
 export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 </script>
 <h1>Empty quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'quiz page has no question components or useQuestion() calls',
+      ),
+    );
+  });
+
+  it('warns on a quiz page that shows a local import only as text', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { graded: true } };
+</script>
+<h1>Empty quiz</h1>
+<pre><code>import Widget from "./Widget.svelte"</code></pre>`,
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(

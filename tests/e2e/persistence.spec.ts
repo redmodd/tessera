@@ -1,27 +1,16 @@
 import { test, expect } from '@playwright/test';
-import { answerMatching } from './helpers.js';
-
-async function waitForContent(page) {
-  await page.waitForSelector('.tessera-content');
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
-}
-
-async function navigateToPage(page, pageTitle: string) {
-  await page.locator('.tessera-nav-page', { hasText: pageTitle }).click();
-  await waitForContent(page);
-}
+import {
+  answerMatching,
+  navigateToPage,
+  waitForTesseraContent,
+} from './helpers.js';
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
-    await waitForContent(page);
+    await waitForTesseraContent(page);
   });
 
   test('navigate to a page, reload → resumes on same page', async ({
@@ -29,13 +18,10 @@ test.describe('Persistence — localStorage', () => {
   }) => {
     // Navigate to "Callouts & Images" (should be page index ~2)
     await navigateToPage(page, 'Callouts & Images');
-    await expect(page.locator('.tessera-content h1')).toContainText(
-      'Callouts & Images',
-    );
 
     // Reload
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     // Should resume on the same page
     await expect(page.locator('.tessera-content h1')).toContainText(
@@ -46,27 +32,18 @@ test.describe('Persistence — localStorage', () => {
   test('visited pages survive reload — progress bar preserved', async ({
     page,
   }) => {
-    // Visit several pages
     await navigateToPage(page, 'Objectives');
     await navigateToPage(page, 'Callouts & Images');
     await navigateToPage(page, 'Accordion & Carousel');
 
-    // Read progress
+    // Welcome plus the three visited pages
     const progressLabel = page.locator('.tessera-progress-label');
-    const textBefore = await progressLabel.textContent();
-    const matchBefore = textBefore?.match(/(\d+) of (\d+)/);
-    const visitedBefore = Number(matchBefore?.[1] || 0);
-    expect(visitedBefore).toBeGreaterThanOrEqual(3); // welcome + visited pages
+    await expect(progressLabel).toContainText(/4 of \d+ pages/);
 
-    // Reload
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
-    // Progress should be preserved
-    const textAfter = await progressLabel.textContent();
-    const matchAfter = textAfter?.match(/(\d+) of (\d+)/);
-    const visitedAfter = Number(matchAfter?.[1] || 0);
-    expect(visitedAfter).toBeGreaterThanOrEqual(visitedBefore);
+    await expect(progressLabel).toContainText(/4 of \d+ pages/);
   });
 
   test('clear localStorage → course starts fresh on new page load', async ({
@@ -76,11 +53,8 @@ test.describe('Persistence — localStorage', () => {
     const ctx1 = await browser.newContext();
     const page1 = await ctx1.newPage();
     await page1.goto('/');
-    await waitForContent(page1);
-    await page1
-      .locator('.tessera-nav-page', { hasText: 'Accordion & Carousel' })
-      .click();
-    await waitForContent(page1);
+    await waitForTesseraContent(page1);
+    await navigateToPage(page1, 'Accordion & Carousel');
     await page1.close();
     await ctx1.close();
 
@@ -90,7 +64,7 @@ test.describe('Persistence — localStorage', () => {
     await page2.goto('/');
     await page2.evaluate(() => localStorage.clear());
     await page2.goto('/');
-    await waitForContent(page2);
+    await waitForTesseraContent(page2);
 
     // Should be on first page (Welcome) since no saved state
     await expect(page2.locator('.tessera-content h1')).toContainText(
@@ -177,7 +151,7 @@ test.describe('Persistence — localStorage', () => {
 
     // Reload and verify state is restored
     await page.reload();
-    await waitForContent(page);
+    await waitForTesseraContent(page);
 
     const restoredData = await page.evaluate(() => {
       const keys = Object.keys(localStorage);

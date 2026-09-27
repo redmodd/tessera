@@ -69,7 +69,7 @@ describe('isPageComplete', () => {
       maxAttempts: 3,
     });
     const manifest = createManifestFromPages([page]);
-    const config = createConfig({ scoring: { passingScore: 70 } });
+    const config = createConfig();
     const progress = new ProgressState(manifest, config);
 
     expect(isPageComplete(0, manifest, progress, config)).toBe(false);

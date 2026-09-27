@@ -38,13 +38,14 @@ export async function waitForServer(page: Page, url: string): Promise<void> {
 }
 
 export async function waitForTesseraContent(page: Page): Promise<void> {
-  await page.waitForSelector('.tessera-content', { timeout: 15000 });
-  await page
-    .waitForFunction(
-      () => !document.querySelector('.tessera-loading-skeleton'),
-      { timeout: 5000 },
-    )
-    .catch(() => {});
+  await expect(page.locator('.tessera-content')).toBeVisible({
+    timeout: 15000,
+  });
+}
+
+export async function navigateToPage(page: Page, title: string): Promise<void> {
+  await page.locator('.tessera-nav-page', { hasText: title }).click();
+  await expect(page.locator('.tessera-content h1')).toContainText(title);
 }
 
 /** Every call the SCORM mock has logged so far, as `[method, ...args]`. */
@@ -173,4 +174,68 @@ export async function answerGradedQuizAfterQ1(page: Page): Promise<void> {
   await primary.click();
 
   await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
+}
+
+export const primaryBtn = (page: Page) =>
+  page.locator('.tessera-quiz-nav .tessera-btn-primary');
+
+export async function answerMultipleChoice(
+  page: Page,
+  optionIndex: number,
+): Promise<void> {
+  const radios = page.locator(
+    '.tessera-quiz-question-wrapper.active .tessera-mc-option',
+  );
+  await radios.nth(optionIndex).click();
+}
+
+export async function answerFillInTheBlank(
+  page: Page,
+  text: string,
+): Promise<void> {
+  const input = page.locator(
+    '.tessera-quiz-question-wrapper.active input[type="text"]',
+  );
+  await input.fill(text);
+}
+
+export async function completePracticeQuiz(
+  page: Page,
+  { mc, fill }: { mc: number; fill: string },
+): Promise<void> {
+  const progress = page.locator('.tessera-quiz-progress-desktop').first();
+
+  await expect(progress).toContainText('Question 1 of 2');
+  await answerMultipleChoice(page, mc);
+  await primaryBtn(page).click();
+
+  await expect(progress).toContainText('Question 2 of 2');
+  await answerFillInTheBlank(page, fill);
+
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
+export async function finishFreeCourse(page: Page): Promise<void> {
+  await openQuiz(page, 'Practice Quiz');
+  await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
+
+  const heading = page.locator('.tessera-content h1');
+  const nav = page.locator('.tessera-nav-page');
+  const count = await nav.count();
+  for (let i = 0; i < count; i++) {
+    const previous = await heading.textContent();
+    await nav.nth(i).click();
+    await expect(heading).not.toHaveText(previous ?? '');
+  }
+}
+
+export function findStatements(statements: any[], verb: string): any[] {
+  return statements.filter(
+    (s) => s?.verb?.id === `http://adlnet.gov/expapi/verbs/${verb}`,
+  );
+}
+
+export function findStatement(statements: any[], verb: string): any {
+  return findStatements(statements, verb)[0];
 }

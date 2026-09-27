@@ -3,6 +3,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import {
   isGradedPage,
+  isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
@@ -51,17 +52,24 @@ export interface GradedUnit {
 
 export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
+  #requiredGradedIndices: ReadonlySet<number>;
   #quizGradedIndices: ReadonlySet<number>;
   #config: CourseConfig;
   #success: SuccessConfig;
   #totalPages: number;
   #quizPageIndices: ReadonlySet<number>;
   #pageWeights: ReadonlyMap<number, number>;
+  #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
   #undeclaredWarned = new Set<number>();
+  #expected: SvelteMap<number, ReadonlySet<string>>;
+  #unconfirmed = new Map<number, Set<string>>();
 
   constructor(manifest: Manifest, config: CourseConfig) {
     this.#declaredGradedIndices = new Set(
       manifest.pages.filter(isGradedPage).map((p) => p.index),
+    );
+    this.#requiredGradedIndices = new Set(
+      manifest.pages.filter(isRequiredGradedPage).map((p) => p.index),
     );
     this.#quizGradedIndices = new Set(
       manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
@@ -72,6 +80,12 @@ export class ProgressState {
     this.#pageWeights = new Map(
       manifest.pages.map((p) => [p.index, normalizeWeight(p.weight)]),
     );
+    this.#listedQuestions = new Map(
+      manifest.pages.flatMap((p) =>
+        p.questions ? [[p.index, new Set(p.questions)] as const] : [],
+      ),
+    );
+    this.#expected = new SvelteMap(this.#listedQuestions);
     this.#totalPages = manifest.totalPages;
     this.#config = config;
     this.#success = resolveSuccess(config);
@@ -184,24 +198,89 @@ export class ProgressState {
   }
 
   /**
-   * Correct a restored answer's `graded` flag and weight from the mounted
-   * component, which outranks what the save was written with.
-   * ponytail: only pages the learner reopens are corrected; a full sweep needs
-   * build-time extraction, which can't see custom question components.
+   * Record a mounted question, so its page counts as answered only once every
+   * graded question on it is, and correct a restored answer's `graded` flag
+   * and weight from it, which outranks what the save was written with. The
+   * manifest lists the built-in questions the source fixes, so only a custom
+   * or dynamically identified one behind a reveal waits to register.
+   * ponytail: only pages the learner opens are corrected; a full sweep needs
+   * each question's weight at build time, which custom question components hide.
    */
-  refreshStandaloneQuestion(
+  registerStandaloneQuestion(
     pageIndex: number,
     questionId: string,
     graded: boolean,
     weight?: number,
   ) {
+    this.#unconfirmed.get(pageIndex)?.delete(questionId);
+    const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
-    if (!questions || !result) return;
     const next = normalizeWeight(weight);
-    if (next === result.weight && graded === result.graded) return;
-    questions.set(questionId, { ...result, weight: next, graded });
-    this.#writeQuestions(pageIndex, questions);
+    if (
+      questions &&
+      result &&
+      (next !== result.weight || graded !== result.graded)
+    ) {
+      questions.set(questionId, { ...result, weight: next, graded });
+      this.#writeQuestions(pageIndex, questions);
+    } else if (expectedChanged) {
+      this.#changed();
+    }
+  }
+
+  restoreUnanswered(pageIndex: number, questionIds: string[]) {
+    this.#unconfirmed.set(pageIndex, new Set(questionIds));
+    if (this.#expect(pageIndex, questionIds, true)) this.#changed();
+  }
+
+  pageMounted(pageIndex: number) {
+    const stale = this.#unconfirmed.get(pageIndex);
+    if (!stale) return;
+    this.#unconfirmed.delete(pageIndex);
+    const listed = this.#listedQuestions.get(pageIndex);
+    const unlisted = [...stale].filter((id) => !listed?.has(id));
+    if (this.#expect(pageIndex, unlisted, false)) this.#changed();
+  }
+
+  /** Unanswered graded questions the manifest doesn't list, which a save carries until they register again. */
+  unlistedUnanswered(pageIndex: number): string[] {
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    const listed = this.#listedQuestions.get(pageIndex);
+    return [...(this.#expected.get(pageIndex) ?? [])].filter(
+      (id) => !questions?.get(id)?.graded && !listed?.has(id),
+    );
+  }
+
+  #allAnswered(pageIndex: number): boolean {
+    const questions = this.gradedUnits.get(pageIndex)?.questions;
+    for (const id of this.#expected.get(pageIndex) ?? []) {
+      if (!questions?.get(id)?.graded) return false;
+    }
+    return true;
+  }
+
+  #expect(
+    pageIndex: number,
+    questionIds: string[],
+    expected: boolean,
+  ): boolean {
+    const before = this.#expected.get(pageIndex);
+    const ids = new Set(before);
+    for (const id of questionIds) {
+      if (expected) ids.add(id);
+      else ids.delete(id);
+    }
+    if (ids.size === (before?.size ?? 0)) return false;
+    this.#expected.set(pageIndex, ids);
+    return true;
+  }
+
+  #answeredScore(pageIndex: number): number | undefined {
+    if (this.#allAnswered(pageIndex)) return this.pageScore(pageIndex);
+    return this.#quizGradedIndices.has(pageIndex)
+      ? this.quizScore(pageIndex)
+      : undefined;
   }
 
   pageScore(pageIndex: number): number | undefined {
@@ -245,9 +324,10 @@ export class ProgressState {
     let attempted = false;
     let allScored = true;
     for (const pageIndex of this.#declaredGradedIndices) {
-      const score = this.pageScore(pageIndex);
+      const score = this.#answeredScore(pageIndex);
       if (score !== undefined) attempted = true;
-      else allScored = false;
+      else if (this.#requiredGradedIndices.has(pageIndex)) allScored = false;
+      else continue;
       entries.push({
         score: score ?? 0,
         weight: this.#pageWeights.get(pageIndex) ?? 1,
@@ -277,14 +357,55 @@ export class ProgressState {
     );
   }
 
-  restoreGradedScoreDecided(): void {
-    this.#gradedScoreDecided = true;
+  #completionReached = $state(false);
+  #passScore = $state<number | null>(null);
+
+  get passScore(): number | null {
+    return this.#passScore;
+  }
+
+  #replaying = false;
+
+  /**
+   * Apply saved progress without latching partway, then restore the saved
+   * latches. A saved pass the course can no longer give is dropped.
+   */
+  replay(
+    apply: () => void,
+    latches: {
+      decided: boolean;
+      completed: boolean;
+      passScore: number | null;
+    },
+  ): void {
+    this.#replaying = true;
+    try {
+      apply();
+    } finally {
+      this.#replaying = false;
+    }
+    this.#gradedScoreDecided = latches.decided;
+    this.#completionReached = latches.completed;
+    const canPass =
+      this.#success.from === 'quiz' ||
+      (this.#success.from === 'fixed' && this.#success.status === 'passed');
+    this.#passScore = canPass ? latches.passScore : null;
+    this.#latch();
   }
 
   #changed() {
     this.version++;
-    if (!this.#gradedScoreDecided && untrack(() => this.gradedScoreFinal))
-      this.#gradedScoreDecided = true;
+    if (!this.#replaying) this.#latch();
+  }
+
+  #latch() {
+    untrack(() => {
+      this.#gradedScoreDecided ||= this.gradedScoreFinal;
+      this.#completionReached ||= this.completionStatus === 'complete';
+      const { average } = this.#graded;
+      if (this.#passScore !== null || this.#verdict === 'passed')
+        this.#passScore = Math.max(this.#passScore ?? average, average);
+    });
   }
 
   completionStatus = $derived.by<CompletionStatus>(() => {
@@ -301,12 +422,15 @@ export class ProgressState {
           : 0;
       return percent >= threshold ? 'complete' : 'incomplete';
     }
-    const { count, average } = this.#graded;
-    if (count === 0) return 'incomplete';
-    return average >= this.#config.scoring.passingScore
+    if (this.#requiredGradedIndices.size === 0) return 'incomplete';
+    return this.#graded.average >= this.#config.scoring.passingScore
       ? 'complete'
       : 'incomplete';
   });
+
+  reportedCompletionStatus = $derived<CompletionStatus>(
+    this.#completionReached ? 'complete' : this.completionStatus,
+  );
 
   completedPages = $derived.by<number>(() => {
     let count = 0;
@@ -325,24 +449,35 @@ export class ProgressState {
       return true;
     return (
       this.#declaredGradedIndices.has(pageIndex) &&
-      this.pageScore(pageIndex) === undefined
+      this.#answeredScore(pageIndex) === undefined
     );
   }
 
-  successStatus = $derived.by<SuccessStatus>(() => {
+  #verdict = $derived.by<SuccessStatus>(() => {
     const success = this.#success;
     if (success.from === 'none') return 'unknown';
     if (success.from === 'fixed')
-      return this.completionStatus === 'complete' ? success.status : 'unknown';
-    const { average, attempted } = this.#graded;
-    if (!this.gradedScoreFinal || !attempted) return 'unknown';
-    return average >= this.#config.scoring.passingScore ? 'passed' : 'failed';
+      return this.reportedCompletionStatus === 'complete'
+        ? success.status
+        : 'unknown';
+    if (!this.gradedScoreFinal) return 'unknown';
+    if (this.#graded.average < this.#config.scoring.passingScore)
+      return 'failed';
+    return this.reportedCompletionStatus === 'complete' ? 'passed' : 'unknown';
   });
 
+  successStatus = $derived<SuccessStatus>(
+    this.#passScore !== null ? 'passed' : this.#verdict,
+  );
+
+  get reportedScore(): number {
+    return this.#passScore ?? this.#graded.average;
+  }
+
   /**
-   * Effective graded score for LMS reporting. Same union and averaging as
-   * successStatus, so a reported score and a reported verdict agree on the
-   * pages they cover.
+   * Live course average that successStatus judges: every required graded page,
+   * plus the optional ones answered. The LMS gets reportedScore, which keeps
+   * the best score from a pass on.
    */
   get gradedScore(): { average: number; attempted: boolean } {
     const { average, attempted } = this.#graded;

@@ -100,9 +100,12 @@ function declaresPassMark(config: ExportConfig): boolean {
   );
 }
 
-function sendsVerdict(config: ExportConfig, hasGradedPages: boolean): boolean {
+function guaranteesVerdict(
+  config: ExportConfig,
+  hasRequiredGradedPage: boolean,
+): boolean {
   const { from } = resolveSuccess(config);
-  return from === 'fixed' || (from === 'quiz' && hasGradedPages);
+  return from === 'fixed' || (from === 'quiz' && hasRequiredGradedPage);
 }
 
 function formatSize(bytes: number): string {
@@ -169,7 +172,7 @@ ${fileElements}
 
 export function generateCMI5Xml(
   config: ExportConfig,
-  hasGradedPages: boolean,
+  hasRequiredGradedPage: boolean,
 ): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
@@ -185,10 +188,11 @@ export function generateCMI5Xml(
     ? ` masteryScore="${Number((config.scoring.passingScore / 100).toFixed(4))}"`
     : '';
   // cmi5 §13.1.4: `moveOn` decides which verb(s) the LMS treats as satisfying
-  // the AU. Wherever the course sends a verdict, that verdict can be Failed and
-  // a failed learner should not receive credit. A course that sends none has to
-  // satisfy on Completed alone, or nothing ever satisfies the AU.
-  const moveOn = sendsVerdict(config, hasGradedPages)
+  // the AU. Wherever the course is sure to send a verdict, that verdict can be
+  // Failed and a failed learner should not receive credit. A course that may
+  // send none has to satisfy on Completed alone, or nothing may ever satisfy
+  // the AU.
+  const moveOn = guaranteesVerdict(config, hasRequiredGradedPage)
     ? 'CompletedAndPassed'
     : 'Completed';
 
@@ -265,7 +269,7 @@ function cleanOldZips(projectRoot: string, slug: string): void {
 type ManifestGenerator = (
   config: ExportConfig,
   outDir: string,
-  hasGradedPages: boolean,
+  hasRequiredGradedPage: boolean,
 ) => string;
 
 const scormManifest =
@@ -331,8 +335,8 @@ export const LMS_BUILD: Record<
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
-    generate: (config, _outDir, hasGradedPages) =>
-      generateCMI5Xml(config, hasGradedPages),
+    generate: (config, _outDir, hasRequiredGradedPage) =>
+      generateCMI5Xml(config, hasRequiredGradedPage),
     adapter: 'CMI5Adapter',
     detect: 'hasCMI5LaunchParams',
     takesApi: false,
@@ -354,7 +358,7 @@ export async function runExport(
   projectRoot: string,
   outDir: string,
   config: ExportConfig,
-  hasGradedPages: boolean,
+  hasRequiredGradedPage: boolean,
 ): Promise<void> {
   const standard = config.export.standard;
   const slug = slugify(config.title) || 'tessera-course';
@@ -378,7 +382,7 @@ export async function runExport(
 
   writeFileSync(
     resolve(outDir, spec.manifestFile),
-    spec.generate(config, outDir, hasGradedPages),
+    spec.generate(config, outDir, hasRequiredGradedPage),
     'utf-8',
   );
   cleanOldZips(projectRoot, slug);

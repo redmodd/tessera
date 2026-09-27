@@ -122,6 +122,10 @@ describe('shouldRestore', () => {
         { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
       ],
       ['a quiz score is null', { g: { '0': { s: null } } }],
+      [
+        'the unanswered questions are not a list of ids',
+        { g: { '0': { w: ['q1', 2] } } },
+      ],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);

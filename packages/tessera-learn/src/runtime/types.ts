@@ -72,6 +72,14 @@ export function isGradedPage(page: {
   return !!(page.quiz?.graded || page.graded);
 }
 
+export function isRequiredGradedPage(page: {
+  quiz?: QuizConfig | null;
+  graded?: boolean;
+  required?: boolean;
+}): boolean {
+  return isGradedPage(page) && page.required !== false;
+}
+
 export interface CourseConfig {
   title: string;
   /** Stable, unique course identity (e.g. 'urn:uuid:…'). Seeds the web
