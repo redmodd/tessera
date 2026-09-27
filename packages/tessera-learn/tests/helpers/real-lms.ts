@@ -1,7 +1,6 @@
 // LMS doubles backed by scorm-again that validate writes against the spec.
 import { onTestFinished } from 'vitest';
-import { Scorm12API } from 'scorm-again/scorm12';
-import { Scorm2004API } from 'scorm-again/scorm2004';
+import { Scorm12API, Scorm2004API } from 'scorm-again';
 import type { SCORM12API } from '../../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../../src/runtime/adapters/scorm2004.js';
 import {

@@ -949,7 +949,7 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     writeGradedPage(testRoot, 'a', 'required: false, weight: 25');
     writeGradedPage(testRoot, 'b', 'required: false, weight: 75');
     const { infos, warnings } = validateProject(testRoot);
-    const weighting = infos.filter((i) => i.includes('score weighting'));
+    const weighting = infos!.filter((i) => i.includes('score weighting'));
     expect(weighting).toHaveLength(1);
     expect(weighting[0]).toContain('no graded page is required');
     expect(weighting[0]).not.toContain('%');

@@ -108,7 +108,7 @@ describe('CMI5Adapter', () => {
 
   it('does not fetch resume state during init', async () => {
     const adapter = await initAdapter({
-      saved: { b: 3, v: [0, 1, 2, 3], q: {}, d: 100 },
+      saved: { b: 3, v: [0, 1, 2, 3], d: 100 },
     });
     expect(requests(mockFetch, 'stateId=tessera-state', 'GET')).toHaveLength(0);
     expect(adapter.getState()).toBeNull();
@@ -117,13 +117,12 @@ describe('CMI5Adapter', () => {
     expect(adapter.getState()).toEqual({
       b: 3,
       v: [0, 1, 2, 3],
-      q: {},
       d: 100,
     });
   });
 
   it('retries a transient resume GET failure and restores on success', async () => {
-    const saved: SavedState = { b: 2, v: [0, 1, 2], q: {}, d: 5 };
+    const saved: SavedState = { b: 2, v: [0, 1, 2], d: 5 };
     const adapter = await initAdapter();
 
     const resumeGet = vi
@@ -138,7 +137,7 @@ describe('CMI5Adapter', () => {
     expect(adapter.getState()).toEqual(saved);
 
     mockFetch.mockClear();
-    adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 9 });
+    adapter.saveState({ b: 3, v: [0, 1, 2, 3], d: 9 });
     await flush();
     expect(stateWrites()).toHaveLength(1);
   });
@@ -163,7 +162,7 @@ describe('CMI5Adapter', () => {
     expect(adapter.getState()).toBeNull();
 
     mockFetch.mockClear();
-    adapter.saveState({ b: 1, v: [0, 1], q: {}, d: 4 });
+    adapter.saveState({ b: 1, v: [0, 1], d: 4 });
     await flush();
     expect(stateWrites()).toHaveLength(1);
   });
@@ -179,7 +178,7 @@ describe('CMI5Adapter', () => {
     expect(resumeGet).toHaveBeenCalledTimes(RETRY_ATTEMPTS);
 
     mockFetch.mockClear();
-    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    adapter.saveState({ b: 0, v: [0], d: 1 });
     await flush();
     expect(stateWrites()).toHaveLength(0);
   });
@@ -190,7 +189,7 @@ describe('CMI5Adapter', () => {
     expect(adapter.getState()).toBeNull();
 
     mockFetch.mockClear();
-    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    adapter.saveState({ b: 0, v: [0], d: 1 });
     await flush();
     expect(stateWrites()).toHaveLength(1);
   });
@@ -207,13 +206,18 @@ describe('CMI5Adapter', () => {
     expect(adapter.getState()).toBeNull();
 
     mockFetch.mockClear();
-    adapter.saveState({ b: 0, v: [0], q: {}, d: 1 });
+    adapter.saveState({ b: 0, v: [0], d: 1 });
     await flush();
     expect(stateWrites()).toHaveLength(1);
   });
 
   it('restores state from xAPI State API', async () => {
-    const saved: SavedState = { b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 };
+    const saved: SavedState = {
+      b: 3,
+      v: [0, 1, 2, 3],
+      g: { '2': { s: 80 } },
+      d: 100,
+    };
     const adapter = await initAdapter({ saved });
     await adapter.loadState();
     expect(adapter.getState()).toEqual(saved);
@@ -230,7 +234,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
 
-    const state: SavedState = { b: 5, v: [0, 1, 2], q: {}, d: 200 };
+    const state: SavedState = { b: 5, v: [0, 1, 2], d: 200 };
     adapter.saveState(state);
 
     // Allow fire-and-forget PUT to settle

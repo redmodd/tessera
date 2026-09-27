@@ -176,8 +176,8 @@ describe('create-tessera workspace scaffold', () => {
 
     const out = join(testDir, 'out');
     mkdirSync(out, { recursive: true });
-    const env = { ...process.env, npm_config_yes: 'true' };
-    delete env.NODE_PATH;
+    const { NODE_PATH: _, ...parentEnv } = process.env;
+    const env = { ...parentEnv, npm_config_yes: 'true' };
     let exitCode = 0;
     let output: string;
     try {

@@ -33,7 +33,7 @@ describe('SCORM12Adapter', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      q: { '2': 80 },
+      g: { '2': { s: 80 } },
       d: 100,
     };
     api.LMSGetValue.mockImplementation((key) =>
@@ -66,7 +66,6 @@ describe('SCORM12Adapter', () => {
     const state: SavedState = {
       b: 5,
       v: [0, 1, 2, 3, 4, 5],
-      q: {},
       d: 200,
     };
     adapter.saveState(state);
@@ -79,7 +78,7 @@ describe('SCORM12Adapter', () => {
 
   it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
     await adapter.init();
-    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
+    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], d: 50 });
     await flush();
     expect(api.LMSSetValue).toHaveBeenCalledWith(
       'cmi.core.lesson_location',
@@ -92,7 +91,7 @@ describe('SCORM12Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       const big = { padding: 'x'.repeat(4200) };
-      const state: SavedState = { b: 0, v: [], q: {}, d: 0, u: { big } };
+      const state: SavedState = { b: 0, v: [], d: 0, u: { big } };
       adapter.saveState(state);
       adapter.saveState(state);
       await flush();
@@ -105,7 +104,7 @@ describe('SCORM12Adapter', () => {
     it('does not warn for state under the limit', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
-      adapter.saveState({ b: 0, v: [0], q: {}, d: 0 });
+      adapter.saveState({ b: 0, v: [0], d: 0 });
       await flush();
       expect(warn).not.toHaveBeenCalled();
     });
@@ -116,7 +115,6 @@ describe('SCORM12Adapter', () => {
       const state: SavedState = {
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'y'.repeat(4200) },
       };
@@ -301,7 +299,7 @@ describe('SCORM12Adapter', () => {
       return 'true';
     });
 
-    adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
+    adapter.saveState({ b: 0, v: [], d: 0 });
     adapter.setScore(85);
 
     await flush();

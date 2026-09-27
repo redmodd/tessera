@@ -44,6 +44,7 @@ const scormXml = (
   LMS_BUILD[standard].generate(
     mergeCourseConfig(config),
     createDistDir(testRoot),
+    false,
   );
 
 // ---- SCORM 1.2 Manifest ----

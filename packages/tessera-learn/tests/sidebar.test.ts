@@ -6,7 +6,7 @@ import { mountInBody } from './helpers/mount.js';
 
 function mountSidebar({
   slugs = ['welcome'],
-  isPageLocked = (_i: number) => false,
+  isPageLocked = (_i: number): boolean => false,
   config = { title: 'Demo' } as object,
 } = {}) {
   const pages = slugs.map((slug, index) => ({

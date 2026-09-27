@@ -24,7 +24,7 @@ describe('SCORM2004Adapter', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      q: { '2': 80 },
+      g: { '2': { s: 80 } },
       d: 100,
     };
     api.GetValue.mockImplementation((key) =>
@@ -55,7 +55,6 @@ describe('SCORM2004Adapter', () => {
     const state: SavedState = {
       b: 5,
       v: [0, 1, 2, 3, 4, 5],
-      q: {},
       d: 200,
     };
     adapter.saveState(state);
@@ -73,7 +72,6 @@ describe('SCORM2004Adapter', () => {
       const state: SavedState = {
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'x'.repeat(64100) },
       };
@@ -92,7 +90,6 @@ describe('SCORM2004Adapter', () => {
       adapter.saveState({
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'y'.repeat(5000) },
       });
@@ -191,7 +188,7 @@ describe('SCORM2004Adapter', () => {
       return 'true';
     });
 
-    adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
+    adapter.saveState({ b: 0, v: [], d: 0 });
     adapter.setScore(85);
 
     await flush();
@@ -203,7 +200,7 @@ describe('SCORM2004Adapter', () => {
 
   it('writes cmi.location from SavedState.b on saveState', async () => {
     await adapter.init();
-    adapter.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], q: {}, d: 100 });
+    adapter.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], d: 100 });
     await flush();
     expect(api.SetValue).toHaveBeenCalledWith('cmi.location', '7');
   });
@@ -250,7 +247,7 @@ describe('SCORM2004Adapter', () => {
       adapter.setSuccessStatus('passed');
       adapter.setDuration(100);
       adapter.setExit('normal');
-      adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
+      adapter.saveState({ b: 3, v: [0, 1, 2, 3], d: 100 });
       adapter.reportInteraction(
         'q1',
         { type: 'true-false', response: true },
@@ -265,7 +262,7 @@ describe('SCORM2004Adapter', () => {
       await adapter.init();
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
-      adapter.saveState({ b: 3, v: [], q: {}, d: 0 });
+      adapter.saveState({ b: 3, v: [], d: 0 });
       await flush();
       settersDidNotFire();
     });

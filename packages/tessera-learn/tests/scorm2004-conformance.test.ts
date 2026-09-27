@@ -21,7 +21,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
   it('a full happy-path session produces no rejected writes', async () => {
     await start();
-    adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 });
+    adapter.saveState({ b: 3, v: [0, 1, 2, 3], g: { '2': { s: 80 } }, d: 100 });
     adapter.setScore(85);
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
@@ -70,7 +70,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
   it('persists suspend_data + location the runtime reads back', async () => {
     await start();
-    const state: SavedState = { b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 };
+    const state: SavedState = { b: 4, v: [0, 1, 2, 3, 4], d: 50 };
     adapter.saveState(state);
     await flush();
     expect(lms.errors).toEqual([]);
@@ -144,7 +144,12 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
   it('a resumed session reads prior suspend_data and continues interaction indexing', async () => {
     await start();
-    const state: SavedState = { b: 2, v: [0, 1, 2], q: { '1': 90 }, d: 120 };
+    const state: SavedState = {
+      b: 2,
+      v: [0, 1, 2],
+      g: { '1': { s: 90 } },
+      d: 120,
+    };
     adapter.saveState(state);
     adapter.reportInteraction(
       'q1',

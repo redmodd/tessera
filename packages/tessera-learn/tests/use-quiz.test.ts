@@ -472,7 +472,7 @@ describe('QuizEngine', () => {
     const bResp = false;
     engine.registerQuestion({
       id: 'a',
-      checkAnswer: () => aResp === true,
+      checkAnswer: () => aResp,
       interaction: () => ({
         type: 'true-false',
         response: aResp,
@@ -481,7 +481,7 @@ describe('QuizEngine', () => {
     });
     engine.registerQuestion({
       id: 'b',
-      checkAnswer: () => bResp === true,
+      checkAnswer: () => bResp,
       interaction: () => ({
         type: 'true-false',
         response: bResp,

@@ -275,7 +275,7 @@ function fakeSpawn(behavior: 'exit0' | 'exit1' | 'error') {
   const fn = (command: string, args: string[]) => {
     calls.push({ command, args });
     return {
-      on(event: string, listener: (arg?: number | null | Error) => void) {
+      on(event: string, listener: (arg: any) => void) {
         if (event === 'exit' && behavior !== 'error') {
           listener(behavior === 'exit0' ? 0 : 1);
         }

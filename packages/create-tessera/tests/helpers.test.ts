@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseArgs } from '../src/index.ts';
+import { parseArgs } from '../src/index.js';
 
 // validateProjectName / toTitleCase now live in tessera-learn (tessera-learn's
 // project-name.test.ts owns their unit coverage); create-tessera imports them.

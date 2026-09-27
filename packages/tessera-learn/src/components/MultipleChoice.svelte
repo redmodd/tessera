@@ -5,6 +5,20 @@
   import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
+  /**
+   * @type {{
+   *   id?: string;
+   *   question: string;
+   *   options: string[];
+   *   correct: number;
+   *   optionFeedback?: string[];
+   *   correctFeedback?: string;
+   *   incorrectFeedback?: string;
+   *   graded?: boolean;
+   *   maxRetries?: number;
+   *   weight?: number;
+   * }}
+   */
   let {
     id,
     question,
