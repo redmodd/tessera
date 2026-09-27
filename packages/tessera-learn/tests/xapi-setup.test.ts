@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildXAPIClient } from '../src/runtime/xapi/setup.js';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
@@ -9,10 +9,6 @@ import type { CourseConfig } from '../src/runtime/types.js';
 import { scorm12Api } from './helpers.js';
 
 const mockFetch = vi.fn();
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 const baseLaunchParams = {
   fetch: 'https://lms.example.com/fetch-token',

@@ -61,7 +61,6 @@ describe('createAdapter', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('SCORM 1.2 API not found'),
     );
-    warnSpy.mockRestore();
   });
 
   it('returns SCORM2004Adapter when API_1484_11 is found', () => {
@@ -77,7 +76,6 @@ describe('createAdapter', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('SCORM 2004 API not found'),
     );
-    warnSpy.mockRestore();
   });
 
   it('falls back to WebAdapter for cmi5 when launch params not found (dev)', () => {
@@ -92,7 +90,6 @@ describe('createAdapter', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('cmi5 launch parameters not found'),
     );
-    warnSpy.mockRestore();
   });
 
   it('returns CMI5Adapter when launch params are present', () => {

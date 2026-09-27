@@ -612,7 +612,6 @@ describe('manual completion — useCompletion hook', () => {
     expect(progress.completionStatus).toBe('incomplete');
     // dev mode is true under vitest (import.meta.env.DEV)
     expect(warn).toHaveBeenCalledTimes(1);
-    warn.mockRestore();
   });
 
   it('throws when called outside a Tessera course', () => {

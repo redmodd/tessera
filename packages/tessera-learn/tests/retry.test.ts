@@ -60,14 +60,12 @@ describe('withRetry', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('LMS call failed after retries'),
     );
-    warnSpy.mockRestore();
   });
 
   it('logs warning on exhausted retries', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await withRetry(() => false, 1);
     expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });
 
@@ -118,7 +116,7 @@ describe('WriteQueue', () => {
   });
 
   it('stops on failure and retries on next trigger', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
     let failFirst = true;
 
@@ -162,8 +160,6 @@ describe('WriteQueue', () => {
     expect(calls).toContain('c');
     expect(calls).toContain('d');
     expect(queue.pending).toBe(0);
-
-    warnSpy.mockRestore();
   });
 
   it('drainSync executes all pending operations synchronously', () => {

@@ -122,12 +122,11 @@ describe('App restore gate honours config.resume', () => {
   });
 
   it('leaves a malformed saved record untouched', async () => {
-    const warns = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, seedLifecycle, setCompletionStatus, unmount } =
       await mountApp('auto', { saved: savedWith({ g: [] }) });
     cleanup = () => {
       unmount(component);
-      warns.mockRestore();
     };
     await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
     expect(seedLifecycle).not.toHaveBeenCalled();

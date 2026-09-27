@@ -671,7 +671,6 @@ describe('QuizEngine', () => {
       );
       expect(matched).toBe(true);
     } finally {
-      warn.mockRestore();
     }
   });
 
@@ -695,12 +694,11 @@ describe('QuizEngine', () => {
       );
       expect(matched).toBe(true);
     } finally {
-      warn.mockRestore();
     }
   });
 
   it('reports a rewritten duplicate id under its unique id', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const { engine, reports } = makeEngine();
       engine.registerQuestion(tfQuestion('dup', true, true));
@@ -710,7 +708,6 @@ describe('QuizEngine', () => {
       engine.submit();
       expect(reports.map((r) => r.id)).toEqual(['dup', 'dup-2']);
     } finally {
-      warn.mockRestore();
     }
   });
 
@@ -726,7 +723,6 @@ describe('QuizEngine', () => {
       );
       expect(matched).toBe(false);
     } finally {
-      warn.mockRestore();
     }
   });
 
@@ -908,7 +904,6 @@ describe('useQuiz (Svelte wrapper)', () => {
       );
       expect(matched).toBe(true);
     } finally {
-      warn.mockRestore();
     }
   });
 
@@ -948,7 +943,6 @@ describe('useQuiz (Svelte wrapper)', () => {
       });
       expect(warn.mock.calls.length).toBe(0);
     } finally {
-      warn.mockRestore();
     }
   });
 
@@ -973,7 +967,6 @@ describe('useQuiz (Svelte wrapper)', () => {
       __warnEmptyQuiz(1);
       expect(warn.mock.calls.length).toBe(0);
     } finally {
-      warn.mockRestore();
     }
   });
 });

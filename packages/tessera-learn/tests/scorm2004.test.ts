@@ -47,7 +47,6 @@ describe('SCORM2004Adapter', () => {
     expect(
       warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
     ).toBe(true);
-    warn.mockRestore();
   });
 
   it('saves state to suspend_data via queue', async () => {
@@ -84,7 +83,6 @@ describe('SCORM2004Adapter', () => {
       expect(warn.mock.calls[0][0]).toMatch(
         /SCORM 2004 cmi\.suspend_data 64000/,
       );
-      warn.mockRestore();
     });
 
     it('does not warn at the SCORM 1.2 threshold (would warn under 1.2)', async () => {
@@ -99,7 +97,6 @@ describe('SCORM2004Adapter', () => {
       });
       await flush();
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
   });
 
@@ -294,7 +291,6 @@ describe('SCORM2004Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       expect(await masteryFrom('-0.5')).toBe(0);
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('ignores and warns on an out-of-range threshold', async () => {
@@ -303,7 +299,6 @@ describe('SCORM2004Adapter', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('cmi.scaled_passing_score'),
       );
-      warn.mockRestore();
     });
   });
 
@@ -441,7 +436,6 @@ describe('SCORM2004Adapter', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('declares 12 correct answers'),
       );
-      warn.mockRestore();
     });
 
     it('writes matching interaction', async () => {

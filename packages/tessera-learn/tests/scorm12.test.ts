@@ -50,7 +50,6 @@ describe('SCORM12Adapter', () => {
     expect(
       warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
     ).toBe(true);
-    warn.mockRestore();
   });
 
   // ---- saveState / suspend_data ----
@@ -94,7 +93,6 @@ describe('SCORM12Adapter', () => {
       expect(warn.mock.calls[0][0]).toMatch(
         /SCORM 1\.2 cmi\.suspend_data 4096/,
       );
-      warn.mockRestore();
     });
 
     it('does not warn for state under the limit', async () => {
@@ -103,7 +101,6 @@ describe('SCORM12Adapter', () => {
       adapter.saveState({ b: 0, v: [0], q: {}, d: 0 });
       await flush();
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('still writes the oversize value to the LMS', async () => {
@@ -145,7 +142,6 @@ describe('SCORM12Adapter', () => {
       expect(warn).not.toHaveBeenCalledWith(
         expect.stringContaining('cmi.student_data.mastery_score'),
       );
-      warn.mockRestore();
     });
 
     it.each(['abc', '-1', '101'])(
@@ -156,7 +152,6 @@ describe('SCORM12Adapter', () => {
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining('cmi.student_data.mastery_score'),
         );
-        warn.mockRestore();
       },
     );
 
@@ -582,7 +577,6 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/General Exception/);
       expect(messages).toMatch(/LMS unavailable/);
       expect(messages).toMatch(/error 301/);
-      warn.mockRestore();
     });
 
     it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
@@ -594,7 +588,6 @@ describe('SCORM12Adapter', () => {
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/cmi\.interactions\._count/);
       expect(messages).toMatch(/overwrite prior session records/);
-      warn.mockRestore();
     });
 
     it('warns when LMSCommit fails during terminate', async () => {
@@ -607,7 +600,6 @@ describe('SCORM12Adapter', () => {
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/Commit.*during terminate/);
       expect(messages).toMatch(/101/);
-      warn.mockRestore();
     });
 
     it('warns when LMSFinish fails during terminate', async () => {
@@ -619,7 +611,6 @@ describe('SCORM12Adapter', () => {
       adapter.terminate();
       const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
       expect(messages).toMatch(/Terminate.*during terminate/);
-      warn.mockRestore();
     });
 
     it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
@@ -638,7 +629,6 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/405/);
       expect(messages).toMatch(/Incorrect Data Type/);
       expect(messages).toMatch(/student_response invalid CMIFeedback/);
-      warn.mockRestore();
     });
   });
 

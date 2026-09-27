@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
@@ -55,10 +55,6 @@ const baseLaunchParams = {
 };
 
 describe('hasCMI5LaunchParams', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('returns true when all params present', () => {
     setSearchParams(baseLaunchParams);
     expect(hasCMI5LaunchParams()).toBe(true);
@@ -101,10 +97,6 @@ describe('CMI5Adapter', () => {
     mockFetch.mockReset();
     vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
     setSearchParams(baseLaunchParams);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   function setupInitMocks(
@@ -319,9 +311,8 @@ describe('CMI5Adapter', () => {
       }
       return { ok: true, text: async () => '', json: async () => ({}) };
     });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.loadState();
-    warn.mockRestore();
 
     // Re-reading identical bytes can't change the answer, so one attempt only.
     expect(resumeGets).toBe(1);
@@ -879,7 +870,6 @@ describe('CMI5Adapter', () => {
           String(c[0]).includes('masteryScore'),
         ),
       ).toBe(true);
-      warn.mockRestore();
     });
 
     it('does NOT attach masteryscore extension to Completed (§9.6.3.2 scopes it to Passed/Failed)', async () => {
@@ -1305,7 +1295,6 @@ describe('CMI5Adapter', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('LaunchData masteryScore'),
       );
-      warn.mockRestore();
     });
 
     it('does NOT emit Completed under launchMode=Browse (§10.2.2)', async () => {
@@ -1433,7 +1422,7 @@ describe('CMI5Adapter', () => {
     });
 
     it('omits scaled score on Passed when below masteryScore (§9.3.4)', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       setupInitMocks(undefined, { masteryScore: 0.8 });
       adapter = new CMI5Adapter();
       await adapter.init();
@@ -1448,7 +1437,6 @@ describe('CMI5Adapter', () => {
       // The Passed verb is still emitted (author asserted it) but
       // without a score that would make the statement non-conformant.
       expect(passed.result.score).toBeUndefined();
-      warn.mockRestore();
     });
 
     it('keeps scaled score on Passed when at or above masteryScore', async () => {
@@ -1483,7 +1471,7 @@ describe('CMI5Adapter', () => {
     it('omits scaled score on Failed when at or above masteryScore (§9.3.5)', async () => {
       // Symmetric to the Passed/§9.3.4 invariant: a Failed statement
       // carrying a score MUST have scaled < masteryScore.
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       setupInitMocks(undefined, { masteryScore: 0.7 });
       adapter = new CMI5Adapter();
       await adapter.init();
@@ -1497,7 +1485,6 @@ describe('CMI5Adapter', () => {
       const failed = statementFor('failed');
       expect(failed).toBeDefined();
       expect(failed.result.score).toBeUndefined();
-      warn.mockRestore();
     });
 
     it('keeps the score on Failed when the AU declares no masteryScore', async () => {

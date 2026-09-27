@@ -4,7 +4,6 @@ import {
   expect,
   vi,
   beforeEach,
-  afterEach,
   type MockInstance,
 } from 'vitest';
 import {
@@ -111,7 +110,6 @@ describe('parseMastery', () => {
   beforeEach(() => {
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
-  afterEach(() => warn.mockRestore());
 
   it('accepts in-range numbers and numeric strings', () => {
     expect(parseMastery(0, 'm')).toBe(0);

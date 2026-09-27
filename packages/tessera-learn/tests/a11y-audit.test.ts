@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   axeTags,
   axeIgnoreRules,
@@ -137,8 +137,6 @@ describe('isMissingDepsError', () => {
 });
 
 describe('launchWithInstall', () => {
-  afterEach(() => vi.restoreAllMocks());
-
   it('returns the browser on first try without installing (common path)', async () => {
     const install = vi.fn(async () => true);
     const browser = { id: 'b' };
@@ -292,8 +290,6 @@ function fakeSpawn(behavior: 'exit0' | 'exit1' | 'error') {
 }
 
 describe('installChromium', () => {
-  afterEach(() => vi.restoreAllMocks());
-
   it('runs the resolved playwright bin with the current Node binary', async () => {
     const spawn = fakeSpawn('exit0');
     const ok = await installChromium('/workspace', spawn.fn);

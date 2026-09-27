@@ -94,7 +94,7 @@ describe('App bounds adapter.init()', () => {
   });
 
   it('renders the page when loadState rejects', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { component, unmount } = await mountApp(
       async () => {},
       async () => {
@@ -103,7 +103,6 @@ describe('App bounds adapter.init()', () => {
     );
     cleanup = () => {
       unmount(component);
-      warn.mockRestore();
     };
 
     await vi.waitFor(() =>
@@ -113,7 +112,7 @@ describe('App bounds adapter.init()', () => {
   });
 
   it('renders the page when the saved state is malformed', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const { component, unmount } = await mountApp(
       async () => {},
       undefined,
@@ -121,7 +120,6 @@ describe('App bounds adapter.init()', () => {
     );
     cleanup = () => {
       unmount(component);
-      error.mockRestore();
     };
 
     await vi.waitFor(() =>

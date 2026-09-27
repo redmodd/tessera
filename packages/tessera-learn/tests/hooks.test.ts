@@ -118,7 +118,6 @@ describe('useQuestion — standalone mode', () => {
       expect(warn.mock.calls[0][0]).toContain('does not declare');
       expect(progress.pageScore(0)).toBe(100);
     } finally {
-      warn.mockRestore();
       vi.unstubAllEnvs();
     }
   });
@@ -714,7 +713,6 @@ describe('useQuestion — inside a <Quiz>', () => {
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
     } finally {
-      warn.mockRestore();
     }
   });
 
