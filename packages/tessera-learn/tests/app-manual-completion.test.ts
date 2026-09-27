@@ -2,11 +2,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import type { CourseConfig } from '../src/runtime/types.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
-import { createManifest, mountApp, stubAdapter } from './helpers.js';
+import {
+  createConfig,
+  createManifest,
+  mountApp,
+  navCtx,
+  stubAdapter,
+} from './helpers.js';
 
 async function mount(
-  completion: object,
+  completion: CourseConfig['completion'],
   {
     manifest = createManifest(2),
     saved = null,
@@ -21,21 +28,8 @@ async function mount(
   const setSuccessStatus = vi.fn();
   const saveState = vi.fn();
   await mountApp({
-    config: {
-      title: 'Demo',
-      resume: 'auto',
-      branding: {},
-      navigation: { mode: 'free' },
-      completion,
-      export: { standard: 'web' },
-    },
+    config: createConfig({ resume: 'auto', completion }),
     manifest,
-    pageModules: Object.fromEntries(
-      manifest.pages.map((p) => [
-        p.importPath,
-        () => import('./fixtures/app-page.svelte'),
-      ]),
-    ),
     adapter: stubAdapter({
       getState: () => saved,
       setCompletionStatus,
@@ -47,8 +41,7 @@ async function mount(
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain('Test page'),
   );
-  const { nav, progress } = (globalThis as any).__tesseraNavCtx ?? {};
-  return { nav, progress, setCompletionStatus, setSuccessStatus, saveState };
+  return { setCompletionStatus, setSuccessStatus, saveState };
 }
 
 const completesOnFirstPage = createManifest(
@@ -59,11 +52,11 @@ const completesOnFirstPage = createManifest(
 
 describe('manual completion in App', () => {
   it('completes when a completesOn: "view" page loads mid-session', async () => {
-    const { nav, progress, setCompletionStatus, setSuccessStatus, saveState } =
-      await mount(
-        { mode: 'manual', requireSuccessStatus: 'passed' },
-        { manifest: createManifest(2, {}, { 1: { completesOn: 'view' } }) },
-      );
+    const { setCompletionStatus, setSuccessStatus, saveState } = await mount(
+      { mode: 'manual', requireSuccessStatus: 'passed' },
+      { manifest: createManifest(2, {}, { 1: { completesOn: 'view' } }) },
+    );
+    const { nav, progress } = navCtx();
     await vi.waitFor(() => {
       expect(setCompletionStatus).toHaveBeenCalledWith('incomplete');
       expect(saveState).toHaveBeenCalled();
@@ -83,10 +76,11 @@ describe('manual completion in App', () => {
   });
 
   it('ignores completesOn outside manual mode', async () => {
-    const { progress } = await mount(
+    await mount(
       { mode: 'percentage', percentageThreshold: 100 },
       { manifest: completesOnFirstPage },
     );
+    const { progress } = navCtx();
 
     expect(progress.manuallyCompleted).toBe(false);
     expect(progress.completionStatus).toBe('incomplete');
@@ -94,7 +88,7 @@ describe('manual completion in App', () => {
 
   it('restores a manual completion saved as m: 1', async () => {
     const manifest = createManifest(2);
-    const { progress } = await mount(
+    await mount(
       { mode: 'manual' },
       {
         manifest,
@@ -107,6 +101,7 @@ describe('manual completion in App', () => {
         } as SavedState,
       },
     );
+    const { progress } = navCtx();
 
     expect(progress.manuallyCompleted).toBe(true);
     expect(progress.completionStatus).toBe('complete');

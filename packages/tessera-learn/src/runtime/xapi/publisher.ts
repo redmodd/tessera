@@ -638,13 +638,6 @@ export class XAPIPublisher {
     // Append the LRS body to the error message so callers see the
     // specific reason (e.g. "Forbidden cmi5 defined statement: ...").
     // Cap at 500 chars; on read failure, fall back to bare status.
-    if (typeof resp.text !== 'function') {
-      return {
-        ok: false,
-        status: resp.status,
-        error: new Error(`LRS responded ${resp.status}`),
-      };
-    }
     return resp.text().then(
       (respBody): SendOutcome => ({
         ok: false,

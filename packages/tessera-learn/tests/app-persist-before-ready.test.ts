@@ -1,54 +1,46 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { createManifest, mountApp, stubAdapter } from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
+import {
+  createConfig,
+  createManifest,
+  mountApp,
+  stubAdapter,
+} from './helpers.js';
 
 const manifest = createManifest(1);
 
-const config = {
-  title: 'Demo',
-  resume: 'auto',
-  branding: {},
-  navigation: { mode: 'free' },
-  scoring: { passingScore: 80 },
-  completion: { mode: 'percentage', percentageThreshold: 100 },
-  export: { standard: 'web' },
-};
+const config = createConfig({ resume: 'auto', scoring: { passingScore: 80 } });
 
 // The layout writes through usePersistence() during init and the page never
 // loads, so the flip to persistenceReady is the only thing that can flush it.
 async function mountWithSlowInit(
-  savedState: object | null = null,
+  saved: Partial<SavedState> | null = null,
   {
-    skipLayout = false,
-    layoutFixture = './fixtures/persisting-layout.svelte',
+    loadLayout = () => import('./fixtures/persisting-layout.svelte'),
     courseConfig = config,
+  }: {
+    loadLayout?: (() => Promise<{ default: unknown }>) | null;
+    courseConfig?: typeof config;
   } = {},
 ) {
-  let releaseInit: () => void;
-  const initGate = new Promise<void>((resolve) => {
-    releaseInit = resolve;
-  });
+  const init = Promise.withResolvers<void>();
   const saveState = vi.fn();
   const commit = vi.fn();
   await mountApp({
     config: courseConfig,
     manifest,
-    pageModules: {
-      [manifest.pages[0].importPath]: () => new Promise(() => {}),
-    },
     adapter: stubAdapter({
-      init: () => initGate,
-      getState: () => savedState as SavedState | null,
+      init: () => init.promise,
+      getState: () => saved as SavedState | null,
       saveState,
       commit,
     }),
-    loadLayout: skipLayout
-      ? undefined
-      : () => import(/* @vite-ignore */ layoutFixture),
+    loadPage: () => new Promise(() => {}),
+    loadLayout: loadLayout ?? undefined,
   });
-  return { saveState, commit, releaseInit: releaseInit! };
+  return { saveState, commit, releaseInit: init.resolve };
 }
 
 describe('state changed during adapter init survives', () => {
@@ -61,7 +53,7 @@ describe('state changed during adapter init survives', () => {
 
     await vi.waitFor(() => {
       expect(saveState).toHaveBeenCalled();
-      expect(saveState.mock.calls.at(-1)![0].u).toEqual({
+      expect(saveState.mock.lastCall![0].u).toEqual({
         'layout-note': 'written-before-ready',
       });
     });
@@ -80,7 +72,7 @@ describe('state changed during adapter init survives', () => {
 
     await vi.waitFor(() => {
       expect(saveState).toHaveBeenCalled();
-      expect(saveState.mock.calls.at(-1)![0].u).toEqual({
+      expect(saveState.mock.lastCall![0].u).toEqual({
         'layout-note': 'written-before-ready',
         'other-note': 'from-a-previous-session',
       });
@@ -96,7 +88,7 @@ describe('state changed during adapter init survives', () => {
       u: { 'other-note': 'from-a-previous-session' },
     };
     const { saveState, commit, releaseInit } = await mountWithSlowInit(saved, {
-      skipLayout: true,
+      loadLayout: null,
     });
 
     releaseInit();
@@ -127,7 +119,7 @@ describe('state changed during adapter init survives', () => {
 
   it('persists a completion marked before the adapter is ready', async () => {
     const { saveState, releaseInit } = await mountWithSlowInit(null, {
-      layoutFixture: './fixtures/completing-layout.svelte',
+      loadLayout: () => import('./fixtures/completing-layout.svelte'),
       courseConfig: { ...config, completion: { mode: 'manual' } },
     });
 
@@ -135,7 +127,7 @@ describe('state changed during adapter init survives', () => {
 
     await vi.waitFor(() => {
       expect(saveState).toHaveBeenCalled();
-      expect(saveState.mock.calls.at(-1)![0].m).toBe(1);
+      expect(saveState.mock.lastCall![0].m).toBe(1);
     });
   });
 });

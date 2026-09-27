@@ -1,21 +1,11 @@
-import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
 import { useCompletion } from '../src/runtime/hooks.svelte.js';
-import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
-import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
-import { WebAdapter } from '../src/runtime/adapters/web.js';
-import {
-  createManifest,
-  createConfig,
-  flush,
-  scorm12Api,
-  scorm2004Api,
-} from './helpers.js';
+import { createManifest, createConfig, tempDir } from './helpers.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 
 const ctxStore = new Map<string, unknown>();
@@ -27,10 +17,6 @@ vi.mock('svelte', async () => {
     getContext: (name: string) => ctxStore.get(name),
   };
 });
-
-// ============================================================================
-// 1. Validation
-// ============================================================================
 
 function courseConfig(
   completion: string,
@@ -58,8 +44,7 @@ describe('manual completion — validation', () => {
   let testRoot: string;
 
   beforeEach(() => {
-    testRoot = mkdtempSync(join(tmpdir(), 'tessera-manual-'));
-    onTestFinished(() => rmSync(testRoot, { recursive: true, force: true }));
+    testRoot = tempDir();
   });
 
   function writeFile(relPath: string, content: string): void {
@@ -246,10 +231,6 @@ describe('manual completion — validation', () => {
   );
 });
 
-// ============================================================================
-// 2. Progress state
-// ============================================================================
-
 function manualConfig(
   overrides: Partial<CourseConfig['completion']> = {},
 ): CourseConfig {
@@ -316,14 +297,12 @@ describe('manual completion — ProgressState', () => {
   });
 });
 
-// ============================================================================
-// 3. Hook
-// ============================================================================
-
-function makeNavCtx(progress: ProgressState, config: CourseConfig) {
+function provideNavCtx(config: CourseConfig): ProgressState {
   const manifest = createManifest(3);
+  const progress = new ProgressState(manifest, config);
   const nav = new NavigationState(manifest, progress, config);
-  return { nav, manifest, progress, config };
+  ctxStore.set('tessera-nav', { nav, manifest, progress, config });
+  return progress;
 }
 
 describe('manual completion — useCompletion hook', () => {
@@ -332,9 +311,7 @@ describe('manual completion — useCompletion hook', () => {
   });
 
   it('markComplete flips progress and reflects completionStatus', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const config = manualConfig();
-    ctxStore.set('tessera-nav', makeNavCtx(progress, config));
+    const progress = provideNavCtx(manualConfig());
 
     const handle = useCompletion();
     expect(handle.completionStatus).toBe('incomplete');
@@ -348,10 +325,7 @@ describe('manual completion — useCompletion hook', () => {
     vi.resetModules();
     const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const progress = new ProgressState(createManifest(0), createConfig());
-    // percentage mode (the helper default)
-    const config = createConfig();
-    ctxStore.set('tessera-nav', makeNavCtx(progress, config));
+    const progress = provideNavCtx(createConfig());
 
     const handle = useCompletion();
     handle.markComplete();
@@ -370,96 +344,12 @@ describe('manual completion — useCompletion hook', () => {
   });
 
   it('flips successStatus when requireSuccessStatus is set', () => {
-    const config = manualConfig({ requireSuccessStatus: 'passed' });
-    const progress = new ProgressState(createManifest(0), config);
-    ctxStore.set('tessera-nav', makeNavCtx(progress, config));
+    const progress = provideNavCtx(
+      manualConfig({ requireSuccessStatus: 'passed' }),
+    );
 
     const handle = useCompletion();
     handle.markComplete();
     expect(progress.successStatus).toBe('passed');
-  });
-});
-
-// ============================================================================
-// 4. Adapter integration (the contract — what App.svelte will call on the
-//    adapter when manual completion fires). We exercise the real adapters
-//    directly to verify per-standard behavior.
-// ============================================================================
-
-describe('manual completion — adapter integration', () => {
-  it('SCORM 1.2 writes lesson_status = completed when only completion is set', async () => {
-    const api = scorm12Api();
-    const adapter = new SCORM12Adapter(api);
-    await adapter.init();
-
-    adapter.setCompletionStatus('complete');
-    adapter.setSuccessStatus('unknown');
-    adapter.commit();
-    await flush();
-
-    expect(api.LMSSetValue).toHaveBeenCalledWith(
-      'cmi.core.lesson_status',
-      'completed',
-    );
-  });
-
-  it('SCORM 1.2 writes lesson_status = passed when requireSuccessStatus = "passed"', async () => {
-    const api = scorm12Api();
-    const adapter = new SCORM12Adapter(api);
-    await adapter.init();
-
-    adapter.setCompletionStatus('complete');
-    adapter.setSuccessStatus('passed');
-    adapter.commit();
-    await flush();
-
-    expect(api.LMSSetValue).toHaveBeenCalledWith(
-      'cmi.core.lesson_status',
-      'passed',
-    );
-  });
-
-  it('SCORM 2004 writes completion_status + success_status independently', async () => {
-    const api = scorm2004Api();
-    const adapter = new SCORM2004Adapter(api);
-    await adapter.init();
-
-    adapter.setCompletionStatus('complete');
-    adapter.setSuccessStatus('unknown');
-    adapter.commit();
-    await flush();
-
-    expect(api.SetValue).toHaveBeenCalledWith(
-      'cmi.completion_status',
-      'completed',
-    );
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.success_status', 'unknown');
-  });
-
-  it('SCORM 2004 writes success_status = "passed" when requireSuccessStatus is "passed"', async () => {
-    const api = scorm2004Api();
-    const adapter = new SCORM2004Adapter(api);
-    await adapter.init();
-
-    adapter.setCompletionStatus('complete');
-    adapter.setSuccessStatus('passed');
-    adapter.commit();
-    await flush();
-
-    expect(api.SetValue).toHaveBeenCalledWith(
-      'cmi.completion_status',
-      'completed',
-    );
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.success_status', 'passed');
-  });
-
-  it('web adapter no-ops on setCompletionStatus (state goes into localStorage via saveState)', async () => {
-    // jsdom-free environment — verify the call doesn't throw and is a pure
-    // in-memory bookkeeping.
-    const adapter = new WebAdapter(createConfig());
-    await adapter.init();
-    expect(() => adapter.setCompletionStatus('complete')).not.toThrow();
-    expect(() => adapter.setSuccessStatus('passed')).not.toThrow();
-    expect(() => adapter.commit()).not.toThrow();
   });
 });

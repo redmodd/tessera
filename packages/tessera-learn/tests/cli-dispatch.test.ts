@@ -21,6 +21,7 @@ let ws: string;
 let course: string;
 
 const stderr = () => printed(vi.mocked(console.error));
+const stdout = () => printed(vi.mocked(console.log));
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -144,5 +145,37 @@ describe('main dispatch', () => {
       expect(run).not.toHaveBeenCalled();
     }
     expect(readdirSync(join(ws, 'courses'))).toEqual(['getting-started']);
+  });
+});
+
+describe('usage', () => {
+  it('returns non-zero and prints usage with no subcommand', async () => {
+    expect(await main([])).toBe(1);
+    expect(stderr()).toContain('Usage: tessera');
+  });
+
+  it('returns non-zero and prints usage for an unknown subcommand', async () => {
+    expect(await main(['frobnicate'])).toBe(1);
+    expect(stderr()).toContain('Unknown command: frobnicate');
+  });
+
+  it.each([
+    'a11y --help',
+    'check -h',
+    'new --help',
+    'duplicate --help',
+    'duplicate src -h',
+    'export --bogus --help',
+  ])('prints usage and exits 0 for `%s`', async (command) => {
+    expect(await main(command.split(' '))).toBe(0);
+    expect(stdout()).toContain('Usage: tessera');
+  });
+
+  it('lists each flag once, under the commands that take it', async () => {
+    await main(['--help']);
+    expect(stdout()).toMatch(/^export\/validate options:\n {2}--standard </m);
+    expect(stdout()).toMatch(
+      /^a11y\/check options:\n {2}--threshold <minor\|/m,
+    );
   });
 });

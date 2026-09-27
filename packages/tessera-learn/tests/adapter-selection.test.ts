@@ -17,7 +17,7 @@ import {
   setLaunchParams,
 } from './helpers.js';
 
-function makeConfig(standard: string): CourseConfig {
+function makeConfig(standard?: string): CourseConfig {
   return createConfig({
     export: { standard } as CourseConfig['export'],
   });
@@ -30,9 +30,7 @@ describe('createAdapter', () => {
   });
 
   it('returns WebAdapter for undefined standard', () => {
-    const config = makeConfig('web');
-    (config.export as any).standard = undefined;
-    const adapter = createAdapter(config);
+    const adapter = createAdapter(makeConfig());
     expect(adapter).toBeInstanceOf(WebAdapter);
   });
 

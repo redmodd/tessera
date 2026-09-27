@@ -5,7 +5,7 @@ import HarnessSvelte from './fixtures/use-quiz-harness.svelte';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
-import { tick } from './helpers.js';
+import { flush } from './helpers.js';
 
 // Most of useQuiz's behavior is now the framework-free QuizEngine, constructed
 // directly with `onComplete` / `report` test doubles — no mount, no jsdom, no
@@ -73,6 +73,29 @@ function tfQuestion(id: string, response: boolean, correct: boolean) {
 }
 
 describe('QuizEngine', () => {
+  it("leaves submit and retry to the quiz and resets only the question's widget", () => {
+    const { engine, reports } = makeEngine();
+    const reset = vi.fn();
+    const q = engine.registerQuestion({
+      ...tfQuestion('a', true, true),
+      reset,
+    });
+    engine.setAnswer(0, true);
+
+    expect(q.mode).toBe('quiz');
+    expect(q.canRetry).toBe(false);
+    q.submit();
+    expect(q.submitted).toBe(false);
+    expect(reports).toHaveLength(0);
+
+    engine.submit();
+    q.retry();
+    q.reset();
+    expect(q.retryCount).toBe(0);
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(engine.state).toBe('submitted');
+  });
+
   it('starts in answering state with no questions', () => {
     const { engine } = makeEngine();
     expect(engine.state).toBe('answering');
@@ -874,7 +897,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
-    await tick();
+    await flush();
     m.unmount();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/submit\(\) was never called/i),
@@ -896,7 +919,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
     act(q);
-    await tick();
+    await flush();
     m.unmount();
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringMatching(/submit\(\) was never called/i),
@@ -917,7 +940,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = mountHarness({ graded: true });
     m.ref.handle!.registerQuestion(tfQuestion('a', true, true));
-    await tick();
+    await flush();
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringMatching(/no registered questions/i),
     );

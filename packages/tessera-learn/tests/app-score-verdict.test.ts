@@ -3,29 +3,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import {
+  createConfig,
   createManifest,
   flush,
   mountApp,
-  setLaunchParams,
+  navCtx,
+  postedStatements,
+  respond,
+  setXAPILaunch,
   stubAdapter,
 } from './helpers.js';
 
-const ACTOR = {
-  objectType: 'Agent',
-  account: { homePage: 'https://lms', name: 'learner-1' },
-};
-
 const manifest = createManifest(1, { 0: { graded: true } });
 
-const config = {
-  title: 'Demo',
+const config = createConfig({
   resume: 'auto',
-  branding: {},
-  navigation: { mode: 'free' },
-  scoring: { passingScore: 70 },
   completion: { mode: 'quiz' },
   export: { standard: 'xapi' },
-};
+});
 
 async function mount(
   adapter: BaseAdapter,
@@ -39,60 +34,38 @@ async function mount(
     loadPage?: () => Promise<unknown>;
   } = {},
 ) {
-  await mountApp({
-    config,
-    manifest: course,
-    pageModules: Object.fromEntries(
-      course.pages.map((p) => [p.importPath, loadPage]),
-    ),
-    adapter,
-    loadLayout,
-  });
-  await vi.waitFor(() =>
-    expect((globalThis as any).__tesseraNavCtx).toBeTruthy(),
-  );
-  return (globalThis as any).__tesseraNavCtx.progress;
+  await mountApp({ config, manifest: course, adapter, loadPage, loadLayout });
+  await vi.waitFor(() => expect(navCtx()).toBeTruthy());
+  return navCtx().progress;
 }
 
 async function mountLaunched() {
-  const verbs: string[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: unknown, init?: { method?: string; body?: string }) => {
-      if (String(url).includes('/statements') && init?.method === 'POST') {
-        const body = JSON.parse(init.body!);
-        for (const statement of Array.isArray(body) ? body : [body]) {
-          verbs.push(statement.verb.display['en-US']);
-        }
-        return new Response('[]', { status: 200 });
-      }
-      return new Response('{}', { status: 404 });
-    }),
+  const fetch = vi.fn(async (url: string, init?: RequestInit) =>
+    url.includes('/statements') && init?.method === 'POST'
+      ? respond(200, '[]')
+      : respond(404),
   );
+  vi.stubGlobal('fetch', fetch);
+  setXAPILaunch({ registration: '2d8b1e1e-0000-4000-8000-000000000000' });
 
-  setLaunchParams({
-    endpoint: 'https://lrs.example/xapi',
-    auth: 'Basic Zm9vOmJhcg==',
-    actor: JSON.stringify(ACTOR),
-    activity_id: 'urn:tessera:au:abc',
-    registration: '2d8b1e1e-0000-4000-8000-000000000000',
-  });
-
-  return { progress: await mount(new XAPIAdapter()), verbs };
+  const progress = await mount(new XAPIAdapter());
+  const verbs = (): string[] =>
+    postedStatements(fetch).map((s) => s.verb.display['en-US']);
+  return { progress, fetch, verbs };
 }
 
 describe('a graded submit that decides the verdict', () => {
   it('reports the score on the verdict instead of a statement of its own', async () => {
-    const { progress, verbs } = await mountLaunched();
-    await vi.waitFor(() => expect(verbs).toContain('initialized'));
-    verbs.length = 0;
+    const { progress, fetch, verbs } = await mountLaunched();
+    await vi.waitFor(() => expect(verbs()).toContain('initialized'));
+    fetch.mockClear();
 
     progress.quizCompleted(0, 90);
 
-    await vi.waitFor(() => expect(verbs).toContain('passed'));
+    await vi.waitFor(() => expect(verbs()).toContain('passed'));
     await flush();
 
-    expect(verbs).not.toContain('scored');
+    expect(verbs()).not.toContain('scored');
   });
 
   it('sends the verdict once, not again from the success effect', async () => {
@@ -158,6 +131,6 @@ describe('a graded submit that decides the verdict', () => {
     window.dispatchEvent(new Event('pagehide'));
 
     expect(setExit).toHaveBeenCalledWith('normal');
-    expect(saveState.mock.calls.at(-1)![0]).toMatchObject({ k: 1 });
+    expect(saveState.mock.lastCall![0]).toMatchObject({ k: 1 });
   });
 });

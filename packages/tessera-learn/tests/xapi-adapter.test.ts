@@ -1,25 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import { postedStatements, setLaunchParams, tick } from './helpers.js';
-
-const ACTOR = {
-  objectType: 'Agent',
-  account: { homePage: 'https://lms', name: 'learner-1' },
-};
+import { flush, postedStatements, respond, setXAPILaunch } from './helpers.js';
 
 const fetchMock = vi.fn();
-
-function launch(params: Record<string, string>) {
-  setLaunchParams({
-    endpoint: 'https://lrs.example/xapi',
-    // Tin Can launch sends the full "Basic <base64>" header value; the adapter
-    // must strip the scheme so it doesn't double-prefix on the wire.
-    auth: 'Basic Zm9vOmJhcg==',
-    activity_id: 'urn:tessera:au:abc',
-    ...params,
-  });
-}
 
 function calls(path: string) {
   return fetchMock.mock.calls.filter(([u]) => String(u).includes(path));
@@ -28,11 +12,11 @@ function calls(path: string) {
 const posted = () => postedStatements(fetchMock);
 
 async function sentActor(actor: unknown) {
-  launch({ actor: JSON.stringify(actor) });
+  setXAPILaunch({ actor: JSON.stringify(actor) });
   const adapter = new XAPIAdapter();
   await adapter.init();
   adapter.setCompletionStatus('complete');
-  await tick();
+  await flush();
   return posted()[0].actor;
 }
 
@@ -49,21 +33,16 @@ const TIN_CAN_ACCOUNT = [
 
 describe('XAPIAdapter', () => {
   beforeEach(() => {
-    fetchMock.mockImplementation(
-      async () => new Response('{}', { status: 404 }),
-    );
+    fetchMock.mockImplementation(async () => respond(404));
     vi.stubGlobal('fetch', fetchMock);
   });
 
   it('parses snake_case Tin Can launch params and sends the version header', async () => {
-    launch({
-      actor: JSON.stringify(ACTOR),
-      registration: '2d8b1e1e-0000-4000-8000-000000000000',
-    });
+    setXAPILaunch({ registration: '2d8b1e1e-0000-4000-8000-000000000000' });
     const adapter = new XAPIAdapter();
     await adapter.init();
     adapter.setCompletionStatus('complete');
-    await tick();
+    await flush();
     const [send] = calls('/statements');
     expect(send).toBeTruthy();
     const headers = send[1].headers as Headers;
@@ -72,7 +51,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('reshapes an array-shaped launch actor into an Agent', async () => {
-    launch({
+    setXAPILaunch({
       actor: JSON.stringify({
         name: ['Learner Name'],
         account: TIN_CAN_ACCOUNT,
@@ -83,7 +62,7 @@ describe('XAPIAdapter', () => {
     await adapter.init();
     await adapter.loadState();
     adapter.setCompletionStatus('complete');
-    await tick();
+    await flush();
     expect(posted()[0].actor).toEqual({
       name: 'Learner Name',
       account: ACCOUNT,
@@ -201,21 +180,21 @@ describe('XAPIAdapter', () => {
   });
 
   it('sends nothing after init rejects an actor it cannot reshape', async () => {
-    launch({ actor: JSON.stringify({ name: 'Learner Name' }) });
+    setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
     adapter.setCompletionStatus('complete');
-    await tick();
+    await flush();
     expect(calls('/statements')).toHaveLength(0);
   });
 
   it('throws on malformed actor JSON', async () => {
-    launch({ actor: 'not-json' });
+    setXAPILaunch({ actor: 'not-json' });
     await expect(new XAPIAdapter().init()).rejects.toThrow(/actor/);
   });
 
   it('rejects a launch actor left with no IFI, blaming the launch param', async () => {
-    launch({
+    setXAPILaunch({
       actor: JSON.stringify({ objectType: 'Person', name: ['Learner Name'] }),
     });
     await expect(new XAPIAdapter().init()).rejects.toThrow(
@@ -225,31 +204,31 @@ describe('XAPIAdapter', () => {
   });
 
   it('stops State API writes after the actor fails validation', async () => {
-    launch({ actor: JSON.stringify({ name: 'Learner Name' }) });
+    setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
     adapter.saveState({ page: 1 } as never);
-    await tick();
+    await flush();
     expect(calls('activities/state')).toHaveLength(0);
   });
 
   it('sends a scored statement when the score changes without a Passed/Failed', async () => {
-    launch({ actor: JSON.stringify(ACTOR) });
+    setXAPILaunch();
     const adapter = new XAPIAdapter();
     await adapter.init();
-    await tick();
+    await flush();
     fetchMock.mockClear();
 
     adapter.setScore(50);
     adapter.setSuccessStatus('failed');
     adapter.commit();
-    await tick();
+    await flush();
 
     adapter.setScore(53.3);
     adapter.setSuccessStatus('failed');
     adapter.setDuration(120);
     adapter.commit();
-    await tick();
+    await flush();
 
     const bodies = posted();
     expect(bodies.map((b) => b.verb.id)).toEqual([
@@ -262,17 +241,17 @@ describe('XAPIAdapter', () => {
   });
 
   it('does not re-send the resumed score on launch', async () => {
-    launch({ actor: JSON.stringify(ACTOR) });
+    setXAPILaunch();
     const adapter = new XAPIAdapter();
     await adapter.init();
-    await tick();
+    await flush();
     fetchMock.mockClear();
     adapter.seedLifecycle('incomplete', 'failed', 60);
 
     adapter.setScore(60);
     adapter.setSuccessStatus('failed');
     adapter.commit();
-    await tick();
+    await flush();
 
     expect(posted()).toHaveLength(0);
   });

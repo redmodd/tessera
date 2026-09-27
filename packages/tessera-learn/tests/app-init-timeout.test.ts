@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
+  createConfig,
   createManifest,
   mountApp,
   stubAdapter,
@@ -11,26 +12,10 @@ import {
 
 const manifest = createManifest(1);
 
-const config = {
-  title: 'Demo',
-  resume: 'auto',
-  branding: {},
-  navigation: { mode: 'free' },
-  scoring: { passingScore: 80 },
-  completion: { mode: 'percentage', percentageThreshold: 100 },
-  export: { standard: 'web' },
-};
+const config = createConfig({ resume: 'auto', scoring: { passingScore: 80 } });
 
 function mount(overrides: Partial<BaseAdapter>) {
-  return mountApp({
-    config,
-    manifest,
-    pageModules: {
-      [manifest.pages[0].importPath]: () =>
-        import('./fixtures/app-page.svelte'),
-    },
-    adapter: stubAdapter(overrides),
-  });
+  return mountApp({ config, manifest, adapter: stubAdapter(overrides) });
 }
 
 // The first page is held until adapter.init() resolves, and the LMS handshake

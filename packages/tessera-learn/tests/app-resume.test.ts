@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { createManifest, mountApp, stubAdapter } from './helpers.js';
+import {
+  createConfig,
+  createManifest,
+  mountApp,
+  stubAdapter,
+} from './helpers.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
@@ -13,18 +18,6 @@ function savedWith(fields: object) {
     d: 120,
     f: structureFingerprint(manifest),
     ...fields,
-  };
-}
-
-function makeConfig(resume: 'auto' | 'never') {
-  return {
-    title: 'Demo',
-    resume,
-    branding: {},
-    navigation: { mode: 'free' },
-    scoring: { passingScore: 80 },
-    completion: { mode: 'percentage', percentageThreshold: 100 },
-    export: { standard: 'web' },
   };
 }
 
@@ -44,20 +37,15 @@ async function mount(
     setScore: vi.fn(),
     setSuccessStatus: vi.fn(),
   };
-  const pageModule =
-    options.pageModule ?? (() => import('./fixtures/app-page.svelte'));
   await mountApp({
-    config: makeConfig(resume),
+    config: createConfig({ resume, scoring: { passingScore: 80 } }),
     manifest,
-    pageModules: Object.fromEntries(
-      manifest.pages.map((p) => [p.importPath, pageModule]),
-    ),
     adapter: stubAdapter({
       getState: () => saved as SavedState | null,
       ...spies,
     }),
+    loadPage: options.pageModule,
   });
-  await vi.waitFor(() => expect(document.body.textContent).toBeTruthy());
   return spies;
 }
 
@@ -86,7 +74,7 @@ describe('App restore gate honours config.resume', () => {
     });
     const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+    expect(saveState.mock.lastCall![0]).toMatchObject({
       v: [0, 1],
       d: 120,
       c: { '1': 2 },
@@ -103,7 +91,7 @@ describe('App restore gate honours config.resume', () => {
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
     expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
     expect(setCompletionStatus).not.toHaveBeenCalledWith('incomplete');
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ k: 1, p: 90 });
+    expect(saveState.mock.lastCall![0]).toMatchObject({ k: 1, p: 90 });
   });
 
   it('holds a pass the restored completion decides when the page resumed on then lowers the score', async () => {
@@ -112,18 +100,18 @@ describe('App restore gate honours config.resume', () => {
       pageModule: () => import('./fixtures/app-page-graded.svelte'),
     });
     await vi.waitFor(() =>
-      expect(saveState.mock.calls.at(-1)?.[0].g['1'].w).toEqual(['q2']),
+      expect(saveState.mock.lastCall?.[0].g['1'].w).toEqual(['q2']),
     );
     expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
     expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({ p: 90 });
+    expect(saveState.mock.lastCall![0]).toMatchObject({ p: 90 });
   });
 
   it('drops a saved unanswered question the page no longer renders', async () => {
     const saved = savedWith({ g: { '1': { q: { q1: 100 }, w: ['q3'] } } });
     const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() =>
-      expect(saveState.mock.calls.at(-1)?.[0].g).toEqual({
+      expect(saveState.mock.lastCall?.[0].g).toEqual({
         '1': { q: { q1: 100 } },
       }),
     );
@@ -136,7 +124,7 @@ describe('App restore gate honours config.resume', () => {
     });
     const { saveState } = await mount('auto', { saved });
     await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    expect(saveState.mock.calls.at(-1)[0]).toMatchObject({
+    expect(saveState.mock.lastCall![0]).toMatchObject({
       g: { '1': { q: { q1: 100, q2: [40, 3, 1] }, w: ['q3'] } },
     });
   });
@@ -147,7 +135,7 @@ describe('App restore gate honours config.resume', () => {
       pageModule: () => import('./fixtures/app-page-practice.svelte'),
     });
     await vi.waitFor(() =>
-      expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({
+      expect(saveState.mock.lastCall?.[0]).toMatchObject({
         g: { '1': { q: { q1: [100, 1, 0] } } },
       }),
     );

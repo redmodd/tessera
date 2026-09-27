@@ -226,14 +226,9 @@ describe('SCORM2004Adapter', () => {
   });
 
   describe('cmi.mode honoring (browse / review launches)', () => {
-    function mockReview(): void {
+    function launchIn(mode: 'review' | 'browse'): void {
       api.GetValue.mockImplementation((key) =>
-        key === 'cmi.mode' ? 'review' : '',
-      );
-    }
-    function mockBrowse(): void {
-      api.GetValue.mockImplementation((key) =>
-        key === 'cmi.mode' ? 'browse' : '',
+        key === 'cmi.mode' ? mode : '',
       );
     }
     function settersDidNotFire(): void {
@@ -248,7 +243,7 @@ describe('SCORM2004Adapter', () => {
     }
 
     it('refuses every learner-record write in review mode', async () => {
-      mockReview();
+      launchIn('review');
       await adapter.init();
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
@@ -266,7 +261,7 @@ describe('SCORM2004Adapter', () => {
     });
 
     it('refuses every learner-record write in browse mode', async () => {
-      mockBrowse();
+      launchIn('browse');
       await adapter.init();
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
@@ -314,15 +309,13 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.id']).toBe('q1');
-      expect(v['cmi.interactions.0.type']).toBe('choice');
-      expect(v['cmi.interactions.0.learner_response']).toBe('a[,]b');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
-      expect(v['cmi.interactions.0.result']).toBe('incorrect');
+      expect(v.id).toBe('q1');
+      expect(v.type).toBe('choice');
+      expect(v.learner_response).toBe('a[,]b');
+      expect(v['correct_responses.0.pattern']).toBe('a');
+      expect(v.result).toBe('incorrect');
       // Zone-free, second-resolution — see formatISO8601Timestamp tests.
-      expect(v['cmi.interactions.0.timestamp']).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
-      );
+      expect(v.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
     });
 
     it('writes true-false interaction', async () => {
@@ -333,10 +326,10 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('true-false');
-      expect(v['cmi.interactions.0.learner_response']).toBe('true');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('true');
-      expect(v['cmi.interactions.0.result']).toBe('correct');
+      expect(v.type).toBe('true-false');
+      expect(v.learner_response).toBe('true');
+      expect(v['correct_responses.0.pattern']).toBe('true');
+      expect(v.result).toBe('correct');
     });
 
     it('writes fill-in interaction', async () => {
@@ -347,10 +340,10 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('fill-in');
-      expect(v['cmi.interactions.0.learner_response']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+      expect(v.type).toBe('fill-in');
+      expect(v.learner_response).toBe('Paris');
+      expect(v['correct_responses.0.pattern']).toBe('Paris');
+      expect(v['correct_responses.1.pattern']).toBe('paris');
     });
 
     it('prefixes fill-in patterns with case_matters when set', async () => {
@@ -366,12 +359,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        '{case_matters=true}Paris',
-      );
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe(
-        '{case_matters=true}paris',
-      );
+      expect(v['correct_responses.0.pattern']).toBe('{case_matters=true}Paris');
+      expect(v['correct_responses.1.pattern']).toBe('{case_matters=true}paris');
     });
 
     it('omits the prefix when caseMatters is false', async () => {
@@ -387,8 +376,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+      expect(v['correct_responses.0.pattern']).toBe('Paris');
+      expect(v['correct_responses.1.pattern']).toBe('paris');
     });
 
     it('writes a single pattern for long-fill-in (2004 allows only one)', async () => {
@@ -403,12 +392,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'answer one',
-      );
-      expect(
-        v['cmi.interactions.0.correct_responses.1.pattern'],
-      ).toBeUndefined();
+      expect(v['correct_responses.0.pattern']).toBe('answer one');
+      expect(v['correct_responses.1.pattern']).toBeUndefined();
     });
 
     it('caps fill-in patterns at the 10 allowed by the RTE', async () => {
@@ -424,10 +409,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.correct_responses.9.pattern']).toBe('a9');
-      expect(
-        v['cmi.interactions.0.correct_responses.10.pattern'],
-      ).toBeUndefined();
+      expect(v['correct_responses.9.pattern']).toBe('a9');
+      expect(v['correct_responses.10.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('declares 12 correct answers'),
       );
@@ -451,11 +434,9 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('matching');
-      expect(v['cmi.interactions.0.learner_response']).toBe('a[.]1[,]b[.]2');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'a[.]1[,]b[.]2',
-      );
+      expect(v.type).toBe('matching');
+      expect(v.learner_response).toBe('a[.]1[,]b[.]2');
+      expect(v['correct_responses.0.pattern']).toBe('a[.]1[,]b[.]2');
     });
 
     it('writes sequencing interaction', async () => {
@@ -470,8 +451,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('sequencing');
-      expect(v['cmi.interactions.0.learner_response']).toBe('x[,]y[,]z');
+      expect(v.type).toBe('sequencing');
+      expect(v.learner_response).toBe('x[,]y[,]z');
     });
 
     it('passes response and correct identifiers through unchanged', async () => {
@@ -486,10 +467,10 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.learner_response']).toBe(
+      expect(v.learner_response).toBe(
         'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
       );
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
+      expect(v['correct_responses.0.pattern']).toBe(
         'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
       );
     });
@@ -507,10 +488,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.learner_response']).toBe('speed-limit');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'speed-limit',
-      );
+      expect(v.learner_response).toBe('speed-limit');
+      expect(v['correct_responses.0.pattern']).toBe('speed-limit');
     });
 
     it('writes numeric interaction', async () => {
@@ -521,11 +500,9 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('numeric');
-      expect(v['cmi.interactions.0.learner_response']).toBe('7');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        '5[:]10',
-      );
+      expect(v.type).toBe('numeric');
+      expect(v.learner_response).toBe('7');
+      expect(v['correct_responses.0.pattern']).toBe('5[:]10');
     });
 
     it('writes performance interaction', async () => {
@@ -546,10 +523,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(v['cmi.interactions.0.type']).toBe('performance');
-      expect(v['cmi.interactions.0.learner_response']).toBe(
-        'stepA[.]1[,]stepB[.]x',
-      );
+      expect(v.type).toBe('performance');
+      expect(v.learner_response).toBe('stepA[.]1[,]stepB[.]x');
     });
 
     it('omits correct_responses when no correct provided', async () => {
@@ -560,10 +535,8 @@ describe('SCORM2004Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      expect(
-        v['cmi.interactions.0.correct_responses.0.pattern'],
-      ).toBeUndefined();
-      expect(v['cmi.interactions.0.result']).toBeUndefined();
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
+      expect(v.result).toBeUndefined();
     });
 
     it('increments index across multiple interactions', async () => {

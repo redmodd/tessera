@@ -7,6 +7,9 @@ import { makeWorkspace, printed } from './helpers.js';
 
 let ws: string;
 
+const readConfig = (name: string) =>
+  readFileSync(join(ws, 'courses', name, 'course.config.js'), 'utf-8');
+
 beforeEach(() => {
   ws = makeWorkspace();
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -25,20 +28,14 @@ describe('runNew', () => {
 
   it('substitutes the course title from the name', () => {
     runNew('my-lesson', ws);
-    const config = readFileSync(
-      join(ws, 'courses', 'my-lesson', 'course.config.js'),
-      'utf-8',
-    );
+    const config = readConfig('my-lesson');
     expect(config).toContain("title: 'My Lesson'");
     expect(config).not.toContain('__PROJECT_TITLE__');
   });
 
   it('mints a unique urn:uuid id', () => {
     runNew('my-lesson', ws);
-    const config = readFileSync(
-      join(ws, 'courses', 'my-lesson', 'course.config.js'),
-      'utf-8',
-    );
+    const config = readConfig('my-lesson');
     expect(config).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
     expect(config).not.toContain('__COURSE_ID__');
   });

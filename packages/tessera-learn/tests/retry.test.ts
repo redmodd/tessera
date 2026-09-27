@@ -133,10 +133,7 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    // 'a' succeeded, 'b' failed after retries, 'c' never ran
-    expect(calls.filter((c) => c === 'a').length).toBe(1);
-    expect(calls.filter((c) => c === 'b-attempt').length).toBe(3); // 3 retry attempts
-    expect(calls.filter((c) => c === 'c').length).toBe(0);
+    expect(calls).toEqual(['a', 'b-attempt', 'b-attempt', 'b-attempt']);
     expect(queue.pending).toBe(2); // b and c still pending
 
     // Now let b succeed on next trigger
@@ -213,7 +210,7 @@ describe('WriteQueue', () => {
     });
 
     // Let the first attempt run and the queue settle into backoff.
-    await new Promise((r) => setTimeout(r, 10));
+    await flush();
     expect(calls).toEqual(['a']);
 
     queue.drainSync();

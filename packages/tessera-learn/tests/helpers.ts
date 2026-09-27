@@ -10,6 +10,7 @@ import {
 } from 'vitest';
 import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
+import type { NavContext } from '../src/runtime/contexts.js';
 import { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SCORM12API } from '../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../src/runtime/adapters/scorm2004.js';
@@ -65,9 +66,7 @@ export function stubAdapter(overrides: Partial<BaseAdapter> = {}): BaseAdapter {
 }
 
 /** Let an adapter's async write queue drain. */
-export const flush = () => new Promise<void>((r) => setTimeout(r, 50));
-
-export const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+export const flush = () => new Promise<void>((r) => setTimeout(r));
 
 export function useFakeTimers(): void {
   vi.useFakeTimers();
@@ -80,12 +79,57 @@ export function setLaunchParams(params: Record<string, string> = {}): void {
   onTestFinished(() => history.replaceState({}, '', '/'));
 }
 
+export const respond = (status: number, body: BodyInit | null = null) =>
+  new Response(body, { status });
+
+export const CMI5_LAUNCH = {
+  fetch: 'https://lms.example.com/fetch-token',
+  endpoint: 'https://lms.example.com/xapi/',
+  registration: 'reg-123',
+  activityId: 'https://example.com/course/1',
+  actor: JSON.stringify({ mbox: 'mailto:test@example.com', name: 'Test User' }),
+};
+
+export function cmi5Fetch({
+  token = 'test-auth-token',
+  launchData,
+  saved,
+}: { token?: string; launchData?: object; saved?: object } = {}) {
+  return async (url: string, init?: RequestInit): Promise<Response> => {
+    if (url === CMI5_LAUNCH.fetch) return new Response(token);
+    if (init?.method && init.method !== 'GET') return respond(204);
+    const doc = url.includes('stateId=LMS.LaunchData')
+      ? launchData
+      : url.includes('activities/state')
+        ? saved
+        : undefined;
+    return doc ? Response.json(doc) : respond(404);
+  };
+}
+
+export const XAPI_ACTOR = {
+  objectType: 'Agent',
+  account: { homePage: 'https://lms', name: 'learner-1' },
+};
+
+export function setXAPILaunch(params: Record<string, string> = {}): void {
+  setLaunchParams({
+    endpoint: 'https://lrs.example/xapi',
+    auth: 'Basic Zm9vOmJhcg==',
+    actor: JSON.stringify(XAPI_ACTOR),
+    activity_id: 'urn:tessera:au:abc',
+    ...params,
+  });
+}
+
 export function setValuesFor(
   setValue: Mock<(key: string, value: string) => string>,
   prefix: string,
 ): Record<string, string> {
   return Object.fromEntries(
-    setValue.mock.calls.filter(([key]) => key.startsWith(prefix)),
+    setValue.mock.calls
+      .filter(([key]) => key.startsWith(`${prefix}.`))
+      .map(([key, value]) => [key.slice(prefix.length + 1), value]),
   );
 }
 
@@ -104,26 +148,34 @@ export function printed(spy: MockInstance): string {
   return spy.mock.calls.flat().join('\n');
 }
 
+export function tempDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'tessera-test-'));
+  onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
 export function makeWorkspace(courses: string[] = []): string {
-  const root = mkdtempSync(join(tmpdir(), 'tessera-test-'));
+  const root = tempDir();
   mkdirSync(join(root, 'courses'));
   for (const name of courses) {
     const dir = join(root, 'courses', name);
     mkdirSync(join(dir, 'pages'), { recursive: true });
     writeFileSync(join(dir, 'course.config.js'), 'export default {};');
   }
-  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
 
 export async function mountApp({
+  config,
+  manifest,
+  adapter,
+  loadPage = () => import('./fixtures/app-page.svelte'),
   loadLayout,
-  ...testGlobals
 }: {
-  config: unknown;
-  manifest: unknown;
-  pageModules: Record<string, () => Promise<unknown>>;
+  config: CourseConfig;
+  manifest: Manifest;
   adapter: BaseAdapter;
+  loadPage?: () => Promise<unknown>;
   loadLayout?: () => Promise<{ default: unknown }>;
 }) {
   // App.svelte imports config at module scope, so the stubs need re-evaluating
@@ -132,7 +184,12 @@ export async function mountApp({
   vi.resetModules();
   const { mount, unmount } = await import('svelte');
   vi.stubGlobal('__tesseraTest', {
-    ...testGlobals,
+    config,
+    manifest,
+    adapter,
+    pageModules: Object.fromEntries(
+      manifest.pages.map((p) => [p.importPath, loadPage]),
+    ),
     layout: loadLayout && (await loadLayout()).default,
   });
   vi.stubGlobal('__tesseraNavCtx', undefined);
@@ -146,6 +203,8 @@ export async function mountApp({
     }
   });
 }
+
+export const navCtx = (): NavContext => (globalThis as any).__tesseraNavCtx;
 
 export function createManifest(
   pageCount: number,

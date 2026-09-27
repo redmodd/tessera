@@ -21,14 +21,20 @@ import {
   useCourse,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
+import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
+import type { Manifest } from '../src/plugin/manifest.js';
+import type { CourseConfig } from '../src/runtime/types.js';
 import { createManifest, createConfig, stubAdapter } from './helpers.js';
 
-function provideNavCtx(progress: ProgressState, currentIndex = 0) {
-  const manifest = createManifest(5);
-  const config = createConfig();
+function provideNavCtx({
+  manifest = createManifest(5),
+  config = createConfig(),
+  pageIndex = 0,
+}: { manifest?: Manifest; config?: CourseConfig; pageIndex?: number } = {}) {
+  const progress = new ProgressState(manifest, config);
   const nav: any = {
-    currentPageIndex: currentIndex,
+    currentPageIndex: pageIndex,
     canGoNext: true,
     canGoPrev: false,
     goToPage: vi.fn((i: number) => {
@@ -43,7 +49,7 @@ function provideNavCtx(progress: ProgressState, currentIndex = 0) {
   const adapter = stubAdapter({ reportInteraction: vi.fn() });
   ctxStore.set('tessera-nav', ctx);
   ctxStore.set('tessera-adapter', { adapter });
-  ctxStore.set('tessera-page', { index: currentIndex });
+  ctxStore.set('tessera-page', { index: pageIndex });
   ctxStore.set('tessera-in-page', true);
   return { ...ctx, adapter };
 }
@@ -56,8 +62,7 @@ beforeEach(() => {
 
 describe('useQuestion — standalone mode', () => {
   it('reports the interaction through the adapter on submit', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const { adapter } = provideNavCtx(progress);
+    const { adapter } = provideNavCtx();
 
     const interaction: Interaction = {
       type: 'choice',
@@ -77,8 +82,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('throws in dev when a graded question registers on an undeclared page', () => {
-    const progress = new ProgressState(createManifest(2), createConfig());
-    provideNavCtx(progress);
+    provideNavCtx({ manifest: createManifest(2) });
 
     expect(() =>
       useQuestion({
@@ -97,8 +101,7 @@ describe('useQuestion — standalone mode', () => {
 
   it('warns once in production when a graded question registers on an undeclared page, not on restore', () => {
     vi.stubEnv('DEV', false);
-    const progress = new ProgressState(createManifest(2), createConfig());
-    provideNavCtx(progress);
+    const { progress } = provideNavCtx({ manifest: createManifest(2) });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     progress.markStandaloneQuestion(0, 'q0', 100, true);
@@ -115,11 +118,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('does not throw for a graded question on a declared page', () => {
-    const progress = new ProgressState(
-      createManifest(2, {}, { 0: { graded: true } }),
-      createConfig(),
-    );
-    provideNavCtx(progress);
+    provideNavCtx({ manifest: createManifest(2, {}, { 0: { graded: true } }) });
 
     expect(() =>
       useQuestion({
@@ -131,8 +130,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('is not answerComplete until an answer is set, with no complete callback', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    provideNavCtx(progress);
+    provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -145,8 +143,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('flags incorrect when response does not match', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const { adapter } = provideNavCtx(progress);
+    const { adapter } = provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -163,8 +160,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('does not register a graded score when graded is false', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    provideNavCtx(progress, 2);
+    const { progress } = provideNavCtx({ pageIndex: 2 });
 
     const q = useQuestion({
       id: 'q1',
@@ -177,11 +173,11 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('registers a graded score when graded is true', () => {
-    const progress = new ProgressState(
-      createManifest(4, {}, { 3: { graded: true } }),
-      createConfig({ completion: { mode: 'quiz' } }),
-    );
-    provideNavCtx(progress, 3);
+    const { progress } = provideNavCtx({
+      manifest: createManifest(4, {}, { 3: { graded: true } }),
+      config: createConfig({ completion: { mode: 'quiz' } }),
+      pageIndex: 3,
+    });
 
     const q = useQuestion({
       id: 'q1',
@@ -197,12 +193,15 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('records against the page it renders on while the next page loads', () => {
-    const progress = new ProgressState(
-      createManifest(3, {}, { 1: { graded: true }, 2: { graded: true } }),
-      createConfig(),
-    );
-    const ctx = provideNavCtx(progress, 1);
-    ctx.nav.currentPageIndex = 2;
+    const { nav, progress } = provideNavCtx({
+      manifest: createManifest(
+        3,
+        {},
+        { 1: { graded: true }, 2: { graded: true } },
+      ),
+      pageIndex: 1,
+    });
+    nav.currentPageIndex = 2;
 
     useQuestion({
       id: 'q1',
@@ -216,11 +215,9 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('uses score override when provided', () => {
-    const progress = new ProgressState(
-      createManifest(2, {}, { 0: { graded: true } }),
-      createConfig(),
-    );
-    provideNavCtx(progress, 0);
+    const { progress } = provideNavCtx({
+      manifest: createManifest(2, {}, { 0: { graded: true } }),
+    });
 
     const q = useQuestion({
       id: 'q1',
@@ -234,11 +231,10 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('passes weight through to the recorded result', () => {
-    const progress = new ProgressState(
-      createManifest(2, {}, { 1: { graded: true } }),
-      createConfig(),
-    );
-    provideNavCtx(progress, 1);
+    const { progress } = provideNavCtx({
+      manifest: createManifest(2, {}, { 1: { graded: true } }),
+      pageIndex: 1,
+    });
 
     useQuestion({
       id: 'q1',
@@ -251,11 +247,10 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('corrects a restored answer whose saved weight is out of date', () => {
-    const progress = new ProgressState(
-      createManifest(2, {}, { 1: { graded: true } }),
-      createConfig(),
-    );
-    provideNavCtx(progress, 1);
+    const { progress } = provideNavCtx({
+      manifest: createManifest(2, {}, { 1: { graded: true } }),
+      pageIndex: 1,
+    });
     progress.markStandaloneQuestion(1, 'q1', 100, true, 3);
 
     useQuestion({
@@ -273,8 +268,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('submit is idempotent — calling twice does not double-report', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const { adapter } = provideNavCtx(progress);
+    const { adapter } = provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -286,9 +280,8 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('reset clears submitted/correct and re-enables submit', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
     const userReset = vi.fn();
-    const { adapter } = provideNavCtx(progress);
+    const { adapter } = provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -308,8 +301,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('mode is "standalone" outside a Quiz', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    provideNavCtx(progress);
+    provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -319,8 +311,7 @@ describe('useQuestion — standalone mode', () => {
   });
 
   it('reports correct=null when interaction has no correct answer', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const { adapter } = provideNavCtx(progress);
+    const { adapter } = provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
@@ -340,14 +331,8 @@ describe('useQuestion — standalone mode', () => {
 // ============ useQuestion — standalone retry ============
 
 describe('useQuestion — standalone retry', () => {
-  function setupCtx() {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const { adapter } = provideNavCtx(progress);
-    return { progress, adapter };
-  }
-
   it('canRetry defaults to true and retryCount starts at 0 (default Infinity cap)', () => {
-    setupCtx();
+    provideNavCtx();
     const q = useQuestion({
       id: 'q1',
       response: () => ({ type: 'true-false', response: true, correct: true }),
@@ -357,7 +342,7 @@ describe('useQuestion — standalone retry', () => {
   });
 
   it('retry() resets submitted/correct, calls opts.reset, and increments retryCount', () => {
-    const { adapter } = setupCtx();
+    const { adapter } = provideNavCtx();
     const userReset = vi.fn();
     const q = useQuestion({
       id: 'q1',
@@ -382,7 +367,7 @@ describe('useQuestion — standalone retry', () => {
   });
 
   it('canRetry flips false when retryCount reaches maxRetries; further retry() is a no-op', () => {
-    const { adapter } = setupCtx();
+    const { adapter } = provideNavCtx();
     const userReset = vi.fn();
     const q = useQuestion({
       id: 'q1',
@@ -411,7 +396,7 @@ describe('useQuestion — standalone retry', () => {
   });
 
   it('maxRetries: 0 means canRetry is false from the start', () => {
-    setupCtx();
+    provideNavCtx();
     const q = useQuestion({
       id: 'q1',
       maxRetries: 0,
@@ -427,74 +412,26 @@ describe('useQuestion — standalone retry', () => {
 
 // ============ useQuestion (inside a <Quiz>) ============
 
-function makeQuizCtx(overrides: Record<string, unknown> = {}) {
-  // Shared state the test can poke to simulate the quiz advancing/submitting.
-  const state = { submitted: false };
-  const handles: any[] = [];
-  const quiz: any = {
-    get submitted() {
-      return state.submitted;
-    },
-    set submitted(v: boolean) {
-      state.submitted = v;
-      for (const h of handles) h._setSubmitted(v);
-    },
-    registerQuestion: vi.fn(),
-    ...overrides,
+function provideQuizCtx() {
+  const quiz = {
+    registerQuestion: vi.fn((api: UseQuizQuestionApi) => ({ id: api.id })),
   };
-  quiz.registerQuestion.mockImplementation((api: any) => {
-    let submitted = state.submitted;
-    let correct: boolean | null = null;
-    const h = {
-      id: api.id,
-      get submitted() {
-        return submitted;
-      },
-      get correct() {
-        return correct;
-      },
-      answer: undefined,
-      feedbackVisible: false,
-      get locked() {
-        return submitted;
-      },
-      isLockedCorrect: false,
-      render: undefined,
-      setAnswer() {},
-      setRender() {},
-      submit() {},
-      retry() {},
-      reset() {
-        api.reset?.();
-      },
-      canRetry: false,
-      retryCount: 0,
-      mode: 'quiz',
-      _setSubmitted(v: boolean) {
-        submitted = v;
-        correct = v ? api.checkAnswer() : null;
-      },
-    };
-    handles.push(h);
-    return h;
-  });
+  ctxStore.set('tessera-quiz', quiz);
   return quiz;
 }
 
 describe('useQuestion — inside a <Quiz>', () => {
-  it('registers with the parent Quiz exactly once', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+  it('registers once and hands back the quiz registration', () => {
+    const quiz = provideQuizCtx();
+    provideNavCtx();
 
     const q = useQuestion({
       id: 'q1',
       response: () => ({ type: 'true-false', response: true, correct: true }),
     });
 
-    expect(q.mode).toBe('quiz');
     expect(quiz.registerQuestion).toHaveBeenCalledTimes(1);
+    expect(q).toBe(quiz.registerQuestion.mock.results[0].value);
     const arg = quiz.registerQuestion.mock.calls[0][0];
     expect(arg.id).toBe('q1');
     expect(typeof arg.checkAnswer).toBe('function');
@@ -502,10 +439,8 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('forwards each widget through to a distinct quiz registration', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+    const quiz = provideQuizCtx();
+    provideNavCtx();
 
     const a = useQuestion({
       id: 'a',
@@ -521,10 +456,8 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('interaction() callback returns the latest response value (not memoized)', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+    const quiz = provideQuizCtx();
+    provideNavCtx();
 
     let current: Interaction = {
       type: 'true-false',
@@ -548,10 +481,8 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('checkAnswer() returns the boolean from isCorrect(response())', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+    const quiz = provideQuizCtx();
+    provideNavCtx();
 
     let current: Interaction = {
       type: 'true-false',
@@ -567,10 +498,8 @@ describe('useQuestion — inside a <Quiz>', () => {
   });
 
   it('reset is passed through to the quiz registration', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+    const quiz = provideQuizCtx();
+    provideNavCtx();
 
     const userReset = vi.fn();
     useQuestion({
@@ -583,79 +512,24 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(arg.reset).toBe(userReset);
   });
 
-  it('handle.submit() is a no-op when nested in a quiz', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    const { adapter } = provideNavCtx(progress);
+  it('records and reports nothing itself, even when graded (the quiz drives scoring)', () => {
+    provideQuizCtx();
+    const { progress, adapter } = provideNavCtx({ pageIndex: 3 });
 
-    const q = useQuestion({
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    useQuestion({
       id: 'q1',
+      graded: true,
       response: () => ({ type: 'true-false', response: true, correct: true }),
     });
-    q.submit();
-    q.submit();
 
     expect(adapter.reportInteraction).not.toHaveBeenCalled();
     expect(progress.gradedUnits.size).toBe(0);
   });
 
-  it('does not record a graded unit even when graded is true (quiz drives scoring)', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress, 3);
-
-    const q = useQuestion({
-      id: 'q1',
-      graded: true,
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-    });
-    q.submit();
-
-    expect(progress.gradedUnits.size).toBe(0);
-  });
-
-  it('handle.submitted mirrors quiz.submitted', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-    });
-    expect(q.submitted).toBe(false);
-    expect(q.correct).toBe(null);
-
-    quiz.submitted = true;
-    expect(q.submitted).toBe(true);
-    expect(q.correct).toBe(true);
-  });
-
-  it('handle.reset calls opts.reset but does not reset the whole quiz', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
-
-    const userReset = vi.fn();
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true }),
-      reset: userReset,
-    });
-    q.reset();
-
-    expect(userReset).toHaveBeenCalledTimes(1);
-  });
-
   it('warns in dev about standalone-only options passed inside a quiz', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
+    provideQuizCtx();
+    provideNavCtx();
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     useQuestion({
@@ -667,26 +541,6 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
   });
-
-  it('retry() is a no-op inside a quiz; canRetry is always false', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const quiz = makeQuizCtx();
-    ctxStore.set('tessera-quiz', quiz);
-    provideNavCtx(progress);
-
-    const userReset = vi.fn();
-    const q = useQuestion({
-      id: 'q1',
-      maxRetries: 5,
-      response: () => ({ type: 'true-false', response: true }),
-      reset: userReset,
-    });
-
-    expect(q.canRetry).toBe(false);
-    q.retry();
-    expect(q.retryCount).toBe(0);
-    expect(userReset).not.toHaveBeenCalled();
-  });
 });
 
 // ============ useNavigation ============
@@ -697,8 +551,7 @@ describe('useNavigation', () => {
   });
 
   it('exposes currentPage, currentPageIndex, and pages from nav context', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 2);
+    const ctx = provideNavCtx({ pageIndex: 2 });
 
     const navHook = useNavigation();
     expect(navHook.currentPageIndex).toBe(2);
@@ -708,24 +561,21 @@ describe('useNavigation', () => {
   });
 
   it('goTo(slug) finds the matching page and calls nav.goToPage', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 0);
+    const ctx = provideNavCtx();
 
     useNavigation().goTo('page-3');
     expect(ctx.nav.goToPage).toHaveBeenCalledWith(3);
   });
 
   it('goTo(unknown slug) is a no-op', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 0);
+    const ctx = provideNavCtx();
 
     useNavigation().goTo('does-not-exist');
     expect(ctx.nav.goToPage).not.toHaveBeenCalled();
   });
 
   it('next/prev/prefetch/canGoNext/canGoPrev delegate to nav', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 0);
+    const ctx = provideNavCtx();
 
     const h = useNavigation();
     h.next();
@@ -739,8 +589,7 @@ describe('useNavigation', () => {
   });
 
   it('canAccess returns false for unknown slug, true when nav.isPageLocked is false', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 0);
+    const ctx = provideNavCtx();
 
     const h = useNavigation();
     expect(h.canAccess('page-1')).toBe(true);
@@ -751,8 +600,7 @@ describe('useNavigation', () => {
   });
 
   it('canAccessIndex checks bounds and nav.isPageLocked', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress, 0);
+    const ctx = provideNavCtx();
 
     const h = useNavigation();
     expect(h.canAccessIndex(1)).toBe(true);
@@ -772,11 +620,10 @@ describe('useProgress', () => {
   });
 
   it('exposes reactive ProgressState fields', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const { progress } = provideNavCtx();
     progress.markVisited(0);
     progress.markVisited(1);
     progress.quizCompleted(2, 80);
-    provideNavCtx(progress);
 
     const h = useProgress();
     expect(h.visitedPages.size).toBe(2);
@@ -791,11 +638,10 @@ describe('useProgress', () => {
       1: { graded: true },
       2: { graded: true },
     });
-    const progress = new ProgressState(
+    const { progress } = provideNavCtx({
       manifest,
-      createConfig({ scoring: { passingScore: 80 } }),
-    );
-    provideNavCtx(progress);
+      config: createConfig({ scoring: { passingScore: 80 } }),
+    });
 
     const h = useProgress();
     expect(h.passingScore).toBe(80);
@@ -809,21 +655,19 @@ describe('useProgress', () => {
   });
 
   it('pageScore defaults to the page it renders on while the next page loads', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
+    const { nav, progress } = provideNavCtx({ pageIndex: 2 });
     progress.markStandaloneQuestion(2, 'q1', 40, true);
-    const ctx = provideNavCtx(progress, 2);
 
     const h = useProgress();
     expect(h.pageScore()).toBe(40);
 
-    ctx.nav.currentPageIndex = 3;
+    nav.currentPageIndex = 3;
     expect(h.pageScore()).toBe(40);
     expect(h.pageScore(3)).toBeUndefined();
   });
 
   it('markVisited and markChunk delegate to ProgressState', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    provideNavCtx(progress);
+    const { progress } = provideNavCtx();
 
     const h = useProgress();
     h.markVisited(3);
@@ -842,8 +686,7 @@ describe('useCourse', () => {
   });
 
   it('exposes the course title and a resolved logo, treating an empty logo as absent', () => {
-    const progress = new ProgressState(createManifest(0), createConfig());
-    const ctx = provideNavCtx(progress);
+    const ctx = provideNavCtx();
 
     const h = useCourse();
     expect(h.title).toBe('Test');
