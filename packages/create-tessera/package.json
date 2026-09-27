@@ -42,7 +42,7 @@
   "scripts": {
     "sync-templates": "node scripts/sync-templates.mjs",
     "build": "pnpm sync-templates && tsdown",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc --noEmit -p tests",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:templates": "node scripts/e2e.mjs",

@@ -1,14 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
-  rmSync,
   existsSync,
   readFileSync,
   readdirSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import {
   LMS_BUILD,
   generateCMI5Xml,
@@ -17,16 +15,9 @@ import {
   runExport,
 } from '../src/plugin/export.js';
 import { mergeCourseConfig } from '../src/plugin/index.js';
+import { tempDir } from './helpers.js';
 
 let testRoot: string;
-let counter = 0;
-
-function createTestDir(): string {
-  counter++;
-  const dir = resolve(tmpdir(), `tessera-export-test-${Date.now()}-${counter}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
 
 function createDistDir(root: string): string {
   const distDir = resolve(root, 'dist');
@@ -43,13 +34,7 @@ function createDistDir(root: string): string {
 }
 
 beforeEach(() => {
-  testRoot = createTestDir();
-});
-
-afterEach(() => {
-  try {
-    rmSync(testRoot, { recursive: true, force: true });
-  } catch {}
+  testRoot = tempDir();
 });
 
 const scormXml = (
@@ -59,6 +44,7 @@ const scormXml = (
   LMS_BUILD[standard].generate(
     mergeCourseConfig(config),
     createDistDir(testRoot),
+    false,
   );
 
 // ---- SCORM 1.2 Manifest ----

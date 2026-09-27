@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
 import {
   XAPIConfigError,
@@ -9,6 +9,7 @@ import {
 } from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
+import { flush, respond, useFakeTimers } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -29,14 +30,14 @@ function verbIds(body: string): string[] {
   return (Array.isArray(parsed) ? parsed : [parsed]).map((s) => s.verb.id);
 }
 
-beforeEach(() => {
-  mockFetch.mockReset();
-  vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
-});
+async function initPublisher(overrides: Parameters<typeof basicOpts>[0] = {}) {
+  const pub = new XAPIPublisher(basicOpts(overrides));
+  await pub.init();
+  return pub;
+}
 
-afterEach(() => {
-  vi.useRealTimers();
-  vi.restoreAllMocks();
+beforeEach(() => {
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 describe('validateAgent', () => {
@@ -101,11 +102,10 @@ describe('XAPIPublisher — construction', () => {
     );
   });
   it('normalizes endpoint trailing slash', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(
-      basicOpts({ endpoint: 'https://lrs.example.com/xapi' as any }),
-    );
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher({
+      endpoint: 'https://lrs.example.com/xapi' as any,
+    });
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
     expect(mockFetch.mock.calls[0][0]).toBe(
       'https://lrs.example.com/xapi/statements',
@@ -115,16 +115,14 @@ describe('XAPIPublisher — construction', () => {
 
 describe('XAPIPublisher — buildStatement', () => {
   it('mints a UUID', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const s1 = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     const s2 = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     expect(s1.id).not.toBe(s2.id);
     expect(s1.id).toMatch(/^[0-9a-f-]{36}$/i);
   });
   it('honors a caller-supplied id', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const s = pub.buildStatement(
       { verb: { id: 'http://verb/a' } },
       { id: 'fixed-id-123' },
@@ -132,8 +130,7 @@ describe('XAPIPublisher — buildStatement', () => {
     expect(s.id).toBe('fixed-id-123');
   });
   it('defaults object to activityId Activity', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     expect(s.object).toEqual({
       id: 'https://example.com/courses/1',
@@ -141,18 +138,14 @@ describe('XAPIPublisher — buildStatement', () => {
     });
   });
   it('attaches grouping[] = [activityId] in context', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     expect(s.context?.contextActivities?.grouping).toEqual([
       { id: 'https://example.com/courses/1' },
     ]);
   });
   it('attaches cmi5 sessionid extension under cmi5Mode', async () => {
-    const pub = new XAPIPublisher(
-      basicOpts({ cmi5Mode: true, sessionId: 'sess-42' }),
-    );
-    await pub.init();
+    const pub = await initPublisher({ cmi5Mode: true, sessionId: 'sess-42' });
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     expect(
       s.context?.extensions?.[
@@ -161,14 +154,12 @@ describe('XAPIPublisher — buildStatement', () => {
     ).toBe('sess-42');
   });
   it('omits cmi5 sessionid extension when not in cmi5 mode', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
     expect(s.context?.extensions).toBeUndefined();
   });
   it('preserves caller-supplied context.extensions', async () => {
-    const pub = new XAPIPublisher(basicOpts({ cmi5Mode: true }));
-    await pub.init();
+    const pub = await initPublisher({ cmi5Mode: true });
     const s = pub.buildStatement({
       verb: { id: 'http://verb/a' },
       context: { extensions: { 'http://my/ext': 'value' } },
@@ -192,15 +183,13 @@ describe('XAPIPublisher — buildStatement', () => {
 
 describe('XAPIPublisher — sendStatement validation', () => {
   it('rejects missing verb.id', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     await expect(pub.sendStatement({ verb: { id: '' } })).rejects.toThrow(
       XAPIStatementError,
     );
   });
   it('rejects missing object.id when object supplied', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     await expect(
       pub.sendStatement({
         verb: { id: 'http://verb/a' },
@@ -209,8 +198,7 @@ describe('XAPIPublisher — sendStatement validation', () => {
     ).rejects.toThrow(XAPIStatementError);
   });
   it('rejects score.scaled out of range', async () => {
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     await expect(
       pub.sendStatement({
         verb: { id: 'http://verb/a' },
@@ -219,9 +207,8 @@ describe('XAPIPublisher — sendStatement validation', () => {
     ).rejects.toThrow(XAPIStatementError);
   });
   it('accepts score.scaled in [-1, 1]', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({
       verb: { id: 'http://verb/a' },
       result: { score: { scaled: -0.5 } },
@@ -232,45 +219,35 @@ describe('XAPIPublisher — sendStatement validation', () => {
 
 describe('XAPIPublisher — send + retry', () => {
   it('reports ok on 204', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 204 });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.destinations[0]).toMatchObject({ ok: true, status: 204 });
   });
 
   it('treats 409 as success (idempotent replay)', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 409 });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(409));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.destinations[0]).toMatchObject({ ok: true, status: 409 });
   });
 
   it('retries on 5xx and eventually succeeds', async () => {
-    let n = 0;
-    mockFetch.mockImplementation(async () => {
-      n++;
-      if (n < 3) return { ok: false, status: 503 };
-      return { ok: true, status: 204 };
-    });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch
+      .mockResolvedValueOnce(respond(503))
+      .mockResolvedValueOnce(respond(503))
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    expect(n).toBe(3);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(r.destinations[0].ok).toBe(true);
   });
 
   it('short-circuits on 4xx (no retry)', async () => {
-    let n = 0;
-    mockFetch.mockImplementation(async () => {
-      n++;
-      return { ok: false, status: 400 };
-    });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(400));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    expect(n).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(r.destinations[0]).toMatchObject({ ok: false, status: 400 });
   });
 
@@ -279,14 +256,13 @@ describe('XAPIPublisher — send + retry', () => {
     // returns rich text like "Forbidden cmi5 defined statement: ..."
     // and dropping it on the floor turns every 403 into "LRS responded
     // 403" with no actionable hint.
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 403,
-      text: async () =>
+    mockFetch.mockResolvedValue(
+      respond(
+        403,
         'Forbidden cmi5 defined statement: context.contextActivities.grouping does not contain Publisher Activity',
-    });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+      ),
+    );
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.destinations[0].ok).toBe(false);
     expect(r.destinations[0].status).toBe(403);
@@ -294,25 +270,19 @@ describe('XAPIPublisher — send + retry', () => {
   });
 
   it('per-statement retry: false sends once and reports outcome', async () => {
-    let n = 0;
-    mockFetch.mockImplementation(async () => {
-      n++;
-      return { ok: false, status: 503 };
-    });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(503));
+    const pub = await initPublisher();
     const r = await pub.sendStatement(
       { verb: { id: 'http://verb/a' } },
       { retry: false },
     );
-    expect(n).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(r.destinations[0]).toMatchObject({ ok: false, status: 503 });
   });
 
   it('returns the fully-formed statement with actor + timestamp filled', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.statement.actor).toEqual({
       mbox: 'mailto:test@example.com',
@@ -325,9 +295,8 @@ describe('XAPIPublisher — send + retry', () => {
 
 describe('XAPIPublisher — auth header', () => {
   it('attaches Basic <token> Authorization header', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts({ auth: 'mytoken' }));
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher({ auth: 'mytoken' });
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('Authorization')).toBe('Basic mytoken');
@@ -335,9 +304,8 @@ describe('XAPIPublisher — auth header', () => {
   });
 
   it('omits Authorization header when auth is empty string', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts({ auth: '' }));
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher({ auth: '' });
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('Authorization')).toBeNull();
@@ -346,18 +314,16 @@ describe('XAPIPublisher — auth header', () => {
 
 describe('XAPIPublisher — version header', () => {
   it('defaults the X-Experience-API-Version header to 1.0.3', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
   });
 
   it('uses the supplied version on the header when given', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts({ version: '2.0.0' }));
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher({ version: '2.0.0' });
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('X-Experience-API-Version')).toBe('2.0.0');
@@ -366,10 +332,9 @@ describe('XAPIPublisher — version header', () => {
 
 describe('XAPIPublisher — function-form auth and 401 handling', () => {
   it('resolves a function-form auth on first send', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const resolver = vi.fn().mockResolvedValue('resolved-tok');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(resolver).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0][1].headers.get('Authorization')).toBe(
@@ -378,39 +343,33 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
   });
 
   it('caches the resolved token across sends', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const resolver = vi.fn().mockResolvedValue('tok-v1');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     await pub.sendStatement({ verb: { id: 'http://verb/b' } });
     expect(resolver).toHaveBeenCalledTimes(1);
   });
 
   it('on 401 with function-form auth, re-resolves and retries the request once', async () => {
-    let n = 0;
-    mockFetch.mockImplementation(async () => {
-      n++;
-      if (n === 1) return { ok: false, status: 401 };
-      return { ok: true, status: 204 };
-    });
+    mockFetch
+      .mockResolvedValueOnce(respond(401))
+      .mockResolvedValue(respond(204));
     const resolver = vi
       .fn()
       .mockResolvedValueOnce('stale-tok')
       .mockResolvedValueOnce('fresh-tok');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    expect(n).toBe(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(resolver).toHaveBeenCalledTimes(2);
     expect(r.destinations[0].ok).toBe(true);
   });
 
   it('on two consecutive 401s, marks auth dead', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 401 });
+    mockFetch.mockResolvedValue(respond(401));
     const resolver = vi.fn().mockResolvedValue('tok');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     const r1 = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r1.destinations[0]).toMatchObject({ ok: false, status: 401 });
     // Subsequent send should fail-fast without hitting fetch.
@@ -421,24 +380,19 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
   });
 
   it('dead-flag persists for the publisher lifetime — subsequent sends never hit fetch', async () => {
-    let n = 0;
     // First send: two 401s mark dead. Anything after must short-circuit
     // before fetch is touched — the test asserts that explicitly.
-    mockFetch.mockImplementation(async () => {
-      n++;
-      return { ok: false, status: 401 };
-    });
+    mockFetch.mockResolvedValue(respond(401));
     const resolver = vi.fn().mockResolvedValue('tok');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     const r1 = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    expect(n).toBe(2); // initial + one re-resolve attempt
+    expect(mockFetch).toHaveBeenCalledTimes(2); // initial + one re-resolve attempt
     expect(r1.destinations[0]).toMatchObject({ ok: false, status: 401 });
 
     // Pretend the LRS would accept us now — the publisher must not
     // discover that, because the dead-flag short-circuits before fetch.
     mockFetch.mockReset();
-    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+    mockFetch.mockResolvedValue(respond(204));
 
     const r2 = await pub.sendStatement({ verb: { id: 'http://verb/b' } });
     expect(mockFetch).not.toHaveBeenCalled();
@@ -452,20 +406,18 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
   });
 
   it('rejects if the auth resolver throws', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const resolver = vi.fn().mockRejectedValue(new Error('network'));
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.destinations[0].ok).toBe(false);
     expect(r.destinations[0].error?.message).toMatch(/auth resolver/);
   });
 
   it('rejects if the auth resolver returns the "Basic " prefix', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const resolver = vi.fn().mockResolvedValue('Basic tok');
-    const pub = new XAPIPublisher(basicOpts({ auth: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ auth: resolver });
     const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     expect(r.destinations[0].ok).toBe(false);
   });
@@ -474,8 +426,7 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
 describe('XAPIPublisher — function-form actor', () => {
   it('resolves an actor function during init', async () => {
     const resolver = vi.fn().mockResolvedValue({ mbox: 'mailto:resolved@e.c' });
-    const pub = new XAPIPublisher(basicOpts({ actor: resolver }));
-    await pub.init();
+    const pub = await initPublisher({ actor: resolver });
     expect(pub.getActor()).toEqual({ mbox: 'mailto:resolved@e.c' });
     expect(resolver).toHaveBeenCalledTimes(1);
   });
@@ -502,14 +453,13 @@ describe('XAPIPublisher — queue ordering', () => {
       const body = JSON.parse(opts.body);
       const verb = body.verb.id;
       order.push(verb);
-      return { ok: true };
+      return respond(204);
     });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     pub.sendStatement({ verb: { id: 'http://verb/1' } });
     pub.sendStatement({ verb: { id: 'http://verb/2' } });
     pub.sendStatement({ verb: { id: 'http://verb/3' } });
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
     expect(order).toEqual(['http://verb/1', 'http://verb/2', 'http://verb/3']);
   });
 });
@@ -519,23 +469,21 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const order: string[] = [];
     mockFetch.mockImplementation(async () => {
       order.push('send');
-      return { ok: true };
+      return respond(204);
     });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     pub.sendStatement({ verb: { id: 'http://verb/1' } });
     pub.chainTask(async () => {
       order.push('task');
     });
     pub.sendStatement({ verb: { id: 'http://verb/2' } });
-    await new Promise((r) => setTimeout(r, 50));
+    await flush();
     expect(order).toEqual(['send', 'task', 'send']);
   });
 
   it('markUnloading flips keepalive on subsequent sends', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     pub.markUnloading();
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
@@ -544,13 +492,12 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
     mockFetch
       .mockReturnValueOnce(new Promise(() => {}))
-      .mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const inflight = pub.sendStatement({
       verb: { id: 'http://verb/in-flight' },
     });
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     const queued = pub.sendStatement({ verb: { id: 'http://verb/queued' } });
 
     const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
@@ -574,12 +521,11 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal takes a statement waiting to retry into its batch', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+      .mockResolvedValueOnce(respond(503))
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
     await vi.advanceTimersByTimeAsync(0);
 
@@ -597,9 +543,8 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal with nothing queued posts a single statement', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     await pub.sendFinal({ verb: { id: 'http://verb/final' } });
     expect(JSON.parse(mockFetch.mock.calls[0][1].body).verb.id).toBe(
       'http://verb/final',
@@ -607,12 +552,11 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal retries a 5xx', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
-      .mockResolvedValue({ ok: true });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+      .mockResolvedValueOnce(respond(503))
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
     const final = pub.sendFinal({ verb: { id: 'http://verb/final' } });
     await vi.advanceTimersByTimeAsync(600_000);
 
@@ -626,14 +570,13 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
       if (++calls === 1) return new Promise(() => {});
       return Promise.resolve(
         verbIds(init.body as string).includes('http://verb/bad')
-          ? { ok: false, status: 400, text: async () => '' }
-          : { ok: true },
+          ? respond(400)
+          : respond(204),
       );
     });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     void pub.sendStatement({ verb: { id: 'http://verb/head' } });
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     const good = pub.sendStatement({ verb: { id: 'http://verb/good' } });
     const bad = pub.sendStatement({ verb: { id: 'http://verb/bad' } });
 
@@ -663,18 +606,17 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   });
 
   it('sendFinal resends each statement, then the final one alone, when a batch carrying an earlier statement gets a 409', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     let calls = 0;
     mockFetch.mockImplementation((_url: string, init: RequestInit) => {
       if (++calls === 1) return Promise.reject(new TypeError('reset'));
       return Promise.resolve(
         verbIds(init.body as string).includes('http://verb/retry')
-          ? { ok: false, status: 409, text: async () => '' }
-          : { ok: true },
+          ? respond(409)
+          : respond(204),
       );
     });
-    const pub = new XAPIPublisher(basicOpts());
-    await pub.init();
+    const pub = await initPublisher();
     const retrying = pub.sendStatement({ verb: { id: 'http://verb/retry' } });
     await vi.advanceTimersByTimeAsync(0);
 
@@ -710,7 +652,7 @@ describe('XAPIClient — fan-out', () => {
   }
 
   it('fans out one statement to every destination with a shared id', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const p1 = makePub('https://lrs1.example.com/xapi/');
     const p2 = makePub('https://lrs2.example.com/xapi/');
     await p1.init();
@@ -730,9 +672,8 @@ describe('XAPIClient — fan-out', () => {
 
   it('isolates failures — one destination 5xx does not affect another', async () => {
     mockFetch.mockImplementation(async (url) => {
-      if (String(url).startsWith('https://lrs1.'))
-        return { ok: false, status: 503 };
-      return { ok: true, status: 204 };
+      if (String(url).startsWith('https://lrs1.')) return respond(503);
+      return respond(204);
     });
     const p1 = makePub('https://lrs1.example.com/xapi/');
     const p2 = makePub('https://lrs2.example.com/xapi/');
@@ -783,7 +724,7 @@ describe('XAPIClient — fan-out', () => {
   });
 
   it('after the shared launch publisher sends Terminated, drops author sends to it but still sends to independent destinations', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(respond(204));
     const launchPub = new XAPIPublisher({
       endpoint: 'https://cmi5.example.com/xapi/',
       auth: 'tok',

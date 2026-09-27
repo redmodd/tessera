@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -8,23 +8,15 @@ import {
   readdirSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import type { Plugin } from 'vite';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
+import { tempDir } from './helpers.js';
 
 let projectRoot: string;
 
 beforeEach(() => {
-  projectRoot = resolve(
-    tmpdir(),
-    `tessera-output-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(resolve(projectRoot, 'pages'), { recursive: true });
-});
-
-afterEach(() => {
-  if (existsSync(projectRoot))
-    rmSync(projectRoot, { recursive: true, force: true });
+  projectRoot = tempDir();
+  mkdirSync(resolve(projectRoot, 'pages'));
 });
 
 function findPlugin(name: string, command: Command = 'build'): Plugin {

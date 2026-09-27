@@ -1,41 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   resolveCourse,
   findWorkspaceRoot,
   listCourses,
   listMalformedCourses,
+  type ResolveResult,
 } from '../src/plugin/course-root.js';
+import { makeWorkspace } from './helpers.js';
 
 let ws: string;
-let counter = 0;
 
-// Build a workspace dir tree: courses/<name>/course.config.js for each name.
-function makeWorkspace(courses: string[]): string {
-  counter++;
-  const root = resolve(
-    tmpdir(),
-    `tessera-course-root-${Date.now()}-${counter}`,
-  );
-  mkdirSync(join(root, 'courses'), { recursive: true });
-  for (const name of courses) {
-    const dir = join(root, 'courses', name);
-    mkdirSync(join(dir, 'pages'), { recursive: true });
-    writeFileSync(join(dir, 'course.config.js'), 'export default {};');
-  }
-  return root;
+function errorOf(result: ResolveResult): string {
+  expect(result.ok).toBe(false);
+  return result.ok ? '' : result.error;
 }
 
 beforeEach(() => {
   ws = makeWorkspace(['getting-started', 'advanced']);
-});
-
-afterEach(() => {
-  try {
-    rmSync(ws, { recursive: true, force: true });
-  } catch {}
 });
 
 describe('findWorkspaceRoot', () => {
@@ -111,23 +95,17 @@ describe('resolveCourse', () => {
   });
 
   it('errors and lists available courses when a named course does not exist', () => {
-    const result = resolveCourse(ws, 'missing');
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('missing');
-      expect(result.error).toContain('advanced');
-      expect(result.error).toContain('getting-started');
-    }
+    const error = errorOf(resolveCourse(ws, 'missing'));
+    expect(error).toContain('missing');
+    expect(error).toContain('advanced');
+    expect(error).toContain('getting-started');
   });
 
   it('errors with a hint when no name is given outside a course dir', () => {
-    const result = resolveCourse(ws);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('advanced');
-      expect(result.error).toContain('getting-started');
-      expect(result.error.toLowerCase()).toContain('course');
-    }
+    const error = errorOf(resolveCourse(ws));
+    expect(error.toLowerCase()).toContain('course');
+    expect(error).toContain('advanced');
+    expect(error).toContain('getting-started');
   });
 
   it('does not change meaning at the workspace root as courses are added', () => {
@@ -136,17 +114,15 @@ describe('resolveCourse', () => {
     expect(resolveCourse(one).ok).toBe(false);
     // ...and still errors with two — never silently picks a course.
     expect(resolveCourse(ws).ok).toBe(false);
-    rmSync(one, { recursive: true, force: true });
   });
 
   it('rejects a path-traversing or otherwise invalid course name before resolving', () => {
-    const traverse = resolveCourse(ws, '../advanced');
-    expect(traverse.ok).toBe(false);
-    if (!traverse.ok) expect(traverse.error).toContain('Invalid course name');
-
-    const bad = resolveCourse(ws, 'Bad/Name');
-    expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.error).toContain('Invalid course name');
+    for (const name of ['../advanced', 'Bad/Name']) {
+      expect(resolveCourse(ws, name)).toEqual({
+        ok: false,
+        error: expect.stringContaining('Invalid course name'),
+      });
+    }
   });
 
   it('errors when a name is given but cwd is not inside a workspace', () => {
@@ -156,11 +132,8 @@ describe('resolveCourse', () => {
 
   it('surfaces a malformed course in the hint instead of silently dropping it', () => {
     mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
-    const result = resolveCourse(ws, 'half-built');
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('half-built');
-      expect(result.error).toContain('course.config.js');
-    }
+    const error = errorOf(resolveCourse(ws, 'half-built'));
+    expect(error).toContain('half-built');
+    expect(error).toContain('course.config.js');
   });
 });

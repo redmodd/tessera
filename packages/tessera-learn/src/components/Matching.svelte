@@ -7,6 +7,18 @@
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
 
+  /**
+   * @type {{
+   *   id?: string;
+   *   question: string;
+   *   pairs: { left: string; right: string }[];
+   *   correctFeedback?: string;
+   *   incorrectFeedback?: string;
+   *   graded?: boolean;
+   *   maxRetries?: number;
+   *   weight?: number;
+   * }}
+   */
   let {
     id,
     question,

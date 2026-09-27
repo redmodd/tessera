@@ -1,5 +1,4 @@
-import type { Scorm12API } from 'scorm-again/scorm12';
-import type { Scorm2004API } from 'scorm-again/scorm2004';
+import type { Scorm12API, Scorm2004API } from 'scorm-again';
 
 export interface CapturedError {
   key: string;

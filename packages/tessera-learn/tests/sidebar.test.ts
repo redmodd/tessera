@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
+import { describe, it, expect } from 'vitest';
+import { flushSync } from 'svelte';
 import Sidebar from '../src/components/Sidebar.svelte';
+import { mountInBody } from './helpers/mount.js';
 
 function mountSidebar({
   slugs = ['welcome'],
-  isPageLocked = (_i: number) => false,
+  isPageLocked = (_i: number): boolean => false,
   config = { title: 'Demo' } as object,
 } = {}) {
   const pages = slugs.map((slug, index) => ({
@@ -35,25 +36,13 @@ function mountSidebar({
     prefetch: () => {},
     goToPage: () => {},
   };
-  const target = document.createElement('div');
-  document.body.appendChild(target);
-  component = mount(Sidebar, {
-    target,
+  return mountInBody(Sidebar, {
     props: {},
     context: new Map([['tessera-nav', { nav, manifest, config }]]),
-  });
-  return target;
+  }).target;
 }
 
-let component: ReturnType<typeof mount> | null = null;
-
 describe('Sidebar', () => {
-  afterEach(() => {
-    if (component) unmount(component);
-    component = null;
-    document.body.innerHTML = '';
-  });
-
   it('clicking a section title collapses and re-expands its pages', () => {
     const target = mountSidebar();
 

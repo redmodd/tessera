@@ -1,43 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  mkdirSync,
-  rmSync,
-  existsSync,
-  writeFileSync,
-  readFileSync,
-} from 'node:fs';
-import { resolve, join } from 'node:path';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mkdirSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runDuplicate } from '../src/plugin/duplicate-cli.js';
+import { makeWorkspace, printed } from './helpers.js';
 
 let ws: string;
-let counter = 0;
 
-function makeWorkspace(): string {
-  counter++;
-  const root = resolve(tmpdir(), `tessera-dup-test-${Date.now()}-${counter}`);
-  mkdirSync(join(root, 'courses'), { recursive: true });
-  return root;
-}
-
-function seedCourse(name: string): string {
+function seedCourse(
+  name: string,
+  config = "export default { title: 'Src' };",
+): string {
   const dir = join(ws, 'courses', name);
   mkdirSync(join(dir, 'pages'), { recursive: true });
-  writeFileSync(
-    join(dir, 'course.config.js'),
-    "export default { title: 'Src' };",
-  );
+  writeFileSync(join(dir, 'course.config.js'), config);
   writeFileSync(join(dir, 'pages', 'index.svelte'), '<h1>hi</h1>');
   return dir;
-}
-
-// Seed courses/src with a hand-written config to exercise the id rewriter.
-function writeSrcConfig(config: string): string {
-  const src = join(ws, 'courses', 'src');
-  mkdirSync(join(src, 'pages'), { recursive: true });
-  writeFileSync(join(src, 'course.config.js'), config);
-  writeFileSync(join(src, 'pages', 'index.svelte'), '<h1>hi</h1>');
-  return src;
 }
 
 function readCopyConfig(): string {
@@ -46,13 +24,7 @@ function readCopyConfig(): string {
 
 beforeEach(() => {
   ws = makeWorkspace();
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-  try {
-    rmSync(ws, { recursive: true, force: true });
-  } catch {}
+  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
 describe('runDuplicate', () => {
@@ -65,7 +37,6 @@ describe('runDuplicate', () => {
     mkdirSync(join(src, 'node_modules', '.tessera-a11y'), { recursive: true });
     writeFileSync(join(src, 'node_modules', '.tessera-a11y', 'index.html'), '');
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const code = runDuplicate('src', 'copy', ws);
     expect(code).toBe(0);
 
@@ -86,11 +57,11 @@ describe('runDuplicate', () => {
   });
 
   it('regenerates the course id so the copy is a distinct course', () => {
-    const src = writeSrcConfig(
+    const src = seedCourse(
+      'src',
       "export default {\n  title: 'Src',\n  id: 'urn:uuid:original',\n};",
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -104,17 +75,16 @@ describe('runDuplicate', () => {
 
   it('injects an id when the source course has none', () => {
     seedCourse('src');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
     expect(readCopyConfig()).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
   });
 
   it('regenerates a backtick-quoted id', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       'export default {\n  title: "Src",\n  id: `urn:uuid:original`,\n};',
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -123,9 +93,8 @@ describe('runDuplicate', () => {
   });
 
   it('replaces a non-string id in place rather than duplicating the key', () => {
-    writeSrcConfig("export default {\n  title: 'Src',\n  id: 123,\n};");
+    seedCourse('src', "export default {\n  title: 'Src',\n  id: 123,\n};");
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -135,11 +104,11 @@ describe('runDuplicate', () => {
   });
 
   it('rewrites a quoted top-level id key in place', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       "export default {\n  title: 'Src',\n  'id': 'urn:uuid:original',\n};",
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -149,11 +118,11 @@ describe('runDuplicate', () => {
   });
 
   it('rewrites the real id and leaves an id: mentioned in a comment alone', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       "export default {\n  // remember to set the id: properly\n  title: 'X',\n  id: 'urn:uuid:original',\n};",
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -163,21 +132,21 @@ describe('runDuplicate', () => {
   });
 
   it('injects an id when only a comment mentions id:', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       '// set the id: below\nexport default {\n  title: "Src",\n};',
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
     expect(readCopyConfig()).toMatch(/id: 'urn:uuid:[0-9a-f-]{36}'/);
   });
 
   it('regenerates the id of an indirectly exported config', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       "const config = {\n  title: 'X',\n  id: 'urn:uuid:original',\n};\nexport default config;",
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -186,11 +155,11 @@ describe('runDuplicate', () => {
   });
 
   it('regenerates the id of a wrapped (call-form) export', () => {
-    writeSrcConfig(
+    seedCourse(
+      'src',
       "export default defineConfig({\n  title: 'Src',\n  id: 'urn:uuid:original',\n});",
     );
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
 
     const copy = readCopyConfig();
@@ -200,9 +169,8 @@ describe('runDuplicate', () => {
   });
 
   it('warns and leaves identity unset when no id-bearing object is found', () => {
-    writeSrcConfig("export default makeConfig('src');");
+    seedCourse('src', "export default makeConfig('src');");
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(runDuplicate('src', 'copy', ws)).toBe(0);
     expect(warn).toHaveBeenCalledWith(
@@ -216,9 +184,7 @@ describe('runDuplicate', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = runDuplicate('src', 'Bad Name', ws);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ').toLowerCase()).toContain(
-      'lowercase',
-    );
+    expect(printed(err).toLowerCase()).toContain('lowercase');
     expect(existsSync(join(ws, 'courses', 'Bad Name'))).toBe(false);
   });
 
@@ -226,7 +192,7 @@ describe('runDuplicate', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = runDuplicate('missing', 'copy', ws);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('not found');
+    expect(printed(err)).toContain('not found');
     expect(existsSync(join(ws, 'courses', 'copy'))).toBe(false);
   });
 
@@ -234,9 +200,7 @@ describe('runDuplicate', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = runDuplicate('src', 'copy', tmpdir());
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ').toLowerCase()).toContain(
-      'workspace',
-    );
+    expect(printed(err).toLowerCase()).toContain('workspace');
   });
 
   it('refuses when <new> already exists and leaves it untouched', () => {
@@ -248,7 +212,7 @@ describe('runDuplicate', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const code = runDuplicate('src', 'copy', ws);
     expect(code).toBe(1);
-    expect(err.mock.calls.flat().join(' ')).toContain('already exists');
+    expect(printed(err)).toContain('already exists');
     // Pre-existing dir untouched, no partial overwrite.
     expect(readFileSync(join(dest, 'marker.txt'), 'utf-8')).toBe('original');
     expect(existsSync(join(dest, 'course.config.js'))).toBe(false);
@@ -256,7 +220,6 @@ describe('runDuplicate', () => {
 
   it('copies a source course whose name collides with a skip entry', () => {
     seedCourse('dist');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const code = runDuplicate('dist', 'copy', ws);
     expect(code).toBe(0);
 

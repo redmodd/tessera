@@ -1,14 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  mkdirSync,
-  writeFileSync,
-  rmSync,
-  existsSync,
-  readdirSync,
-} from 'node:fs';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { main } from '../src/plugin/cli.js';
+import { makeWorkspace, printed } from './helpers.js';
 
 const { runAudit, runBuild, runDev, runValidate } = vi.hoisted(() => ({
   runAudit: vi.fn(async () => 0),
@@ -25,37 +19,15 @@ vi.mock('../src/plugin/validate-cli.js', () => ({ runValidate }));
 
 let ws: string;
 let course: string;
-let counter = 0;
 
-function makeWorkspace(courses: string[]): string {
-  counter++;
-  const root = resolve(tmpdir(), `tessera-cli-disp-${Date.now()}-${counter}`);
-  mkdirSync(join(root, 'courses'), { recursive: true });
-  for (const name of courses) {
-    const dir = join(root, 'courses', name);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'course.config.js'), 'export default {};');
-  }
-  return root;
-}
-
-function stderr(): string {
-  return vi.mocked(console.error).mock.calls.flat().join('\n');
-}
+const stderr = () => printed(vi.mocked(console.error));
+const stdout = () => printed(vi.mocked(console.log));
 
 beforeEach(() => {
-  vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   ws = makeWorkspace(['getting-started']);
   course = join(ws, 'courses', 'getting-started');
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-  try {
-    rmSync(ws, { recursive: true, force: true });
-  } catch {}
 });
 
 describe('main dispatch', () => {
@@ -173,5 +145,37 @@ describe('main dispatch', () => {
       expect(run).not.toHaveBeenCalled();
     }
     expect(readdirSync(join(ws, 'courses'))).toEqual(['getting-started']);
+  });
+});
+
+describe('usage', () => {
+  it('returns non-zero and prints usage with no subcommand', async () => {
+    expect(await main([])).toBe(1);
+    expect(stderr()).toContain('Usage: tessera');
+  });
+
+  it('returns non-zero and prints usage for an unknown subcommand', async () => {
+    expect(await main(['frobnicate'])).toBe(1);
+    expect(stderr()).toContain('Unknown command: frobnicate');
+  });
+
+  it.each([
+    'a11y --help',
+    'check -h',
+    'new --help',
+    'duplicate --help',
+    'duplicate src -h',
+    'export --bogus --help',
+  ])('prints usage and exits 0 for `%s`', async (command) => {
+    expect(await main(command.split(' '))).toBe(0);
+    expect(stdout()).toContain('Usage: tessera');
+  });
+
+  it('lists each flag once, under the commands that take it', async () => {
+    await main(['--help']);
+    expect(stdout()).toMatch(/^export\/validate options:\n {2}--standard </m);
+    expect(stdout()).toMatch(
+      /^a11y\/check options:\n {2}--threshold <minor\|/m,
+    );
   });
 });

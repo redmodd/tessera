@@ -1,6 +1,6 @@
 // LMS doubles backed by scorm-again that validate writes against the spec.
-import { Scorm12API } from 'scorm-again/scorm12';
-import { Scorm2004API } from 'scorm-again/scorm2004';
+import { onTestFinished } from 'vitest';
+import { Scorm12API, Scorm2004API } from 'scorm-again';
 import type { SCORM12API } from '../../src/runtime/adapters/scorm12.js';
 import type { SCORM2004API } from '../../src/runtime/adapters/scorm2004.js';
 import {
@@ -8,6 +8,7 @@ import {
   createScorm12ErrorCapture,
   createScorm2004ErrorCapture,
 } from './scorm-error-capture.js';
+import { valuesUnder } from '../helpers.js';
 
 interface RealLms<TApi, TRaw> {
   api: TApi;
@@ -68,19 +69,15 @@ export function createReal12Lms(): RealLms12 {
     LMSGetDiagnostic: (c) => raw.LMSGetDiagnostic(c),
   };
 
-  return {
-    api,
-    raw,
-    errors,
-    log,
-    dispose: () => {
-      try {
-        if (!raw.isTerminated()) raw.LMSFinish('');
-      } catch {
-        /* already torn down */
-      }
-    },
+  const dispose = () => {
+    try {
+      if (!raw.isTerminated()) raw.LMSFinish('');
+    } catch {
+      /* already torn down */
+    }
   };
+  onTestFinished(dispose);
+  return { api, raw, errors, log, dispose };
 }
 
 export function createReal2004Lms(): RealLms2004 {
@@ -128,19 +125,15 @@ export function createReal2004Lms(): RealLms2004 {
     GetDiagnostic: (c) => raw.GetDiagnostic(c),
   };
 
-  return {
-    api,
-    raw,
-    errors,
-    log,
-    dispose: () => {
-      try {
-        if (!raw.isTerminated()) raw.Terminate('');
-      } catch {
-        /* already torn down */
-      }
-    },
+  const dispose = () => {
+    try {
+      if (!raw.isTerminated()) raw.Terminate('');
+    } catch {
+      /* already torn down */
+    }
   };
+  onTestFinished(dispose);
+  return { api, raw, errors, log, dispose };
 }
 
 // Simulate an LMS re-launch (resume): snapshot the committed CMI off the
@@ -162,20 +155,14 @@ export function relaunch2004(prev: RealLms2004): RealLms2004 {
   return next;
 }
 
-/** Collect the values written for a given dotted-key prefix, from the log. */
 export function writtenValues(
   log: string[][],
   prefix: string,
 ): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of log) {
-    const [method, key, value] = entry;
-    if (
-      (method === 'LMSSetValue' || method === 'SetValue') &&
-      key?.startsWith(prefix)
-    ) {
-      out[key] = value;
-    }
-  }
-  return out;
+  return valuesUnder(
+    log
+      .filter(([method]) => method === 'LMSSetValue' || method === 'SetValue')
+      .map(([, key, value]) => [key, value]),
+    prefix,
+  );
 }

@@ -5,7 +5,13 @@ import {
 } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { validateAgent } from '../src/runtime/xapi/validation.js';
-import { flush, scorm12Api } from './helpers.js';
+import {
+  flush,
+  printed,
+  scorm12Api,
+  useFakeTimers,
+  valuesUnder,
+} from './helpers.js';
 
 describe('SCORM12Adapter', () => {
   let api: Mocked<SCORM12API>;
@@ -27,7 +33,7 @@ describe('SCORM12Adapter', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      q: { '2': 80 },
+      g: { '2': { s: 80 } },
       d: 100,
     };
     api.LMSGetValue.mockImplementation((key) =>
@@ -47,10 +53,10 @@ describe('SCORM12Adapter', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
-    expect(
-      warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
-    ).toBe(true);
-    warn.mockRestore();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/not valid JSON/),
+      expect.any(Error),
+    );
   });
 
   // ---- saveState / suspend_data ----
@@ -60,7 +66,6 @@ describe('SCORM12Adapter', () => {
     const state: SavedState = {
       b: 5,
       v: [0, 1, 2, 3, 4, 5],
-      q: {},
       d: 200,
     };
     adapter.saveState(state);
@@ -73,7 +78,7 @@ describe('SCORM12Adapter', () => {
 
   it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
     await adapter.init();
-    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 });
+    adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], d: 50 });
     await flush();
     expect(api.LMSSetValue).toHaveBeenCalledWith(
       'cmi.core.lesson_location',
@@ -86,7 +91,7 @@ describe('SCORM12Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       const big = { padding: 'x'.repeat(4200) };
-      const state: SavedState = { b: 0, v: [], q: {}, d: 0, u: { big } };
+      const state: SavedState = { b: 0, v: [], d: 0, u: { big } };
       adapter.saveState(state);
       adapter.saveState(state);
       await flush();
@@ -94,16 +99,14 @@ describe('SCORM12Adapter', () => {
       expect(warn.mock.calls[0][0]).toMatch(
         /SCORM 1\.2 cmi\.suspend_data 4096/,
       );
-      warn.mockRestore();
     });
 
     it('does not warn for state under the limit', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
-      adapter.saveState({ b: 0, v: [0], q: {}, d: 0 });
+      adapter.saveState({ b: 0, v: [0], d: 0 });
       await flush();
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('still writes the oversize value to the LMS', async () => {
@@ -112,7 +115,6 @@ describe('SCORM12Adapter', () => {
       const state: SavedState = {
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'y'.repeat(4200) },
       };
@@ -145,7 +147,6 @@ describe('SCORM12Adapter', () => {
       expect(warn).not.toHaveBeenCalledWith(
         expect.stringContaining('cmi.student_data.mastery_score'),
       );
-      warn.mockRestore();
     });
 
     it.each(['abc', '-1', '101'])(
@@ -156,7 +157,6 @@ describe('SCORM12Adapter', () => {
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining('cmi.student_data.mastery_score'),
         );
-        warn.mockRestore();
       },
     );
 
@@ -299,7 +299,7 @@ describe('SCORM12Adapter', () => {
       return 'true';
     });
 
-    adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
+    adapter.saveState({ b: 0, v: [], d: 0 });
     adapter.setScore(85);
 
     await flush();
@@ -317,22 +317,17 @@ describe('SCORM12Adapter', () => {
       return callCount >= 3 ? 'true' : 'false';
     });
 
+    useFakeTimers();
     adapter.setScore(85);
-    // Allow async retries to complete
-    await new Promise((r) => setTimeout(r, 1000));
+    await vi.runAllTimersAsync();
     expect(callCount).toBeGreaterThanOrEqual(3);
   });
 
   // ---- interactions ----
 
   describe('reportInteraction', () => {
-    function setValuesFor(prefix: string): Record<string, string> {
-      const result: Record<string, string> = {};
-      for (const call of api.LMSSetValue.mock.calls) {
-        if (call[0].startsWith(prefix)) result[call[0]] = call[1];
-      }
-      return result;
-    }
+    const interaction0 = () =>
+      valuesUnder(api.LMSSetValue.mock.calls, 'cmi.interactions.0');
 
     it('writes choice interaction with student_response and HH:MM:SS time', async () => {
       adapter.reportInteraction(
@@ -341,13 +336,14 @@ describe('SCORM12Adapter', () => {
         false,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.id']).toBe('q1');
-      expect(v['cmi.interactions.0.type']).toBe('choice');
-      expect(v['cmi.interactions.0.student_response']).toBe('a,b');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
-      expect(v['cmi.interactions.0.result']).toBe('wrong');
-      expect(v['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+      expect(interaction0()).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        student_response: 'a,b',
+        'correct_responses.0.pattern': 'a',
+        result: 'wrong',
+        time: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
+      });
     });
 
     it('slugs non-alphanumeric choice identifiers (SCORM 1.2 CMIIdentifier)', async () => {
@@ -361,13 +357,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe(
-        '88_Earth_days,Iron_rich_dust',
-      );
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        '88_Earth_days',
-      );
+      expect(interaction0()).toMatchObject({
+        student_response: '88_Earth_days,Iron_rich_dust',
+        'correct_responses.0.pattern': '88_Earth_days',
+      });
     });
 
     it('encodes true-false as t/f per SCORM 1.2', async () => {
@@ -377,9 +370,10 @@ describe('SCORM12Adapter', () => {
         false,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('t');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('f');
+      expect(interaction0()).toMatchObject({
+        student_response: 't',
+        'correct_responses.0.pattern': 'f',
+      });
     });
 
     it('uses plain . and , delimiters for matching pairs', async () => {
@@ -399,13 +393,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe(
-        'Phobos.Mars,Europa.Jupiter',
-      );
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'Phobos.Mars,Europa.Jupiter',
-      );
+      expect(interaction0()).toMatchObject({
+        student_response: 'Phobos.Mars,Europa.Jupiter',
+        'correct_responses.0.pattern': 'Phobos.Mars,Europa.Jupiter',
+      });
     });
 
     it('maps choice response/correct to option indexes when options is supplied', async () => {
@@ -420,9 +411,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('2');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('2');
+      expect(interaction0()).toMatchObject({
+        student_response: '2',
+        'correct_responses.0.pattern': '2',
+      });
     });
 
     it('maps matching pairs to indexes via optionPairs', async () => {
@@ -440,9 +432,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('0.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('0.0');
+      expect(interaction0()).toMatchObject({
+        student_response: '0.0',
+        'correct_responses.0.pattern': '0.0',
+      });
     });
 
     it('falls back to slugging when options is not supplied', async () => {
@@ -452,11 +445,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('speed_limit');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'speed_limit',
-      );
+      expect(interaction0()).toMatchObject({
+        student_response: 'speed_limit',
+        'correct_responses.0.pattern': 'speed_limit',
+      });
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
@@ -466,13 +458,11 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.student_response']).toBe('22');
-      expect(
-        v['cmi.interactions.0.correct_responses.0.pattern'],
-      ).toBeUndefined();
+      const v = interaction0();
+      expect(v.student_response).toBe('22');
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
       // result still tells the LMS pass/fail
-      expect(v['cmi.interactions.0.result']).toBe('correct');
+      expect(v.result).toBe('correct');
     });
 
     it('keeps numeric correct_responses when min == max (single value)', async () => {
@@ -482,8 +472,8 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('7');
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBe('7');
     });
 
     it('writes one pattern per fill-in alternative', async () => {
@@ -493,9 +483,10 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('blue');
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('Blue');
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': 'blue',
+        'correct_responses.1.pattern': 'Blue',
+      });
     });
 
     it('emits no case_matters prefix (SCORM 1.2 has no such syntax)', async () => {
@@ -510,8 +501,8 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBe('Paris');
     });
 
     it('maps long-fill-in to fill-in (SCORM 1.2 has no long-fill-in type)', async () => {
@@ -525,8 +516,8 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('fill-in');
+      const v = interaction0();
+      expect(v.type).toBe('fill-in');
     });
 
     it('maps other to fill-in', async () => {
@@ -536,8 +527,8 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('fill-in');
+      const v = interaction0();
+      expect(v.type).toBe('fill-in');
     });
 
     it('writes result=correct for correct answers', async () => {
@@ -547,8 +538,8 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.result']).toBe('correct');
+      const v = interaction0();
+      expect(v.result).toBe('correct');
     });
 
     it('omits correct_responses and result when not provided', async () => {
@@ -558,11 +549,9 @@ describe('SCORM12Adapter', () => {
         null,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(
-        v['cmi.interactions.0.correct_responses.0.pattern'],
-      ).toBeUndefined();
-      expect(v['cmi.interactions.0.result']).toBeUndefined();
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
+      expect(v.result).toBeUndefined();
     });
   });
 
@@ -576,13 +565,12 @@ describe('SCORM12Adapter', () => {
       api.LMSGetErrorString.mockReturnValue('General Exception');
       api.LMSGetDiagnostic.mockReturnValue('LMS unavailable');
       await adapter.init();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      const messages = printed(warn);
       expect(messages).toMatch(/Initialize/);
       expect(messages).toMatch(/101/);
       expect(messages).toMatch(/General Exception/);
       expect(messages).toMatch(/LMS unavailable/);
       expect(messages).toMatch(/error 301/);
-      warn.mockRestore();
     });
 
     it('warns when cmi.interactions._count is non-numeric (would clobber prior records)', async () => {
@@ -591,10 +579,9 @@ describe('SCORM12Adapter', () => {
         key === 'cmi.interactions._count' ? 'NaN' : '',
       );
       await adapter.init();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      const messages = printed(warn);
       expect(messages).toMatch(/cmi\.interactions\._count/);
       expect(messages).toMatch(/overwrite prior session records/);
-      warn.mockRestore();
     });
 
     it('warns when LMSCommit fails during terminate', async () => {
@@ -604,10 +591,9 @@ describe('SCORM12Adapter', () => {
       api.LMSGetLastError.mockReturnValue('101');
       api.LMSGetErrorString.mockReturnValue('General Exception');
       adapter.terminate();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      const messages = printed(warn);
       expect(messages).toMatch(/Commit.*during terminate/);
       expect(messages).toMatch(/101/);
-      warn.mockRestore();
     });
 
     it('warns when LMSFinish fails during terminate', async () => {
@@ -617,9 +603,8 @@ describe('SCORM12Adapter', () => {
       api.LMSGetLastError.mockReturnValue('101');
       api.LMSGetErrorString.mockReturnValue('General Exception');
       adapter.terminate();
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      const messages = printed(warn);
       expect(messages).toMatch(/Terminate.*during terminate/);
-      warn.mockRestore();
     });
 
     it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
@@ -631,14 +616,14 @@ describe('SCORM12Adapter', () => {
       api.LMSGetDiagnostic.mockReturnValue(
         'student_response invalid CMIFeedback',
       );
+      useFakeTimers();
       adapter.setScore(85);
-      await new Promise((r) => setTimeout(r, 1000));
-      const messages = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      await vi.runAllTimersAsync();
+      const messages = printed(warn);
       expect(messages).toMatch(/cmi\.core\.score\.raw/);
       expect(messages).toMatch(/405/);
       expect(messages).toMatch(/Incorrect Data Type/);
       expect(messages).toMatch(/student_response invalid CMIFeedback/);
-      warn.mockRestore();
     });
   });
 

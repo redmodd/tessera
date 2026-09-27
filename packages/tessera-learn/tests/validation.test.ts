@@ -1,22 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { validateProject } from '../src/plugin/validation.js';
+import { tempDir } from './helpers.js';
 
-// Create a unique temp dir for each test
 let testRoot: string;
-let counter = 0;
-
-function createTestDir(): string {
-  counter++;
-  const dir = resolve(
-    tmpdir(),
-    `tessera-validation-test-${Date.now()}-${counter}`,
-  );
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
 
 function writeConfig(root: string, content: string): void {
   writeFileSync(resolve(root, 'course.config.js'), content, 'utf-8');
@@ -79,15 +67,7 @@ ${body}`,
 }
 
 beforeEach(() => {
-  testRoot = createTestDir();
-});
-
-afterEach(() => {
-  try {
-    rmSync(testRoot, { recursive: true, force: true });
-  } catch {
-    // cleanup best-effort
-  }
+  testRoot = tempDir();
 });
 
 // ---- Config Validation ----
@@ -969,7 +949,7 @@ export const pageConfig = { title: "Practice", quiz: { graded: true, required: f
     writeGradedPage(testRoot, 'a', 'required: false, weight: 25');
     writeGradedPage(testRoot, 'b', 'required: false, weight: 75');
     const { infos, warnings } = validateProject(testRoot);
-    const weighting = infos.filter((i) => i.includes('score weighting'));
+    const weighting = infos!.filter((i) => i.includes('score weighting'));
     expect(weighting).toHaveLength(1);
     expect(weighting[0]).toContain('no graded page is required');
     expect(weighting[0]).not.toContain('%');

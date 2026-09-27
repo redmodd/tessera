@@ -1,27 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
 import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 import { resolvedContext, resolvedPlugins } from './helpers/plugin.js';
+import { tempDir } from './helpers.js';
 
 let projectRoot: string;
 
 beforeEach(() => {
-  projectRoot = mkdtempSync(resolve(tmpdir(), 'tessera-virtual-test-'));
+  projectRoot = tempDir();
   mkdirSync(resolve(projectRoot, 'pages'));
-});
-
-afterEach(() => {
-  rmSync(projectRoot, { recursive: true, force: true });
 });
 
 function tesseraSubPlugin(name: string) {

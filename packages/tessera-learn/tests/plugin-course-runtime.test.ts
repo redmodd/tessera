@@ -1,21 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { normalizePath } from 'vite';
 
 import { tesseraCourseRuntimePlugin } from '../src/plugin/course-runtime.js';
 import { resolvedContext } from './helpers/plugin.js';
+import { tempDir } from './helpers.js';
 
 describe('tessera:course-runtime virtual module', () => {
   let projectRoot: string;
 
   beforeEach(() => {
-    projectRoot = mkdtempSync(resolve(tmpdir(), 'tessera-course-runtime-'));
-  });
-
-  afterEach(() => {
-    rmSync(projectRoot, { recursive: true, force: true });
+    projectRoot = tempDir();
   });
 
   function load(): string {

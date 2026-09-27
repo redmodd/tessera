@@ -2,6 +2,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { useCourse, useNavigation } from '../runtime/hooks.svelte.js';
 
+  /** @type {{ onclose?: () => void }} */
   let { onclose } = $props();
   const course = useCourse();
   const nav = useNavigation();

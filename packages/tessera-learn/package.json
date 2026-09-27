@@ -75,7 +75,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-check --tsconfig ./tsconfig.json && svelte-check --tsconfig ./tests/tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm build"

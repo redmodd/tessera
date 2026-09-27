@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DurationTracker } from '../src/runtime/duration.js';
+import { useFakeTimers } from './helpers.js';
 
 describe('DurationTracker', () => {
   it('starts at 0 with no previous seconds', () => {
@@ -13,7 +14,7 @@ describe('DurationTracker', () => {
   });
 
   it('accumulates time', () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     const tracker = new DurationTracker(0);
 
     vi.advanceTimersByTime(5000);
@@ -21,17 +22,13 @@ describe('DurationTracker', () => {
 
     vi.advanceTimersByTime(10000);
     expect(tracker.totalSeconds).toBe(15);
-
-    vi.useRealTimers();
   });
 
   it('adds elapsed time to previous seconds', () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     const tracker = new DurationTracker(60);
 
     vi.advanceTimersByTime(30000);
     expect(tracker.totalSeconds).toBe(90);
-
-    vi.useRealTimers();
   });
 });

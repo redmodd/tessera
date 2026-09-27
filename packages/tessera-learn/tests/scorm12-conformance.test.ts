@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SCORM12Adapter } from '../src/runtime/adapters/scorm12.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
@@ -8,7 +8,7 @@ import {
   writtenValues,
   type RealLms12,
 } from './helpers/real-lms.js';
-import { flush } from './helpers.js';
+import { flush, useFakeTimers } from './helpers.js';
 
 describe('SCORM12Adapter against scorm-again', () => {
   let lms: RealLms12;
@@ -20,11 +20,9 @@ describe('SCORM12Adapter against scorm-again', () => {
     return adapter.init();
   }
 
-  afterEach(() => lms?.dispose());
-
   it('a full happy-path session produces no rejected writes', async () => {
     await start();
-    adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: { '2': 80 }, d: 100 });
+    adapter.saveState({ b: 3, v: [0, 1, 2, 3], g: { '2': { s: 80 } }, d: 100 });
     adapter.setScore(85);
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
@@ -69,7 +67,7 @@ describe('SCORM12Adapter against scorm-again', () => {
 
   it('persists suspend_data + lesson_location the runtime reads back', async () => {
     await start();
-    const state: SavedState = { b: 4, v: [0, 1, 2, 3, 4], q: {}, d: 50 };
+    const state: SavedState = { b: 4, v: [0, 1, 2, 3, 4], d: 50 };
     adapter.saveState(state);
     await flush();
     expect(lms.errors).toEqual([]);
@@ -120,8 +118,8 @@ describe('SCORM12Adapter against scorm-again', () => {
         await flush();
         expect(lms.errors).toEqual([]);
         const written = writtenValues(lms.log, 'cmi.interactions.0');
-        expect(written['cmi.interactions.0.id']).toBe('q1');
-        expect(written['cmi.interactions.0.type']).toBeDefined();
+        expect(written.id).toBe('q1');
+        expect(written.type).toBeDefined();
       },
     );
   });
@@ -129,7 +127,12 @@ describe('SCORM12Adapter against scorm-again', () => {
   it('a resumed session reads prior suspend_data and continues interaction indexing', async () => {
     // First session: save state + report one interaction, then terminate.
     await start();
-    const state: SavedState = { b: 2, v: [0, 1, 2], q: { '1': 90 }, d: 120 };
+    const state: SavedState = {
+      b: 2,
+      v: [0, 1, 2],
+      g: { '1': { s: 90 } },
+      d: 120,
+    };
     adapter.saveState(state);
     adapter.reportInteraction(
       'q1',
@@ -155,16 +158,17 @@ describe('SCORM12Adapter against scorm-again', () => {
     await flush();
     expect(lms.errors).toEqual([]);
     const written = writtenValues(lms.log, 'cmi.interactions.1');
-    expect(written['cmi.interactions.1.id']).toBe('q2');
+    expect(written.id).toBe('q2');
   });
 
   it('the wrapper has teeth: an out-of-range score is flagged', async () => {
     await start();
     // The adapter does not clamp score.raw to 0..100; 150 is out of the SCORM
     // 1.2 range and a real LMS rejects it (405). The always-true mock never
-    // would. We await the retry queue draining before asserting.
+    // would.
+    useFakeTimers();
     adapter.setScore(150);
-    await new Promise((r) => setTimeout(r, 400));
+    await vi.runAllTimersAsync();
     expect(lms.errors.some((e) => e.key === 'cmi.core.score.raw')).toBe(true);
     expect(lms.errors[0].code).toBe('405');
   });

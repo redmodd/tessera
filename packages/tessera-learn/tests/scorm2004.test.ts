@@ -4,7 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, scorm2004Api } from './helpers.js';
+import { flush, scorm2004Api, valuesUnder } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -24,7 +24,7 @@ describe('SCORM2004Adapter', () => {
     const state: SavedState = {
       b: 3,
       v: [0, 1, 2, 3],
-      q: { '2': 80 },
+      g: { '2': { s: 80 } },
       d: 100,
     };
     api.GetValue.mockImplementation((key) =>
@@ -44,10 +44,10 @@ describe('SCORM2004Adapter', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     expect(adapter.getState()).toBeNull();
-    expect(
-      warn.mock.calls.some((c) => /not valid JSON/.test(String(c[0]))),
-    ).toBe(true);
-    warn.mockRestore();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/not valid JSON/),
+      expect.any(Error),
+    );
   });
 
   it('saves state to suspend_data via queue', async () => {
@@ -55,7 +55,6 @@ describe('SCORM2004Adapter', () => {
     const state: SavedState = {
       b: 5,
       v: [0, 1, 2, 3, 4, 5],
-      q: {},
       d: 200,
     };
     adapter.saveState(state);
@@ -73,7 +72,6 @@ describe('SCORM2004Adapter', () => {
       const state: SavedState = {
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'x'.repeat(64100) },
       };
@@ -84,7 +82,6 @@ describe('SCORM2004Adapter', () => {
       expect(warn.mock.calls[0][0]).toMatch(
         /SCORM 2004 cmi\.suspend_data 64000/,
       );
-      warn.mockRestore();
     });
 
     it('does not warn at the SCORM 1.2 threshold (would warn under 1.2)', async () => {
@@ -93,13 +90,11 @@ describe('SCORM2004Adapter', () => {
       adapter.saveState({
         b: 0,
         v: [],
-        q: {},
         d: 0,
         u: { big: 'y'.repeat(5000) },
       });
       await flush();
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
   });
 
@@ -193,7 +188,7 @@ describe('SCORM2004Adapter', () => {
       return 'true';
     });
 
-    adapter.saveState({ b: 0, v: [], q: {}, d: 0 });
+    adapter.saveState({ b: 0, v: [], d: 0 });
     adapter.setScore(85);
 
     await flush();
@@ -205,7 +200,7 @@ describe('SCORM2004Adapter', () => {
 
   it('writes cmi.location from SavedState.b on saveState', async () => {
     await adapter.init();
-    adapter.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], q: {}, d: 100 });
+    adapter.saveState({ b: 7, v: [0, 1, 2, 3, 4, 5, 6, 7], d: 100 });
     await flush();
     expect(api.SetValue).toHaveBeenCalledWith('cmi.location', '7');
   });
@@ -228,14 +223,9 @@ describe('SCORM2004Adapter', () => {
   });
 
   describe('cmi.mode honoring (browse / review launches)', () => {
-    function mockReview(): void {
+    function launchIn(mode: 'review' | 'browse'): void {
       api.GetValue.mockImplementation((key) =>
-        key === 'cmi.mode' ? 'review' : '',
-      );
-    }
-    function mockBrowse(): void {
-      api.GetValue.mockImplementation((key) =>
-        key === 'cmi.mode' ? 'browse' : '',
+        key === 'cmi.mode' ? mode : '',
       );
     }
     function settersDidNotFire(): void {
@@ -250,14 +240,14 @@ describe('SCORM2004Adapter', () => {
     }
 
     it('refuses every learner-record write in review mode', async () => {
-      mockReview();
+      launchIn('review');
       await adapter.init();
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('passed');
       adapter.setDuration(100);
       adapter.setExit('normal');
-      adapter.saveState({ b: 3, v: [0, 1, 2, 3], q: {}, d: 100 });
+      adapter.saveState({ b: 3, v: [0, 1, 2, 3], d: 100 });
       adapter.reportInteraction(
         'q1',
         { type: 'true-false', response: true },
@@ -268,11 +258,11 @@ describe('SCORM2004Adapter', () => {
     });
 
     it('refuses every learner-record write in browse mode', async () => {
-      mockBrowse();
+      launchIn('browse');
       await adapter.init();
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
-      adapter.saveState({ b: 3, v: [], q: {}, d: 0 });
+      adapter.saveState({ b: 3, v: [], d: 0 });
       await flush();
       settersDidNotFire();
     });
@@ -294,7 +284,6 @@ describe('SCORM2004Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       expect(await masteryFrom('-0.5')).toBe(0);
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('ignores and warns on an out-of-range threshold', async () => {
@@ -303,18 +292,12 @@ describe('SCORM2004Adapter', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('cmi.scaled_passing_score'),
       );
-      warn.mockRestore();
     });
   });
 
   describe('reportInteraction', () => {
-    function setValuesFor(prefix: string): Record<string, string> {
-      const result: Record<string, string> = {};
-      for (const call of api.SetValue.mock.calls) {
-        if (call[0].startsWith(prefix)) result[call[0]] = call[1];
-      }
-      return result;
-    }
+    const interaction0 = () =>
+      valuesUnder(api.SetValue.mock.calls, 'cmi.interactions.0');
 
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(
@@ -323,16 +306,17 @@ describe('SCORM2004Adapter', () => {
         false,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.id']).toBe('q1');
-      expect(v['cmi.interactions.0.type']).toBe('choice');
-      expect(v['cmi.interactions.0.learner_response']).toBe('a[,]b');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('a');
-      expect(v['cmi.interactions.0.result']).toBe('incorrect');
-      // Zone-free, second-resolution — see formatISO8601Timestamp tests.
-      expect(v['cmi.interactions.0.timestamp']).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
-      );
+      expect(interaction0()).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        learner_response: 'a[,]b',
+        'correct_responses.0.pattern': 'a',
+        result: 'incorrect',
+        // Zone-free, second-resolution, see formatISO8601Timestamp tests.
+        timestamp: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
+        ),
+      });
     });
 
     it('writes true-false interaction', async () => {
@@ -342,11 +326,12 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('true-false');
-      expect(v['cmi.interactions.0.learner_response']).toBe('true');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('true');
-      expect(v['cmi.interactions.0.result']).toBe('correct');
+      expect(interaction0()).toMatchObject({
+        type: 'true-false',
+        learner_response: 'true',
+        'correct_responses.0.pattern': 'true',
+        result: 'correct',
+      });
     });
 
     it('writes fill-in interaction', async () => {
@@ -356,11 +341,12 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('fill-in');
-      expect(v['cmi.interactions.0.learner_response']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+      expect(interaction0()).toMatchObject({
+        type: 'fill-in',
+        learner_response: 'Paris',
+        'correct_responses.0.pattern': 'Paris',
+        'correct_responses.1.pattern': 'paris',
+      });
     });
 
     it('prefixes fill-in patterns with case_matters when set', async () => {
@@ -375,13 +361,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        '{case_matters=true}Paris',
-      );
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe(
-        '{case_matters=true}paris',
-      );
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': '{case_matters=true}Paris',
+        'correct_responses.1.pattern': '{case_matters=true}paris',
+      });
     });
 
     it('omits the prefix when caseMatters is false', async () => {
@@ -396,9 +379,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe('Paris');
-      expect(v['cmi.interactions.0.correct_responses.1.pattern']).toBe('paris');
+      expect(interaction0()).toMatchObject({
+        'correct_responses.0.pattern': 'Paris',
+        'correct_responses.1.pattern': 'paris',
+      });
     });
 
     it('writes a single pattern for long-fill-in (2004 allows only one)', async () => {
@@ -412,13 +396,9 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'answer one',
-      );
-      expect(
-        v['cmi.interactions.0.correct_responses.1.pattern'],
-      ).toBeUndefined();
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBe('answer one');
+      expect(v['correct_responses.1.pattern']).toBeUndefined();
     });
 
     it('caps fill-in patterns at the 10 allowed by the RTE', async () => {
@@ -433,15 +413,12 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.correct_responses.9.pattern']).toBe('a9');
-      expect(
-        v['cmi.interactions.0.correct_responses.10.pattern'],
-      ).toBeUndefined();
+      const v = interaction0();
+      expect(v['correct_responses.9.pattern']).toBe('a9');
+      expect(v['correct_responses.10.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('declares 12 correct answers'),
       );
-      warn.mockRestore();
     });
 
     it('writes matching interaction', async () => {
@@ -461,12 +438,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('matching');
-      expect(v['cmi.interactions.0.learner_response']).toBe('a[.]1[,]b[.]2');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'a[.]1[,]b[.]2',
-      );
+      expect(interaction0()).toMatchObject({
+        type: 'matching',
+        learner_response: 'a[.]1[,]b[.]2',
+        'correct_responses.0.pattern': 'a[.]1[,]b[.]2',
+      });
     });
 
     it('writes sequencing interaction', async () => {
@@ -480,9 +456,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('sequencing');
-      expect(v['cmi.interactions.0.learner_response']).toBe('x[,]y[,]z');
+      expect(interaction0()).toMatchObject({
+        type: 'sequencing',
+        learner_response: 'x[,]y[,]z',
+      });
     });
 
     it('passes response and correct identifiers through unchanged', async () => {
@@ -496,13 +473,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.learner_response']).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
-      );
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
-      );
+      expect(interaction0()).toMatchObject({
+        learner_response: 'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
+        'correct_responses.0.pattern':
+          'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
+      });
     });
 
     it('ignores `options` and keeps named identifiers (no index mapping for SCORM 2004)', async () => {
@@ -517,11 +492,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.learner_response']).toBe('speed-limit');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        'speed-limit',
-      );
+      expect(interaction0()).toMatchObject({
+        learner_response: 'speed-limit',
+        'correct_responses.0.pattern': 'speed-limit',
+      });
     });
 
     it('writes numeric interaction', async () => {
@@ -531,12 +505,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('numeric');
-      expect(v['cmi.interactions.0.learner_response']).toBe('7');
-      expect(v['cmi.interactions.0.correct_responses.0.pattern']).toBe(
-        '5[:]10',
-      );
+      expect(interaction0()).toMatchObject({
+        type: 'numeric',
+        learner_response: '7',
+        'correct_responses.0.pattern': '5[:]10',
+      });
     });
 
     it('writes performance interaction', async () => {
@@ -556,11 +529,10 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(v['cmi.interactions.0.type']).toBe('performance');
-      expect(v['cmi.interactions.0.learner_response']).toBe(
-        'stepA[.]1[,]stepB[.]x',
-      );
+      expect(interaction0()).toMatchObject({
+        type: 'performance',
+        learner_response: 'stepA[.]1[,]stepB[.]x',
+      });
     });
 
     it('omits correct_responses when no correct provided', async () => {
@@ -570,11 +542,9 @@ describe('SCORM2004Adapter', () => {
         null,
       );
       await flush();
-      const v = setValuesFor('cmi.interactions.0');
-      expect(
-        v['cmi.interactions.0.correct_responses.0.pattern'],
-      ).toBeUndefined();
-      expect(v['cmi.interactions.0.result']).toBeUndefined();
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
+      expect(v.result).toBeUndefined();
     });
 
     it('increments index across multiple interactions', async () => {
