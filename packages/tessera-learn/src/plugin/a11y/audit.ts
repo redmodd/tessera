@@ -2,6 +2,7 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import type { PreviewServer } from 'vite';
 import { generateManifest } from '../manifest.js';
 import { readA11ySettings, type A11ySettings } from '../validation.js';
 
@@ -358,8 +359,7 @@ export async function runAudit(
 
   const manifest = generateManifest(resolve(projectRoot, 'pages'));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const vite = (await import('vite')) as any;
+  const vite = await import('vite');
   const { resolveTesseraConfig } = await import('../inline-config.js');
   // Carries tesseraPlugin() + the Svelte compiler; without it the plugin-less
   // build would silently produce a broken bundle (there is no vite.config.js).
@@ -378,8 +378,7 @@ export async function runAudit(
   const prevEnv = process.env[AUDIT_ENV_FLAG];
   process.env[AUDIT_ENV_FLAG] = '1';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let server: any;
+  let server: PreviewServer | undefined;
   try {
     console.log('[tessera a11y] Building course…');
     await vite.build(
@@ -396,7 +395,7 @@ export async function runAudit(
       preview: { port: 0, host: '127.0.0.1' },
       logLevel: 'warn',
     });
-    const baseUrl: string | undefined = server.resolvedUrls?.local?.[0];
+    const baseUrl = server.resolvedUrls?.local?.[0];
     if (!baseUrl) {
       console.error('[tessera a11y] Could not determine preview server URL.');
       return 1;
@@ -513,9 +512,15 @@ export async function runAudit(
     );
     return 1;
   } finally {
-    server?.httpServer?.close?.();
     if (prevEnv === undefined) delete process.env[AUDIT_ENV_FLAG];
     else process.env[AUDIT_ENV_FLAG] = prevEnv;
+    await server?.close().catch((err: unknown) => {
+      console.warn(
+        `\x1b[33m[tessera a11y]\x1b[0m Could not close the preview server: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
   }
 }
 

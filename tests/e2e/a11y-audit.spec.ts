@@ -4,6 +4,13 @@ import { resolve } from 'node:path';
 import { variantDir } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
 
+async function audit(dir: string): Promise<number> {
+  const sigtermListeners = process.listenerCount('SIGTERM');
+  const code = await runAudit(dir, dir, { threshold: 'serious' });
+  expect(process.listenerCount('SIGTERM')).toBe(sigtermListeners);
+  return code;
+}
+
 // runAudit serves dist/ and launches its own browser, so this is a single
 // long-running call rather than a page-driven test.
 test.describe('Tier 2 — runtime accessibility audit', () => {
@@ -14,7 +21,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
 
     // Standalone fixture has no shared/ dir, so workspaceRoot is just the course
     // dir — runAudit's second arg only feeds the (here unused) $shared alias.
-    const code = await runAudit(dir, dir, { threshold: 'serious' });
+    const code = await audit(dir);
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -31,7 +38,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     test.setTimeout(120_000);
     const dir = variantDir('custom-layout', 'web');
 
-    await runAudit(dir, dir, { threshold: 'serious' });
+    await audit(dir);
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -53,7 +60,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     test.setTimeout(120_000);
     const dir = variantDir('broken-page', 'web');
 
-    const code = await runAudit(dir, dir, { threshold: 'serious' });
+    const code = await audit(dir);
 
     const reportPath = resolve(dir, 'a11y-report.json');
     expect(existsSync(reportPath)).toBe(true);
