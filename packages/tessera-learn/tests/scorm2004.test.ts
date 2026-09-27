@@ -181,12 +181,6 @@ describe('SCORM2004Adapter', () => {
     expect(api.Terminate).toHaveBeenCalledTimes(1);
   });
 
-  it('exit terminates the session without leaving the page', async () => {
-    await adapter.init();
-    expect(await adapter.exit()).toBe(false);
-    expect(api.Terminate).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     ['suspend', 'suspendAll'],
     ['normal', 'exitAll'],
@@ -205,7 +199,7 @@ describe('SCORM2004Adapter', () => {
       });
 
       adapter.setExit(mode);
-      await adapter.exit();
+      expect(await adapter.exit()).toBe(false);
 
       expect(order.slice(-2)).toEqual([
         `adl.nav.request=${request}`,

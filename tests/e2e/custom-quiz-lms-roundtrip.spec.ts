@@ -190,7 +190,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
   test('Custom quiz emits xAPI Scored and per-question Answered statements, holding Passed for completion', async ({
     page,
   }) => {
-    const { statements } = await installCmi5Mock(page);
+    const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await answerCustomQuizCorrectly(page);

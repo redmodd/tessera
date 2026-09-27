@@ -400,13 +400,12 @@ export function useCourse(): {
   exit(): Promise<void>;
 } {
   const ctx = requireNavContext('useCourse()');
-  const { config } = ctx;
   return {
     get title() {
-      return config.title;
+      return ctx.config.title;
     },
     get logo() {
-      return resolveAsset(config.branding?.logo ?? '') || undefined;
+      return resolveAsset(ctx.config.branding?.logo ?? '') || undefined;
     },
     get canExit() {
       return ctx.canExit;

@@ -13,6 +13,7 @@ import {
   respond,
   setLaunchParams,
   statementRequests,
+  useFakeTimers,
 } from './helpers.js';
 
 const mockFetch = vi.fn();
@@ -960,14 +961,10 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       mockFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
       adapter.saveState({ b: 1 } as never);
-      vi.useFakeTimers();
-      try {
-        const exiting = adapter.exit();
-        await vi.advanceTimersByTimeAsync(10_000);
-        expect(await exiting).toBe(true);
-      } finally {
-        vi.useRealTimers();
-      }
+      useFakeTimers();
+      const exiting = adapter.exit();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await exiting).toBe(true);
 
       expect(assign).toHaveBeenCalledWith(returnURL);
       expect(statementFor('terminated')).toBeDefined();

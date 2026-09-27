@@ -422,11 +422,11 @@
     adapter.terminate();
   }
 
-  let courseUnmounted = Promise.resolve();
+  let courseUnmounted;
   function trackCourseUnmount() {
     let resolve;
     courseUnmounted = new Promise((r) => (resolve = r));
-    return () => resolve();
+    return resolve;
   }
 
   async function exit() {
@@ -441,9 +441,10 @@
         console.warn('Tessera: exit failed', err);
         return false;
       }));
-    if (returned) return;
-    exitPhase = 'ended';
-    window.close();
+    if (!returned) {
+      exitPhase = 'ended';
+      window.close();
+    }
   }
 
   // ---- Lifecycle ----

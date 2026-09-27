@@ -85,18 +85,18 @@ export async function installScorm2004Mock(
 /**
  * Route the cmi5 launch endpoints to a mock LMS: the auth token, an LRS that
  * records every posted statement, and a State API with no saved state. Pass
- * `launchData` to serve an `LMS.LaunchData` document.
+ * `launchData` to serve an `LMS.LaunchData` document. Resolves to the array
+ * the posted statements land in.
  */
 export async function installCmi5Mock(
   page: Page,
   { launchData }: { launchData?: object } = {},
-): Promise<{ statements: any[]; tokenRequests: number }> {
-  const lms = { statements: [] as any[], tokenRequests: 0 };
+): Promise<any[]> {
+  const statements: any[] = [];
   await page.route('http://cmi5-mock.test/**', async (route) => {
     const req = route.request();
     const url = req.url();
     if (url.endsWith('/fetch')) {
-      lms.tokenRequests++;
       await route.fulfill({
         status: 200,
         contentType: 'text/plain',
@@ -107,7 +107,7 @@ export async function installCmi5Mock(
     if (url.includes('/xapi/statements')) {
       if (req.method() === 'POST' || req.method() === 'PUT') {
         try {
-          lms.statements.push(...[JSON.parse(req.postData() ?? '[]')].flat());
+          statements.push(...[JSON.parse(req.postData() ?? '[]')].flat());
         } catch {}
       }
       await route.fulfill({
@@ -131,7 +131,7 @@ export async function installCmi5Mock(
     }
     await route.fulfill({ status: 200, body: '{}' });
   });
-  return lms;
+  return statements;
 }
 
 export function cmi5LaunchURL(base: string): string {

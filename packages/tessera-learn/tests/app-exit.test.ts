@@ -10,7 +10,6 @@ import {
 } from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
-import type { CourseConfig } from '../src/runtime/types.js';
 import {
   createConfig,
   createManifest,
@@ -36,27 +35,13 @@ function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
 
 async function mount(
   adapter: BaseAdapter,
-  {
-    config = createConfig(),
-    manifest = createManifest(2),
-    loadLayout,
-    loadPage,
-    xapiClient,
-  }: {
-    config?: CourseConfig;
-    manifest?: ReturnType<typeof createManifest>;
-    loadLayout?: () => Promise<{ default: unknown }>;
-    loadPage?: () => Promise<unknown>;
-    xapiClient?: { markUnloading(): void };
-  } = {},
+  options: Partial<Parameters<typeof mountApp>[0]> = {},
 ) {
   await mountApp({
-    config,
-    manifest,
+    config: createConfig(),
+    manifest: createManifest(2),
     adapter,
-    loadLayout,
-    loadPage,
-    xapiClient,
+    ...options,
   });
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain('Test page'),

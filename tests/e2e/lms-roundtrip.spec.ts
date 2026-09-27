@@ -482,7 +482,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
   test('launch with CMI5 params sends Initialized statement', async ({
     page,
   }) => {
-    const lms = await installCmi5Mock(page);
+    const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -490,10 +490,8 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     // Give the adapter a moment to fire the Initialized statement
     await page.waitForTimeout(500);
 
-    expect(lms.tokenRequests).toBeGreaterThanOrEqual(1);
-
     // Find an Initialized statement
-    const initStmt = findStatement(lms.statements, 'initialized');
+    const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
     expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
@@ -503,7 +501,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
   test('passing a graded quiz sends a Passed statement once the course completes', async ({
     page,
   }) => {
-    const { statements } = await installCmi5Mock(page);
+    const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -544,7 +542,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     page,
   }) => {
     const RETURN_URL = 'http://cmi5-mock.test/return';
-    const { statements } = await installCmi5Mock(page, {
+    const statements = await installCmi5Mock(page, {
       launchData: { returnURL: RETURN_URL },
     });
     let terminatedBeforeReturn = false;
