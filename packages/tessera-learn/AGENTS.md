@@ -996,7 +996,7 @@ function useCourse(): {
 };
 ```
 
-`exit()` saves progress and ends the LMS session. Under cmi5 with a `returnURL`, it sends the learner back to that URL. Otherwise the course shows a "Session ended" screen and tries to close the window; under SCORM 2004 it also asks the LMS to suspend the course (`suspendAll`), or exit it once complete (`exitAll`). The default layout renders an **Exit course** button when `canExit` is true; a custom layout renders its own:
+`exit()` saves progress and ends the LMS session; it does nothing while `canExit` is false. Under cmi5 with a `returnURL`, it sends the learner back to that URL. Otherwise the course shows a "Session ended" screen and tries to close the window; under SCORM 2004 it also asks the LMS to suspend the course (`suspendAll`), or exit it once complete (`exitAll`). The default layout renders an **Exit course** button when `canExit` is true; a custom layout renders its own:
 
 ```svelte
 <script>

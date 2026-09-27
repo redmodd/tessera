@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type MockInstance,
+} from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import { WebAdapter } from '../src/runtime/adapters/web.js';
 import type { CourseConfig } from '../src/runtime/types.js';
@@ -15,15 +22,12 @@ import {
 
 function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
   const calls: string[] = [];
-  const record = (name: string) => () => {
-    calls.push(name);
-  };
   const adapter = stubAdapter({
-    saveState: record('saveState'),
+    saveState: () => calls.push('saveState'),
     setDuration: (seconds) => calls.push(`setDuration:${seconds}`),
     setExit: (mode) => calls.push(`setExit:${mode}`),
-    commit: record('commit'),
-    terminate: record('terminate'),
+    commit: () => calls.push('commit'),
+    terminate: () => calls.push('terminate'),
     ...overrides,
   });
   return { adapter, calls };
@@ -48,6 +52,8 @@ async function mount(
   await flush();
 }
 
+const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
+
 const exitButton = () =>
   document.querySelector<HTMLButtonElement>('.tessera-exit-btn');
 
@@ -59,7 +65,7 @@ const EXIT_SEQUENCE = [
   'terminate',
 ];
 
-let close: ReturnType<typeof vi.spyOn>;
+let close: MockInstance<typeof window.close>;
 
 beforeEach(() => {
   close = vi.spyOn(window, 'close').mockImplementation(() => {});
@@ -86,7 +92,7 @@ describe('exiting a course', () => {
     await mount(adapter, {
       config: manualConfig(),
       manifest: createManifest(1, {}, { 0: { completesOn: 'view' } }),
-      loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+      loadLayout: masteryLayout,
     });
     await vi.waitFor(() =>
       expect(navCtx().progress.completionStatus).toBe('complete'),
@@ -135,7 +141,7 @@ describe('exiting a course', () => {
   });
 
   it('terminates without exiting on pagehide', async () => {
-    const exit = vi.fn(async () => true);
+    const exit = vi.fn();
     const { adapter, calls } = recordingAdapter({ exit });
     await mount(adapter);
     const launched = calls.length;
@@ -166,5 +172,29 @@ describe('exiting a course', () => {
 
     expect(document.querySelector('.tessera-sidebar')).not.toBeNull();
     expect(exitButton()).toBeNull();
+  });
+
+  it('ignores exit() without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter, { loadLayout: masteryLayout });
+    const launched = calls.length;
+
+    await navCtx().exit();
+
+    expect(calls.slice(launched)).toEqual([]);
+    expect(document.body.textContent).not.toContain('Session ended');
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('keeps saving after pagehide without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter, { loadLayout: masteryLayout });
+    window.dispatchEvent(new Event('pagehide'));
+    const hidden = calls.length;
+
+    navCtx().nav.goToPage(1);
+    await flush();
+
+    expect(calls.slice(hidden)).toContain('saveState');
   });
 });

@@ -37,6 +37,7 @@
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
+  const canExit = $derived(adapter.connected && persistenceReady);
   // Holds the resolved xAPI client for unload-time markUnloading. Set
   // after adapter.init() resolves and registered globally so useXAPI()
   // can reach it.
@@ -103,7 +104,7 @@
     progress,
     config,
     get canExit() {
-      return adapter.connected && persistenceReady;
+      return canExit;
     },
     exit,
   });
@@ -303,7 +304,7 @@
   }
 
   function persistState() {
-    if (!persistenceReady || terminated) return;
+    if (!persistenceReady) return;
     adapter.saveState(serializeState());
   }
 
@@ -419,7 +420,7 @@
   }
 
   async function exit() {
-    if (!persistenceReady || !endSession()) return;
+    if (!canExit || !endSession()) return;
     exitPhase = 'ending';
     const returned = await adapter.exit().catch((err) => {
       console.warn('Tessera: exit failed', err);
