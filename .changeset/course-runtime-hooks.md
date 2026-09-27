@@ -2,4 +2,4 @@
 'tessera-learn': minor
 ---
 
-Custom page access rules and xAPI login/learner functions now go in a new optional `course.runtime.js` file (functions in `course.config.js` never worked), and each xAPI destination with its own endpoint now needs an `id`.
+**Breaking:** a function in `course.config.js` now fails the build (functions there never worked). Move custom page access rules (`canAccess`) and xAPI `auth`/`actor` resolvers to named exports in a new optional `course.runtime.js`. Each xAPI destination with its own endpoint now needs an `id`, which `course.runtime.js` keys its resolvers by.
