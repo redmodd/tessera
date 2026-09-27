@@ -16,6 +16,7 @@ import {
   respond,
   scorm12Api,
   setLaunchParams,
+  setXAPILaunch,
   statementRequests,
 } from './helpers.js';
 
@@ -238,20 +239,9 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 });
 
 describe('buildXAPIClient — plain xAPI launch integration', () => {
-  const xapiLaunch = {
-    endpoint: 'https://lrs.example.com/xapi/',
-    auth: 'eGFwaS1hdXRo',
-    registration: '550e8400-e29b-41d4-a716-446655440000',
-    activity_id: 'https://example.com/course/plain-xapi',
-    actor: JSON.stringify({
-      mbox: 'mailto:plain@example.com',
-      name: 'Plain',
-    }),
-  };
-
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch);
-    setLaunchParams(xapiLaunch);
+    setXAPILaunch();
     mockFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('activities/state')) {
         return respond(404);
@@ -286,14 +276,12 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
 
     expect(result.destinations).toHaveLength(1);
     expect(result.destinations[0].ok).toBe(true);
-    expect(result.destinations[0].endpoint).toBe(xapiLaunch.endpoint);
+    expect(result.destinations[0].endpoint).toBe('https://lrs.example/xapi/');
 
     const [[, init]] = statementRequests(mockFetch);
-    expect(init.headers.get('Authorization')).toBe('Basic eGFwaS1hdXRo');
+    expect(init.headers.get('Authorization')).toBe('Basic Zm9vOmJhcg==');
     expect(init.headers.get('X-Experience-API-Version')).toBe('1.0.3');
-    expect(postedStatements(mockFetch)[0].actor.mbox).toBe(
-      'mailto:plain@example.com',
-    );
+    expect(postedStatements(mockFetch)[0].actor.account.name).toBe('learner-1');
   });
 
   it("dev fallback: 'lms' under xapi with no launch params surfaces an xAPI-specific error", async () => {

@@ -100,11 +100,13 @@ export function cmi5Fetch({
   return async (url: string, init?: RequestInit): Promise<Response> => {
     if (url === CMI5_LAUNCH.fetch) return new Response(token);
     if (init?.method && init.method !== 'GET') return respond(204);
-    const doc = url.includes('stateId=LMS.LaunchData')
-      ? launchData
-      : url.includes('activities/state')
-        ? saved
-        : undefined;
+    const stateId = new URL(url).searchParams.get('stateId');
+    const doc =
+      stateId === 'LMS.LaunchData'
+        ? launchData
+        : stateId === 'tessera-state'
+          ? saved
+          : undefined;
     return doc ? Response.json(doc) : respond(404);
   };
 }

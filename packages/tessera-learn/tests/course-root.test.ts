@@ -7,10 +7,16 @@ import {
   findWorkspaceRoot,
   listCourses,
   listMalformedCourses,
+  type ResolveResult,
 } from '../src/plugin/course-root.js';
 import { makeWorkspace } from './helpers.js';
 
 let ws: string;
+
+function errorOf(result: ResolveResult): string {
+  expect(result.ok).toBe(false);
+  return result.ok ? '' : result.error;
+}
 
 beforeEach(() => {
   ws = makeWorkspace(['getting-started', 'advanced']);
@@ -89,17 +95,17 @@ describe('resolveCourse', () => {
   });
 
   it('errors and lists available courses when a named course does not exist', () => {
-    expect(resolveCourse(ws, 'missing')).toEqual({
-      ok: false,
-      error: expect.stringMatching(/missing[^]*advanced[^]*getting-started/),
-    });
+    const error = errorOf(resolveCourse(ws, 'missing'));
+    expect(error).toContain('missing');
+    expect(error).toContain('advanced');
+    expect(error).toContain('getting-started');
   });
 
   it('errors with a hint when no name is given outside a course dir', () => {
-    expect(resolveCourse(ws)).toEqual({
-      ok: false,
-      error: expect.stringMatching(/course[^]*advanced[^]*getting-started/i),
-    });
+    const error = errorOf(resolveCourse(ws));
+    expect(error.toLowerCase()).toContain('course');
+    expect(error).toContain('advanced');
+    expect(error).toContain('getting-started');
   });
 
   it('does not change meaning at the workspace root as courses are added', () => {
@@ -126,9 +132,8 @@ describe('resolveCourse', () => {
 
   it('surfaces a malformed course in the hint instead of silently dropping it', () => {
     mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
-    expect(resolveCourse(ws, 'half-built')).toEqual({
-      ok: false,
-      error: expect.stringMatching(/half-built[^]*course\.config\.js/),
-    });
+    const error = errorOf(resolveCourse(ws, 'half-built'));
+    expect(error).toContain('half-built');
+    expect(error).toContain('course.config.js');
   });
 });
