@@ -13,6 +13,7 @@ import {
   respond,
   scorm12Api,
   setLaunchParams,
+  statementRequests,
 } from './helpers.js';
 
 const mockFetch = vi.fn();
@@ -59,9 +60,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
     expect(result.destinations[0].endpoint).toBe(CMI5_LAUNCH.endpoint);
 
     // POST went to the LMS-launch endpoint with the launch auth token.
-    const statementCalls = mockFetch.mock.calls.filter(([url]) =>
-      String(url).includes('statements'),
-    );
+    const statementCalls = statementRequests(mockFetch);
     expect(statementCalls.length).toBeGreaterThan(0);
     const [, init] = statementCalls[0];
     const headers = new Headers((init as RequestInit).headers);
@@ -300,9 +299,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     expect(result.destinations[0].ok).toBe(true);
     expect(result.destinations[0].endpoint).toBe(xapiLaunch.endpoint);
 
-    const statementCalls = mockFetch.mock.calls.filter(([url]) =>
-      String(url).includes('statements'),
-    );
+    const statementCalls = statementRequests(mockFetch);
     expect(statementCalls.length).toBeGreaterThan(0);
     const [, init] = statementCalls[0];
     const headers = new Headers((init as RequestInit).headers);

@@ -4,7 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, scorm2004Api, setValuesFor } from './helpers.js';
+import { flush, scorm2004Api, valuesUnder } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -299,7 +299,8 @@ describe('SCORM2004Adapter', () => {
   });
 
   describe('reportInteraction', () => {
-    const interaction0 = () => setValuesFor(api.SetValue, 'cmi.interactions.0');
+    const interaction0 = () =>
+      valuesUnder(api.SetValue.mock.calls, 'cmi.interactions.0');
 
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(

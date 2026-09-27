@@ -19,6 +19,7 @@ import {
   useProgress,
   usePersistence,
   useCourse,
+  useCompletion,
 } from '../src/runtime/hooks.svelte.js';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
@@ -700,6 +701,64 @@ describe('useCourse', () => {
 
     ctx.config.branding = { logo: '$assets/logo.svg' };
     expect(h.logo).toBe('./assets/logo.svg');
+  });
+});
+
+// ============ useCompletion ============
+
+describe('useCompletion', () => {
+  const manualConfig = (
+    overrides: Partial<CourseConfig['completion']> = {},
+  ): CourseConfig =>
+    createConfig({
+      completion: {
+        mode: 'manual',
+        ...overrides,
+      } as CourseConfig['completion'],
+      scoring: { passingScore: 0 },
+    });
+
+  it('markComplete flips progress and reflects completionStatus', () => {
+    const { progress } = provideNavCtx({ config: manualConfig() });
+
+    const handle = useCompletion();
+    expect(handle.completionStatus).toBe('incomplete');
+
+    handle.markComplete();
+    expect(progress.completionStatus).toBe('complete');
+    expect(handle.completionStatus).toBe('complete');
+  });
+
+  it('markComplete is a no-op outside manual mode and warns once per session', async () => {
+    vi.resetModules();
+    const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { progress } = provideNavCtx();
+
+    const handle = useCompletion();
+    handle.markComplete();
+    handle.markComplete();
+    handle.markComplete();
+
+    expect(progress.completionStatus).toBe('incomplete');
+    // dev mode is true under vitest (import.meta.env.DEV)
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when called outside a Tessera course', () => {
+    expect(() => useCompletion()).toThrow(
+      /must be called inside a Tessera course/,
+    );
+  });
+
+  it('flips successStatus when requireSuccessStatus is set', () => {
+    const { progress } = provideNavCtx({
+      config: manualConfig({ requireSuccessStatus: 'passed' }),
+    });
+
+    const handle = useCompletion();
+    handle.markComplete();
+    expect(progress.successStatus).toBe('passed');
   });
 });
 

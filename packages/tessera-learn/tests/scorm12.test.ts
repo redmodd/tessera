@@ -9,8 +9,8 @@ import {
   flush,
   printed,
   scorm12Api,
-  setValuesFor,
   useFakeTimers,
+  valuesUnder,
 } from './helpers.js';
 
 describe('SCORM12Adapter', () => {
@@ -329,7 +329,7 @@ describe('SCORM12Adapter', () => {
 
   describe('reportInteraction', () => {
     const interaction0 = () =>
-      setValuesFor(api.LMSSetValue, 'cmi.interactions.0');
+      valuesUnder(api.LMSSetValue.mock.calls, 'cmi.interactions.0');
 
     it('writes choice interaction with student_response and HH:MM:SS time', async () => {
       adapter.reportInteraction(

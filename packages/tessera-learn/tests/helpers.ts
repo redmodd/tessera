@@ -122,23 +122,26 @@ export function setXAPILaunch(params: Record<string, string> = {}): void {
   });
 }
 
-export function setValuesFor(
-  setValue: Mock<(key: string, value: string) => string>,
+export function valuesUnder(
+  writes: string[][],
   prefix: string,
 ): Record<string, string> {
   return Object.fromEntries(
-    setValue.mock.calls
+    writes
       .filter(([key]) => key.startsWith(`${prefix}.`))
       .map(([key, value]) => [key.slice(prefix.length + 1), value]),
   );
 }
 
-export function statementRequests(fetch: Mock) {
+export function requests(fetch: Mock, path: string, method?: string) {
   return fetch.mock.calls.filter(
     ([url, init]) =>
-      String(url).includes('/statements') && init?.method === 'POST',
+      String(url).includes(path) && (!method || init?.method === method),
   );
 }
+
+export const statementRequests = (fetch: Mock) =>
+  requests(fetch, '/statements', 'POST');
 
 export function postedStatements(fetch: Mock): any[] {
   return statementRequests(fetch).flatMap(([, init]) => JSON.parse(init.body));

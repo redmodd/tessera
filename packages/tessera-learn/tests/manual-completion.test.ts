@@ -1,22 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { NavigationState } from '../src/runtime/navigation.svelte.js';
-import { useCompletion } from '../src/runtime/hooks.svelte.js';
 import { createManifest, createConfig, tempDir } from './helpers.js';
 import type { CourseConfig } from '../src/runtime/types.js';
-
-const ctxStore = new Map<string, unknown>();
-
-vi.mock('svelte', async () => {
-  const actual = await vi.importActual<typeof import('svelte')>('svelte');
-  return {
-    ...actual,
-    getContext: (name: string) => ctxStore.get(name),
-  };
-});
 
 function courseConfig(
   completion: string,
@@ -294,62 +282,5 @@ describe('manual completion — ProgressState', () => {
 
     progress.markCompleteManually();
     expect(progress.successStatus).toBe('unknown');
-  });
-});
-
-function provideNavCtx(config: CourseConfig): ProgressState {
-  const manifest = createManifest(3);
-  const progress = new ProgressState(manifest, config);
-  const nav = new NavigationState(manifest, progress, config);
-  ctxStore.set('tessera-nav', { nav, manifest, progress, config });
-  return progress;
-}
-
-describe('manual completion — useCompletion hook', () => {
-  beforeEach(() => {
-    ctxStore.clear();
-  });
-
-  it('markComplete flips progress and reflects completionStatus', () => {
-    const progress = provideNavCtx(manualConfig());
-
-    const handle = useCompletion();
-    expect(handle.completionStatus).toBe('incomplete');
-
-    handle.markComplete();
-    expect(progress.completionStatus).toBe('complete');
-    expect(handle.completionStatus).toBe('complete');
-  });
-
-  it('markComplete is a no-op outside manual mode and warns once per session', async () => {
-    vi.resetModules();
-    const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const progress = provideNavCtx(createConfig());
-
-    const handle = useCompletion();
-    handle.markComplete();
-    handle.markComplete();
-    handle.markComplete();
-
-    expect(progress.completionStatus).toBe('incomplete');
-    // dev mode is true under vitest (import.meta.env.DEV)
-    expect(warn).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws when called outside a Tessera course', () => {
-    expect(() => useCompletion()).toThrow(
-      /must be called inside a Tessera course/,
-    );
-  });
-
-  it('flips successStatus when requireSuccessStatus is set', () => {
-    const progress = provideNavCtx(
-      manualConfig({ requireSuccessStatus: 'passed' }),
-    );
-
-    const handle = useCompletion();
-    handle.markComplete();
-    expect(progress.successStatus).toBe('passed');
   });
 });

@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import { flush, postedStatements, respond, setXAPILaunch } from './helpers.js';
+import {
+  flush,
+  postedStatements,
+  requests,
+  respond,
+  setXAPILaunch,
+} from './helpers.js';
 
 const fetchMock = vi.fn();
 
-function calls(path: string) {
-  return fetchMock.mock.calls.filter(([u]) => String(u).includes(path));
-}
+const calls = (path: string) => requests(fetchMock, path);
 
 const posted = () => postedStatements(fetchMock);
 

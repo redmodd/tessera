@@ -9,6 +9,7 @@ import {
   createScorm12ErrorCapture,
   createScorm2004ErrorCapture,
 } from './scorm-error-capture.js';
+import { valuesUnder } from '../helpers.js';
 
 interface RealLms<TApi, TRaw> {
   api: TApi;
@@ -159,13 +160,10 @@ export function writtenValues(
   log: string[][],
   prefix: string,
 ): Record<string, string> {
-  return Object.fromEntries(
+  return valuesUnder(
     log
-      .filter(
-        ([method, key]) =>
-          (method === 'LMSSetValue' || method === 'SetValue') &&
-          key.startsWith(`${prefix}.`),
-      )
-      .map(([, key, value]) => [key.slice(prefix.length + 1), value]),
+      .filter(([method]) => method === 'LMSSetValue' || method === 'SetValue')
+      .map(([, key, value]) => [key, value]),
+    prefix,
   );
 }

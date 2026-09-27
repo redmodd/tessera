@@ -9,6 +9,7 @@ import {
   cmi5Fetch,
   flush,
   postedStatements,
+  requests,
   respond,
   setLaunchParams,
   statementRequests,
@@ -20,11 +21,7 @@ const VERB = 'http://adlnet.gov/expapi/verbs/';
 
 const sentStatements = () => postedStatements(mockFetch);
 
-const stateWrites = () =>
-  mockFetch.mock.calls.filter(
-    ([url, init]) =>
-      String(url).includes('activities/state') && init?.method === 'PUT',
-  );
+const stateWrites = () => requests(mockFetch, 'activities/state', 'PUT');
 
 const statementFor = (verb: string): any =>
   sentStatements().find((b: any) => b?.verb?.id === `${VERB}${verb}`);
@@ -245,7 +242,9 @@ describe('CMI5Adapter', () => {
     // Allow fire-and-forget PUT to settle
     await flush();
 
-    const putCalls = stateWrites();
+    const putCalls = mockFetch.mock.calls.filter(
+      ([, init]) => init?.method === 'PUT',
+    );
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0]).toContain('activities/state');
     expect(JSON.parse(putCalls[0][1].body)).toEqual({ ...state, n: 1 });
