@@ -98,7 +98,7 @@
   // menus, tables of contents, etc. that can navigate to specific pages.
   setNavContext({ nav, manifest, progress, config });
 
-  // ---- Adapter context (read by useQuestion / usePersistence) ----
+  // ---- Adapter context (read by useQuestion / useQuiz) ----
   setAdapterContext({
     get adapter() {
       return adapter;

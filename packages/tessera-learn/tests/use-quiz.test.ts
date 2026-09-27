@@ -770,7 +770,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     expect(m.ref.handle).not.toBeNull();
   });
 
-  it('reads quiz config from the page context — proves context flow holds for custom quiz.svelte', () => {
+  it('reads quiz config from the page context, so a custom quiz.svelte still gets it', () => {
     // A custom quiz.svelte rendered through virtual:tessera-quiz must still
     // receive the page context from App.svelte. A non-default maxAttempts proves the
     // read goes through pageCtx, not a baked-in default.
