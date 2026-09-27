@@ -31,7 +31,12 @@ function answer(graded: boolean | undefined) {
         progress,
         config,
       } as any);
-      setPageContext({ index: 0 } as any);
+      setPageContext({
+        quiz: null,
+        quizState: null,
+        passingScore: 70,
+        index: 0,
+      });
       setInPage(true);
     },
   });

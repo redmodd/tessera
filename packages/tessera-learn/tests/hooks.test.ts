@@ -37,14 +37,8 @@ import {
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { UseQuizQuestionApi } from '../src/runtime/hooks.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import {
-  setNavContext,
-  setAdapterContext,
-  setPageContext,
-  setQuizContext,
-  setInPage,
-  setUserStateStore,
-} from '../src/runtime/contexts.js';
+import * as runtimeContexts from '../src/runtime/contexts.js';
+import { setQuizContext, setUserStateStore } from '../src/runtime/contexts.js';
 import type { Manifest } from '../src/plugin/manifest.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import {
@@ -58,7 +52,13 @@ function provideNavCtx({
   manifest = createManifest(5),
   config = createConfig(),
   pageIndex = 0,
-}: { manifest?: Manifest; config?: CourseConfig; pageIndex?: number } = {}) {
+  contexts = runtimeContexts,
+}: {
+  manifest?: Manifest;
+  config?: CourseConfig;
+  pageIndex?: number;
+  contexts?: typeof runtimeContexts;
+} = {}) {
   const progress = new ProgressState(manifest, config);
   const nav: any = {
     currentPageIndex: pageIndex,
@@ -74,10 +74,15 @@ function provideNavCtx({
   };
   const ctx = { nav, manifest, progress, config };
   const adapter = stubAdapter({ reportInteraction: vi.fn() });
-  setNavContext(ctx);
-  setAdapterContext({ adapter });
-  setPageContext({ index: pageIndex } as any);
-  setInPage(true);
+  contexts.setNavContext(ctx);
+  contexts.setAdapterContext({ adapter });
+  contexts.setPageContext({
+    quiz: null,
+    quizState: null,
+    passingScore: 70,
+    index: pageIndex,
+  });
+  contexts.setInPage(true);
   return { ...ctx, adapter };
 }
 
@@ -747,10 +752,9 @@ describe('useCompletion', () => {
   it('markComplete is a no-op outside manual mode and warns once per session', async () => {
     vi.resetModules();
     const { useCompletion } = await import('../src/runtime/hooks.svelte.js');
-    const { setNavContext } = await import('../src/runtime/contexts.js');
+    const contexts = await import('../src/runtime/contexts.js');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { nav, manifest, progress, config } = provideNavCtx();
-    setNavContext({ nav, manifest, progress, config });
+    const { progress } = provideNavCtx({ contexts });
 
     const handle = useCompletion();
     handle.markComplete();
