@@ -7,6 +7,7 @@ import type { SavedState } from '../src/runtime/persistence.js';
 import { validateAgent } from '../src/runtime/xapi/validation.js';
 import {
   flush,
+  noDeadline,
   printed,
   scorm12Api,
   useFakeTimers,
@@ -76,11 +77,13 @@ describe('SCORM12Adapter', () => {
     );
   });
 
-  it('warns and skips suspend_data when the state cannot be serialized', async () => {
+  it('warns once and skips suspend_data when the state cannot be serialized', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await adapter.init();
     adapter.saveState({ b: 0, v: [], d: 0, u: { big: 1n } });
+    adapter.saveState({ b: 1, v: [], d: 0, u: { big: 1n } });
     adapter.terminate();
+    expect(warn).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledWith(
       'Tessera: Failed to serialize cmi.suspend_data',
       expect.any(TypeError),
@@ -308,7 +311,7 @@ describe('SCORM12Adapter', () => {
 
   it('exit finishes the session without leaving the page', async () => {
     await adapter.init();
-    expect(await adapter.exit()).toBe(false);
+    expect(await adapter.exit(noDeadline)).toBe(false);
     expect(api.LMSFinish).toHaveBeenCalledTimes(1);
   });
 
