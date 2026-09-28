@@ -254,30 +254,25 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
  * Shared by SCORM 1.2 (property "API") and SCORM 2004 (property "API_1484_11").
  * Returns null if not found within 10 levels or a cross-origin boundary is hit.
  */
-export function findLMSAPI(propName: string): unknown {
-  function scan(win: Window): unknown {
+export function findLMSAPI<T>(propName: 'API' | 'API_1484_11'): T | null {
+  function scan(win: Window): T | null {
     for (let i = 0; i < 10; i++) {
       try {
-        const value = (win as unknown as Record<string, unknown>)[propName];
+        const value = (win as unknown as Record<string, T>)[propName];
         if (value) return value;
       } catch {
-        // Cross-origin frame — stop
+        // Cross-origin frame: stop
         return null;
       }
       if (win.parent === win) break;
-      try {
-        win = win.parent;
-      } catch {
-        // Cross-origin frame — stop
-        break;
-      }
+      win = win.parent;
     }
     return null;
   }
 
   // Check window.opener chain first (popup launch pattern)
   if (window.opener) {
-    const api = scan(window.opener as Window);
+    const api = scan(window.opener);
     if (api) return api;
   }
 

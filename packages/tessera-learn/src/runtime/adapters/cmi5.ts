@@ -76,9 +76,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected readonly activityIdParam = 'activityId';
   protected readonly authParam = 'fetch';
 
-  // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
-  // and continuing with no token will 401-loop until auth is marked dead.
-  // Fail loud at launch instead of dribbling errors per statement.
+  // The cmi5 fetch URL is single-use (§6.2), so a failed token request fails
+  // the launch instead of retrying.
   protected async resolveAuth(fetchUrl: string): Promise<string> {
     let resp: Response;
     try {

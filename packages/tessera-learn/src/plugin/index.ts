@@ -503,12 +503,12 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
 }
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
-  const { adapter } = LMS_BUILD[standard];
+  const { adapter: adapterClass } = LMS_BUILD[standard];
   return `
-import { ${adapter} } from 'tessera-learn/runtime/adapters/${standard}.js';
+import { ${adapterClass} } from 'tessera-learn/runtime/adapters/${standard}.js';
 import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
 export function createAdapter() {
-  const adapter = ${adapter}.connect();
+  const adapter = ${adapterClass}.connect();
   if (!adapter) throw missingApiError('${standard}');
   return adapter;
 }

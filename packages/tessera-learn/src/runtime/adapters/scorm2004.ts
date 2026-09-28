@@ -64,7 +64,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #exitMode: ExitMode = 'suspend';
 
   static connect(): SCORM2004Adapter | null {
-    const api = findLMSAPI('API_1484_11') as SCORM2004API | null;
+    const api = findLMSAPI<SCORM2004API>('API_1484_11');
     return api ? new SCORM2004Adapter(api) : null;
   }
 
