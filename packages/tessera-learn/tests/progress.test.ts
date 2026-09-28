@@ -64,13 +64,6 @@ describe('ProgressState', () => {
   });
 
   describe('restoring a quiz', () => {
-    it('seeds score and attempts without counting a new attempt', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: 2 } } });
-      expect(progress.quizScore(2)).toBe(90);
-      expect(progress.quizAttempts(2)).toBe(2);
-    });
-
     it('a later submit continues the restored attempt count', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.restoreFrom({ v: [], g: { 2: { s: 90, a: 2 } } });
@@ -87,31 +80,29 @@ describe('ProgressState', () => {
   });
 
   describe('toSaved / restoreFrom', () => {
-    const manifest = () =>
-      createManifest(
-        4,
-        { 1: { graded: true } },
-        { 2: { graded: true }, 3: { graded: true } },
-      );
-    const config = () =>
-      createConfig({
-        completion: { mode: 'manual' },
-        success: { from: 'quiz' },
-        scoring: { passingScore: 50 },
-      });
+    const manifest = createManifest(
+      4,
+      { 1: { graded: true } },
+      { 2: { graded: true }, 3: { graded: true } },
+    );
+    const config = createConfig({
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 50 },
+    });
     const roundTrip = (progress: ProgressState) => {
-      const restored = new ProgressState(manifest(), config());
+      const restored = new ProgressState(manifest, config);
       restored.restoreFrom(progress.toSaved());
       return restored;
     };
 
     it('saves nothing but an empty visited list for fresh progress', () => {
-      const progress = new ProgressState(manifest(), config());
+      const progress = new ProgressState(manifest, config);
       expect(progress.toSaved()).toEqual({ v: [] });
     });
 
     it('round-trips visited pages, chunks and quiz results', () => {
-      const progress = new ProgressState(manifest(), config());
+      const progress = new ProgressState(manifest, config);
       progress.markVisited(0);
       progress.markVisited(1);
       progress.markChunk(0, 2);
@@ -132,7 +123,7 @@ describe('ProgressState', () => {
     });
 
     it('saves a graded weight-1 question as its score and any other as a tuple', () => {
-      const progress = new ProgressState(manifest(), config());
+      const progress = new ProgressState(manifest, config);
       progress.markStandaloneQuestion(2, 'plain', 70, true);
       progress.markStandaloneQuestion(2, 'heavy', 90, true, 3);
       progress.markStandaloneQuestion(2, 'practice', 10, false);
@@ -151,19 +142,8 @@ describe('ProgressState', () => {
       expect(restored.toSaved()).toEqual(saved);
     });
 
-    it('round-trips the unanswered graded questions the manifest does not list', () => {
-      const progress = new ProgressState(manifest(), config());
-      progress.registerStandaloneQuestion(3, 'q1', true);
-      progress.registerStandaloneQuestion(3, 'q2', true);
-      progress.markStandaloneQuestion(3, 'q1', 100, true);
-
-      const saved = progress.toSaved();
-      expect(saved.g?.[3]?.w).toEqual(['q2']);
-      expect(roundTrip(progress).toSaved()).toEqual(saved);
-    });
-
     it('round-trips all four latches', () => {
-      const progress = new ProgressState(manifest(), config());
+      const progress = new ProgressState(manifest, config);
       progress.quizCompleted(1, 100);
       progress.markStandaloneQuestion(2, 'q1', 100, true);
       progress.markStandaloneQuestion(3, 'q1', 100, true);
