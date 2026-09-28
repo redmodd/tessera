@@ -447,7 +447,7 @@
   }
 
   function handlePageshow(event) {
-    if (!launched || !event.persisted) return;
+    if (!terminated || !event.persisted) return;
     if (adapter.connected) {
       leaveCourse('ended');
       return;

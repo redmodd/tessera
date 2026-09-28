@@ -488,6 +488,26 @@ describe('exiting a course', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it('keeps running a course the learner left and restored while it was launching', async () => {
+    const init = Promise.withResolvers<void>();
+    const { adapter, calls } = recordingAdapter({ init: () => init.promise });
+    await mountApp({
+      config: createConfig(),
+      manifest: createManifest(2),
+      adapter,
+      loadLayout: masteryLayout,
+    });
+
+    enterBfcache();
+    init.resolve();
+    await vi.waitFor(() => expect(navCtx().canExit).toBe(true));
+    restoreFromBfcache();
+    await flush();
+
+    expect(document.body.textContent).not.toContain('Session ended');
+    expect(calls).not.toContain('terminate');
+  });
+
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
     await mount(adapter, { loadLayout: masteryLayout });
