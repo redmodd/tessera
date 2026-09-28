@@ -11,6 +11,8 @@ import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
+import type { SCORM12API } from './scorm12.js';
+import type { SCORM2004API } from './scorm2004.js';
 import {
   httpOrigin,
   largerSuspendDataStandards,
@@ -249,16 +251,23 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   abstract override setExit(mode: ExitMode): void;
 }
 
+interface LMSAPIs {
+  API: SCORM12API;
+  API_1484_11: SCORM2004API;
+}
+
 /**
  * Walk the window.opener and window.parent chains looking for an LMS API object.
  * Shared by SCORM 1.2 (property "API") and SCORM 2004 (property "API_1484_11").
  * Returns null if not found within 10 levels or a cross-origin boundary is hit.
  */
-export function findLMSAPI<T>(propName: 'API' | 'API_1484_11'): T | null {
-  function scan(win: Window): T | null {
+export function findLMSAPI<K extends keyof LMSAPIs>(
+  propName: K,
+): LMSAPIs[K] | null {
+  function scan(win: Window): LMSAPIs[K] | null {
     for (let i = 0; i < 10; i++) {
       try {
-        const value = (win as unknown as Record<string, T>)[propName];
+        const value = (win as unknown as Partial<LMSAPIs>)[propName];
         if (value) return value;
       } catch {
         // Cross-origin frame: stop

@@ -66,7 +66,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #successStatus: 'passed' | 'failed' | null = null;
 
   static connect(): SCORM12Adapter | null {
-    const api = findLMSAPI<SCORM12API>('API');
+    const api = findLMSAPI('API');
     return api ? new SCORM12Adapter(api) : null;
   }
 
