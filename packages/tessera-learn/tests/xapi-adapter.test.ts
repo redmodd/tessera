@@ -46,10 +46,18 @@ describe('XAPIAdapter.connect', () => {
   it.each(['endpoint', 'auth', 'actor', 'activity_id'])(
     'returns null when %s is missing',
     (param) => {
-      setXAPILaunch({ [param]: '' });
+      setXAPILaunch();
+      const url = new URL(window.location.href);
+      url.searchParams.delete(param);
+      window.history.replaceState({}, '', url);
       expect(XAPIAdapter.connect()).toBeNull();
     },
   );
+
+  it('returns null when activity_id is empty', () => {
+    setXAPILaunch({ activity_id: '' });
+    expect(XAPIAdapter.connect()).toBeNull();
+  });
 
   it('returns null for a cmi5 launch, which names the activity activityId', () => {
     setLaunchParams({

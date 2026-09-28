@@ -92,7 +92,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected publisher: XAPIPublisher | null = null;
   protected endpoint = '';
   protected actor: XAPIAgent | null = null;
-  declare static readonly activityIdParam: string;
+  protected abstract readonly activityIdParam: string;
+  protected abstract readonly launchParams: readonly string[];
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
@@ -112,12 +113,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSeq = 0;
   #stateSaved = true;
 
-  /** The adapter for this launch, or null when the LMS did not send every one of `launchParams`. */
-  static connect<T extends BaseXAPILaunchAdapter>(
-    this: (new () => T) & { readonly launchParams: readonly string[] },
-  ): T | null {
+  static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
+    const adapter = new this();
     const params = new URLSearchParams(window.location.search);
-    return this.launchParams.every((p) => params.get(p)) ? new this() : null;
+    const required = [...adapter.launchParams, adapter.activityIdParam];
+    return required.every((p) => params.get(p)) ? adapter : null;
   }
 
   /**
@@ -134,10 +134,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         `Tessera ${this.logName}: launch parameter 'endpoint' is not an absolute http(s) URL. The LMS did not send a usable LRS endpoint.`,
       );
     }
-    this.#activityId =
-      params.get(
-        (this.constructor as typeof BaseXAPILaunchAdapter).activityIdParam,
-      ) || '';
+    this.#activityId = params.get(this.activityIdParam) || '';
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
     this.#registration = params.get('registration') || undefined;

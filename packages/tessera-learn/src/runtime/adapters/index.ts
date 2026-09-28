@@ -22,7 +22,6 @@ export interface CreateAdapterOptions {
   manifest?: Manifest;
 }
 
-/** `connect()` returns an adapter when the LMS runtime is reachable, else null. */
 const LMS_ADAPTERS: Record<LMSStandard, { connect(): BaseAdapter | null }> = {
   scorm12: SCORM12Adapter,
   scorm2004: SCORM2004Adapter,
