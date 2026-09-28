@@ -16,25 +16,43 @@ describe('weightedScore', () => {
 describe('ProgressState', () => {
   describe('markVisited', () => {
     it('adds page index to visited set', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       expect(progress.visitedPages.has(0)).toBe(true);
     });
 
     it('is idempotent', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       progress.markVisited(0);
       expect(progress.visitedPages.size).toBe(1);
     });
 
     it('tracks multiple pages', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       progress.markVisited(3);
       progress.markVisited(5);
       expect(progress.visitedPages.size).toBe(3);
       expect(progress.visitedPages.has(3)).toBe(true);
+    });
+
+    it.each([6, -1, 1.5])('ignores %s, which is not a page', (index) => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markVisited(index);
+      expect(progress.visitedPages.size).toBe(0);
+    });
+  });
+
+  describe('markChunk', () => {
+    it.each([
+      [6, 1],
+      [1.5, 1],
+      [0, 1.5],
+    ])('ignores page %s chunk %s', (page, chunk) => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markChunk(page, chunk);
+      expect(progress.chunkProgress.size).toBe(0);
     });
   });
 
@@ -95,6 +113,12 @@ describe('ProgressState', () => {
         g: { 3: { s: 90 }, NaN: { q: { q1: 100 } }, ' ': { s: 90 } },
       });
       expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
+    it('drops a saved chunk that is not a whole number', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ v: [], c: { 0: 2.5, 1: 1 } });
+      expect(progress.toSaved().c).toEqual({ 1: 1 });
     });
 
     it('clamps saved scores to 0-100', () => {

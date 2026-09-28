@@ -3,6 +3,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import {
   isGradedPage,
+  isPageIndex,
   isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
@@ -137,6 +138,7 @@ export class ProgressState {
   }
 
   markVisited(pageIndex: number) {
+    if (!isPageIndex(pageIndex, this.#totalPages)) return;
     if (this.visitedPages.has(pageIndex)) return;
     this.visitedPages.add(pageIndex);
     this.#changed();
@@ -162,6 +164,8 @@ export class ProgressState {
 
   /** Record the highest chunk index revealed on a page. Only advances forward. */
   markChunk(pageIndex: number, chunkIndex: number) {
+    if (!isPageIndex(pageIndex, this.#totalPages)) return;
+    if (!Number.isInteger(chunkIndex)) return;
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
     this.chunkProgress.set(pageIndex, chunkIndex);
@@ -391,18 +395,11 @@ export class ProgressState {
    * latches. A saved pass the course can no longer give is dropped.
    */
   restoreFrom(saved: SavedProgress): void {
-    const isPage = (key: string | number) => {
-      const i = Number(key);
-      return (
-        String(i) === String(key) &&
-        Number.isInteger(i) &&
-        i >= 0 &&
-        i < this.#totalPages
-      );
-    };
+    const isPage = (key: string) =>
+      String(Number(key)) === key && isPageIndex(Number(key), this.#totalPages);
     this.#replaying = true;
     try {
-      for (const idx of saved.v) if (isPage(idx)) this.markVisited(idx);
+      for (const idx of saved.v) this.markVisited(idx);
       for (const [key, chunkIndex] of Object.entries(saved.c ?? {})) {
         if (isPage(key)) this.markChunk(Number(key), chunkIndex);
       }
