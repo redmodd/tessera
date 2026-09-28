@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
 import {
   answerMatching,
+  bfcacheRoundTrip,
+  exitCourse,
   navigateToPage,
+  readSavedState,
   waitForTesseraContent,
 } from './helpers.js';
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
+    await page.clock.install();
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
@@ -83,13 +87,7 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Objectives');
     await navigateToPage(page, 'Callouts & Images');
 
-    // Check localStorage
-    const storageData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const storageData = await readSavedState(page);
 
     expect(storageData).not.toBeNull();
     expect(storageData).toHaveProperty('b'); // bookmark
@@ -140,12 +138,7 @@ test.describe('Persistence — localStorage', () => {
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 
     // Verify quiz score is in localStorage
-    const storageData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const storageData = await readSavedState(page);
     expect(storageData).not.toBeNull();
     expect(Object.keys(storageData.g).length).toBeGreaterThanOrEqual(1);
 
@@ -153,33 +146,35 @@ test.describe('Persistence — localStorage', () => {
     await page.reload();
     await waitForTesseraContent(page);
 
-    const restoredData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const restoredData = await readSavedState(page);
     expect(restoredData).not.toBeNull();
     expect(Object.keys(restoredData.g).length).toBeGreaterThanOrEqual(1);
   });
 
   test('state includes duration tracking', async ({ page }) => {
     // Persistence is event-driven: a save fires on each page change. Navigate
-    // once to seed the store, sleep past the 1-second tick, then navigate
+    // once to seed the store, fast-forward past the 1-second tick, then navigate
     // again to flush the updated duration. This avoids polling for a value
     // that only updates when something else triggers a save.
     await navigateToPage(page, 'Objectives');
-    await page.waitForTimeout(1100);
+    await page.clock.fastForward(1_100);
     await navigateToPage(page, 'Callouts & Images');
 
-    const storageData = await page.evaluate(() => {
-      const tesseraKey = Object.keys(localStorage).find((k) =>
-        k.startsWith('tessera-'),
-      );
-      return JSON.parse(localStorage.getItem(tesseraKey!)!);
-    });
+    const storageData = await readSavedState(page);
     expect(storageData).toHaveProperty('d');
     expect(storageData.d).toBeGreaterThanOrEqual(1);
     expect(storageData.b).toBeGreaterThanOrEqual(0);
+  });
+
+  test('a page restored from the back/forward cache saves again when the learner leaves', async ({
+    page,
+  }) => {
+    await expect(page.locator('.tessera-content h1')).toBeVisible();
+    await bfcacheRoundTrip(page);
+    const restored = (await readSavedState(page)).d;
+    await page.clock.fastForward(5_000);
+    await exitCourse(page);
+
+    expect((await readSavedState(page)).d).toBeGreaterThanOrEqual(restored + 5);
   });
 });

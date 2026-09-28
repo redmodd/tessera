@@ -12,6 +12,7 @@
 export class DurationTracker {
   #startTime = Date.now();
   #accumulated = 0;
+  #pausedAt: number | null = null;
 
   constructor(previousSeconds: number = 0) {
     this.#accumulated = previousSeconds;
@@ -24,6 +25,18 @@ export class DurationTracker {
 
   /** This session only. Use for SCORM session_time and cmi5 result.duration. */
   get sessionSeconds(): number {
-    return Math.floor((Date.now() - this.#startTime) / 1000);
+    return Math.floor(
+      ((this.#pausedAt ?? Date.now()) - this.#startTime) / 1000,
+    );
+  }
+
+  pause(): void {
+    this.#pausedAt ??= Date.now();
+  }
+
+  resume(): void {
+    if (this.#pausedAt === null) return;
+    this.#startTime += Date.now() - this.#pausedAt;
+    this.#pausedAt = null;
   }
 }

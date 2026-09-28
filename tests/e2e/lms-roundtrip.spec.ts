@@ -11,6 +11,7 @@ import {
 import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
+  bfcacheRoundTrip,
   clickExitCourse,
   exitCourse,
   findStatement,
@@ -27,6 +28,32 @@ import {
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
+
+async function expectRestoreToEndSession(page: Page): Promise<void> {
+  await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+  await bfcacheRoundTrip(page);
+  await expect(
+    page.getByRole('heading', { name: 'Session ended' }),
+  ).toBeVisible();
+}
+
+async function expectNoScormCallsAfter(page: Page, finish: string) {
+  const log = await scormLog(page);
+  const end = log.findIndex(([fn]) => fn === finish);
+  expect(end).toBeGreaterThan(-1);
+  expect(log.slice(end + 1)).toEqual([]);
+}
+
+async function expectNoStatementsAfterTerminated(
+  page: Page,
+  statements: any[],
+) {
+  await expect
+    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+    .toBeTruthy();
+  await page.waitForTimeout(300);
+  expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+}
 
 // ---------------------------------------------------------------------------
 // SCORM 1.2
@@ -236,6 +263,15 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     expect(log.filter((entry) => entry[0] === 'LMSFinish')).toHaveLength(1);
   });
 
+  test('a page restored from the back/forward cache ends the session and stops writing', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await expectRestoreToEndSession(page);
+
+    await expectNoScormCallsAfter(page, 'LMSFinish');
+  });
+
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
@@ -432,6 +468,15 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     ).toHaveLength(1);
   });
 
+  test('a page restored from the back/forward cache ends the session and stops writing', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await expectRestoreToEndSession(page);
+
+    await expectNoScormCallsAfter(page, 'Terminate');
+  });
+
   test.describe('LMS scaled_passing_score', () => {
     test.use({ lmsData: { 'cmi.scaled_passing_score': '0.6' } });
 
@@ -564,6 +609,17 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.waitForURL(RETURN_URL);
 
     expect(terminatedBeforeReturn).toBe(true);
+  });
+
+  test('a page restored from the back/forward cache ends the session and stops sending', async ({
+    page,
+  }) => {
+    const statements = await installCmi5Mock(page);
+
+    await page.goto(cmi5LaunchURL(BASE));
+    await expectRestoreToEndSession(page);
+
+    await expectNoStatementsAfterTerminated(page, statements);
   });
 });
 
@@ -801,5 +857,17 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect
       .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
       .toBeTruthy();
+  });
+
+  test('a page restored from the back/forward cache ends the session and stops sending', async ({
+    page,
+  }) => {
+    const statements: any[] = [];
+    await routeLRS(page, statements, []);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await expectRestoreToEndSession(page);
+
+    await expectNoStatementsAfterTerminated(page, statements);
   });
 });

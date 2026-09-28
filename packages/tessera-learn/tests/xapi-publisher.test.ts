@@ -504,6 +504,15 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(true);
   });
 
+  it('markRestored returns subsequent sends to plain fetches', async () => {
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    pub.markUnloading();
+    pub.markRestored();
+    await pub.sendStatement({ verb: { id: 'http://verb/x' } });
+    expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
+  });
+
   it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
     mockFetch
       .mockReturnValueOnce(new Promise(() => {}))

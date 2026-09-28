@@ -439,9 +439,30 @@
   }
 
   function handlePagehide() {
+    if (!launched) return;
     endSession();
+    if (exitPhase === 'ending') exitPhase = 'ended';
+    duration.pause();
     xapiClient?.markUnloading();
     adapter.terminate();
+  }
+
+  function handlePageshow(event) {
+    if (!terminated || !event.persisted) return;
+    xapiClient?.markRestored();
+    if (adapter.connected) {
+      leaveCourse('ended');
+      return;
+    }
+    terminated = false;
+    duration.resume();
+  }
+
+  function leaveCourse(phase) {
+    exitPhase = phase;
+    loadGeneration++;
+    pageLoading = false;
+    clearTimeout(manualWatchdog);
   }
 
   let unmountCourse;
@@ -449,22 +470,19 @@
 
   async function exit() {
     if (!canExit) return;
-    exitPhase = 'ending';
-    loadGeneration++;
-    pageLoading = false;
+    leaveCourse('ending');
     const deadline = new Promise((resolve) =>
       setTimeout(resolve, EXIT_TIMEOUT_MS),
     );
     await Promise.race([courseUnmounted, deadline]);
     await xapiClient?.flush(deadline);
-    const returned =
-      endSession() &&
-      (await adapter.exit(deadline).catch((err) => {
-        console.warn('Tessera: exit failed', err);
-        return false;
-      }));
+    if (!endSession()) return;
+    await adapter.exit(deadline).catch((err) => {
+      console.warn('Tessera: exit failed', err);
+    });
+    if (exitPhase === 'ended') return;
     exitPhase = 'ended';
-    if (!returned) window.close();
+    if (!adapter.returnToLMS()) window.close();
   }
 
   // ---- Lifecycle ----
@@ -565,7 +583,6 @@
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('pagehide', handlePagehide);
     launched = true;
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
@@ -592,16 +609,14 @@
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    window.removeEventListener('pagehide', handlePagehide);
-    if (manualWatchdog !== null) {
-      clearTimeout(manualWatchdog);
-      manualWatchdog = null;
-    }
+    clearTimeout(manualWatchdog);
     // Clear the global slot so a stale client from a previous mount
     // can't leak into a fresh one (matters for tests that re-mount).
     registerXAPIClient(null);
   });
 </script>
+
+<svelte:window onpagehide={handlePagehide} onpageshow={handlePageshow} />
 
 {#snippet page()}
   {#if pageError}

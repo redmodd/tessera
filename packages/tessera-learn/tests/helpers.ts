@@ -71,8 +71,10 @@ export const flush = () => new Promise<void>((r) => setTimeout(r));
 
 export const noDeadline = new Promise<never>(() => {});
 
-export function useFakeTimers(): void {
-  vi.useFakeTimers();
+export function useFakeTimers(
+  options?: Parameters<typeof vi.useFakeTimers>[0],
+): void {
+  vi.useFakeTimers(options);
   onTestFinished(() => {
     vi.useRealTimers();
   });
@@ -186,7 +188,7 @@ export async function mountApp({
   adapter: BaseAdapter;
   loadPage?: () => Promise<unknown>;
   loadLayout?: (() => Promise<{ default: unknown }>) | null;
-  xapiClient?: Pick<XAPIClient, 'markUnloading' | 'flush'>;
+  xapiClient?: Pick<XAPIClient, 'markUnloading' | 'markRestored' | 'flush'>;
 }) {
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for each mount. Svelte and the layout come from that same fresh registry or

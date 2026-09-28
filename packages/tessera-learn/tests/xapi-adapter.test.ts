@@ -267,9 +267,10 @@ describe('XAPIAdapter', () => {
     await adapter.init();
     await flush();
 
-    expect(await adapter.exit(noDeadline)).toBe(false);
+    await adapter.exit(noDeadline);
     expect(posted().map((s) => s.verb.id)).toContain(
       'http://adlnet.gov/expapi/verbs/terminated',
     );
+    expect(adapter.returnToLMS()).toBe(false);
   });
 });

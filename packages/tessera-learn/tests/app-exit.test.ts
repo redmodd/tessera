@@ -52,6 +52,17 @@ async function mount(
   await flush();
 }
 
+type XAPIClientStub = NonNullable<Parameters<typeof mountApp>[0]['xapiClient']>;
+
+const xapiClient = (
+  overrides: Partial<XAPIClientStub> = {},
+): XAPIClientStub => ({
+  markUnloading() {},
+  markRestored() {},
+  flush: async () => {},
+  ...overrides,
+});
+
 const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
 
 const userState = (): UserStateStore =>
@@ -86,6 +97,28 @@ function confirmExit() {
   exitButton()!.click();
   dialogButton('Exit course').click();
 }
+
+function enterBfcache() {
+  window.dispatchEvent(
+    new PageTransitionEvent('pagehide', { persisted: true }),
+  );
+}
+
+function restoreFromBfcache() {
+  window.dispatchEvent(
+    new PageTransitionEvent('pageshow', { persisted: true }),
+  );
+}
+
+function bfcacheRoundTrip() {
+  enterBfcache();
+  restoreFromBfcache();
+}
+
+const leavingTheCourse: [string, () => unknown][] = [
+  ['the exit', () => navCtx().exit()],
+  ['a back/forward cache restore', bfcacheRoundTrip],
+];
 
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
@@ -262,25 +295,28 @@ describe('exiting a course', () => {
     );
   });
 
-  it('drops a page that finishes loading after the exit', async () => {
-    let release!: () => void;
-    const page = () => import('./fixtures/app-page.svelte');
-    let loads = 0;
-    const loadPage = () =>
-      loads++ === 0
-        ? page()
-        : new Promise((resolve) => (release = () => resolve(page())));
-    const { adapter } = recordingAdapter();
-    await mount(adapter, { loadLayout: masteryLayout, loadPage });
+  it.each(leavingTheCourse)(
+    'drops a page that finishes loading after %s',
+    async (_, leave) => {
+      let release!: () => void;
+      const page = () => import('./fixtures/app-page.svelte');
+      let loads = 0;
+      const loadPage = () =>
+        loads++ === 0
+          ? page()
+          : new Promise((resolve) => (release = () => resolve(page())));
+      const { adapter } = recordingAdapter();
+      await mount(adapter, { loadLayout: masteryLayout, loadPage });
 
-    navCtx().nav.goToPage(1);
-    await flush();
-    await navCtx().exit();
-    release();
-    await flush();
+      navCtx().nav.goToPage(1);
+      await flush();
+      await leave();
+      release();
+      await flush();
 
-    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
-  });
+      expect(navCtx().progress.visitedPages.has(1)).toBe(false);
+    },
+  );
 
   it('exits normally once the course is complete', async () => {
     const { adapter, calls } = recordingAdapter();
@@ -300,7 +336,7 @@ describe('exiting a course', () => {
 
   it('terminates on pagehide while the exit is still saving', async () => {
     const { adapter, calls } = recordingAdapter({
-      exit: () => new Promise<boolean>(() => {}),
+      exit: () => new Promise<void>(() => {}),
     });
     await mount(adapter);
     const launched = calls.length;
@@ -351,7 +387,7 @@ describe('exiting a course', () => {
     const drained = Promise.withResolvers<void>();
     const flush = vi.fn(() => drained.promise);
     const { adapter, calls } = recordingAdapter();
-    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+    await mount(adapter, { xapiClient: xapiClient({ flush }) });
     const launched = calls.length;
 
     confirmExit();
@@ -366,9 +402,9 @@ describe('exiting a course', () => {
 
   it('bounds the xAPI flush and the adapter exit by one deadline', async () => {
     const flush = vi.fn(async (_deadline: Promise<unknown>) => {});
-    const exit = vi.fn(async () => false);
+    const exit = vi.fn(async () => {});
     const { adapter } = recordingAdapter({ exit });
-    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+    await mount(adapter, { xapiClient: xapiClient({ flush }) });
 
     confirmExit();
 
@@ -382,7 +418,7 @@ describe('exiting a course', () => {
     const { adapter } = recordingAdapter();
     await mount(adapter, {
       loadLayout: masteryLayout,
-      xapiClient: { markUnloading, flush: async () => {} },
+      xapiClient: xapiClient({ markUnloading }),
     });
 
     await navCtx().exit();
@@ -402,18 +438,179 @@ describe('exiting a course', () => {
     expect(exitButton()).toBeNull();
   });
 
-  it('leaves the window open when the adapter returns the learner to the LMS', async () => {
-    const exit = vi.fn(async () => true);
+  it('ends a session restored from the back/forward cache after pagehide', async () => {
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter);
+    enterBfcache();
+    const hidden = calls.length;
+    restoreFromBfcache();
+    await flush();
+
+    expect(document.body.textContent).toContain('Session ended');
+    expect(document.body.textContent).not.toContain('Test page');
+    expect(calls.slice(hidden)).toEqual([]);
+  });
+
+  it('leaves the window open when a back/forward cache restore interrupts the exit', async () => {
+    const drained = Promise.withResolvers<void>();
+    const exit = vi.fn();
     const { adapter } = recordingAdapter({ exit });
+    await mount(adapter, {
+      xapiClient: xapiClient({ flush: () => drained.promise }),
+    });
+
+    confirmExit();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Ending session'),
+    );
+    bfcacheRoundTrip();
+    drained.resolve();
+    await flush();
+
+    expect(document.body.textContent).toContain('Session ended');
+    expect(exit).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['after', false],
+    ['before', true],
+  ])(
+    'stays on a page restored from the back/forward cache when the adapter exit settles %s the restore',
+    async (_, settlesFirst) => {
+      const exiting = Promise.withResolvers<void>();
+      const exit = vi.fn(() => exiting.promise);
+      const returnToLMS = vi.fn(() => true);
+      const { adapter } = recordingAdapter({ exit, returnToLMS });
+      await mount(adapter);
+
+      confirmExit();
+      await vi.waitFor(() => expect(exit).toHaveBeenCalled());
+      enterBfcache();
+      if (settlesFirst) {
+        exiting.resolve();
+        await flush();
+      }
+      restoreFromBfcache();
+      exiting.resolve();
+      await flush();
+
+      expect(document.body.textContent).toContain('Session ended');
+      expect(returnToLMS).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps running a course the learner left and restored while it was launching', async () => {
+    const init = Promise.withResolvers<void>();
+    const { adapter, calls } = recordingAdapter({ init: () => init.promise });
+    await mountApp({
+      config: createConfig(),
+      manifest: createManifest(2),
+      adapter,
+      loadLayout: masteryLayout,
+    });
+
+    enterBfcache();
+    init.resolve();
+    await vi.waitFor(() => expect(navCtx().canExit).toBe(true));
+    restoreFromBfcache();
+    await flush();
+
+    expect(document.body.textContent).not.toContain('Session ended');
+    expect(calls).not.toContain('terminate');
+  });
+
+  it('keeps a course restored from the back/forward cache running without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter, { loadLayout: masteryLayout });
+    bfcacheRoundTrip();
+    const restored = calls.length;
+
+    navCtx().nav.goToPage(1);
+    await flush();
+
+    expect(document.body.textContent).not.toContain('Session ended');
+    expect(calls.slice(restored)).toContain('saveState');
+  });
+
+  it('ends the session again on the next pagehide after a restore without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter);
+    bfcacheRoundTrip();
+    const restored = calls.length;
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(calls.slice(restored)).toEqual(EXIT_SEQUENCE);
+  });
+
+  it('leaves time in the back/forward cache out of the saved duration', async () => {
+    useFakeTimers({ toFake: ['Date'] });
+    const saved: SavedState[] = [];
+    const { adapter } = recordingAdapter({
+      connected: false,
+      saveState: (state) => saved.push(state),
+    });
+    await mount(adapter);
+
+    vi.advanceTimersByTime(10_000);
+    enterBfcache();
+    vi.advanceTimersByTime(3 * 60 * 60_000);
+    restoreFromBfcache();
+    vi.advanceTimersByTime(5_000);
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(saved.at(-1)!.d).toBe(15);
+  });
+
+  it.each([
+    ['under an LMS', true],
+    ['without an LMS', false],
+  ])(
+    'takes xAPI sends out of keepalive when a course %s is restored',
+    async (_, connected) => {
+      const markRestored = vi.fn();
+      const { adapter } = recordingAdapter({ connected });
+      await mount(adapter, { xapiClient: xapiClient({ markRestored }) });
+
+      bfcacheRoundTrip();
+
+      expect(markRestored).toHaveBeenCalled();
+    },
+  );
+
+  it('leaves the window open when the adapter returns the learner to the LMS', async () => {
+    const returnToLMS = vi.fn(() => true);
+    const { adapter } = recordingAdapter({ returnToLMS });
     await mount(adapter);
 
     confirmExit();
 
-    await vi.waitFor(() => expect(exit).toHaveReturned());
-    await flush();
-    expect(document.body.textContent).toContain('Session ended');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Session ended'),
+    );
+    expect(returnToLMS).toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
   });
+
+  it.each(leavingTheCourse)(
+    'drops the manual-completion watchdog after %s',
+    async (_, leave) => {
+      useFakeTimers({ shouldAdvanceTime: true });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { adapter } = recordingAdapter();
+      await mount(adapter, {
+        config: manualConfig(),
+        loadLayout: masteryLayout,
+      });
+
+      await leave();
+      vi.advanceTimersByTime(60_000);
+
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
 
   it('offers no Exit button without an LMS', async () => {
     const config = createConfig();

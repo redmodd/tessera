@@ -199,7 +199,7 @@ describe('SCORM2004Adapter', () => {
       });
 
       adapter.setExit(mode);
-      expect(await adapter.exit(noDeadline)).toBe(false);
+      await adapter.exit(noDeadline);
 
       expect(order.slice(-2)).toEqual([
         `adl.nav.request=${request}`,

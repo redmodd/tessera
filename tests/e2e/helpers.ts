@@ -125,6 +125,25 @@ export async function exitCourse(page: Page): Promise<void> {
   });
 }
 
+/** The web adapter's saved state from localStorage, or null before the first save. */
+export async function readSavedState(page: Page): Promise<any> {
+  return page.evaluate(() => {
+    const tesseraKey = Object.keys(localStorage).find((k) =>
+      k.startsWith('tessera-'),
+    );
+    return tesseraKey ? JSON.parse(localStorage.getItem(tesseraKey)!) : null;
+  });
+}
+
+/** Send the page through a back/forward cache round trip, as leaving and pressing Back does. */
+export async function bfcacheRoundTrip(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const type of ['pagehide', 'pageshow']) {
+      window.dispatchEvent(new PageTransitionEvent(type, { persisted: true }));
+    }
+  });
+}
+
 /** Click the default layout's Exit course button and confirm. */
 export async function clickExitCourse(page: Page): Promise<void> {
   await page.locator('.tessera-exit-btn').click();

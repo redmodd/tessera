@@ -293,8 +293,9 @@ describe('SCORM12Adapter', () => {
 
   it('exit finishes the session without leaving the page', async () => {
     await adapter.init();
-    expect(await adapter.exit(noDeadline)).toBe(false);
+    await adapter.exit(noDeadline);
     expect(api.LMSFinish).toHaveBeenCalledTimes(1);
+    expect(adapter.returnToLMS()).toBe(false);
   });
 
   it('drops writes after LMSFinish', async () => {

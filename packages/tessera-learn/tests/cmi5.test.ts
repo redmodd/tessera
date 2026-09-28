@@ -912,27 +912,34 @@ describe('CMI5Adapter', () => {
     });
   });
 
-  describe('exit() — returnURL redirect (cmi5 §10.2.6)', () => {
-    it('waits for a statement already sending before Terminated and the redirect', async () => {
-      const returnURL = 'https://lms.example.com/learner/done';
-      const adapter = await initAdapter({ launchData: { returnURL } });
+  describe('exit() and the returnURL redirect (cmi5 §10.2.6)', () => {
+    it('waits for a statement already sending before Terminated', async () => {
+      const adapter = await initAdapter();
       await flush();
 
-      const assign = stubLocationAssign();
       mockFetch.mockClear();
       const sending = Promise.withResolvers<Response>();
       mockFetch.mockReturnValueOnce(sending.promise);
       adapter.setCompletionStatus('complete');
       await flush();
 
-      const exiting = adapter.exit(noDeadline);
+      let exited = false;
+      const exiting = adapter.exit(noDeadline).then(() => (exited = true));
       await flush();
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(assign).not.toHaveBeenCalled();
+      expect(exited).toBe(false);
 
       sending.resolve(respond(204));
-      expect(await exiting).toBe(true);
+      await exiting;
       expect(statementFor('terminated')).toBeDefined();
+    });
+
+    it('sends the learner to the returnURL', async () => {
+      const returnURL = 'https://lms.example.com/learner/done';
+      const adapter = await initAdapter({ launchData: { returnURL } });
+      const assign = stubLocationAssign();
+
+      expect(adapter.returnToLMS()).toBe(true);
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
 
@@ -981,23 +988,23 @@ describe('CMI5Adapter', () => {
       expect(exitPut?.[1].keepalive).toBe(true);
     });
 
-    it('stops waiting on a stalled LRS and still redirects', async () => {
-      const returnURL = 'https://lms.example.com/learner/done';
-      const adapter = await initAdapter({ launchData: { returnURL } });
+    it('stops waiting on a stalled LRS at the deadline', async () => {
+      const adapter = await initAdapter();
       await adapter.loadState();
 
-      const assign = stubLocationAssign();
       mockFetch.mockClear();
       mockFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
       adapter.saveState({ b: 1 } as never);
       const deadline = Promise.withResolvers<void>();
-      const exiting = adapter.exit(deadline.promise);
+      let exited = false;
+      const exiting = adapter
+        .exit(deadline.promise)
+        .then(() => (exited = true));
       await flush();
-      expect(assign).not.toHaveBeenCalled();
+      expect(exited).toBe(false);
       deadline.resolve();
-      expect(await exiting).toBe(true);
+      await exiting;
 
-      expect(assign).toHaveBeenCalledWith(returnURL);
       expect(statementFor('terminated')).toBeDefined();
       const exitPut = stateWrites().find(([url]: any[]) =>
         url.includes('tessera-state-exit'),
@@ -1013,7 +1020,7 @@ describe('CMI5Adapter', () => {
 
         const assign = stubLocationAssign();
 
-        expect(await adapter.exit(noDeadline)).toBe(false);
+        expect(adapter.returnToLMS()).toBe(false);
         expect(assign).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining(`returnURL "${returnURL}"`),
@@ -1027,8 +1034,9 @@ describe('CMI5Adapter', () => {
       const assign = stubLocationAssign();
       mockFetch.mockClear();
 
-      expect(await adapter.exit(noDeadline)).toBe(false);
+      await adapter.exit(noDeadline);
       expect(statementFor('terminated')).toBeDefined();
+      expect(adapter.returnToLMS()).toBe(false);
       expect(assign).not.toHaveBeenCalled();
     });
   });

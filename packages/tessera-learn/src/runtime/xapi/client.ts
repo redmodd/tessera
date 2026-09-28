@@ -104,6 +104,10 @@ export class XAPIClient {
     for (const p of this.#publishers) p.markUnloading();
   }
 
+  markRestored(): void {
+    for (const p of this.#publishers) p.markRestored();
+  }
+
   /** Resolves once every destination has sent what it has queued, or at `deadline`. */
   async flush(deadline: Promise<unknown>): Promise<void> {
     await Promise.race([

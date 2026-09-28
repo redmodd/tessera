@@ -1,5 +1,4 @@
 <script>
-  import { onMount } from 'svelte';
   import {
     useCourse,
     useNavigation,
@@ -52,12 +51,9 @@
       e.preventDefault();
     }
   }
-
-  onMount(() => {
-    window.addEventListener('keydown', handleKeyNav);
-    return () => window.removeEventListener('keydown', handleKeyNav);
-  });
 </script>
+
+<svelte:window onkeydown={handleKeyNav} />
 
 <button
   class="tessera-hamburger"
