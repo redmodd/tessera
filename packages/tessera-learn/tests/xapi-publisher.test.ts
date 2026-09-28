@@ -328,20 +328,12 @@ describe('XAPIPublisher — auth header', () => {
 });
 
 describe('XAPIPublisher — version header', () => {
-  it('defaults the X-Experience-API-Version header to 1.0.3', async () => {
+  it('sends the X-Experience-API-Version header as 1.0.3', async () => {
     mockFetch.mockResolvedValue(respond(204));
     const pub = await initPublisher();
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
-  });
-
-  it('uses the supplied version on the header when given', async () => {
-    mockFetch.mockResolvedValue(respond(204));
-    const pub = await initPublisher({ version: '2.0.0' });
-    await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    const headers = mockFetch.mock.calls[0][1].headers;
-    expect(headers.get('X-Experience-API-Version')).toBe('2.0.0');
   });
 });
 

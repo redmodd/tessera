@@ -1,7 +1,6 @@
 import { parseMastery } from './format.js';
 import {
   BaseXAPILaunchAdapter,
-  type LaunchParams,
   type PublisherLaunchOptions,
 } from './xapi-launch-base.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
@@ -79,18 +78,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
 
   protected override readonly logName = 'cmi5';
   protected override readonly profile = STANDARDS.cmi5;
-
-  protected readLaunchParams(params: URLSearchParams): LaunchParams {
-    this.masteryScore = parseMastery(
-      params.get('masteryScore'),
-      "cmi5 launch parameter 'masteryScore'",
-    );
-    return {
-      endpoint: params.get('endpoint') || '',
-      activityId: params.get('activityId') || '',
-      registration: params.get('registration') || '',
-    };
-  }
+  protected readonly activityIdParam = 'activityId';
 
   protected async resolveAuth(params: URLSearchParams): Promise<string> {
     const fetchUrl = params.get('fetch');
@@ -164,10 +152,16 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     return token;
   }
 
-  protected override async beforePublisher(): Promise<PublisherLaunchOptions> {
-    // cmi5 §10 — LaunchData carries the session id (§9.6.3.1), Publisher
+  protected override async beforePublisher(
+    params: URLSearchParams,
+  ): Promise<PublisherLaunchOptions> {
+    this.masteryScore = parseMastery(
+      params.get('masteryScore'),
+      "cmi5 launch parameter 'masteryScore'",
+    );
+    // cmi5 §10: LaunchData carries the session id (§9.6.3.1), Publisher
     // Activity (§9.6.2.3), and launchMode/returnURL/masteryScore (§10.2); its
-    // masteryScore overrides the URL value parsed earlier (§10.2.4).
+    // masteryScore overrides the URL value above (§10.2.4).
     this.#launchData = await this.#fetchLaunchData();
     const tmpl = this.#launchData?.contextTemplate ?? {};
     let sessionId: string | undefined;
@@ -202,7 +196,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   /**
-   * cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict LRSes track
+   * cmi5 §11: fetch the Agent Profile BEFORE Initialized. Strict LRSes track
    * the GET and reject Initialized otherwise. A 404 here is legitimate (no
    * prefs set); the GET itself is what's required.
    */

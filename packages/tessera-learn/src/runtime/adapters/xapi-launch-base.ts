@@ -9,7 +9,7 @@ import { STANDARDS } from '../standards.js';
 import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { XAPIPublisher } from '../xapi/publisher.js';
+import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type {
@@ -77,16 +77,10 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
-export interface LaunchParams {
-  endpoint: string;
-  activityId: string;
-  registration: string;
-}
-
-export interface PublisherLaunchOptions {
-  sessionId?: string;
-  cmi5Mode?: boolean;
-}
+export type PublisherLaunchOptions = Pick<
+  XAPIPublisherOptions,
+  'sessionId' | 'cmi5Mode'
+>;
 
 /**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
@@ -101,6 +95,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected actor: XAPIAgent | null = null;
   protected registration: string | undefined;
   protected authToken = '';
+  /** Launch URL parameter that carries the activity IRI. */
+  protected abstract readonly activityIdParam: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected readonly logName: string = 'xAPI';
   protected readonly profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
@@ -125,25 +121,25 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    */
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
-    const launch = this.readLaunchParams(params);
-    this.endpoint = launch.endpoint.replace(/\/?$/, '/');
-    this.activityId = launch.activityId;
+    this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
+    this.activityId = params.get(this.activityIdParam) || '';
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
-    this.registration = launch.registration || undefined;
-    this.#parseActorParam(params.get('actor') || '');
+    this.registration = params.get('registration') || undefined;
+    const actor = this.#parseActorParam(params.get('actor') || '');
+    this.actor = actor;
     this.authToken = await this.resolveAuth(params);
-    await this.#createPublisher(await this.beforePublisher());
+    await this.#createPublisher(actor, await this.beforePublisher(params));
     await this.beforeInitialized();
     this.#sendInitialized();
   }
 
-  protected abstract readLaunchParams(params: URLSearchParams): LaunchParams;
-
   /** The Basic credential (without the scheme) for every LRS request. */
   protected abstract resolveAuth(params: URLSearchParams): Promise<string>;
 
-  protected async beforePublisher(): Promise<PublisherLaunchOptions> {
+  protected async beforePublisher(
+    _params: URLSearchParams,
+  ): Promise<PublisherLaunchOptions> {
     return {};
   }
 
@@ -352,7 +348,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   /** Parse the launch `actor` param into an Identified Agent, failing loud on malformed JSON. */
-  #parseActorParam(raw: string): void {
+  #parseActorParam(raw: string): XAPIAgent {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') {
@@ -361,7 +357,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       const actor = normalizeLaunchActor(parsed as Record<string, unknown>);
       const invalid = validateAgent(actor);
       if (invalid) throw new Error(joinFieldError('actor', invalid));
-      this.actor = actor;
+      return actor;
     } catch (err) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
@@ -371,16 +367,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   /** Construct the publisher from the resolved launch fields plus per-profile options. */
-  async #createPublisher(opts: PublisherLaunchOptions): Promise<void> {
-    if (!this.actor) {
-      throw new Error(
-        `Tessera ${this.logName}: cannot create publisher before the launch actor is resolved.`,
-      );
-    }
+  async #createPublisher(
+    actor: XAPIAgent,
+    opts: PublisherLaunchOptions,
+  ): Promise<void> {
     this.publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.authToken,
-      actor: this.actor,
+      actor,
       activityId: this.activityId,
       registration: this.registration,
       ...opts,
