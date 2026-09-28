@@ -17,8 +17,8 @@ import {
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 
-/** cmi5 §9.6.2 — well-known IRI owned by ADL for the cmi5 session id extension. */
-const CMI5_SESSIONID_EXT =
+/** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
+export const CMI5_SESSIONID_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
 
 export interface XAPIPublisherOptions {
@@ -92,9 +92,9 @@ function isClientError(status: number | undefined): boolean {
  * sequential queue ordering, retry on 5xx/network errors, and 401-driven
  * auth re-resolution.
  *
- * The cmi5 adapter constructs one of these for its lifecycle stream
- * (`cmi5Mode: true`). Author-config destinations construct one (or more,
- * fanned out) via the runtime registry.
+ * The launch adapters construct one for their lifecycle stream (with
+ * `cmi5Mode: true` under cmi5). Author-config destinations construct one (or
+ * more, fanned out) via the runtime registry.
  */
 export class XAPIPublisher {
   readonly #endpoint: string;
@@ -160,8 +160,8 @@ export class XAPIPublisher {
       this.#cachedActor = this.#actorValue;
     }
     // Eagerly cache static auth (including the empty-string sentinel for
-    // an unauthenticated cmi5 launch where the fetch URL produced no
-    // token) so the hot send path stays synchronous up to fetch().
+    // unauthenticated requests) so the hot send path stays synchronous up
+    // to fetch().
     if (typeof this.#authValue !== 'function') {
       this.#cachedAuth = this.#authValue;
     }
@@ -201,10 +201,9 @@ export class XAPIPublisher {
     } else {
       throw new XAPIConfigError('xapi.actor is required');
     }
-    // Validate static auth eagerly. An empty string is allowed (the
-    // unauthenticated cmi5 case where the LMS fetch URL produced no
-    // token) — only non-empty values are run through the Basic/Bearer
-    // prefix checks.
+    // Validate static auth eagerly. An empty string means unauthenticated
+    // (e.g. a Tin Can launch with no `auth` param), so only non-empty values
+    // are run through the Basic/Bearer prefix checks.
     if (typeof this.#authValue === 'string' && this.#authValue.length > 0) {
       const aErr = validateAuthCredential(this.#authValue);
       if (aErr) throw new XAPIConfigError(`xapi.auth: ${aErr}`);
@@ -344,8 +343,8 @@ export class XAPIPublisher {
   /**
    * Enqueue a pre-built statement (or array as a single batch POST) onto
    * the queue. Returns a promise that resolves with the outcome once the
-   * send settles. Used by the cmi5 adapter for its lifecycle stream and
-   * its interaction batches.
+   * send settles. Used by `sendStatement` and by the fan-out client, which
+   * builds each destination's statement with a shared id.
    */
   enqueueBuilt(
     statementOrBatch: Statement | Statement[],
@@ -664,8 +663,8 @@ export class XAPIPublisher {
       return Promise.resolve(this.#cachedAuth);
     }
     if (typeof this.#authValue === 'string') {
-      // Static auth: an empty string means unauthenticated (the cmi5 case
-      // where the LMS fetch URL produced no token); otherwise revalidate.
+      // Static auth: an empty string means unauthenticated; otherwise
+      // revalidate.
       if (this.#authValue.length > 0) {
         const err = validateAuthCredential(this.#authValue);
         if (err)

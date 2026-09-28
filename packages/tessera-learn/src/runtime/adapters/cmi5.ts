@@ -1,8 +1,6 @@
 import { parseMastery } from './format.js';
-import {
-  BaseXAPILaunchAdapter,
-  type PublisherLaunchOptions,
-} from './xapi-launch-base.js';
+import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
@@ -29,10 +27,6 @@ const LMS_LAUNCH_DATA_STATE_ID = 'LMS.LaunchData';
 
 /** Agent Profile id (cmi5 §11) where the LMS stores learner preferences. */
 const CMI5_LEARNER_PREFS_PROFILE_ID = 'cmi5LearnerPreferences';
-
-/** xAPI cmi5 sessionid context extension IRI (cmi5 §9.6.3.1). */
-const CMI5_SESSIONID_EXT_IRI =
-  'https://w3id.org/xapi/cmi5/context/extensions/sessionid';
 
 /** cmi5 §10 `LMS.LaunchData` document. `contextTemplate` is the base context for every Defined Statement (§9.6.2). */
 interface CMI5LaunchData {
@@ -152,9 +146,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     return token;
   }
 
-  protected override async beforePublisher(
-    params: URLSearchParams,
-  ): Promise<PublisherLaunchOptions> {
+  protected override async prepareLaunch(params: URLSearchParams) {
     this.masteryScore = parseMastery(
       params.get('masteryScore'),
       "cmi5 launch parameter 'masteryScore'",
@@ -162,46 +154,40 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // cmi5 §10: LaunchData carries the session id (§9.6.3.1), Publisher
     // Activity (§9.6.2.3), and launchMode/returnURL/masteryScore (§10.2); its
     // masteryScore overrides the URL value above (§10.2.4).
-    this.#launchData = await this.#fetchLaunchData();
-    let sessionId: string | undefined;
-    const launchSession =
-      this.#launchData?.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT_IRI];
-    if (typeof launchSession === 'string' && launchSession.trim()) {
-      sessionId = launchSession.trim();
-    }
-    if (this.#launchData) {
-      if (
-        typeof this.#launchData.launchMode === 'string' &&
-        VALID_LAUNCH_MODE.has(this.#launchData.launchMode)
-      ) {
-        this.#launchMode = this.#launchData.launchMode;
-      }
-      const { returnURL } = this.#launchData;
-      if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
-        this.returnURL = returnURL;
-      } else if (returnURL) {
-        console.warn(
-          `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
-        );
-      }
-      const launchMastery = parseMastery(
-        this.#launchData.masteryScore,
-        'cmi5 LaunchData masteryScore',
-      );
-      if (launchMastery !== null) {
-        this.masteryScore = launchMastery;
-      }
-    }
-    return { sessionId, cmi5Mode: true };
-  }
+    const launchData = await this.#fetchLaunchData();
+    this.#launchData = launchData;
+    // cmi5 §11: fetch the Agent Profile BEFORE Initialized. Strict LRSes track
+    // the GET and reject Initialized otherwise. A 404 here is legitimate (no
+    // prefs set); the GET itself is what's required.
+    await this.#fetchLearnerPreferences();
+    if (!launchData) return { cmi5Mode: true };
 
-  /**
-   * cmi5 §11: fetch the Agent Profile BEFORE Initialized. Strict LRSes track
-   * the GET and reject Initialized otherwise. A 404 here is legitimate (no
-   * prefs set); the GET itself is what's required.
-   */
-  protected override beforeInitialized(): Promise<void> {
-    return this.#fetchLearnerPreferences();
+    if (
+      typeof launchData.launchMode === 'string' &&
+      VALID_LAUNCH_MODE.has(launchData.launchMode)
+    ) {
+      this.#launchMode = launchData.launchMode;
+    }
+    const { returnURL } = launchData;
+    if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
+      this.returnURL = returnURL;
+    } else if (returnURL) {
+      console.warn(
+        `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
+      );
+    }
+    const launchMastery = parseMastery(
+      launchData.masteryScore,
+      'cmi5 LaunchData masteryScore',
+    );
+    if (launchMastery !== null) {
+      this.masteryScore = launchMastery;
+    }
+    const session =
+      launchData.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
+    const sessionId =
+      typeof session === 'string' ? session.trim() || undefined : undefined;
+    return { sessionId, cmi5Mode: true };
   }
 
   override seedLifecycle(

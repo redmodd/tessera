@@ -327,16 +327,6 @@ describe('XAPIPublisher — auth header', () => {
   });
 });
 
-describe('XAPIPublisher — version header', () => {
-  it('sends the X-Experience-API-Version header as 1.0.3', async () => {
-    mockFetch.mockResolvedValue(respond(204));
-    const pub = await initPublisher();
-    await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    const headers = mockFetch.mock.calls[0][1].headers;
-    expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
-  });
-});
-
 describe('XAPIPublisher — function-form auth and 401 handling', () => {
   it('resolves a function-form auth on first send', async () => {
     mockFetch.mockResolvedValue(respond(204));

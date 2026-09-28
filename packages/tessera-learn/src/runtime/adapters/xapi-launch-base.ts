@@ -77,7 +77,7 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
-export type PublisherLaunchOptions = Pick<
+type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
   'sessionId' | 'cmi5Mode'
 >;
@@ -115,7 +115,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   /**
    * The endpoint, activity id and actor are checked before auth so a bad
    * launch fails before a single-use cmi5 fetch token is spent, and auth
-   * resolves before `beforePublisher()` because its requests carry the token
+   * resolves before `prepareLaunch()` because its requests carry the token
    * and the actor.
    */
   async init(): Promise<void> {
@@ -144,24 +144,22 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       actor,
       activityId: this.activityId,
       registration: this.registration,
-      ...(await this.beforePublisher(params)),
+      ...(await this.prepareLaunch(params)),
     });
     await publisher.init();
     this.publisher = publisher;
-    await this.beforeInitialized();
     this.#sendInitialized();
   }
 
   /** The Basic credential (without the scheme) for every LRS request. */
   protected abstract resolveAuth(params: URLSearchParams): Promise<string>;
 
-  protected async beforePublisher(
+  /** Profile launch requests that must precede Initialized; returns the profile's publisher options. */
+  protected async prepareLaunch(
     _params: URLSearchParams,
   ): Promise<PublisherLaunchOptions> {
     return {};
   }
-
-  protected async beforeInitialized(): Promise<void> {}
 
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
