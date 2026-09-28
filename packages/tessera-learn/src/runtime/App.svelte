@@ -233,85 +233,21 @@
   }
 
   function serializeState() {
-    const c = {};
-    for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
-      c[String(pageIndex)] = chunkIndex;
-    }
-    const g = {};
-    for (const [pageIndex, unit] of progress.gradedUnits) {
-      const entry = {};
-      if (unit.quizScore !== undefined) entry.s = unit.quizScore;
-      if (unit.attempts > 1) entry.a = unit.attempts;
-      if (unit.questions?.size) {
-        const questions = {};
-        for (const [qid, { score, weight, graded }] of unit.questions) {
-          questions[qid] =
-            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
-        }
-        entry.q = questions;
-      }
-      const unanswered = progress.unlistedUnanswered(pageIndex);
-      if (unanswered.length > 0) entry.w = unanswered;
-      if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
-    }
+    const { v, ...saved } = progress.toSaved();
     const u = savableUserState();
     return {
       b: nav.currentPageIndex,
       f: currentFingerprint,
-      v: [...progress.visitedPages],
+      v,
       d: duration.totalSeconds,
-      ...(Object.keys(g).length > 0 ? { g } : {}),
-      ...(progress.chunkProgress.size > 0 ? { c } : {}),
+      ...saved,
       ...(Object.keys(u).length > 0 ? { u } : {}),
-      ...(progress.manuallyCompleted ? { m: 1 } : {}),
-      ...(progress.gradedScoreDecided ? { s: 1 } : {}),
-      ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
-      ...(progress.passScore !== null ? { p: progress.passScore } : {}),
     };
   }
 
   function restoreState(saved) {
     if (!saved) return;
-    const latches = {
-      decided: saved.s === 1,
-      completed: saved.k === 1,
-      passScore: typeof saved.p === 'number' ? saved.p : null,
-    };
-    progress.replay(() => {
-      for (const idx of saved.v) {
-        progress.markVisited(idx);
-      }
-      // Restore chunk progress (absent when no page reveals content in stages)
-      if (saved.c) {
-        for (const [key, chunkIndex] of Object.entries(saved.c)) {
-          progress.markChunk(Number(key), chunkIndex);
-        }
-      }
-      if (saved.g) {
-        for (const [key, unit] of Object.entries(saved.g)) {
-          const pageIndex = Number(key);
-          if (unit.s !== undefined) {
-            progress.restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
-          }
-          if (unit.w) progress.restoreUnanswered(pageIndex, unit.w);
-          for (const [qid, entry] of Object.entries(unit.q ?? {})) {
-            const [score, weight, graded] = Array.isArray(entry)
-              ? entry
-              : [entry, 1, 1];
-            progress.markStandaloneQuestion(
-              pageIndex,
-              qid,
-              score,
-              graded === 1,
-              weight,
-            );
-          }
-        }
-      }
-      if (saved.m === 1) {
-        progress.markCompleteManually();
-      }
-    }, latches);
+    progress.restoreFrom(saved);
     // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
       userState = { ...userState, ...saved.u };

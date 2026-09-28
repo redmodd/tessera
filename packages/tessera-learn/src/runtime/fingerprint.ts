@@ -48,9 +48,9 @@ const isGradedUnit = (value: unknown): boolean =>
   (value.q == null || isQuestionRecord(value.q)) &&
   (value.w == null || isStringArray(value.w));
 
-// Rejected whole: a shape restoreState() iterates unguarded throws partway
+// Rejected whole: a shape restoreFrom() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.
-// A null optional is fine, restoreState skips it.
+// A null optional is fine, restoreFrom skips it.
 const isMalformed = (saved: SavedState): boolean =>
   !isRecord(saved) ||
   !isNumber(saved.b) ||

@@ -250,7 +250,9 @@ describe('useQuestion — standalone mode', () => {
 
     expect(progress.pageScore(1)).toBe(100);
     expect(progress.gradedUnits.has(2)).toBe(false);
-    expect(progress.unlistedUnanswered(2)).toEqual([]);
+
+    progress.markStandaloneQuestion(2, 'q2', 100, true);
+    expect(progress.awaitingScore(2)).toBe(false);
   });
 
   it('uses score override when provided', () => {

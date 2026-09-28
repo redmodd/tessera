@@ -8,8 +8,15 @@ import {
   type CourseConfig,
   type SuccessConfig,
 } from './types.js';
-import type { CompletionStatus, SuccessStatus } from './persistence.js';
+import type {
+  CompletionStatus,
+  GradedUnitState,
+  SavedState,
+  SuccessStatus,
+} from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
+
+type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
 export interface StandaloneResult {
   score: number;
@@ -150,7 +157,7 @@ export class ProgressState {
   }
 
   /** Seed a quiz page from saved state, without counting a new attempt. */
-  restoreQuiz(pageIndex: number, score: number, attempts: number) {
+  #restoreQuiz(pageIndex: number, score: number, attempts: number) {
     this.#write(pageIndex, {
       quizScore: score,
       ...(attempts > 0 ? { attempts } : {}),
@@ -229,7 +236,7 @@ export class ProgressState {
     }
   }
 
-  restoreUnanswered(pageIndex: number, questionIds: string[]) {
+  #restoreUnanswered(pageIndex: number, questionIds: string[]) {
     this.#unconfirmed.set(pageIndex, new Set(questionIds));
     if (this.#expect(pageIndex, questionIds, true)) this.#changed();
   }
@@ -244,7 +251,7 @@ export class ProgressState {
   }
 
   /** Unanswered graded questions the manifest doesn't list, which a save carries until they register again. */
-  unlistedUnanswered(pageIndex: number): string[] {
+  #unlistedUnanswered(pageIndex: number): string[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const listed = this.#listedQuestions.get(pageIndex);
     return [...(this.#expected.get(pageIndex) ?? [])].filter(
@@ -343,10 +350,6 @@ export class ProgressState {
 
   #gradedScoreDecided = $state(false);
 
-  get gradedScoreDecided(): boolean {
-    return this.#gradedScoreDecided;
-  }
-
   get gradedScoreFinal(): boolean {
     const { count, allScored } = this.#graded;
     return (
@@ -360,36 +363,80 @@ export class ProgressState {
   #completionReached = $state(false);
   #passScore = $state<number | null>(null);
 
-  get passScore(): number | null {
-    return this.#passScore;
-  }
-
   #replaying = false;
+
+  toSaved(): SavedProgress {
+    const g: Record<string, GradedUnitState> = {};
+    for (const [pageIndex, unit] of this.gradedUnits) {
+      const entry: GradedUnitState = {};
+      if (unit.quizScore !== undefined) entry.s = unit.quizScore;
+      if (unit.attempts > 1) entry.a = unit.attempts;
+      if (unit.questions?.size) {
+        entry.q = {};
+        for (const [qid, { score, weight, graded }] of unit.questions) {
+          entry.q[qid] =
+            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
+        }
+      }
+      const unanswered = this.#unlistedUnanswered(pageIndex);
+      if (unanswered.length > 0) entry.w = unanswered;
+      if (Object.keys(entry).length > 0) g[pageIndex] = entry;
+    }
+    return {
+      v: [...this.visitedPages],
+      ...(Object.keys(g).length > 0 ? { g } : {}),
+      ...(this.chunkProgress.size > 0
+        ? { c: Object.fromEntries(this.chunkProgress) }
+        : {}),
+      ...(this.#manuallyCompleted ? { m: 1 as const } : {}),
+      ...(this.#gradedScoreDecided ? { s: 1 as const } : {}),
+      ...(this.reportedCompletionStatus === 'complete'
+        ? { k: 1 as const }
+        : {}),
+      ...(this.#passScore !== null ? { p: this.#passScore } : {}),
+    };
+  }
 
   /**
    * Apply saved progress without latching partway, then restore the saved
    * latches. A saved pass the course can no longer give is dropped.
    */
-  replay(
-    apply: () => void,
-    latches: {
-      decided: boolean;
-      completed: boolean;
-      passScore: number | null;
-    },
-  ): void {
+  restoreFrom(saved: SavedProgress): void {
     this.#replaying = true;
     try {
-      apply();
+      for (const idx of saved.v) this.markVisited(idx);
+      for (const [key, chunkIndex] of Object.entries(saved.c ?? {})) {
+        this.markChunk(Number(key), chunkIndex);
+      }
+      for (const [key, unit] of Object.entries(saved.g ?? {})) {
+        const pageIndex = Number(key);
+        if (unit.s !== undefined) {
+          this.#restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
+        }
+        if (unit.w) this.#restoreUnanswered(pageIndex, unit.w);
+        for (const [qid, entry] of Object.entries(unit.q ?? {})) {
+          const [score, weight, graded] = Array.isArray(entry)
+            ? entry
+            : [entry, 1, 1];
+          this.markStandaloneQuestion(
+            pageIndex,
+            qid,
+            score,
+            graded === 1,
+            weight,
+          );
+        }
+      }
+      if (saved.m === 1) this.markCompleteManually();
     } finally {
       this.#replaying = false;
     }
-    this.#gradedScoreDecided = latches.decided;
-    this.#completionReached = latches.completed;
+    this.#gradedScoreDecided = saved.s === 1;
+    this.#completionReached = saved.k === 1;
     const canPass =
       this.#success.from === 'quiz' ||
       (this.#success.from === 'fixed' && this.#success.status === 'passed');
-    this.#passScore = canPass ? latches.passScore : null;
+    this.#passScore = canPass && typeof saved.p === 'number' ? saved.p : null;
     this.#latch();
   }
 
