@@ -98,6 +98,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected actor: XAPIAgent | null = null;
   protected abstract readonly activityIdParam: string;
   protected abstract readonly authParam: string;
+  /** Names the credential `resolveAuth()` returns in launch errors. */
+  protected abstract readonly credentialLabel: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
@@ -153,7 +155,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const invalidAuth = validateAuthCredential(this.#authToken);
     if (invalidAuth) {
       throw new Error(
-        `Tessera ${this.logName}: credential from launch parameter '${this.authParam}' ${invalidAuth}`,
+        `Tessera ${this.logName}: ${this.credentialLabel} ${invalidAuth}`,
       );
     }
     const publisher = new XAPIPublisher({

@@ -245,13 +245,16 @@ describe('XAPIAdapter', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects an auth param that carries only the Basic scheme before any request', async () => {
-    setXAPILaunch({ auth: 'Basic ' });
-    await expect(XAPIAdapter.connect()!.init()).rejects.toThrow(
-      /launch parameter 'auth' must be a non-empty string/,
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+  it.each(['Basic ', 'Basic'])(
+    'rejects an auth param of %j, which carries only the scheme, before any request',
+    async (auth) => {
+      setXAPILaunch({ auth });
+      await expect(XAPIAdapter.connect()!.init()).rejects.toThrow(
+        /launch parameter 'auth' must be a non-empty string/,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });

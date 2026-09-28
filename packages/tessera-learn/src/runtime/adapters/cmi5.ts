@@ -74,6 +74,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected readonly profile = STANDARDS.cmi5;
   protected readonly activityIdParam = 'activityId';
   protected readonly authParam = 'fetch';
+  protected readonly credentialLabel = 'fetch token';
 
   // The cmi5 fetch URL is single-use (§6.2), so a failed token request fails
   // the launch instead of retrying.
