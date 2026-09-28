@@ -102,30 +102,8 @@ describe('shouldRestore', () => {
       ['a page in g is not a record', { g: { '0': null } }],
       ['b is not a number', { b: '1' }],
       ['d is not a number', { d: '120' }],
-      ['a visited page is not a number', { v: ['0', 1] }],
-      ['a quiz score is not a number', { g: { '0': { s: '80' } } }],
-      ['an attempt count is not a number', { g: { '0': { a: '2' } } }],
-      [
-        'a standalone score is not a number',
-        { g: { '0': { q: { q1: '80' } } } },
-      ],
-      [
-        'a standalone entry is not a [score, weight, graded] triple',
-        { g: { '0': { q: { q1: [80] } } } },
-      ],
-      [
-        'a standalone entry omits the graded flag',
-        { g: { '0': { q: { q1: [80, 1] } } } },
-      ],
-      [
-        'a standalone entry carries more than a graded flag',
-        { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
-      ],
-      ['a quiz score is null', { g: { '0': { s: null } } }],
-      [
-        'the unanswered questions are not a list of ids',
-        { g: { '0': { w: ['q1', 2] } } },
-      ],
+      ['the standalone answers are not a record', { g: { '0': { q: [] } } }],
+      ['the unanswered questions are not a list', { g: { '0': { w: 'q1' } } }],
     ])('discards a saved document where %s', (_label, bad) => {
       const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
       expect(shouldRestore(saved, fp, 'auto')).toBe(false);
@@ -161,6 +139,17 @@ describe('shouldRestore', () => {
     ['c is null', { c: null }],
     ['g is null', { g: null }],
     ['a graded unit carries only a score', { g: { '0': { s: 80 } } }],
+    ['a visited page is not a number', { v: ['0', 1] }],
+    ['a chunk is not a number', { c: { '0': '2' } }],
+    ['a quiz score is null', { g: { '0': { s: null, a: '2' } } }],
+    [
+      'a standalone entry is not a [score, weight, graded] triple',
+      { g: { '0': { q: { q1: '80', q2: [80], q3: [80, 1, 1, 1] } } } },
+    ],
+    [
+      'an unanswered question id is not a string',
+      { g: { '0': { w: ['q1', 2] } } },
+    ],
   ])('restores a saved document where %s', (_label, nulled) => {
     const saved = { ...savedWith(fp), ...nulled } as unknown as SavedState;
     expect(shouldRestore(saved, fp, 'auto')).toBe(true);

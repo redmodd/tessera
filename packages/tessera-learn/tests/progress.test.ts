@@ -136,6 +136,22 @@ describe('ProgressState', () => {
       expect(progress.reportedScore).toBe(100);
     });
 
+    it('drops a saved quiz or question score that is not a number, keeping the rest', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: [0, '1' as never],
+        g: {
+          0: { s: null as never, a: 2 },
+          1: { s: '80' as never },
+          2: { q: { bad: '80', gone: [null, 1, 1], kept: 70 } as never },
+        },
+      });
+      expect(progress.toSaved()).toEqual({
+        v: [0],
+        g: { 2: { q: { kept: 70 } } },
+      });
+    });
+
     it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
@@ -651,9 +667,10 @@ describe('ProgressState', () => {
       [150, 100],
       [-5, 0],
       [Number.NaN, 0],
-    ])('clamps a score of %s to %s', (score, expected) => {
+      ['80', 80],
+    ])('clamps a score of %j to %s', (score, expected) => {
       const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'q1', score, true);
+      progress.markStandaloneQuestion(3, 'q1', score as number, true);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(
         expected,
       );

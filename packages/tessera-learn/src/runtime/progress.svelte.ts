@@ -193,7 +193,7 @@ export class ProgressState {
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
     questions.set(questionId, {
-      score: clampScore(score),
+      score: clampScore(Number(score)),
       weight: normalizeWeight(weight),
       graded,
     });
@@ -406,7 +406,7 @@ export class ProgressState {
         this.markChunk(pageIndex, chunkIndex);
       }
       for (const [pageIndex, unit] of pageEntries(saved.g)) {
-        if (unit.s !== undefined) {
+        if (typeof unit.s === 'number') {
           const attempts = unit.a ?? 1;
           this.#write(pageIndex, {
             quizScore: clampScore(unit.s),
@@ -422,6 +422,7 @@ export class ProgressState {
           const [score, weight, graded] = Array.isArray(entry)
             ? entry
             : [entry, 1, 1];
+          if (typeof score !== 'number') continue;
           this.markStandaloneQuestion(
             pageIndex,
             qid,
