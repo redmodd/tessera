@@ -252,8 +252,8 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 }
 
 /**
- * Search the window.parent chain, then the parent chain of window.top.opener, for the dialect's LMS API object.
- * Cross-origin frames are skipped. Returns null if neither chain has it within 10 levels.
+ * Search the window.parent chain, then the parent chains of window.opener and window.top.opener, for the dialect's LMS API object.
+ * Cross-origin frames are skipped. Returns null if no chain has it within 10 levels.
  */
 export function findLMSAPI<TApi>({
   apiName,
@@ -269,12 +269,16 @@ export function findLMSAPI<TApi>({
           return value as TApi;
         }
       } catch {}
-      if (win.parent === win) break;
-      win = win.parent;
+      const parent = win.parent;
+      if (!parent || parent === win) break;
+      win = parent;
     }
     return null;
   }
 
-  const opener = window.top?.opener;
-  return scan(window) ?? (opener ? scan(opener) : null);
+  let api = scan(window);
+  for (const opener of new Set([window.opener, window.top?.opener])) {
+    if (opener) api ??= scan(opener);
+  }
+  return api;
 }

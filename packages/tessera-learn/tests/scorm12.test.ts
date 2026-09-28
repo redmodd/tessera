@@ -47,6 +47,25 @@ describe('SCORM12Adapter.connect', () => {
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
+  it('connects to an API on the opener of a framed course window', async () => {
+    const api = scorm12Api();
+    const opener: Record<string, unknown> = { API: api };
+    opener.parent = opener;
+    const lms: Record<string, unknown> = { opener: null };
+    lms.parent = lms;
+    vi.stubGlobal('window', { parent: lms, top: lms, opener });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('returns null when the opener has closed', () => {
+    const win: Record<string, unknown> = { opener: { parent: null } };
+    win.parent = win;
+    win.top = win;
+    vi.stubGlobal('window', win);
+    expect(SCORM12Adapter.connect()).toBeNull();
+  });
+
   it("prefers an API on the course's frame chain over the opener's", async () => {
     const api = scorm12Api();
     const openerApi = scorm12Api();
