@@ -899,11 +899,11 @@ function useNavigation(): {
   readonly currentPageIndex: number;
   readonly pages: ManifestPage[];
   goTo(slug: string): void;
-  goToIndex(index: number): void;
+  goToIndex(index: number): void; // no-op for a locked page or an index that is not a whole number in range
   next(): void;
   prev(): void;
-  readonly canGoNext: boolean;
-  readonly canGoPrev: boolean;
+  readonly canGoNext: boolean; // false when the next page is locked
+  readonly canGoPrev: boolean; // false when the previous page is locked
   canAccess(slug: string): boolean; // first page with that slug; slugs repeat across lessons
   canAccessIndex(index: number): boolean; // use this when iterating pages or sections
   readonly sections: ManifestSection[]; // course tree: { title, slug, lessons: [{ title, slug, pages }] }
@@ -926,8 +926,8 @@ function useProgress(): {
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete'; // live, so it can drop after the LMS is told complete; the LMS stays complete
   readonly successStatus: 'unknown' | 'passed' | 'failed'; // passed only once the course completes, then held
-  markVisited(pageIndex: number): void;
-  markChunk(pageIndex: number, chunkIndex: number): void;
+  markVisited(pageIndex: number): void; // no-op for an index that is not a page in the course
+  markChunk(pageIndex: number, chunkIndex: number): void; // same, and for a chunkIndex that is not a whole number
 };
 ```
 
