@@ -213,7 +213,7 @@ describe('ProgressState', () => {
 
     it('counts a quiz restored from saved state', () => {
       const progress = setup({ 1: { graded: true } });
-      progress.restoreFrom({ v: [0, 1, 2, 3], g: { 1: { s: 80 } } });
+      progress.restoreFrom({ v: [], g: { 1: { s: 80 } } });
       expect(progress.completionStatus).toBe('complete');
     });
   });

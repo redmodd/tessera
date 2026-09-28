@@ -233,14 +233,12 @@
   }
 
   function serializeState() {
-    const { v, ...saved } = progress.toSaved();
     const u = savableUserState();
     return {
       b: nav.currentPageIndex,
       f: currentFingerprint,
-      v,
       d: duration.totalSeconds,
-      ...saved,
+      ...progress.toSaved(),
       ...(Object.keys(u).length > 0 ? { u } : {}),
     };
   }
