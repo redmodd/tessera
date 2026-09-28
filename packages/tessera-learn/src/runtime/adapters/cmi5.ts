@@ -1,7 +1,6 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
-import { validateAuthCredential } from '../xapi/agent-rules.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
@@ -74,17 +73,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected readonly logName = 'cmi5';
   protected readonly profile = STANDARDS.cmi5;
   protected readonly activityIdParam = 'activityId';
+  protected readonly authParam = 'fetch';
+  protected readonly credentialLabel = 'fetch token';
 
-  protected async resolveAuth(params: URLSearchParams): Promise<string> {
-    const fetchUrl = params.get('fetch');
-    // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
-    // and continuing with no token will 401-loop until auth is marked dead.
-    // Fail loud at launch instead of dribbling errors per statement.
-    if (!fetchUrl) {
-      throw new Error(
-        "Tessera cmi5: launch parameter 'fetch' is missing. Cannot acquire LMS auth token.",
-      );
-    }
+  // The cmi5 fetch URL is single-use (§6.2), so a failed token request fails
+  // the launch instead of retrying.
+  protected async resolveAuth(fetchUrl: string): Promise<string> {
     let resp: Response;
     try {
       resp = await fetch(fetchUrl, { method: 'POST' });
@@ -143,10 +137,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       throw new Error(
         'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.',
       );
-    }
-    const invalid = validateAuthCredential(token);
-    if (invalid) {
-      throw new Error(`Tessera cmi5: fetch token ${invalid}`);
     }
     return token;
   }

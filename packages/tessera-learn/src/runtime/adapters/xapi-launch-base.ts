@@ -11,7 +11,11 @@ import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
-import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
+import {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from '../xapi/agent-rules.js';
 import type {
   XAPIAgent,
   PartialStatement,
@@ -93,6 +97,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected endpoint = '';
   protected actor: XAPIAgent | null = null;
   protected abstract readonly activityIdParam: string;
+  protected abstract readonly authParam: string;
+  /** Names the credential `resolveAuth()` returns in launch errors. */
+  protected abstract readonly credentialLabel: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
@@ -111,6 +118,18 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
   #stateSaved = true;
+
+  static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
+    const adapter = new this();
+    const params = new URLSearchParams(window.location.search);
+    const required = [
+      'endpoint',
+      'actor',
+      adapter.activityIdParam,
+      adapter.authParam,
+    ];
+    return required.every((p) => params.get(p)) ? adapter : null;
+  }
 
   /**
    * The endpoint and actor are checked before auth so a bad
@@ -132,7 +151,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
-    this.#authToken = await this.resolveAuth(params);
+    this.#authToken = await this.resolveAuth(params.get(this.authParam) || '');
+    const invalidAuth = validateAuthCredential(this.#authToken);
+    if (invalidAuth) {
+      throw new Error(
+        `Tessera ${this.logName}: ${this.credentialLabel} ${invalidAuth}`,
+      );
+    }
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.#authToken,
@@ -146,8 +171,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#sendInitialized();
   }
 
-  /** The Basic credential (without the scheme) for every LRS request. */
-  protected abstract resolveAuth(params: URLSearchParams): Promise<string>;
+  /** The Basic credential (without the scheme) for every LRS request, from the `authParam` launch value. `init()` validates it. */
+  protected abstract resolveAuth(value: string): Promise<string>;
 
   /** Profile launch requests that must precede Initialized; returns the profile's publisher options. */
   protected async prepareLaunch(
@@ -433,9 +458,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     options: RequestInit = {},
   ): Promise<Response> {
     const headers = new Headers(options.headers);
-    if (this.#authToken) {
-      headers.set('Authorization', `Basic ${this.#authToken}`);
-    }
+    headers.set('Authorization', `Basic ${this.#authToken}`);
     headers.set('X-Experience-API-Version', X_API_VERSION);
     const keepalive = this.publisher?.isUnloading() ?? false;
     return fetch(url, {

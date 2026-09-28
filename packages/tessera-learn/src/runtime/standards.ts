@@ -47,7 +47,7 @@ export const STANDARDS = {
     derivesLearnerActor: true,
     warnLabel: 'SCORM 1.2 API',
     missingDetail:
-      'no SCORM 1.2 API object found in the window.parent or window.opener chain.',
+      'no SCORM 1.2 API object found in the parent chain of window, window.opener, or window.top.opener.',
     learnerIdField: 'cmi.core.student_id',
     learnerNameField: 'cmi.core.student_name',
     suspendDataLimit: 4096,
@@ -61,7 +61,7 @@ export const STANDARDS = {
     derivesLearnerActor: true,
     warnLabel: 'SCORM 2004 API',
     missingDetail:
-      'no SCORM 2004 API object found in the window.parent or window.opener chain.',
+      'no SCORM 2004 API object found in the parent chain of window, window.opener, or window.top.opener.',
     learnerIdField: 'cmi.learner_id',
     learnerNameField: 'cmi.learner_name',
     suspendDataLimit: 64000,
@@ -75,7 +75,7 @@ export const STANDARDS = {
     derivesLearnerActor: false,
     warnLabel: 'cmi5 launch parameters',
     missingDetail:
-      'no cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
+      'one or more cmi5 launch parameters (fetch / endpoint / activityId / actor) are missing from the URL.',
     interactionFormat: XAPI_INTERACTION_FORMAT,
   },
   xapi: {
@@ -86,7 +86,7 @@ export const STANDARDS = {
     derivesLearnerActor: false,
     warnLabel: 'xAPI launch parameters',
     missingDetail:
-      'no xAPI launch parameters (endpoint / auth / actor / activity_id) on the URL.',
+      'one or more xAPI launch parameters (endpoint / auth / actor / activity_id) are missing from the URL.',
     interactionFormat: XAPI_INTERACTION_FORMAT,
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };

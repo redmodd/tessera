@@ -503,16 +503,14 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
 }
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
-  const { adapter, detect, takesApi } = LMS_BUILD[standard];
-  const guard = takesApi
-    ? `const api = ${detect}();\n  if (!api) throw missingApiError('${standard}');\n  return new ${adapter}(api);`
-    : `if (!${detect}()) throw missingApiError('${standard}');\n  return new ${adapter}();`;
+  const { adapter: adapterClass } = LMS_BUILD[standard];
   return `
-import { ${adapter} } from 'tessera-learn/runtime/adapters/${standard}.js';
-import { ${detect} } from 'tessera-learn/runtime/adapters/discovery.js';
+import { ${adapterClass} } from 'tessera-learn/runtime/adapters/${standard}.js';
 import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
 export function createAdapter() {
-  ${guard}
+  const adapter = ${adapterClass}.connect();
+  if (!adapter) throw missingApiError('${standard}');
+  return adapter;
 }
 `;
 }

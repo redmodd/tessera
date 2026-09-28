@@ -32,6 +32,7 @@ import {
 import {
   validateAgent,
   validateAuthCredential,
+  isBearerCredential,
   joinFieldError,
 } from '../runtime/xapi/agent-rules.js';
 import {
@@ -913,7 +914,12 @@ function validateSingleXAPIEntry(
   } else {
     const authErr = validateAuthCredential(auth);
     if (authErr) {
-      d.error(`course.config.js: ${joinFieldError(`${label}.auth`, authErr)}`);
+      const hint = isBearerCredential(auth)
+        ? ` For OAuth, export a ${hookRef}.auth resolver from course.runtime.js that returns a Basic credential.`
+        : '';
+      d.error(
+        `course.config.js: ${joinFieldError(`${label}.auth`, authErr)}${hint}`,
+      );
     } else {
       d.warn(
         `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +

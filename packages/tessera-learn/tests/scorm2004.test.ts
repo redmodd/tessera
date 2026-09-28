@@ -4,7 +4,28 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, noDeadline, scorm2004Api, valuesUnder } from './helpers.js';
+import {
+  flush,
+  noDeadline,
+  scorm12Api,
+  scorm2004Api,
+  stubLmsFrame,
+  valuesUnder,
+} from './helpers.js';
+
+describe('SCORM2004Adapter.connect', () => {
+  it('connects to an API on a parent frame', async () => {
+    const api = scorm2004Api();
+    stubLmsFrame({ API_1484_11: api });
+    await SCORM2004Adapter.connect()!.init();
+    expect(api.Initialize).toHaveBeenCalled();
+  });
+
+  it('returns null when no frame exposes the API', () => {
+    stubLmsFrame({ API: scorm12Api() });
+    expect(SCORM2004Adapter.connect()).toBeNull();
+  });
+});
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;

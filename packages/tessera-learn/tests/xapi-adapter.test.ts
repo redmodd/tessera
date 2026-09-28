@@ -7,7 +7,9 @@ import {
   postedStatements,
   requests,
   respond,
+  setLaunchParams,
   setXAPILaunch,
+  XAPI_LAUNCH,
 } from './helpers.js';
 
 const fetchMock = vi.fn();
@@ -35,6 +37,33 @@ const TIN_CAN_ACCOUNT = [
     accountName: ACCOUNT.name,
   },
 ];
+
+describe('XAPIAdapter.connect', () => {
+  it('connects when all params are present', () => {
+    setXAPILaunch();
+    expect(XAPIAdapter.connect()).toBeInstanceOf(XAPIAdapter);
+  });
+
+  it.each(['endpoint', 'auth', 'actor', 'activity_id'] as const)(
+    'returns null when %s is missing',
+    (param) => {
+      const { [param]: _, ...rest } = XAPI_LAUNCH;
+      setLaunchParams(rest);
+      expect(XAPIAdapter.connect()).toBeNull();
+    },
+  );
+
+  it('returns null when activity_id is empty', () => {
+    setXAPILaunch({ activity_id: '' });
+    expect(XAPIAdapter.connect()).toBeNull();
+  });
+
+  it('returns null for a cmi5 launch, which names the activity activityId', () => {
+    const { activity_id, ...rest } = XAPI_LAUNCH;
+    setLaunchParams({ ...rest, activityId: activity_id });
+    expect(XAPIAdapter.connect()).toBeNull();
+  });
+});
 
 describe('XAPIAdapter', () => {
   beforeEach(() => {
@@ -215,6 +244,17 @@ describe('XAPIAdapter', () => {
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each(['Basic ', 'Basic'])(
+    'rejects an auth param of %j, which carries only the scheme, before any request',
+    async (auth) => {
+      setXAPILaunch({ auth });
+      await expect(XAPIAdapter.connect()!.init()).rejects.toThrow(
+        /launch parameter 'auth' must be a non-empty string/,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });

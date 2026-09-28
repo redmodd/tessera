@@ -25,6 +25,8 @@ import {
  */
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
+  apiName: string;
+  initializeMethod: keyof TApi;
   sessionTimeKey: string;
   masteryKey: string;
   masteryRange: readonly [number, number];
@@ -247,4 +249,36 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   abstract override setCompletionStatus(status: CompletionStatus): void;
   abstract override setSuccessStatus(status: SuccessStatus): void;
   abstract override setExit(mode: ExitMode): void;
+}
+
+/**
+ * Search the window.parent chain, then the parent chains of window.opener and window.top.opener, for the dialect's LMS API object.
+ * Cross-origin frames are skipped. Returns null if no chain has it within 10 levels.
+ */
+export function findLMSAPI<TApi>({
+  apiName,
+  initializeMethod,
+}: ScormDialect<TApi>): TApi | null {
+  function scan(win: Window): TApi | null {
+    for (let i = 0; i < 10; i++) {
+      try {
+        const value = (win as unknown as Record<string, Partial<TApi> | null>)[
+          apiName
+        ];
+        if (typeof value?.[initializeMethod] === 'function') {
+          return value as TApi;
+        }
+      } catch {}
+      const parent = win.parent;
+      if (!parent || parent === win) break;
+      win = parent;
+    }
+    return null;
+  }
+
+  let api = scan(window);
+  for (const opener of new Set([window.opener, window.top?.opener])) {
+    if (opener) api ??= scan(opener);
+  }
+  return api;
 }

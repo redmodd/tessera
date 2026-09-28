@@ -6,12 +6,6 @@ import { SCORM12Adapter } from './scorm12.js';
 import { SCORM2004Adapter } from './scorm2004.js';
 import { CMI5Adapter } from './cmi5.js';
 import { XAPIAdapter } from './xapi.js';
-import {
-  findSCORM12API,
-  findSCORM2004API,
-  hasCMI5LaunchParams,
-  hasXAPILaunchParams,
-} from './discovery.js';
 import { LMSAdapterError, missingApiError } from './lms-error.js';
 import { standardProfile, type LMSStandard } from '../standards.js';
 
@@ -28,18 +22,11 @@ export interface CreateAdapterOptions {
   manifest?: Manifest;
 }
 
-/** Per-standard LMS wiring: `detect` returns an adapter when the LMS runtime is reachable, else null. */
-const LMS_ADAPTERS: Record<LMSStandard, () => BaseAdapter | null> = {
-  scorm12: () => {
-    const api = findSCORM12API();
-    return api ? new SCORM12Adapter(api) : null;
-  },
-  scorm2004: () => {
-    const api = findSCORM2004API();
-    return api ? new SCORM2004Adapter(api) : null;
-  },
-  cmi5: () => (hasCMI5LaunchParams() ? new CMI5Adapter() : null),
-  xapi: () => (hasXAPILaunchParams() ? new XAPIAdapter() : null),
+const LMS_ADAPTERS: Record<LMSStandard, { connect(): BaseAdapter | null }> = {
+  scorm12: SCORM12Adapter,
+  scorm2004: SCORM2004Adapter,
+  cmi5: CMI5Adapter,
+  xapi: XAPIAdapter,
 };
 
 /**
@@ -60,7 +47,7 @@ export function createAdapter(
   const allowFallback = options.allowFallback ?? import.meta.env?.DEV === true;
   const profile = standardProfile(config.export?.standard);
   if (profile?.packaged) {
-    const adapter = LMS_ADAPTERS[profile.id]();
+    const adapter = LMS_ADAPTERS[profile.id].connect();
     if (adapter) return adapter;
     if (!allowFallback) throw missingApiError(profile.id);
     console.warn(

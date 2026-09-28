@@ -4,7 +4,11 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
+import {
+  BaseScormAdapter,
+  findLMSAPI,
+  type ScormDialect,
+} from './scorm-base.js';
 import {
   formatISO8601Duration,
   formatISO8601Timestamp,
@@ -26,6 +30,8 @@ export interface SCORM2004API {
 
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
+  apiName: 'API_1484_11',
+  initializeMethod: 'Initialize',
   sessionTimeKey: 'cmi.session_time',
   masteryKey: 'cmi.scaled_passing_score',
   masteryRange: [-1, 1],
@@ -58,6 +64,11 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
   #exitMode: ExitMode = 'suspend';
+
+  static connect(): SCORM2004Adapter | null {
+    const api = findLMSAPI(SCORM2004_DIALECT);
+    return api ? new SCORM2004Adapter(api) : null;
+  }
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);

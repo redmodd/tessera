@@ -56,6 +56,13 @@ export function scorm2004Api(
   };
 }
 
+/** Stubs `window` as a course iframe whose top-level LMS frame holds `lmsGlobals`. */
+export function stubLmsFrame(lmsGlobals: Record<string, unknown>): void {
+  const lms: Record<string, unknown> = { ...lmsGlobals };
+  lms.parent = lms;
+  vi.stubGlobal('window', { parent: lms });
+}
+
 class StubAdapter extends BaseAdapter {
   async init(): Promise<void> {}
   saveState(): void {}
@@ -116,17 +123,18 @@ export function cmi5Fetch({
   };
 }
 
+export const XAPI_LAUNCH = {
+  endpoint: 'https://lrs.example/xapi',
+  auth: 'Basic Zm9vOmJhcg==',
+  actor: JSON.stringify({
+    objectType: 'Agent',
+    account: { homePage: 'https://lms', name: 'learner-1' },
+  }),
+  activity_id: 'urn:tessera:au:abc',
+};
+
 export function setXAPILaunch(params: Record<string, string> = {}): void {
-  setLaunchParams({
-    endpoint: 'https://lrs.example/xapi',
-    auth: 'Basic Zm9vOmJhcg==',
-    actor: JSON.stringify({
-      objectType: 'Agent',
-      account: { homePage: 'https://lms', name: 'learner-1' },
-    }),
-    activity_id: 'urn:tessera:au:abc',
-    ...params,
-  });
+  setLaunchParams({ ...XAPI_LAUNCH, ...params });
 }
 
 export function valuesUnder(

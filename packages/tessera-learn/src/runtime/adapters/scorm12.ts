@@ -5,7 +5,11 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
+import {
+  BaseScormAdapter,
+  findLMSAPI,
+  type ScormDialect,
+} from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
 import { STANDARDS } from '../standards.js';
 
@@ -25,6 +29,8 @@ export interface SCORM12API {
 
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   profile: STANDARDS.scorm12,
+  apiName: 'API',
+  initializeMethod: 'LMSInitialize',
   sessionTimeKey: 'cmi.core.session_time',
   masteryKey: 'cmi.student_data.mastery_score',
   masteryRange: [0, 100],
@@ -60,6 +66,11 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: 'passed' | 'failed' | null = null;
+
+  static connect(): SCORM12Adapter | null {
+    const api = findLMSAPI(SCORM12_DIALECT);
+    return api ? new SCORM12Adapter(api) : null;
+  }
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);

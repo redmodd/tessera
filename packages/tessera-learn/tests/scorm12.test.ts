@@ -10,9 +10,115 @@ import {
   noDeadline,
   printed,
   scorm12Api,
+  scorm2004Api,
+  stubLmsFrame,
   useFakeTimers,
   valuesUnder,
 } from './helpers.js';
+
+describe('SCORM12Adapter.connect', () => {
+  it('connects to an API on a parent frame', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('connects to an API on the opener chain', async () => {
+    const api = scorm12Api();
+    const opener: Record<string, unknown> = { API: api };
+    opener.parent = opener;
+    const win: Record<string, unknown> = { opener };
+    win.parent = win;
+    win.top = win;
+    vi.stubGlobal('window', win);
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('connects to an API on the opener of a popup the course is framed in', async () => {
+    const api = scorm12Api();
+    const opener: Record<string, unknown> = { API: api };
+    opener.parent = opener;
+    const popup: Record<string, unknown> = { opener };
+    popup.parent = popup;
+    vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('connects to an API on the opener of a framed course window', async () => {
+    const api = scorm12Api();
+    const opener: Record<string, unknown> = { API: api };
+    opener.parent = opener;
+    const lms: Record<string, unknown> = { opener: null };
+    lms.parent = lms;
+    vi.stubGlobal('window', { parent: lms, top: lms, opener });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('returns null when the opener has closed', () => {
+    const win: Record<string, unknown> = { opener: { parent: null } };
+    win.parent = win;
+    win.top = win;
+    vi.stubGlobal('window', win);
+    expect(SCORM12Adapter.connect()).toBeNull();
+  });
+
+  it("prefers an API on the course's frame chain over the opener's", async () => {
+    const api = scorm12Api();
+    const openerApi = scorm12Api();
+    const opener: Record<string, unknown> = { API: openerApi };
+    opener.parent = opener;
+    const popup: Record<string, unknown> = { API: api, opener };
+    popup.parent = popup;
+    vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+    expect(openerApi.LMSInitialize).not.toHaveBeenCalled();
+  });
+
+  it('skips a cross-origin frame named like the API', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    (window as unknown as Record<string, unknown>).API = {
+      get LMSInitialize(): never {
+        throw new DOMException('Blocked', 'SecurityError');
+      },
+    };
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('climbs past a cross-origin frame', async () => {
+    const api = scorm12Api();
+    const lms: Record<string, unknown> = { API: api };
+    lms.parent = lms;
+    const crossOrigin = {
+      parent: lms,
+      get API(): never {
+        throw new DOMException('Blocked', 'SecurityError');
+      },
+    };
+    vi.stubGlobal('window', { parent: crossOrigin });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('skips a same-named global that is not the API', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    (window as unknown as Record<string, unknown>).API = { id: 'API' };
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('returns null when no frame exposes the API', () => {
+    stubLmsFrame({ API_1484_11: scorm2004Api() });
+    expect(SCORM12Adapter.connect()).toBeNull();
+  });
+});
 
 describe('SCORM12Adapter', () => {
   let api: Mocked<SCORM12API>;
