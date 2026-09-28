@@ -89,7 +89,7 @@ export abstract class BaseAdapter {
     this.terminate();
   }
 
-  /** Send the learner back to the LMS after an exit. False when it gave nowhere to go. */
+  /** Send the learner back to the LMS after an exit. False when there is nowhere to return to. */
   returnToLMS(): boolean {
     return false;
   }
