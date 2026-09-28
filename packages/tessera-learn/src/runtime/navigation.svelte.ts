@@ -101,6 +101,7 @@ export class NavigationState {
   }
 
   goToPage(index: number) {
+    if (!Number.isInteger(index)) return;
     if (index < 0 || index >= this.manifest.totalPages) return;
     if (this.isPageLocked(index)) return;
     this.currentPageIndex = index;
