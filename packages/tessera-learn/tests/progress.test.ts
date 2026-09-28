@@ -97,6 +97,21 @@ describe('ProgressState', () => {
       expect(progress.toSaved()).toEqual({ v: [0] });
     });
 
+    it('clamps saved scores to 0-100', () => {
+      const progress = new ProgressState(
+        createManifest(3),
+        createConfig({ success: { from: 'quiz' } }),
+      );
+      progress.restoreFrom({
+        v: [],
+        g: { 0: { s: 5000 }, 1: { q: { q1: -20 } } },
+        p: 250,
+      });
+      expect(progress.quizScore(0)).toBe(100);
+      expect(progress.getPageStandaloneAverage(1)).toBe(0);
+      expect(progress.reportedScore).toBe(100);
+    });
+
     it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
@@ -600,6 +615,18 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 80, true);
       progress.markStandaloneQuestion(3, 'q2', 100, true);
       expect(progress.getPageStandaloneAverage(3)).toBe(90);
+    });
+
+    it.each([
+      [150, 100],
+      [-5, 0],
+      [Number.NaN, 0],
+    ])('clamps a score of %s to %s', (score, expected) => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'q1', score, true);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(
+        expected,
+      );
     });
   });
 

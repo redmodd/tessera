@@ -30,6 +30,10 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
+function clampScore(score: number): number {
+  return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
+}
+
 export function weightedScore(
   entries: { score: number; weight: number }[],
 ): number {
@@ -189,7 +193,7 @@ export class ProgressState {
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
     questions.set(questionId, {
-      score,
+      score: clampScore(score),
       weight: normalizeWeight(weight),
       graded,
     });
@@ -407,7 +411,7 @@ export class ProgressState {
         const pageIndex = Number(key);
         if (unit.s !== undefined) {
           this.#write(pageIndex, {
-            quizScore: unit.s,
+            quizScore: clampScore(unit.s),
             attempts: Math.max(1, Math.trunc(unit.a ?? 1)),
           });
         }
@@ -437,7 +441,8 @@ export class ProgressState {
     const canPass =
       this.#success.from === 'quiz' ||
       (this.#success.from === 'fixed' && this.#success.status === 'passed');
-    this.#passScore = canPass && typeof saved.p === 'number' ? saved.p : null;
+    this.#passScore =
+      canPass && typeof saved.p === 'number' ? clampScore(saved.p) : null;
     this.#latch();
   }
 
