@@ -145,7 +145,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
-    this.#authToken = await this.resolveAuth(params.get(this.authParam) || '');
+    const authValue = params.get(this.authParam);
+    if (!authValue) {
+      throw new Error(
+        `Tessera ${this.logName}: launch parameter '${this.authParam}' is missing. The LMS did not send LRS credentials.`,
+      );
+    }
+    this.#authToken = await this.resolveAuth(authValue);
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.#authToken,

@@ -1140,6 +1140,16 @@ describe('CMI5Adapter', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it('rejects a launch with no fetch URL before any request', async () => {
+      const { fetch: _, ...rest } = CMI5_LAUNCH;
+      setLaunchParams(rest);
+      mockFetch.mockClear();
+      await expect(initAdapter()).rejects.toThrow(
+        /launch parameter 'fetch' is missing/,
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('rejects a fetched token carrying the Basic scheme before any LRS request', async () => {
       mockFetch.mockClear();
       await expect(

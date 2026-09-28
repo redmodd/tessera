@@ -245,6 +245,15 @@ describe('XAPIAdapter', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects a launch with no auth before any request', async () => {
+    const { auth: _, ...rest } = XAPI_LAUNCH;
+    setLaunchParams(rest);
+    await expect(new XAPIAdapter().init()).rejects.toThrow(
+      /launch parameter 'auth' is missing/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
     const adapter = new XAPIAdapter();
