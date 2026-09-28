@@ -136,7 +136,7 @@ export async function readSavedState(page: Page): Promise<any> {
 }
 
 /** Send the page through a back/forward cache round trip, as leaving and pressing Back does. */
-export async function restoreFromBfcache(page: Page): Promise<void> {
+export async function bfcacheRoundTrip(page: Page): Promise<void> {
   await page.evaluate(() => {
     for (const type of ['pagehide', 'pageshow']) {
       window.dispatchEvent(new PageTransitionEvent(type, { persisted: true }));

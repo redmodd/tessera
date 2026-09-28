@@ -11,6 +11,7 @@ import {
 import {
   answerGradedQuiz,
   answerGradedQuizAfterQ1,
+  bfcacheRoundTrip,
   clickExitCourse,
   exitCourse,
   findStatement,
@@ -21,13 +22,38 @@ import {
   navigateToPage,
   openQuiz,
   reportedQuestionCount,
-  restoreFromBfcache,
   scormData,
   scormLog,
   startPreview,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
+
+async function expectRestoreToEndSession(page: Page): Promise<void> {
+  await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+  await bfcacheRoundTrip(page);
+  await expect(
+    page.getByRole('heading', { name: 'Session ended' }),
+  ).toBeVisible();
+}
+
+async function expectNoScormCallsAfter(page: Page, finish: string) {
+  const log = await scormLog(page);
+  const end = log.findIndex(([fn]) => fn === finish);
+  expect(end).toBeGreaterThan(-1);
+  expect(log.slice(end + 1)).toEqual([]);
+}
+
+async function expectNoStatementsAfterTerminated(
+  page: Page,
+  statements: any[],
+) {
+  await expect
+    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+    .toBeTruthy();
+  await page.waitForTimeout(300);
+  expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+}
 
 // ---------------------------------------------------------------------------
 // SCORM 1.2
@@ -241,17 +267,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     page,
   }) => {
     await page.goto(BASE);
-    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+    await expectRestoreToEndSession(page);
 
-    await restoreFromBfcache(page);
-
-    await expect(
-      page.getByRole('heading', { name: 'Session ended' }),
-    ).toBeVisible();
-    const log = await scormLog(page);
-    const finish = log.findIndex(([fn]) => fn === 'LMSFinish');
-    expect(finish).toBeGreaterThan(-1);
-    expect(log.slice(finish + 1)).toEqual([]);
+    await expectNoScormCallsAfter(page, 'LMSFinish');
   });
 
   test.describe('LMS mastery_score', () => {
@@ -454,17 +472,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     page,
   }) => {
     await page.goto(BASE);
-    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+    await expectRestoreToEndSession(page);
 
-    await restoreFromBfcache(page);
-
-    await expect(
-      page.getByRole('heading', { name: 'Session ended' }),
-    ).toBeVisible();
-    const log = await scormLog(page);
-    const terminate = log.findIndex(([fn]) => fn === 'Terminate');
-    expect(terminate).toBeGreaterThan(-1);
-    expect(log.slice(terminate + 1)).toEqual([]);
+    await expectNoScormCallsAfter(page, 'Terminate');
   });
 
   test.describe('LMS scaled_passing_score', () => {
@@ -607,18 +617,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
-    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+    await expectRestoreToEndSession(page);
 
-    await restoreFromBfcache(page);
-
-    await expect(
-      page.getByRole('heading', { name: 'Session ended' }),
-    ).toBeVisible();
-    await expect
-      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-      .toBeTruthy();
-    await page.waitForTimeout(300);
-    expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+    await expectNoStatementsAfterTerminated(page, statements);
   });
 });
 
@@ -865,17 +866,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await routeLRS(page, statements, []);
 
     await page.goto(xapiLaunchURL(BASE));
-    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+    await expectRestoreToEndSession(page);
 
-    await restoreFromBfcache(page);
-
-    await expect(
-      page.getByRole('heading', { name: 'Session ended' }),
-    ).toBeVisible();
-    await expect
-      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-      .toBeTruthy();
-    await page.waitForTimeout(300);
-    expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+    await expectNoStatementsAfterTerminated(page, statements);
   });
 });

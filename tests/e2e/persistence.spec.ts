@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
 import {
   answerMatching,
+  bfcacheRoundTrip,
   exitCourse,
   navigateToPage,
   readSavedState,
-  restoreFromBfcache,
   waitForTesseraContent,
 } from './helpers.js';
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
+    await page.clock.install();
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/');
@@ -152,11 +153,11 @@ test.describe('Persistence — localStorage', () => {
 
   test('state includes duration tracking', async ({ page }) => {
     // Persistence is event-driven: a save fires on each page change. Navigate
-    // once to seed the store, sleep past the 1-second tick, then navigate
+    // once to seed the store, fast-forward past the 1-second tick, then navigate
     // again to flush the updated duration. This avoids polling for a value
     // that only updates when something else triggers a save.
     await navigateToPage(page, 'Objectives');
-    await page.waitForTimeout(1100);
+    await page.clock.fastForward(1_100);
     await navigateToPage(page, 'Callouts & Images');
 
     const storageData = await readSavedState(page);
@@ -169,11 +170,11 @@ test.describe('Persistence — localStorage', () => {
     page,
   }) => {
     await expect(page.locator('.tessera-content h1')).toBeVisible();
-    await restoreFromBfcache(page);
+    await bfcacheRoundTrip(page);
     const restored = (await readSavedState(page)).d;
-    await page.waitForTimeout(1100);
+    await page.clock.fastForward(5_000);
     await exitCourse(page);
 
-    expect((await readSavedState(page)).d).toBeGreaterThan(restored);
+    expect((await readSavedState(page)).d).toBeGreaterThanOrEqual(restored + 5);
   });
 });
