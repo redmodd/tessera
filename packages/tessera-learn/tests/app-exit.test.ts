@@ -110,6 +110,16 @@ function restoreFromBfcache() {
   );
 }
 
+function bfcacheRoundTrip() {
+  enterBfcache();
+  restoreFromBfcache();
+}
+
+const leavingTheCourse: [string, () => unknown][] = [
+  ['the exit', () => navCtx().exit()],
+  ['a back/forward cache restore', bfcacheRoundTrip],
+];
+
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
 };
@@ -285,34 +295,28 @@ describe('exiting a course', () => {
     );
   });
 
-  it.each([
-    ['the exit', () => navCtx().exit()],
-    [
-      'a back/forward cache restore',
-      () => {
-        enterBfcache();
-        restoreFromBfcache();
-      },
-    ],
-  ])('drops a page that finishes loading after %s', async (_, leave) => {
-    let release!: () => void;
-    const page = () => import('./fixtures/app-page.svelte');
-    let loads = 0;
-    const loadPage = () =>
-      loads++ === 0
-        ? page()
-        : new Promise((resolve) => (release = () => resolve(page())));
-    const { adapter } = recordingAdapter();
-    await mount(adapter, { loadLayout: masteryLayout, loadPage });
+  it.each(leavingTheCourse)(
+    'drops a page that finishes loading after %s',
+    async (_, leave) => {
+      let release!: () => void;
+      const page = () => import('./fixtures/app-page.svelte');
+      let loads = 0;
+      const loadPage = () =>
+        loads++ === 0
+          ? page()
+          : new Promise((resolve) => (release = () => resolve(page())));
+      const { adapter } = recordingAdapter();
+      await mount(adapter, { loadLayout: masteryLayout, loadPage });
 
-    navCtx().nav.goToPage(1);
-    await flush();
-    await leave();
-    release();
-    await flush();
+      navCtx().nav.goToPage(1);
+      await flush();
+      await leave();
+      release();
+      await flush();
 
-    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
-  });
+      expect(navCtx().progress.visitedPages.has(1)).toBe(false);
+    },
+  );
 
   it('exits normally once the course is complete', async () => {
     const { adapter, calls } = recordingAdapter();
@@ -459,8 +463,7 @@ describe('exiting a course', () => {
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Ending session'),
     );
-    enterBfcache();
-    restoreFromBfcache();
+    bfcacheRoundTrip();
     drained.resolve();
     await flush();
 
@@ -521,8 +524,7 @@ describe('exiting a course', () => {
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
     await mount(adapter, { loadLayout: masteryLayout });
-    enterBfcache();
-    restoreFromBfcache();
+    bfcacheRoundTrip();
     const restored = calls.length;
 
     navCtx().nav.goToPage(1);
@@ -535,8 +537,7 @@ describe('exiting a course', () => {
   it('ends the session again on the next pagehide after a restore without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
     await mount(adapter);
-    enterBfcache();
-    restoreFromBfcache();
+    bfcacheRoundTrip();
     const restored = calls.length;
 
     window.dispatchEvent(new Event('pagehide'));
@@ -545,10 +546,7 @@ describe('exiting a course', () => {
   });
 
   it('leaves time in the back/forward cache out of the saved duration', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    onTestFinished(() => {
-      vi.useRealTimers();
-    });
+    useFakeTimers({ toFake: ['Date'] });
     const saved: SavedState[] = [];
     const { adapter } = recordingAdapter({
       connected: false,
@@ -576,8 +574,7 @@ describe('exiting a course', () => {
       const { adapter } = recordingAdapter({ connected });
       await mount(adapter, { xapiClient: xapiClient({ markRestored }) });
 
-      enterBfcache();
-      restoreFromBfcache();
+      bfcacheRoundTrip();
 
       expect(markRestored).toHaveBeenCalled();
     },
@@ -597,29 +594,23 @@ describe('exiting a course', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['the exit', () => navCtx().exit()],
-    [
-      'a back/forward cache restore',
-      () => {
-        enterBfcache();
-        restoreFromBfcache();
-      },
-    ],
-  ])('drops the manual-completion watchdog after %s', async (_, leave) => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    onTestFinished(() => {
-      vi.useRealTimers();
-    });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { adapter } = recordingAdapter();
-    await mount(adapter, { config: manualConfig(), loadLayout: masteryLayout });
+  it.each(leavingTheCourse)(
+    'drops the manual-completion watchdog after %s',
+    async (_, leave) => {
+      useFakeTimers({ shouldAdvanceTime: true });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { adapter } = recordingAdapter();
+      await mount(adapter, {
+        config: manualConfig(),
+        loadLayout: masteryLayout,
+      });
 
-    await leave();
-    vi.advanceTimersByTime(60_000);
+      await leave();
+      vi.advanceTimersByTime(60_000);
 
-    expect(warn).not.toHaveBeenCalled();
-  });
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
 
   it('offers no Exit button without an LMS', async () => {
     const config = createConfig();

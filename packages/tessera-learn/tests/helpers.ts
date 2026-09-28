@@ -71,8 +71,10 @@ export const flush = () => new Promise<void>((r) => setTimeout(r));
 
 export const noDeadline = new Promise<never>(() => {});
 
-export function useFakeTimers(): void {
-  vi.useFakeTimers();
+export function useFakeTimers(
+  options?: Parameters<typeof vi.useFakeTimers>[0],
+): void {
+  vi.useFakeTimers(options);
   onTestFinished(() => {
     vi.useRealTimers();
   });
