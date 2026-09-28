@@ -116,13 +116,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
     const params = new URLSearchParams(window.location.search);
-    return adapter.#missingLaunchParam(params) ? null : adapter;
-  }
-
-  #missingLaunchParam(params: URLSearchParams): string | undefined {
-    return ['endpoint', 'actor', this.activityIdParam, this.authParam].find(
-      (p) => !params.get(p),
-    );
+    const required = [
+      'endpoint',
+      'actor',
+      adapter.activityIdParam,
+      adapter.authParam,
+    ];
+    return required.every((p) => params.get(p)) ? adapter : null;
   }
 
   /**
@@ -133,12 +133,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    */
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
-    const missing = this.#missingLaunchParam(params);
-    if (missing) {
-      throw new Error(
-        `Tessera ${this.logName}: launch parameter '${missing}' is missing. The LMS did not send a complete launch.`,
-      );
-    }
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
     if (!httpOrigin(this.endpoint)) {
       throw new Error(

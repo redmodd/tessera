@@ -75,7 +75,7 @@ export const STANDARDS = {
     derivesLearnerActor: false,
     warnLabel: 'cmi5 launch parameters',
     missingDetail:
-      'no cmi5 launch parameters (fetch / endpoint / activityId / actor) on the URL.',
+      'a cmi5 launch parameter (fetch / endpoint / activityId / actor) is missing from the URL.',
     interactionFormat: XAPI_INTERACTION_FORMAT,
   },
   xapi: {
@@ -86,7 +86,7 @@ export const STANDARDS = {
     derivesLearnerActor: false,
     warnLabel: 'xAPI launch parameters',
     missingDetail:
-      'no xAPI launch parameters (endpoint / auth / actor / activity_id) on the URL.',
+      'an xAPI launch parameter (endpoint / auth / actor / activity_id) is missing from the URL.',
     interactionFormat: XAPI_INTERACTION_FORMAT,
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };

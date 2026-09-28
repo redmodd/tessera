@@ -256,6 +256,11 @@ interface LMSAPIs {
   API_1484_11: SCORM2004API;
 }
 
+const INITIALIZE_METHOD = {
+  API: 'LMSInitialize',
+  API_1484_11: 'Initialize',
+} as const;
+
 /**
  * Walk the window.opener and window.parent chains looking for an LMS API object.
  * Shared by SCORM 1.2 (property "API") and SCORM 2004 (property "API_1484_11").
@@ -267,8 +272,11 @@ export function findLMSAPI<K extends keyof LMSAPIs>(
   function scan(win: Window): LMSAPIs[K] | null {
     for (let i = 0; i < 10; i++) {
       try {
-        const value = (win as unknown as Partial<LMSAPIs>)[propName];
-        if (value) return value;
+        const value = (win as unknown as Record<string, unknown>)[propName];
+        const initialize = (value as Record<string, unknown> | null)?.[
+          INITIALIZE_METHOD[propName]
+        ];
+        if (typeof initialize === 'function') return value as LMSAPIs[K];
       } catch {
         // Cross-origin frame: stop
         return null;

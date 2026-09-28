@@ -48,6 +48,14 @@ describe('SCORM12Adapter.connect', () => {
     expect(SCORM12Adapter.connect()).toBeNull();
   });
 
+  it('skips a same-named global that is not the API', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    (window as unknown as Record<string, unknown>).API = { id: 'API' };
+    await SCORM12Adapter.connect()?.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
   it('returns null when no frame exposes the API', () => {
     stubLmsFrame({ API_1484_11: scorm2004Api() });
     expect(SCORM12Adapter.connect()).toBeNull();

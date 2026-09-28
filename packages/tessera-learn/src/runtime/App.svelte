@@ -491,10 +491,10 @@
     if (config.title) document.title = config.title;
 
     // Initialize persistence and restore state. Adapter init() may throw
-    // for malformed launch params (cmi5 actor JSON, missing fetch URL,
-    // failed token request). Surface that to the UI rather than crashing
-    // silently: a launch-time error means the LMS context is wrong and
-    // the user can't continue regardless.
+    // for malformed launch params (cmi5 actor JSON, failed token request).
+    // Surface that to the UI rather than crashing silently: a launch-time
+    // error means the LMS context is wrong and the user can't continue
+    // regardless.
     let initDeadline;
     try {
       await Promise.race([

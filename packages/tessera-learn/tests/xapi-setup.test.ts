@@ -217,7 +217,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 
     // sendStatement is Promise.all-fail-fast — the whole call rejects.
     await expect(sendOnce(client!)).rejects.toThrow(
-      /no cmi5 launch parameters/,
+      /cmi5 launch parameter \(fetch \/ endpoint \/ activityId \/ actor\) is missing/,
     );
   });
 
@@ -233,7 +233,7 @@ describe('buildXAPIClient — cmi5 custom xAPI integration', () => {
 
     const client = await buildXAPIClient(config, new WebAdapter(config));
     await expect(sendOnce(client!)).rejects.toThrow(
-      /no cmi5 launch parameters/,
+      /cmi5 launch parameter \(fetch \/ endpoint \/ activityId \/ actor\) is missing/,
     );
   });
 });
@@ -296,7 +296,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
     expect(client).not.toBeNull();
 
     await expect(sendOnce(client!)).rejects.toThrow(
-      /xAPI launch parameters \(endpoint \/ auth \/ actor \/ activity_id\)/,
+      /xAPI launch parameter \(endpoint \/ auth \/ actor \/ activity_id\)/,
     );
   });
 });

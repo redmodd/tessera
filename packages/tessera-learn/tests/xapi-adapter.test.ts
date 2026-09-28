@@ -245,28 +245,10 @@ describe('XAPIAdapter', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a launch with no auth before any request', async () => {
-    const { auth: _, ...rest } = XAPI_LAUNCH;
-    setLaunchParams(rest);
-    await expect(new XAPIAdapter().init()).rejects.toThrow(
-      /launch parameter 'auth' is missing/,
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('rejects an auth param that carries only the Basic scheme before any request', async () => {
     setXAPILaunch({ auth: 'Basic ' });
-    await expect(new XAPIAdapter().init()).rejects.toThrow(
+    await expect(XAPIAdapter.connect()!.init()).rejects.toThrow(
       /launch parameter 'auth' must be a non-empty string/,
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects a launch with no activity_id before any request', async () => {
-    const { activity_id: _, ...rest } = XAPI_LAUNCH;
-    setLaunchParams(rest);
-    await expect(new XAPIAdapter().init()).rejects.toThrow(
-      /launch parameter 'activity_id' is missing/,
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
