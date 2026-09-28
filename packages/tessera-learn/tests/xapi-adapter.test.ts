@@ -208,6 +208,14 @@ describe('XAPIAdapter', () => {
     expect(calls('/xapi')).toHaveLength(0);
   });
 
+  it('rejects a relative endpoint before any request', async () => {
+    setXAPILaunch({ endpoint: '/lrs' });
+    await expect(new XAPIAdapter().init()).rejects.toThrow(
+      /launch parameter 'endpoint' is not an absolute http\(s\) URL/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
     const adapter = new XAPIAdapter();

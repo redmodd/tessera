@@ -91,11 +91,14 @@ describe('validateAuthCredential', () => {
 });
 
 describe('XAPIPublisher — construction', () => {
-  it('throws when endpoint is not http(s)', () => {
-    expect(
-      () => new XAPIPublisher(basicOpts({ endpoint: 'ftp://x' as any })),
-    ).toThrow(/http\(s\)/);
-  });
+  it.each(['ftp://x', 'http://'])(
+    'throws when endpoint %s is not an absolute http(s) URL',
+    (endpoint) => {
+      expect(() => new XAPIPublisher(basicOpts({ endpoint }))).toThrow(
+        /http\(s\)/,
+      );
+    },
+  );
   it('throws when endpoint is missing', () => {
     expect(() => new XAPIPublisher(basicOpts({ endpoint: '' as any }))).toThrow(
       /endpoint/,
@@ -324,24 +327,6 @@ describe('XAPIPublisher — auth header', () => {
     await pub.sendStatement({ verb: { id: 'http://verb/a' } });
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers.get('Authorization')).toBeNull();
-  });
-});
-
-describe('XAPIPublisher — version header', () => {
-  it('defaults the X-Experience-API-Version header to 1.0.3', async () => {
-    mockFetch.mockResolvedValue(respond(204));
-    const pub = await initPublisher();
-    await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    const headers = mockFetch.mock.calls[0][1].headers;
-    expect(headers.get('X-Experience-API-Version')).toBe('1.0.3');
-  });
-
-  it('uses the supplied version on the header when given', async () => {
-    mockFetch.mockResolvedValue(respond(204));
-    const pub = await initPublisher({ version: '2.0.0' });
-    await pub.sendStatement({ verb: { id: 'http://verb/a' } });
-    const headers = mockFetch.mock.calls[0][1].headers;
-    expect(headers.get('X-Experience-API-Version')).toBe('2.0.0');
   });
 });
 
