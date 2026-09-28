@@ -1132,18 +1132,24 @@ describe('CMI5Adapter', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it.each([
-      ['endpoint', /launch parameter 'endpoint'/],
-      ['activityId', /launch parameter 'activityId'/],
-    ])(
-      'rejects a missing %s before spending the single-use fetch URL',
-      async (param, message) => {
-        setLaunchParams({ ...CMI5_LAUNCH, [param]: '' });
-        mockFetch.mockClear();
-        await expect(initAdapter()).rejects.toThrow(message);
-        expect(mockFetch).not.toHaveBeenCalled();
-      },
-    );
+    it('rejects a relative endpoint before spending the single-use fetch URL', async () => {
+      setLaunchParams({ ...CMI5_LAUNCH, endpoint: '/lrs' });
+      mockFetch.mockClear();
+      await expect(initAdapter()).rejects.toThrow(
+        /launch parameter 'endpoint' is not an absolute http\(s\) URL/,
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects a fetched token carrying the Basic scheme before any LRS request', async () => {
+      mockFetch.mockClear();
+      await expect(
+        initAdapter({ token: '{"auth-token": "Basic dGVzdA=="}' }),
+      ).rejects.toThrow(/fetch token must be the Basic credential value only/);
+      expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
+        CMI5_LAUNCH.fetch,
+      ]);
+    });
 
     it('reads LMS.LaunchData with the fetched token', async () => {
       mockFetch.mockClear();

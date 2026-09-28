@@ -113,7 +113,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSaved = true;
 
   /**
-   * The endpoint, activity id and actor are checked before auth so a bad
+   * The endpoint and actor are checked before auth so a bad
    * launch fails before a single-use cmi5 fetch token is spent, and auth
    * resolves before `prepareLaunch()` because its requests carry the token
    * and the actor.
@@ -123,15 +123,10 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
     if (!httpOrigin(this.endpoint)) {
       throw new Error(
-        `Tessera ${this.logName}: launch parameter 'endpoint' is missing or not an absolute http(s) URL. The LMS did not send a usable LRS endpoint.`,
+        `Tessera ${this.logName}: launch parameter 'endpoint' is not an absolute http(s) URL. The LMS did not send a usable LRS endpoint.`,
       );
     }
     this.#activityId = params.get(this.activityIdParam) || '';
-    if (!this.#activityId) {
-      throw new Error(
-        `Tessera ${this.logName}: launch parameter '${this.activityIdParam}' is missing.`,
-      );
-    }
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
     this.#registration = params.get('registration') || undefined;

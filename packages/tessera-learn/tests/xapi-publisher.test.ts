@@ -91,11 +91,14 @@ describe('validateAuthCredential', () => {
 });
 
 describe('XAPIPublisher — construction', () => {
-  it('throws when endpoint is not http(s)', () => {
-    expect(
-      () => new XAPIPublisher(basicOpts({ endpoint: 'ftp://x' as any })),
-    ).toThrow(/http\(s\)/);
-  });
+  it.each(['ftp://x', 'http://'])(
+    'throws when endpoint %s is not an absolute http(s) URL',
+    (endpoint) => {
+      expect(() => new XAPIPublisher(basicOpts({ endpoint }))).toThrow(
+        /http\(s\)/,
+      );
+    },
+  );
   it('throws when endpoint is missing', () => {
     expect(() => new XAPIPublisher(basicOpts({ endpoint: '' as any }))).toThrow(
       /endpoint/,

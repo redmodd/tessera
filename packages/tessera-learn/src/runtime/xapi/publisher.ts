@@ -16,6 +16,7 @@ import {
   XAPIConfigError,
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
+import { httpOrigin } from '../standards.js';
 
 /** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
 export const CMI5_SESSIONID_EXT =
@@ -138,7 +139,7 @@ export class XAPIPublisher {
     if (!opts.endpoint || typeof opts.endpoint !== 'string') {
       throw new XAPIConfigError('XAPIPublisher: endpoint is required');
     }
-    if (!/^https?:\/\//i.test(opts.endpoint)) {
+    if (!httpOrigin(opts.endpoint)) {
       throw new XAPIConfigError(
         'XAPIPublisher: endpoint must be an absolute http(s) URL',
       );
@@ -201,9 +202,8 @@ export class XAPIPublisher {
     } else {
       throw new XAPIConfigError('xapi.actor is required');
     }
-    // Validate static auth eagerly. An empty string means unauthenticated
-    // (e.g. a Tin Can launch with no `auth` param), so only non-empty values
-    // are run through the Basic/Bearer prefix checks.
+    // Validate static auth eagerly. An empty string means unauthenticated, so
+    // only non-empty values are run through the Basic/Bearer prefix checks.
     if (typeof this.#authValue === 'string' && this.#authValue.length > 0) {
       const aErr = validateAuthCredential(this.#authValue);
       if (aErr) throw new XAPIConfigError(`xapi.auth: ${aErr}`);

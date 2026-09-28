@@ -208,11 +208,12 @@ describe('XAPIAdapter', () => {
     expect(calls('/xapi')).toHaveLength(0);
   });
 
-  it('names the Tin Can activity_id param when it is missing', async () => {
-    setXAPILaunch({ activity_id: '' });
+  it('rejects a relative endpoint before any request', async () => {
+    setXAPILaunch({ endpoint: '/lrs' });
     await expect(new XAPIAdapter().init()).rejects.toThrow(
-      /launch parameter 'activity_id' is missing/,
+      /launch parameter 'endpoint' is not an absolute http\(s\) URL/,
     );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('stops State API writes after the actor fails validation', async () => {
