@@ -441,6 +441,7 @@
   function handlePagehide() {
     if (!launched) return;
     endSession();
+    if (exitPhase === 'ending') exitPhase = 'ended';
     duration.pause();
     xapiClient?.markUnloading();
     adapter.terminate();

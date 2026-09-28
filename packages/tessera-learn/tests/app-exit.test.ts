@@ -469,24 +469,34 @@ describe('exiting a course', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it('stays on a page restored from the back/forward cache while the adapter exits', async () => {
-    const exiting = Promise.withResolvers<void>();
-    const exit = vi.fn(() => exiting.promise);
-    const returnToLMS = vi.fn(() => true);
-    const { adapter } = recordingAdapter({ exit, returnToLMS });
-    await mount(adapter);
+  it.each([
+    ['after', false],
+    ['before', true],
+  ])(
+    'stays on a page restored from the back/forward cache when the adapter exit settles %s the restore',
+    async (_, settlesFirst) => {
+      const exiting = Promise.withResolvers<void>();
+      const exit = vi.fn(() => exiting.promise);
+      const returnToLMS = vi.fn(() => true);
+      const { adapter } = recordingAdapter({ exit, returnToLMS });
+      await mount(adapter);
 
-    confirmExit();
-    await vi.waitFor(() => expect(exit).toHaveBeenCalled());
-    enterBfcache();
-    restoreFromBfcache();
-    exiting.resolve();
-    await flush();
+      confirmExit();
+      await vi.waitFor(() => expect(exit).toHaveBeenCalled());
+      enterBfcache();
+      if (settlesFirst) {
+        exiting.resolve();
+        await flush();
+      }
+      restoreFromBfcache();
+      exiting.resolve();
+      await flush();
 
-    expect(document.body.textContent).toContain('Session ended');
-    expect(returnToLMS).not.toHaveBeenCalled();
-    expect(close).not.toHaveBeenCalled();
-  });
+      expect(document.body.textContent).toContain('Session ended');
+      expect(returnToLMS).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    },
+  );
 
   it('keeps running a course the learner left and restored while it was launching', async () => {
     const init = Promise.withResolvers<void>();
