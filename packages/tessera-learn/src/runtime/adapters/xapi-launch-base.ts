@@ -91,10 +91,7 @@ type PublisherLaunchOptions = Pick<
 export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected publisher: XAPIPublisher | null = null;
   protected endpoint = '';
-  protected activityId = '';
   protected actor: XAPIAgent | null = null;
-  protected registration: string | undefined;
-  protected authToken = '';
   protected abstract readonly activityIdParam: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
@@ -108,6 +105,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected lastScoreEmitted: number | null = null;
   protected terminated = false;
   protected returnURL: string | undefined;
+  #activityId = '';
+  #registration: string | undefined;
+  #authToken = '';
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
   #stateSaved = true;
@@ -126,24 +126,24 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         `Tessera ${this.logName}: launch parameter 'endpoint' is missing or not an absolute http(s) URL. The LMS did not send a usable LRS endpoint.`,
       );
     }
-    this.activityId = params.get(this.activityIdParam) || '';
-    if (!this.activityId) {
+    this.#activityId = params.get(this.activityIdParam) || '';
+    if (!this.#activityId) {
       throw new Error(
         `Tessera ${this.logName}: launch parameter '${this.activityIdParam}' is missing.`,
       );
     }
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
-    this.registration = params.get('registration') || undefined;
+    this.#registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
-    this.authToken = await this.resolveAuth(params);
+    this.#authToken = await this.resolveAuth(params);
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
-      auth: this.authToken,
+      auth: this.#authToken,
       actor,
-      activityId: this.activityId,
-      registration: this.registration,
+      activityId: this.#activityId,
+      registration: this.#registration,
       ...(await this.prepareLaunch(params)),
     });
     await publisher.init();
@@ -318,7 +318,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.dispatch('Answered', {
       verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
       object: {
-        id: `${this.activityId}#${questionId}`,
+        id: `${this.#activityId}#${questionId}`,
         objectType: 'Activity',
         definition,
       },
@@ -425,11 +425,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   protected buildStateUrl(stateId: string = 'tessera-state'): string {
     const params = new URLSearchParams({
-      activityId: this.activityId,
+      activityId: this.#activityId,
       agent: JSON.stringify(this.actor),
       stateId,
     });
-    if (this.registration) params.set('registration', this.registration);
+    if (this.#registration) params.set('registration', this.#registration);
     return `${this.endpoint}activities/state?${params.toString()}`;
   }
 
@@ -438,8 +438,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     options: RequestInit = {},
   ): Promise<Response> {
     const headers = new Headers(options.headers);
-    if (this.authToken) {
-      headers.set('Authorization', `Basic ${this.authToken}`);
+    if (this.#authToken) {
+      headers.set('Authorization', `Basic ${this.#authToken}`);
     }
     headers.set('X-Experience-API-Version', X_API_VERSION);
     const keepalive = this.publisher?.isUnloading() ?? false;

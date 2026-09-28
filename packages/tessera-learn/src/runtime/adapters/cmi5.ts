@@ -160,31 +160,31 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // the GET and reject Initialized otherwise. A 404 here is legitimate (no
     // prefs set); the GET itself is what's required.
     await this.#fetchLearnerPreferences();
-    if (!launchData) return { cmi5Mode: true };
-
-    if (
-      typeof launchData.launchMode === 'string' &&
-      VALID_LAUNCH_MODE.has(launchData.launchMode)
-    ) {
-      this.#launchMode = launchData.launchMode;
-    }
-    const { returnURL } = launchData;
-    if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
-      this.returnURL = returnURL;
-    } else if (returnURL) {
-      console.warn(
-        `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
+    if (launchData) {
+      if (
+        typeof launchData.launchMode === 'string' &&
+        VALID_LAUNCH_MODE.has(launchData.launchMode)
+      ) {
+        this.#launchMode = launchData.launchMode;
+      }
+      const { returnURL } = launchData;
+      if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
+        this.returnURL = returnURL;
+      } else if (returnURL) {
+        console.warn(
+          `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
+        );
+      }
+      const launchMastery = parseMastery(
+        launchData.masteryScore,
+        'cmi5 LaunchData masteryScore',
       );
-    }
-    const launchMastery = parseMastery(
-      launchData.masteryScore,
-      'cmi5 LaunchData masteryScore',
-    );
-    if (launchMastery !== null) {
-      this.masteryScore = launchMastery;
+      if (launchMastery !== null) {
+        this.masteryScore = launchMastery;
+      }
     }
     const session =
-      launchData.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
+      launchData?.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
     const sessionId =
       typeof session === 'string' ? session.trim() || undefined : undefined;
     return { sessionId, cmi5Mode: true };
