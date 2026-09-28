@@ -123,17 +123,18 @@ export function cmi5Fetch({
   };
 }
 
+export const XAPI_LAUNCH = {
+  endpoint: 'https://lrs.example/xapi',
+  auth: 'Basic Zm9vOmJhcg==',
+  actor: JSON.stringify({
+    objectType: 'Agent',
+    account: { homePage: 'https://lms', name: 'learner-1' },
+  }),
+  activity_id: 'urn:tessera:au:abc',
+};
+
 export function setXAPILaunch(params: Record<string, string> = {}): void {
-  setLaunchParams({
-    endpoint: 'https://lrs.example/xapi',
-    auth: 'Basic Zm9vOmJhcg==',
-    actor: JSON.stringify({
-      objectType: 'Agent',
-      account: { homePage: 'https://lms', name: 'learner-1' },
-    }),
-    activity_id: 'urn:tessera:au:abc',
-    ...params,
-  });
+  setLaunchParams({ ...XAPI_LAUNCH, ...params });
 }
 
 export function valuesUnder(

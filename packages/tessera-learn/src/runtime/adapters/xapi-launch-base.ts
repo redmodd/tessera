@@ -93,7 +93,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected endpoint = '';
   protected actor: XAPIAgent | null = null;
   protected abstract readonly activityIdParam: string;
-  protected abstract readonly launchParams: readonly string[];
+  protected abstract readonly authParam: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
@@ -116,7 +116,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
     const params = new URLSearchParams(window.location.search);
-    const required = [...adapter.launchParams, adapter.activityIdParam];
+    const required = [
+      'endpoint',
+      'actor',
+      adapter.activityIdParam,
+      adapter.authParam,
+    ];
     return required.every((p) => params.get(p)) ? adapter : null;
   }
 
@@ -140,7 +145,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
-    this.#authToken = await this.resolveAuth(params);
+    this.#authToken = await this.resolveAuth(params.get(this.authParam) || '');
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.#authToken,
@@ -154,8 +159,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#sendInitialized();
   }
 
-  /** The Basic credential (without the scheme) for every LRS request. */
-  protected abstract resolveAuth(params: URLSearchParams): Promise<string>;
+  /** The Basic credential (without the scheme) for every LRS request, from the `authParam` launch value. */
+  protected abstract resolveAuth(value: string): Promise<string>;
 
   /** Profile launch requests that must precede Initialized; returns the profile's publisher options. */
   protected async prepareLaunch(

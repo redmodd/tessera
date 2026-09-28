@@ -10,11 +10,11 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   protected readonly profile = STANDARDS.xapi;
   // Tin Can uses snake_case `activity_id` (NOT cmi5's camelCase `activityId`).
   protected readonly activityIdParam = 'activity_id';
-  protected readonly launchParams = ['endpoint', 'auth', 'actor'];
+  protected readonly authParam = 'auth';
 
-  protected async resolveAuth(params: URLSearchParams): Promise<string> {
+  protected async resolveAuth(auth: string): Promise<string> {
     // Tin Can launch passes `auth` as the full "Basic <base64>" header value;
     // strip the scheme so we don't double-prefix it when sending.
-    return (params.get('auth') || '').replace(/^Basic\s+/i, '');
+    return auth.replace(/^Basic\s+/i, '');
   }
 }

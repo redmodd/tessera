@@ -74,18 +74,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   protected readonly logName = 'cmi5';
   protected readonly profile = STANDARDS.cmi5;
   protected readonly activityIdParam = 'activityId';
-  protected readonly launchParams = ['fetch', 'endpoint', 'actor'];
+  protected readonly authParam = 'fetch';
 
-  protected async resolveAuth(params: URLSearchParams): Promise<string> {
-    const fetchUrl = params.get('fetch');
-    // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
-    // and continuing with no token will 401-loop until auth is marked dead.
-    // Fail loud at launch instead of dribbling errors per statement.
-    if (!fetchUrl) {
-      throw new Error(
-        "Tessera cmi5: launch parameter 'fetch' is missing. Cannot acquire LMS auth token.",
-      );
-    }
+  // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
+  // and continuing with no token will 401-loop until auth is marked dead.
+  // Fail loud at launch instead of dribbling errors per statement.
+  protected async resolveAuth(fetchUrl: string): Promise<string> {
     let resp: Response;
     try {
       resp = await fetch(fetchUrl, { method: 'POST' });
