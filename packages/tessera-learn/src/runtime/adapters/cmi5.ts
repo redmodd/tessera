@@ -1,5 +1,9 @@
 import { parseMastery } from './format.js';
-import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import {
+  BaseXAPILaunchAdapter,
+  type LaunchParams,
+  type PublisherLaunchOptions,
+} from './xapi-launch-base.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
@@ -73,26 +77,23 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   #launchMode: CMI5LaunchMode = 'Normal';
   #heldFailed = false;
 
-  async init(): Promise<void> {
-    this.version = '1.0.3';
-    this.logName = 'cmi5';
-    this.profile = STANDARDS.cmi5;
-    const params = new URLSearchParams(window.location.search);
-    const fetchUrl = params.get('fetch');
-    this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
-    const reg = params.get('registration') || '';
-    // xAPI requires `context.registration` to be a UUID; sending an empty
-    // string makes LRSes 400. Omit when the LMS didn't provide one.
-    this.registration = reg ? reg : undefined;
-    this.activityId = params.get('activityId') || '';
+  protected override readonly logName = 'cmi5';
+  protected override readonly profile = STANDARDS.cmi5;
 
+  protected readLaunchParams(params: URLSearchParams): LaunchParams {
     this.masteryScore = parseMastery(
       params.get('masteryScore'),
       "cmi5 launch parameter 'masteryScore'",
     );
+    return {
+      endpoint: params.get('endpoint') || '',
+      activityId: params.get('activityId') || '',
+      registration: params.get('registration') || '',
+    };
+  }
 
-    this.parseActorParam(params.get('actor') || '');
-
+  protected async resolveAuth(params: URLSearchParams): Promise<string> {
+    const fetchUrl = params.get('fetch');
     // The cmi5 fetch URL is single-use (§6.2): if it fails we can't retry,
     // and continuing with no token will 401-loop until auth is marked dead.
     // Fail loud at launch instead of dribbling errors per statement.
@@ -155,13 +156,15 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     if (!token) {
       token = text.replace(/^auth-token=/, '').trim();
     }
-    this.authToken = token;
-    if (!this.authToken) {
+    if (!token) {
       throw new Error(
         'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.',
       );
     }
+    return token;
+  }
 
+  protected override async beforePublisher(): Promise<PublisherLaunchOptions> {
     // cmi5 §10 — LaunchData carries the session id (§9.6.3.1), Publisher
     // Activity (§9.6.2.3), and launchMode/returnURL/masteryScore (§10.2); its
     // masteryScore overrides the URL value parsed earlier (§10.2.4).
@@ -195,18 +198,16 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
         this.masteryScore = launchMastery;
       }
     }
+    return { sessionId, cmi5Mode: true };
+  }
 
-    await this.createPublisher({ sessionId, cmi5Mode: true });
-
-    // cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict
-    // LRSes track the GET and reject Initialized otherwise. A 404 here
-    // is legitimate (no prefs set); the GET itself is what's required.
-    await this.#fetchLearnerPreferences();
-
-    // cmi5 §9.3.2 — Initialized is queued here, before the caller's
-    // loadState(), so a slow LRS can't push it past the spec's "reasonable
-    // period".
-    this.sendInitialized();
+  /**
+   * cmi5 §11 — fetch the Agent Profile BEFORE Initialized. Strict LRSes track
+   * the GET and reject Initialized otherwise. A 404 here is legitimate (no
+   * prefs set); the GET itself is what's required.
+   */
+  protected override beforeInitialized(): Promise<void> {
+    return this.#fetchLearnerPreferences();
   }
 
   override seedLifecycle(

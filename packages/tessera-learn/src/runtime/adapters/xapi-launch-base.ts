@@ -10,6 +10,7 @@ import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher } from '../xapi/publisher.js';
+import { X_API_VERSION } from '../xapi/version.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
 import type {
   XAPIAgent,
@@ -76,11 +77,22 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
+export interface LaunchParams {
+  endpoint: string;
+  activityId: string;
+  registration: string;
+}
+
+export interface PublisherLaunchOptions {
+  sessionId?: string;
+  cmi5Mode?: boolean;
+}
+
 /**
  * Version-neutral xAPI launch lifecycle shared by the cmi5 and plain-xAPI
- * adapters. Subclasses set the protected fields in init() and may override
- * buildContext()/isDefinedStatementAllowed()/scoreForSuccess() to layer
- * profile rules on top.
+ * adapters. `init()` runs the launch in a fixed order; subclasses fill in its
+ * steps and may override buildContext()/isDefinedStatementAllowed()/
+ * scoreForSuccess() to layer profile rules on top.
  */
 export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected publisher: XAPIPublisher | null = null;
@@ -89,10 +101,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected actor: XAPIAgent | null = null;
   protected registration: string | undefined;
   protected authToken = '';
-  protected version = '1.0.3';
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
-  protected logName = 'xAPI';
-  protected profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
+  protected readonly logName: string = 'xAPI';
+  protected readonly profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
     STANDARDS.xapi;
 
   protected scaled: number | null = null;
@@ -106,6 +117,37 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
   #stateSaved = true;
+
+  /**
+   * The actor is parsed before auth so a malformed one fails before a
+   * single-use cmi5 fetch token is spent, and auth resolves before
+   * `beforePublisher()` because its requests carry the token and the actor.
+   */
+  async init(): Promise<void> {
+    const params = new URLSearchParams(window.location.search);
+    const launch = this.readLaunchParams(params);
+    this.endpoint = launch.endpoint.replace(/\/?$/, '/');
+    this.activityId = launch.activityId;
+    // xAPI requires `context.registration` to be a UUID; sending an empty
+    // string makes LRSes 400. Omit when the LMS didn't provide one.
+    this.registration = launch.registration || undefined;
+    this.#parseActorParam(params.get('actor') || '');
+    this.authToken = await this.resolveAuth(params);
+    await this.#createPublisher(await this.beforePublisher());
+    await this.beforeInitialized();
+    this.#sendInitialized();
+  }
+
+  protected abstract readLaunchParams(params: URLSearchParams): LaunchParams;
+
+  /** The Basic credential (without the scheme) for every LRS request. */
+  protected abstract resolveAuth(params: URLSearchParams): Promise<string>;
+
+  protected async beforePublisher(): Promise<PublisherLaunchOptions> {
+    return {};
+  }
+
+  protected async beforeInitialized(): Promise<void> {}
 
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
@@ -310,7 +352,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   /** Parse the launch `actor` param into an Identified Agent, failing loud on malformed JSON. */
-  protected parseActorParam(raw: string): void {
+  #parseActorParam(raw: string): void {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') {
@@ -329,10 +371,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   /** Construct the publisher from the resolved launch fields plus per-profile options. */
-  protected async createPublisher(opts: {
-    sessionId?: string;
-    cmi5Mode?: boolean;
-  }): Promise<XAPIPublisher> {
+  async #createPublisher(opts: PublisherLaunchOptions): Promise<void> {
     if (!this.actor) {
       throw new Error(
         `Tessera ${this.logName}: cannot create publisher before the launch actor is resolved.`,
@@ -344,7 +383,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       actor: this.actor,
       activityId: this.activityId,
       registration: this.registration,
-      version: this.version,
       ...opts,
     });
     try {
@@ -353,11 +391,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.publisher = null;
       throw err;
     }
-    return this.publisher;
   }
 
-  /** Fire-and-forget Initialized statement (the first Defined Statement of the session). */
-  protected sendInitialized(): void {
+  /**
+   * Fire-and-forget Initialized statement (the first Defined Statement of the
+   * session). Queued before the caller's loadState(), so a slow LRS can't push
+   * it past cmi5 §9.3.2's "reasonable period".
+   */
+  #sendInitialized(): void {
     this.dispatch('Initialized', {
       verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
       context: this.buildContext(),
@@ -411,7 +452,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (this.authToken) {
       headers.set('Authorization', `Basic ${this.authToken}`);
     }
-    headers.set('X-Experience-API-Version', this.version);
+    headers.set('X-Experience-API-Version', X_API_VERSION);
     const keepalive = this.publisher?.isUnloading() ?? false;
     return fetch(url, {
       ...options,
