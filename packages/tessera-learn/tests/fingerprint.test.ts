@@ -105,8 +105,6 @@ describe('shouldRestore', () => {
       ['a visited page is not a number', { v: ['0', 1] }],
       ['a quiz score is not a number', { g: { '0': { s: '80' } } }],
       ['an attempt count is not a number', { g: { '0': { a: '2' } } }],
-      ['an attempt count is below one', { g: { '0': { a: 0 } } }],
-      ['an attempt count is not a whole number', { g: { '0': { a: 1.5 } } }],
       [
         'a standalone score is not a number',
         { g: { '0': { q: { q1: '80' } } } },

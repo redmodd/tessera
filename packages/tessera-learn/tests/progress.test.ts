@@ -77,6 +77,15 @@ describe('ProgressState', () => {
       progress.restoreFrom({ v: [], g: { 2: { s: 90 } } });
       expect(progress.quizAttempts(2)).toBe(1);
     });
+
+    it.each([0, -3, 1.5])(
+      'restores a saved attempt count of %s as one',
+      (a) => {
+        const progress = new ProgressState(createManifest(0), createConfig());
+        progress.restoreFrom({ v: [], g: { 2: { s: 90, a } } });
+        expect(progress.quizAttempts(2)).toBe(1);
+      },
+    );
   });
 
   describe('toSaved / restoreFrom', () => {

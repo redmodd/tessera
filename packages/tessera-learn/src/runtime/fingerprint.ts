@@ -44,8 +44,7 @@ const isQuestionRecord = (value: unknown): boolean =>
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   ('s' in value ? isNumber(value.s) : true) &&
-  (value.a == null ||
-    (isNumber(value.a) && Number.isInteger(value.a) && value.a >= 1)) &&
+  (value.a == null || isNumber(value.a)) &&
   (value.q == null || isQuestionRecord(value.q)) &&
   (value.w == null || isStringArray(value.w));
 
