@@ -461,6 +461,7 @@
     exitPhase = phase;
     loadGeneration++;
     pageLoading = false;
+    clearTimeout(manualWatchdog);
   }
 
   let unmountCourse;

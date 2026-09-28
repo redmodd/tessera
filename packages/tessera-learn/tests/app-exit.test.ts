@@ -581,6 +581,30 @@ describe('exiting a course', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['the exit', () => navCtx().exit()],
+    [
+      'a back/forward cache restore',
+      () => {
+        enterBfcache();
+        restoreFromBfcache();
+      },
+    ],
+  ])('drops the manual-completion watchdog after %s', async (_, leave) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { adapter } = recordingAdapter();
+    await mount(adapter, { config: manualConfig(), loadLayout: masteryLayout });
+
+    await leave();
+    vi.advanceTimersByTime(60_000);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('offers no Exit button without an LMS', async () => {
     const config = createConfig();
     const manifest = createManifest(2);
