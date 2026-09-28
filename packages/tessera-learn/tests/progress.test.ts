@@ -65,7 +65,7 @@ describe('ProgressState', () => {
 
   describe('restoring a quiz', () => {
     it('a later submit continues the restored attempt count', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ v: [], g: { 2: { s: 90, a: 2 } } });
       progress.quizCompleted(2, 40);
       expect(progress.quizAttempts(2)).toBe(3);
@@ -73,7 +73,7 @@ describe('ProgressState', () => {
     });
 
     it('assumes one attempt when the save omits the count', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ v: [], g: { 2: { s: 90 } } });
       expect(progress.quizAttempts(2)).toBe(1);
     });
@@ -81,11 +81,21 @@ describe('ProgressState', () => {
     it.each([0, -3, 1.5])(
       'restores a saved attempt count of %s as one',
       (a) => {
-        const progress = new ProgressState(createManifest(0), createConfig());
+        const progress = new ProgressState(createManifest(3), createConfig());
         progress.restoreFrom({ v: [], g: { 2: { s: 90, a } } });
         expect(progress.quizAttempts(2)).toBe(1);
       },
     );
+
+    it('drops saved progress for pages the course does not have', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: [0, 3, 1.5, -1],
+        c: { 3: 1, x: 2 },
+        g: { 3: { s: 90 }, NaN: { q: { q1: 100 } } },
+      });
+      expect(progress.toSaved()).toEqual({ v: [0] });
+    });
   });
 
   describe('toSaved / restoreFrom', () => {
