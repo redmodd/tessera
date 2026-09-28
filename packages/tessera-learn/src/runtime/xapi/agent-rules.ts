@@ -98,7 +98,7 @@ export function validateAuthCredential(auth: string): string | null {
     return "must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
   }
   if (/^bearer\s/i.test(auth)) {
-    return 'must be a Basic credential; Bearer/OAuth credentials are not supported in v1. Use Basic auth, or wrap your token-exchange in an auth function that returns a Basic credential.';
+    return 'must be a Basic credential; Bearer/OAuth credentials are not supported.';
   }
   return null;
 }
