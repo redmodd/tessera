@@ -29,7 +29,7 @@ const isNumber = (value: unknown): value is number =>
 const isNumberRecord = (value: unknown): boolean =>
   isRecord(value) && Object.values(value).every(isNumber);
 
-const isNumberArray = (value: unknown): boolean =>
+const isNumberArray = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every(isNumber);
 
 const isStringArray = (value: unknown): boolean =>
@@ -38,7 +38,9 @@ const isStringArray = (value: unknown): boolean =>
 const isQuestionRecord = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
-    (v) => isNumber(v) || (isNumberArray(v) && (v as number[]).length === 3),
+    (v) =>
+      isNumber(v) ||
+      (isNumberArray(v) && v.length === 3 && (v[2] === 0 || v[2] === 1)),
   );
 
 const isGradedUnit = (value: unknown): boolean =>

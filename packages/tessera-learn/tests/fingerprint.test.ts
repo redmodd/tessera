@@ -121,6 +121,10 @@ describe('shouldRestore', () => {
         'a standalone entry carries more than a graded flag',
         { g: { '0': { q: { q1: [80, 1, 1, 1] } } } },
       ],
+      [
+        'a standalone graded flag is not 0 or 1',
+        { g: { '0': { q: { q1: [80, 1, 7] } } } },
+      ],
       ['a quiz score is null', { g: { '0': { s: null } } }],
       [
         'the unanswered questions are not a list of ids',
