@@ -96,7 +96,7 @@ describe('ProgressState', () => {
       expect(progress.quizAttempts(2)).toBe(1);
     });
 
-    it.each([0, -3, 1.5])(
+    it.each([0, -3, 1.5, 2.7])(
       'restores a saved attempt count of %s as one',
       (a) => {
         const progress = new ProgressState(createManifest(3), createConfig());

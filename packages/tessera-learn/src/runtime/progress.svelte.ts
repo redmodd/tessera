@@ -407,9 +407,11 @@ export class ProgressState {
         if (!isPage(key)) continue;
         const pageIndex = Number(key);
         if (unit.s !== undefined) {
+          const attempts = unit.a ?? 1;
           this.#write(pageIndex, {
             quizScore: clampScore(unit.s),
-            attempts: Math.max(1, Math.trunc(unit.a ?? 1)),
+            attempts:
+              Number.isInteger(attempts) && attempts >= 1 ? attempts : 1,
           });
         }
         if (unit.w) {
