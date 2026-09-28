@@ -396,11 +396,7 @@ export class ProgressState {
       for (const [key, unit] of Object.entries(saved.g ?? {})) {
         const pageIndex = Number(key);
         if (unit.s !== undefined) {
-          const attempts = unit.a ?? 1;
-          this.#write(pageIndex, {
-            quizScore: unit.s,
-            ...(attempts > 0 ? { attempts } : {}),
-          });
+          this.#write(pageIndex, { quizScore: unit.s, attempts: unit.a ?? 1 });
         }
         if (unit.w) {
           this.#unconfirmed.set(pageIndex, new Set(unit.w));

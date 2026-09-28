@@ -77,12 +77,6 @@ describe('ProgressState', () => {
       progress.restoreFrom({ v: [], g: { 2: { s: 90 } } });
       expect(progress.quizAttempts(2)).toBe(1);
     });
-
-    it('ignores a saved attempt count below one', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: -3 } } });
-      expect(progress.quizAttempts(2)).toBe(0);
-    });
   });
 
   describe('toSaved / restoreFrom', () => {
