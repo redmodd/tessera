@@ -13,23 +13,6 @@ export class XAPIConfigError extends Error {
   }
 }
 
-export function validatePublisherTarget(
-  endpoint: string,
-  activityId: string,
-): void {
-  if (!endpoint || typeof endpoint !== 'string') {
-    throw new XAPIConfigError('XAPIPublisher: endpoint is required');
-  }
-  if (!/^https?:\/\//i.test(endpoint)) {
-    throw new XAPIConfigError(
-      'XAPIPublisher: endpoint must be an absolute http(s) URL',
-    );
-  }
-  if (!activityId) {
-    throw new XAPIConfigError('XAPIPublisher: activityId is required');
-  }
-}
-
 /** Thrown synchronously by `sendStatement` for partial-statement misuse. */
 export class XAPIStatementError extends Error {
   statement: PartialStatement;

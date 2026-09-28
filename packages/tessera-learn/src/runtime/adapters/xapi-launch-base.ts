@@ -5,14 +5,13 @@ import type {
 } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
-import { STANDARDS } from '../standards.js';
+import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
 import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
-import { validatePublisherTarget } from '../xapi/validation.js';
 import type {
   XAPIAgent,
   PartialStatement,
@@ -99,8 +98,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected abstract readonly activityIdParam: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
-  protected abstract readonly profile:
-    typeof STANDARDS.cmi5 | typeof STANDARDS.xapi;
+  protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
 
   protected scaled: number | null = null;
   protected durationSeconds = 0;
@@ -123,15 +121,33 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
+    if (!httpOrigin(this.endpoint)) {
+      throw new Error(
+        `Tessera ${this.logName}: launch parameter 'endpoint' is missing or not an absolute http(s) URL. The LMS did not send a usable LRS endpoint.`,
+      );
+    }
     this.activityId = params.get(this.activityIdParam) || '';
-    validatePublisherTarget(this.endpoint, this.activityId);
+    if (!this.activityId) {
+      throw new Error(
+        `Tessera ${this.logName}: launch parameter '${this.activityIdParam}' is missing.`,
+      );
+    }
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
     this.registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
     this.authToken = await this.resolveAuth(params);
-    await this.#createPublisher(actor, await this.beforePublisher(params));
+    const publisher = new XAPIPublisher({
+      endpoint: this.endpoint,
+      auth: this.authToken,
+      actor,
+      activityId: this.activityId,
+      registration: this.registration,
+      ...(await this.beforePublisher(params)),
+    });
+    await publisher.init();
+    this.publisher = publisher;
     await this.beforeInitialized();
     this.#sendInitialized();
   }
@@ -365,27 +381,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
         { cause: err },
       );
-    }
-  }
-
-  /** Construct the publisher from the resolved launch fields plus per-profile options. */
-  async #createPublisher(
-    actor: XAPIAgent,
-    opts: PublisherLaunchOptions,
-  ): Promise<void> {
-    this.publisher = new XAPIPublisher({
-      endpoint: this.endpoint,
-      auth: this.authToken,
-      actor,
-      activityId: this.activityId,
-      registration: this.registration,
-      ...opts,
-    });
-    try {
-      await this.publisher.init();
-    } catch (err) {
-      this.publisher = null;
-      throw err;
     }
   }
 

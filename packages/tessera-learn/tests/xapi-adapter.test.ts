@@ -208,6 +208,13 @@ describe('XAPIAdapter', () => {
     expect(calls('/xapi')).toHaveLength(0);
   });
 
+  it('names the Tin Can activity_id param when it is missing', async () => {
+    setXAPILaunch({ activity_id: '' });
+    await expect(new XAPIAdapter().init()).rejects.toThrow(
+      /launch parameter 'activity_id' is missing/,
+    );
+  });
+
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
     const adapter = new XAPIAdapter();

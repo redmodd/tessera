@@ -163,9 +163,9 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     // Activity (§9.6.2.3), and launchMode/returnURL/masteryScore (§10.2); its
     // masteryScore overrides the URL value above (§10.2.4).
     this.#launchData = await this.#fetchLaunchData();
-    const tmpl = this.#launchData?.contextTemplate ?? {};
     let sessionId: string | undefined;
-    const launchSession = (tmpl.extensions ?? {})[CMI5_SESSIONID_EXT_IRI];
+    const launchSession =
+      this.#launchData?.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT_IRI];
     if (typeof launchSession === 'string' && launchSession.trim()) {
       sessionId = launchSession.trim();
     }

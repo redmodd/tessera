@@ -1133,8 +1133,8 @@ describe('CMI5Adapter', () => {
     });
 
     it.each([
-      ['endpoint', /endpoint must be an absolute/],
-      ['activityId', /activityId is required/],
+      ['endpoint', /launch parameter 'endpoint'/],
+      ['activityId', /launch parameter 'activityId'/],
     ])(
       'rejects a missing %s before spending the single-use fetch URL',
       async (param, message) => {
