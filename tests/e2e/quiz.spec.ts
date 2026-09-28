@@ -7,15 +7,9 @@ import {
   completePracticeQuiz,
   navigateToPage,
   primaryBtn,
+  readSavedState,
   waitForTesseraContent,
 } from './helpers.js';
-
-async function readSavedState(page: Page) {
-  return page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k.startsWith('tessera-'));
-    return JSON.parse(localStorage.getItem(key!)!);
-  });
-}
 
 /**
  * Advance past one immediate-feedback question. The primary button cycles:
