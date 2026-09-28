@@ -64,7 +64,13 @@ interface CMI5LaunchData {
  * Agent Profile GET.
  */
 export class CMI5Adapter extends BaseXAPILaunchAdapter {
-  static readonly launchParams = ['fetch', 'endpoint', 'activityId', 'actor'];
+  static override readonly activityIdParam = 'activityId';
+  static readonly launchParams = [
+    'fetch',
+    'endpoint',
+    this.activityIdParam,
+    'actor',
+  ];
 
   // cmi5 §10 LMS.LaunchData; `contextTemplate` (§9.6.2) is the base context
   // strict LRSes validate every Defined Statement against.
@@ -75,7 +81,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
 
   protected readonly logName = 'cmi5';
   protected readonly profile = STANDARDS.cmi5;
-  protected readonly activityIdParam = 'activityId';
 
   protected async resolveAuth(params: URLSearchParams): Promise<string> {
     const fetchUrl = params.get('fetch');
