@@ -85,6 +85,10 @@ export function validateAgent(actor: unknown): string | null {
   return null;
 }
 
+export function isBearerCredential(auth: string): boolean {
+  return /^bearer\s/i.test(auth);
+}
+
 /**
  * Validate a Basic-auth credential string (the value after "Basic ").
  * v1 supports Basic only. Bearer is a hard error so OAuth users see the
@@ -97,7 +101,7 @@ export function validateAuthCredential(auth: string): string | null {
   if (/^basic\s/i.test(auth)) {
     return "must be the Basic credential value only, not the full header. Drop the 'Basic ' prefix.";
   }
-  if (/^bearer\s/i.test(auth)) {
+  if (isBearerCredential(auth)) {
     return 'must be a Basic credential; Bearer/OAuth credentials are not supported.';
   }
   return null;

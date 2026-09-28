@@ -157,7 +157,12 @@ describe('xapi config validation — explicit endpoint', () => {
   it('errors on Bearer auth (non-goal in v1)', () => {
     const { errors } = validate(destination({ auth: 'Bearer xyz' }), 'web');
     expect(
-      errors.find((e) => e.includes('Bearer') && e.includes('not supported')),
+      errors.find(
+        (e) =>
+          e.includes('Bearer') &&
+          e.includes('not supported') &&
+          e.includes('course.runtime.js'),
+      ),
     ).toBeDefined();
   });
 
