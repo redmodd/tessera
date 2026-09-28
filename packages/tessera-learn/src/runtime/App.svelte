@@ -439,6 +439,7 @@
   }
 
   function handlePagehide() {
+    if (!launched) return;
     endSession();
     duration.pause();
     xapiClient?.markUnloading();
@@ -446,7 +447,7 @@
   }
 
   function handlePageshow(event) {
-    if (!event.persisted) return;
+    if (!launched || !event.persisted) return;
     if (adapter.connected) {
       leaveCourse('ended');
       return;
@@ -580,8 +581,6 @@
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('pagehide', handlePagehide);
-    window.addEventListener('pageshow', handlePageshow);
     launched = true;
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
@@ -608,8 +607,6 @@
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    window.removeEventListener('pagehide', handlePagehide);
-    window.removeEventListener('pageshow', handlePageshow);
     if (manualWatchdog !== null) {
       clearTimeout(manualWatchdog);
       manualWatchdog = null;
@@ -619,6 +616,8 @@
     registerXAPIClient(null);
   });
 </script>
+
+<svelte:window onpagehide={handlePagehide} onpageshow={handlePageshow} />
 
 {#snippet page()}
   {#if pageError}
