@@ -69,7 +69,7 @@ function provideNavCtx({
     }),
     goNext: vi.fn(),
     goPrev: vi.fn(),
-    isPageLocked: vi.fn(() => false),
+    canAccessIndex: vi.fn(() => true),
     prefetch: vi.fn(),
   };
   const ctx = {
@@ -605,11 +605,11 @@ describe('useNavigation', () => {
     expect(ctx.nav.goToPage).toHaveBeenCalledWith(3);
   });
 
-  it('goTo(unknown slug) is a no-op', () => {
+  it('goTo(unknown slug) passes nav.goToPage an index that is not a page', () => {
     const ctx = provideNavCtx();
 
     useNavigation().goTo('does-not-exist');
-    expect(ctx.nav.goToPage).not.toHaveBeenCalled();
+    expect(ctx.nav.goToPage).toHaveBeenCalledWith(-1);
   });
 
   it('next/prev/prefetch/canGoNext/canGoPrev delegate to nav', () => {
@@ -626,28 +626,19 @@ describe('useNavigation', () => {
     expect(h.canGoPrev).toBe(false);
   });
 
-  it('canAccess returns false for unknown slug, true when nav.isPageLocked is false', () => {
+  it('canAccess and canAccessIndex delegate to nav.canAccessIndex', () => {
     const ctx = provideNavCtx();
 
     const h = useNavigation();
     expect(h.canAccess('page-1')).toBe(true);
-    expect(h.canAccess('does-not-exist')).toBe(false);
+    expect(ctx.nav.canAccessIndex).toHaveBeenLastCalledWith(1);
+    h.canAccess('does-not-exist');
+    expect(ctx.nav.canAccessIndex).toHaveBeenLastCalledWith(-1);
 
-    ctx.nav.isPageLocked = vi.fn(() => true);
+    ctx.nav.canAccessIndex = vi.fn(() => false);
     expect(h.canAccess('page-1')).toBe(false);
-  });
-
-  it('canAccessIndex checks bounds and nav.isPageLocked', () => {
-    const ctx = provideNavCtx();
-
-    const h = useNavigation();
-    expect(h.canAccessIndex(1)).toBe(true);
-    expect(h.canAccessIndex(-1)).toBe(false);
-    expect(h.canAccessIndex(1.5)).toBe(false);
-    expect(h.canAccessIndex(ctx.manifest.pages.length)).toBe(false);
-
-    ctx.nav.isPageLocked = vi.fn(() => true);
     expect(h.canAccessIndex(1)).toBe(false);
+    expect(ctx.nav.canAccessIndex).toHaveBeenLastCalledWith(1);
   });
 });
 

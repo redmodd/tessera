@@ -125,6 +125,22 @@ describe('NavigationState', () => {
     );
   });
 
+  describe('canAccessIndex', () => {
+    it('is true only for an unlocked page the course has', () => {
+      const manifest = createManifest(5);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
+      expect(nav.canAccessIndex(0)).toBe(true);
+      expect(nav.canAccessIndex(3)).toBe(false);
+      expect(nav.canAccessIndex(-1)).toBe(false);
+      expect(nav.canAccessIndex(0.5)).toBe(false);
+      expect(nav.canAccessIndex(5)).toBe(false);
+    });
+  });
+
   describe('canGoPrev', () => {
     it('is false at index 0', () => {
       const nav = new NavigationState(

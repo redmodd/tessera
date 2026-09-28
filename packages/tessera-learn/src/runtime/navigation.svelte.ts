@@ -93,17 +93,19 @@ export class NavigationState {
    * so callers don't need to guard.
    */
   prefetch(index: number) {
-    if (!this.#pageModules) return;
-    if (!isPageIndex(index, this.manifest.totalPages)) return;
-    if (this.isPageLocked(index)) return;
+    if (!this.#pageModules || !this.canAccessIndex(index)) return;
     const page = this.manifest.pages[index];
     void this.#pageModules[page.importPath]?.();
   }
 
+  canAccessIndex(index: number): boolean {
+    return (
+      isPageIndex(index, this.manifest.totalPages) && !this.isPageLocked(index)
+    );
+  }
+
   goToPage(index: number) {
-    if (!isPageIndex(index, this.manifest.totalPages)) return;
-    if (this.isPageLocked(index)) return;
-    this.currentPageIndex = index;
+    if (this.canAccessIndex(index)) this.currentPageIndex = index;
   }
 
   goNext() {

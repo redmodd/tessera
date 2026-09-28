@@ -1,7 +1,7 @@
 import { onDestroy, onMount, tick } from 'svelte';
 import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
-import { isPageIndex, type QuizConfig } from './types.js';
+import type { QuizConfig } from './types.js';
 import type { CompletionStatus } from './persistence.js';
 import {
   requireNavContext,
@@ -263,8 +263,6 @@ export function useNavigation() {
   const { nav, manifest } = requireNavContext('useNavigation()');
   const indexOf = (slug: string) =>
     manifest.pages.findIndex((p) => p.slug === slug);
-  const canAccessIndex = (index: number) =>
-    isPageIndex(index, manifest.pages.length) && !nav.isPageLocked(index);
   return {
     get currentPage() {
       return manifest.pages[nav.currentPageIndex];
@@ -276,8 +274,7 @@ export function useNavigation() {
       return manifest.pages;
     },
     goTo(slug: string) {
-      const index = indexOf(slug);
-      if (index >= 0) nav.goToPage(index);
+      nav.goToPage(indexOf(slug));
     },
     goToIndex(index: number) {
       nav.goToPage(index);
@@ -295,9 +292,11 @@ export function useNavigation() {
       return nav.canGoPrev;
     },
     canAccess(slug: string) {
-      return canAccessIndex(indexOf(slug));
+      return nav.canAccessIndex(indexOf(slug));
     },
-    canAccessIndex,
+    canAccessIndex(index: number) {
+      return nav.canAccessIndex(index);
+    },
     get sections() {
       return manifest.sections;
     },
