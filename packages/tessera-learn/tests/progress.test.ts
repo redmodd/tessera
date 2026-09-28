@@ -77,6 +77,12 @@ describe('ProgressState', () => {
       progress.restoreFrom({ v: [], g: { 2: { s: 90 } } });
       expect(progress.quizAttempts(2)).toBe(1);
     });
+
+    it('ignores a saved attempt count below one', () => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: -3 } } });
+      expect(progress.quizAttempts(2)).toBe(0);
+    });
   });
 
   describe('toSaved / restoreFrom', () => {
@@ -90,8 +96,8 @@ describe('ProgressState', () => {
       success: { from: 'quiz' },
       scoring: { passingScore: 50 },
     });
-    const roundTrip = (progress: ProgressState) => {
-      const restored = new ProgressState(manifest, config);
+    const roundTrip = (progress: ProgressState, restoreConfig = config) => {
+      const restored = new ProgressState(manifest, restoreConfig);
       restored.restoreFrom(progress.toSaved());
       return restored;
     };
@@ -142,21 +148,38 @@ describe('ProgressState', () => {
       expect(restored.toSaved()).toEqual(saved);
     });
 
-    it('round-trips all four latches', () => {
+    it('round-trips a manual completion', () => {
       const progress = new ProgressState(manifest, config);
-      progress.quizCompleted(1, 100);
-      progress.markStandaloneQuestion(2, 'q1', 100, true);
-      progress.markStandaloneQuestion(3, 'q1', 100, true);
       progress.markCompleteManually();
 
       const saved = progress.toSaved();
-      expect(saved).toMatchObject({ m: 1, s: 1, k: 1, p: 100 });
+      expect(saved).toMatchObject({ m: 1 });
 
       const restored = roundTrip(progress);
       expect(restored.manuallyCompleted).toBe(true);
-      expect(restored.gradedScoreFinal).toBe(true);
+      expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it('round-trips the completion, final score and pass a lowered score no longer gives', () => {
+      const quizConfig = createConfig({
+        completion: { mode: 'quiz' },
+        success: { from: 'quiz' },
+        scoring: { passingScore: 50 },
+      });
+      const progress = new ProgressState(manifest, quizConfig);
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      const saved = progress.toSaved();
+      expect(saved).toMatchObject({ s: 1, k: 1, p: 66.67 });
+
+      const restored = roundTrip(progress, quizConfig);
+      expect(restored.completionStatus).toBe('incomplete');
       expect(restored.reportedCompletionStatus).toBe('complete');
+      expect(restored.gradedScoreFinal).toBe(true);
       expect(restored.successStatus).toBe('passed');
+      expect(restored.reportedScore).toBe(66.67);
       expect(restored.toSaved()).toEqual(saved);
     });
   });
