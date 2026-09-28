@@ -285,7 +285,16 @@ describe('exiting a course', () => {
     );
   });
 
-  it('drops a page that finishes loading after the exit', async () => {
+  it.each([
+    ['the exit', () => navCtx().exit()],
+    [
+      'a back/forward cache restore',
+      () => {
+        enterBfcache();
+        restoreFromBfcache();
+      },
+    ],
+  ])('drops a page that finishes loading after %s', async (_, leave) => {
     let release!: () => void;
     const page = () => import('./fixtures/app-page.svelte');
     let loads = 0;
@@ -298,7 +307,7 @@ describe('exiting a course', () => {
 
     navCtx().nav.goToPage(1);
     await flush();
-    await navCtx().exit();
+    await leave();
     release();
     await flush();
 
@@ -436,27 +445,6 @@ describe('exiting a course', () => {
     expect(document.body.textContent).toContain('Session ended');
     expect(document.body.textContent).not.toContain('Test page');
     expect(calls.slice(hidden)).toEqual([]);
-  });
-
-  it('drops a page that finishes loading after a back/forward cache restore', async () => {
-    let release!: () => void;
-    const page = () => import('./fixtures/app-page.svelte');
-    let loads = 0;
-    const loadPage = () =>
-      loads++ === 0
-        ? page()
-        : new Promise((resolve) => (release = () => resolve(page())));
-    const { adapter } = recordingAdapter();
-    await mount(adapter, { loadLayout: masteryLayout, loadPage });
-
-    navCtx().nav.goToPage(1);
-    await flush();
-    enterBfcache();
-    restoreFromBfcache();
-    release();
-    await flush();
-
-    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
   });
 
   it('leaves the window open when a back/forward cache restore interrupts the exit', async () => {

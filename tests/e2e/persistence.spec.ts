@@ -1,10 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   answerMatching,
+  exitCourse,
   navigateToPage,
   restoreFromBfcache,
   waitForTesseraContent,
 } from './helpers.js';
+
+const readSavedState = (page: Page) =>
+  page.evaluate(() => {
+    const tesseraKey = Object.keys(localStorage).find((k) =>
+      k.startsWith('tessera-'),
+    );
+    return tesseraKey ? JSON.parse(localStorage.getItem(tesseraKey)!) : null;
+  });
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
@@ -84,13 +93,7 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Objectives');
     await navigateToPage(page, 'Callouts & Images');
 
-    // Check localStorage
-    const storageData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const storageData = await readSavedState(page);
 
     expect(storageData).not.toBeNull();
     expect(storageData).toHaveProperty('b'); // bookmark
@@ -141,12 +144,7 @@ test.describe('Persistence — localStorage', () => {
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 
     // Verify quiz score is in localStorage
-    const storageData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const storageData = await readSavedState(page);
     expect(storageData).not.toBeNull();
     expect(Object.keys(storageData.g).length).toBeGreaterThanOrEqual(1);
 
@@ -154,12 +152,7 @@ test.describe('Persistence — localStorage', () => {
     await page.reload();
     await waitForTesseraContent(page);
 
-    const restoredData = await page.evaluate(() => {
-      const keys = Object.keys(localStorage);
-      const tesseraKey = keys.find((k) => k.startsWith('tessera-'));
-      if (!tesseraKey) return null;
-      return JSON.parse(localStorage.getItem(tesseraKey)!);
-    });
+    const restoredData = await readSavedState(page);
     expect(restoredData).not.toBeNull();
     expect(Object.keys(restoredData.g).length).toBeGreaterThanOrEqual(1);
   });
@@ -173,12 +166,7 @@ test.describe('Persistence — localStorage', () => {
     await page.waitForTimeout(1100);
     await navigateToPage(page, 'Callouts & Images');
 
-    const storageData = await page.evaluate(() => {
-      const tesseraKey = Object.keys(localStorage).find((k) =>
-        k.startsWith('tessera-'),
-      );
-      return JSON.parse(localStorage.getItem(tesseraKey!)!);
-    });
+    const storageData = await readSavedState(page);
     expect(storageData).toHaveProperty('d');
     expect(storageData.d).toBeGreaterThanOrEqual(1);
     expect(storageData.b).toBeGreaterThanOrEqual(0);
@@ -187,21 +175,11 @@ test.describe('Persistence — localStorage', () => {
   test('a page restored from the back/forward cache saves again when the learner leaves', async ({
     page,
   }) => {
-    const savedDuration = () =>
-      page.evaluate(() => {
-        const tesseraKey = Object.keys(localStorage).find((k) =>
-          k.startsWith('tessera-'),
-        );
-        return JSON.parse(localStorage.getItem(tesseraKey!)!).d;
-      });
-
     await restoreFromBfcache(page);
-    const restored = await savedDuration();
+    const restored = (await readSavedState(page)).d;
     await page.waitForTimeout(1100);
-    await page.evaluate(() =>
-      window.dispatchEvent(new PageTransitionEvent('pagehide')),
-    );
+    await exitCourse(page);
 
-    expect(await savedDuration()).toBeGreaterThan(restored);
+    expect((await readSavedState(page)).d).toBeGreaterThan(restored);
   });
 });
