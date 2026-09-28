@@ -1,5 +1,5 @@
 import type { Manifest } from '../plugin/manifest.js';
-import type { CourseConfig } from './types.js';
+import { isPageIndex, type CourseConfig } from './types.js';
 import { ProgressState } from './progress.svelte.js';
 import { resolveAccess, type AccessFn } from './access.js';
 
@@ -94,15 +94,14 @@ export class NavigationState {
    */
   prefetch(index: number) {
     if (!this.#pageModules) return;
-    if (index < 0 || index >= this.manifest.totalPages) return;
+    if (!isPageIndex(index, this.manifest.totalPages)) return;
     if (this.isPageLocked(index)) return;
     const page = this.manifest.pages[index];
     void this.#pageModules[page.importPath]?.();
   }
 
   goToPage(index: number) {
-    if (!Number.isInteger(index)) return;
-    if (index < 0 || index >= this.manifest.totalPages) return;
+    if (!isPageIndex(index, this.manifest.totalPages)) return;
     if (this.isPageLocked(index)) return;
     this.currentPageIndex = index;
   }

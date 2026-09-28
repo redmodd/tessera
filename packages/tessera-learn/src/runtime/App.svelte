@@ -250,9 +250,7 @@
     }
     duration = new DurationTracker(saved.d);
     // Navigate to bookmark (after state is restored so locking is correct)
-    if (saved.b > 0 && saved.b < manifest.totalPages) {
-      nav.goToPage(saved.b);
-    }
+    nav.goToPage(saved.b);
   }
 
   function persistState() {

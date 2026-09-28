@@ -644,6 +644,7 @@ describe('useNavigation', () => {
     const h = useNavigation();
     expect(h.canAccessIndex(1)).toBe(true);
     expect(h.canAccessIndex(-1)).toBe(false);
+    expect(h.canAccessIndex(1.5)).toBe(false);
     expect(h.canAccessIndex(ctx.manifest.pages.length)).toBe(false);
 
     ctx.nav.isPageLocked = vi.fn(() => true);

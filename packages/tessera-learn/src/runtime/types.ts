@@ -72,6 +72,10 @@ export function isGradedPage(page: {
   return !!(page.quiz?.graded || page.graded);
 }
 
+export function isPageIndex(index: number, totalPages: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < totalPages;
+}
+
 export function isRequiredGradedPage(page: {
   quiz?: QuizConfig | null;
   graded?: boolean;

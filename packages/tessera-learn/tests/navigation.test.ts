@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
@@ -103,6 +103,28 @@ describe('NavigationState', () => {
     });
   });
 
+  describe('prefetch', () => {
+    it.each([1.5, -1, 5])(
+      'loads nothing for %s, which is not a page',
+      (index) => {
+        const manifest = createManifest(5);
+        const nav = new NavigationState(
+          manifest,
+          new ProgressState(manifest, createConfig()),
+          createConfig(),
+        );
+        const load = vi.fn();
+        nav.setPageModules(
+          Object.fromEntries(manifest.pages.map((p) => [p.importPath, load])),
+        );
+        nav.prefetch(index);
+        expect(load).not.toHaveBeenCalled();
+        nav.prefetch(1);
+        expect(load).toHaveBeenCalledOnce();
+      },
+    );
+  });
+
   describe('canGoPrev', () => {
     it('is false at index 0', () => {
       const nav = new NavigationState(
@@ -189,9 +211,10 @@ describe('NavigationState', () => {
     });
 
     it('is true when current page is visited', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const manifest = createManifest(3);
+      const progress = new ProgressState(manifest, createConfig());
       const nav = new NavigationState(
-        createManifest(3),
+        manifest,
         progress,
         createConfig({ navigation: { mode: 'sequential' } }),
       );
