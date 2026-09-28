@@ -64,6 +64,8 @@ interface CMI5LaunchData {
  * Agent Profile GET.
  */
 export class CMI5Adapter extends BaseXAPILaunchAdapter {
+  static readonly launchParams = ['fetch', 'endpoint', 'activityId', 'actor'];
+
   // cmi5 §10 LMS.LaunchData; `contextTemplate` (§9.6.2) is the base context
   // strict LRSes validate every Defined Statement against.
   #launchData: CMI5LaunchData | null = null;

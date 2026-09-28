@@ -56,6 +56,13 @@ export function scorm2004Api(
   };
 }
 
+/** Stubs `window` as a course iframe whose top-level LMS frame holds `lmsGlobals`. */
+export function stubLmsFrame(lmsGlobals: Record<string, unknown> = {}): void {
+  const lms: Record<string, unknown> = { ...lmsGlobals };
+  lms.parent = lms;
+  vi.stubGlobal('window', { parent: lms });
+}
+
 class StubAdapter extends BaseAdapter {
   async init(): Promise<void> {}
   saveState(): void {}

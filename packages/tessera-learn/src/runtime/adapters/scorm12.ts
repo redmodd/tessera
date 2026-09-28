@@ -7,6 +7,7 @@ import type {
 } from '../persistence.js';
 import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
+import { findLMSAPI } from './retry.js';
 import { STANDARDS } from '../standards.js';
 
 /**
@@ -60,6 +61,12 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: 'passed' | 'failed' | null = null;
+
+  /** Null when no frame in the opener/parent chain exposes `window.API`. */
+  static connect(): SCORM12Adapter | null {
+    const api = findLMSAPI('API') as SCORM12API | null;
+    return api ? new SCORM12Adapter(api) : null;
+  }
 
   constructor(api: SCORM12API) {
     super(api, SCORM12_DIALECT);

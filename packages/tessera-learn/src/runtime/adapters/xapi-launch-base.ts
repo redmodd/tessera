@@ -112,6 +112,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSeq = 0;
   #stateSaved = true;
 
+  /** The adapter for this launch, or null when the LMS did not send every one of `launchParams`. */
+  static connect<T extends BaseXAPILaunchAdapter>(
+    this: (new () => T) & { readonly launchParams: readonly string[] },
+  ): T | null {
+    const params = new URLSearchParams(window.location.search);
+    return this.launchParams.every((p) => params.get(p)) ? new this() : null;
+  }
+
   /**
    * The endpoint and actor are checked before auth so a bad
    * launch fails before a single-use cmi5 fetch token is spent, and auth

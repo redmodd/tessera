@@ -11,6 +11,7 @@ import {
   formatReal107,
   toScaled,
 } from './format.js';
+import { findLMSAPI } from './retry.js';
 import { STANDARDS } from '../standards.js';
 
 export interface SCORM2004API {
@@ -58,6 +59,12 @@ export type SCORM2004Mode = 'browse' | 'normal' | 'review';
 export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
   #exitMode: ExitMode = 'suspend';
+
+  /** Null when no frame in the opener/parent chain exposes `window.API_1484_11`. */
+  static connect(): SCORM2004Adapter | null {
+    const api = findLMSAPI('API_1484_11') as SCORM2004API | null;
+    return api ? new SCORM2004Adapter(api) : null;
+  }
 
   constructor(api: SCORM2004API) {
     super(api, SCORM2004_DIALECT);

@@ -284,9 +284,6 @@ export const LMS_BUILD: Record<
     manifestFile: string;
     generate: ManifestGenerator;
     adapter: string;
-    detect: string;
-    /** SCORM detectors return the API object the constructor needs; cmi5/xAPI ones return a boolean. */
-    takesApi: boolean;
   }
 > = {
   scorm12: {
@@ -304,8 +301,6 @@ export const LMS_BUILD: Record<
         `<adlcp:masteryscore>${formatReal107(score)}</adlcp:masteryscore>`,
     }),
     adapter: 'SCORM12Adapter',
-    detect: 'findSCORM12API',
-    takesApi: true,
   },
   scorm2004: {
     manifestFile: 'imsmanifest.xml',
@@ -330,23 +325,17 @@ export const LMS_BUILD: Record<
         </imsss:sequencing>`,
     }),
     adapter: 'SCORM2004Adapter',
-    detect: 'findSCORM2004API',
-    takesApi: true,
   },
   cmi5: {
     manifestFile: 'cmi5.xml',
     generate: (config, _outDir, hasRequiredGradedPage) =>
       generateCMI5Xml(config, hasRequiredGradedPage),
     adapter: 'CMI5Adapter',
-    detect: 'hasCMI5LaunchParams',
-    takesApi: false,
   },
   xapi: {
     manifestFile: 'tincan.xml',
     generate: (config) => generateTincanXml(config),
     adapter: 'XAPIAdapter',
-    detect: 'hasXAPILaunchParams',
-    takesApi: false,
   },
 };
 

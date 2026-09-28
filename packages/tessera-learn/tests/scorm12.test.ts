@@ -10,9 +10,25 @@ import {
   noDeadline,
   printed,
   scorm12Api,
+  scorm2004Api,
+  stubLmsFrame,
   useFakeTimers,
   valuesUnder,
 } from './helpers.js';
+
+describe('SCORM12Adapter.connect', () => {
+  it('connects to an API on a parent frame', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    await SCORM12Adapter.connect()?.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('returns null when no frame exposes the API', () => {
+    stubLmsFrame({ API_1484_11: scorm2004Api() });
+    expect(SCORM12Adapter.connect()).toBeNull();
+  });
+});
 
 describe('SCORM12Adapter', () => {
   let api: Mocked<SCORM12API>;

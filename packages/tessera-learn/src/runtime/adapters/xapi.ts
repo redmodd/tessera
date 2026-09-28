@@ -6,6 +6,8 @@ import { STANDARDS } from '../standards.js';
  * URL, with no cmi5 fetch-token, LMS.LaunchData or cmi5 context.
  */
 export class XAPIAdapter extends BaseXAPILaunchAdapter {
+  static readonly launchParams = ['endpoint', 'auth', 'actor', 'activity_id'];
+
   protected readonly logName = 'xAPI';
   protected readonly profile = STANDARDS.xapi;
   // Tin Can uses snake_case `activity_id` (NOT cmi5's camelCase `activityId`).

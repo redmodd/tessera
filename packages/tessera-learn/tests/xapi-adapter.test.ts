@@ -7,6 +7,7 @@ import {
   postedStatements,
   requests,
   respond,
+  setLaunchParams,
   setXAPILaunch,
 } from './helpers.js';
 
@@ -35,6 +36,31 @@ const TIN_CAN_ACCOUNT = [
     accountName: ACCOUNT.name,
   },
 ];
+
+describe('XAPIAdapter.connect', () => {
+  it('connects when all params are present', () => {
+    setXAPILaunch();
+    expect(XAPIAdapter.connect()).toBeInstanceOf(XAPIAdapter);
+  });
+
+  it.each(['endpoint', 'auth', 'actor', 'activity_id'])(
+    'returns null when %s is missing',
+    (param) => {
+      setXAPILaunch({ [param]: '' });
+      expect(XAPIAdapter.connect()).toBeNull();
+    },
+  );
+
+  it('returns null for a cmi5 launch, which names the activity activityId', () => {
+    setLaunchParams({
+      endpoint: 'https://lrs.example/xapi',
+      auth: 'Basic Zm9vOmJhcg==',
+      actor: JSON.stringify({ mbox: 'mailto:test@example.com' }),
+      activityId: 'urn:tessera:au:abc',
+    });
+    expect(XAPIAdapter.connect()).toBeNull();
+  });
+});
 
 describe('XAPIAdapter', () => {
   beforeEach(() => {

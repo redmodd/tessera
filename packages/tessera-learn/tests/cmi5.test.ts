@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
-import { hasCMI5LaunchParams } from '../src/runtime/adapters/discovery.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
 import {
@@ -44,24 +43,24 @@ function isRunningStateGet(url: string, options?: RequestInit): boolean {
   );
 }
 
-describe('hasCMI5LaunchParams', () => {
-  it('returns true when all params present', () => {
+describe('CMI5Adapter.connect', () => {
+  it('connects when all params are present', () => {
     setLaunchParams(CMI5_LAUNCH);
-    expect(hasCMI5LaunchParams()).toBe(true);
+    expect(CMI5Adapter.connect()).toBeInstanceOf(CMI5Adapter);
   });
 
   it.each(['fetch', 'endpoint', 'activityId', 'actor'] as const)(
-    'returns false when %s is missing',
+    'returns null when %s is missing',
     (param) => {
       const { [param]: _, ...rest } = CMI5_LAUNCH;
       setLaunchParams(rest);
-      expect(hasCMI5LaunchParams()).toBe(false);
+      expect(CMI5Adapter.connect()).toBeNull();
     },
   );
 
-  it('returns false with empty search', () => {
+  it('returns null with empty search', () => {
     setLaunchParams();
-    expect(hasCMI5LaunchParams()).toBe(false);
+    expect(CMI5Adapter.connect()).toBeNull();
   });
 });
 
