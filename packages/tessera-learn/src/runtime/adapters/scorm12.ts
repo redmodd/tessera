@@ -29,6 +29,8 @@ export interface SCORM12API {
 
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   profile: STANDARDS.scorm12,
+  apiName: 'API',
+  initializeMethod: 'LMSInitialize',
   sessionTimeKey: 'cmi.core.session_time',
   masteryKey: 'cmi.student_data.mastery_score',
   masteryRange: [0, 100],
@@ -66,7 +68,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #successStatus: 'passed' | 'failed' | null = null;
 
   static connect(): SCORM12Adapter | null {
-    const api = findLMSAPI('API');
+    const api = findLMSAPI(SCORM12_DIALECT);
     return api ? new SCORM12Adapter(api) : null;
   }
 

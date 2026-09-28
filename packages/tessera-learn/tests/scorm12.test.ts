@@ -20,7 +20,7 @@ describe('SCORM12Adapter.connect', () => {
   it('connects to an API on a parent frame', async () => {
     const api = scorm12Api();
     stubLmsFrame({ API: api });
-    await SCORM12Adapter.connect()?.init();
+    await SCORM12Adapter.connect()!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -31,7 +31,7 @@ describe('SCORM12Adapter.connect', () => {
     const win: Record<string, unknown> = { opener };
     win.parent = win;
     vi.stubGlobal('window', win);
-    await SCORM12Adapter.connect()?.init();
+    await SCORM12Adapter.connect()!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -52,7 +52,7 @@ describe('SCORM12Adapter.connect', () => {
     const api = scorm12Api();
     stubLmsFrame({ API: api });
     (window as unknown as Record<string, unknown>).API = { id: 'API' };
-    await SCORM12Adapter.connect()?.init();
+    await SCORM12Adapter.connect()!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 

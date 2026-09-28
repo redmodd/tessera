@@ -11,8 +11,6 @@ import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
-import type { SCORM12API } from './scorm12.js';
-import type { SCORM2004API } from './scorm2004.js';
 import {
   httpOrigin,
   largerSuspendDataStandards,
@@ -27,6 +25,8 @@ import {
  */
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
+  apiName: string;
+  initializeMethod: keyof TApi;
   sessionTimeKey: string;
   masteryKey: string;
   masteryRange: readonly [number, number];
@@ -251,32 +251,23 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   abstract override setExit(mode: ExitMode): void;
 }
 
-interface LMSAPIs {
-  API: SCORM12API;
-  API_1484_11: SCORM2004API;
-}
-
-const INITIALIZE_METHOD = {
-  API: 'LMSInitialize',
-  API_1484_11: 'Initialize',
-} as const;
-
 /**
- * Walk the window.opener and window.parent chains looking for an LMS API object.
- * Shared by SCORM 1.2 (property "API") and SCORM 2004 (property "API_1484_11").
+ * Walk the window.opener and window.parent chains looking for the dialect's LMS API object.
  * Returns null if not found within 10 levels or a cross-origin boundary is hit.
  */
-export function findLMSAPI<K extends keyof LMSAPIs>(
-  propName: K,
-): LMSAPIs[K] | null {
-  function scan(win: Window): LMSAPIs[K] | null {
+export function findLMSAPI<TApi>({
+  apiName,
+  initializeMethod,
+}: ScormDialect<TApi>): TApi | null {
+  function scan(win: Window): TApi | null {
     for (let i = 0; i < 10; i++) {
       try {
-        const value = (win as unknown as Record<string, unknown>)[propName];
-        const initialize = (value as Record<string, unknown> | null)?.[
-          INITIALIZE_METHOD[propName]
+        const value = (win as unknown as Record<string, Partial<TApi> | null>)[
+          apiName
         ];
-        if (typeof initialize === 'function') return value as LMSAPIs[K];
+        if (typeof value?.[initializeMethod] === 'function') {
+          return value as TApi;
+        }
       } catch {
         // Cross-origin frame: stop
         return null;

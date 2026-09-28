@@ -30,6 +30,8 @@ export interface SCORM2004API {
 
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
+  apiName: 'API_1484_11',
+  initializeMethod: 'Initialize',
   sessionTimeKey: 'cmi.session_time',
   masteryKey: 'cmi.scaled_passing_score',
   masteryRange: [-1, 1],
@@ -64,7 +66,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #exitMode: ExitMode = 'suspend';
 
   static connect(): SCORM2004Adapter | null {
-    const api = findLMSAPI('API_1484_11');
+    const api = findLMSAPI(SCORM2004_DIALECT);
     return api ? new SCORM2004Adapter(api) : null;
   }
 

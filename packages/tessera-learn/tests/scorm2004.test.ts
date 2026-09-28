@@ -17,7 +17,7 @@ describe('SCORM2004Adapter.connect', () => {
   it('connects to an API on a parent frame', async () => {
     const api = scorm2004Api();
     stubLmsFrame({ API_1484_11: api });
-    await SCORM2004Adapter.connect()?.init();
+    await SCORM2004Adapter.connect()!.init();
     expect(api.Initialize).toHaveBeenCalled();
   });
 
