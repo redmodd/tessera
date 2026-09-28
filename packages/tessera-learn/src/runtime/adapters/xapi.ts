@@ -1,4 +1,5 @@
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import { validateAuthCredential } from '../xapi/agent-rules.js';
 import { STANDARDS } from '../standards.js';
 
 /**
@@ -15,6 +16,11 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   protected async resolveAuth(auth: string): Promise<string> {
     // Tin Can launch passes `auth` as the full "Basic <base64>" header value;
     // strip the scheme so we don't double-prefix it when sending.
-    return auth.replace(/^Basic\s+/i, '');
+    const token = auth.replace(/^Basic\s+/i, '');
+    const invalid = validateAuthCredential(token);
+    if (invalid) {
+      throw new Error(`Tessera xAPI: launch parameter 'auth' ${invalid}`);
+    }
+    return token;
   }
 }

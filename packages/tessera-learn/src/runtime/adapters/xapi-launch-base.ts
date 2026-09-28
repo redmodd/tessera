@@ -116,13 +116,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
     const params = new URLSearchParams(window.location.search);
-    const required = [
-      'endpoint',
-      'actor',
-      adapter.activityIdParam,
-      adapter.authParam,
-    ];
-    return required.every((p) => params.get(p)) ? adapter : null;
+    return adapter.#missingLaunchParam(params) ? null : adapter;
+  }
+
+  #missingLaunchParam(params: URLSearchParams): string | undefined {
+    return ['endpoint', 'actor', this.activityIdParam, this.authParam].find(
+      (p) => !params.get(p),
+    );
   }
 
   /**
@@ -133,6 +133,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    */
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
+    const missing = this.#missingLaunchParam(params);
+    if (missing) {
+      throw new Error(
+        `Tessera ${this.logName}: launch parameter '${missing}' is missing. The LMS did not send a complete launch.`,
+      );
+    }
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
     if (!httpOrigin(this.endpoint)) {
       throw new Error(
@@ -145,13 +151,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#registration = params.get('registration') || undefined;
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
-    const authValue = params.get(this.authParam);
-    if (!authValue) {
-      throw new Error(
-        `Tessera ${this.logName}: launch parameter '${this.authParam}' is missing. The LMS did not send LRS credentials.`,
-      );
-    }
-    this.#authToken = await this.resolveAuth(authValue);
+    this.#authToken = await this.resolveAuth(params.get(this.authParam) || '');
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.#authToken,
