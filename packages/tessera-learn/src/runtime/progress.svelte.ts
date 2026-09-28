@@ -156,14 +156,6 @@ export class ProgressState {
     });
   }
 
-  /** Seed a quiz page from saved state, without counting a new attempt. */
-  #restoreQuiz(pageIndex: number, score: number, attempts: number) {
-    this.#write(pageIndex, {
-      quizScore: score,
-      ...(attempts > 0 ? { attempts } : {}),
-    });
-  }
-
   /** Record the highest chunk index revealed on a page. Only advances forward. */
   markChunk(pageIndex: number, chunkIndex: number) {
     const current = this.chunkProgress.get(pageIndex) ?? -1;
@@ -234,11 +226,6 @@ export class ProgressState {
     } else if (expectedChanged) {
       this.#changed();
     }
-  }
-
-  #restoreUnanswered(pageIndex: number, questionIds: string[]) {
-    this.#unconfirmed.set(pageIndex, new Set(questionIds));
-    if (this.#expect(pageIndex, questionIds, true)) this.#changed();
   }
 
   pageMounted(pageIndex: number) {
@@ -411,9 +398,16 @@ export class ProgressState {
       for (const [key, unit] of Object.entries(saved.g ?? {})) {
         const pageIndex = Number(key);
         if (unit.s !== undefined) {
-          this.#restoreQuiz(pageIndex, unit.s, unit.a ?? 1);
+          const attempts = unit.a ?? 1;
+          this.#write(pageIndex, {
+            quizScore: unit.s,
+            ...(attempts > 0 ? { attempts } : {}),
+          });
         }
-        if (unit.w) this.#restoreUnanswered(pageIndex, unit.w);
+        if (unit.w) {
+          this.#unconfirmed.set(pageIndex, new Set(unit.w));
+          if (this.#expect(pageIndex, unit.w, true)) this.#changed();
+        }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
           const [score, weight, graded] = Array.isArray(entry)
             ? entry
