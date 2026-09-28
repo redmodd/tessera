@@ -125,6 +125,16 @@ export async function exitCourse(page: Page): Promise<void> {
   });
 }
 
+/** The web adapter's saved state from localStorage, or null before the first save. */
+export async function readSavedState(page: Page): Promise<any> {
+  return page.evaluate(() => {
+    const tesseraKey = Object.keys(localStorage).find((k) =>
+      k.startsWith('tessera-'),
+    );
+    return tesseraKey ? JSON.parse(localStorage.getItem(tesseraKey)!) : null;
+  });
+}
+
 /** Send the page through a back/forward cache round trip, as leaving and pressing Back does. */
 export async function restoreFromBfcache(page: Page): Promise<void> {
   await page.evaluate(() => {

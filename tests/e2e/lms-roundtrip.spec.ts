@@ -241,7 +241,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     page,
   }) => {
     await page.goto(BASE);
-    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
 
     await restoreFromBfcache(page);
 
@@ -454,7 +454,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     page,
   }) => {
     await page.goto(BASE);
-    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
 
     await restoreFromBfcache(page);
 
@@ -865,7 +865,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await routeLRS(page, statements, []);
 
     await page.goto(xapiLaunchURL(BASE));
-    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
 
     await restoreFromBfcache(page);
 

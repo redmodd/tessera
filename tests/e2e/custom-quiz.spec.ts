@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { waitForTesseraContent } from './helpers.js';
+import { readSavedState, waitForTesseraContent } from './helpers.js';
 
 /**
  * End-to-end fixture for Phase 5 Task 2 — proves a project-supplied
@@ -127,12 +127,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     // The web adapter writes serialized state to localStorage. Read it back
     // and verify the quiz score made it into the saved state — the same code
     // path SCORM/cmi5 adapters take, just routed through a different sink.
-    const saved = await page.evaluate(() => {
-      const raw = Object.entries(localStorage).find(([k]) =>
-        k.startsWith('tessera-'),
-      )?.[1];
-      return raw ? JSON.parse(raw) : null;
-    });
+    const saved = await readSavedState(page);
     expect(saved).not.toBeNull();
     // g is the graded-unit map keyed by page index; the exam page is index 1.
     expect(saved.g['1'].s).toBe(100);

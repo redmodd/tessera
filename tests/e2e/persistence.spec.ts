@@ -1,19 +1,12 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   answerMatching,
   exitCourse,
   navigateToPage,
+  readSavedState,
   restoreFromBfcache,
   waitForTesseraContent,
 } from './helpers.js';
-
-const readSavedState = (page: Page) =>
-  page.evaluate(() => {
-    const tesseraKey = Object.keys(localStorage).find((k) =>
-      k.startsWith('tessera-'),
-    );
-    return tesseraKey ? JSON.parse(localStorage.getItem(tesseraKey)!) : null;
-  });
 
 test.describe('Persistence — localStorage', () => {
   test.beforeEach(async ({ page }) => {
@@ -175,6 +168,7 @@ test.describe('Persistence — localStorage', () => {
   test('a page restored from the back/forward cache saves again when the learner leaves', async ({
     page,
   }) => {
+    await expect(page.locator('.tessera-content h1')).toBeVisible();
     await restoreFromBfcache(page);
     const restored = (await readSavedState(page)).d;
     await page.waitForTimeout(1100);
