@@ -244,13 +244,10 @@
   }
 
   function restoreState(saved) {
-    if (!saved) return;
     progress.restoreFrom(saved);
-    // Restore user-scoped state from usePersistence (absent on older saves)
     if (saved.u && typeof saved.u === 'object') {
       userState = { ...userState, ...saved.u };
     }
-    // Restore duration
     duration = new DurationTracker(saved.d);
     // Navigate to bookmark (after state is restored so locking is correct)
     if (saved.b > 0 && saved.b < manifest.totalPages) {
