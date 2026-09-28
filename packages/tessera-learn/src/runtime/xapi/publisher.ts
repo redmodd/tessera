@@ -465,6 +465,10 @@ export class XAPIPublisher {
     this.#unloading = true;
   }
 
+  markRestored(): void {
+    this.#unloading = false;
+  }
+
   /** Whether the publisher is in unloading mode (for tests). */
   isUnloading(): boolean {
     return this.#unloading;

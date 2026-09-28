@@ -445,7 +445,19 @@
   }
 
   function handlePageshow(event) {
-    if (event.persisted && adapter.connected) exitPhase = 'ended';
+    if (!event.persisted) return;
+    if (adapter.connected) {
+      leaveCourse('ended');
+      return;
+    }
+    terminated = false;
+    xapiClient?.markRestored();
+  }
+
+  function leaveCourse(phase) {
+    exitPhase = phase;
+    loadGeneration++;
+    pageLoading = false;
   }
 
   let unmountCourse;
@@ -453,20 +465,17 @@
 
   async function exit() {
     if (!canExit) return;
-    exitPhase = 'ending';
-    loadGeneration++;
-    pageLoading = false;
+    leaveCourse('ending');
     const deadline = new Promise((resolve) =>
       setTimeout(resolve, EXIT_TIMEOUT_MS),
     );
     await Promise.race([courseUnmounted, deadline]);
     await xapiClient?.flush(deadline);
-    const returned =
-      endSession() &&
-      (await adapter.exit(deadline).catch((err) => {
-        console.warn('Tessera: exit failed', err);
-        return false;
-      }));
+    if (!endSession()) return;
+    const returned = await adapter.exit(deadline).catch((err) => {
+      console.warn('Tessera: exit failed', err);
+      return false;
+    });
     exitPhase = 'ended';
     if (!returned) window.close();
   }

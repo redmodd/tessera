@@ -87,10 +87,13 @@ function confirmExit() {
   dialogButton('Exit course').click();
 }
 
-function restoreFromBfcache() {
+function enterBfcache() {
   window.dispatchEvent(
     new PageTransitionEvent('pagehide', { persisted: true }),
   );
+}
+
+function restoreFromBfcache() {
   window.dispatchEvent(
     new PageTransitionEvent('pageshow', { persisted: true }),
   );
@@ -360,7 +363,9 @@ describe('exiting a course', () => {
     const drained = Promise.withResolvers<void>();
     const flush = vi.fn(() => drained.promise);
     const { adapter, calls } = recordingAdapter();
-    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+    await mount(adapter, {
+      xapiClient: { markUnloading() {}, markRestored() {}, flush },
+    });
     const launched = calls.length;
 
     confirmExit();
@@ -377,7 +382,9 @@ describe('exiting a course', () => {
     const flush = vi.fn(async (_deadline: Promise<unknown>) => {});
     const exit = vi.fn(async () => false);
     const { adapter } = recordingAdapter({ exit });
-    await mount(adapter, { xapiClient: { markUnloading() {}, flush } });
+    await mount(adapter, {
+      xapiClient: { markUnloading() {}, markRestored() {}, flush },
+    });
 
     confirmExit();
 
@@ -391,7 +398,7 @@ describe('exiting a course', () => {
     const { adapter } = recordingAdapter();
     await mount(adapter, {
       loadLayout: masteryLayout,
-      xapiClient: { markUnloading, flush: async () => {} },
+      xapiClient: { markUnloading, markRestored() {}, flush: async () => {} },
     });
 
     await navCtx().exit();
@@ -414,18 +421,67 @@ describe('exiting a course', () => {
   it('ends a session restored from the back/forward cache after pagehide', async () => {
     const { adapter, calls } = recordingAdapter();
     await mount(adapter);
+    enterBfcache();
+    const hidden = calls.length;
     restoreFromBfcache();
-    const restored = calls.length;
     await flush();
 
     expect(document.body.textContent).toContain('Session ended');
     expect(document.body.textContent).not.toContain('Test page');
-    expect(calls.slice(restored)).toEqual([]);
+    expect(calls.slice(hidden)).toEqual([]);
+  });
+
+  it('drops a page that finishes loading after a back/forward cache restore', async () => {
+    let release!: () => void;
+    const page = () => import('./fixtures/app-page.svelte');
+    let loads = 0;
+    const loadPage = () =>
+      loads++ === 0
+        ? page()
+        : new Promise((resolve) => (release = () => resolve(page())));
+    const { adapter } = recordingAdapter();
+    await mount(adapter, { loadLayout: masteryLayout, loadPage });
+
+    navCtx().nav.goToPage(1);
+    await flush();
+    enterBfcache();
+    restoreFromBfcache();
+    release();
+    await flush();
+
+    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
+  });
+
+  it('leaves the window open when a back/forward cache restore interrupts the exit', async () => {
+    const drained = Promise.withResolvers<void>();
+    const exit = vi.fn();
+    const { adapter } = recordingAdapter({ exit });
+    await mount(adapter, {
+      xapiClient: {
+        markUnloading() {},
+        markRestored() {},
+        flush: () => drained.promise,
+      },
+    });
+
+    confirmExit();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Ending session'),
+    );
+    enterBfcache();
+    restoreFromBfcache();
+    drained.resolve();
+    await flush();
+
+    expect(document.body.textContent).toContain('Session ended');
+    expect(exit).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
     await mount(adapter, { loadLayout: masteryLayout });
+    enterBfcache();
     restoreFromBfcache();
     const restored = calls.length;
 
@@ -434,6 +490,31 @@ describe('exiting a course', () => {
 
     expect(document.body.textContent).not.toContain('Session ended');
     expect(calls.slice(restored)).toContain('saveState');
+  });
+
+  it('ends the session again on the next pagehide after a restore without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter);
+    enterBfcache();
+    restoreFromBfcache();
+    const restored = calls.length;
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(calls.slice(restored)).toEqual(EXIT_SEQUENCE);
+  });
+
+  it('takes xAPI sends out of keepalive when a course without an LMS is restored', async () => {
+    const markRestored = vi.fn();
+    const { adapter } = recordingAdapter({ connected: false });
+    await mount(adapter, {
+      xapiClient: { markUnloading() {}, markRestored, flush: async () => {} },
+    });
+
+    enterBfcache();
+    restoreFromBfcache();
+
+    expect(markRestored).toHaveBeenCalled();
   });
 
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {

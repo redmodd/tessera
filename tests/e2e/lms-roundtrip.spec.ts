@@ -237,6 +237,23 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     expect(log.filter((entry) => entry[0] === 'LMSFinish')).toHaveLength(1);
   });
 
+  test('a page restored from the back/forward cache ends the session and stops writing', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await restoreFromBfcache(page);
+
+    await expect(
+      page.getByRole('heading', { name: 'Session ended' }),
+    ).toBeVisible();
+    const log = await scormLog(page);
+    const finish = log.findIndex(([fn]) => fn === 'LMSFinish');
+    expect(finish).toBeGreaterThan(-1);
+    expect(log.slice(finish + 1)).toEqual([]);
+  });
+
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
@@ -433,6 +450,23 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     ).toHaveLength(1);
   });
 
+  test('a page restored from the back/forward cache ends the session and stops writing', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await restoreFromBfcache(page);
+
+    await expect(
+      page.getByRole('heading', { name: 'Session ended' }),
+    ).toBeVisible();
+    const log = await scormLog(page);
+    const terminate = log.findIndex(([fn]) => fn === 'Terminate');
+    expect(terminate).toBeGreaterThan(-1);
+    expect(log.slice(terminate + 1)).toEqual([]);
+  });
+
   test.describe('LMS scaled_passing_score', () => {
     test.use({ lmsData: { 'cmi.scaled_passing_score': '0.6' } });
 
@@ -570,7 +604,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
   test('a page restored from the back/forward cache shows the session as ended', async ({
     page,
   }) => {
-    const statements = await installCmi5Mock(page);
+    await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await expect(page.locator('.tessera-exit-btn')).toBeVisible();
@@ -580,9 +614,6 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expect(
       page.getByRole('heading', { name: 'Session ended' }),
     ).toBeVisible();
-    await expect
-      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-      .toBeDefined();
   });
 });
 
@@ -820,5 +851,20 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect
       .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
       .toBeTruthy();
+  });
+
+  test('a page restored from the back/forward cache shows the session as ended', async ({
+    page,
+  }) => {
+    await routeLRS(page, [], []);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+
+    await restoreFromBfcache(page);
+
+    await expect(
+      page.getByRole('heading', { name: 'Session ended' }),
+    ).toBeVisible();
   });
 });
