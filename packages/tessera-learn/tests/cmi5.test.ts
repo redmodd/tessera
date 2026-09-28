@@ -1144,7 +1144,9 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       await expect(
         initAdapter({ token: '{"auth-token": "Basic dGVzdA=="}' }),
-      ).rejects.toThrow(/fetch token must be the Basic credential value only/);
+      ).rejects.toThrow(
+        /launch parameter 'fetch' must be the Basic credential value only/,
+      );
       expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
         CMI5_LAUNCH.fetch,
       ]);

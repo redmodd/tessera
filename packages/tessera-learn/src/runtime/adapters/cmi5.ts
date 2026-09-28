@@ -1,7 +1,6 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
-import { validateAuthCredential } from '../xapi/agent-rules.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
@@ -137,10 +136,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       throw new Error(
         'Tessera cmi5: fetch token request returned an empty token. Expected a JSON body of the form {"auth-token": "..."}.',
       );
-    }
-    const invalid = validateAuthCredential(token);
-    if (invalid) {
-      throw new Error(`Tessera cmi5: fetch token ${invalid}`);
     }
     return token;
   }

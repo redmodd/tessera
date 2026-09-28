@@ -11,7 +11,11 @@ import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
-import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
+import {
+  validateAgent,
+  validateAuthCredential,
+  joinFieldError,
+} from '../xapi/agent-rules.js';
 import type {
   XAPIAgent,
   PartialStatement,
@@ -146,6 +150,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const actor = this.#parseActorParam(params.get('actor') || '');
     this.actor = actor;
     this.#authToken = await this.resolveAuth(params.get(this.authParam) || '');
+    const invalidAuth = validateAuthCredential(this.#authToken);
+    if (invalidAuth) {
+      throw new Error(
+        `Tessera ${this.logName}: credential from launch parameter '${this.authParam}' ${invalidAuth}`,
+      );
+    }
     const publisher = new XAPIPublisher({
       endpoint: this.endpoint,
       auth: this.#authToken,
@@ -159,7 +169,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#sendInitialized();
   }
 
-  /** The Basic credential (without the scheme) for every LRS request, from the `authParam` launch value. */
+  /** The Basic credential (without the scheme) for every LRS request, from the `authParam` launch value. `init()` validates it. */
   protected abstract resolveAuth(value: string): Promise<string>;
 
   /** Profile launch requests that must precede Initialized; returns the profile's publisher options. */
@@ -446,9 +456,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     options: RequestInit = {},
   ): Promise<Response> {
     const headers = new Headers(options.headers);
-    if (this.#authToken) {
-      headers.set('Authorization', `Basic ${this.#authToken}`);
-    }
+    headers.set('Authorization', `Basic ${this.#authToken}`);
     headers.set('X-Experience-API-Version', X_API_VERSION);
     const keepalive = this.publisher?.isUnloading() ?? false;
     return fetch(url, {
