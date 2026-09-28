@@ -217,7 +217,7 @@ describe('ProgressState', () => {
       expect(saved).toMatchObject({ m: 1 });
 
       const restored = roundTrip(progress);
-      expect(restored.manuallyCompleted).toBe(true);
+      expect(restored.completionStatus).toBe('complete');
       expect(restored.toSaved()).toEqual(saved);
     });
 

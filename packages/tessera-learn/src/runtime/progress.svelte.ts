@@ -122,10 +122,6 @@ export class ProgressState {
    */
   version = $state(0);
 
-  get manuallyCompleted(): boolean {
-    return this.#manuallyCompleted;
-  }
-
   get passingScore(): number {
     return this.#config.scoring.passingScore;
   }
