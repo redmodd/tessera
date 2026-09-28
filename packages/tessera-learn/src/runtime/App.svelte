@@ -448,13 +448,13 @@
 
   function handlePageshow(event) {
     if (!terminated || !event.persisted) return;
+    xapiClient?.markRestored();
     if (adapter.connected) {
       leaveCourse('ended');
       return;
     }
     terminated = false;
     duration.resume();
-    xapiClient?.markRestored();
   }
 
   function leaveCourse(phase) {

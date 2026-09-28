@@ -556,16 +556,22 @@ describe('exiting a course', () => {
     expect(saved.at(-1)!.d).toBe(15);
   });
 
-  it('takes xAPI sends out of keepalive when a course without an LMS is restored', async () => {
-    const markRestored = vi.fn();
-    const { adapter } = recordingAdapter({ connected: false });
-    await mount(adapter, { xapiClient: xapiClient({ markRestored }) });
+  it.each([
+    ['under an LMS', true],
+    ['without an LMS', false],
+  ])(
+    'takes xAPI sends out of keepalive when a course %s is restored',
+    async (_, connected) => {
+      const markRestored = vi.fn();
+      const { adapter } = recordingAdapter({ connected });
+      await mount(adapter, { xapiClient: xapiClient({ markRestored }) });
 
-    enterBfcache();
-    restoreFromBfcache();
+      enterBfcache();
+      restoreFromBfcache();
 
-    expect(markRestored).toHaveBeenCalled();
-  });
+      expect(markRestored).toHaveBeenCalled();
+    },
+  );
 
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {
     const returnToLMS = vi.fn(() => true);
