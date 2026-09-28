@@ -47,6 +47,19 @@ describe('SCORM12Adapter.connect', () => {
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
+  it("prefers an API on the course's frame chain over the opener's", async () => {
+    const api = scorm12Api();
+    const openerApi = scorm12Api();
+    const opener: Record<string, unknown> = { API: openerApi };
+    opener.parent = opener;
+    const popup: Record<string, unknown> = { API: api, opener };
+    popup.parent = popup;
+    vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+    expect(openerApi.LMSInitialize).not.toHaveBeenCalled();
+  });
+
   it('skips a cross-origin frame named like the API', async () => {
     const api = scorm12Api();
     stubLmsFrame({ API: api });
@@ -59,8 +72,9 @@ describe('SCORM12Adapter.connect', () => {
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
-  it('stops at a cross-origin frame', () => {
-    const lms: Record<string, unknown> = { API: scorm12Api() };
+  it('climbs past a cross-origin frame', async () => {
+    const api = scorm12Api();
+    const lms: Record<string, unknown> = { API: api };
     lms.parent = lms;
     const crossOrigin = {
       parent: lms,
@@ -69,7 +83,8 @@ describe('SCORM12Adapter.connect', () => {
       },
     };
     vi.stubGlobal('window', { parent: crossOrigin });
-    expect(SCORM12Adapter.connect()).toBeNull();
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
   it('skips a same-named global that is not the API', async () => {
