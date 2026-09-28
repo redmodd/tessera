@@ -4,14 +4,17 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
+import {
+  BaseScormAdapter,
+  findLMSAPI,
+  type ScormDialect,
+} from './scorm-base.js';
 import {
   formatISO8601Duration,
   formatISO8601Timestamp,
   formatReal107,
   toScaled,
 } from './format.js';
-import { findLMSAPI } from './retry.js';
 import { STANDARDS } from '../standards.js';
 
 export interface SCORM2004API {

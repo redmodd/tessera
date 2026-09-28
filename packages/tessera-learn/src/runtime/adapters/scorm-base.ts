@@ -248,3 +248,39 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   abstract override setSuccessStatus(status: SuccessStatus): void;
   abstract override setExit(mode: ExitMode): void;
 }
+
+/**
+ * Walk the window.opener and window.parent chains looking for an LMS API object.
+ * Shared by SCORM 1.2 (property "API") and SCORM 2004 (property "API_1484_11").
+ * Returns null if not found within 10 levels or a cross-origin boundary is hit.
+ */
+export function findLMSAPI(propName: string): unknown {
+  function scan(win: Window): unknown {
+    for (let i = 0; i < 10; i++) {
+      try {
+        const value = (win as unknown as Record<string, unknown>)[propName];
+        if (value) return value;
+      } catch {
+        // Cross-origin frame — stop
+        return null;
+      }
+      if (win.parent === win) break;
+      try {
+        win = win.parent;
+      } catch {
+        // Cross-origin frame — stop
+        break;
+      }
+    }
+    return null;
+  }
+
+  // Check window.opener chain first (popup launch pattern)
+  if (window.opener) {
+    const api = scan(window.opener as Window);
+    if (api) return api;
+  }
+
+  // Check window.parent chain (iframe launch pattern)
+  return scan(window);
+}

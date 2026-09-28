@@ -5,9 +5,12 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import { BaseScormAdapter, type ScormDialect } from './scorm-base.js';
+import {
+  BaseScormAdapter,
+  findLMSAPI,
+  type ScormDialect,
+} from './scorm-base.js';
 import { formatHHMMSS, formatReal107 } from './format.js';
-import { findLMSAPI } from './retry.js';
 import { STANDARDS } from '../standards.js';
 
 /**
