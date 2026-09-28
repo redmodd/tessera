@@ -91,10 +91,19 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
         v: [0, 3, 1.5, -1],
-        c: { 3: 1, x: 2 },
-        g: { 3: { s: 90 }, NaN: { q: { q1: 100 } } },
+        c: { 3: 1, x: 2, '': 1, '1e0': 1 },
+        g: { 3: { s: 90 }, NaN: { q: { q1: 100 } }, ' ': { s: 90 } },
       });
       expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
+    it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: [],
+        g: { 0: { q: { q1: [80, 1, 7] as never } } },
+      });
+      expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
     });
   });
 
