@@ -163,6 +163,12 @@ describe('ProgressState', () => {
       return restored;
     };
 
+    it('skips a null chunk or graded record, which the resume gate lets through', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.restoreFrom({ v: [0], c: null, g: null } as never);
+      expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
     it('saves nothing but an empty visited list for fresh progress', () => {
       const progress = new ProgressState(manifest, config);
       expect(progress.toSaved()).toEqual({ v: [] });

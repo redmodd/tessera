@@ -391,17 +391,21 @@ export class ProgressState {
    * latches. A saved pass the course can no longer give is dropped.
    */
   restoreFrom(saved: SavedProgress): void {
-    const isPage = (key: string) =>
-      String(Number(key)) === key && isPageIndex(Number(key), this.#totalPages);
+    const pageEntries = <T>(record?: Record<string, T>) =>
+      Object.entries(record ?? {}).flatMap(([key, value]) => {
+        const pageIndex = Number(key);
+        return String(pageIndex) === key &&
+          isPageIndex(pageIndex, this.#totalPages)
+          ? [[pageIndex, value] as const]
+          : [];
+      });
     this.#replaying = true;
     try {
       for (const idx of saved.v) this.markVisited(idx);
-      for (const [key, chunkIndex] of Object.entries(saved.c ?? {})) {
-        if (isPage(key)) this.markChunk(Number(key), chunkIndex);
+      for (const [pageIndex, chunkIndex] of pageEntries(saved.c)) {
+        this.markChunk(pageIndex, chunkIndex);
       }
-      for (const [key, unit] of Object.entries(saved.g ?? {})) {
-        if (!isPage(key)) continue;
-        const pageIndex = Number(key);
+      for (const [pageIndex, unit] of pageEntries(saved.g)) {
         if (unit.s !== undefined) {
           const attempts = unit.a ?? 1;
           this.#write(pageIndex, {
