@@ -7,6 +7,7 @@ import type { SavedState } from '../src/runtime/persistence.js';
 import { validateAgent } from '../src/runtime/xapi/validation.js';
 import {
   flush,
+  noDeadline,
   printed,
   scorm12Api,
   useFakeTimers,
@@ -288,6 +289,26 @@ describe('SCORM12Adapter', () => {
     adapter.terminate();
     adapter.terminate();
     expect(api.LMSFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('exit finishes the session without leaving the page', async () => {
+    await adapter.init();
+    expect(await adapter.exit(noDeadline)).toBe(false);
+    expect(api.LMSFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops writes after LMSFinish', async () => {
+    await adapter.init();
+    adapter.terminate();
+    api.LMSSetValue.mockClear();
+    api.LMSCommit.mockClear();
+
+    adapter.setCompletionStatus('complete');
+    adapter.commit();
+    await flush();
+
+    expect(api.LMSSetValue).not.toHaveBeenCalled();
+    expect(api.LMSCommit).not.toHaveBeenCalled();
   });
 
   // ---- queue ----

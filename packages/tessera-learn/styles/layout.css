@@ -46,6 +46,45 @@
   padding: var(--tessera-spacing-md) 0;
 }
 
+.tessera-sidebar-footer {
+  padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+  border-top: 1px solid var(--tessera-border);
+  flex-shrink: 0;
+}
+
+.tessera-exit-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.tessera-exit-dialog {
+  max-width: 400px;
+  width: calc(100% - 2 * var(--tessera-spacing-md));
+  margin: auto;
+  padding: var(--tessera-spacing-xl);
+  color: var(--tessera-text);
+  background: var(--tessera-bg);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.tessera-exit-dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.tessera-exit-dialog h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.tessera-exit-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tessera-spacing-sm);
+  margin-top: var(--tessera-spacing-lg);
+}
+
 /* Sidebar section */
 .tessera-nav-section {
   margin-bottom: var(--tessera-spacing-sm);
@@ -357,8 +396,9 @@
   cursor: not-allowed;
 }
 
-/* ---- Error Page ---- */
-.tessera-error {
+/* ---- Error Page / Session Ended ---- */
+.tessera-error,
+.tessera-session-ended {
   text-align: center;
   padding: var(--tessera-spacing-xl) var(--tessera-spacing-md);
 }
@@ -368,7 +408,8 @@
   margin-bottom: var(--tessera-spacing-md);
 }
 
-.tessera-error p {
+.tessera-error p,
+.tessera-session-ended p {
   color: var(--tessera-text-light);
   margin-bottom: var(--tessera-spacing-lg);
 }

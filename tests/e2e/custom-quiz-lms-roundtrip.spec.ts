@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
+  installCmi5Mock,
   installScorm12Mock,
   installScorm2004Mock,
   cmi5LaunchURL,
@@ -189,37 +190,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
   test('Custom quiz emits xAPI Scored and per-question Answered statements, holding Passed for completion', async ({
     page,
   }) => {
-    const statements: any[] = [];
-    await page.route('http://cmi5-mock.test/**', async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (url.endsWith('/fetch')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'text/plain',
-          body: 'auth-token=test-token-abc',
-        });
-        return;
-      }
-      if (url.includes('/xapi/statements')) {
-        if (req.method() === 'POST' || req.method() === 'PUT') {
-          try {
-            statements.push(JSON.parse(req.postData() ?? '{}'));
-          } catch {}
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['stmt-id']),
-        });
-        return;
-      }
-      if (url.includes('/xapi/activities/state')) {
-        await route.fulfill({ status: 404, body: '{}' });
-        return;
-      }
-      await route.fulfill({ status: 200, body: '{}' });
-    });
+    const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await answerCustomQuizCorrectly(page);

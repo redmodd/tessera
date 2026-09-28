@@ -105,6 +105,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected returnURL: string | undefined;
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
+  #stateSaved = true;
 
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
@@ -138,10 +139,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (this.stateLoadFailed) return;
     this.state = state;
     if (!this.publisher) return;
-    void this.publisher.chainTask(() => this.#putState(state));
+    void this.publisher.chainTask(async () => {
+      this.#stateSaved = await this.#putState(state);
+    });
   }
 
-  async #putState(state: SavedState, stateId?: string): Promise<void> {
+  async #putState(state: SavedState, stateId?: string): Promise<boolean> {
     try {
       const resp = await this.xapiFetch(this.buildStateUrl(stateId), {
         method: 'PUT',
@@ -153,8 +156,10 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
           `Tessera ${this.logName}: State API PUT returned ${resp.status}; learner progress did not persist.`,
         );
       }
+      return resp.ok;
     } catch (err) {
       console.warn(`Tessera ${this.logName}: Failed to save state`, err);
+      return false;
     }
   }
 
@@ -267,12 +272,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  override terminate(): void {
+  override terminate(unloading = true): void {
     if (this.terminated) return;
     this.terminated = true;
     if (!this.publisher) return;
-    this.publisher.markUnloading();
-    if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
+    if (unloading) {
+      this.publisher.markUnloading();
+      if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
+    }
     const duration = formatISO8601Duration(this.durationSeconds);
     this.#finalSend = this.#report(
       'Terminated',
@@ -284,13 +291,19 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     );
   }
 
-  async exit(): Promise<void> {
-    if (!this.terminated) await this.publisher?.chainTask(async () => {});
-    this.terminate();
-    await this.#finalSend;
-    if (this.returnURL && typeof window !== 'undefined') {
-      window.location.assign(this.returnURL);
+  override async exit(deadline: Promise<unknown>): Promise<boolean> {
+    const settles = (task: Promise<unknown>) =>
+      Promise.race([task.then(() => true), deadline.then(() => false)]);
+    if (!this.terminated) {
+      const saved =
+        !this.publisher ||
+        ((await settles(this.publisher.drained())) && this.#stateSaved);
+      this.terminate(!saved);
     }
+    if (this.#finalSend) await settles(this.#finalSend);
+    if (!this.returnURL || typeof window === 'undefined') return false;
+    window.location.assign(this.returnURL);
+    return true;
   }
 
   /** Parse the launch `actor` param into an Identified Agent, failing loud on malformed JSON. */

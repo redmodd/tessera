@@ -972,7 +972,7 @@ function useCompletion(): {
 
 ### `usePersistence<T>(key)`
 
-Per-widget persistent state, JSON-serializable only. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Mind the SCORM 1.2 ~4 KB suspend-data cap (see [LMS behaviour](#lms-behaviour)).
+Per-widget persistent state, JSON-serializable only: a value that isn't (a `BigInt`, a cycle) lasts the session but is left out of the save, with a console warning. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Mind the SCORM 1.2 ~4 KB suspend-data cap (see [LMS behaviour](#lms-behaviour)).
 
 ```ts
 function usePersistence<T>(key: string): {
@@ -985,13 +985,38 @@ Usage in [Recipe 1](#recipe-1-custom-draw-a-line-question) (persists partial pro
 
 ### `useCourse`
 
-Course identity from `course.config.js`, for layouts and headers. Use it instead of importing the config file.
+Course identity from `course.config.js`, for layouts and headers, and the session's exit. Use it instead of importing the config file.
 
 ```ts
 function useCourse(): {
   readonly title: string;
   readonly logo: string | undefined; // branding.logo with $assets/ resolved, ready for <img src>; undefined when unset or empty
+  readonly canExit: boolean; // true under an LMS once the launch finishes, until the session ends; false on the web
+  exit(): Promise<void>;
 };
+```
+
+`exit()`:
+
+- Saves progress and ends the LMS session. Does nothing while `canExit` is false.
+- Sends the learner to the cmi5 `returnURL` when there is one; otherwise shows a "Session ended" screen.
+- Does not confirm, and the session cannot resume. The default layout's **Exit course** button confirms first; a custom layout must confirm in a `<dialog>`, never `window.confirm()` (sandboxed LMS iframes make it return false without asking).
+
+```svelte
+<script>
+  import { useCourse } from 'tessera-learn';
+  const course = useCourse();
+  let confirmExit = $state();
+</script>
+
+{#if course.canExit}
+  <button onclick={() => confirmExit.showModal()}>Exit course</button>
+  <dialog bind:this={confirmExit} aria-label="Exit the course?">
+    <p>Exit the course? Your progress will be saved.</p>
+    <button onclick={() => confirmExit.close()}>Cancel</button>
+    <button onclick={() => course.exit()}>Exit course</button>
+  </dialog>
+{/if}
 ```
 
 ### `isCorrect(interaction)`
@@ -1152,6 +1177,8 @@ Drop `layout.svelte` at the project root to replace the default chrome. The cont
   <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next</button>
 </footer>
 ```
+
+A custom layout gets no Exit button; add one with [`useCourse()`](#usecourse).
 
 To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` and compose around it.
 

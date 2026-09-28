@@ -8,6 +8,7 @@
   import { onMount, onDestroy, tick, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
+  import SessionEnded from './SessionEnded.svelte';
   import PageHost from './PageHost.svelte';
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
@@ -36,9 +37,10 @@
   const adapter = createAdapter(config, { manifest });
   const currentFingerprint = structureFingerprint(manifest);
   let persistenceReady = $state(false);
-  // Holds the resolved xAPI client for unload-time markUnloading. Set
-  // after adapter.init() resolves and registered globally so useXAPI()
-  // can reach it.
+  let launched = $state(false);
+  // Holds the resolved xAPI client for the exit flush and unload-time
+  // markUnloading. Set after adapter.init() resolves and registered globally
+  // so useXAPI() can reach it.
   let xapiClient = null;
 
   // ---- State classes ----
@@ -96,7 +98,16 @@
   // ---- Navigation context (read by custom chrome components) ----
   // Exposes nav/manifest/progress/config so courses can build custom top bars,
   // menus, tables of contents, etc. that can navigate to specific pages.
-  setNavContext({ nav, manifest, progress, config });
+  setNavContext({
+    nav,
+    manifest,
+    progress,
+    config,
+    get canExit() {
+      return canExit;
+    },
+    exit,
+  });
 
   // ---- Adapter context (read by useQuestion / useQuiz) ----
   setAdapterContext({
@@ -201,6 +212,26 @@
   }
 
   // ---- Persistence: serialize / restore ----
+  const unsavableKeys = new Set();
+
+  function savableUserState() {
+    const u = {};
+    for (const [key, value] of Object.entries(userState)) {
+      try {
+        JSON.stringify(value);
+        u[key] = value;
+      } catch (err) {
+        if (unsavableKeys.has(key)) continue;
+        unsavableKeys.add(key);
+        console.warn(
+          `Tessera: usePersistence('${key}') holds a value that is not JSON-serializable; it is left out of the save`,
+          err,
+        );
+      }
+    }
+    return u;
+  }
+
   function serializeState() {
     const c = {};
     for (const [pageIndex, chunkIndex] of progress.chunkProgress) {
@@ -223,6 +254,7 @@
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[String(pageIndex)] = entry;
     }
+    const u = savableUserState();
     return {
       b: nav.currentPageIndex,
       f: currentFingerprint,
@@ -230,7 +262,7 @@
       d: duration.totalSeconds,
       ...(Object.keys(g).length > 0 ? { g } : {}),
       ...(progress.chunkProgress.size > 0 ? { c } : {}),
-      ...(Object.keys(userState).length > 0 ? { u: { ...userState } } : {}),
+      ...(Object.keys(u).length > 0 ? { u } : {}),
       ...(progress.manuallyCompleted ? { m: 1 } : {}),
       ...(progress.gradedScoreDecided ? { s: 1 } : {}),
       ...(progress.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
@@ -293,7 +325,7 @@
   }
 
   function persistState() {
-    if (!persistenceReady) return;
+    if (!persistenceReady || exitPhase) return;
     adapter.saveState(serializeState());
   }
 
@@ -383,11 +415,16 @@
   });
 
   // ---- Exit / Terminate lifecycle ----
-  let terminated = false;
+  const EXIT_TIMEOUT_MS = 10_000;
+  let terminated = $state(false);
+  let exitPhase = $state(null);
   let manualWatchdog = null;
+  const canExit = $derived(
+    adapter.connected && launched && !terminated && !exitPhase,
+  );
 
-  function handleExit() {
-    if (terminated) return;
+  function endSession() {
+    if (terminated) return false;
     terminated = true;
     adapter.saveState(serializeState());
     adapter.setDuration(duration.sessionSeconds);
@@ -398,8 +435,36 @@
       progress.reportedCompletionStatus === 'complete' ? 'normal' : 'suspend',
     );
     adapter.commit();
+    return true;
+  }
+
+  function handlePagehide() {
+    endSession();
     xapiClient?.markUnloading();
     adapter.terminate();
+  }
+
+  let unmountCourse;
+  const courseUnmounted = new Promise((r) => (unmountCourse = r));
+
+  async function exit() {
+    if (!canExit) return;
+    exitPhase = 'ending';
+    loadGeneration++;
+    pageLoading = false;
+    const deadline = new Promise((resolve) =>
+      setTimeout(resolve, EXIT_TIMEOUT_MS),
+    );
+    await Promise.race([courseUnmounted, deadline]);
+    await xapiClient?.flush(deadline);
+    const returned =
+      endSession() &&
+      (await adapter.exit(deadline).catch((err) => {
+        console.warn('Tessera: exit failed', err);
+        return false;
+      }));
+    exitPhase = 'ended';
+    if (!returned) window.close();
   }
 
   // ---- Lifecycle ----
@@ -500,7 +565,8 @@
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('pagehide', handleExit);
+    window.addEventListener('pagehide', handlePagehide);
+    launched = true;
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn
@@ -526,7 +592,7 @@
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    window.removeEventListener('pagehide', handleExit);
+    window.removeEventListener('pagehide', handlePagehide);
     if (manualWatchdog !== null) {
       clearTimeout(manualWatchdog);
       manualWatchdog = null;
@@ -562,11 +628,16 @@
   data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
 >
   <LoadingBar active={pageLoading} />
-  {#if UserLayout}
-    <UserLayout {page} />
-  {:else if chromeMode === 'custom'}
-    {@render page()}
+  {#if exitPhase}
+    <SessionEnded ended={exitPhase === 'ended'} />
   {:else}
-    <DefaultLayout {page} />
+    <span hidden {@attach () => unmountCourse}></span>
+    {#if UserLayout}
+      <UserLayout {page} />
+    {:else if chromeMode === 'custom'}
+      {@render page()}
+    {:else}
+      <DefaultLayout {page} />
+    {/if}
   {/if}
 </div>

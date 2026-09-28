@@ -8,6 +8,7 @@ import {
   CMI5_LAUNCH,
   cmi5Fetch,
   flush,
+  noDeadline,
   postedStatements,
   requests,
   respond,
@@ -924,16 +925,101 @@ describe('CMI5Adapter', () => {
       adapter.setCompletionStatus('complete');
       await flush();
 
-      const exiting = adapter.exit();
+      const exiting = adapter.exit(noDeadline);
       await flush();
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(assign).not.toHaveBeenCalled();
 
       sending.resolve(respond(204));
-      await exiting;
+      expect(await exiting).toBe(true);
       expect(statementFor('terminated')).toBeDefined();
       expect(assign).toHaveBeenCalledWith(returnURL);
     });
+
+    it('sends a held Failed before Terminated', async () => {
+      const adapter = await initAdapter();
+      mockFetch.mockClear();
+
+      adapter.setScore(40);
+      adapter.setSuccessStatus('failed');
+      await adapter.exit(noDeadline);
+
+      const ids = sentVerbs();
+      expect(ids).toContain('failed');
+      expect(ids.indexOf('failed')).toBeLessThan(ids.indexOf('terminated'));
+    });
+
+    it('saves the final state once, without keepalive', async () => {
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      adapter.saveState({ b: 1 } as never);
+      await adapter.exit(noDeadline);
+
+      const puts = stateWrites();
+      expect(puts).toHaveLength(1);
+      expect(new URL(puts[0][0]).searchParams.get('stateId')).toBe(
+        'tessera-state',
+      );
+      expect(puts[0][1].keepalive).toBeUndefined();
+    });
+
+    it('writes the exit state when the final save fails', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValueOnce(respond(500));
+      adapter.saveState({ b: 1 } as never);
+      await adapter.exit(noDeadline);
+
+      const exitPut = stateWrites().find(([url]: any[]) =>
+        url.includes('tessera-state-exit'),
+      );
+      expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
+    it('stops waiting on a stalled LRS and still redirects', async () => {
+      const returnURL = 'https://lms.example.com/learner/done';
+      const adapter = await initAdapter({ launchData: { returnURL } });
+      await adapter.loadState();
+
+      const assign = stubLocationAssign();
+      mockFetch.mockClear();
+      mockFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
+      adapter.saveState({ b: 1 } as never);
+      const deadline = Promise.withResolvers<void>();
+      const exiting = adapter.exit(deadline.promise);
+      await flush();
+      expect(assign).not.toHaveBeenCalled();
+      deadline.resolve();
+      expect(await exiting).toBe(true);
+
+      expect(assign).toHaveBeenCalledWith(returnURL);
+      expect(statementFor('terminated')).toBeDefined();
+      const exitPut = stateWrites().find(([url]: any[]) =>
+        url.includes('tessera-state-exit'),
+      );
+      expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
+    it.each(['javascript:alert(1)', '/lms/course/42'])(
+      'warns and ignores a returnURL that is not absolute http(s): %s',
+      async (returnURL) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const adapter = await initAdapter({ launchData: { returnURL } });
+
+        const assign = stubLocationAssign();
+
+        expect(await adapter.exit(noDeadline)).toBe(false);
+        expect(assign).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(`returnURL "${returnURL}"`),
+        );
+      },
+    );
 
     it('still terminates but skips redirect when LMS did not supply a returnURL', async () => {
       const adapter = await initAdapter();
@@ -941,7 +1027,7 @@ describe('CMI5Adapter', () => {
       const assign = stubLocationAssign();
       mockFetch.mockClear();
 
-      await adapter.exit();
+      expect(await adapter.exit(noDeadline)).toBe(false);
       expect(statementFor('terminated')).toBeDefined();
       expect(assign).not.toHaveBeenCalled();
     });

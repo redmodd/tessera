@@ -22,6 +22,8 @@ export interface NavContext {
   manifest: Manifest;
   progress: ProgressState;
   config: CourseConfig;
+  readonly canExit: boolean;
+  exit(): Promise<void>;
 }
 
 export interface AdapterContext {

@@ -1,13 +1,19 @@
 <script>
   import { onMount } from 'svelte';
-  import { useNavigation, useProgress } from '../runtime/hooks.svelte.js';
+  import {
+    useCourse,
+    useNavigation,
+    useProgress,
+  } from '../runtime/hooks.svelte.js';
   import Sidebar from './Sidebar.svelte';
 
   let { page } = $props();
   const nav = useNavigation();
   const progress = useProgress();
+  const course = useCourse();
 
   let sidebarOpen = $state(false);
+  let exitDialog = $state();
 
   let progressPercent = $derived(
     nav.pages.length > 0
@@ -28,7 +34,7 @@
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
     if (
       e.target?.closest(
-        '[role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz',
+        'dialog, [role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz',
       )
     )
       return;
@@ -81,6 +87,41 @@
     aria-label="Course sidebar"
   >
     <Sidebar onclose={closeSidebar} />
+    {#if course.canExit}
+      <div class="tessera-sidebar-footer">
+        <button
+          class="tessera-page-nav-btn tessera-exit-btn"
+          onclick={() => exitDialog.showModal()}
+        >
+          Exit course
+        </button>
+      </div>
+      <dialog
+        class="tessera-exit-dialog"
+        aria-labelledby="tessera-exit-title"
+        bind:this={exitDialog}
+      >
+        <h2 id="tessera-exit-title">Exit the course?</h2>
+        <p>Your progress will be saved.</p>
+        <div class="tessera-exit-dialog-actions">
+          <button
+            class="tessera-page-nav-btn"
+            onclick={() => exitDialog.close()}
+          >
+            Cancel
+          </button>
+          <button
+            class="tessera-page-nav-btn tessera-btn-primary"
+            onclick={() => {
+              exitDialog.close();
+              course.exit();
+            }}
+          >
+            Exit course
+          </button>
+        </div>
+      </dialog>
+    {/if}
   </aside>
 
   <main class="tessera-main">

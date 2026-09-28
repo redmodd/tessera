@@ -24,9 +24,11 @@ export class XAPIStatementError extends Error {
 }
 
 /**
- * Validate a partial statement at the boundary. Three checks —
- * verb.id, object.id when supplied, score.scaled when supplied. Anything
- * else passes through; the LRS gives clearer errors than we can.
+ * Validate a partial statement at the boundary. Four checks: verb.id,
+ * object.id when supplied, score.scaled when supplied, and that it
+ * serializes to JSON, since a throw inside the send queue would stall every
+ * later send. Anything else passes through; the LRS gives clearer errors
+ * than we can.
  *
  * Called from both the client (so a fan-out send fails once before any
  * destination's `buildStatement` runs) and the publisher (so a single-
@@ -76,5 +78,13 @@ export function validatePartialStatement(partial: PartialStatement): void {
         partial,
       );
     }
+  }
+  try {
+    JSON.stringify(partial);
+  } catch (err) {
+    throw new XAPIStatementError(
+      `sendStatement: statement must be JSON-serializable (${err instanceof Error ? err.message : String(err)})`,
+      partial,
+    );
   }
 }

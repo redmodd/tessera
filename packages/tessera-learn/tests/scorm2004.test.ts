@@ -4,7 +4,7 @@ import {
   type SCORM2004API,
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
-import { flush, scorm2004Api, valuesUnder } from './helpers.js';
+import { flush, noDeadline, scorm2004Api, valuesUnder } from './helpers.js';
 
 describe('SCORM2004Adapter', () => {
   let api: Mocked<SCORM2004API>;
@@ -180,6 +180,33 @@ describe('SCORM2004Adapter', () => {
     adapter.terminate();
     expect(api.Terminate).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['suspend', 'suspendAll'],
+    ['normal', 'exitAll'],
+  ] as const)(
+    'exit with cmi.exit=%s asks the LMS for %s before Terminate',
+    async (mode, request) => {
+      await adapter.init();
+      const order: string[] = [];
+      api.SetValue.mockImplementation((key, value) => {
+        order.push(`${key}=${value}`);
+        return 'true';
+      });
+      api.Terminate.mockImplementation(() => {
+        order.push('Terminate');
+        return 'true';
+      });
+
+      adapter.setExit(mode);
+      expect(await adapter.exit(noDeadline)).toBe(false);
+
+      expect(order.slice(-2)).toEqual([
+        `adl.nav.request=${request}`,
+        'Terminate',
+      ]);
+    },
+  );
 
   it('operations are queued sequentially', async () => {
     const order: string[] = [];

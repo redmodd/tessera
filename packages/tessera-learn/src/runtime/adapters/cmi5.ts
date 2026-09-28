@@ -1,6 +1,6 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
-import { STANDARDS } from '../standards.js';
+import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 
 const CMI5_MASTERYSCORE_EXT =
@@ -179,11 +179,13 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       ) {
         this.#launchMode = this.#launchData.launchMode;
       }
-      if (
-        typeof this.#launchData.returnURL === 'string' &&
-        this.#launchData.returnURL
-      ) {
-        this.returnURL = this.#launchData.returnURL;
+      const { returnURL } = this.#launchData;
+      if (typeof returnURL === 'string' && httpOrigin(returnURL)) {
+        this.returnURL = returnURL;
+      } else if (returnURL) {
+        console.warn(
+          `Tessera: ignoring cmi5 LaunchData returnURL ${JSON.stringify(returnURL)}; it is not an absolute http(s) URL`,
+        );
       }
       const launchMastery = parseMastery(
         this.#launchData.masteryScore,
@@ -228,9 +230,9 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     super.setSuccessStatus(status);
   }
 
-  override terminate(): void {
+  override terminate(unloading?: boolean): void {
     if (this.#heldFailed) super.setSuccessStatus('failed');
-    super.terminate();
+    super.terminate(unloading);
   }
 
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */

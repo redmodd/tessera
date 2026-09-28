@@ -9,7 +9,7 @@ import {
 } from '../src/runtime/xapi/validation.js';
 import { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { XAPIAgent } from '../src/runtime/xapi/types.js';
-import { flush, respond, useFakeTimers } from './helpers.js';
+import { flush, noDeadline, respond, useFakeTimers } from './helpers.js';
 
 const mockFetch = vi.fn();
 
@@ -205,6 +205,21 @@ describe('XAPIPublisher — sendStatement validation', () => {
         result: { score: { scaled: 1.5 } },
       }),
     ).rejects.toThrow(XAPIStatementError);
+  });
+  it('rejects a statement that is not JSON-serializable and keeps sending', async () => {
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    await expect(
+      pub.sendStatement({
+        verb: { id: 'http://verb/a' },
+        result: { extensions: { 'http://ext/big': 1n } },
+      }),
+    ).rejects.toThrow(XAPIStatementError);
+
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/b' } });
+
+    expect(r.destinations[0].ok).toBe(true);
+    await expect(pub.drained()).resolves.toBeUndefined();
   });
   it('accepts score.scaled in [-1, 1]', async () => {
     mockFetch.mockResolvedValue(respond(204));
@@ -721,6 +736,42 @@ describe('XAPIClient — fan-out', () => {
       XAPIStatementError,
     );
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('flush waits for queued sends on every destination', async () => {
+    const launchPub = makePub('https://cmi5.example.com/xapi/');
+    const independentPub = makePub('https://analytics.example.com/xapi/');
+    await launchPub.init();
+    await independentPub.init();
+    const client = new XAPIClient([launchPub, independentPub]);
+    const launchSending = Promise.withResolvers<Response>();
+    const analyticsSending = Promise.withResolvers<Response>();
+    mockFetch.mockImplementation((url: string) =>
+      url.includes('analytics')
+        ? analyticsSending.promise
+        : launchSending.promise,
+    );
+    void client.sendStatement({ verb: { id: 'http://verb/closing' } });
+
+    let flushed = false;
+    const flushing = client.flush(noDeadline).then(() => (flushed = true));
+    launchSending.resolve(respond(204));
+    await flush();
+    expect(flushed).toBe(false);
+
+    analyticsSending.resolve(respond(204));
+    await flushing;
+    expect(flushed).toBe(true);
+  });
+
+  it('flush gives up on a stalled destination at the deadline', async () => {
+    const pub = makePub('https://analytics.example.com/xapi/');
+    await pub.init();
+    const client = new XAPIClient([pub]);
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    void client.sendStatement({ verb: { id: 'http://verb/closing' } });
+
+    await client.flush(Promise.resolve());
   });
 
   it('after the shared launch publisher sends Terminated, drops author sends to it but still sends to independent destinations', async () => {
