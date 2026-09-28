@@ -87,6 +87,15 @@ function confirmExit() {
   dialogButton('Exit course').click();
 }
 
+function restoreFromBfcache() {
+  window.dispatchEvent(
+    new PageTransitionEvent('pagehide', { persisted: true }),
+  );
+  window.dispatchEvent(
+    new PageTransitionEvent('pageshow', { persisted: true }),
+  );
+}
+
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
 };
@@ -400,6 +409,31 @@ describe('exiting a course', () => {
     await flush();
 
     expect(exitButton()).toBeNull();
+  });
+
+  it('ends a session restored from the back/forward cache after pagehide', async () => {
+    const { adapter, calls } = recordingAdapter();
+    await mount(adapter);
+    restoreFromBfcache();
+    const restored = calls.length;
+    await flush();
+
+    expect(document.body.textContent).toContain('Session ended');
+    expect(document.body.textContent).not.toContain('Test page');
+    expect(calls.slice(restored)).toEqual([]);
+  });
+
+  it('keeps a course restored from the back/forward cache running without an LMS', async () => {
+    const { adapter, calls } = recordingAdapter({ connected: false });
+    await mount(adapter, { loadLayout: masteryLayout });
+    restoreFromBfcache();
+    const restored = calls.length;
+
+    navCtx().nav.goToPage(1);
+    await flush();
+
+    expect(document.body.textContent).not.toContain('Session ended');
+    expect(calls.slice(restored)).toContain('saveState');
   });
 
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {

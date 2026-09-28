@@ -125,6 +125,15 @@ export async function exitCourse(page: Page): Promise<void> {
   });
 }
 
+/** Send the page through a back/forward cache round trip, as leaving and pressing Back does. */
+export async function restoreFromBfcache(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const type of ['pagehide', 'pageshow']) {
+      window.dispatchEvent(new PageTransitionEvent(type, { persisted: true }));
+    }
+  });
+}
+
 /** Click the default layout's Exit course button and confirm. */
 export async function clickExitCourse(page: Page): Promise<void> {
   await page.locator('.tessera-exit-btn').click();

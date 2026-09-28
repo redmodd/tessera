@@ -21,6 +21,7 @@ import {
   navigateToPage,
   openQuiz,
   reportedQuestionCount,
+  restoreFromBfcache,
   scormData,
   scormLog,
   startPreview,
@@ -564,6 +565,24 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await page.waitForURL(RETURN_URL);
 
     expect(terminatedBeforeReturn).toBe(true);
+  });
+
+  test('a page restored from the back/forward cache shows the session as ended', async ({
+    page,
+  }) => {
+    const statements = await installCmi5Mock(page);
+
+    await page.goto(cmi5LaunchURL(BASE));
+    await expect(page.locator('.tessera-exit-btn')).toBeVisible();
+
+    await restoreFromBfcache(page);
+
+    await expect(
+      page.getByRole('heading', { name: 'Session ended' }),
+    ).toBeVisible();
+    await expect
+      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+      .toBeDefined();
   });
 });
 
