@@ -1,10 +1,13 @@
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import { STANDARDS } from '../standards.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
  * URL, with no cmi5 fetch-token, LMS.LaunchData or cmi5 context.
  */
 export class XAPIAdapter extends BaseXAPILaunchAdapter {
+  protected readonly logName = 'xAPI';
+  protected readonly profile = STANDARDS.xapi;
   // Tin Can uses snake_case `activity_id` (NOT cmi5's camelCase `activityId`).
   protected readonly activityIdParam = 'activity_id';
 

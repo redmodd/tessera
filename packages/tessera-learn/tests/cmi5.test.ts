@@ -1132,6 +1132,19 @@ describe('CMI5Adapter', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['endpoint', /endpoint must be an absolute/],
+      ['activityId', /activityId is required/],
+    ])(
+      'rejects a missing %s before spending the single-use fetch URL',
+      async (param, message) => {
+        setLaunchParams({ ...CMI5_LAUNCH, [param]: '' });
+        mockFetch.mockClear();
+        await expect(initAdapter()).rejects.toThrow(message);
+        expect(mockFetch).not.toHaveBeenCalled();
+      },
+    );
+
     it('reads LMS.LaunchData with the fetched token', async () => {
       mockFetch.mockClear();
       await initAdapter();

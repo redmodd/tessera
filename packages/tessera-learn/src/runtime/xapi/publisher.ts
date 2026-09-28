@@ -13,6 +13,7 @@ import {
   validateAgent,
   validateAuthCredential,
   joinFieldError,
+  validatePublisherTarget,
   XAPIConfigError,
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
@@ -135,17 +136,7 @@ export class XAPIPublisher {
   #closed = false;
 
   constructor(opts: XAPIPublisherOptions) {
-    if (!opts.endpoint || typeof opts.endpoint !== 'string') {
-      throw new XAPIConfigError('XAPIPublisher: endpoint is required');
-    }
-    if (!/^https?:\/\//i.test(opts.endpoint)) {
-      throw new XAPIConfigError(
-        'XAPIPublisher: endpoint must be an absolute http(s) URL',
-      );
-    }
-    if (!opts.activityId) {
-      throw new XAPIConfigError('XAPIPublisher: activityId is required');
-    }
+    validatePublisherTarget(opts.endpoint, opts.activityId);
     this.#endpoint = opts.endpoint.replace(/\/?$/, '/');
     this.#statementsUrl = `${this.#endpoint}statements`;
     this.#activityId = opts.activityId;

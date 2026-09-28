@@ -76,8 +76,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   #launchMode: CMI5LaunchMode = 'Normal';
   #heldFailed = false;
 
-  protected override readonly logName = 'cmi5';
-  protected override readonly profile = STANDARDS.cmi5;
+  protected readonly logName = 'cmi5';
+  protected readonly profile = STANDARDS.cmi5;
   protected readonly activityIdParam = 'activityId';
 
   protected async resolveAuth(params: URLSearchParams): Promise<string> {

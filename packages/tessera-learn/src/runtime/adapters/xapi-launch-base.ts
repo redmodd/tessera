@@ -12,6 +12,7 @@ import { BaseAdapter } from './base.js';
 import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import { validateAgent, joinFieldError } from '../xapi/agent-rules.js';
+import { validatePublisherTarget } from '../xapi/validation.js';
 import type {
   XAPIAgent,
   PartialStatement,
@@ -95,12 +96,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected actor: XAPIAgent | null = null;
   protected registration: string | undefined;
   protected authToken = '';
-  /** Launch URL parameter that carries the activity IRI. */
   protected abstract readonly activityIdParam: string;
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
-  protected readonly logName: string = 'xAPI';
-  protected readonly profile: typeof STANDARDS.cmi5 | typeof STANDARDS.xapi =
-    STANDARDS.xapi;
+  protected abstract readonly logName: string;
+  protected abstract readonly profile:
+    typeof STANDARDS.cmi5 | typeof STANDARDS.xapi;
 
   protected scaled: number | null = null;
   protected durationSeconds = 0;
@@ -115,14 +115,16 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSaved = true;
 
   /**
-   * The actor is parsed before auth so a malformed one fails before a
-   * single-use cmi5 fetch token is spent, and auth resolves before
-   * `beforePublisher()` because its requests carry the token and the actor.
+   * The endpoint, activity id and actor are checked before auth so a bad
+   * launch fails before a single-use cmi5 fetch token is spent, and auth
+   * resolves before `beforePublisher()` because its requests carry the token
+   * and the actor.
    */
   async init(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.endpoint = (params.get('endpoint') || '').replace(/\/?$/, '/');
     this.activityId = params.get(this.activityIdParam) || '';
+    validatePublisherTarget(this.endpoint, this.activityId);
     // xAPI requires `context.registration` to be a UUID; sending an empty
     // string makes LRSes 400. Omit when the LMS didn't provide one.
     this.registration = params.get('registration') || undefined;
