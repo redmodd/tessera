@@ -160,6 +160,18 @@ describe('NavigationState', () => {
       nav.goToPage(1);
       expect(nav.canGoPrev).toBe(true);
     });
+
+    it('is false when the previous page is locked', () => {
+      const manifest = createManifest(3);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig(),
+        { canAccess: ({ pageIndex }) => pageIndex !== 1 },
+      );
+      nav.currentPageIndex = 2;
+      expect(nav.canGoPrev).toBe(false);
+    });
   });
 
   describe('canGoNext — free mode', () => {

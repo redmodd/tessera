@@ -37,13 +37,9 @@ export class NavigationState {
   #canAccess: AccessFn | undefined;
   currentPageIndex = $state(0);
 
-  canGoPrev = $derived(this.currentPageIndex > 0);
+  canGoPrev = $derived(this.canAccessIndex(this.currentPageIndex - 1));
 
-  canGoNext = $derived.by(() => {
-    const next = this.currentPageIndex + 1;
-    if (next >= this.manifest.totalPages) return false;
-    return !this.isPageLocked(next);
-  });
+  canGoNext = $derived(this.canAccessIndex(this.currentPageIndex + 1));
 
   // Memo cache so the derived can return a stable Set reference when
   // membership is unchanged (two Sets with identical contents are not `===`).
@@ -109,11 +105,11 @@ export class NavigationState {
   }
 
   goNext() {
-    if (this.canGoNext) this.goToPage(this.currentPageIndex + 1);
+    this.goToPage(this.currentPageIndex + 1);
   }
 
   goPrev() {
-    if (this.canGoPrev) this.goToPage(this.currentPageIndex - 1);
+    this.goToPage(this.currentPageIndex - 1);
   }
 
   isPageLocked(index: number): boolean {
