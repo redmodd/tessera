@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   answerMatching,
   navigateToPage,
+  restoreFromBfcache,
   waitForTesseraContent,
 } from './helpers.js';
 
@@ -181,5 +182,26 @@ test.describe('Persistence — localStorage', () => {
     expect(storageData).toHaveProperty('d');
     expect(storageData.d).toBeGreaterThanOrEqual(1);
     expect(storageData.b).toBeGreaterThanOrEqual(0);
+  });
+
+  test('a page restored from the back/forward cache saves again when the learner leaves', async ({
+    page,
+  }) => {
+    const savedDuration = () =>
+      page.evaluate(() => {
+        const tesseraKey = Object.keys(localStorage).find((k) =>
+          k.startsWith('tessera-'),
+        );
+        return JSON.parse(localStorage.getItem(tesseraKey!)!).d;
+      });
+
+    await restoreFromBfcache(page);
+    const restored = await savedDuration();
+    await page.waitForTimeout(1100);
+    await page.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent('pagehide')),
+    );
+
+    expect(await savedDuration()).toBeGreaterThan(restored);
   });
 });

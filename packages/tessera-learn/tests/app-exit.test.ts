@@ -52,6 +52,17 @@ async function mount(
   await flush();
 }
 
+type XAPIClientStub = NonNullable<Parameters<typeof mountApp>[0]['xapiClient']>;
+
+const xapiClient = (
+  overrides: Partial<XAPIClientStub> = {},
+): XAPIClientStub => ({
+  markUnloading() {},
+  markRestored() {},
+  flush: async () => {},
+  ...overrides,
+});
+
 const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
 
 const userState = (): UserStateStore =>
@@ -363,9 +374,7 @@ describe('exiting a course', () => {
     const drained = Promise.withResolvers<void>();
     const flush = vi.fn(() => drained.promise);
     const { adapter, calls } = recordingAdapter();
-    await mount(adapter, {
-      xapiClient: { markUnloading() {}, markRestored() {}, flush },
-    });
+    await mount(adapter, { xapiClient: xapiClient({ flush }) });
     const launched = calls.length;
 
     confirmExit();
@@ -382,9 +391,7 @@ describe('exiting a course', () => {
     const flush = vi.fn(async (_deadline: Promise<unknown>) => {});
     const exit = vi.fn(async () => false);
     const { adapter } = recordingAdapter({ exit });
-    await mount(adapter, {
-      xapiClient: { markUnloading() {}, markRestored() {}, flush },
-    });
+    await mount(adapter, { xapiClient: xapiClient({ flush }) });
 
     confirmExit();
 
@@ -398,7 +405,7 @@ describe('exiting a course', () => {
     const { adapter } = recordingAdapter();
     await mount(adapter, {
       loadLayout: masteryLayout,
-      xapiClient: { markUnloading, markRestored() {}, flush: async () => {} },
+      xapiClient: xapiClient({ markUnloading }),
     });
 
     await navCtx().exit();
@@ -457,11 +464,7 @@ describe('exiting a course', () => {
     const exit = vi.fn();
     const { adapter } = recordingAdapter({ exit });
     await mount(adapter, {
-      xapiClient: {
-        markUnloading() {},
-        markRestored() {},
-        flush: () => drained.promise,
-      },
+      xapiClient: xapiClient({ flush: () => drained.promise }),
     });
 
     confirmExit();
@@ -504,12 +507,32 @@ describe('exiting a course', () => {
     expect(calls.slice(restored)).toEqual(EXIT_SEQUENCE);
   });
 
+  it('leaves time in the back/forward cache out of the saved duration', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const saved: SavedState[] = [];
+    const { adapter } = recordingAdapter({
+      connected: false,
+      saveState: (state) => saved.push(state),
+    });
+    await mount(adapter);
+
+    vi.advanceTimersByTime(10_000);
+    enterBfcache();
+    vi.advanceTimersByTime(3 * 60 * 60_000);
+    restoreFromBfcache();
+    vi.advanceTimersByTime(5_000);
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(saved.at(-1)!.d).toBe(15);
+  });
+
   it('takes xAPI sends out of keepalive when a course without an LMS is restored', async () => {
     const markRestored = vi.fn();
     const { adapter } = recordingAdapter({ connected: false });
-    await mount(adapter, {
-      xapiClient: { markUnloading() {}, markRestored, flush: async () => {} },
-    });
+    await mount(adapter, { xapiClient: xapiClient({ markRestored }) });
 
     enterBfcache();
     restoreFromBfcache();

@@ -440,6 +440,7 @@
 
   function handlePagehide() {
     endSession();
+    duration.pause();
     xapiClient?.markUnloading();
     adapter.terminate();
   }
@@ -451,6 +452,7 @@
       return;
     }
     terminated = false;
+    duration.resume();
     xapiClient?.markRestored();
   }
 

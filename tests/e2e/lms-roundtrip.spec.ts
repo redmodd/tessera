@@ -601,10 +601,10 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(terminatedBeforeReturn).toBe(true);
   });
 
-  test('a page restored from the back/forward cache shows the session as ended', async ({
+  test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
-    await installCmi5Mock(page);
+    const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
     await expect(page.locator('.tessera-exit-btn')).toBeVisible();
@@ -614,6 +614,11 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expect(
       page.getByRole('heading', { name: 'Session ended' }),
     ).toBeVisible();
+    await expect
+      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+      .toBeTruthy();
+    await page.waitForTimeout(300);
+    expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
   });
 });
 
@@ -853,10 +858,11 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       .toBeTruthy();
   });
 
-  test('a page restored from the back/forward cache shows the session as ended', async ({
+  test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
-    await routeLRS(page, [], []);
+    const statements: any[] = [];
+    await routeLRS(page, statements, []);
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -866,5 +872,10 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(
       page.getByRole('heading', { name: 'Session ended' }),
     ).toBeVisible();
+    await expect
+      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+      .toBeTruthy();
+    await page.waitForTimeout(300);
+    expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
   });
 });
