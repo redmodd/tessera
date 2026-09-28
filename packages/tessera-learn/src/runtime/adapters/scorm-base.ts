@@ -252,7 +252,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 }
 
 /**
- * Walk the window.opener and window.parent chains looking for the dialect's LMS API object.
+ * Walk the top window's opener chain and the window.parent chain looking for the dialect's LMS API object.
  * Returns null if not found within 10 levels or a cross-origin boundary is hit.
  */
 export function findLMSAPI<TApi>({
@@ -261,16 +261,21 @@ export function findLMSAPI<TApi>({
 }: ScormDialect<TApi>): TApi | null {
   function scan(win: Window): TApi | null {
     for (let i = 0; i < 10; i++) {
+      let value: Partial<TApi> | null | undefined;
       try {
-        const value = (win as unknown as Record<string, Partial<TApi> | null>)[
+        value = (win as unknown as Record<string, Partial<TApi> | null>)[
           apiName
         ];
+      } catch {
+        // Cross-origin frame: stop
+        return null;
+      }
+      try {
         if (typeof value?.[initializeMethod] === 'function') {
           return value as TApi;
         }
       } catch {
-        // Cross-origin frame: stop
-        return null;
+        // A cross-origin iframe named like the API: keep climbing
       }
       if (win.parent === win) break;
       win = win.parent;
@@ -278,9 +283,11 @@ export function findLMSAPI<TApi>({
     return null;
   }
 
-  // Check window.opener chain first (popup launch pattern)
-  if (window.opener) {
-    const api = scan(window.opener);
+  // Check the opener chain first (popup launch pattern). The top window's
+  // opener covers a course framed inside the LMS popup.
+  const opener = window.top?.opener;
+  if (opener) {
+    const api = scan(opener);
     if (api) return api;
   }
 

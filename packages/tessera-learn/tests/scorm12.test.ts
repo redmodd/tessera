@@ -30,7 +30,31 @@ describe('SCORM12Adapter.connect', () => {
     opener.parent = opener;
     const win: Record<string, unknown> = { opener };
     win.parent = win;
+    win.top = win;
     vi.stubGlobal('window', win);
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('connects to an API on the opener of a popup the course is framed in', async () => {
+    const api = scorm12Api();
+    const opener: Record<string, unknown> = { API: api };
+    opener.parent = opener;
+    const popup: Record<string, unknown> = { opener };
+    popup.parent = popup;
+    vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
+    await SCORM12Adapter.connect()!.init();
+    expect(api.LMSInitialize).toHaveBeenCalled();
+  });
+
+  it('skips a cross-origin frame named like the API', async () => {
+    const api = scorm12Api();
+    stubLmsFrame({ API: api });
+    (window as unknown as Record<string, unknown>).API = {
+      get LMSInitialize(): never {
+        throw new DOMException('Blocked', 'SecurityError');
+      },
+    };
     await SCORM12Adapter.connect()!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
