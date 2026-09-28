@@ -475,12 +475,12 @@
     await Promise.race([courseUnmounted, deadline]);
     await xapiClient?.flush(deadline);
     if (!endSession()) return;
-    const returned = await adapter.exit(deadline).catch((err) => {
+    await adapter.exit(deadline).catch((err) => {
       console.warn('Tessera: exit failed', err);
-      return false;
     });
+    if (exitPhase === 'ended') return;
     exitPhase = 'ended';
-    if (!returned) window.close();
+    if (!adapter.returnToLMS()) window.close();
   }
 
   // ---- Lifecycle ----

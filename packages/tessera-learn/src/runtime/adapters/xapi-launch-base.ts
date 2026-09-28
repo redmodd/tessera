@@ -291,7 +291,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     );
   }
 
-  override async exit(deadline: Promise<unknown>): Promise<boolean> {
+  override async exit(deadline: Promise<unknown>): Promise<void> {
     const settles = (task: Promise<unknown>) =>
       Promise.race([task.then(() => true), deadline.then(() => false)]);
     if (!this.terminated) {
@@ -301,6 +301,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.terminate(!saved);
     }
     if (this.#finalSend) await settles(this.#finalSend);
+  }
+
+  override returnToLMS(): boolean {
     if (!this.returnURL || typeof window === 'undefined') return false;
     window.location.assign(this.returnURL);
     return true;

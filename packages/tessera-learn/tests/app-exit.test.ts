@@ -332,7 +332,7 @@ describe('exiting a course', () => {
 
   it('terminates on pagehide while the exit is still saving', async () => {
     const { adapter, calls } = recordingAdapter({
-      exit: () => new Promise<boolean>(() => {}),
+      exit: () => new Promise<void>(() => {}),
     });
     await mount(adapter);
     const launched = calls.length;
@@ -398,7 +398,7 @@ describe('exiting a course', () => {
 
   it('bounds the xAPI flush and the adapter exit by one deadline', async () => {
     const flush = vi.fn(async (_deadline: Promise<unknown>) => {});
-    const exit = vi.fn(async () => false);
+    const exit = vi.fn(async () => {});
     const { adapter } = recordingAdapter({ exit });
     await mount(adapter, { xapiClient: xapiClient({ flush }) });
 
@@ -469,6 +469,25 @@ describe('exiting a course', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it('stays on a page restored from the back/forward cache while the adapter exits', async () => {
+    const exiting = Promise.withResolvers<void>();
+    const exit = vi.fn(() => exiting.promise);
+    const returnToLMS = vi.fn(() => true);
+    const { adapter } = recordingAdapter({ exit, returnToLMS });
+    await mount(adapter);
+
+    confirmExit();
+    await vi.waitFor(() => expect(exit).toHaveBeenCalled());
+    enterBfcache();
+    restoreFromBfcache();
+    exiting.resolve();
+    await flush();
+
+    expect(document.body.textContent).toContain('Session ended');
+    expect(returnToLMS).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
     await mount(adapter, { loadLayout: masteryLayout });
@@ -529,15 +548,16 @@ describe('exiting a course', () => {
   });
 
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {
-    const exit = vi.fn(async () => true);
-    const { adapter } = recordingAdapter({ exit });
+    const returnToLMS = vi.fn(() => true);
+    const { adapter } = recordingAdapter({ returnToLMS });
     await mount(adapter);
 
     confirmExit();
 
-    await vi.waitFor(() => expect(exit).toHaveReturned());
-    await flush();
-    expect(document.body.textContent).toContain('Session ended');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Session ended'),
+    );
+    expect(returnToLMS).toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
   });
 
