@@ -608,10 +608,7 @@
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    if (manualWatchdog !== null) {
-      clearTimeout(manualWatchdog);
-      manualWatchdog = null;
-    }
+    clearTimeout(manualWatchdog);
     // Clear the global slot so a stale client from a previous mount
     // can't leak into a fresh one (matters for tests that re-mount).
     registerXAPIClient(null);
