@@ -1,5 +1,33 @@
 # tessera-learn
 
+## 0.8.0
+
+### Minor Changes
+
+- 867e011: Learners can exit the course under an LMS: the default layout shows a confirmed **Exit course** button, and `useCourse()` adds `exit()` and `canExit` for custom layouts. Exiting saves progress, ends the LMS session, and returns to the cmi5 `returnURL` or shows a "Session ended" screen. A `usePersistence()` value that is not JSON-serializable logs a warning and is left out of the save instead of costing the whole save. `useXAPI().sendStatement()` rejects a statement that is not JSON-serializable instead of stalling every later send.
+- d3a1e84: **Breaking:** the `progress` a custom `canAccess` receives no longer has the internal `manuallyCompleted`, `gradedScoreDecided`, `passScore`, `unlistedUnanswered`, `replay`, `restoreQuiz` and `restoreUnanswered` members. Read `completionStatus`, `successStatus` and `reportedScore` instead.
+  
+  A corrupted value in saved progress is repaired or dropped on resume instead of discarding the whole save.
+  
+  Prev is disabled when the previous page is locked, and a standalone question's `score()` is clamped to 0–100.
+- 903ee98: **Breaking:** `tessera-learn` now needs `svelte` 5.57.0 or later. To upgrade, run `pnpm add -D svelte@^5.57.0`. The `TESSERA_NAV`, `TESSERA_ADAPTER`, `TESSERA_PAGE`, `TESSERA_IN_PAGE` and `TESSERA_USER_STATE` keys are no longer exported from `tessera-learn/runtime/contexts`, and `getContext('tessera-nav')` and the other `'tessera-*'` string keys now return `undefined`. Read these contexts through the hooks instead.
+
+### Patch Changes
+
+- f91a78f: `runAudit` now fully closes its preview server, so it no longer leaves a SIGTERM handler behind that can exit the calling process.
+- 261c19f: An xAPI launch whose `auth` parameter carries no credential now fails at launch instead of sending unauthenticated requests. SCORM API discovery no longer stops at a same-named global that isn't the LMS API, such as an element with `id="API"`, or at a cross-origin frame in the chain. It searches the course's own frame chain before the opener's, and finds an API on the window that opened an LMS popup when the course runs in a frame inside that popup.
+- 3a03e5c: A course restored from the browser's back/forward cache under an LMS now shows "Session ended" instead of running on untracked, so cmi5 and xAPI no longer lose the Completed, Passed/Failed, and Scored statements for work done there.
+  
+  A restored course without an LMS now saves its progress again when the learner leaves and no longer counts the time spent in the back/forward cache. After any restore, `xapi:` destinations no longer send as if the page were closing.
+- 61997ef: The optional `playwright` and `@axe-core/playwright` peer ranges are capped at their current major versions (`^1.40.0`, `^4.0.0`), so an untested major version gets a peer warning.
+- 3e8a482: A course inside a folder whose name contains `node_modules` or `virtual:` (such as `node_modules-demo/`) no longer skips the undefined-import build error and Svelte a11y warnings. Only a `node_modules` folder inside the project marks a file as a dependency.
+  
+  Svelte a11y warnings from a build run at the workspace root (`pnpm export <course>`) now show course-relative paths, and `$shared` components are no longer reported or gated as course files, matching a build run from the course folder.
+- 5d21656: `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting` and `Sidebar` now declare their prop types, so TypeScript and svelte-check no longer require optional props such as `alt` on a decorative image, `id`, `graded`, `maxRetries` or `onclose`.
+  
+  Internal test cleanup: unit tests now reset mocks, undo spies, stubbed globals and env vars, and remove temp dirs automatically, and `pnpm check` type-checks them. Removes test-only runtime code: the `__resetUseCompletionWarning`, `__warnUnsubmittedQuiz` and `__warnEmptyQuiz` exports from `runtime/hooks.svelte`, and the xAPI publisher's fallback for a `fetch` result that is not a `Response`.
+- c6081d4: A cmi5 launch with a relative `endpoint` fails before spending the single-use fetch URL, instead of sending the auth token to the course's own host, and a fetched token that includes the `Basic ` scheme fails before any LRS request. cmi5 and xAPI name the `endpoint` launch parameter in the error. cmi5 launches fetch `LMS.LaunchData` and learner preferences in parallel.
+
 ## 0.7.0
 
 ### Minor Changes
