@@ -82,6 +82,16 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
+  it('keeps the rest of a save whose bookmark and duration are corrupted', async () => {
+    const { saveState } = await mount('auto', {
+      saved: savedWith({ b: '1', d: '120', c: { '1': 2 } }),
+    });
+    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+    const last = saveState.mock.lastCall![0];
+    expect(last).toMatchObject({ b: 0, v: [0, 1], c: { '1': 2 } });
+    expect(last.d).toBeLessThan(120);
+  });
+
   it('keeps a saved completion and pass the course has since fallen below', async () => {
     const { seedLifecycle, setCompletionStatus, saveState } = await mount(
       'auto',

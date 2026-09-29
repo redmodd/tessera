@@ -23,9 +23,6 @@ export function structureFingerprint(manifest: Manifest): string {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
 const isGradedUnit = (value: unknown): boolean =>
   isRecord(value) &&
   (value.q == null || isRecord(value.q)) &&
@@ -33,12 +30,10 @@ const isGradedUnit = (value: unknown): boolean =>
 
 // Rejected whole: a shape restoreFrom() iterates unguarded throws partway
 // through and the mutations already applied get written back over the record.
-// A null optional is fine, restoreFrom skips it. Bad values in a sound shape
-// are left to restoreFrom, which drops or repairs them.
+// A null optional is fine, restoreFrom skips it. Bad values in a sound shape,
+// the bookmark and duration included, are dropped or repaired on restore.
 const isMalformed = (saved: SavedState): boolean =>
   !isRecord(saved) ||
-  !isNumber(saved.b) ||
-  !isNumber(saved.d) ||
   !Array.isArray(saved.v) ||
   (saved.c != null && !isRecord(saved.c)) ||
   (saved.g != null &&

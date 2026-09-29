@@ -100,8 +100,6 @@ describe('shouldRestore', () => {
       ['c is not a record', { c: 3 }],
       ['g is an array', { g: [] }],
       ['a page in g is not a record', { g: { '0': null } }],
-      ['b is not a number', { b: '1' }],
-      ['d is not a number', { d: '120' }],
       ['the standalone answers are not a record', { g: { '0': { q: [] } } }],
       ['the unanswered questions are not a list', { g: { '0': { w: 'q1' } } }],
     ])('discards a saved document where %s', (_label, bad) => {
@@ -139,6 +137,8 @@ describe('shouldRestore', () => {
     ['c is null', { c: null }],
     ['g is null', { g: null }],
     ['a graded unit carries only a score', { g: { '0': { s: 80 } } }],
+    ['b is not a number', { b: '1' }],
+    ['d is not a number', { d: '120' }],
     ['a visited page is not a number', { v: ['0', 1] }],
     ['a chunk is not a number', { c: { '0': '2' } }],
     ['a quiz score is null', { g: { '0': { s: null, a: '2' } } }],
