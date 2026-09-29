@@ -194,7 +194,7 @@ export class ProgressState {
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
     questions.set(questionId, {
-      score: clampScore(Number(score)),
+      score: clampScore(score),
       weight: normalizeWeight(weight),
       graded,
     });
