@@ -249,9 +249,7 @@
     if (isRecord(saved.u)) {
       userState = { ...userState, ...saved.u };
     }
-    duration = new DurationTracker(
-      Number.isFinite(saved.d) && saved.d >= 0 ? saved.d : 0,
-    );
+    duration = new DurationTracker(saved.d);
     // Navigate to bookmark (after state is restored so locking is correct)
     nav.goToPage(saved.b);
   }

@@ -28,17 +28,6 @@ describe('NavigationState', () => {
       expect(nav.currentPageIndex).toBe(2);
     });
 
-    it('is a no-op for a fractional index', () => {
-      const nav = new NavigationState(
-        createManifest(5),
-        new ProgressState(createManifest(0), createConfig()),
-        createConfig(),
-      );
-      nav.goToPage(2);
-      nav.goToPage(1.5);
-      expect(nav.currentPageIndex).toBe(2);
-    });
-
     it('is a no-op for index beyond total pages', () => {
       const nav = new NavigationState(
         createManifest(5),

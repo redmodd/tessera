@@ -15,7 +15,10 @@ export class DurationTracker {
   #pausedAt: number | null = null;
 
   constructor(previousSeconds: number = 0) {
-    this.#accumulated = previousSeconds;
+    this.#accumulated =
+      Number.isFinite(previousSeconds) && previousSeconds > 0
+        ? previousSeconds
+        : 0;
   }
 
   /** Cumulative across all sessions. Use for suspend_data persistence. */
