@@ -31,6 +31,9 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
@@ -393,7 +396,7 @@ export class ProgressState {
    */
   restoreFrom(saved: SavedProgress): void {
     const pageEntries = <T>(record?: Record<string, T>) =>
-      Object.entries(record ?? {}).flatMap(([key, value]) => {
+      Object.entries(isRecord(record) ? record : {}).flatMap(([key, value]) => {
         const pageIndex = Number(key);
         return String(pageIndex) === key &&
           isPageIndex(pageIndex, this.#totalPages)
@@ -402,27 +405,33 @@ export class ProgressState {
       });
     this.#replaying = true;
     try {
-      for (const idx of saved.v) this.markVisited(idx);
+      for (const idx of Array.isArray(saved.v) ? saved.v : []) {
+        this.markVisited(idx);
+      }
       for (const [pageIndex, chunkIndex] of pageEntries(saved.c)) {
         this.markChunk(pageIndex, chunkIndex);
       }
       for (const [pageIndex, unit] of pageEntries(saved.g)) {
+        if (!isRecord(unit)) continue;
         if (typeof unit.s === 'number') {
-          const attempts = unit.a ?? 1;
+          const attempts = Number(unit.a ?? 1);
           this.#write(pageIndex, {
             quizScore: clampScore(unit.s),
-            attempts:
-              Number.isInteger(attempts) && attempts >= 1 ? attempts : 1,
+            attempts: Number.isFinite(attempts)
+              ? Math.max(1, Math.ceil(attempts))
+              : 1,
           });
         }
-        const unanswered = (unit.w ?? []).filter(
+        const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
           (id): id is string => typeof id === 'string',
         );
         if (unanswered.length > 0) {
           this.#unconfirmed.set(pageIndex, new Set(unanswered));
           if (this.#expect(pageIndex, unanswered, true)) this.#changed();
         }
-        for (const [qid, entry] of Object.entries(unit.q ?? {})) {
+        for (const [qid, entry] of Object.entries(
+          isRecord(unit.q) ? unit.q : {},
+        )) {
           const [score, weight, graded] = Array.isArray(entry)
             ? entry
             : [entry, 1, 1];

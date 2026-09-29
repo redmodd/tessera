@@ -96,14 +96,19 @@ describe('ProgressState', () => {
       expect(progress.quizAttempts(2)).toBe(1);
     });
 
-    it.each([0, -3, 1.5, 2.7])(
-      'restores a saved attempt count of %s as one',
-      (a) => {
-        const progress = new ProgressState(createManifest(3), createConfig());
-        progress.restoreFrom({ v: [], g: { 2: { s: 90, a } } });
-        expect(progress.quizAttempts(2)).toBe(1);
-      },
-    );
+    it.each([
+      [0, 1],
+      [-3, 1],
+      [1.5, 2],
+      [2.7, 3],
+      ['3', 3],
+      ['x', 1],
+      [Infinity, 1],
+    ])('restores a saved attempt count of %s as %s', (a, expected) => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: a as number } } });
+      expect(progress.quizAttempts(2)).toBe(expected);
+    });
 
     it('drops saved progress for pages the course does not have', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
@@ -196,10 +201,27 @@ describe('ProgressState', () => {
       return restored;
     };
 
-    it('skips a null chunk or graded record, which the resume gate lets through', () => {
+    it.each([
+      ['null records', { v: [0], c: null, g: null }],
+      ['records of the wrong type', { v: [0], c: 3, g: [{ s: 80 }] }],
+    ])('skips %s and keeps the rest', (_label, saved) => {
       const progress = new ProgressState(manifest, config);
-      progress.restoreFrom({ v: [0], c: null, g: null } as never);
+      progress.restoreFrom(saved as never);
       expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
+    it('skips a saved list or record of the wrong type and keeps the rest', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.restoreFrom({
+        v: 'nope',
+        c: { 1: 2 },
+        g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
+      } as never);
+      expect(progress.toSaved()).toEqual({
+        v: [],
+        c: { 1: 2 },
+        g: { 1: { s: 80 } },
+      });
     });
 
     it('saves nothing but an empty visited list for fresh progress', () => {

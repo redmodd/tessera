@@ -57,16 +57,6 @@ describe('App restore gate honours config.resume', () => {
     await vi.waitFor(() => expect(seedLifecycle).toHaveBeenCalled());
   });
 
-  it('leaves a malformed saved record untouched', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { seedLifecycle, setCompletionStatus } = await mount('auto', {
-      saved: savedWith({ g: [] }),
-    });
-    await vi.waitFor(() => expect(setCompletionStatus).toHaveBeenCalled());
-    expect(seedLifecycle).not.toHaveBeenCalled();
-    expect(setCompletionStatus).not.toHaveBeenCalledWith('complete');
-  });
-
   it('restores every optional field intact', async () => {
     const saved = savedWith({
       c: { '1': 2 },
@@ -82,15 +72,20 @@ describe('App restore gate honours config.resume', () => {
     });
   });
 
-  it('keeps the rest of a save whose bookmark and duration are corrupted', async () => {
-    const { saveState } = await mount('auto', {
-      saved: savedWith({ b: '1', d: '120', c: { '1': 2 } }),
-    });
-    await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
-    const last = saveState.mock.lastCall![0];
-    expect(last).toMatchObject({ b: 0, v: [0, 1], c: { '1': 2 } });
-    expect(last.d).toBeLessThan(120);
-  });
+  it.each(['120', -120])(
+    'keeps the rest of a save whose bookmark, graded record and duration (%s) are corrupted',
+    async (d) => {
+      const { saveState } = await mount('auto', {
+        saved: savedWith({ b: '1', d, g: [], c: { '1': 2 } }),
+      });
+      await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
+      const last = saveState.mock.lastCall![0];
+      expect(last).toMatchObject({ b: 0, v: [0, 1], c: { '1': 2 } });
+      expect(last.g).toBeUndefined();
+      expect(last.d).toBeGreaterThanOrEqual(0);
+      expect(last.d).toBeLessThan(120);
+    },
+  );
 
   it('keeps a saved completion and pass the course has since fallen below', async () => {
     const { seedLifecycle, setCompletionStatus, saveState } = await mount(

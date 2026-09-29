@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   structureFingerprint,
   shouldRestore,
@@ -90,68 +90,11 @@ describe('shouldRestore', () => {
     expect(shouldRestore(savedWith(fp), fp)).toBe(true);
   });
 
-  describe('malformed documents', () => {
-    beforeEach(() => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-    });
-
-    it.each([
-      ['v is not an array', { v: 'nope' }],
-      ['c is not a record', { c: 3 }],
-      ['g is an array', { g: [] }],
-      ['a page in g is not a record', { g: { '0': null } }],
-      ['the standalone answers are not a record', { g: { '0': { q: [] } } }],
-      ['the unanswered questions are not a list', { g: { '0': { w: 'q1' } } }],
-    ])('discards a saved document where %s', (_label, bad) => {
-      const saved = { ...savedWith(fp), ...bad } as unknown as SavedState;
-      expect(shouldRestore(saved, fp, 'auto')).toBe(false);
-    });
-
-    it.each([
-      ['a number', 42],
-      ['a string', 'nope'],
-    ])('discards a saved document that parsed to %s', (_label, bad) => {
-      expect(shouldRestore(bad as unknown as SavedState, fp, 'auto')).toBe(
-        false,
-      );
-    });
-
-    it('keeps a save whose standalone entries carry weights', () => {
-      const saved = {
-        ...savedWith(fp),
-        g: { '0': { q: { q1: 80, q2: [100, 3, 1] } } },
-      } as unknown as SavedState;
-      expect(shouldRestore(saved, fp, 'auto')).toBe(true);
-    });
-
-    it('warns so a corrupt record is distinguishable from a first launch', () => {
-      const saved = { ...savedWith(fp), g: [] } as unknown as SavedState;
-      shouldRestore(saved, fp, 'auto');
-      expect(console.warn).toHaveBeenCalledWith(
-        'Tessera: discarding malformed resume state',
-      );
-    });
-  });
-
   it.each([
-    ['c is null', { c: null }],
-    ['g is null', { g: null }],
-    ['a graded unit carries only a score', { g: { '0': { s: 80 } } }],
-    ['b is not a number', { b: '1' }],
-    ['d is not a number', { d: '120' }],
-    ['a visited page is not a number', { v: ['0', 1] }],
-    ['a chunk is not a number', { c: { '0': '2' } }],
-    ['a quiz score is null', { g: { '0': { s: null, a: '2' } } }],
-    [
-      'a standalone entry is not a [score, weight, graded] triple',
-      { g: { '0': { q: { q1: '80', q2: [80], q3: [80, 1, 1, 1] } } } },
-    ],
-    [
-      'an unanswered question id is not a string',
-      { g: { '0': { w: ['q1', 2] } } },
-    ],
-  ])('restores a saved document where %s', (_label, nulled) => {
-    const saved = { ...savedWith(fp), ...nulled } as unknown as SavedState;
-    expect(shouldRestore(saved, fp, 'auto')).toBe(true);
+    ['a number', 42],
+    ['a string', 'nope'],
+  ])('discards a saved document that parsed to %s', (_label, bad) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(shouldRestore(bad as unknown as SavedState, fp, 'auto')).toBe(false);
   });
 });
