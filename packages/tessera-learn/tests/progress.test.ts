@@ -160,6 +160,23 @@ describe('ProgressState', () => {
       });
       expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
     });
+
+    it('drops a saved unanswered question id that is not a string', () => {
+      const progress = new ProgressState(
+        createManifest(3, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.restoreFrom({
+        v: [0],
+        g: { 0: { q: { q1: 100 }, w: [2, 'q2'] as never } },
+      });
+      expect(progress.toSaved().g).toEqual({
+        0: { q: { q1: 100 }, w: ['q2'] },
+      });
+
+      progress.markStandaloneQuestion(0, 'q2', 100, true);
+      expect(progress.awaitingScore(0)).toBe(false);
+    });
   });
 
   describe('toSaved / restoreFrom', () => {
@@ -229,6 +246,15 @@ describe('ProgressState', () => {
         progress.gradedUnits.get(2)?.questions,
       );
       expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it('saves a question whose id is __proto__', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.markStandaloneQuestion(2, '__proto__', 70, true);
+
+      const saved = JSON.parse(JSON.stringify(progress.toSaved()));
+      expect(Object.keys(saved.g[2].q)).toEqual(['__proto__']);
+      expect(roundTrip(progress).pageScore(2)).toBe(70);
     });
 
     it('round-trips a manual completion', () => {

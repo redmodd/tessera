@@ -363,11 +363,12 @@ export class ProgressState {
       if (unit.quizScore !== undefined) entry.s = unit.quizScore;
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
-        entry.q = {};
-        for (const [qid, { score, weight, graded }] of unit.questions) {
-          entry.q[qid] =
-            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0];
-        }
+        entry.q = Object.fromEntries(
+          [...unit.questions].map(([qid, { score, weight, graded }]) => [
+            qid,
+            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0],
+          ]),
+        );
       }
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
@@ -414,9 +415,12 @@ export class ProgressState {
               Number.isInteger(attempts) && attempts >= 1 ? attempts : 1,
           });
         }
-        if (unit.w) {
-          this.#unconfirmed.set(pageIndex, new Set(unit.w));
-          if (this.#expect(pageIndex, unit.w, true)) this.#changed();
+        const unanswered = (unit.w ?? []).filter(
+          (id): id is string => typeof id === 'string',
+        );
+        if (unanswered.length > 0) {
+          this.#unconfirmed.set(pageIndex, new Set(unanswered));
+          if (this.#expect(pageIndex, unanswered, true)) this.#changed();
         }
         for (const [qid, entry] of Object.entries(unit.q ?? {})) {
           const [score, weight, graded] = Array.isArray(entry)
