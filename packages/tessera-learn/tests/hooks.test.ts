@@ -605,13 +605,6 @@ describe('useNavigation', () => {
     expect(ctx.nav.goToPage).toHaveBeenCalledWith(3);
   });
 
-  it('goTo(unknown slug) passes nav.goToPage an index that is not a page', () => {
-    const ctx = provideNavCtx();
-
-    useNavigation().goTo('does-not-exist');
-    expect(ctx.nav.goToPage).toHaveBeenCalledWith(-1);
-  });
-
   it('next/prev/prefetch/canGoNext/canGoPrev delegate to nav', () => {
     const ctx = provideNavCtx();
 

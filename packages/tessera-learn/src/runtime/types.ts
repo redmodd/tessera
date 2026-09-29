@@ -72,8 +72,9 @@ export function isGradedPage(page: {
   return !!(page.quiz?.graded || page.graded);
 }
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 export function isPageIndex(index: number, totalPages: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < totalPages;

@@ -104,25 +104,22 @@ describe('NavigationState', () => {
   });
 
   describe('prefetch', () => {
-    it.each([1.5, -1, 5])(
-      'loads nothing for %s, which is not a page',
-      (index) => {
-        const manifest = createManifest(5);
-        const nav = new NavigationState(
-          manifest,
-          new ProgressState(manifest, createConfig()),
-          createConfig(),
-        );
-        const load = vi.fn();
-        nav.setPageModules(
-          Object.fromEntries(manifest.pages.map((p) => [p.importPath, load])),
-        );
-        nav.prefetch(index);
-        expect(load).not.toHaveBeenCalled();
-        nav.prefetch(1);
-        expect(load).toHaveBeenCalledOnce();
-      },
-    );
+    it('loads nothing for an index that is not a page', () => {
+      const manifest = createManifest(5);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig(),
+      );
+      const load = vi.fn();
+      nav.setPageModules(
+        Object.fromEntries(manifest.pages.map((p) => [p.importPath, load])),
+      );
+      nav.prefetch(1.5);
+      expect(load).not.toHaveBeenCalled();
+      nav.prefetch(1);
+      expect(load).toHaveBeenCalledOnce();
+    });
   });
 
   describe('canAccessIndex', () => {

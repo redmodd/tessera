@@ -84,7 +84,7 @@ describe('ProgressState', () => {
   describe('restoreFrom', () => {
     it('a later submit continues the restored attempt count', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: 2 } } });
+      progress.restoreFrom({ g: { 2: { s: 90, a: 2 } } });
       progress.quizCompleted(2, 40);
       expect(progress.quizAttempts(2)).toBe(3);
       expect(progress.quizScore(2)).toBe(90);
@@ -92,7 +92,7 @@ describe('ProgressState', () => {
 
     it('assumes one attempt when the save omits the count', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90 } } });
+      progress.restoreFrom({ g: { 2: { s: 90 } } });
       expect(progress.quizAttempts(2)).toBe(1);
     });
 
@@ -106,7 +106,7 @@ describe('ProgressState', () => {
       [Infinity, 1],
     ])('restores a saved attempt count of %s as %s', (a, expected) => {
       const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90, a } } });
+      progress.restoreFrom({ g: { 2: { s: 90, a } } });
       expect(progress.quizAttempts(2)).toBe(expected);
     });
 
@@ -122,7 +122,7 @@ describe('ProgressState', () => {
 
     it('drops a saved chunk that is not a whole number', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({ v: [], c: { 0: 2.5, 1: 1 } });
+      progress.restoreFrom({ c: { 0: 2.5, 1: 1 } });
       expect(progress.toSaved().c).toEqual({ 1: 1 });
     });
 
@@ -132,7 +132,6 @@ describe('ProgressState', () => {
         createConfig({ success: { from: 'quiz' } }),
       );
       progress.restoreFrom({
-        v: [],
         g: { 0: { s: 5000 }, 1: { q: { q1: -20 } } },
         p: 250,
       });
@@ -160,7 +159,6 @@ describe('ProgressState', () => {
     it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
-        v: [],
         g: { 0: { q: { q1: [80, 1, 7] } } },
       });
       expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
@@ -184,26 +182,25 @@ describe('ProgressState', () => {
     });
 
     it.each([
-      ['null records', { v: [0], c: null, g: null }],
-      ['records of the wrong type', { v: [0], c: 3, g: [{ s: 80 }] }],
-    ])('skips %s and keeps the rest', (_label, saved) => {
+      ['null records', { v: [0], c: null, g: null }, { v: [0] }],
+      [
+        'records of the wrong type',
+        { v: [0], c: 3, g: [{ s: 80 }] },
+        { v: [0] },
+      ],
+      [
+        'a list or nested record of the wrong type',
+        {
+          v: 'nope',
+          c: { 1: 2 },
+          g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
+        },
+        { v: [], c: { 1: 2 }, g: { 1: { s: 80 } } },
+      ],
+    ])('skips %s and keeps the rest', (_label, saved, expected) => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom(saved);
-      expect(progress.toSaved()).toEqual({ v: [0] });
-    });
-
-    it('skips a saved list or record of the wrong type and keeps the rest', () => {
-      const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({
-        v: 'nope',
-        c: { 1: 2 },
-        g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
-      });
-      expect(progress.toSaved()).toEqual({
-        v: [],
-        c: { 1: 2 },
-        g: { 1: { s: 80 } },
-      });
+      expect(progress.toSaved()).toEqual(expected);
     });
   });
 
@@ -347,7 +344,7 @@ describe('ProgressState', () => {
 
     it('counts a quiz restored from saved state', () => {
       const progress = setup({ 1: { graded: true } });
-      progress.restoreFrom({ v: [], g: { 1: { s: 80 } } });
+      progress.restoreFrom({ g: { 1: { s: 80 } } });
       expect(progress.completionStatus).toBe('complete');
     });
   });
@@ -669,7 +666,7 @@ describe('ProgressState', () => {
           success: { from: 'none' },
         }),
       );
-      progress.restoreFrom({ v: [], g: { 0: { s: 40 } }, s: 1, k: 1, p: 75 });
+      progress.restoreFrom({ g: { 0: { s: 40 } }, s: 1, k: 1, p: 75 });
 
       expect(progress.successStatus).toBe('unknown');
       expect(progress.reportedScore).toBe(40);
@@ -682,7 +679,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.restoreFrom({ v: [], s: 1 });
+      progress.restoreFrom({ s: 1 });
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
@@ -987,7 +984,7 @@ describe('ProgressState', () => {
       expect(saved.toSaved().g?.[0]?.w).toBeUndefined();
 
       const progress = new ProgressState(manifest, createConfig());
-      progress.restoreFrom({ v: [], g: { 0: { q: { q1: 100 }, w: ['q2'] } } });
+      progress.restoreFrom({ g: { 0: { q: { q1: 100 }, w: ['q2'] } } });
       progress.registerStandaloneQuestion(0, 'q1', true);
       progress.pageMounted(0);
 
@@ -1330,7 +1327,7 @@ describe('ProgressState', () => {
         createConfig({ completion: { mode: 'quiz' } }),
       );
 
-      progress.restoreFrom({ v: [], g: { 0: { s: 100 }, 1: { s: 0 } } });
+      progress.restoreFrom({ g: { 0: { s: 100 }, 1: { s: 0 } } });
 
       expect(progress.reportedCompletionStatus).toBe('incomplete');
       expect(progress.gradedScoreFinal).toBe(false);

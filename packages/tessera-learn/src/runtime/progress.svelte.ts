@@ -392,7 +392,7 @@ export class ProgressState {
    * Apply saved progress without latching partway, then restore the saved
    * latches. A saved pass the course can no longer give is dropped.
    */
-  restoreFrom(saved: { [K in keyof SavedProgress]?: unknown }): void {
+  restoreFrom(saved: Partial<Record<keyof SavedProgress, unknown>>): void {
     const pageEntries = (record: unknown) =>
       Object.entries(isRecord(record) ? record : {}).flatMap(([key, value]) => {
         const pageIndex = Number(key);

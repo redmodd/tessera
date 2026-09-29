@@ -96,7 +96,8 @@ export class NavigationState {
 
   canAccessIndex(index: number): boolean {
     return (
-      isPageIndex(index, this.manifest.totalPages) && !this.#isPageLocked(index)
+      isPageIndex(index, this.manifest.totalPages) &&
+      (this.#auditMode || !this.#lockedSet.has(index))
     );
   }
 
@@ -110,11 +111,6 @@ export class NavigationState {
 
   goPrev() {
     this.goToPage(this.currentPageIndex - 1);
-  }
-
-  #isPageLocked(index: number): boolean {
-    if (this.#auditMode) return false;
-    return this.#lockedSet.has(index);
   }
 
   // Resolve the access predicate once (course.runtime.js canAccess, or the
