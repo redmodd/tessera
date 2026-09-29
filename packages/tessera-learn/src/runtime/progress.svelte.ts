@@ -392,8 +392,8 @@ export class ProgressState {
    * Apply saved progress without latching partway, then restore the saved
    * latches. A saved pass the course can no longer give is dropped.
    */
-  restoreFrom(saved: SavedProgress): void {
-    const pageEntries = <T>(record?: Record<string, T>) =>
+  restoreFrom(saved: { [K in keyof SavedProgress]?: unknown }): void {
+    const pageEntries = (record: unknown) =>
       Object.entries(isRecord(record) ? record : {}).flatMap(([key, value]) => {
         const pageIndex = Number(key);
         return String(pageIndex) === key &&
@@ -407,7 +407,9 @@ export class ProgressState {
         this.markVisited(idx);
       }
       for (const [pageIndex, chunkIndex] of pageEntries(saved.c)) {
-        this.markChunk(pageIndex, chunkIndex);
+        if (typeof chunkIndex === 'number') {
+          this.markChunk(pageIndex, chunkIndex);
+        }
       }
       for (const [pageIndex, unit] of pageEntries(saved.g)) {
         if (!isRecord(unit)) continue;
