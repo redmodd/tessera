@@ -89,8 +89,8 @@
     "vite": "^8.3.0"
   },
   "peerDependencies": {
-    "@axe-core/playwright": ">=4",
-    "playwright": ">=1.40",
+    "@axe-core/playwright": "^4.0.0",
+    "playwright": "^1.40.0",
     "svelte": "^5.57.0"
   },
   "peerDependenciesMeta": {
