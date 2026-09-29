@@ -414,12 +414,12 @@ export class ProgressState {
       for (const [pageIndex, unit] of pageEntries(saved.g)) {
         if (!isRecord(unit)) continue;
         if (typeof unit.s === 'number') {
-          const attempts = Number(unit.a ?? 1);
           this.#write(pageIndex, {
             quizScore: clampScore(unit.s),
-            attempts: Number.isFinite(attempts)
-              ? Math.max(1, Math.ceil(attempts))
-              : 1,
+            attempts:
+              typeof unit.a === 'number' && Number.isFinite(unit.a)
+                ? Math.max(1, Math.ceil(unit.a))
+                : 1,
           });
         }
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
