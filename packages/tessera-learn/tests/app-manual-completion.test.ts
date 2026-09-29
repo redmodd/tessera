@@ -72,7 +72,7 @@ describe('manual completion in App', () => {
       expect(setSuccessStatus).toHaveBeenCalledWith('passed');
       expect(saveState.mock.lastCall![0].m).toBe(1);
     });
-    expect(progress.manuallyCompleted).toBe(true);
+    expect(progress.toSaved().m).toBe(1);
   });
 
   it('ignores completesOn outside manual mode', async () => {
@@ -82,7 +82,7 @@ describe('manual completion in App', () => {
     );
     const { progress } = navCtx();
 
-    expect(progress.manuallyCompleted).toBe(false);
+    expect(progress.toSaved().m).toBeUndefined();
     expect(progress.completionStatus).toBe('incomplete');
   });
 
@@ -103,7 +103,7 @@ describe('manual completion in App', () => {
     );
     const { progress } = navCtx();
 
-    expect(progress.manuallyCompleted).toBe(true);
+    expect(progress.toSaved().m).toBe(1);
     expect(progress.completionStatus).toBe('complete');
   });
 

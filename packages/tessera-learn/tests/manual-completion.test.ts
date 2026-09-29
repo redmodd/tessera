@@ -227,11 +227,11 @@ describe('manual completion — ProgressState', () => {
   it('markCompleteManually flips status once and is idempotent', () => {
     const progress = new ProgressState(createManifest(0), createConfig());
     expect(progress.completionStatus).toBe('incomplete');
-    expect(progress.manuallyCompleted).toBe(false);
+    expect(progress.toSaved().m).toBeUndefined();
 
     progress.markCompleteManually();
     expect(progress.completionStatus).toBe('complete');
-    expect(progress.manuallyCompleted).toBe(true);
+    expect(progress.toSaved().m).toBe(1);
 
     const versionAfterFirst = progress.version;
     progress.markCompleteManually();

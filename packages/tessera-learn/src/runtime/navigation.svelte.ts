@@ -1,5 +1,5 @@
 import type { Manifest } from '../plugin/manifest.js';
-import type { CourseConfig } from './types.js';
+import { isPageIndex, type CourseConfig } from './types.js';
 import { ProgressState } from './progress.svelte.js';
 import { resolveAccess, type AccessFn } from './access.js';
 
@@ -37,13 +37,9 @@ export class NavigationState {
   #canAccess: AccessFn | undefined;
   currentPageIndex = $state(0);
 
-  canGoPrev = $derived(this.currentPageIndex > 0);
+  canGoPrev = $derived(this.canAccessIndex(this.currentPageIndex - 1));
 
-  canGoNext = $derived.by(() => {
-    const next = this.currentPageIndex + 1;
-    if (next >= this.manifest.totalPages) return false;
-    return !this.isPageLocked(next);
-  });
+  canGoNext = $derived(this.canAccessIndex(this.currentPageIndex + 1));
 
   // Memo cache so the derived can return a stable Set reference when
   // membership is unchanged (two Sets with identical contents are not `===`).
@@ -93,30 +89,28 @@ export class NavigationState {
    * so callers don't need to guard.
    */
   prefetch(index: number) {
-    if (!this.#pageModules) return;
-    if (index < 0 || index >= this.manifest.totalPages) return;
-    if (this.isPageLocked(index)) return;
+    if (!this.#pageModules || !this.canAccessIndex(index)) return;
     const page = this.manifest.pages[index];
     void this.#pageModules[page.importPath]?.();
   }
 
+  canAccessIndex(index: number): boolean {
+    return (
+      isPageIndex(index, this.manifest.totalPages) &&
+      (this.#auditMode || !this.#lockedSet.has(index))
+    );
+  }
+
   goToPage(index: number) {
-    if (index < 0 || index >= this.manifest.totalPages) return;
-    if (this.isPageLocked(index)) return;
-    this.currentPageIndex = index;
+    if (this.canAccessIndex(index)) this.currentPageIndex = index;
   }
 
   goNext() {
-    if (this.canGoNext) this.goToPage(this.currentPageIndex + 1);
+    this.goToPage(this.currentPageIndex + 1);
   }
 
   goPrev() {
-    if (this.canGoPrev) this.goToPage(this.currentPageIndex - 1);
-  }
-
-  isPageLocked(index: number): boolean {
-    if (this.#auditMode) return false;
-    return this.#lockedSet.has(index);
+    this.goToPage(this.currentPageIndex - 1);
   }
 
   // Resolve the access predicate once (course.runtime.js canAccess, or the

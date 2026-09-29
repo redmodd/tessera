@@ -357,7 +357,7 @@ A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in
 
 ### Per-question weighting
 
-Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places; in a quiz each `score` is 0 or 100, standalone it is whatever `score()` returns. Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
+Pass `weight` (default 1; non-positive or non-finite treated as 1) to change how much a question pulls on the page score; works inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places; in a quiz each `score` is 0 or 100, standalone it is what `score()` returns, clamped to 0–100 (non-finite counts as 0). Weights affect only the page-level `cmi.core.score.raw` rollup, not `cmi.interactions.*` (each question is still one pass/fail interaction). Editing a weight after learners have saved progress applies the next time each learner opens that page; pages they never revisit keep the weight their answer was saved with.
 
 ### Per-page weighting
 
@@ -899,11 +899,11 @@ function useNavigation(): {
   readonly currentPageIndex: number;
   readonly pages: ManifestPage[];
   goTo(slug: string): void;
-  goToIndex(index: number): void;
+  goToIndex(index: number): void; // no-op for a locked page or an index that is not a whole number in range
   next(): void;
   prev(): void;
-  readonly canGoNext: boolean;
-  readonly canGoPrev: boolean;
+  readonly canGoNext: boolean; // false when the next page is locked
+  readonly canGoPrev: boolean; // false when the previous page is locked
   canAccess(slug: string): boolean; // first page with that slug; slugs repeat across lessons
   canAccessIndex(index: number): boolean; // use this when iterating pages or sections
   readonly sections: ManifestSection[]; // course tree: { title, slug, lessons: [{ title, slug, pages }] }
@@ -926,8 +926,8 @@ function useProgress(): {
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
   readonly completionStatus: 'incomplete' | 'complete'; // live, so it can drop after the LMS is told complete; the LMS stays complete
   readonly successStatus: 'unknown' | 'passed' | 'failed'; // passed only once the course completes, then held
-  markVisited(pageIndex: number): void;
-  markChunk(pageIndex: number, chunkIndex: number): void;
+  markVisited(pageIndex: number): void; // no-op for an index that is not a page in the course
+  markChunk(pageIndex: number, chunkIndex: number): void; // same, and for a chunkIndex that is not a whole number
 };
 ```
 

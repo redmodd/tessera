@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { NavigationState } from '../src/runtime/navigation.svelte.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
@@ -92,6 +92,55 @@ describe('NavigationState', () => {
     });
   });
 
+  describe('prefetch', () => {
+    it('loads nothing for an index that is not a page', () => {
+      const manifest = createManifest(5);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig(),
+      );
+      const load = vi.fn();
+      nav.setPageModules(
+        Object.fromEntries(manifest.pages.map((p) => [p.importPath, load])),
+      );
+      nav.prefetch(1.5);
+      expect(load).not.toHaveBeenCalled();
+      nav.prefetch(1);
+      expect(load).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('canAccessIndex', () => {
+    it('is true only for an unlocked page the course has', () => {
+      const manifest = createManifest(5);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig({ navigation: { mode: 'sequential' } }),
+      );
+      expect(nav.canAccessIndex(0)).toBe(true);
+      expect(nav.canAccessIndex(3)).toBe(false);
+      expect(nav.canAccessIndex(-1)).toBe(false);
+      expect(nav.canAccessIndex(0.5)).toBe(false);
+      expect(nav.canAccessIndex(5)).toBe(false);
+    });
+
+    it('uses the canAccess option over the navigation.mode preset', () => {
+      const manifest = createManifest(3);
+      const progress = new ProgressState(manifest, createConfig());
+      const config = createConfig({ navigation: { mode: 'free' } });
+      const nav = new NavigationState(manifest, progress, config, {
+        canAccess: ({ pageIndex, progress }) =>
+          pageIndex === 0 || progress.visitedPages.has(0),
+      });
+
+      expect(nav.canAccessIndex(1)).toBe(false);
+      progress.markVisited(0);
+      expect(nav.canAccessIndex(1)).toBe(true);
+    });
+  });
+
   describe('canGoPrev', () => {
     it('is false at index 0', () => {
       const nav = new NavigationState(
@@ -110,6 +159,18 @@ describe('NavigationState', () => {
       );
       nav.goToPage(1);
       expect(nav.canGoPrev).toBe(true);
+    });
+
+    it('is false when the previous page is locked', () => {
+      const manifest = createManifest(3);
+      const nav = new NavigationState(
+        manifest,
+        new ProgressState(manifest, createConfig()),
+        createConfig(),
+        { canAccess: ({ pageIndex }) => pageIndex !== 1 },
+      );
+      nav.currentPageIndex = 2;
+      expect(nav.canGoPrev).toBe(false);
     });
   });
 
@@ -178,9 +239,10 @@ describe('NavigationState', () => {
     });
 
     it('is true when current page is visited', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const manifest = createManifest(3);
+      const progress = new ProgressState(manifest, createConfig());
       const nav = new NavigationState(
-        createManifest(3),
+        manifest,
         progress,
         createConfig({ navigation: { mode: 'sequential' } }),
       );
@@ -258,22 +320,6 @@ describe('NavigationState', () => {
       );
       nav.goPrev();
       expect(nav.currentPageIndex).toBe(0);
-    });
-  });
-
-  describe('isPageLocked', () => {
-    it('uses the canAccess option over the navigation.mode preset', () => {
-      const manifest = createManifest(3);
-      const progress = new ProgressState(manifest, createConfig());
-      const config = createConfig({ navigation: { mode: 'free' } });
-      const nav = new NavigationState(manifest, progress, config, {
-        canAccess: ({ pageIndex, progress }) =>
-          pageIndex === 0 || progress.visitedPages.has(0),
-      });
-
-      expect(nav.isPageLocked(1)).toBe(true);
-      progress.markVisited(0);
-      expect(nav.isPageLocked(1)).toBe(false);
     });
   });
 

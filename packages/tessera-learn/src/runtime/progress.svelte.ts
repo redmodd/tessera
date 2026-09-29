@@ -3,13 +3,22 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Manifest } from '../plugin/manifest.js';
 import {
   isGradedPage,
+  isPageIndex,
+  isRecord,
   isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
 } from './types.js';
-import type { CompletionStatus, SuccessStatus } from './persistence.js';
+import type {
+  CompletionStatus,
+  GradedUnitState,
+  SavedState,
+  SuccessStatus,
+} from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
+
+type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
 export interface StandaloneResult {
   score: number;
@@ -21,6 +30,10 @@ export function normalizeWeight(weight: unknown): number {
   return typeof weight === 'number' && Number.isFinite(weight) && weight > 0
     ? weight
     : 1;
+}
+
+function clampScore(score: number): number {
+  return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
 
 export function weightedScore(
@@ -110,10 +123,6 @@ export class ProgressState {
    */
   version = $state(0);
 
-  get manuallyCompleted(): boolean {
-    return this.#manuallyCompleted;
-  }
-
   get passingScore(): number {
     return this.#config.scoring.passingScore;
   }
@@ -126,6 +135,7 @@ export class ProgressState {
   }
 
   markVisited(pageIndex: number) {
+    if (!isPageIndex(pageIndex, this.#totalPages)) return;
     if (this.visitedPages.has(pageIndex)) return;
     this.visitedPages.add(pageIndex);
     this.#changed();
@@ -149,16 +159,10 @@ export class ProgressState {
     });
   }
 
-  /** Seed a quiz page from saved state, without counting a new attempt. */
-  restoreQuiz(pageIndex: number, score: number, attempts: number) {
-    this.#write(pageIndex, {
-      quizScore: score,
-      ...(attempts > 0 ? { attempts } : {}),
-    });
-  }
-
   /** Record the highest chunk index revealed on a page. Only advances forward. */
   markChunk(pageIndex: number, chunkIndex: number) {
+    if (!isPageIndex(pageIndex, this.#totalPages)) return;
+    if (!Number.isInteger(chunkIndex)) return;
     const current = this.chunkProgress.get(pageIndex) ?? -1;
     if (chunkIndex <= current) return;
     this.chunkProgress.set(pageIndex, chunkIndex);
@@ -190,7 +194,7 @@ export class ProgressState {
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
     questions.set(questionId, {
-      score,
+      score: clampScore(score),
       weight: normalizeWeight(weight),
       graded,
     });
@@ -229,11 +233,6 @@ export class ProgressState {
     }
   }
 
-  restoreUnanswered(pageIndex: number, questionIds: string[]) {
-    this.#unconfirmed.set(pageIndex, new Set(questionIds));
-    if (this.#expect(pageIndex, questionIds, true)) this.#changed();
-  }
-
   pageMounted(pageIndex: number) {
     const stale = this.#unconfirmed.get(pageIndex);
     if (!stale) return;
@@ -244,7 +243,7 @@ export class ProgressState {
   }
 
   /** Unanswered graded questions the manifest doesn't list, which a save carries until they register again. */
-  unlistedUnanswered(pageIndex: number): string[] {
+  #unlistedUnanswered(pageIndex: number): string[] {
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const listed = this.#listedQuestions.get(pageIndex);
     return [...(this.#expected.get(pageIndex) ?? [])].filter(
@@ -343,10 +342,6 @@ export class ProgressState {
 
   #gradedScoreDecided = $state(false);
 
-  get gradedScoreDecided(): boolean {
-    return this.#gradedScoreDecided;
-  }
-
   get gradedScoreFinal(): boolean {
     const { count, allScored } = this.#graded;
     return (
@@ -360,36 +355,107 @@ export class ProgressState {
   #completionReached = $state(false);
   #passScore = $state<number | null>(null);
 
-  get passScore(): number | null {
-    return this.#passScore;
-  }
-
   #replaying = false;
+
+  toSaved(): SavedProgress {
+    const g: Record<string, GradedUnitState> = {};
+    for (const [pageIndex, unit] of this.gradedUnits) {
+      const entry: GradedUnitState = {};
+      if (unit.quizScore !== undefined) entry.s = unit.quizScore;
+      if (unit.attempts > 1) entry.a = unit.attempts;
+      if (unit.questions?.size) {
+        entry.q = Object.fromEntries(
+          [...unit.questions].map(([qid, { score, weight, graded }]) => [
+            qid,
+            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0],
+          ]),
+        );
+      }
+      const unanswered = this.#unlistedUnanswered(pageIndex);
+      if (unanswered.length > 0) entry.w = unanswered;
+      if (Object.keys(entry).length > 0) g[pageIndex] = entry;
+    }
+    return {
+      v: [...this.visitedPages],
+      ...(Object.keys(g).length > 0 ? { g } : {}),
+      ...(this.chunkProgress.size > 0
+        ? { c: Object.fromEntries(this.chunkProgress) }
+        : {}),
+      ...(this.#manuallyCompleted ? { m: 1 } : {}),
+      ...(this.#gradedScoreDecided ? { s: 1 } : {}),
+      ...(this.reportedCompletionStatus === 'complete' ? { k: 1 } : {}),
+      ...(this.#passScore !== null ? { p: this.#passScore } : {}),
+    };
+  }
 
   /**
    * Apply saved progress without latching partway, then restore the saved
    * latches. A saved pass the course can no longer give is dropped.
    */
-  replay(
-    apply: () => void,
-    latches: {
-      decided: boolean;
-      completed: boolean;
-      passScore: number | null;
-    },
-  ): void {
+  restoreFrom(saved: Partial<Record<keyof SavedProgress, unknown>>): void {
+    const pageEntries = (record: unknown) =>
+      Object.entries(isRecord(record) ? record : {}).flatMap(([key, value]) => {
+        const pageIndex = Number(key);
+        return String(pageIndex) === key &&
+          isPageIndex(pageIndex, this.#totalPages)
+          ? [[pageIndex, value] as const]
+          : [];
+      });
     this.#replaying = true;
     try {
-      apply();
+      for (const idx of Array.isArray(saved.v) ? saved.v : []) {
+        this.markVisited(idx);
+      }
+      for (const [pageIndex, chunkIndex] of pageEntries(saved.c)) {
+        if (typeof chunkIndex === 'number') {
+          this.markChunk(pageIndex, chunkIndex);
+        }
+      }
+      for (const [pageIndex, unit] of pageEntries(saved.g)) {
+        if (!isRecord(unit)) continue;
+        if (typeof unit.s === 'number') {
+          this.#write(pageIndex, {
+            quizScore: clampScore(unit.s),
+            attempts:
+              typeof unit.a === 'number' && Number.isFinite(unit.a)
+                ? Math.max(1, Math.ceil(unit.a))
+                : 1,
+          });
+        }
+        const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
+          (id): id is string => typeof id === 'string',
+        );
+        if (unanswered.length > 0) {
+          this.#unconfirmed.set(pageIndex, new Set(unanswered));
+          if (this.#expect(pageIndex, unanswered, true)) this.#changed();
+        }
+        for (const [qid, entry] of Object.entries(
+          isRecord(unit.q) ? unit.q : {},
+        )) {
+          const [score, weight, graded] = Array.isArray(entry)
+            ? entry
+            : [entry, 1, 1];
+          if (typeof score !== 'number') continue;
+          this.markStandaloneQuestion(
+            pageIndex,
+            qid,
+            score,
+            graded === 1,
+            weight,
+          );
+        }
+      }
+      if (saved.m === 1) this.markCompleteManually();
     } finally {
       this.#replaying = false;
     }
-    this.#gradedScoreDecided = latches.decided;
-    this.#completionReached = latches.completed;
+    this.#gradedScoreDecided = saved.s === 1;
+    this.#completionReached = saved.k === 1;
     const canPass =
       this.#success.from === 'quiz' ||
       (this.#success.from === 'fixed' && this.#success.status === 'passed');
-    this.#passScore = canPass ? latches.passScore : null;
+    this.#passScore =
+      canPass && typeof saved.p === 'number' ? clampScore(saved.p) : null;
     this.#latch();
   }
 

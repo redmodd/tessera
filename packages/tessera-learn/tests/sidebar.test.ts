@@ -7,7 +7,7 @@ import { setNavContext } from '../src/runtime/contexts.js';
 
 function mountSidebar({
   slugs = ['welcome'],
-  isPageLocked = (_i: number): boolean => false,
+  canAccessIndex = (_i: number): boolean => true,
   config = { title: 'Demo' } as object,
 } = {}) {
   const pages = slugs.map((slug, index) => ({
@@ -33,7 +33,7 @@ function mountSidebar({
   };
   const nav = {
     currentPageIndex: 0,
-    isPageLocked,
+    canAccessIndex,
     prefetch: () => {},
     goToPage: () => {},
   };
@@ -78,7 +78,7 @@ describe('Sidebar', () => {
   it('locks pages by index when two lessons share a page slug', () => {
     const target = mountSidebar({
       slugs: ['01-overview', '01-overview'],
-      isPageLocked: (i) => i === 1,
+      canAccessIndex: (i) => i !== 1,
     });
 
     const buttons = target.querySelectorAll('.tessera-nav-page');

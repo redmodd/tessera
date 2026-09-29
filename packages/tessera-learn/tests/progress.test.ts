@@ -5,8 +5,6 @@ import {
 } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
-const NO_LATCHES = { decided: false, completed: false, passScore: null };
-
 describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
@@ -18,25 +16,43 @@ describe('weightedScore', () => {
 describe('ProgressState', () => {
   describe('markVisited', () => {
     it('adds page index to visited set', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       expect(progress.visitedPages.has(0)).toBe(true);
     });
 
     it('is idempotent', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       progress.markVisited(0);
       expect(progress.visitedPages.size).toBe(1);
     });
 
     it('tracks multiple pages', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
+      const progress = new ProgressState(createManifest(6), createConfig());
       progress.markVisited(0);
       progress.markVisited(3);
       progress.markVisited(5);
       expect(progress.visitedPages.size).toBe(3);
       expect(progress.visitedPages.has(3)).toBe(true);
+    });
+
+    it.each([6, -1, 1.5])('ignores %s, which is not a page', (index) => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markVisited(index);
+      expect(progress.visitedPages.size).toBe(0);
+    });
+  });
+
+  describe('markChunk', () => {
+    it.each([
+      [6, 1],
+      [1.5, 1],
+      [0, 1.5],
+    ])('ignores page %s chunk %s', (page, chunk) => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markChunk(page, chunk);
+      expect(progress.chunkProgress.size).toBe(0);
     });
   });
 
@@ -65,20 +81,231 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('restoreQuiz', () => {
-    it('seeds score and attempts without counting a new attempt', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.restoreQuiz(2, 90, 2);
-      expect(progress.quizScore(2)).toBe(90);
-      expect(progress.quizAttempts(2)).toBe(2);
-    });
-
+  describe('restoreFrom', () => {
     it('a later submit continues the restored attempt count', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      progress.restoreQuiz(2, 90, 2);
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ g: { 2: { s: 90, a: 2 } } });
       progress.quizCompleted(2, 40);
       expect(progress.quizAttempts(2)).toBe(3);
       expect(progress.quizScore(2)).toBe(90);
+    });
+
+    it('assumes one attempt when the save omits the count', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ g: { 2: { s: 90 } } });
+      expect(progress.quizAttempts(2)).toBe(1);
+    });
+
+    it.each([
+      [0, 1],
+      [2.7, 3],
+      ['3', 1],
+      [Infinity, 1],
+    ])('restores a saved attempt count of %s as %s', (a, expected) => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ g: { 2: { s: 90, a } } });
+      expect(progress.quizAttempts(2)).toBe(expected);
+    });
+
+    it('drops saved progress for pages the course does not have', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: [0, 3, 1.5, -1],
+        c: { 3: 1, x: 2, '': 1, '1e0': 1 },
+        g: { 3: { s: 90 }, NaN: { q: { q1: 100 } }, ' ': { s: 90 } },
+      });
+      expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
+    it('drops a saved chunk that is not a whole number', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({ c: { 0: 2.5, 1: 1 } });
+      expect(progress.toSaved().c).toEqual({ 1: 1 });
+    });
+
+    it('clamps saved scores to 0-100', () => {
+      const progress = new ProgressState(
+        createManifest(3),
+        createConfig({ success: { from: 'quiz' } }),
+      );
+      progress.restoreFrom({
+        g: { 0: { s: 5000 }, 1: { q: { q1: -20 } } },
+        p: 250,
+      });
+      expect(progress.quizScore(0)).toBe(100);
+      expect(progress.getPageStandaloneAverage(1)).toBe(0);
+      expect(progress.reportedScore).toBe(100);
+    });
+
+    it('drops a saved quiz or question score that is not a number, keeping the rest', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: [0, '1'],
+        g: {
+          0: { s: null, a: 2 },
+          1: { s: '80' },
+          2: { q: { bad: '80', gone: [null, 1, 1], kept: 70 } },
+        },
+      });
+      expect(progress.toSaved()).toEqual({
+        v: [0],
+        g: { 2: { q: { kept: 70 } } },
+      });
+    });
+
+    it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        g: { 0: { q: { q1: [80, 1, 7] } } },
+      });
+      expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
+    });
+
+    it('drops a saved unanswered question id that is not a string', () => {
+      const progress = new ProgressState(
+        createManifest(3, {}, { 0: { graded: true } }),
+        createConfig(),
+      );
+      progress.restoreFrom({
+        v: [0],
+        g: { 0: { q: { q1: 100 }, w: [2, 'q2'] } },
+      });
+      expect(progress.toSaved().g).toEqual({
+        0: { q: { q1: 100 }, w: ['q2'] },
+      });
+
+      progress.markStandaloneQuestion(0, 'q2', 100, true);
+      expect(progress.awaitingScore(0)).toBe(false);
+    });
+
+    it.each([
+      ['null records', { v: [0], c: null, g: null }, { v: [0] }],
+      [
+        'records of the wrong type',
+        { v: [0], c: 3, g: [{ s: 80 }] },
+        { v: [0] },
+      ],
+      [
+        'a list or nested record of the wrong type',
+        {
+          v: 'nope',
+          c: { 1: 2 },
+          g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
+        },
+        { v: [], c: { 1: 2 }, g: { 1: { s: 80 } } },
+      ],
+    ])('skips %s and keeps the rest', (_label, saved, expected) => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom(saved);
+      expect(progress.toSaved()).toEqual(expected);
+    });
+  });
+
+  describe('toSaved / restoreFrom', () => {
+    const manifest = createManifest(
+      4,
+      { 1: { graded: true } },
+      { 2: { graded: true }, 3: { graded: true } },
+    );
+    const config = createConfig({
+      completion: { mode: 'manual' },
+      success: { from: 'quiz' },
+      scoring: { passingScore: 50 },
+    });
+    const roundTrip = (progress: ProgressState, restoreConfig = config) => {
+      const restored = new ProgressState(manifest, restoreConfig);
+      restored.restoreFrom(progress.toSaved());
+      return restored;
+    };
+
+    it('saves nothing but an empty visited list for fresh progress', () => {
+      const progress = new ProgressState(manifest, config);
+      expect(progress.toSaved()).toEqual({ v: [] });
+    });
+
+    it('round-trips visited pages, chunks and quiz results', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.markVisited(0);
+      progress.markVisited(1);
+      progress.markChunk(0, 2);
+      progress.quizCompleted(1, 40);
+      progress.quizCompleted(1, 80);
+
+      const saved = progress.toSaved();
+      expect(saved.v).toEqual([0, 1]);
+      expect(saved.c).toEqual({ 0: 2 });
+      expect(saved.g).toEqual({ 1: { s: 80, a: 2 } });
+
+      const restored = roundTrip(progress);
+      expect([...restored.visitedPages]).toEqual([0, 1]);
+      expect(restored.getChunk(0)).toBe(2);
+      expect(restored.quizScore(1)).toBe(80);
+      expect(restored.quizAttempts(1)).toBe(2);
+      expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it('saves a graded weight-1 question as its score and any other as a tuple', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.markStandaloneQuestion(2, 'plain', 70, true);
+      progress.markStandaloneQuestion(2, 'heavy', 90, true, 3);
+      progress.markStandaloneQuestion(2, 'practice', 10, false);
+
+      const saved = progress.toSaved();
+      expect(saved.g?.[2]?.q).toEqual({
+        plain: 70,
+        heavy: [90, 3, 1],
+        practice: [10, 1, 0],
+      });
+
+      const restored = roundTrip(progress);
+      expect(restored.gradedUnits.get(2)?.questions).toEqual(
+        progress.gradedUnits.get(2)?.questions,
+      );
+      expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it('saves a question whose id is __proto__', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.markStandaloneQuestion(2, '__proto__', 70, true);
+
+      const saved = JSON.parse(JSON.stringify(progress.toSaved()));
+      expect(Object.keys(saved.g[2].q)).toEqual(['__proto__']);
+      expect(roundTrip(progress).pageScore(2)).toBe(70);
+    });
+
+    it('round-trips a manual completion', () => {
+      const progress = new ProgressState(manifest, config);
+      progress.markCompleteManually();
+
+      const saved = progress.toSaved();
+      expect(saved).toMatchObject({ m: 1 });
+
+      const restored = roundTrip(progress);
+      expect(restored.completionStatus).toBe('complete');
+      expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it('round-trips the completion, final score and pass a lowered score no longer gives', () => {
+      const quizConfig = createConfig({
+        completion: { mode: 'quiz' },
+        success: { from: 'quiz' },
+        scoring: { passingScore: 50 },
+      });
+      const progress = new ProgressState(manifest, quizConfig);
+      progress.markStandaloneQuestion(2, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 100, true);
+      progress.markStandaloneQuestion(3, 'q1', 0, true);
+
+      const saved = progress.toSaved();
+      expect(saved).toMatchObject({ s: 1, k: 1, p: 66.67 });
+
+      const restored = roundTrip(progress, quizConfig);
+      expect(restored.completionStatus).toBe('incomplete');
+      expect(restored.reportedCompletionStatus).toBe('complete');
+      expect(restored.gradedScoreFinal).toBe(true);
+      expect(restored.successStatus).toBe('passed');
+      expect(restored.reportedScore).toBe(66.67);
+      expect(restored.toSaved()).toEqual(saved);
     });
   });
 
@@ -114,7 +341,7 @@ describe('ProgressState', () => {
 
     it('counts a quiz restored from saved state', () => {
       const progress = setup({ 1: { graded: true } });
-      progress.restoreQuiz(1, 80, 1);
+      progress.restoreFrom({ g: { 1: { s: 80 } } });
       expect(progress.completionStatus).toBe('complete');
     });
   });
@@ -436,11 +663,7 @@ describe('ProgressState', () => {
           success: { from: 'none' },
         }),
       );
-      progress.replay(() => progress.restoreQuiz(0, 40, 1), {
-        decided: true,
-        completed: true,
-        passScore: 75,
-      });
+      progress.restoreFrom({ g: { 0: { s: 40 } }, s: 1, k: 1, p: 75 });
 
       expect(progress.successStatus).toBe('unknown');
       expect(progress.reportedScore).toBe(40);
@@ -453,7 +676,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 0, true);
       expect(progress.gradedScoreFinal).toBe(false);
 
-      progress.replay(() => {}, { ...NO_LATCHES, decided: true });
+      progress.restoreFrom({ s: 1 });
 
       expect(progress.gradedScoreFinal).toBe(true);
       expect(progress.successStatus).toBe('failed');
@@ -480,6 +703,18 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 80, true);
       progress.markStandaloneQuestion(3, 'q2', 100, true);
       expect(progress.getPageStandaloneAverage(3)).toBe(90);
+    });
+
+    it.each([
+      [150, 100],
+      [-5, 0],
+      [Number.NaN, 0],
+    ])('clamps a score of %j to %s', (score, expected) => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'q1', score, true);
+      expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.score).toBe(
+        expected,
+      );
     });
   });
 
@@ -678,19 +913,15 @@ describe('ProgressState', () => {
     it('carries the unanswered questions across a resume', () => {
       const saved = onePage();
       saved.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      expect(saved.unlistedUnanswered(0)).toEqual(['q-light']);
+      expect(saved.toSaved().g?.[0]?.w).toEqual(['q-light']);
 
       const progress = new ProgressState(
         createManifest(1, {}, { 0: { graded: true } }),
         createConfig(),
       );
-      progress.replay(() => {
-        progress.markVisited(0);
-        progress.restoreUnanswered(0, saved.unlistedUnanswered(0));
-        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      }, NO_LATCHES);
+      progress.restoreFrom(saved.toSaved());
 
-      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
+      expect(progress.toSaved().g?.[0]?.w).toEqual(['q-light']);
       expect(progress.awaitingScore(0)).toBe(true);
       expect(progress.completionStatus).toBe('incomplete');
     });
@@ -700,16 +931,17 @@ describe('ProgressState', () => {
         createManifest(1, {}, { 0: { graded: true } }),
         createConfig(),
       );
-      progress.replay(() => {
-        progress.markVisited(0);
-        progress.restoreUnanswered(0, ['q-light', 'q-removed']);
-        progress.markStandaloneQuestion(0, 'q-heavy', 100, true, 3);
-      }, NO_LATCHES);
+      progress.restoreFrom({
+        v: [0],
+        g: {
+          0: { q: { 'q-heavy': [100, 3, 1] }, w: ['q-light', 'q-removed'] },
+        },
+      });
       progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
       progress.registerStandaloneQuestion(0, 'q-light', true, 1);
       progress.pageMounted(0);
 
-      expect(progress.unlistedUnanswered(0)).toEqual(['q-light']);
+      expect(progress.toSaved().g?.[0]?.w).toEqual(['q-light']);
 
       progress.markStandaloneQuestion(0, 'q-light', 0, true, 1);
 
@@ -745,13 +977,10 @@ describe('ProgressState', () => {
       );
       const saved = new ProgressState(manifest, createConfig());
       saved.markStandaloneQuestion(0, 'q1', 100, true);
-      expect(saved.unlistedUnanswered(0)).toEqual([]);
+      expect(saved.toSaved().g?.[0]?.w).toBeUndefined();
 
       const progress = new ProgressState(manifest, createConfig());
-      progress.replay(() => {
-        progress.restoreUnanswered(0, ['q2']);
-        progress.markStandaloneQuestion(0, 'q1', 100, true);
-      }, NO_LATCHES);
+      progress.restoreFrom({ g: { 0: { q: { q1: 100 }, w: ['q2'] } } });
       progress.registerStandaloneQuestion(0, 'q1', true);
       progress.pageMounted(0);
 
@@ -1094,10 +1323,7 @@ describe('ProgressState', () => {
         createConfig({ completion: { mode: 'quiz' } }),
       );
 
-      progress.replay(() => {
-        progress.restoreQuiz(0, 100, 1);
-        progress.restoreQuiz(1, 0, 1);
-      }, NO_LATCHES);
+      progress.restoreFrom({ g: { 0: { s: 100 }, 1: { s: 0 } } });
 
       expect(progress.reportedCompletionStatus).toBe('incomplete');
       expect(progress.gradedScoreFinal).toBe(false);
