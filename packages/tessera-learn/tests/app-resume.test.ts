@@ -76,12 +76,13 @@ describe('App restore gate honours config.resume', () => {
     'keeps the rest of a save whose bookmark, graded record and duration (%s) are corrupted',
     async (d) => {
       const { saveState } = await mount('auto', {
-        saved: savedWith({ b: '1', d, g: [], c: { '1': 2 } }),
+        saved: savedWith({ b: '1', d, g: [], c: { '1': 2 }, u: ['x'] }),
       });
       await vi.waitFor(() => expect(saveState).toHaveBeenCalled());
       const last = saveState.mock.lastCall![0];
       expect(last).toMatchObject({ b: 0, v: [0, 1], c: { '1': 2 } });
       expect(last.g).toBeUndefined();
+      expect(last.u).toBeUndefined();
       expect(last.d).toBeGreaterThanOrEqual(0);
       expect(last.d).toBeLessThan(120);
     },

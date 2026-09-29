@@ -18,6 +18,7 @@
   import { DurationTracker } from './duration.js';
   import { createAdapter } from 'virtual:tessera-adapter';
   import { structureFingerprint, shouldRestore } from './fingerprint.js';
+  import { isRecord } from './types.js';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
   import { registerXAPIClient } from './xapi/registry.js';
   import {
@@ -245,7 +246,7 @@
 
   function restoreState(saved) {
     progress.restoreFrom(saved);
-    if (saved.u && typeof saved.u === 'object') {
+    if (isRecord(saved.u)) {
       userState = { ...userState, ...saved.u };
     }
     duration = new DurationTracker(

@@ -4,6 +4,7 @@ import type { Manifest } from '../plugin/manifest.js';
 import {
   isGradedPage,
   isPageIndex,
+  isRecord,
   isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
@@ -30,9 +31,6 @@ export function normalizeWeight(weight: unknown): number {
     ? weight
     : 1;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
