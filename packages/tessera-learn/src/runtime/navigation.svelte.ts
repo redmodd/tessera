@@ -96,7 +96,7 @@ export class NavigationState {
 
   canAccessIndex(index: number): boolean {
     return (
-      isPageIndex(index, this.manifest.totalPages) && !this.isPageLocked(index)
+      isPageIndex(index, this.manifest.totalPages) && !this.#isPageLocked(index)
     );
   }
 
@@ -112,7 +112,7 @@ export class NavigationState {
     this.goToPage(this.currentPageIndex - 1);
   }
 
-  isPageLocked(index: number): boolean {
+  #isPageLocked(index: number): boolean {
     if (this.#auditMode) return false;
     return this.#lockedSet.has(index);
   }

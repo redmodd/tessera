@@ -139,6 +139,20 @@ describe('NavigationState', () => {
       expect(nav.canAccessIndex(0.5)).toBe(false);
       expect(nav.canAccessIndex(5)).toBe(false);
     });
+
+    it('uses the canAccess option over the navigation.mode preset', () => {
+      const manifest = createManifest(3);
+      const progress = new ProgressState(manifest, createConfig());
+      const config = createConfig({ navigation: { mode: 'free' } });
+      const nav = new NavigationState(manifest, progress, config, {
+        canAccess: ({ pageIndex, progress }) =>
+          pageIndex === 0 || progress.visitedPages.has(0),
+      });
+
+      expect(nav.canAccessIndex(1)).toBe(false);
+      progress.markVisited(0);
+      expect(nav.canAccessIndex(1)).toBe(true);
+    });
   });
 
   describe('canGoPrev', () => {
@@ -320,22 +334,6 @@ describe('NavigationState', () => {
       );
       nav.goPrev();
       expect(nav.currentPageIndex).toBe(0);
-    });
-  });
-
-  describe('isPageLocked', () => {
-    it('uses the canAccess option over the navigation.mode preset', () => {
-      const manifest = createManifest(3);
-      const progress = new ProgressState(manifest, createConfig());
-      const config = createConfig({ navigation: { mode: 'free' } });
-      const nav = new NavigationState(manifest, progress, config, {
-        canAccess: ({ pageIndex, progress }) =>
-          pageIndex === 0 || progress.visitedPages.has(0),
-      });
-
-      expect(nav.isPageLocked(1)).toBe(true);
-      progress.markVisited(0);
-      expect(nav.isPageLocked(1)).toBe(false);
     });
   });
 

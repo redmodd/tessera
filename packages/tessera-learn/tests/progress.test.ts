@@ -81,7 +81,7 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('restoring a quiz', () => {
+  describe('restoreFrom', () => {
     it('a later submit continues the restored attempt count', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ v: [], g: { 2: { s: 90, a: 2 } } });
@@ -101,12 +101,12 @@ describe('ProgressState', () => {
       [-3, 1],
       [1.5, 2],
       [2.7, 3],
-      ['3', 3],
+      ['3', 1],
       ['x', 1],
       [Infinity, 1],
     ])('restores a saved attempt count of %s as %s', (a, expected) => {
       const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({ v: [], g: { 2: { s: 90, a: a as number } } });
+      progress.restoreFrom({ v: [], g: { 2: { s: 90, a } } });
       expect(progress.quizAttempts(2)).toBe(expected);
     });
 
@@ -144,11 +144,11 @@ describe('ProgressState', () => {
     it('drops a saved quiz or question score that is not a number, keeping the rest', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
-        v: [0, '1' as never],
+        v: [0, '1'],
         g: {
-          0: { s: null as never, a: 2 },
-          1: { s: '80' as never },
-          2: { q: { bad: '80', gone: [null, 1, 1], kept: 70 } as never },
+          0: { s: null, a: 2 },
+          1: { s: '80' },
+          2: { q: { bad: '80', gone: [null, 1, 1], kept: 70 } },
         },
       });
       expect(progress.toSaved()).toEqual({
@@ -161,7 +161,7 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
         v: [],
-        g: { 0: { q: { q1: [80, 1, 7] as never } } },
+        g: { 0: { q: { q1: [80, 1, 7] } } },
       });
       expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
     });
@@ -173,7 +173,7 @@ describe('ProgressState', () => {
       );
       progress.restoreFrom({
         v: [0],
-        g: { 0: { q: { q1: 100 }, w: [2, 'q2'] as never } },
+        g: { 0: { q: { q1: 100 }, w: [2, 'q2'] } },
       });
       expect(progress.toSaved().g).toEqual({
         0: { q: { q1: 100 }, w: ['q2'] },
@@ -181,6 +181,29 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(0, 'q2', 100, true);
       expect(progress.awaitingScore(0)).toBe(false);
+    });
+
+    it.each([
+      ['null records', { v: [0], c: null, g: null }],
+      ['records of the wrong type', { v: [0], c: 3, g: [{ s: 80 }] }],
+    ])('skips %s and keeps the rest', (_label, saved) => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom(saved);
+      expect(progress.toSaved()).toEqual({ v: [0] });
+    });
+
+    it('skips a saved list or record of the wrong type and keeps the rest', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.restoreFrom({
+        v: 'nope',
+        c: { 1: 2 },
+        g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
+      });
+      expect(progress.toSaved()).toEqual({
+        v: [],
+        c: { 1: 2 },
+        g: { 1: { s: 80 } },
+      });
     });
   });
 
@@ -200,29 +223,6 @@ describe('ProgressState', () => {
       restored.restoreFrom(progress.toSaved());
       return restored;
     };
-
-    it.each([
-      ['null records', { v: [0], c: null, g: null }],
-      ['records of the wrong type', { v: [0], c: 3, g: [{ s: 80 }] }],
-    ])('skips %s and keeps the rest', (_label, saved) => {
-      const progress = new ProgressState(manifest, config);
-      progress.restoreFrom(saved as never);
-      expect(progress.toSaved()).toEqual({ v: [0] });
-    });
-
-    it('skips a saved list or record of the wrong type and keeps the rest', () => {
-      const progress = new ProgressState(manifest, config);
-      progress.restoreFrom({
-        v: 'nope',
-        c: { 1: 2 },
-        g: { 0: null, 1: { s: 80, q: [100], w: 'q1' } },
-      } as never);
-      expect(progress.toSaved()).toEqual({
-        v: [],
-        c: { 1: 2 },
-        g: { 1: { s: 80 } },
-      });
-    });
 
     it('saves nothing but an empty visited list for fresh progress', () => {
       const progress = new ProgressState(manifest, config);
