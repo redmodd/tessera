@@ -1,5 +1,11 @@
 # create-tessera
 
+## 0.8.0
+
+### Patch Changes
+
+- 5d21656: Internal test cleanup: scaffold tests remove their temp dirs automatically, and `pnpm check` type-checks the tests.
+
 ## 0.7.0
 
 ### Patch Changes
