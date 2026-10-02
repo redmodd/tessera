@@ -245,7 +245,7 @@ describe('exiting a course', () => {
   });
 
   it.each(leavingTheCourse)(
-    'drops a page that finishes loading after %s',
+    'drops a page still loading after %s',
     async (_, leave) => {
       let release!: () => void;
       const page = () => import('./fixtures/app-page.svelte');
@@ -260,6 +260,8 @@ describe('exiting a course', () => {
       navCtx().nav.goToPage(1);
       await flush();
       await leave();
+      await new Promise((r) => setTimeout(r, 150));
+      expect(document.querySelector('.tessera-loading-bar')).toBeNull();
       release();
       await flush();
 

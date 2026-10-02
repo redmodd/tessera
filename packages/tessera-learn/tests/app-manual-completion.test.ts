@@ -5,9 +5,12 @@ import type { CourseConfig } from '../src/runtime/types.js';
 import {
   createConfig,
   createManifest,
+  flush,
+  manualConfig,
   mountApp,
   navCtx,
   stubAdapter,
+  useFakeTimers,
 } from './helpers.js';
 
 async function mount(
@@ -67,5 +70,23 @@ describe('manual completion in App', () => {
 
     expect(progress.toSaved().m).toBeUndefined();
     expect(progress.completionStatus).toBe('incomplete');
+  });
+
+  it('starts no watchdog when App unmounts before the session starts', async () => {
+    useFakeTimers({ shouldAdvanceTime: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const init = Promise.withResolvers<void>();
+    const { unmount } = await mountApp({
+      config: manualConfig(),
+      manifest: createManifest(1),
+      adapter: stubAdapter({ init: () => init.promise }),
+    });
+
+    unmount();
+    init.resolve();
+    await flush();
+    vi.advanceTimersByTime(60_000);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

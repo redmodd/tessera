@@ -18,33 +18,26 @@ export function createSession({
   manifest = createManifest(2),
   adapter = stubAdapter(),
   xapiClient = null,
-  onLeave = () => {},
+  buildXAPIClient = async () => xapiClient as XAPIClient | null,
 }: {
   config?: CourseConfig;
   manifest?: Manifest;
   adapter?: BaseAdapter;
   xapiClient?: XAPIClientStub | null;
-  onLeave?: () => void;
+  buildXAPIClient?: () => Promise<XAPIClient | null>;
 } = {}) {
   const course = $state(config);
   const progress = new ProgressState(manifest, course);
   const nav = new NavigationState(manifest, progress, course);
-  let session!: CourseSession;
-  const destroy = $effect.root(() => {
-    session = new CourseSession({
-      adapter,
-      manifest,
-      config: course,
-      progress,
-      nav,
-      buildXAPIClient: async () => xapiClient as XAPIClient | null,
-      courseUnmounted: Promise.resolve(),
-      onLeave,
-    });
+  const session = new CourseSession({
+    adapter,
+    manifest,
+    config: course,
+    progress,
+    nav,
+    buildXAPIClient,
+    courseUnmounted: Promise.resolve(),
   });
-  onTestFinished(() => {
-    destroy();
-    session.dispose();
-  });
+  onTestFinished(() => session.dispose());
   return { session, progress, nav, config: course };
 }

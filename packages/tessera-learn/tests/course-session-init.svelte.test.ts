@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import {
   createConfig,
   createManifest,
@@ -88,27 +89,36 @@ describe('CourseSession bounds adapter.init()', () => {
 });
 
 describe('CourseSession disposed while starting', () => {
-  it('registers no xAPI client and attaches no window listeners', async () => {
-    const { registerXAPIClient, useXAPI } =
-      await import('../src/runtime/xapi/registry.js');
-    const addListener = vi.spyOn(window, 'addEventListener');
-    const init = Promise.withResolvers<void>();
-    const { session } = createSession({
-      adapter: stubAdapter({ init: () => init.promise }),
-      xapiClient: {
-        markUnloading() {},
-        markRestored() {},
-        flush: async () => {},
-      },
-    });
-    const started = session.start();
+  it.each([
+    ['adapter init', 'init'],
+    ['the xAPI client build', 'build'],
+  ] as const)(
+    'registers no xAPI client and ends no session when disposed during %s',
+    async (_, phase) => {
+      const { useXAPI } = await import('../src/runtime/xapi/registry.js');
+      const terminate = vi.fn();
+      const init = Promise.withResolvers<void>();
+      const build = Promise.withResolvers<XAPIClient | null>();
+      const { session } = createSession({
+        adapter: stubAdapter({
+          init: () => (phase === 'init' ? init.promise : Promise.resolve()),
+          terminate,
+        }),
+        buildXAPIClient: () => build.promise,
+      });
+      const started = session.start();
+      if (phase === 'build') {
+        await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+      }
 
-    session.dispose();
-    init.resolve();
+      session.dispose();
+      init.resolve();
+      build.resolve({} as XAPIClient);
+      await started;
+      window.dispatchEvent(new Event('pagehide'));
 
-    expect(await started).toBeNull();
-    expect(useXAPI()).toBeNull();
-    expect(addListener).not.toHaveBeenCalledWith('pagehide', expect.anything());
-    registerXAPIClient(null);
-  });
+      expect(useXAPI()).toBeNull();
+      expect(terminate).not.toHaveBeenCalled();
+    },
+  );
 });

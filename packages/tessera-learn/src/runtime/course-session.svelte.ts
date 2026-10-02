@@ -32,7 +32,6 @@ export interface CourseSessionDeps {
   buildXAPIClient: () => Promise<XAPIClient | null>;
   /** Resolves once the course UI has unmounted, so the final save sees its last writes. */
   courseUnmounted: Promise<void>;
-  onLeave: () => void;
 }
 
 export class CourseSession {
@@ -42,8 +41,8 @@ export class CourseSession {
   #nav: NavigationState;
   #buildXAPIClient: () => Promise<XAPIClient | null>;
   #courseUnmounted: Promise<void>;
-  #onLeave: () => void;
   #fingerprint: string;
+  #destroyEffects: () => void;
 
   #persistenceReady = $state(false);
   #launched = $state(false);
@@ -80,7 +79,6 @@ export class CourseSession {
     nav,
     buildXAPIClient,
     courseUnmounted,
-    onLeave,
   }: CourseSessionDeps) {
     this.#adapter = adapter;
     this.#config = config;
@@ -88,11 +86,12 @@ export class CourseSession {
     this.#nav = nav;
     this.#buildXAPIClient = buildXAPIClient;
     this.#courseUnmounted = courseUnmounted;
-    this.#onLeave = onLeave;
     this.#fingerprint = structureFingerprint(manifest);
 
-    this.#trackChanges();
-    this.#reportStatus();
+    this.#destroyEffects = $effect.root(() => {
+      this.#trackChanges();
+      this.#reportStatus();
+    });
   }
 
   get persistenceReady(): boolean {
@@ -175,6 +174,16 @@ export class CourseSession {
       }
     }
 
+    // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
+    // Cloud rolls that up to "completed"/"passed" during status rollup.
+    adapter.setCompletionStatus(progress.reportedCompletionStatus);
+    adapter.setSuccessStatus(progress.successStatus);
+    adapter.commit();
+
+    window.addEventListener('pagehide', this.#onPagehide);
+    window.addEventListener('pageshow', this.#onPageshow);
+    this.#launched = true;
+
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
     try {
@@ -185,22 +194,12 @@ export class CourseSession {
     }
     if (this.#disposed) return null;
     registerXAPIClient(this.#xapiClient);
-
-    // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
-    // Cloud rolls that up to "completed"/"passed" during status rollup.
-    adapter.setCompletionStatus(progress.reportedCompletionStatus);
-    adapter.setSuccessStatus(progress.successStatus);
-    adapter.commit();
-
-    window.addEventListener('pagehide', this.#onPagehide);
-    window.addEventListener('pageshow', this.#onPageshow);
-    this.#launched = true;
     return null;
   }
 
   async exit(): Promise<void> {
     if (!this.canExit) return;
-    this.#leave('ending');
+    this.#exitPhase = 'ending';
     const deadline = new Promise((resolve) =>
       setTimeout(resolve, EXIT_TIMEOUT_MS),
     );
@@ -210,13 +209,14 @@ export class CourseSession {
     await this.#adapter.exit(deadline).catch((err) => {
       console.warn('Tessera: exit failed', err);
     });
-    if (this.#exitPhase === 'ended') return;
+    if (this.exitPhase === 'ended') return;
     this.#exitPhase = 'ended';
     if (!this.#adapter.returnToLMS()) window.close();
   }
 
   dispose(): void {
     this.#disposed = true;
+    this.#destroyEffects();
     window.removeEventListener('pagehide', this.#onPagehide);
     window.removeEventListener('pageshow', this.#onPageshow);
     // A stale client from this session must not leak into a fresh one.
@@ -375,11 +375,6 @@ export class CourseSession {
     return true;
   }
 
-  #leave(phase: ExitPhase): void {
-    this.#exitPhase = phase;
-    this.#onLeave();
-  }
-
   #onPagehide = (): void => {
     if (!this.#launched) return;
     this.#endSession();
@@ -393,7 +388,7 @@ export class CourseSession {
     if (!this.#terminated || !event.persisted) return;
     this.#xapiClient?.markRestored();
     if (this.#adapter.connected) {
-      this.#leave('ended');
+      this.#exitPhase = 'ended';
       return;
     }
     this.#terminated = false;

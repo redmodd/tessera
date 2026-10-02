@@ -50,7 +50,6 @@
   }
 
   let unmountCourse;
-  let manualWatchdog = null;
   const session = new CourseSession({
     adapter,
     manifest,
@@ -60,11 +59,6 @@
     buildXAPIClient: () =>
       buildXAPIClient(config, adapter, courseRuntime?.xapi),
     courseUnmounted: new Promise((r) => (unmountCourse = r)),
-    onLeave() {
-      loadGeneration++;
-      pageLoading = false;
-      clearTimeout(manualWatchdog);
-    },
   });
 
   const onIdle =
@@ -161,7 +155,7 @@
 
     loader()
       .then((mod) => {
-        if (gen !== loadGeneration) return; // stale
+        if (gen !== loadGeneration || session.exitPhase) return; // stale
         pageError = null;
         pageContext.quiz = page.quiz;
         pageContext.quizState = {
@@ -182,7 +176,7 @@
         onIdle(() => nav.prefetch(index + 1));
       })
       .catch((err) => {
-        if (gen !== loadGeneration) return; // stale
+        if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
         pageLoading = false;
@@ -214,34 +208,40 @@
       console.error('Tessera: adapter init failed', initError);
       pageError = initError;
       pageLoading = false;
+    }
+  });
+
+  // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
+  // trigger check: catches the hook never being called or no completesOn
+  // page being reachable.
+  $effect(() => {
+    if (
+      !import.meta.env?.DEV ||
+      config.completion.mode !== 'manual' ||
+      config.completion.trigger !== undefined
+    ) {
       return;
     }
-
-    // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
-    // trigger check — catches the hook never being called or no completesOn
-    // page being reachable.
     if (
-      import.meta.env?.DEV &&
-      config.completion.mode === 'manual' &&
-      config.completion.trigger === undefined &&
-      progress.completionStatus === 'incomplete'
+      !session.persistenceReady ||
+      session.exitPhase ||
+      progress.completionStatus !== 'incomplete'
     ) {
-      manualWatchdog = window.setTimeout(() => {
-        if (progress.completionStatus === 'incomplete') {
-          console.warn(
-            '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
-              'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
-              '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
-              'in course.config.js to fail the build instead of waiting at runtime.',
-          );
-        }
-      }, 60_000);
+      return;
     }
+    const watchdog = setTimeout(() => {
+      console.warn(
+        '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
+          'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
+          '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
+          'in course.config.js to fail the build instead of waiting at runtime.',
+      );
+    }, 60_000);
+    return () => clearTimeout(watchdog);
   });
 
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
-    clearTimeout(manualWatchdog);
     session.dispose();
   });
 </script>
@@ -270,7 +270,7 @@
   data-tessera-page-index={auditMode ? renderedPageIndex : undefined}
   data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
 >
-  <LoadingBar active={pageLoading} />
+  <LoadingBar active={pageLoading && !session.exitPhase} />
   {#if session.exitPhase}
     <SessionEnded ended={session.exitPhase === 'ended'} />
   {:else}

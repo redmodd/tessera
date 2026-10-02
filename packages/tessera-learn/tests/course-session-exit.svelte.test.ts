@@ -95,18 +95,6 @@ describe('ending a CourseSession', () => {
     expect(close).toHaveBeenCalled();
   });
 
-  it.each([
-    ['the exit', (session: { exit(): unknown }) => session.exit()],
-    ['a back/forward cache restore', bfcacheRoundTrip],
-  ])('tells the shell the learner left on %s', async (_, leave) => {
-    const onLeave = vi.fn();
-    const { session } = await start(recordingAdapter().adapter, { onLeave });
-
-    await leave(session);
-
-    expect(onLeave).toHaveBeenCalledOnce();
-  });
-
   it('stops saving once the session has ended', async () => {
     const { adapter, calls } = recordingAdapter();
     const { session } = await start(adapter);
@@ -117,6 +105,32 @@ describe('ending a CourseSession', () => {
     await flush();
 
     expect(calls.slice(exited)).toEqual([]);
+  });
+
+  it('stops saving once disposed', async () => {
+    const { adapter, calls } = recordingAdapter();
+    const { session, progress } = await start(adapter);
+    session.dispose();
+    const disposed = calls.length;
+
+    progress.markVisited(1);
+    await flush();
+
+    expect(calls.slice(disposed)).toEqual([]);
+  });
+
+  it('ends the session on pagehide while the xAPI client is still building', async () => {
+    const { adapter, calls } = recordingAdapter();
+    const { session } = createSession({
+      adapter,
+      buildXAPIClient: () => new Promise(() => {}),
+    });
+    void session.start();
+    await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+
+    pagehide();
+
+    expect(calls.at(-1)).toBe('terminate');
   });
 
   it('leaves a value that is not JSON-serializable out of the save', async () => {
