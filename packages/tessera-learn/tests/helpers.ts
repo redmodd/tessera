@@ -215,18 +215,13 @@ export async function mountApp({
   vi.stubGlobal('__tesseraNavCtx', undefined);
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
-  let mounted = true;
-  const unmountApp = () => {
-    if (!mounted) return;
-    mounted = false;
+  onTestFinished(() => {
     try {
       unmount(component);
     } finally {
       document.body.innerHTML = '';
     }
-  };
-  onTestFinished(unmountApp);
-  return { unmount: unmountApp };
+  });
 }
 
 export const navCtx = (): NavContext => (globalThis as any).__tesseraNavCtx;

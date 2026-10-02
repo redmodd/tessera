@@ -112,3 +112,10 @@ describe('state changed during adapter init survives', () => {
     expect(saveState.mock.lastCall![0].m).toBe(1);
   });
 });
+
+describe('CourseSession user state', () => {
+  it('holds nothing under a key the object prototype defines', () => {
+    const { session } = createSession();
+    expect(session.userStateStore.get('constructor')).toBeNull();
+  });
+});

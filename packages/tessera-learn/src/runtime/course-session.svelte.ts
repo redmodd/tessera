@@ -20,9 +20,9 @@ import type { XAPIClient } from './xapi/client.js';
 const INIT_TIMEOUT_MS = 15_000;
 const EXIT_TIMEOUT_MS = 10_000;
 
-export type ExitPhase = 'ending' | 'ended';
+type ExitPhase = 'ending' | 'ended';
 
-export interface CourseSessionDeps {
+interface CourseSessionDeps {
   adapter: BaseAdapter;
   manifest: Manifest;
   /** A `$state` proxy, so the LMS mastery override re-derives every consumer. */
@@ -45,7 +45,6 @@ export class CourseSession {
   #destroyEffects: () => void;
 
   #persistenceReady = $state(false);
-  #launched = $state(false);
   #terminated = $state(false);
   #disposed = false;
   #exitPhase = $state<ExitPhase | null>(null);
@@ -64,7 +63,8 @@ export class CourseSession {
   #prevCompletionStatus: CompletionStatus = 'incomplete';
 
   readonly userStateStore: UserStateStore = {
-    get: (key) => (key in this.#userState ? this.#userState[key] : null),
+    get: (key) =>
+      Object.hasOwn(this.#userState, key) ? this.#userState[key] : null,
     set: (key, value) => {
       this.#userState[key] = value;
       this.#requestPersist();
@@ -91,6 +91,7 @@ export class CourseSession {
     this.#destroyEffects = $effect.root(() => {
       this.#trackChanges();
       this.#reportStatus();
+      this.#watchManualCompletion();
     });
   }
 
@@ -105,7 +106,7 @@ export class CourseSession {
   get canExit(): boolean {
     return (
       this.#adapter.connected &&
-      this.#launched &&
+      this.#persistenceReady &&
       !this.#terminated &&
       !this.#exitPhase
     );
@@ -182,7 +183,6 @@ export class CourseSession {
 
     window.addEventListener('pagehide', this.#onPagehide);
     window.addEventListener('pageshow', this.#onPageshow);
-    this.#launched = true;
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -190,7 +190,6 @@ export class CourseSession {
       this.#xapiClient = await this.#buildXAPIClient();
     } catch (err) {
       console.warn('Tessera: xAPI client setup failed', err);
-      this.#xapiClient = null;
     }
     if (this.#disposed) return null;
     registerXAPIClient(this.#xapiClient);
@@ -359,6 +358,38 @@ export class CourseSession {
     });
   }
 
+  // Dev-only, for `completion.mode: "manual"` without an opt-in trigger check:
+  // catches the hook never being called or no completesOn page being reachable.
+  #watchManualCompletion(): void {
+    const config = this.#config;
+    const progress = this.#progress;
+    $effect(() => {
+      if (
+        !import.meta.env?.DEV ||
+        config.completion.mode !== 'manual' ||
+        config.completion.trigger !== undefined
+      ) {
+        return;
+      }
+      if (
+        !this.#persistenceReady ||
+        this.#exitPhase ||
+        progress.completionStatus !== 'incomplete'
+      ) {
+        return;
+      }
+      const watchdog = setTimeout(() => {
+        console.warn(
+          '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
+            'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
+            '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
+            'in course.config.js to fail the build instead of waiting at runtime.',
+        );
+      }, 60_000);
+      return () => clearTimeout(watchdog);
+    });
+  }
+
   #endSession(): boolean {
     if (this.#terminated) return false;
     this.#terminated = true;
@@ -376,7 +407,6 @@ export class CourseSession {
   }
 
   #onPagehide = (): void => {
-    if (!this.#launched) return;
     this.#endSession();
     if (this.#exitPhase === 'ending') this.#exitPhase = 'ended';
     this.#duration.pause();

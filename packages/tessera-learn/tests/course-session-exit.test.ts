@@ -11,26 +11,20 @@ import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { flush, manualConfig, stubAdapter, useFakeTimers } from './helpers.js';
 import {
+  bfcacheRoundTrip,
   createSession,
+  enterBfcache,
+  EXIT_SEQUENCE,
+  pagehide,
+  recordingAdapter,
+  restoreFromBfcache,
+  type SessionOptions,
   type XAPIClientStub,
 } from './helpers/session.svelte.js';
 
-function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
-  const calls: string[] = [];
-  const adapter = stubAdapter({
-    saveState: () => calls.push('saveState'),
-    setDuration: (seconds) => calls.push(`setDuration:${seconds}`),
-    setExit: (mode) => calls.push(`setExit:${mode}`),
-    commit: () => calls.push('commit'),
-    terminate: () => calls.push('terminate'),
-    ...overrides,
-  });
-  return { adapter, calls };
-}
-
 async function start(
   adapter: BaseAdapter,
-  options: Omit<Parameters<typeof createSession>[0], 'adapter'> = {},
+  options: Omit<SessionOptions, 'adapter'> = {},
 ) {
   const course = createSession({ adapter, ...options });
   await course.session.start();
@@ -47,35 +41,6 @@ const xapiClient = (
   ...overrides,
 });
 
-function pagehide() {
-  window.dispatchEvent(new Event('pagehide'));
-}
-
-function enterBfcache() {
-  window.dispatchEvent(
-    new PageTransitionEvent('pagehide', { persisted: true }),
-  );
-}
-
-function restoreFromBfcache() {
-  window.dispatchEvent(
-    new PageTransitionEvent('pageshow', { persisted: true }),
-  );
-}
-
-function bfcacheRoundTrip() {
-  enterBfcache();
-  restoreFromBfcache();
-}
-
-const EXIT_SEQUENCE = [
-  'saveState',
-  'setDuration:0',
-  'setExit:suspend',
-  'commit',
-  'terminate',
-];
-
 let close: MockInstance<typeof window.close>;
 
 beforeEach(() => {
@@ -83,6 +48,20 @@ beforeEach(() => {
 });
 
 describe('ending a CourseSession', () => {
+  it('offers no exit until the session starts', async () => {
+    const init = Promise.withResolvers<void>();
+    const { session } = createSession({
+      adapter: stubAdapter({ init: () => init.promise }),
+    });
+    const started = session.start();
+    expect(session.canExit).toBe(false);
+
+    init.resolve();
+    await started;
+
+    expect(session.canExit).toBe(true);
+  });
+
   it('ends the session on exit', async () => {
     const { adapter, calls } = recordingAdapter();
     const { session } = await start(adapter);

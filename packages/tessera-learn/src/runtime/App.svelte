@@ -211,35 +211,6 @@
     }
   });
 
-  // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
-  // trigger check: catches the hook never being called or no completesOn
-  // page being reachable.
-  $effect(() => {
-    if (
-      !import.meta.env?.DEV ||
-      config.completion.mode !== 'manual' ||
-      config.completion.trigger !== undefined
-    ) {
-      return;
-    }
-    if (
-      !session.persistenceReady ||
-      session.exitPhase ||
-      progress.completionStatus !== 'incomplete'
-    ) {
-      return;
-    }
-    const watchdog = setTimeout(() => {
-      console.warn(
-        '[tessera] completion.mode is "manual" but the course has not completed after 60s. ' +
-          'No page declared `pageConfig.completesOn: "view"` was reached, and no component called ' +
-          '`useCompletion().markComplete()`. This is a misconfiguration; set `completion.trigger: "page"` ' +
-          'in course.config.js to fail the build instead of waiting at runtime.',
-      );
-    }, 60_000);
-    return () => clearTimeout(watchdog);
-  });
-
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
     session.dispose();

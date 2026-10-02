@@ -14,25 +14,15 @@ import {
   createConfig,
   createManifest,
   flush,
-  manualConfig,
   mountApp,
   navCtx,
-  stubAdapter,
   useFakeTimers,
 } from './helpers.js';
-
-function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
-  const calls: string[] = [];
-  const adapter = stubAdapter({
-    saveState: () => calls.push('saveState'),
-    setDuration: (seconds) => calls.push(`setDuration:${seconds}`),
-    setExit: (mode) => calls.push(`setExit:${mode}`),
-    commit: () => calls.push('commit'),
-    terminate: () => calls.push('terminate'),
-    ...overrides,
-  });
-  return { adapter, calls };
-}
+import {
+  bfcacheRoundTrip,
+  EXIT_SEQUENCE,
+  recordingAdapter,
+} from './helpers/session.svelte.js';
 
 async function mount(
   adapter: BaseAdapter,
@@ -82,23 +72,6 @@ function confirmExit() {
   dialogButton('Exit course').click();
 }
 
-function enterBfcache() {
-  window.dispatchEvent(
-    new PageTransitionEvent('pagehide', { persisted: true }),
-  );
-}
-
-function restoreFromBfcache() {
-  window.dispatchEvent(
-    new PageTransitionEvent('pageshow', { persisted: true }),
-  );
-}
-
-function bfcacheRoundTrip() {
-  enterBfcache();
-  restoreFromBfcache();
-}
-
 const leavingTheCourse: [string, () => unknown][] = [
   ['the exit', () => navCtx().exit()],
   ['a back/forward cache restore', bfcacheRoundTrip],
@@ -110,14 +83,6 @@ HTMLDialogElement.prototype.showModal = function () {
 HTMLDialogElement.prototype.close = function () {
   this.open = false;
 };
-
-const EXIT_SEQUENCE = [
-  'saveState',
-  'setDuration:0',
-  'setExit:suspend',
-  'commit',
-  'terminate',
-];
 
 let close: MockInstance<typeof window.close>;
 
@@ -177,17 +142,6 @@ describe('exiting a course', () => {
     await vi.waitFor(() =>
       expect(document.activeElement?.className).toBe('tessera-session-ended'),
     );
-  });
-
-  it('offers no exit until the launch finishes', async () => {
-    const canExitAtLaunch: boolean[] = [];
-    const { adapter } = recordingAdapter({
-      setCompletionStatus: () => canExitAtLaunch.push(navCtx().canExit),
-    });
-    await mount(adapter, { loadLayout: masteryLayout });
-
-    expect(canExitAtLaunch[0]).toBe(false);
-    expect(navCtx().canExit).toBe(true);
   });
 
   it('unmounts the course before the final save', async () => {
@@ -254,36 +208,20 @@ describe('exiting a course', () => {
         loads++ === 0
           ? page()
           : new Promise((resolve) => (release = () => resolve(page())));
+      useFakeTimers({ shouldAdvanceTime: true });
       const { adapter } = recordingAdapter();
       await mount(adapter, { loadLayout: masteryLayout, loadPage });
 
       navCtx().nav.goToPage(1);
       await flush();
       await leave();
-      await new Promise((r) => setTimeout(r, 150));
+      vi.advanceTimersByTime(150);
+      await flush();
       expect(document.querySelector('.tessera-loading-bar')).toBeNull();
       release();
       await flush();
 
       expect(navCtx().progress.visitedPages.has(1)).toBe(false);
-    },
-  );
-
-  it.each(leavingTheCourse)(
-    'drops the manual-completion watchdog after %s',
-    async (_, leave) => {
-      useFakeTimers({ shouldAdvanceTime: true });
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const { adapter } = recordingAdapter();
-      await mount(adapter, {
-        config: manualConfig(),
-        loadLayout: masteryLayout,
-      });
-
-      await leave();
-      vi.advanceTimersByTime(60_000);
-
-      expect(warn).not.toHaveBeenCalled();
     },
   );
 

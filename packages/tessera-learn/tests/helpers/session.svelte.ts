@@ -13,19 +13,21 @@ export type XAPIClientStub = Pick<
   'markUnloading' | 'markRestored' | 'flush'
 >;
 
+export interface SessionOptions {
+  config?: CourseConfig;
+  manifest?: Manifest;
+  adapter?: BaseAdapter;
+  xapiClient?: XAPIClientStub | null;
+  buildXAPIClient?: () => Promise<XAPIClient | null>;
+}
+
 export function createSession({
   config = createConfig(),
   manifest = createManifest(2),
   adapter = stubAdapter(),
   xapiClient = null,
   buildXAPIClient = async () => xapiClient as XAPIClient | null,
-}: {
-  config?: CourseConfig;
-  manifest?: Manifest;
-  adapter?: BaseAdapter;
-  xapiClient?: XAPIClientStub | null;
-  buildXAPIClient?: () => Promise<XAPIClient | null>;
-} = {}) {
+}: SessionOptions = {}) {
   const course = $state(config);
   const progress = new ProgressState(manifest, course);
   const nav = new NavigationState(manifest, progress, course);
@@ -40,4 +42,46 @@ export function createSession({
   });
   onTestFinished(() => session.dispose());
   return { session, progress, nav, config: course };
+}
+
+export function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
+  const calls: string[] = [];
+  const adapter = stubAdapter({
+    saveState: () => calls.push('saveState'),
+    setDuration: (seconds) => calls.push(`setDuration:${seconds}`),
+    setExit: (mode) => calls.push(`setExit:${mode}`),
+    commit: () => calls.push('commit'),
+    terminate: () => calls.push('terminate'),
+    ...overrides,
+  });
+  return { adapter, calls };
+}
+
+export const EXIT_SEQUENCE = [
+  'saveState',
+  'setDuration:0',
+  'setExit:suspend',
+  'commit',
+  'terminate',
+];
+
+export function pagehide() {
+  window.dispatchEvent(new Event('pagehide'));
+}
+
+export function enterBfcache() {
+  window.dispatchEvent(
+    new PageTransitionEvent('pagehide', { persisted: true }),
+  );
+}
+
+export function restoreFromBfcache() {
+  window.dispatchEvent(
+    new PageTransitionEvent('pageshow', { persisted: true }),
+  );
+}
+
+export function bfcacheRoundTrip() {
+  enterBfcache();
+  restoreFromBfcache();
 }

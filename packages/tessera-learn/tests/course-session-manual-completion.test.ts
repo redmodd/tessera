@@ -3,8 +3,16 @@ import { describe, it, expect, vi } from 'vitest';
 import type { SavedState } from '../src/runtime/persistence.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
-import { createConfig, createManifest, flush, stubAdapter } from './helpers.js';
-import { createSession } from './helpers/session.svelte.js';
+import type { CourseSession } from '../src/runtime/course-session.svelte.js';
+import {
+  createConfig,
+  createManifest,
+  flush,
+  manualConfig,
+  stubAdapter,
+  useFakeTimers,
+} from './helpers.js';
+import { bfcacheRoundTrip, createSession } from './helpers/session.svelte.js';
 
 const manifest = createManifest(2);
 
@@ -65,5 +73,54 @@ describe('manual completion in a CourseSession', () => {
     expect(setCompletionStatus).toHaveBeenCalledWith('complete');
     expect(setSuccessStatus).not.toHaveBeenCalledWith('passed');
     expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
+  });
+});
+
+describe('the manual-completion watchdog', () => {
+  function watch(init?: Promise<void>) {
+    useFakeTimers({ shouldAdvanceTime: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const course = createSession({
+      config: manualConfig(),
+      adapter: stubAdapter(init && { init: () => init }),
+    });
+    return { ...course, warn };
+  }
+
+  it('warns when a manual course has not completed after 60s', async () => {
+    const { session, warn } = watch();
+    await session.start();
+    await flush();
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('has not completed after 60s'),
+    );
+  });
+
+  it.each([
+    ['the exit', (session: CourseSession) => session.exit()],
+    ['a back/forward cache restore', bfcacheRoundTrip],
+  ])('stops after %s', async (_, leave) => {
+    const { session, warn } = watch();
+    await session.start();
+    await flush();
+
+    await leave(session);
+    await flush();
+    vi.advanceTimersByTime(60_000);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('waits for the session to start', async () => {
+    const { session, warn } = watch(new Promise(() => {}));
+    void session.start();
+    await flush();
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });
