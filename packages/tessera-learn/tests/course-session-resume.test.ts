@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { createConfig, createManifest, flush, stubAdapter } from './helpers.js';
-import { createSession } from './helpers/session.svelte.js';
+import { startSession } from './helpers/session.svelte.js';
 import type { ProgressState } from '../src/runtime/progress.svelte.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
@@ -33,7 +33,7 @@ async function start(
     setScore: vi.fn(),
     setSuccessStatus: vi.fn(),
   };
-  const { session, progress } = createSession({
+  const { progress } = await startSession({
     config: createConfig({ resume, scoring: { passingScore: 80 } }),
     manifest,
     adapter: stubAdapter({
@@ -41,8 +41,6 @@ async function start(
       ...spies,
     }),
   });
-  await session.start();
-  await flush();
   return { ...spies, progress };
 }
 

@@ -40,8 +40,6 @@ async function mount(
   await flush();
 }
 
-const masteryLayout = () => import('./fixtures/mastery-layout.svelte');
-
 function stubAnimate(finishes: boolean) {
   Element.prototype.animate = () => {
     const animation = {
@@ -71,11 +69,6 @@ function confirmExit() {
   exitButton()!.click();
   dialogButton('Exit course').click();
 }
-
-const leavingTheCourse: [string, () => unknown][] = [
-  ['the exit', () => navCtx().exit()],
-  ['a back/forward cache restore', bfcacheRoundTrip],
-];
 
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
@@ -198,32 +191,35 @@ describe('exiting a course', () => {
     ]);
   });
 
-  it.each(leavingTheCourse)(
-    'drops a page still loading after %s',
-    async (_, leave) => {
-      let release!: () => void;
-      const page = () => import('./fixtures/app-page.svelte');
-      let loads = 0;
-      const loadPage = () =>
-        loads++ === 0
-          ? page()
-          : new Promise((resolve) => (release = () => resolve(page())));
-      useFakeTimers({ shouldAdvanceTime: true });
-      const { adapter } = recordingAdapter();
-      await mount(adapter, { loadLayout: masteryLayout, loadPage });
+  it.each([
+    ['the exit', () => navCtx().exit()],
+    ['a back/forward cache restore', bfcacheRoundTrip],
+  ])('drops a page still loading after %s', async (_, leave) => {
+    let release!: () => void;
+    const page = () => import('./fixtures/app-page.svelte');
+    let loads = 0;
+    const loadPage = () =>
+      loads++ === 0
+        ? page()
+        : new Promise((resolve) => (release = () => resolve(page())));
+    useFakeTimers({ shouldAdvanceTime: true });
+    const { adapter } = recordingAdapter();
+    await mount(adapter, {
+      loadPage,
+      loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+    });
 
-      navCtx().nav.goToPage(1);
-      await flush();
-      await leave();
-      vi.advanceTimersByTime(150);
-      await flush();
-      expect(document.querySelector('.tessera-loading-bar')).toBeNull();
-      release();
-      await flush();
+    navCtx().nav.goToPage(1);
+    await flush();
+    await leave();
+    vi.advanceTimersByTime(150);
+    await flush();
+    expect(document.querySelector('.tessera-loading-bar')).toBeNull();
+    release();
+    await flush();
 
-      expect(navCtx().progress.visitedPages.has(1)).toBe(false);
-    },
-  );
+    expect(navCtx().progress.visitedPages.has(1)).toBe(false);
+  });
 
   it('offers no Exit button without an LMS', async () => {
     const config = createConfig();

@@ -6,18 +6,17 @@ import type { BaseAdapter } from '../../src/runtime/adapters/base.js';
 import type { Manifest } from '../../src/plugin/manifest.js';
 import type { CourseConfig } from '../../src/runtime/types.js';
 import type { XAPIClient } from '../../src/runtime/xapi/client.js';
-import { createConfig, createManifest, stubAdapter } from '../helpers.js';
-
-export type XAPIClientStub = Pick<
-  XAPIClient,
-  'markUnloading' | 'markRestored' | 'flush'
->;
+import {
+  createConfig,
+  createManifest,
+  flush,
+  stubAdapter,
+} from '../helpers.js';
 
 export interface SessionOptions {
   config?: CourseConfig;
   manifest?: Manifest;
   adapter?: BaseAdapter;
-  xapiClient?: XAPIClientStub | null;
   buildXAPIClient?: () => Promise<XAPIClient | null>;
 }
 
@@ -25,8 +24,7 @@ export function createSession({
   config = createConfig(),
   manifest = createManifest(2),
   adapter = stubAdapter(),
-  xapiClient = null,
-  buildXAPIClient = async () => xapiClient as XAPIClient | null,
+  buildXAPIClient = async () => null,
 }: SessionOptions = {}) {
   const course = $state(config);
   const progress = new ProgressState(manifest, course);
@@ -42,6 +40,13 @@ export function createSession({
   });
   onTestFinished(() => session.dispose());
   return { session, progress, nav, config: course };
+}
+
+export async function startSession(options: SessionOptions = {}) {
+  const course = createSession(options);
+  await course.session.start();
+  await flush();
+  return course;
 }
 
 export function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {

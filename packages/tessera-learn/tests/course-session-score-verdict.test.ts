@@ -11,13 +11,13 @@ import {
   setXAPILaunch,
   stubAdapter,
 } from './helpers.js';
-import { createSession } from './helpers/session.svelte.js';
+import { pagehide, startSession } from './helpers/session.svelte.js';
 
 async function start(
   adapter: BaseAdapter,
   manifest = createManifest(1, { 0: { graded: true } }),
 ) {
-  const { session, progress } = createSession({
+  const { progress } = await startSession({
     config: createConfig({
       resume: 'auto',
       completion: { mode: 'quiz' },
@@ -26,8 +26,6 @@ async function start(
     manifest,
     adapter,
   });
-  await session.start();
-  await flush();
   return progress;
 }
 
@@ -93,7 +91,7 @@ describe('a graded submit that decides the verdict', () => {
       'complete',
     ]);
 
-    window.dispatchEvent(new Event('pagehide'));
+    pagehide();
 
     expect(setExit).toHaveBeenCalledWith('normal');
     expect(saveState.mock.lastCall![0]).toMatchObject({ k: 1 });

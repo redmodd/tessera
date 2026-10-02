@@ -12,7 +12,11 @@ import {
   stubAdapter,
   useFakeTimers,
 } from './helpers.js';
-import { bfcacheRoundTrip, createSession } from './helpers/session.svelte.js';
+import {
+  bfcacheRoundTrip,
+  createSession,
+  startSession,
+} from './helpers/session.svelte.js';
 
 const manifest = createManifest(2);
 
@@ -22,7 +26,7 @@ async function start(
 ) {
   const setCompletionStatus = vi.fn();
   const setSuccessStatus = vi.fn();
-  const { session, progress } = createSession({
+  const { progress } = await startSession({
     config: createConfig({ resume: 'auto', completion }),
     manifest,
     adapter: stubAdapter({
@@ -31,7 +35,6 @@ async function start(
       setSuccessStatus,
     }),
   });
-  await session.start();
   return { progress, setCompletionStatus, setSuccessStatus };
 }
 

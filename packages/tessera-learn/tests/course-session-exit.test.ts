@@ -7,8 +7,8 @@ import {
   beforeEach,
   type MockInstance,
 } from 'vitest';
-import type { BaseAdapter } from '../src/runtime/adapters/base.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import { flush, manualConfig, stubAdapter, useFakeTimers } from './helpers.js';
 import {
   bfcacheRoundTrip,
@@ -18,28 +18,18 @@ import {
   pagehide,
   recordingAdapter,
   restoreFromBfcache,
-  type SessionOptions,
-  type XAPIClientStub,
+  startSession,
 } from './helpers/session.svelte.js';
 
-async function start(
-  adapter: BaseAdapter,
-  options: Omit<SessionOptions, 'adapter'> = {},
-) {
-  const course = createSession({ adapter, ...options });
-  await course.session.start();
-  await flush();
-  return course;
-}
-
-const xapiClient = (
-  overrides: Partial<XAPIClientStub> = {},
-): XAPIClientStub => ({
-  markUnloading() {},
-  markRestored() {},
-  flush: async () => {},
-  ...overrides,
-});
+const buildXAPIStub =
+  (overrides: Partial<XAPIClient> = {}) =>
+  async () =>
+    ({
+      markUnloading() {},
+      markRestored() {},
+      flush: async () => {},
+      ...overrides,
+    }) as XAPIClient;
 
 let close: MockInstance<typeof window.close>;
 
@@ -64,7 +54,7 @@ describe('ending a CourseSession', () => {
 
   it('ends the session on exit', async () => {
     const { adapter, calls } = recordingAdapter();
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
     const launched = calls.length;
 
     await session.exit();
@@ -76,7 +66,7 @@ describe('ending a CourseSession', () => {
 
   it('stops saving once the session has ended', async () => {
     const { adapter, calls } = recordingAdapter();
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
     await session.exit();
     const exited = calls.length;
 
@@ -88,7 +78,7 @@ describe('ending a CourseSession', () => {
 
   it('stops saving once disposed', async () => {
     const { adapter, calls } = recordingAdapter();
-    const { session, progress } = await start(adapter);
+    const { session, progress } = await startSession({ adapter });
     session.dispose();
     const disposed = calls.length;
 
@@ -118,7 +108,7 @@ describe('ending a CourseSession', () => {
     const { adapter } = recordingAdapter({
       saveState: (state) => saved.push(state),
     });
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
 
     session.userStateStore.set('note', 'kept');
     session.userStateStore.set('big', 1n);
@@ -136,7 +126,8 @@ describe('ending a CourseSession', () => {
 
   it('exits normally once the course is complete', async () => {
     const { adapter, calls } = recordingAdapter();
-    const { session, progress } = await start(adapter, {
+    const { session, progress } = await startSession({
+      adapter,
       config: manualConfig(),
     });
     progress.markCompleteManually();
@@ -150,7 +141,7 @@ describe('ending a CourseSession', () => {
     const { adapter, calls } = recordingAdapter({
       exit: () => new Promise<void>(() => {}),
     });
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
     const launched = calls.length;
 
     void session.exit();
@@ -168,7 +159,7 @@ describe('ending a CourseSession', () => {
         throw new Error('boom');
       },
     });
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
 
     await session.exit();
 
@@ -183,7 +174,7 @@ describe('ending a CourseSession', () => {
   it('terminates without exiting on pagehide', async () => {
     const exit = vi.fn();
     const { adapter, calls } = recordingAdapter({ exit });
-    await start(adapter);
+    await startSession({ adapter });
     const launched = calls.length;
 
     pagehide();
@@ -196,8 +187,9 @@ describe('ending a CourseSession', () => {
     const drained = Promise.withResolvers<void>();
     const flushXAPI = vi.fn(() => drained.promise);
     const { adapter, calls } = recordingAdapter();
-    const { session } = await start(adapter, {
-      xapiClient: xapiClient({ flush: flushXAPI }),
+    const { session } = await startSession({
+      adapter,
+      buildXAPIClient: buildXAPIStub({ flush: flushXAPI }),
     });
     const launched = calls.length;
 
@@ -214,8 +206,9 @@ describe('ending a CourseSession', () => {
     const flushXAPI = vi.fn(async (_deadline: Promise<unknown>) => {});
     const exit = vi.fn(async () => {});
     const { adapter } = recordingAdapter({ exit });
-    const { session } = await start(adapter, {
-      xapiClient: xapiClient({ flush: flushXAPI }),
+    const { session } = await startSession({
+      adapter,
+      buildXAPIClient: buildXAPIStub({ flush: flushXAPI }),
     });
 
     await session.exit();
@@ -226,8 +219,9 @@ describe('ending a CourseSession', () => {
   it('switches xAPI sends to keepalive on pagehide but not on exit', async () => {
     const markUnloading = vi.fn();
     const { adapter } = recordingAdapter();
-    const { session } = await start(adapter, {
-      xapiClient: xapiClient({ markUnloading }),
+    const { session } = await startSession({
+      adapter,
+      buildXAPIClient: buildXAPIStub({ markUnloading }),
     });
 
     await session.exit();
@@ -238,7 +232,9 @@ describe('ending a CourseSession', () => {
   });
 
   it('withdraws the exit once pagehide ends the session', async () => {
-    const { session } = await start(recordingAdapter().adapter);
+    const { session } = await startSession({
+      adapter: recordingAdapter().adapter,
+    });
     expect(session.canExit).toBe(true);
 
     pagehide();
@@ -248,7 +244,7 @@ describe('ending a CourseSession', () => {
 
   it('ends a session restored from the back/forward cache after pagehide', async () => {
     const { adapter, calls } = recordingAdapter();
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
     enterBfcache();
     const hidden = calls.length;
 
@@ -263,8 +259,9 @@ describe('ending a CourseSession', () => {
     const drained = Promise.withResolvers<void>();
     const exit = vi.fn();
     const { adapter } = recordingAdapter({ exit });
-    const { session } = await start(adapter, {
-      xapiClient: xapiClient({ flush: () => drained.promise }),
+    const { session } = await startSession({
+      adapter,
+      buildXAPIClient: buildXAPIStub({ flush: () => drained.promise }),
     });
 
     const exiting = session.exit();
@@ -287,7 +284,7 @@ describe('ending a CourseSession', () => {
       const exit = vi.fn(() => exiting.promise);
       const returnToLMS = vi.fn(() => true);
       const { adapter } = recordingAdapter({ exit, returnToLMS });
-      const { session } = await start(adapter);
+      const { session } = await startSession({ adapter });
 
       void session.exit();
       await vi.waitFor(() => expect(exit).toHaveBeenCalled());
@@ -325,7 +322,7 @@ describe('ending a CourseSession', () => {
 
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
-    const { session, nav } = await start(adapter);
+    const { session, nav } = await startSession({ adapter });
     bfcacheRoundTrip();
     const restored = calls.length;
 
@@ -338,7 +335,7 @@ describe('ending a CourseSession', () => {
 
   it('ends the session again on the next pagehide after a restore without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
-    await start(adapter);
+    await startSession({ adapter });
     bfcacheRoundTrip();
     const restored = calls.length;
 
@@ -354,7 +351,7 @@ describe('ending a CourseSession', () => {
       connected: false,
       saveState: (state) => saved.push(state),
     });
-    await start(adapter);
+    await startSession({ adapter });
 
     vi.advanceTimersByTime(10_000);
     enterBfcache();
@@ -374,7 +371,10 @@ describe('ending a CourseSession', () => {
     async (_, connected) => {
       const markRestored = vi.fn();
       const { adapter } = recordingAdapter({ connected });
-      await start(adapter, { xapiClient: xapiClient({ markRestored }) });
+      await startSession({
+        adapter,
+        buildXAPIClient: buildXAPIStub({ markRestored }),
+      });
 
       bfcacheRoundTrip();
 
@@ -385,7 +385,7 @@ describe('ending a CourseSession', () => {
   it('leaves the window open when the adapter returns the learner to the LMS', async () => {
     const returnToLMS = vi.fn(() => true);
     const { adapter } = recordingAdapter({ returnToLMS });
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
 
     await session.exit();
 
@@ -396,7 +396,7 @@ describe('ending a CourseSession', () => {
 
   it('ignores exit() without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
-    const { session } = await start(adapter);
+    const { session } = await startSession({ adapter });
     const launched = calls.length;
 
     await session.exit();
@@ -408,7 +408,7 @@ describe('ending a CourseSession', () => {
 
   it('keeps saving after pagehide without an LMS', async () => {
     const { adapter, calls } = recordingAdapter({ connected: false });
-    const { nav } = await start(adapter);
+    const { nav } = await startSession({ adapter });
     pagehide();
     const hidden = calls.length;
 

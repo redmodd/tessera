@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { createConfig, createManifest, stubAdapter } from './helpers.js';
-import { createSession } from './helpers/session.svelte.js';
+import { startSession } from './helpers/session.svelte.js';
 
 async function startWithMastery(masteryScore: number | null) {
-  const { session, progress, config } = createSession({
+  const { progress, config } = await startSession({
     config: createConfig({
       resume: 'auto',
       completion: { mode: 'quiz' },
@@ -13,7 +13,6 @@ async function startWithMastery(masteryScore: number | null) {
     manifest: createManifest(1, { 0: { graded: true } }),
     adapter: stubAdapter({ getMasteryScore: () => masteryScore }),
   });
-  await session.start();
   return { progress, config };
 }
 

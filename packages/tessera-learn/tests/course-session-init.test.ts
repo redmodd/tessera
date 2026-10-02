@@ -9,7 +9,7 @@ import {
   stubAdapter,
   useFakeTimers,
 } from './helpers.js';
-import { createSession } from './helpers/session.svelte.js';
+import { createSession, pagehide } from './helpers/session.svelte.js';
 
 function startWith(overrides: Partial<BaseAdapter>) {
   const { session } = createSession({
@@ -113,9 +113,9 @@ describe('CourseSession disposed while starting', () => {
 
       session.dispose();
       init.resolve();
-      build.resolve({} as XAPIClient);
+      build.resolve({ markUnloading() {} } as XAPIClient);
       await started;
-      window.dispatchEvent(new Event('pagehide'));
+      pagehide();
 
       expect(useXAPI()).toBeNull();
       expect(terminate).not.toHaveBeenCalled();

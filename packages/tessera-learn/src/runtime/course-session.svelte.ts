@@ -43,6 +43,7 @@ export class CourseSession {
   #courseUnmounted: Promise<void>;
   #fingerprint: string;
   #destroyEffects: () => void;
+  #listeners = new AbortController();
 
   #persistenceReady = $state(false);
   #terminated = $state(false);
@@ -167,12 +168,11 @@ export class CourseSession {
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);
-    } finally {
-      this.#persistenceReady = true;
-      if (this.#persistPending) {
-        this.#persistPending = false;
-        this.#requestPersist();
-      }
+    }
+    this.#persistenceReady = true;
+    if (this.#persistPending) {
+      this.#persistPending = false;
+      this.#requestPersist();
     }
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
@@ -181,8 +181,11 @@ export class CourseSession {
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    window.addEventListener('pagehide', this.#onPagehide);
-    window.addEventListener('pageshow', this.#onPageshow);
+    const { signal } = this.#listeners;
+    window.addEventListener('pagehide', () => this.#onPagehide(), { signal });
+    window.addEventListener('pageshow', (event) => this.#onPageshow(event), {
+      signal,
+    });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -216,8 +219,7 @@ export class CourseSession {
   dispose(): void {
     this.#disposed = true;
     this.#destroyEffects();
-    window.removeEventListener('pagehide', this.#onPagehide);
-    window.removeEventListener('pageshow', this.#onPageshow);
+    this.#listeners.abort();
     // A stale client from this session must not leak into a fresh one.
     registerXAPIClient(null);
   }
@@ -361,16 +363,16 @@ export class CourseSession {
   // Dev-only, for `completion.mode: "manual"` without an opt-in trigger check:
   // catches the hook never being called or no completesOn page being reachable.
   #watchManualCompletion(): void {
-    const config = this.#config;
+    const { completion } = this.#config;
+    if (
+      !import.meta.env?.DEV ||
+      completion.mode !== 'manual' ||
+      completion.trigger !== undefined
+    ) {
+      return;
+    }
     const progress = this.#progress;
     $effect(() => {
-      if (
-        !import.meta.env?.DEV ||
-        config.completion.mode !== 'manual' ||
-        config.completion.trigger !== undefined
-      ) {
-        return;
-      }
       if (
         !this.#persistenceReady ||
         this.#exitPhase ||
@@ -406,15 +408,15 @@ export class CourseSession {
     return true;
   }
 
-  #onPagehide = (): void => {
+  #onPagehide(): void {
     this.#endSession();
     if (this.#exitPhase === 'ending') this.#exitPhase = 'ended';
     this.#duration.pause();
     this.#xapiClient?.markUnloading();
     this.#adapter.terminate();
-  };
+  }
 
-  #onPageshow = (event: PageTransitionEvent): void => {
+  #onPageshow(event: PageTransitionEvent): void {
     if (!this.#terminated || !event.persisted) return;
     this.#xapiClient?.markRestored();
     if (this.#adapter.connected) {
@@ -423,5 +425,5 @@ export class CourseSession {
     }
     this.#terminated = false;
     this.#duration.resume();
-  };
+  }
 }
