@@ -117,6 +117,25 @@ describe('ending a CourseSession', () => {
     },
   );
 
+  it('registers the xAPI client built while the page was in the back/forward cache', async () => {
+    const { useXAPI } = await import('../src/runtime/xapi/registry.js');
+    const build = Promise.withResolvers<XAPIClient | null>();
+    const { session } = createSession({
+      adapter: recordingAdapter({ connected: false }).adapter,
+      buildXAPIClient: () => build.promise,
+    });
+    const started = session.start();
+    await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+
+    enterBfcache();
+    const client = await buildXAPIStub()();
+    build.resolve(client);
+    await started;
+    restoreFromBfcache();
+
+    expect(useXAPI()).toBe(client);
+  });
+
   it('leaves a value that is not JSON-serializable out of the save', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const saved: SavedState[] = [];

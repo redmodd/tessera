@@ -421,5 +421,6 @@ export class CourseSession {
     }
     this.#terminated = false;
     this.#duration.resume();
+    registerXAPIClient(this.#xapiClient);
   };
 }
