@@ -44,6 +44,20 @@ describe('ending a CourseSession', () => {
     expect(session.canExit).toBe(true);
   });
 
+  it('offers no exit while the xAPI client is still building', async () => {
+    const build = Promise.withResolvers<XAPIClient | null>();
+    const { session } = createSession({ buildXAPIClient: () => build.promise });
+    const started = session.start();
+    await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+
+    expect(session.canExit).toBe(false);
+
+    build.resolve(await buildXAPIStub()());
+    await started;
+
+    expect(session.canExit).toBe(true);
+  });
+
   it('ends the session on exit', async () => {
     const { adapter, calls } = recordingAdapter();
     const { session } = await startSession({ adapter });
@@ -75,9 +89,26 @@ describe('ending a CourseSession', () => {
     const disposed = calls.length;
 
     progress.markVisited(1);
+    session.userStateStore.set('late-note', 'written after dispose');
     await flush();
 
     expect(calls.slice(disposed)).toEqual([]);
+  });
+
+  it.each([
+    ['exit', (session: CourseSession) => session.exit()],
+    ['pagehide', pagehide],
+  ])('unregisters the xAPI client on %s', async (_, leave) => {
+    const { useXAPI } = await import('../src/runtime/xapi/registry.js');
+    const { session } = await startSession({
+      adapter: recordingAdapter().adapter,
+      buildXAPIClient: buildXAPIStub(),
+    });
+    expect(useXAPI()).not.toBeNull();
+
+    await leave(session);
+
+    expect(useXAPI()).toBeNull();
   });
 
   it('ends the session on pagehide while the xAPI client is still building', async () => {
@@ -94,28 +125,22 @@ describe('ending a CourseSession', () => {
     expect(calls.at(-1)).toBe('terminate');
   });
 
-  it.each([
-    ['exit', (session: CourseSession) => session.exit()],
-    ['pagehide', pagehide],
-  ])(
-    'registers no xAPI client once the session ends on %s during the build',
-    async (_, leave) => {
-      const { useXAPI } = await import('../src/runtime/xapi/registry.js');
-      const build = Promise.withResolvers<XAPIClient | null>();
-      const { session } = createSession({
-        adapter: recordingAdapter().adapter,
-        buildXAPIClient: () => build.promise,
-      });
-      const started = session.start();
-      await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+  it('registers no xAPI client once pagehide ends the session during the build', async () => {
+    const { useXAPI } = await import('../src/runtime/xapi/registry.js');
+    const build = Promise.withResolvers<XAPIClient | null>();
+    const { session } = createSession({
+      adapter: recordingAdapter().adapter,
+      buildXAPIClient: () => build.promise,
+    });
+    const started = session.start();
+    await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
 
-      await leave(session);
-      build.resolve(await buildXAPIStub()());
-      await started;
+    pagehide();
+    build.resolve(await buildXAPIStub()());
+    await started;
 
-      expect(useXAPI()).toBeNull();
-    },
-  );
+    expect(useXAPI()).toBeNull();
+  });
 
   it('registers the xAPI client built while the page was in the back/forward cache', async () => {
     const { useXAPI } = await import('../src/runtime/xapi/registry.js');
@@ -355,8 +380,12 @@ describe('ending a CourseSession', () => {
   });
 
   it('keeps a course restored from the back/forward cache running without an LMS', async () => {
+    const { useXAPI } = await import('../src/runtime/xapi/registry.js');
     const { adapter, calls } = recordingAdapter({ connected: false });
-    const { session, nav } = await startSession({ adapter });
+    const { session, nav } = await startSession({
+      adapter,
+      buildXAPIClient: buildXAPIStub(),
+    });
     bfcacheRoundTrip();
     const restored = calls.length;
 
@@ -365,6 +394,7 @@ describe('ending a CourseSession', () => {
 
     expect(session.exitPhase).toBeNull();
     expect(calls.slice(restored)).toContain('saveState');
+    expect(useXAPI()).not.toBeNull();
   });
 
   it('ends the session again on the next pagehide after a restore without an LMS', async () => {

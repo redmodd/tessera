@@ -46,6 +46,7 @@ export class CourseSession {
   #lifetime = new AbortController();
 
   #persistenceReady = $state(false);
+  #launched = $state(false);
   #terminated = $state(false);
   #exitPhase = $state<ExitPhase | null>(null);
   #duration = new DurationTracker(0);
@@ -106,7 +107,7 @@ export class CourseSession {
   get canExit(): boolean {
     return (
       this.#adapter.connected &&
-      this.#persistenceReady &&
+      this.#launched &&
       !this.#terminated &&
       !this.#exitPhase
     );
@@ -193,21 +194,27 @@ export class CourseSession {
     }
     if (this.#lifetime.signal.aborted || this.#terminated) return null;
     registerXAPIClient(this.#xapiClient);
+    this.#launched = true;
     return null;
   }
 
   async exit(): Promise<void> {
     if (!this.canExit) return;
     this.#exitPhase = 'ending';
-    const deadline = new Promise((resolve) =>
-      setTimeout(resolve, EXIT_TIMEOUT_MS),
-    );
-    await Promise.race([this.#courseUnmounted, deadline]);
-    await this.#xapiClient?.flush(deadline);
-    if (!this.#endSession()) return;
-    await this.#adapter.exit(deadline).catch((err) => {
-      console.warn('Tessera: exit failed', err);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise((resolve) => {
+      timer = setTimeout(resolve, EXIT_TIMEOUT_MS);
     });
+    try {
+      await Promise.race([this.#courseUnmounted, deadline]);
+      await this.#xapiClient?.flush(deadline);
+      if (!this.#endSession()) return;
+      await this.#adapter.exit(deadline).catch((err) => {
+        console.warn('Tessera: exit failed', err);
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (this.exitPhase === 'ended') return;
     this.#exitPhase = 'ended';
     if (!this.#adapter.returnToLMS()) window.close();
@@ -286,7 +293,7 @@ export class CourseSession {
     this.#persistScheduled = true;
     queueMicrotask(() => {
       this.#persistScheduled = false;
-      if (this.#exitPhase) return;
+      if (this.#exitPhase || this.#lifetime.signal.aborted) return;
       this.#adapter.saveState(this.#serialize());
     });
   }
@@ -391,6 +398,7 @@ export class CourseSession {
   #endSession(): boolean {
     if (this.#terminated) return false;
     this.#terminated = true;
+    registerXAPIClient(null);
     const adapter = this.#adapter;
     adapter.saveState(this.#serialize());
     adapter.setDuration(this.#duration.sessionSeconds);
