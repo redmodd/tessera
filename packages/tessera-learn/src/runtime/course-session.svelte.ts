@@ -43,11 +43,10 @@ export class CourseSession {
   #courseUnmounted: Promise<void>;
   #fingerprint: string;
   #destroyEffects: () => void;
-  #listeners = new AbortController();
+  #lifetime = new AbortController();
 
   #persistenceReady = $state(false);
   #terminated = $state(false);
-  #disposed = false;
   #exitPhase = $state<ExitPhase | null>(null);
   #duration = new DurationTracker(0);
   #xapiClient: XAPIClient | null = null;
@@ -136,7 +135,7 @@ export class CourseSession {
     } finally {
       clearTimeout(initDeadline);
     }
-    if (this.#disposed) return null;
+    if (this.#lifetime.signal.aborted) return null;
 
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
@@ -145,7 +144,7 @@ export class CourseSession {
     } catch (err) {
       console.warn('Tessera: resume state load failed', err);
     }
-    if (this.#disposed) return null;
+    if (this.#lifetime.signal.aborted) return null;
 
     // An LMS-supplied mastery score is the authoritative pass threshold for
     // this launch and overrides the manifest.
@@ -181,11 +180,9 @@ export class CourseSession {
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
-    const { signal } = this.#listeners;
-    window.addEventListener('pagehide', () => this.#onPagehide(), { signal });
-    window.addEventListener('pageshow', (event) => this.#onPageshow(event), {
-      signal,
-    });
+    const { signal } = this.#lifetime;
+    window.addEventListener('pagehide', this.#onPagehide, { signal });
+    window.addEventListener('pageshow', this.#onPageshow, { signal });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -194,7 +191,7 @@ export class CourseSession {
     } catch (err) {
       console.warn('Tessera: xAPI client setup failed', err);
     }
-    if (this.#disposed) return null;
+    if (this.#lifetime.signal.aborted || this.#terminated) return null;
     registerXAPIClient(this.#xapiClient);
     return null;
   }
@@ -217,9 +214,8 @@ export class CourseSession {
   }
 
   dispose(): void {
-    this.#disposed = true;
+    this.#lifetime.abort();
     this.#destroyEffects();
-    this.#listeners.abort();
     // A stale client from this session must not leak into a fresh one.
     registerXAPIClient(null);
   }
@@ -408,15 +404,15 @@ export class CourseSession {
     return true;
   }
 
-  #onPagehide(): void {
+  #onPagehide = (): void => {
     this.#endSession();
     if (this.#exitPhase === 'ending') this.#exitPhase = 'ended';
     this.#duration.pause();
     this.#xapiClient?.markUnloading();
     this.#adapter.terminate();
-  }
+  };
 
-  #onPageshow(event: PageTransitionEvent): void {
+  #onPageshow = (event: PageTransitionEvent): void => {
     if (!this.#terminated || !event.persisted) return;
     this.#xapiClient?.markRestored();
     if (this.#adapter.connected) {
@@ -425,5 +421,5 @@ export class CourseSession {
     }
     this.#terminated = false;
     this.#duration.resume();
-  }
+  };
 }

@@ -13,7 +13,7 @@ import {
   stubAdapter,
 } from '../helpers.js';
 
-export interface SessionOptions {
+interface SessionOptions {
   config?: CourseConfig;
   manifest?: Manifest;
   adapter?: BaseAdapter;
@@ -48,6 +48,16 @@ export async function startSession(options: SessionOptions = {}) {
   await flush();
   return course;
 }
+
+export const buildXAPIStub =
+  (overrides: Partial<XAPIClient> = {}) =>
+  async () =>
+    ({
+      markUnloading() {},
+      markRestored() {},
+      flush: async () => {},
+      ...overrides,
+    }) as XAPIClient;
 
 export function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
   const calls: string[] = [];

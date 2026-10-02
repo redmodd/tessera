@@ -9,9 +9,11 @@ import {
 } from 'vitest';
 import type { SavedState } from '../src/runtime/persistence.js';
 import type { XAPIClient } from '../src/runtime/xapi/client.js';
+import type { CourseSession } from '../src/runtime/course-session.svelte.js';
 import { flush, manualConfig, stubAdapter, useFakeTimers } from './helpers.js';
 import {
   bfcacheRoundTrip,
+  buildXAPIStub,
   createSession,
   enterBfcache,
   EXIT_SEQUENCE,
@@ -20,16 +22,6 @@ import {
   restoreFromBfcache,
   startSession,
 } from './helpers/session.svelte.js';
-
-const buildXAPIStub =
-  (overrides: Partial<XAPIClient> = {}) =>
-  async () =>
-    ({
-      markUnloading() {},
-      markRestored() {},
-      flush: async () => {},
-      ...overrides,
-    }) as XAPIClient;
 
 let close: MockInstance<typeof window.close>;
 
@@ -101,6 +93,29 @@ describe('ending a CourseSession', () => {
 
     expect(calls.at(-1)).toBe('terminate');
   });
+
+  it.each([
+    ['exit', (session: CourseSession) => session.exit()],
+    ['pagehide', pagehide],
+  ])(
+    'registers no xAPI client once the session ends on %s during the build',
+    async (_, leave) => {
+      const { useXAPI } = await import('../src/runtime/xapi/registry.js');
+      const build = Promise.withResolvers<XAPIClient | null>();
+      const { session } = createSession({
+        adapter: recordingAdapter().adapter,
+        buildXAPIClient: () => build.promise,
+      });
+      const started = session.start();
+      await vi.waitFor(() => expect(session.persistenceReady).toBe(true));
+
+      await leave(session);
+      build.resolve(await buildXAPIStub()());
+      await started;
+
+      expect(useXAPI()).toBeNull();
+    },
+  );
 
   it('leaves a value that is not JSON-serializable out of the save', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -182,13 +182,9 @@ describe('exiting a course', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await exiting;
 
-    expect(calls.slice(launched)).toEqual([
-      'saveState',
-      'setDuration:10',
-      'setExit:suspend',
-      'commit',
-      'terminate',
-    ]);
+    expect(calls.slice(launched)).toEqual(
+      EXIT_SEQUENCE.with(1, 'setDuration:10'),
+    );
   });
 
   it.each([
