@@ -22,16 +22,35 @@ function startWith(overrides: Partial<BaseAdapter>) {
 // The first page is held until adapter.init() resolves, and the LMS handshake
 // it performs has no deadline of its own.
 describe('CourseSession bounds adapter.init()', () => {
-  it('rejects when init never resolves', async () => {
+  it('resolves with the timeout when init never resolves', async () => {
     useFakeTimers();
     const { session, started } = startWith({
       init: () => new Promise(() => {}),
     });
-    const rejected = expect(started).rejects.toThrow('adapter init timed out');
 
     await vi.advanceTimersByTimeAsync(15_000);
-    await rejected;
+    expect((await started)?.message).toBe('adapter init timed out');
     expect(session.persistenceReady).toBe(false);
+  });
+
+  it('resolves with the error when init fails', async () => {
+    const { started } = startWith({
+      init: async () => {
+        throw new Error('bad launch');
+      },
+    });
+
+    expect((await started)?.message).toBe('bad launch');
+  });
+
+  it('rejects for a failure after init', async () => {
+    const { started } = startWith({
+      commit: () => {
+        throw new Error('commit failed');
+      },
+    });
+
+    await expect(started).rejects.toThrow('commit failed');
   });
 
   it('starts when init resolves inside the deadline', async () => {
@@ -65,5 +84,31 @@ describe('CourseSession bounds adapter.init()', () => {
 
     await started;
     expect(session.persistenceReady).toBe(true);
+  });
+});
+
+describe('CourseSession disposed while starting', () => {
+  it('registers no xAPI client and attaches no window listeners', async () => {
+    const { registerXAPIClient, useXAPI } =
+      await import('../src/runtime/xapi/registry.js');
+    const addListener = vi.spyOn(window, 'addEventListener');
+    const init = Promise.withResolvers<void>();
+    const { session } = createSession({
+      adapter: stubAdapter({ init: () => init.promise }),
+      xapiClient: {
+        markUnloading() {},
+        markRestored() {},
+        flush: async () => {},
+      },
+    });
+    const started = session.start();
+
+    session.dispose();
+    init.resolve();
+
+    expect(await started).toBeNull();
+    expect(useXAPI()).toBeNull();
+    expect(addListener).not.toHaveBeenCalledWith('pagehide', expect.anything());
+    registerXAPIClient(null);
   });
 });

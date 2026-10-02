@@ -16,7 +16,7 @@ const STUBS: Record<string, string> = {
   'virtual:tessera-quiz': 'export default null;',
   'virtual:tessera-course-runtime': 'export default null;',
   'virtual:tessera-xapi-setup':
-    'export async function buildXAPIClient() { return null; }',
+    'export async function buildXAPIClient(...args) { return globalThis.__tesseraTest.buildXAPIClient?.(...args) ?? null; }',
 };
 
 const tesseraVirtualStubs = {

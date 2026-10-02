@@ -188,12 +188,14 @@ export async function mountApp({
   adapter,
   loadPage = () => import('./fixtures/app-page.svelte'),
   loadLayout,
+  buildXAPIClient,
 }: {
   config: CourseConfig;
   manifest: Manifest;
   adapter: BaseAdapter;
   loadPage?: () => Promise<unknown>;
   loadLayout?: (() => Promise<{ default: unknown }>) | null;
+  buildXAPIClient?: (...args: unknown[]) => Promise<unknown>;
 }) {
   // App.svelte imports config at module scope, so the stubs need re-evaluating
   // for each mount. Svelte and the layout come from that same fresh registry or
@@ -208,6 +210,7 @@ export async function mountApp({
       manifest.pages.map((p) => [p.importPath, loadPage]),
     ),
     layout: loadLayout && (await loadLayout()).default,
+    buildXAPIClient,
   });
   vi.stubGlobal('__tesseraNavCtx', undefined);
   const App = (await import('../src/runtime/App.svelte')).default;

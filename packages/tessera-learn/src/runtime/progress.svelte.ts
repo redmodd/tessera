@@ -118,7 +118,7 @@ export class ProgressState {
   #manuallyCompleted = $state(false);
 
   /**
-   * Monotonic counter incremented on every persistable state mutation. App.svelte
+   * Monotonic counter incremented on every persistable state mutation. CourseSession
    * subscribes to this single signal to schedule a coalesced save.
    */
   version = $state(0);

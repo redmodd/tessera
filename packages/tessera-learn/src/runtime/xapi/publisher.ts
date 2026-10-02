@@ -171,7 +171,7 @@ export class XAPIPublisher {
   /**
    * Resolve actor (if function-form) and validate it. Idempotent.
    * Throws `XAPIConfigError` if the resolved actor fails the Identified
-   * Agent rule. App.svelte awaits init before registering the publisher
+   * Agent rule. CourseSession awaits init before registering the publisher
    * so by the time `useXAPI()` returns non-null, init is complete.
    */
   init(): Promise<void> {

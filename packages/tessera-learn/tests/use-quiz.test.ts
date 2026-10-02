@@ -157,7 +157,7 @@ describe('QuizEngine', () => {
   });
 
   it('reads passingScore live so a late LMS mastery override is reflected', () => {
-    // App.svelte applies an LMS-supplied masteryScore to pageContext.passingScore
+    // CourseSession applies an LMS-supplied masteryScore to the passing score
     // *after* useQuiz() may already have mounted the quiz. The engine must read
     // the threshold on each access, not snapshot it at construction, or the
     // quiz's pass/fail UI diverges from the LMS success status.

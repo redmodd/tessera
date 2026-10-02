@@ -8,7 +8,11 @@ import type { Manifest } from '../plugin/manifest.js';
 import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { UserStateStore } from './contexts.js';
-import type { SavedState, SuccessStatus } from './persistence.js';
+import type {
+  CompletionStatus,
+  SavedState,
+  SuccessStatus,
+} from './persistence.js';
 import type { XAPIClient } from './xapi/client.js';
 
 // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
@@ -44,6 +48,7 @@ export class CourseSession {
   #persistenceReady = $state(false);
   #launched = $state(false);
   #terminated = $state(false);
+  #disposed = false;
   #exitPhase = $state<ExitPhase | null>(null);
   #duration = new DurationTracker(0);
   #xapiClient: XAPIClient | null = null;
@@ -57,7 +62,7 @@ export class CourseSession {
 
   #prevReportedScore: number | null = null;
   #prevSuccessStatus: SuccessStatus = 'unknown';
-  #prevCompletionStatus = 'incomplete';
+  #prevCompletionStatus: CompletionStatus = 'incomplete';
 
   readonly userStateStore: UserStateStore = {
     get: (key) => (key in this.#userState ? this.#userState[key] : null),
@@ -88,9 +93,6 @@ export class CourseSession {
 
     this.#trackChanges();
     this.#reportStatus();
-
-    window.addEventListener('pagehide', this.#onPagehide);
-    window.addEventListener('pageshow', this.#onPageshow);
   }
 
   get persistenceReady(): boolean {
@@ -110,8 +112,11 @@ export class CourseSession {
     );
   }
 
-  /** Rejects when adapter init fails or times out: the learner can't continue regardless. */
-  async start(): Promise<void> {
+  /**
+   * Resolves with the error when adapter init fails or times out: the learner
+   * can't continue regardless. Failures after init reject.
+   */
+  async start(): Promise<Error | null> {
     const adapter = this.#adapter;
     const progress = this.#progress;
     let initDeadline: ReturnType<typeof setTimeout> | undefined;
@@ -125,9 +130,12 @@ export class CourseSession {
           );
         }),
       ]);
+    } catch (err) {
+      return err instanceof Error ? err : new Error(String(err));
     } finally {
       clearTimeout(initDeadline);
     }
+    if (this.#disposed) return null;
 
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
@@ -136,6 +144,7 @@ export class CourseSession {
     } catch (err) {
       console.warn('Tessera: resume state load failed', err);
     }
+    if (this.#disposed) return null;
 
     // An LMS-supplied mastery score is the authoritative pass threshold for
     // this launch and overrides the manifest.
@@ -174,6 +183,7 @@ export class CourseSession {
       console.warn('Tessera: xAPI client setup failed', err);
       this.#xapiClient = null;
     }
+    if (this.#disposed) return null;
     registerXAPIClient(this.#xapiClient);
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
@@ -182,7 +192,10 @@ export class CourseSession {
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
 
+    window.addEventListener('pagehide', this.#onPagehide);
+    window.addEventListener('pageshow', this.#onPageshow);
     this.#launched = true;
+    return null;
   }
 
   async exit(): Promise<void> {
@@ -203,6 +216,7 @@ export class CourseSession {
   }
 
   dispose(): void {
+    this.#disposed = true;
     window.removeEventListener('pagehide', this.#onPagehide);
     window.removeEventListener('pageshow', this.#onPageshow);
     // A stale client from this session must not leak into a fresh one.

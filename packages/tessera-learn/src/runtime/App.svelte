@@ -209,11 +209,10 @@
     applyBranding(document.documentElement, config.branding);
     if (config.title) document.title = config.title;
 
-    try {
-      await session.start();
-    } catch (err) {
-      console.error('Tessera: adapter init failed', err);
-      pageError = err instanceof Error ? err : new Error(String(err));
+    const initError = await session.start();
+    if (initError) {
+      console.error('Tessera: adapter init failed', initError);
+      pageError = initError;
       pageLoading = false;
       return;
     }
