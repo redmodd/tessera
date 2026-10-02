@@ -8,7 +8,7 @@ import type { Manifest } from '../plugin/manifest.js';
 import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { UserStateStore } from './contexts.js';
-import type { SavedState } from './persistence.js';
+import type { SavedState, SuccessStatus } from './persistence.js';
 import type { XAPIClient } from './xapi/client.js';
 
 // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
@@ -56,7 +56,7 @@ export class CourseSession {
   #persistPending = false;
 
   #prevReportedScore: number | null = null;
-  #prevSuccessStatus = 'unknown';
+  #prevSuccessStatus: SuccessStatus = 'unknown';
   #prevCompletionStatus = 'incomplete';
 
   readonly userStateStore: UserStateStore = {
@@ -110,7 +110,7 @@ export class CourseSession {
     );
   }
 
-  /** Rejects when the adapter cannot connect: the learner can't continue regardless. */
+  /** Rejects when adapter init fails or times out: the learner can't continue regardless. */
   async start(): Promise<void> {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -315,7 +315,7 @@ export class CourseSession {
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
         this.#prevSuccessStatus = progress.successStatus;
-        adapter.setSuccessStatus(progress.successStatus);
+        adapter.setSuccessStatus(this.#prevSuccessStatus);
         adapter.setDuration(this.#duration.sessionSeconds);
         adapter.commit();
       });
