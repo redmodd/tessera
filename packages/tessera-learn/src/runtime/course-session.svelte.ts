@@ -174,15 +174,15 @@ export class CourseSession {
       this.#requestPersist();
     }
 
+    const { signal } = this.#lifetime;
+    window.addEventListener('pagehide', this.#onPagehide, { signal });
+    window.addEventListener('pageshow', this.#onPageshow, { signal });
+
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
     adapter.setCompletionStatus(progress.reportedCompletionStatus);
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
-
-    const { signal } = this.#lifetime;
-    window.addEventListener('pagehide', this.#onPagehide, { signal });
-    window.addEventListener('pageshow', this.#onPageshow, { signal });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.

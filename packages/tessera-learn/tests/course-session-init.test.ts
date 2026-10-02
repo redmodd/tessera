@@ -58,6 +58,21 @@ describe('CourseSession bounds adapter.init()', () => {
     await expect(started).rejects.toThrow('commit failed');
   });
 
+  it('ends the session on pagehide after a failure after init', async () => {
+    const terminate = vi.fn();
+    const { started } = startWith({
+      setCompletionStatus: () => {
+        throw new Error('status push failed');
+      },
+      terminate,
+    });
+    await expect(started).rejects.toThrow('status push failed');
+
+    pagehide();
+
+    expect(terminate).toHaveBeenCalledOnce();
+  });
+
   it('starts when init resolves inside the deadline', async () => {
     useFakeTimers();
     const { session, started } = startWith({
