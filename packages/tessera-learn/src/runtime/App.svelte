@@ -15,12 +15,9 @@
   import { ProgressState } from './progress.svelte.js';
   import { DEFAULT_PASSING_SCORE } from './defaults.js';
   import { applyBranding } from './branding.js';
-  import { DurationTracker } from './duration.js';
+  import { CourseSession } from './course-session.svelte.js';
   import { createAdapter } from 'virtual:tessera-adapter';
-  import { structureFingerprint, shouldRestore } from './fingerprint.js';
-  import { isRecord } from './types.js';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
-  import { registerXAPIClient } from './xapi/registry.js';
   import {
     setPageContext,
     setNavContext,
@@ -28,21 +25,9 @@
     setUserStateStore,
   } from './contexts.js';
 
-  // ---- Persistence ----
-  // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
-  // have no deadline of their own, and the first page waits on all three.
-  const INIT_TIMEOUT_MS = 15_000;
-
   const config = $state(rawConfig);
 
   const adapter = createAdapter(config, { manifest });
-  const currentFingerprint = structureFingerprint(manifest);
-  let persistenceReady = $state(false);
-  let launched = $state(false);
-  // Holds the resolved xAPI client for the exit flush and unload-time
-  // markUnloading. Set after adapter.init() resolves and registered globally
-  // so useXAPI() can reach it.
-  let xapiClient = null;
 
   // ---- State classes ----
   // The Tier-2 auditor appends ?__tessera_audit to unlock navigation so it can
@@ -63,7 +48,24 @@
       goToIndex: (i) => nav.goToPage(i),
     };
   }
-  let duration = $state(new DurationTracker(0));
+
+  let unmountCourse;
+  let manualWatchdog = null;
+  const session = new CourseSession({
+    adapter,
+    manifest,
+    config,
+    progress,
+    nav,
+    buildXAPIClient: () =>
+      buildXAPIClient(config, adapter, courseRuntime?.xapi),
+    courseUnmounted: new Promise((r) => (unmountCourse = r)),
+    onLeave() {
+      loadGeneration++;
+      pageLoading = false;
+      clearTimeout(manualWatchdog);
+    },
+  });
 
   const onIdle =
     typeof window !== 'undefined' && window.requestIdleCallback
@@ -105,9 +107,9 @@
     progress,
     config,
     get canExit() {
-      return canExit;
+      return session.canExit;
     },
-    exit,
+    exit: () => session.exit(),
   });
 
   // ---- Adapter context (read by useQuestion / useQuiz) ----
@@ -118,17 +120,7 @@
   });
 
   // ---- User-scoped state (read/written by usePersistence) ----
-  // Each call site namespaces under its own key. Persisted to SavedState.u.
-  let userState = $state({});
-  setUserStateStore({
-    get(key) {
-      return key in userState ? userState[key] : null;
-    },
-    set(key, value) {
-      userState[key] = value;
-      requestPersist();
-    },
-  });
+  setUserStateStore(session.userStateStore);
 
   // ---- Chrome mode ----
   // A project-supplied layout.svelte at the project root takes precedence.
@@ -203,7 +195,7 @@
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;
-    if (!persistenceReady) return;
+    if (!session.persistenceReady) return;
     untrack(() => loadPage(index));
   });
 
@@ -212,308 +204,19 @@
     retryKey++;
   }
 
-  // ---- Persistence: serialize / restore ----
-  const unsavableKeys = new Set();
-
-  function savableUserState() {
-    const u = {};
-    for (const [key, value] of Object.entries(userState)) {
-      try {
-        JSON.stringify(value);
-        u[key] = value;
-      } catch (err) {
-        if (unsavableKeys.has(key)) continue;
-        unsavableKeys.add(key);
-        console.warn(
-          `Tessera: usePersistence('${key}') holds a value that is not JSON-serializable; it is left out of the save`,
-          err,
-        );
-      }
-    }
-    return u;
-  }
-
-  function serializeState() {
-    const u = savableUserState();
-    return {
-      b: nav.currentPageIndex,
-      f: currentFingerprint,
-      d: duration.totalSeconds,
-      ...progress.toSaved(),
-      ...(Object.keys(u).length > 0 ? { u } : {}),
-    };
-  }
-
-  function restoreState(saved) {
-    progress.restoreFrom(saved);
-    if (isRecord(saved.u)) {
-      userState = { ...userState, ...saved.u };
-    }
-    duration = new DurationTracker(saved.d);
-    // Navigate to bookmark (after state is restored so locking is correct)
-    nav.goToPage(saved.b);
-  }
-
-  function persistState() {
-    if (!persistenceReady || exitPhase) return;
-    adapter.saveState(serializeState());
-  }
-
-  // ---- Persistence: coalesced save on state changes ----
-  // A single microtask-batched scheduler. Multiple state mutations within one
-  // tick collapse to one persistState() call (and one LMS commit).
-  let persistScheduled = false;
-  let persistPending = false;
-  let persistEffectRan = false;
-
-  function requestPersist() {
-    if (!persistenceReady) {
-      persistPending = true;
-      return;
-    }
-    if (persistScheduled) return;
-    persistScheduled = true;
-    queueMicrotask(() => {
-      persistScheduled = false;
-      persistState();
-    });
-  }
-
-  const launchPageIndex = nav.currentPageIndex;
-  const launchVersion = progress.version;
-
-  $effect(() => {
-    // Subscribe to every signal that influences serializeState():
-    //   - currentPageIndex (bookmark)
-    //   - progress.version (bumped by markVisited / quizCompleted /
-    //     markChunk / markStandaloneQuestion)
-    // userState writes go through requestPersist() directly from the setter.
-    const pageIndex = nav.currentPageIndex;
-    const version = progress.version;
-    if (!persistEffectRan) {
-      persistEffectRan = true;
-      if (pageIndex === launchPageIndex && version === launchVersion) return;
-    }
-    untrack(requestPersist);
-  });
-
-  // ---- Persistence: report score/completion/success to adapter ----
-  let prevReportedScore = null;
-  let prevSuccessStatus = 'unknown';
-  $effect(() => {
-    if (!persistenceReady) return;
-
-    if (!progress.gradedScoreFinal) return;
-
-    const score = progress.reportedScore;
-    if (score === prevReportedScore) return;
-    prevReportedScore = score;
-
-    untrack(() => {
-      adapter.setScore(score);
-      // Before the commit, so a verdict this score decides carries it and
-      // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-      prevSuccessStatus = progress.successStatus;
-      adapter.setSuccessStatus(prevSuccessStatus);
-      adapter.setDuration(duration.sessionSeconds);
-      adapter.commit();
-    });
-  });
-
-  let prevCompletionStatus = 'incomplete';
-  $effect(() => {
-    const status = progress.reportedCompletionStatus;
-    if (!persistenceReady) return;
-    if (status === prevCompletionStatus) return;
-    prevCompletionStatus = status;
-    untrack(() => {
-      adapter.setCompletionStatus(status);
-      adapter.setDuration(duration.sessionSeconds);
-      adapter.commit();
-    });
-  });
-
-  $effect(() => {
-    const status = progress.successStatus;
-    if (!persistenceReady) return;
-    if (status === prevSuccessStatus) return;
-    prevSuccessStatus = status;
-    untrack(() => {
-      adapter.setSuccessStatus(status);
-      adapter.commit();
-    });
-  });
-
-  // ---- Exit / Terminate lifecycle ----
-  const EXIT_TIMEOUT_MS = 10_000;
-  let terminated = $state(false);
-  let exitPhase = $state(null);
-  let manualWatchdog = null;
-  const canExit = $derived(
-    adapter.connected && launched && !terminated && !exitPhase,
-  );
-
-  function endSession() {
-    if (terminated) return false;
-    terminated = true;
-    adapter.saveState(serializeState());
-    adapter.setDuration(duration.sessionSeconds);
-    // Tell SCORM whether this is a suspend-to-resume close or a normal
-    // exit. cmi5/web adapters no-op. Must come before terminate() so the
-    // value is committed in the same flush.
-    adapter.setExit(
-      progress.reportedCompletionStatus === 'complete' ? 'normal' : 'suspend',
-    );
-    adapter.commit();
-    return true;
-  }
-
-  function handlePagehide() {
-    if (!launched) return;
-    endSession();
-    if (exitPhase === 'ending') exitPhase = 'ended';
-    duration.pause();
-    xapiClient?.markUnloading();
-    adapter.terminate();
-  }
-
-  function handlePageshow(event) {
-    if (!terminated || !event.persisted) return;
-    xapiClient?.markRestored();
-    if (adapter.connected) {
-      leaveCourse('ended');
-      return;
-    }
-    terminated = false;
-    duration.resume();
-  }
-
-  function leaveCourse(phase) {
-    exitPhase = phase;
-    loadGeneration++;
-    pageLoading = false;
-    clearTimeout(manualWatchdog);
-  }
-
-  let unmountCourse;
-  const courseUnmounted = new Promise((r) => (unmountCourse = r));
-
-  async function exit() {
-    if (!canExit) return;
-    leaveCourse('ending');
-    const deadline = new Promise((resolve) =>
-      setTimeout(resolve, EXIT_TIMEOUT_MS),
-    );
-    await Promise.race([courseUnmounted, deadline]);
-    await xapiClient?.flush(deadline);
-    if (!endSession()) return;
-    await adapter.exit(deadline).catch((err) => {
-      console.warn('Tessera: exit failed', err);
-    });
-    if (exitPhase === 'ended') return;
-    exitPhase = 'ended';
-    if (!adapter.returnToLMS()) window.close();
-  }
-
   // ---- Lifecycle ----
   onMount(async () => {
     applyBranding(document.documentElement, config.branding);
     if (config.title) document.title = config.title;
 
-    // Initialize persistence and restore state. Adapter init() may throw
-    // for malformed launch params (endpoint, actor JSON, credential) or a
-    // failed cmi5 token request. Surface that to the UI rather than crashing
-    // silently: a launch-time error means the LMS context is wrong and the
-    // user can't continue regardless.
-    let initDeadline;
     try {
-      await Promise.race([
-        adapter.init(),
-        new Promise((_, reject) => {
-          initDeadline = setTimeout(
-            () => reject(new Error('adapter init timed out')),
-            INIT_TIMEOUT_MS,
-          );
-        }),
-      ]);
+      await session.start();
     } catch (err) {
       console.error('Tessera: adapter init failed', err);
       pageError = err instanceof Error ? err : new Error(String(err));
       pageLoading = false;
       return;
-    } finally {
-      clearTimeout(initDeadline);
     }
-
-    // Separate from init(): the adapter bounds this itself, so a stalled State
-    // API costs the bookmark rather than the launch.
-    try {
-      await adapter.loadState();
-    } catch (err) {
-      console.warn('Tessera: resume state load failed', err);
-    }
-
-    // An LMS-supplied mastery score is the authoritative pass threshold for
-    // this launch and overrides the manifest. `config` is a $state proxy, so
-    // this one write re-derives every consumer: completion and success status,
-    // navigation gating, the Quiz page context, and useProgress().passingScore
-    // in a custom layout.
-    const lmsMastery = adapter.getMasteryScore();
-    if (lmsMastery !== null) {
-      config.scoring.passingScore = Number((lmsMastery * 100).toPrecision(15));
-    }
-
-    // The first page is gated on persistenceReady, so a malformed saved
-    // document must cost the resume, not the course.
-    try {
-      const saved = adapter.getState();
-      if (saved && shouldRestore(saved, currentFingerprint, config.resume)) {
-        restoreState(saved);
-        prevCompletionStatus = progress.reportedCompletionStatus;
-        prevSuccessStatus = progress.successStatus;
-        const seededScore = progress.gradedScoreFinal
-          ? progress.reportedScore
-          : null;
-        if (
-          adapter.seedLifecycle(
-            progress.reportedCompletionStatus,
-            progress.successStatus,
-            seededScore,
-          )
-        ) {
-          prevReportedScore = seededScore;
-        }
-      }
-    } catch (err) {
-      console.error('Tessera: resume state could not be restored', err);
-    } finally {
-      persistenceReady = true;
-      if (persistPending) {
-        persistPending = false;
-        requestPersist();
-      }
-    }
-
-    // Build the xAPI client (custom destinations + cmi5 'lms' shared
-    // queue) once the adapter has resolved its launch context. Failure
-    // here is non-fatal — courses with no `xapi:` config get null, which
-    // is what `useXAPI()` is documented to return when nothing is wired.
-    try {
-      xapiClient = await buildXAPIClient(config, adapter, courseRuntime?.xapi);
-    } catch (err) {
-      console.warn('Tessera: xAPI client setup failed', err);
-      xapiClient = null;
-    }
-    registerXAPIClient(xapiClient);
-
-    // Push initial completion + success status to the adapter so LMSes never
-    // see the SCORM default ("unknown") on Terminate — SCORM Cloud rolls that
-    // up to "completed"/"passed" during status rollup.
-    adapter.setCompletionStatus(progress.reportedCompletionStatus);
-    adapter.setSuccessStatus(progress.successStatus);
-    adapter.commit();
-
-    launched = true;
 
     // Dev-only watchdog for `completion.mode: "manual"` without an opt-in
     // trigger check — catches the hook never being called or no completesOn
@@ -540,13 +243,9 @@
   onDestroy(() => {
     if (auditMode) delete window.__tesseraAudit;
     clearTimeout(manualWatchdog);
-    // Clear the global slot so a stale client from a previous mount
-    // can't leak into a fresh one (matters for tests that re-mount).
-    registerXAPIClient(null);
+    session.dispose();
   });
 </script>
-
-<svelte:window onpagehide={handlePagehide} onpageshow={handlePageshow} />
 
 {#snippet page()}
   {#if pageError}
@@ -573,8 +272,8 @@
   data-tessera-page-error={auditMode && pageError ? 'true' : undefined}
 >
   <LoadingBar active={pageLoading} />
-  {#if exitPhase}
-    <SessionEnded ended={exitPhase === 'ended'} />
+  {#if session.exitPhase}
+    <SessionEnded ended={session.exitPhase === 'ended'} />
   {:else}
     <span hidden {@attach () => unmountCourse}></span>
     {#if UserLayout}
