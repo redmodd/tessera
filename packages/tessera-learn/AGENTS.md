@@ -1349,9 +1349,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
-    <button disabled={selected === null} onclick={() => q.submit()}
-      >Check</button
-    >
+    <button disabled={selected === null} onclick={q.submit}>Check</button>
   {/if}
 {/if}
 ```

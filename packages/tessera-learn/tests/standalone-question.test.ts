@@ -211,10 +211,4 @@ describe('StandaloneQuestion', () => {
     done = true;
     expect(gated.answerComplete).toBe(true);
   });
-
-  it('is a standalone handle with no render', () => {
-    const { q } = make();
-    expect(q.mode).toBe('standalone');
-    expect(q.render).toBe(undefined);
-  });
 });

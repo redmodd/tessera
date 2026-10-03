@@ -1,6 +1,5 @@
 import { onDestroy, onMount, tick } from 'svelte';
-import type { Interaction } from './interaction.js';
-import { isCorrect as isCorrectInteraction } from './interaction.js';
+import { isCorrect, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type { CompletionStatus } from './persistence.js';
 import {
@@ -68,7 +67,7 @@ export interface UseQuestionOptions {
   weight?: number;
   /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
-  /** Called on submit — returns the current learner response payload, or undefined while unanswered. */
+  /** Called on submit. Returns the current learner response, or undefined while unanswered. */
   response: () => Interaction | undefined;
   /** Whether the current answer is fully specified. Default: true. */
   complete?: () => boolean;
@@ -139,15 +138,16 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       weight: opts.weight,
       checkAnswer: () => {
         const response = opts.response();
-        return !!response && isCorrectInteraction(response) === true;
+        return !!response && isCorrect(response) === true;
       },
       reset: opts.reset,
       complete: opts.complete,
-      interaction: () => opts.response(),
+      interaction: opts.response,
     });
   }
 
   const pageIndex = isInPage() ? getPageContext()?.index : undefined;
+  let markScore: (score: number) => void = () => {};
   if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
@@ -161,22 +161,19 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       !!opts.graded,
       opts.weight,
     );
+    markScore = (score) =>
+      navCtx.progress.markStandaloneQuestion(
+        pageIndex,
+        opts.id,
+        score,
+        !!opts.graded,
+        opts.weight,
+      );
   }
 
   return new StandaloneQuestion(opts, {
-    report: (id, interaction, correct) =>
-      adapterCtx?.adapter.reportInteraction(id, interaction, correct),
-    markScore: (score) => {
-      if (navCtx && pageIndex !== undefined) {
-        navCtx.progress.markStandaloneQuestion(
-          pageIndex,
-          opts.id,
-          score,
-          !!opts.graded,
-          opts.weight,
-        );
-      }
-    },
+    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    markScore,
   });
 }
 
@@ -430,8 +427,7 @@ export function useQuiz(
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
-    report: (id, interaction, correct) =>
-      adapterCtx?.adapter.reportInteraction(id, interaction, correct),
+    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
     onComplete: (score) => progress.quizCompleted(pageIndex, score),
     notify: (name, detail) => {
       opts
