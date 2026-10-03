@@ -795,14 +795,14 @@ interface Question {
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
+  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted correct, no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
 }
 ```
 
-Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "already correct" banner.
+Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to render the "already correct" banner.
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
@@ -848,7 +848,7 @@ function useQuestion(opts: {
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
-  retry(): void; // standalone only; no-op once correct, maxRetries hit, or inside a quiz
+  retry(): void; // standalone only; no-op before a submit, once correct, maxRetries hit, or inside a quiz
   readonly canRetry: boolean; // standalone: false once correct or maxRetries hit
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';

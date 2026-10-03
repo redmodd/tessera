@@ -80,7 +80,6 @@ export class StandaloneQuestion implements UseQuestionHandle {
     if (this.#submitted) return;
     const response = this.#opts.response();
     if (!response) return;
-    this.#answer = response.response;
     const correct = isCorrect(response);
     this.#correct = correct;
 

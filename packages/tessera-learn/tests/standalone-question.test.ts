@@ -27,6 +27,7 @@ function make(opts: Partial<UseQuestionOptions> = {}) {
 describe('StandaloneQuestion', () => {
   it('submit reports once and marks the score', () => {
     const { q, report, markScore } = make();
+    q.setAnswer(1);
     q.submit();
     q.submit();
 
@@ -36,7 +37,7 @@ describe('StandaloneQuestion', () => {
     expect(markScore).toHaveBeenCalledWith(100);
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
-    expect(q.answer).toBe(true);
+    expect(q.answer).toBe(1);
     expect(q.locked).toBe(true);
     expect(q.feedbackVisible).toBe(true);
   });
