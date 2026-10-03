@@ -303,7 +303,7 @@
         {/if}
       {/if}
       {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={() => q.retry()} />
+        <RetryButton onclick={q.retry} />
       {/if}
     </div>
   {/if}
@@ -313,7 +313,7 @@
     <div class="tessera-sorting-actions">
       <button
         class="tessera-btn-primary tessera-sorting-check"
-        onclick={() => q.submit()}
+        onclick={q.submit}
       >
         Check Answer
       </button>

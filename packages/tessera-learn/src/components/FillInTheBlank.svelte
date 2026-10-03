@@ -128,7 +128,7 @@
         {/if}
       {/if}
       {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={() => q.retry()} />
+        <RetryButton onclick={q.retry} />
       {/if}
     </div>
   {/if}

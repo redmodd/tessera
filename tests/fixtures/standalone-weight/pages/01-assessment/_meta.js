@@ -1,4 +1,4 @@
 export default {
   title: 'Assessment',
-  pages: ['weighted'],
+  pages: ['weighted', 'practice'],
 };
