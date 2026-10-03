@@ -91,7 +91,7 @@ export interface UseQuestionHandle extends Question {
   submit(): void;
   /** Reset the widget's own state. */
   reset(): void;
-  /** Standalone retry. No-op once `maxRetries` is hit or inside a quiz. */
+  /** Standalone retry. No-op once correct, once `maxRetries` is hit, or inside a quiz. */
   retry(): void;
   readonly canRetry: boolean;
   readonly retryCount: number;

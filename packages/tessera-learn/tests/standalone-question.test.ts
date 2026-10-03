@@ -90,7 +90,7 @@ describe('StandaloneQuestion', () => {
   });
 
   it('methods work unbound', () => {
-    const { q, report } = make({ maxRetries: 1 });
+    const { q, report } = make({ maxRetries: 1, response: () => wrong });
     const { setAnswer, submit, retry, reset, commit, setRender } = q;
     setAnswer('a');
     commit();
@@ -140,7 +140,11 @@ describe('StandaloneQuestion', () => {
 
   it('retry resets, reports afresh and stops at maxRetries', () => {
     const userReset = vi.fn();
-    const { q, report } = make({ maxRetries: 1, reset: userReset });
+    const { q, report } = make({
+      maxRetries: 1,
+      reset: userReset,
+      response: () => wrong,
+    });
     expect(q.canRetry).toBe(true);
     q.submit();
 
@@ -158,6 +162,30 @@ describe('StandaloneQuestion', () => {
     expect(q.submitted).toBe(true);
     expect(userReset).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledTimes(2);
+  });
+
+  it('cannot retry a correct answer', () => {
+    const userReset = vi.fn();
+    const { q } = make({ reset: userReset });
+    q.submit();
+    expect(q.canRetry).toBe(false);
+
+    q.retry();
+    q.reset();
+    expect(q.submitted).toBe(true);
+    expect(q.retryCount).toBe(0);
+    expect(userReset).not.toHaveBeenCalled();
+  });
+
+  it('can retry an answer with no correct response', () => {
+    const { q } = make({
+      response: () => ({ type: 'likert', response: 'agree' }),
+    });
+    q.submit();
+    expect(q.canRetry).toBe(true);
+
+    q.retry();
+    expect(q.submitted).toBe(false);
   });
 
   it('maxRetries: 0 means canRetry is false from the start', () => {

@@ -78,7 +78,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get canRetry(): boolean {
-    return this.#retryCount < this.#maxRetries;
+    return this.#correct !== true && this.#retryCount < this.#maxRetries;
   }
 
   get retryCount(): number {
@@ -116,7 +116,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   };
 
   retry = (): void => {
-    if (!this.#submitted || this.#retryCount >= this.#maxRetries) return;
+    if (!this.#submitted || !this.canRetry) return;
     this.#retryCount++;
     this.#clear();
   };
