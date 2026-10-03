@@ -13,6 +13,7 @@ import {
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
+import { StandaloneQuestion } from './standalone-question.svelte.js';
 import { resolveAsset } from '../components/util.js';
 
 /**
@@ -158,105 +159,21 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     );
   }
 
-  const maxRetries = opts.maxRetries ?? Infinity;
-  let submitted = $state(false);
-  let correct = $state<boolean | null>(null);
-  let retryCount = $state(0);
-  let currentAnswer = $state<unknown>(undefined);
-
-  let committed = false;
-
-  function commit() {
-    const response = opts.response();
-    if (!response) return;
-    committed = true;
-    adapterCtx?.adapter.reportInteraction(
-      opts.id,
-      response,
-      isCorrectInteraction(response),
-    );
-  }
-
-  function submit() {
-    if (submitted) return;
-    const response = opts.response();
-    currentAnswer = response.response;
-    correct = isCorrectInteraction(response);
-    const score = opts.score ? opts.score() : correct === true ? 100 : 0;
-
-    if (!committed) {
-      adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
-      committed = true;
-    }
-    if (navCtx && pageIndex !== undefined) {
-      navCtx.progress.markStandaloneQuestion(
-        pageIndex,
-        opts.id,
-        score,
-        !!opts.graded,
-        opts.weight,
-      );
-    }
-
-    submitted = true;
-  }
-
-  function reset() {
-    submitted = false;
-    correct = null;
-    currentAnswer = undefined;
-    committed = false;
-    opts.reset?.();
-  }
-
-  function retry() {
-    if (retryCount >= maxRetries) return;
-    retryCount++;
-    reset();
-  }
-
-  return {
-    get id() {
-      return opts.id;
+  return new StandaloneQuestion(opts, {
+    report: (id, interaction, correct) =>
+      adapterCtx?.adapter.reportInteraction(id, interaction, correct),
+    markScore: (id, score, graded, weight) => {
+      if (navCtx && pageIndex !== undefined) {
+        navCtx.progress.markStandaloneQuestion(
+          pageIndex,
+          id,
+          score,
+          graded,
+          weight,
+        );
+      }
     },
-    get submitted() {
-      return submitted;
-    },
-    get correct() {
-      return correct;
-    },
-    get answer() {
-      return currentAnswer;
-    },
-    get answerComplete() {
-      return currentAnswer !== undefined && (opts.complete?.() ?? true);
-    },
-    get feedbackVisible() {
-      return submitted;
-    },
-    get locked() {
-      return submitted;
-    },
-    get isLockedCorrect() {
-      return submitted && correct === true && retryCount >= maxRetries;
-    },
-    render: undefined,
-    setAnswer(a: unknown) {
-      currentAnswer = a;
-    },
-    commit,
-    submit,
-    reset,
-    retry,
-    get canRetry() {
-      return retryCount < maxRetries;
-    },
-    get retryCount() {
-      return retryCount;
-    },
-    mode: 'standalone' as const,
-    setRender() {},
-  };
+  });
 }
 
 export function useNavigation() {
