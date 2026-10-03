@@ -184,16 +184,18 @@ describe('StandaloneQuestion', () => {
 
   it('stays unsubmitted when recording the score throws', () => {
     const error = new Error('storage');
+    const report = vi.fn();
     const throwing = new StandaloneQuestion(
       { id: 'q1', response: () => right },
       {
-        report: vi.fn(),
+        report,
         markScore: () => {
           throw error;
         },
       },
     );
     expect(() => throwing.submit()).toThrow(error);
+    expect(report).not.toHaveBeenCalled();
     expect(throwing.submitted).toBe(false);
     expect(throwing.correct).toBe(null);
     expect(throwing.isLockedCorrect).toBe(false);
@@ -211,9 +213,10 @@ describe('StandaloneQuestion', () => {
   });
 
   it('maxRetries: 0 means canRetry is false from the start', () => {
-    const { q } = make({ maxRetries: 0 });
+    const { q } = make({ maxRetries: 0, response: () => wrong });
     expect(q.canRetry).toBe(false);
     q.submit();
+    expect(q.canRetry).toBe(false);
     q.retry();
 
     expect(q.retryCount).toBe(0);

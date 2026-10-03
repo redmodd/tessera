@@ -6,4 +6,4 @@
 
 **Behavior change:** `q.answer` holds only what was passed to `setAnswer()`, as in a quiz. A standalone submit no longer replaces it with the interaction's response.
 
-`commit()` reports each distinct answer once. `response()` may return `undefined` while unanswered: standalone `submit()` no-ops and a quiz scores the question incorrect.
+Calling `commit()` again with an unchanged answer no longer reports it again. `response()` may return `undefined` while unanswered: standalone `submit()` no-ops and a quiz scores the question incorrect.

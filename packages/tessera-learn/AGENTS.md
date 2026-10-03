@@ -848,7 +848,7 @@ function useQuestion(opts: {
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
-  retry(): void; // standalone only; no-op unless canRetry, and inside a quiz
+  retry(): void; // standalone: no-op unless canRetry. Always a no-op inside a quiz
   readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit. A remount starts over.
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';

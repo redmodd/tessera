@@ -91,7 +91,7 @@ export interface UseQuestionHandle extends Question {
   submit(): void;
   /** Clear the answer. After a standalone submit, same as `retry()`. */
   reset(): void;
-  /** Standalone retry. No-op unless `canRetry`; always inside a quiz. */
+  /** Standalone retry. No-op unless `canRetry`. Always a no-op inside a quiz. */
   retry(): void;
   /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. A remount starts over. */
   readonly canRetry: boolean;

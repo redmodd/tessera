@@ -85,8 +85,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const correct = isCorrect(response);
     const score = this.#opts.score?.() ?? (correct ? 100 : 0);
 
-    this.#report(response, correct);
     this.#deps.markScore(score);
+    this.#report(response, correct);
 
     this.#correct = correct;
     this.#score = score;
