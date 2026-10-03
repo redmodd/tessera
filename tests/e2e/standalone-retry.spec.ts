@@ -9,15 +9,15 @@ import {
 } from './lms-mocks.js';
 import {
   findStatements,
-  interactionField,
   navigateToPage,
+  scormData,
   startPreview,
   waitForServer,
   waitForTesseraContent,
 } from './helpers.js';
 import type { Standard } from './global-setup.js';
 
-/** Each interaction reported on the practice page, in order, as its correct flag. */
+/** Each interaction recorded for q-retry, in order, as its correct flag. */
 type Results = () => Promise<boolean[]>;
 
 interface Mode {
@@ -38,8 +38,15 @@ function scormMode(
     async launch(page, base) {
       await install(page);
       await page.goto(base);
-      return async () =>
-        (await interactionField(page, 'result')).map((r) => r === 'correct');
+      return async () => {
+        const data = await scormData(page);
+        return Object.keys(data)
+          .filter(
+            (k) =>
+              /^cmi\.interactions\.\d+\.id$/.test(k) && data[k] === 'q_retry',
+          )
+          .map((k) => data[k.replace(/id$/, 'result')] === 'correct');
+      };
     },
   };
 }
@@ -66,7 +73,7 @@ const MODES: Mode[] = [
 ];
 
 for (const mode of MODES) {
-  test.describe.serial(`standalone retry trail — ${mode.standard}`, () => {
+  test.describe.serial(`standalone retry trail: ${mode.standard}`, () => {
     test.fixme(!!mode.fixme, mode.fixme);
     const BASE = `http://localhost:${mode.port}`;
     let preview: ChildProcess;
@@ -83,6 +90,12 @@ for (const mode of MODES) {
     });
 
     test.afterAll(() => preview?.kill('SIGTERM'));
+    test.afterEach(async ({ page }) => {
+      const errors = await page.evaluate(
+        () => (window as { __scormErrors?: unknown[] }).__scormErrors ?? [],
+      );
+      expect(errors).toEqual([]);
+    });
 
     async function open(page: Page): Promise<Results> {
       const results = await mode.launch(page, BASE);
@@ -108,6 +121,7 @@ for (const mode of MODES) {
       await choose(page, 'Mercury');
       await expect.poll(results).toEqual([false, true]);
       await expect(tryAgain(page)).toHaveCount(0);
+      await expect(page.getByRole('radio', { name: 'Mercury' })).toBeDisabled();
     });
 
     test('maxRetries hides Try again once the retry is spent', async ({
@@ -122,6 +136,7 @@ for (const mode of MODES) {
       await choose(page, 'Earth');
       await expect.poll(results).toEqual([false, false]);
       await expect(tryAgain(page)).toHaveCount(0);
+      await expect(page.getByRole('radio', { name: 'Earth' })).toBeDisabled();
     });
   });
 }
