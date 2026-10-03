@@ -67,7 +67,7 @@ const FIXTURES: Record<FixtureName, FixtureSpec> = {
   },
   'standalone-weight': {
     source: resolve(REPO_ROOT, 'tests/fixtures/standalone-weight'),
-    standards: ['scorm12'],
+    standards: ['scorm12', 'scorm2004', 'cmi5'],
   },
   'page-weight': {
     source: resolve(REPO_ROOT, 'tests/fixtures/page-weight'),

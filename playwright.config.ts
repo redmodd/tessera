@@ -42,6 +42,7 @@ export default defineConfig({
         /custom-quiz\.spec\.ts$/,
         /a11y-audit\.spec\.ts$/,
         /lms-variants\.spec\.ts$/,
+        /standalone-retry\.spec\.ts$/,
       ],
     },
     {
@@ -91,7 +92,7 @@ export default defineConfig({
     {
       name: 'lms-variants',
       use: { browserName: 'chromium' },
-      testMatch: /lms-variants\.spec\.ts$/,
+      testMatch: /(lms-variants|standalone-retry)\.spec\.ts$/,
     },
     {
       name: 'a11y-audit',
