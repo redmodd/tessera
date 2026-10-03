@@ -198,19 +198,15 @@ describe('StandaloneQuestion', () => {
     expect(q.submitted).toBe(true);
   });
 
-  it('isLockedCorrect only once correct and out of retries', () => {
-    const capped = make({ maxRetries: 0 });
-    expect(capped.q.isLockedCorrect).toBe(false);
-    capped.q.submit();
-    expect(capped.q.isLockedCorrect).toBe(true);
+  it('isLockedCorrect once a correct answer is submitted', () => {
+    const { q } = make();
+    expect(q.isLockedCorrect).toBe(false);
+    q.submit();
+    expect(q.isLockedCorrect).toBe(true);
 
     const wrongQ = make({ maxRetries: 0, response: () => wrong });
     wrongQ.q.submit();
     expect(wrongQ.q.isLockedCorrect).toBe(false);
-
-    const open = make();
-    open.q.submit();
-    expect(open.q.isLockedCorrect).toBe(false);
   });
 
   it('answerComplete needs an answer and defaults complete to true', () => {

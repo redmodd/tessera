@@ -89,10 +89,11 @@ export interface UseQuestionOptions {
 export interface UseQuestionHandle extends Question {
   /** Standalone submit. No-op inside a quiz (the shell drives submission). */
   submit(): void;
-  /** Reset the widget's own state. */
+  /** Clear the answer. After a standalone submit, same as `retry()`. */
   reset(): void;
   /** Standalone retry. No-op once correct, once `maxRetries` is hit, or inside a quiz. */
   retry(): void;
+  /** Standalone: false once correct or `maxRetries` is hit. */
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';

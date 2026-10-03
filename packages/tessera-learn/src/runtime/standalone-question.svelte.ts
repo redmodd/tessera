@@ -2,10 +2,6 @@ import type { Interaction } from './interaction.js';
 import { isCorrect as isCorrectInteraction } from './interaction.js';
 import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 
-/**
- * Dependencies injected into {@link StandaloneQuestion}. The `useQuestion`
- * wrapper bridges them to the LMS adapter and page progress.
- */
 export interface StandaloneQuestionDeps {
   report: (
     id: string,
@@ -20,7 +16,6 @@ export interface StandaloneQuestionDeps {
   ) => void;
 }
 
-/** A question outside a quiz: owns its own submit, retry and LMS reporting. */
 export class StandaloneQuestion implements UseQuestionHandle {
   readonly mode = 'standalone';
   readonly render = undefined;
@@ -70,11 +65,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get isLockedCorrect(): boolean {
-    return (
-      this.#submitted &&
-      this.#correct === true &&
-      this.#retryCount >= this.#maxRetries
-    );
+    return this.#submitted && this.#correct === true;
   }
 
   get canRetry(): boolean {
