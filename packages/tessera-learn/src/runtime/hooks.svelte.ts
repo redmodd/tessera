@@ -66,7 +66,7 @@ export interface UseQuestionOptions {
    * non-finite weight rolls up as 1.
    */
   weight?: number;
-  /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
+  /** Standalone retry cap, counted per mount. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
   /** Called on submit. Returns the current learner response, or undefined while unanswered. */
   response: () => Interaction | undefined;
@@ -93,7 +93,7 @@ export interface UseQuestionHandle extends Question {
   reset(): void;
   /** Standalone retry. No-op unless `canRetry`; always inside a quiz. */
   retry(): void;
-  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. */
+  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. A remount starts over. */
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';

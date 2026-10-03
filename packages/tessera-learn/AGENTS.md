@@ -446,7 +446,7 @@ Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs. The retry count and the full-score lock reset when the learner leaves the page; a revisit can resubmit and replace the saved score:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />
@@ -842,14 +842,14 @@ function useQuestion(opts: {
   response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
-  maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
+  maxRetries?: number; // standalone retry cap per mount (default Infinity); ignored inside a quiz
   complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
   retry(): void; // standalone only; no-op unless canRetry, and inside a quiz
-  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit
+  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit. A remount starts over.
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   setRender(render: unknown): void;
