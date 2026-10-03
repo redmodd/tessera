@@ -839,7 +839,7 @@ Register a question widget so the runtime can submit, score, persist, and report
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id
   graded?: boolean; // standalone only
-  response: () => Interaction; // current answer; read at submit (and on each commit())
+  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
@@ -1229,10 +1229,9 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 <!-- line-drawing UI calls connect(l, r) on drop -->
 
 {#if q.mode === 'standalone'}
-  <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
+  <button onclick={q.submit} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.correct === false && q.canRetry}<button onclick={() => q.retry()}
-      >Try again</button
+  {#if q.submitted && q.canRetry}<button onclick={q.retry}>Try again</button
     >{/if}
 {/if}
 ```

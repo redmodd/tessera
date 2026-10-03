@@ -344,7 +344,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
 
-    let current: Interaction = {
+    let current: Interaction | undefined = {
       type: 'true-false',
       response: true,
       correct: true,
@@ -354,6 +354,8 @@ describe('useQuestion — inside a <Quiz>', () => {
     const arg = quiz.registerQuestion.mock.calls[0][0];
     expect(arg.checkAnswer()).toBe(true);
     current = { type: 'true-false', response: false, correct: true };
+    expect(arg.checkAnswer()).toBe(false);
+    current = undefined;
     expect(arg.checkAnswer()).toBe(false);
   });
 

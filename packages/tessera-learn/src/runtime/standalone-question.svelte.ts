@@ -1,19 +1,9 @@
-import type { Interaction } from './interaction.js';
-import { isCorrect as isCorrectInteraction } from './interaction.js';
+import { isCorrect, type Interaction } from './interaction.js';
 import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
+import type { QuizEngineDeps } from './quiz-engine.svelte.js';
 
-export interface StandaloneQuestionDeps {
-  report: (
-    id: string,
-    interaction: Interaction,
-    correct: boolean | null,
-  ) => void;
-  markScore: (
-    id: string,
-    score: number,
-    graded: boolean,
-    weight: number | undefined,
-  ) => void;
+export interface StandaloneQuestionDeps extends Pick<QuizEngineDeps, 'report'> {
+  markScore: (score: number) => void;
 }
 
 export class StandaloneQuestion implements UseQuestionHandle {
@@ -22,7 +12,6 @@ export class StandaloneQuestion implements UseQuestionHandle {
 
   #opts: UseQuestionOptions;
   #deps: StandaloneQuestionDeps;
-  #maxRetries: number;
 
   #submitted = $state(false);
   #correct = $state<boolean | null>(null);
@@ -33,7 +22,6 @@ export class StandaloneQuestion implements UseQuestionHandle {
   constructor(opts: UseQuestionOptions, deps: StandaloneQuestionDeps) {
     this.#opts = opts;
     this.#deps = deps;
-    this.#maxRetries = opts.maxRetries ?? Infinity;
   }
 
   get id(): string {
@@ -65,11 +53,14 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get isLockedCorrect(): boolean {
-    return this.#submitted && this.#correct === true;
+    return this.#correct === true;
   }
 
   get canRetry(): boolean {
-    return this.#correct !== true && this.#retryCount < this.#maxRetries;
+    return (
+      !this.isLockedCorrect &&
+      this.#retryCount < (this.#opts.maxRetries ?? Infinity)
+    );
   }
 
   get retryCount(): number {
@@ -82,21 +73,19 @@ export class StandaloneQuestion implements UseQuestionHandle {
 
   commit = (): void => {
     const response = this.#opts.response();
-    if (response) this.#report(response, isCorrectInteraction(response));
+    if (response) this.#report(response, isCorrect(response));
   };
 
   submit = (): void => {
     if (this.#submitted) return;
-    const opts = this.#opts;
-    const response = opts.response();
+    const response = this.#opts.response();
     if (!response) return;
     this.#answer = response.response;
-    const correct = isCorrectInteraction(response);
+    const correct = isCorrect(response);
     this.#correct = correct;
-    const score = opts.score ? opts.score() : correct === true ? 100 : 0;
 
     this.#report(response, correct);
-    this.#deps.markScore(opts.id, score, !!opts.graded, opts.weight);
+    this.#deps.markScore(this.#opts.score?.() ?? (correct ? 100 : 0));
 
     this.#submitted = true;
   };

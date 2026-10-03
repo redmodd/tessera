@@ -68,8 +68,8 @@ export interface UseQuestionOptions {
   weight?: number;
   /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
-  /** Called on submit — returns the current learner response payload. */
-  response: () => Interaction;
+  /** Called on submit — returns the current learner response payload, or undefined while unanswered. */
+  response: () => Interaction | undefined;
   /** Whether the current answer is fully specified. Default: true. */
   complete?: () => boolean;
   /**
@@ -137,7 +137,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     return quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
-      checkAnswer: () => isCorrectInteraction(opts.response()) === true,
+      checkAnswer: () => {
+        const response = opts.response();
+        return !!response && isCorrectInteraction(response) === true;
+      },
       reset: opts.reset,
       complete: opts.complete,
       interaction: () => opts.response(),
@@ -163,14 +166,14 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   return new StandaloneQuestion(opts, {
     report: (id, interaction, correct) =>
       adapterCtx?.adapter.reportInteraction(id, interaction, correct),
-    markScore: (id, score, graded, weight) => {
+    markScore: (score) => {
       if (navCtx && pageIndex !== undefined) {
         navCtx.progress.markStandaloneQuestion(
           pageIndex,
-          id,
+          opts.id,
           score,
-          graded,
-          weight,
+          !!opts.graded,
+          opts.weight,
         );
       }
     },
@@ -343,7 +346,7 @@ export interface UseQuizQuestionApi {
   reset?: () => void;
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
-  interaction?: () => Interaction;
+  interaction?: () => Interaction | undefined;
 }
 
 export interface UseQuizHandle {

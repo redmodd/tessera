@@ -26,14 +26,14 @@ function make(opts: Partial<UseQuestionOptions> = {}) {
 
 describe('StandaloneQuestion', () => {
   it('submit reports once and marks the score', () => {
-    const { q, report, markScore } = make({ graded: true, weight: 2 });
+    const { q, report, markScore } = make();
     q.submit();
     q.submit();
 
     expect(report).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledWith('q1', right, true);
     expect(markScore).toHaveBeenCalledTimes(1);
-    expect(markScore).toHaveBeenCalledWith('q1', 100, true, 2);
+    expect(markScore).toHaveBeenCalledWith(100);
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
     expect(q.answer).toBe(true);
@@ -46,11 +46,11 @@ describe('StandaloneQuestion', () => {
     wrongQ.q.submit();
     expect(wrongQ.q.correct).toBe(false);
     expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false);
-    expect(wrongQ.markScore).toHaveBeenCalledWith('q1', 0, false, undefined);
+    expect(wrongQ.markScore).toHaveBeenCalledWith(0);
 
     const scored = make({ response: () => wrong, score: () => 40 });
     scored.q.submit();
-    expect(scored.markScore).toHaveBeenCalledWith('q1', 40, false, undefined);
+    expect(scored.markScore).toHaveBeenCalledWith(40);
   });
 
   it('reports correct=null when the interaction has no correct answer', () => {
@@ -64,7 +64,7 @@ describe('StandaloneQuestion', () => {
 
   it('submit is a no-op while there is no response', () => {
     const { q, report, markScore } = make({
-      response: () => undefined as unknown as Interaction,
+      response: () => undefined,
     });
     q.submit();
 
@@ -86,7 +86,7 @@ describe('StandaloneQuestion', () => {
 
     expect(report).toHaveBeenCalledTimes(2);
     expect(report).toHaveBeenLastCalledWith('q1', right, true);
-    expect(markScore).toHaveBeenCalledWith('q1', 100, false, undefined);
+    expect(markScore).toHaveBeenCalledWith(100);
   });
 
   it('methods work unbound', () => {
@@ -114,20 +114,6 @@ describe('StandaloneQuestion', () => {
     expect(userReset).toHaveBeenCalledTimes(1);
   });
 
-  it('reset after a submit is a retry and honors maxRetries', () => {
-    const { q, report } = make({ maxRetries: 1, response: () => wrong });
-    q.submit();
-    q.reset();
-    expect(q.submitted).toBe(false);
-    expect(q.retryCount).toBe(1);
-
-    q.submit();
-    q.reset();
-    expect(q.submitted).toBe(true);
-    expect(q.retryCount).toBe(1);
-    expect(report).toHaveBeenCalledTimes(2);
-  });
-
   it('retry before a submit is a no-op', () => {
     const userReset = vi.fn();
     const { q } = make({ maxRetries: 1, reset: userReset });
@@ -138,31 +124,34 @@ describe('StandaloneQuestion', () => {
     expect(userReset).not.toHaveBeenCalled();
   });
 
-  it('retry resets, reports afresh and stops at maxRetries', () => {
-    const userReset = vi.fn();
-    const { q, report } = make({
-      maxRetries: 1,
-      reset: userReset,
-      response: () => wrong,
-    });
-    expect(q.canRetry).toBe(true);
-    q.submit();
+  it.each(['retry', 'reset'] as const)(
+    '%s after a submit resets, reports afresh and stops at maxRetries',
+    (method) => {
+      const userReset = vi.fn();
+      const { q, report } = make({
+        maxRetries: 1,
+        reset: userReset,
+        response: () => wrong,
+      });
+      expect(q.canRetry).toBe(true);
+      q.submit();
 
-    q.retry();
-    expect(q.submitted).toBe(false);
-    expect(q.correct).toBe(null);
-    expect(q.answer).toBe(undefined);
-    expect(q.retryCount).toBe(1);
-    expect(q.canRetry).toBe(false);
-    expect(userReset).toHaveBeenCalledTimes(1);
+      q[method]();
+      expect(q.submitted).toBe(false);
+      expect(q.correct).toBe(null);
+      expect(q.answer).toBe(undefined);
+      expect(q.retryCount).toBe(1);
+      expect(q.canRetry).toBe(false);
+      expect(userReset).toHaveBeenCalledTimes(1);
 
-    q.submit();
-    q.retry();
-    expect(q.retryCount).toBe(1);
-    expect(q.submitted).toBe(true);
-    expect(userReset).toHaveBeenCalledTimes(1);
-    expect(report).toHaveBeenCalledTimes(2);
-  });
+      q.submit();
+      q[method]();
+      expect(q.retryCount).toBe(1);
+      expect(q.submitted).toBe(true);
+      expect(userReset).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('cannot retry a correct answer', () => {
     const userReset = vi.fn();
