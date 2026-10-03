@@ -15,6 +15,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
 
   #submitted = $state(false);
   #correct = $state<boolean | null>(null);
+  #score = $state(0);
   #retryCount = $state(0);
   #answer = $state<unknown>(undefined);
   #reported: string | null = null;
@@ -53,11 +54,12 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get isLockedCorrect(): boolean {
-    return this.#correct === true;
+    return this.#submitted && this.#score >= 100;
   }
 
   get canRetry(): boolean {
     return (
+      this.#submitted &&
       !this.isLockedCorrect &&
       this.#retryCount < (this.#opts.maxRetries ?? Infinity)
     );
@@ -81,11 +83,13 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const response = this.#opts.response();
     if (!response) return;
     const correct = isCorrect(response);
-    this.#correct = correct;
+    const score = this.#opts.score?.() ?? (correct ? 100 : 0);
 
     this.#report(response, correct);
-    this.#deps.markScore(this.#opts.score?.() ?? (correct ? 100 : 0));
+    this.#deps.markScore(score);
 
+    this.#correct = correct;
+    this.#score = score;
     this.#submitted = true;
   };
 
@@ -95,7 +99,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   };
 
   retry = (): void => {
-    if (!this.#submitted || !this.canRetry) return;
+    if (!this.canRetry) return;
     this.#retryCount++;
     this.#clear();
   };
@@ -112,6 +116,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   #clear(): void {
     this.#submitted = false;
     this.#correct = null;
+    this.#score = 0;
     this.#answer = undefined;
     this.#reported = null;
     this.#opts.reset?.();

@@ -795,7 +795,7 @@ interface Question {
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted correct, no retry
+  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100, no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
@@ -848,8 +848,8 @@ function useQuestion(opts: {
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
-  retry(): void; // standalone only; no-op before a submit, once correct, maxRetries hit, or inside a quiz
-  readonly canRetry: boolean; // standalone: false once correct or maxRetries hit
+  retry(): void; // standalone only; no-op unless canRetry, and inside a quiz
+  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   setRender(render: unknown): void;
@@ -1231,8 +1231,7 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 {#if q.mode === 'standalone'}
   <button onclick={q.submit} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.submitted && q.canRetry}<button onclick={q.retry}>Try again</button
-    >{/if}
+  {#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
 {/if}
 ```
 

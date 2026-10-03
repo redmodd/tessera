@@ -121,7 +121,7 @@ describe('StandaloneQuestion', () => {
     q.retry();
 
     expect(q.retryCount).toBe(0);
-    expect(q.canRetry).toBe(true);
+    expect(q.canRetry).toBe(false);
     expect(userReset).not.toHaveBeenCalled();
   });
 
@@ -134,8 +134,8 @@ describe('StandaloneQuestion', () => {
         reset: userReset,
         response: () => wrong,
       });
-      expect(q.canRetry).toBe(true);
       q.submit();
+      expect(q.canRetry).toBe(true);
 
       q[method]();
       expect(q.submitted).toBe(false);
@@ -165,6 +165,38 @@ describe('StandaloneQuestion', () => {
     expect(q.submitted).toBe(true);
     expect(q.retryCount).toBe(0);
     expect(userReset).not.toHaveBeenCalled();
+  });
+
+  it('locks on a full score, not on correctness', () => {
+    const essay = make({
+      response: () => ({ type: 'long-fill-in', response: 'long enough' }),
+      score: () => 100,
+    }).q;
+    essay.submit();
+    expect(essay.isLockedCorrect).toBe(true);
+    expect(essay.canRetry).toBe(false);
+
+    const partial = make({ score: () => 40 }).q;
+    partial.submit();
+    expect(partial.isLockedCorrect).toBe(false);
+    expect(partial.canRetry).toBe(true);
+  });
+
+  it('stays unsubmitted when recording the score throws', () => {
+    const error = new Error('storage');
+    const throwing = new StandaloneQuestion(
+      { id: 'q1', response: () => right },
+      {
+        report: vi.fn(),
+        markScore: () => {
+          throw error;
+        },
+      },
+    );
+    expect(() => throwing.submit()).toThrow(error);
+    expect(throwing.submitted).toBe(false);
+    expect(throwing.correct).toBe(null);
+    expect(throwing.isLockedCorrect).toBe(false);
   });
 
   it('can retry an answer with no correct response', () => {

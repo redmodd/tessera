@@ -43,8 +43,8 @@ export interface Question {
   /**
    * Narrow case of `locked`. In a quiz, a retry policy (e.g.
    * `retryMode: 'incorrect-only'`) preserved the answer as already correct;
-   * use this to show the "already correct" banner. Standalone, a correct
-   * answer was submitted and can't be retried. Use `locked` to gate input.
+   * use this to show the "already correct" banner. Standalone, an answer
+   * scoring 100 was submitted and can't be retried. Use `locked` to gate input.
    */
   readonly isLockedCorrect: boolean;
   /** Snippet the widget registered with `setRender` (shell calls `{@render q.render()}`). */
@@ -91,9 +91,9 @@ export interface UseQuestionHandle extends Question {
   submit(): void;
   /** Clear the answer. After a standalone submit, same as `retry()`. */
   reset(): void;
-  /** Standalone retry. No-op before a submit, once correct, once `maxRetries` is hit, or inside a quiz. */
+  /** Standalone retry. No-op unless `canRetry`; always inside a quiz. */
   retry(): void;
-  /** Standalone: false once correct or `maxRetries` is hit. */
+  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. */
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
@@ -143,7 +143,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       },
       reset: opts.reset,
       complete: opts.complete,
-      interaction: opts.response,
+      interaction: () => opts.response(),
     });
   }
 
