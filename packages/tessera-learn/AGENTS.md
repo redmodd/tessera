@@ -847,7 +847,7 @@ function useQuestion(opts: {
   reset?: () => void;
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
-  reset(): void;
+  reset(): void; // clear the answer; after a standalone submit, same as retry()
   retry(): void; // standalone only; no-op once maxRetries hit or inside a quiz
   readonly canRetry: boolean;
   readonly retryCount: number;
@@ -1231,7 +1231,8 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 {#if q.mode === 'standalone'}
   <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button
+  {#if q.correct === false && q.canRetry}<button onclick={() => q.retry()}
+      >Try again</button
     >{/if}
 {/if}
 ```
