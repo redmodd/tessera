@@ -1043,7 +1043,7 @@ xapi?.sendStatement({
 });
 ```
 
-`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured or before adapter init resolves — **null-check and degrade gracefully**. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
+`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured, before adapter init resolves, or once the session has ended (Exit or page close): **null-check and degrade gracefully**. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
 
 ### Configure the destination
 
