@@ -446,7 +446,7 @@ Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice, rendering their own Check/Retry. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs. The retry count and the full-score lock reset when the learner leaves the page; a revisit can resubmit and replace the saved score:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />
@@ -795,14 +795,14 @@ interface Question {
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // narrow case: retry policy preserved this as already-correct
+  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100, no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
 }
 ```
 
-Gate input on `q.locked`; branch on `q.isLockedCorrect` only to render the "already correct" banner.
+Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to render the "already correct" banner.
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
@@ -839,17 +839,17 @@ Register a question widget so the runtime can submit, score, persist, and report
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id
   graded?: boolean; // standalone only
-  response: () => Interaction; // current answer; read at submit (and on each commit())
+  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
-  maxRetries?: number; // standalone retry cap (default Infinity); ignored inside a quiz
+  maxRetries?: number; // standalone retry cap per mount (default Infinity); ignored inside a quiz
   complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
-  reset(): void;
-  retry(): void; // standalone only; no-op once maxRetries hit or inside a quiz
-  readonly canRetry: boolean;
+  reset(): void; // clear the answer; after a standalone submit, same as retry()
+  retry(): void; // standalone: no-op unless canRetry. Always a no-op inside a quiz
+  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit. A remount starts over.
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   setRender(render: unknown): void;
@@ -1229,10 +1229,9 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 <!-- line-drawing UI calls connect(l, r) on drop -->
 
 {#if q.mode === 'standalone'}
-  <button onclick={() => q.submit()} disabled={q.submitted}>Check</button>
+  <button onclick={q.submit} disabled={q.submitted}>Check</button>
   {#if q.correct === true}<p>Correct.</p>{/if}
-  {#if q.correct === false}<button onclick={() => q.reset()}>Try again</button
-    >{/if}
+  {#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
 {/if}
 ```
 
@@ -1349,9 +1348,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
-    <button disabled={selected === null} onclick={() => q.submit()}
-      >Check</button
-    >
+    <button disabled={selected === null} onclick={q.submit}>Check</button>
   {/if}
 {/if}
 ```

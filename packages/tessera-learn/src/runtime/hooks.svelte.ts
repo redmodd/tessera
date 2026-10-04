@@ -1,6 +1,5 @@
 import { onDestroy, onMount, tick } from 'svelte';
-import type { Interaction } from './interaction.js';
-import { isCorrect as isCorrectInteraction } from './interaction.js';
+import { isCorrect, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type { CompletionStatus } from './persistence.js';
 import {
@@ -13,6 +12,7 @@ import {
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
+import { StandaloneQuestion } from './standalone-question.svelte.js';
 import { resolveAsset } from '../components/util.js';
 
 /**
@@ -41,9 +41,10 @@ export interface Question {
    */
   readonly locked: boolean;
   /**
-   * Narrow case of `locked`: the answer is preserved as "already correct" by
-   * a retry policy (e.g. `retryMode: 'incorrect-only'`). Use this to show an
-   * explicit banner; use `locked` to gate input.
+   * Narrow case of `locked`. In a quiz, a retry policy (e.g.
+   * `retryMode: 'incorrect-only'`) preserved the answer as already correct;
+   * use this to show the "already correct" banner. Standalone, an answer
+   * scoring 100 was submitted and can't be retried. Use `locked` to gate input.
    */
   readonly isLockedCorrect: boolean;
   /** Snippet the widget registered with `setRender` (shell calls `{@render q.render()}`). */
@@ -65,10 +66,10 @@ export interface UseQuestionOptions {
    * non-finite weight rolls up as 1.
    */
   weight?: number;
-  /** Standalone retry cap. Default `Infinity`. Ignored inside a quiz. */
+  /** Standalone retry cap, counted per mount. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
-  /** Called on submit — returns the current learner response payload. */
-  response: () => Interaction;
+  /** Called on submit. Returns the current learner response, or undefined while unanswered. */
+  response: () => Interaction | undefined;
   /** Whether the current answer is fully specified. Default: true. */
   complete?: () => boolean;
   /**
@@ -88,10 +89,11 @@ export interface UseQuestionOptions {
 export interface UseQuestionHandle extends Question {
   /** Standalone submit. No-op inside a quiz (the shell drives submission). */
   submit(): void;
-  /** Reset the widget's own state. */
+  /** Clear the answer. After a standalone submit, same as `retry()`. */
   reset(): void;
-  /** Standalone retry. No-op once `maxRetries` is hit or inside a quiz. */
+  /** Standalone retry. No-op unless `canRetry`. Always a no-op inside a quiz. */
   retry(): void;
+  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. A remount starts over. */
   readonly canRetry: boolean;
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
@@ -135,7 +137,10 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
     return quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
-      checkAnswer: () => isCorrectInteraction(opts.response()) === true,
+      checkAnswer: () => {
+        const response = opts.response();
+        return !!response && isCorrect(response) === true;
+      },
       reset: opts.reset,
       complete: opts.complete,
       interaction: () => opts.response(),
@@ -143,6 +148,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
   }
 
   const pageIndex = isInPage() ? getPageContext()?.index : undefined;
+  let markScore: (score: number) => void = () => {};
   if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
@@ -156,39 +162,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       !!opts.graded,
       opts.weight,
     );
-  }
-
-  const maxRetries = opts.maxRetries ?? Infinity;
-  let submitted = $state(false);
-  let correct = $state<boolean | null>(null);
-  let retryCount = $state(0);
-  let currentAnswer = $state<unknown>(undefined);
-
-  let committed = false;
-
-  function commit() {
-    const response = opts.response();
-    if (!response) return;
-    committed = true;
-    adapterCtx?.adapter.reportInteraction(
-      opts.id,
-      response,
-      isCorrectInteraction(response),
-    );
-  }
-
-  function submit() {
-    if (submitted) return;
-    const response = opts.response();
-    currentAnswer = response.response;
-    correct = isCorrectInteraction(response);
-    const score = opts.score ? opts.score() : correct === true ? 100 : 0;
-
-    if (!committed) {
-      adapterCtx?.adapter.reportInteraction(opts.id, response, correct);
-      committed = true;
-    }
-    if (navCtx && pageIndex !== undefined) {
+    markScore = (score) =>
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,
@@ -196,67 +170,12 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         !!opts.graded,
         opts.weight,
       );
-    }
-
-    submitted = true;
   }
 
-  function reset() {
-    submitted = false;
-    correct = null;
-    currentAnswer = undefined;
-    committed = false;
-    opts.reset?.();
-  }
-
-  function retry() {
-    if (retryCount >= maxRetries) return;
-    retryCount++;
-    reset();
-  }
-
-  return {
-    get id() {
-      return opts.id;
-    },
-    get submitted() {
-      return submitted;
-    },
-    get correct() {
-      return correct;
-    },
-    get answer() {
-      return currentAnswer;
-    },
-    get answerComplete() {
-      return currentAnswer !== undefined && (opts.complete?.() ?? true);
-    },
-    get feedbackVisible() {
-      return submitted;
-    },
-    get locked() {
-      return submitted;
-    },
-    get isLockedCorrect() {
-      return submitted && correct === true && retryCount >= maxRetries;
-    },
-    render: undefined,
-    setAnswer(a: unknown) {
-      currentAnswer = a;
-    },
-    commit,
-    submit,
-    reset,
-    retry,
-    get canRetry() {
-      return retryCount < maxRetries;
-    },
-    get retryCount() {
-      return retryCount;
-    },
-    mode: 'standalone' as const,
-    setRender() {},
-  };
+  return new StandaloneQuestion(opts, {
+    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    markScore,
+  });
 }
 
 export function useNavigation() {
@@ -425,7 +344,7 @@ export interface UseQuizQuestionApi {
   reset?: () => void;
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
-  interaction?: () => Interaction;
+  interaction?: () => Interaction | undefined;
 }
 
 export interface UseQuizHandle {
@@ -509,8 +428,7 @@ export function useQuiz(
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
-    report: (id, interaction, correct) =>
-      adapterCtx?.adapter.reportInteraction(id, interaction, correct),
+    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
     onComplete: (score) => progress.quizCompleted(pageIndex, score),
     notify: (name, detail) => {
       opts

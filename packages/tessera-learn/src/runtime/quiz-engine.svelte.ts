@@ -46,7 +46,7 @@ interface InternalQuestion {
   checkAnswer: () => boolean;
   reset?: () => void;
   complete?: () => boolean;
-  interaction?: () => Interaction;
+  interaction?: () => Interaction | undefined;
   render: unknown;
 }
 

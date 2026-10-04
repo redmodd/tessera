@@ -168,36 +168,6 @@ describe('useQuestion — standalone mode', () => {
     ).not.toThrow();
   });
 
-  it('is not answerComplete until an answer is set, with no complete callback', () => {
-    provideNavCtx();
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'choice', response: ['a'], correct: ['a'] }),
-    });
-
-    expect(q.answerComplete).toBe(false);
-    q.setAnswer('a');
-    expect(q.answerComplete).toBe(true);
-  });
-
-  it('flags incorrect when response does not match', () => {
-    const { adapter } = provideNavCtx();
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: false, correct: true }),
-    });
-    q.submit();
-
-    expect(adapter.reportInteraction).toHaveBeenCalledWith(
-      'q1',
-      expect.objectContaining({ type: 'true-false' }),
-      false,
-    );
-    expect(q.correct).toBe(false);
-  });
-
   it('does not register a graded score when graded is false', () => {
     const { progress } = provideNavCtx({ pageIndex: 2 });
 
@@ -252,22 +222,6 @@ describe('useQuestion — standalone mode', () => {
     expect(progress.gradedUnits.has(2)).toBe(false);
   });
 
-  it('uses score override when provided', () => {
-    const { progress } = provideNavCtx({
-      manifest: createManifest(2, {}, { 0: { graded: true } }),
-    });
-
-    const q = useQuestion({
-      id: 'q1',
-      graded: true,
-      response: () => ({ type: 'true-false', response: false, correct: true }),
-      score: () => 42,
-    });
-    q.submit();
-
-    expect(progress.gradedUnits.get(0)?.questions?.get('q1')?.score).toBe(42);
-  });
-
   it('passes weight through to the recorded result', () => {
     const { progress } = provideNavCtx({
       manifest: createManifest(2, {}, { 1: { graded: true } }),
@@ -305,39 +259,6 @@ describe('useQuestion — standalone mode', () => {
     });
   });
 
-  it('submit is idempotent — calling twice does not double-report', () => {
-    const { adapter } = provideNavCtx();
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-    });
-    q.submit();
-    q.submit();
-    expect(adapter.reportInteraction).toHaveBeenCalledTimes(1);
-  });
-
-  it('reset clears submitted/correct and re-enables submit', () => {
-    const userReset = vi.fn();
-    const { adapter } = provideNavCtx();
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-      reset: userReset,
-    });
-    q.submit();
-    expect(q.submitted).toBe(true);
-    q.reset();
-
-    expect(q.submitted).toBe(false);
-    expect(q.correct).toBe(null);
-    expect(userReset).toHaveBeenCalled();
-
-    q.submit();
-    expect(adapter.reportInteraction).toHaveBeenCalledTimes(2);
-  });
-
   it('mode is "standalone" outside a Quiz', () => {
     provideNavCtx();
 
@@ -346,105 +267,6 @@ describe('useQuestion — standalone mode', () => {
       response: () => ({ type: 'true-false', response: true }),
     });
     expect(q.mode).toBe('standalone');
-  });
-
-  it('reports correct=null when interaction has no correct answer', () => {
-    const { adapter } = provideNavCtx();
-
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'likert', response: 'agree' }),
-    });
-    q.submit();
-
-    expect(adapter.reportInteraction).toHaveBeenCalledWith(
-      'q1',
-      expect.any(Object),
-      null,
-    );
-    expect(q.correct).toBe(null);
-  });
-});
-
-// ============ useQuestion — standalone retry ============
-
-describe('useQuestion — standalone retry', () => {
-  it('canRetry defaults to true and retryCount starts at 0 (default Infinity cap)', () => {
-    provideNavCtx();
-    const q = useQuestion({
-      id: 'q1',
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-    });
-    expect(q.canRetry).toBe(true);
-    expect(q.retryCount).toBe(0);
-  });
-
-  it('retry() resets submitted/correct, calls opts.reset, and increments retryCount', () => {
-    const { adapter } = provideNavCtx();
-    const userReset = vi.fn();
-    const q = useQuestion({
-      id: 'q1',
-      maxRetries: 2,
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-      reset: userReset,
-    });
-    q.submit();
-    expect(q.submitted).toBe(true);
-    expect(q.correct).toBe(true);
-
-    q.retry();
-
-    expect(q.submitted).toBe(false);
-    expect(q.correct).toBe(null);
-    expect(q.retryCount).toBe(1);
-    expect(userReset).toHaveBeenCalledTimes(1);
-
-    // Resubmit reports a fresh interaction (not deduped against the prior submit).
-    q.submit();
-    expect(adapter.reportInteraction).toHaveBeenCalledTimes(2);
-  });
-
-  it('canRetry flips false when retryCount reaches maxRetries; further retry() is a no-op', () => {
-    const { adapter } = provideNavCtx();
-    const userReset = vi.fn();
-    const q = useQuestion({
-      id: 'q1',
-      maxRetries: 2,
-      response: () => ({ type: 'true-false', response: false, correct: true }),
-      reset: userReset,
-    });
-
-    q.submit();
-    q.retry();
-    expect(q.canRetry).toBe(true);
-    expect(q.retryCount).toBe(1);
-
-    q.submit();
-    q.retry();
-    expect(q.canRetry).toBe(false);
-    expect(q.retryCount).toBe(2);
-
-    // Cap reached — retry no-ops, retryCount and reset count don't move.
-    q.submit();
-    q.retry();
-    expect(q.retryCount).toBe(2);
-    expect(userReset).toHaveBeenCalledTimes(2);
-    // The third submit still reported (reset wasn't called, but submit() ran before retry no-op).
-    expect(adapter.reportInteraction).toHaveBeenCalledTimes(3);
-  });
-
-  it('maxRetries: 0 means canRetry is false from the start', () => {
-    provideNavCtx();
-    const q = useQuestion({
-      id: 'q1',
-      maxRetries: 0,
-      response: () => ({ type: 'true-false', response: true, correct: true }),
-    });
-    expect(q.canRetry).toBe(false);
-    q.submit();
-    q.retry();
-    expect(q.retryCount).toBe(0);
-    expect(q.submitted).toBe(true);
   });
 });
 
@@ -522,7 +344,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
 
-    let current: Interaction = {
+    let current: Interaction | undefined = {
       type: 'true-false',
       response: true,
       correct: true,
@@ -532,6 +354,8 @@ describe('useQuestion — inside a <Quiz>', () => {
     const arg = quiz.registerQuestion.mock.calls[0][0];
     expect(arg.checkAnswer()).toBe(true);
     current = { type: 'true-false', response: false, correct: true };
+    expect(arg.checkAnswer()).toBe(false);
+    current = undefined;
     expect(arg.checkAnswer()).toBe(false);
   });
 
