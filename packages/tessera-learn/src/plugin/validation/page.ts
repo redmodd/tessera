@@ -1,17 +1,16 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
-import JSON5 from 'json5';
 import {
-  extractDefaultExportObjectLiteral,
   parsePageConfigFromSource,
+  readMetaFile,
   readSourceFileCached,
   ensureSvelteSuffix,
-  isPageList,
   orderPageFiles,
   walkPages,
   isLiterallyGradedQuestion,
   listedGradedQuestions,
   QUESTION_COMPONENT_NAMES,
+  type MetaFile,
   type PageConfig,
 } from '../manifest.js';
 import {
@@ -243,18 +242,14 @@ export function validatePages(
     const sectionRel = relative(projectRoot, section.dir);
     const pagesBeforeSection = pages.length;
 
-    const sectionMeta = validateMetaFile(section.metaPath, sectionRel, d);
+    const sectionMeta = validateMetaFile(section.metaPath, projectRoot, d);
 
     for (const lesson of section.lessons) {
       // Flat lesson uses the section _meta, already validated above.
       const meta =
         lesson.name === null
           ? sectionMeta
-          : validateMetaFile(
-              lesson.metaPath,
-              relative(projectRoot, lesson.dir),
-              d,
-            );
+          : validateMetaFile(lesson.metaPath, projectRoot, d);
 
       if (meta?.pages) {
         for (const pageName of meta.pages) {
@@ -301,29 +296,18 @@ export function validatePages(
 
 function validateMetaFile(
   metaPath: string,
-  parentRel: string,
+  projectRoot: string,
   d: Diagnostics,
-): { title?: string; pages?: string[] } | null {
-  if (!existsSync(metaPath)) return null;
+): MetaFile | null {
+  const { meta, problem } = readMetaFile(metaPath);
+  if (problem === 'missing') return null;
 
-  const metaRel = `${parentRel}/_meta.js`;
-  const result = extractDefaultExportObjectLiteral(
-    readSourceFileCached(metaPath),
-  );
-
-  if (result.kind === 'parse-error') {
+  const metaRel = relative(projectRoot, metaPath);
+  if (problem === 'parse-error') {
     d.error(`${metaRel}: could not parse — JavaScript syntax error`);
     return null;
   }
-  if (result.kind !== 'literal') {
-    d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
-    return null;
-  }
-
-  let meta: { title?: string; pages?: string[] };
-  try {
-    meta = JSON5.parse(result.text);
-  } catch {
+  if (problem === 'not-literal') {
     d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
     return null;
   }
@@ -331,9 +315,8 @@ function validateMetaFile(
   if (!meta.title) {
     d.error(`${metaRel}: missing required "title" field`);
   }
-  if (meta.pages !== undefined && !isPageList(meta.pages)) {
+  if (problem === 'invalid-pages') {
     d.error(`${metaRel}: "pages" must be an array of page file names`);
-    delete meta.pages;
   }
 
   return meta;

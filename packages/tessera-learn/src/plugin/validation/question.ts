@@ -1,5 +1,5 @@
 import JSON5 from 'json5';
-import { staticQuestionId } from '../manifest.js';
+import { isStringArray, staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import { isRecord } from '../../runtime/types.js';
@@ -66,7 +66,7 @@ const QUESTION_COMPONENTS: Record<
       if (answers) {
         if (answers.length === 0) {
           d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
-        } else if (answers.some((a) => typeof a !== 'string')) {
+        } else if (!isStringArray(answers)) {
           d.error(
             `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
           );

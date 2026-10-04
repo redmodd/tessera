@@ -117,8 +117,6 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-export { defaultExportObjectLiteral as extractDefaultExportObjectLiteral } from './ast.js';
-
 export type CourseConfigRead =
   | { ok: true; config: Partial<CourseConfig> }
   | {
@@ -185,31 +183,40 @@ export function resolveConfigRead(
   };
 }
 
-/**
- * Read a _meta.js file and extract its default export object.
- * Uses the same JSON5 approach as pageConfig extraction — find the object literal
- * after `export default` and parse it.
- */
-export function readMetaFile(metaPath: string): {
+export interface MetaFile {
   title?: string;
   pages?: string[];
-} {
-  if (!existsSync(metaPath)) return {};
-
-  const result = defaultExportObjectLiteral(readSourceFileCached(metaPath));
-  if (result.kind !== 'literal') return {};
-
-  try {
-    const meta = JSON5.parse(result.text);
-    if (!isPageList(meta.pages)) delete meta.pages;
-    return meta;
-  } catch {
-    return {};
-  }
 }
 
-export function isPageList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((p) => typeof p === 'string');
+/**
+ * Read a _meta.js file's `export default { ... }` literal. `meta` is always
+ * usable (empty on failure, `pages` dropped when malformed); `problem` says
+ * what went wrong so the validator can report it.
+ */
+export function readMetaFile(metaPath: string): {
+  meta: MetaFile;
+  problem?: 'missing' | 'parse-error' | 'not-literal' | 'invalid-pages';
+} {
+  if (!existsSync(metaPath)) return { meta: {}, problem: 'missing' };
+
+  const result = defaultExportObjectLiteral(readSourceFileCached(metaPath));
+  if (result.kind === 'parse-error')
+    return { meta: {}, problem: 'parse-error' };
+  if (result.kind !== 'literal') return { meta: {}, problem: 'not-literal' };
+
+  let meta;
+  try {
+    meta = JSON5.parse(result.text);
+  } catch {
+    return { meta: {}, problem: 'not-literal' };
+  }
+  if (meta.pages === undefined || isStringArray(meta.pages)) return { meta };
+  delete meta.pages;
+  return { meta, problem: 'invalid-pages' };
+}
+
+export function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
@@ -381,7 +388,7 @@ export function generateManifest(
   let pageIndex = 0;
 
   for (const walkedSection of walked) {
-    const sectionMeta = readMetaFile(walkedSection.metaPath);
+    const sectionMeta = readMetaFile(walkedSection.metaPath).meta;
     const sectionSlug = deriveSlug(walkedSection.name);
 
     const section: ManifestSection = {
@@ -396,7 +403,7 @@ export function generateManifest(
       const isFlat = walkedLesson.name === null;
       const lessonMeta = isFlat
         ? sectionMeta
-        : readMetaFile(walkedLesson.metaPath);
+        : readMetaFile(walkedLesson.metaPath).meta;
       const lessonSlug = isFlat ? sectionSlug : deriveSlug(walkedLesson.name!);
       const relDir = isFlat
         ? `/pages/${walkedSection.name}`

@@ -20,7 +20,19 @@ import { describeType, type Diagnostics } from './diagnostics.js';
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export type XAPIHookRead = RuntimeXAPIHooks | 'none' | 'unknown';
+const LAUNCH_INHERITED_FIELDS = [
+  'auth',
+  'actor',
+  'activityId',
+  'registration',
+  'actorAccountHomePage',
+];
+
+const ACTOR_DERIVING_STANDARDS = STANDARD_IDS.filter(
+  (id) => STANDARDS[id].derivesLearnerActor,
+).join('/');
+
+type XAPIHookRead = RuntimeXAPIHooks | 'none' | 'unknown';
 
 export function readRuntimeXAPIHooks(
   projectRoot: string,
@@ -170,15 +182,7 @@ function validateSingleXAPIEntry(
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
       );
     }
-    // Forbid extra fields — everything is inherited from the launch.
-    const forbidden = [
-      'auth',
-      'actor',
-      'activityId',
-      'registration',
-      'actorAccountHomePage',
-    ];
-    for (const f of forbidden) {
+    for (const f of LAUNCH_INHERITED_FIELDS) {
       if (entry[f] !== undefined) {
         d.error(
           `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
@@ -318,7 +322,7 @@ function validateSingleXAPIEntry(
     }
     if (profile && !profile.derivesLearnerActor) {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is only used under ${STANDARD_IDS.filter((id) => STANDARDS[id].derivesLearnerActor).join('/')} actor synthesis; ignored under "${profile.id}".`,
+        `course.config.js: ${label}.actorAccountHomePage is only used under ${ACTOR_DERIVING_STANDARDS} actor synthesis; ignored under "${profile.id}".`,
       );
     }
   }

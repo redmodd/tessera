@@ -171,42 +171,50 @@ export function crossValidate(
   }
 
   if (profile && 'suspendDataLimit' in profile) {
-    // Estimate worst-case suspend_data size when all pages are visited, all
-    // quizzes completed, all chunks revealed, and a modest amount of
-    // usePersistence / standalone-question state has accumulated.
-    //
-    // SavedState shape (see runtime/persistence.ts) — single-letter keys:
-    //   b (bookmark), v (visited[]), d (duration), c (chunk progress),
-    //   g (per-page quiz + standalone scores), u (user state from usePersistence)
-    //
-    // We can't statically detect calls to `useQuestion({ graded: true })` or
-    // `usePersistence`, so reserve a fixed buffer per page for those.
-    const totalPages = pageResults.pages.length;
-    const totalQuizzes = pageResults.pages.filter((p) => p.hasQuiz).length;
-    let visitedChars = 0;
-    for (let i = 0; i < totalPages; i++) {
-      visitedChars += String(i).length + 1; // digit chars + comma
-    }
-    const overhead = 60; // top-level JSON overhead with all keys
-    // The `g` entry wrapper is budgeted once in standaloneBytes; a quiz adds
-    // only its own fields.
-    const quizBytes = totalQuizzes * 14; // g entry: "s":100,"a":2,
-    const chunkBytes = totalPages * 12; // c: "NNN":NN,
-    const standaloneBytes = totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
-    const userStateBuffer = 256; // usePersistence headroom
-    const estimatedSize =
-      overhead +
-      visitedChars +
-      quizBytes +
-      chunkBytes +
-      standaloneBytes +
-      userStateBuffer;
+    reportSuspendDataEstimate(pageResults.pages, profile, d);
+  }
+}
 
-    const limit = profile.suspendDataLimit;
-    if (estimatedSize > limit * 0.8) {
-      d.warn(
-        `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider ${quoteList(largerSuspendDataStandards(limit))}.`,
-      );
-    }
+function reportSuspendDataEstimate(
+  pages: PageInfo[],
+  profile: Extract<StandardProfile, { suspendDataLimit: number }>,
+  d: Diagnostics,
+): void {
+  // Estimate worst-case suspend_data size when all pages are visited, all
+  // quizzes completed, all chunks revealed, and a modest amount of
+  // usePersistence / standalone-question state has accumulated.
+  //
+  // SavedState shape (see runtime/persistence.ts) — single-letter keys:
+  //   b (bookmark), v (visited[]), d (duration), c (chunk progress),
+  //   g (per-page quiz + standalone scores), u (user state from usePersistence)
+  //
+  // We can't statically detect calls to `useQuestion({ graded: true })` or
+  // `usePersistence`, so reserve a fixed buffer per page for those.
+  const totalPages = pages.length;
+  const totalQuizzes = pages.filter((p) => p.hasQuiz).length;
+  let visitedChars = 0;
+  for (let i = 0; i < totalPages; i++) {
+    visitedChars += String(i).length + 1; // digit chars + comma
+  }
+  const overhead = 60; // top-level JSON overhead with all keys
+  // The `g` entry wrapper is budgeted once in standaloneBytes; a quiz adds
+  // only its own fields.
+  const quizBytes = totalQuizzes * 14; // g entry: "s":100,"a":2,
+  const chunkBytes = totalPages * 12; // c: "NNN":NN,
+  const standaloneBytes = totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
+  const userStateBuffer = 256; // usePersistence headroom
+  const estimatedSize =
+    overhead +
+    visitedChars +
+    quizBytes +
+    chunkBytes +
+    standaloneBytes +
+    userStateBuffer;
+
+  const limit = profile.suspendDataLimit;
+  if (estimatedSize > limit * 0.8) {
+    d.warn(
+      `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider ${quoteList(largerSuspendDataStandards(limit))}.`,
+    );
   }
 }

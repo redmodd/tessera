@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import {
+  isStringArray,
   readCourseConfig,
   readSourceFileCached,
   resolveConfigRead,
@@ -97,7 +98,6 @@ export function parseConfig(
   }
   const config: ParsedConfig = read.config;
 
-  // Check for unknown fields
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
       d.warn(`course.config.js: unknown field "${key}" — will be ignored`);
@@ -123,7 +123,6 @@ export function parseConfig(
     );
   }
 
-  // Validate branding
   if (config.branding !== undefined) {
     validateBranding(config.branding, projectRoot, d);
   }
@@ -161,27 +160,28 @@ export function parseConfig(
     );
   }
 
-  // Validate a11y config block
   if (config.a11y !== undefined) {
     validateA11yConfig(config.a11y, d);
   }
 
-  // Validate navigation.mode
-  if (config.navigation?.mode !== undefined) {
-    if (!oneOf(NAVIGATION_MODES, config.navigation.mode)) {
-      d.error(
-        `course.config.js: "navigation.mode" must be ${quoteList(NAVIGATION_MODES)}, got "${config.navigation.mode}"`,
-      );
-    }
+  const navigationMode = config.navigation?.mode;
+  if (
+    navigationMode !== undefined &&
+    !oneOf(NAVIGATION_MODES, navigationMode)
+  ) {
+    d.error(
+      `course.config.js: "navigation.mode" must be ${quoteList(NAVIGATION_MODES)}, got "${navigationMode}"`,
+    );
   }
 
-  // Validate completion.mode
-  if (config.completion?.mode !== undefined) {
-    if (!oneOf(COMPLETION_MODES, config.completion.mode)) {
-      d.error(
-        `course.config.js: "completion.mode" must be ${quoteList(COMPLETION_MODES)}, got "${config.completion.mode}"`,
-      );
-    }
+  const completionMode = config.completion?.mode;
+  if (
+    completionMode !== undefined &&
+    !oneOf(COMPLETION_MODES, completionMode)
+  ) {
+    d.error(
+      `course.config.js: "completion.mode" must be ${quoteList(COMPLETION_MODES)}, got "${completionMode}"`,
+    );
   }
 
   if (config.completion?.trigger !== undefined) {
@@ -249,14 +249,12 @@ export function parseConfig(
     );
   }
 
-  // Validate resume policy
   if (config.resume !== undefined && !oneOf(RESUME_POLICIES, config.resume)) {
     d.error(
       `course.config.js: "resume" must be ${quoteList(RESUME_POLICIES)}, got "${config.resume}"`,
     );
   }
 
-  // Validate export.csp (web-only CSP extension)
   if (config.export?.csp !== undefined) {
     const csp = config.export.csp;
     if (csp !== false && !isCspOverrides(csp)) {
@@ -410,14 +408,9 @@ function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
       `course.config.js: "a11y.standard" must be ${quoteList(A11Y_STANDARDS)}, got ${JSON.stringify(a11y.standard)}`,
     );
   }
-  if (a11y.ignore !== undefined) {
-    if (
-      !Array.isArray(a11y.ignore) ||
-      a11y.ignore.some((x) => typeof x !== 'string')
-    ) {
-      d.error(
-        `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,
-      );
-    }
+  if (a11y.ignore !== undefined && !isStringArray(a11y.ignore)) {
+    d.error(
+      `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,
+    );
   }
 }

@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import {
   generateManifest,
   extractPageConfig,
-  extractDefaultExportObjectLiteral,
   parsePageConfigFromSource,
   readMetaFile,
   orderPageFiles,
@@ -12,6 +11,7 @@ import {
   titleCase,
   deriveSlug,
 } from '../src/plugin/manifest.js';
+import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
 import { tempDir } from './helpers.js';
 
@@ -125,11 +125,11 @@ describe('orderPageFiles', () => {
   });
 });
 
-// ---------- extractDefaultExportObjectLiteral ----------
+// ---------- defaultExportObjectLiteral ----------
 
-describe('extractDefaultExportObjectLiteral', () => {
+describe('defaultExportObjectLiteral', () => {
   const literalOf = (src: string): string | null => {
-    const r = extractDefaultExportObjectLiteral(src);
+    const r = defaultExportObjectLiteral(src);
     return r.kind === 'literal' ? r.text : null;
   };
 
@@ -176,24 +176,24 @@ describe('extractDefaultExportObjectLiteral', () => {
   });
 
   it('reports "none" when there is no default export', () => {
-    expect(extractDefaultExportObjectLiteral('const x = 1;').kind).toBe('none');
+    expect(defaultExportObjectLiteral('const x = 1;').kind).toBe('none');
   });
 
   it('reports "invalid" when the default export is not an object literal', () => {
-    expect(extractDefaultExportObjectLiteral('export default "hi";').kind).toBe(
+    expect(defaultExportObjectLiteral('export default "hi";').kind).toBe(
       'invalid',
     );
   });
 
   it('reports "parse-error" for unparseable source', () => {
     expect(
-      extractDefaultExportObjectLiteral('export default { title: "hi"').kind,
+      defaultExportObjectLiteral('export default { title: "hi"').kind,
     ).toBe('parse-error');
   });
 
   it('reports "parse-error" when a valid export is followed by junk', () => {
     expect(
-      extractDefaultExportObjectLiteral(
+      defaultExportObjectLiteral(
         `export default { title: 'OK' };\nconst broken =`,
       ).kind,
     ).toBe('parse-error');
@@ -255,7 +255,7 @@ describe('readMetaFile', () => {
       'meta-test/_meta.js',
       'export default { title: "My Section" };',
     );
-    const meta = readMetaFile(path);
+    const { meta } = readMetaFile(path);
     expect(meta.title).toBe('My Section');
   });
 
@@ -264,7 +264,7 @@ describe('readMetaFile', () => {
       'meta-test2/_meta.js',
       'export default { title: "Lesson", pages: ["a", "b"] };',
     );
-    const meta = readMetaFile(path);
+    const { meta } = readMetaFile(path);
     expect(meta.title).toBe('Lesson');
     expect(meta.pages).toEqual(['a', 'b']);
   });
@@ -274,16 +274,22 @@ describe('readMetaFile', () => {
       'meta-test3/_meta.js',
       'export default { title: "Lesson", pages: "a" };',
     );
-    expect(readMetaFile(path)).toEqual({ title: 'Lesson' });
+    expect(readMetaFile(path)).toEqual({
+      meta: { title: 'Lesson' },
+      problem: 'invalid-pages',
+    });
   });
 
-  it('returns empty object for missing file', () => {
-    expect(readMetaFile('/nonexistent/_meta.js')).toEqual({});
+  it('returns empty meta for missing file', () => {
+    expect(readMetaFile('/nonexistent/_meta.js')).toEqual({
+      meta: {},
+      problem: 'missing',
+    });
   });
 
-  it('returns empty object for invalid content', () => {
+  it('returns empty meta for invalid content', () => {
     const path = createFile('meta-bad/_meta.js', 'not valid js');
-    expect(readMetaFile(path)).toEqual({});
+    expect(readMetaFile(path).meta).toEqual({});
   });
 
   it('handles trailing commas', () => {
@@ -291,7 +297,7 @@ describe('readMetaFile', () => {
       'meta-trailing/_meta.js',
       'export default { title: "T", pages: ["a",], };',
     );
-    const meta = readMetaFile(path);
+    const { meta } = readMetaFile(path);
     expect(meta.title).toBe('T');
     expect(meta.pages).toEqual(['a']);
   });
