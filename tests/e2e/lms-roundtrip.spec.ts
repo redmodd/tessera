@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Request } from '@playwright/test';
 import { type ChildProcess } from 'node:child_process';
 import {
   installCmi5Mock,
@@ -683,16 +683,23 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     });
   }
 
-  /** `stateGet` scripts the resume read; `statePuts` collects attempted writes. */
+  /**
+   * `stateGet` scripts the resume read (null leaves it unanswered);
+   * `statePuts` collects attempted writes and `statements` posted statements.
+   */
   async function routeLRSWithState(
     page: Page,
-    stateGet: { status: number; body: string },
+    stateGet: { status: number; body: string } | null,
     statePuts: string[],
+    statements: any[] = [],
   ): Promise<void> {
     await page.route('http://xapi-mock.test/**', async (route) => {
       const req = route.request();
       const url = req.url();
       if (url.includes('/xapi/statements')) {
+        try {
+          statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
+        } catch {}
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -706,6 +713,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
           await route.fulfill({ status: 204, body: '' });
           return;
         }
+        if (!stateGet) return;
         await route.fulfill({
           status: stateGet.status,
           contentType: 'application/json',
@@ -762,43 +770,29 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(statePuts).toHaveLength(0);
   });
 
-  test('pagehide while the resume GET is pending sends Terminated and writes no state', async ({
+  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
     page,
   }) => {
     const statements: any[] = [];
     const statePuts: string[] = [];
-    let stateGets = 0;
-    await page.route('http://xapi-mock.test/**', async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (url.includes('/xapi/statements')) {
-        try {
-          statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
-        } catch {}
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['stmt-id']),
-        });
-        return;
-      }
-      if (url.includes('/xapi/activities/state')) {
-        if (req.method() === 'PUT') {
-          statePuts.push(req.postData() ?? '');
-          await route.fulfill({ status: 204, body: '' });
-        } else {
-          stateGets++;
-        }
-        return;
-      }
-      await route.fulfill({ status: 200, body: '{}' });
-    });
+    await routeLRSWithState(page, null, statePuts, statements);
+    const isStateGet = (req: Request) =>
+      req.url().includes('/xapi/activities/state') && req.method() === 'GET';
+    const resumeGet = page.waitForRequest(isStateGet);
 
     await page.goto(xapiLaunchURL(BASE));
-    await expect.poll(() => stateGets).toBeGreaterThan(0);
+    await resumeGet;
+    const aborted = page.waitForEvent('requestfailed', {
+      predicate: isStateGet,
+      timeout: 2000,
+    });
     await exitCourse(page);
+    await aborted;
 
     await expectNoStatementsAfterTerminated(page, statements);
+    expect(findStatement(statements, 'terminated').result.duration).toMatch(
+      /^PT/,
+    );
     expect(statePuts).toEqual([]);
   });
 

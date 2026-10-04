@@ -49,7 +49,7 @@ export class CourseSession {
   #launched = $state(false);
   #terminated = $state(false);
   #exitPhase = $state<ExitPhase | null>(null);
-  #duration = new DurationTracker(0);
+  #duration = new DurationTracker();
   #xapiClient: XAPIClient | null = null;
 
   // Each usePersistence call site namespaces under its own key. Saved to SavedState.u.
@@ -233,7 +233,7 @@ export class CourseSession {
     if (isRecord(saved.u)) {
       this.#userState = { ...this.#userState, ...saved.u };
     }
-    this.#duration = new DurationTracker(saved.d);
+    this.#duration.setPrevious(saved.d);
     // After progress, so the bookmark's page is unlocked.
     this.#nav.goToPage(saved.b);
 

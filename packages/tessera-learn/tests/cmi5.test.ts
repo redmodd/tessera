@@ -86,10 +86,12 @@ describe('CMI5Adapter', () => {
     return assign;
   }
 
-  function routeResumeGet(resumeGet: Mock<() => Promise<Response>>): void {
+  function routeResumeGet(
+    resumeGet: Mock<(init?: RequestInit) => Promise<Response>>,
+  ): void {
     const lms = cmi5Fetch();
     mockFetch.mockImplementation((url: string, init?: RequestInit) =>
-      isRunningStateGet(url, init) ? resumeGet() : lms(url, init),
+      isRunningStateGet(url, init) ? resumeGet(init) : lms(url, init),
     );
   }
 
@@ -558,6 +560,32 @@ describe('CMI5Adapter', () => {
       `${VERB}completed`,
       `${VERB}terminated`,
     ]);
+  });
+
+  it('aborts the resume GET in flight on terminate, and still refuses to save', async () => {
+    const adapter = await initAdapter();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const resumeGet = vi.fn(
+      (init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(init.signal!.reason),
+          );
+        }),
+    );
+    routeResumeGet(resumeGet);
+    const loading = adapter.loadState();
+    await flush();
+
+    adapter.terminate();
+    await loading;
+    adapter.saveState({ b: 0, v: [0], d: 1 });
+    await flush();
+
+    expect(resumeGet).toHaveBeenCalledTimes(1);
+    expect(adapter.getState()).toBeNull();
+    expect(stateWrites()).toHaveLength(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('stops retrying the resume GET once terminated, and still refuses to save', async () => {

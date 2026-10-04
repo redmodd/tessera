@@ -119,6 +119,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
   #stateSaved = true;
+  #termination = new AbortController();
 
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
@@ -350,6 +351,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   override terminate(unloading = true): void {
     if (this.terminated) return;
     this.terminated = true;
+    this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {
       this.publisher.markUnloading();
@@ -474,21 +476,34 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * LMS backoff schedule; the one with the higher write sequence wins. A 404,
    * an empty body, or an unparseable one is a definitive answer and returns
    * with saving enabled. Exhausting the attempts or the deadline, or
-   * terminating first, leaves the stored state unread, so `stateLoadFailed`
-   * withholds every later write.
+   * terminating first (which aborts the read in flight), leaves the stored
+   * state unread, so `stateLoadFailed` withholds every later write.
    */
   override async loadState(): Promise<void> {
-    const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS),
+      this.#termination.signal,
+    ]);
     let lastDetail = '';
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
       if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, backoffMs(attempt - 1)));
-        if (deadline.aborted || this.terminated) break;
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, backoffMs(attempt - 1));
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+        if (signal.aborted) break;
       }
       try {
         const [running, exit] = await Promise.all([
-          this.#getStateDoc(this.buildStateUrl(), deadline),
-          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), deadline),
+          this.#getStateDoc(this.buildStateUrl(), signal),
+          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), signal),
         ]);
         const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
         this.#stateSeq = latest?.n ?? 0;
@@ -501,7 +516,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
-        if (deadline.aborted || this.terminated) break;
+        if (signal.aborted) break;
       }
     }
     this.stateLoadFailed = true;
