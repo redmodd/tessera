@@ -2,14 +2,6 @@
 'tessera-learn': patch
 ---
 
-`tessera validate --standard` now applies that standard to page checks even when `course.config.js` does not parse.
+Validation now catches more `course.config.js` and `_meta.js` mistakes: an unknown `chrome` value, an `export`, `navigation`, `completion`, or `scoring` value that is not an object (so `export: "scorm12"` no longer silently builds for web), and a `_meta.js` `title` or `pages` of the wrong type (which used to crash the build). `success: null` no longer crashes validation.
 
-An unknown `chrome` value in `course.config.js` is now a validation error, so `tessera dev` and `tessera export` stop on it as well as `tessera validate`. So is an `export`, `navigation`, `completion`, or `scoring` value that is not an object. These used to pass, so `export: "scorm12"` built for web.
-
-A `_meta.js` `pages` value that is not an array of strings is now a validation error instead of crashing the build. A non-string `_meta.js` `title` is now a validation error.
-
-`success: null` in `course.config.js` is now reported as a validation error instead of crashing validation on a course with graded pages.
-
-A `course.config.js` or `_meta.js` default export holding a variable or other expression now says so instead of reporting a syntax error or a missing `export default`. Both files now report a syntax error or a missing `export default` with the same message.
-
-Validation messages now print the offending value as written: a string is quoted, and `NaN` or `Infinity` no longer shows as `null`.
+A default export that isn't a static object literal now says so, and validation messages print rejected values as written.
