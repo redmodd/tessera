@@ -59,8 +59,7 @@ async function expectPagehideAbortsResumeGet(
   page: Page,
   launchURL: string,
   isResumeGet: (req: Request) => boolean,
-  statements: any[],
-  statePuts: string[],
+  { statements, statePuts }: { statements: any[]; statePuts: string[] },
 ): Promise<void> {
   await page.clock.install();
   const resumeGet = page.waitForRequest(isResumeGet);
@@ -671,8 +670,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       page,
       cmi5LaunchURL(BASE),
       isResumeGet,
-      statements,
-      statePuts,
+      { statements, statePuts },
     );
   });
 });
@@ -809,13 +807,10 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     const isStateGet = (req: Request) =>
       req.url().includes('/xapi/activities/state') && req.method() === 'GET';
 
-    await expectPagehideAbortsResumeGet(
-      page,
-      xapiLaunchURL(BASE),
-      isStateGet,
+    await expectPagehideAbortsResumeGet(page, xapiLaunchURL(BASE), isStateGet, {
       statements,
       statePuts,
-    );
+    });
   });
 
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
