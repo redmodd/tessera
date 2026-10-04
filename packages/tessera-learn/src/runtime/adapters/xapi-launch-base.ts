@@ -497,47 +497,37 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * state unread, so `stateLoadFailed` withholds every later write.
    */
   override async loadState(): Promise<void> {
-    const load = linkedController(
-      AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS),
-      this.#termination.signal,
-    );
+    const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
     let lastDetail = '';
-    try {
-      for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+    for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+      const request = linkedController(deadline, this.#termination.signal);
+      try {
         if (attempt > 0) {
           await new Promise((resolve) => {
             setTimeout(resolve, backoffMs(attempt - 1));
-            load.signal.addEventListener('abort', resolve, { once: true });
+            request.signal.addEventListener('abort', resolve, { once: true });
           });
-          if (load.signal.aborted) break;
+          if (request.signal.aborted) break;
         }
-        const request = linkedController(load.signal);
-        try {
-          const [running, exit] = await Promise.all([
-            this.#getStateDoc(this.buildStateUrl(), request.signal),
-            this.#getStateDoc(
-              this.buildStateUrl(EXIT_STATE_ID),
-              request.signal,
-            ),
-          ]);
-          const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
-          this.#stateSeq = latest?.n ?? 0;
-          if (latest) {
-            const { n: _n, ...state } = latest;
-            this.state = state;
-          } else {
-            this.state = null;
-          }
-          return;
-        } catch (err) {
-          lastDetail = err instanceof Error ? err.message : String(err);
-          if (load.signal.aborted) break;
-        } finally {
-          request.abort();
+        const [running, exit] = await Promise.all([
+          this.#getStateDoc(this.buildStateUrl(), request.signal),
+          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), request.signal),
+        ]);
+        const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
+        this.#stateSeq = latest?.n ?? 0;
+        if (latest) {
+          const { n: _n, ...state } = latest;
+          this.state = state;
+        } else {
+          this.state = null;
         }
+        return;
+      } catch (err) {
+        lastDetail = err instanceof Error ? err.message : String(err);
+        if (request.signal.aborted) break;
+      } finally {
+        request.abort();
       }
-    } finally {
-      load.abort();
     }
     this.stateLoadFailed = true;
     this.state = null;
