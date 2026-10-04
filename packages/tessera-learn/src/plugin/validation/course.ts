@@ -4,7 +4,7 @@ import {
 } from '../../runtime/standards.js';
 import { resolveSuccess } from '../../runtime/types.js';
 import type { ParsedConfig } from './config.js';
-import type { Diagnostics } from './diagnostics.js';
+import { quoteList, type Diagnostics } from './diagnostics.js';
 import type { PageInfo, PagesValidationResult } from './page.js';
 
 function reportEffectiveWeights(
@@ -204,11 +204,8 @@ export function crossValidate(
 
     const limit = profile.suspendDataLimit;
     if (estimatedSize > limit * 0.8) {
-      const alternatives = largerSuspendDataStandards(limit)
-        .map((id) => `"${id}"`)
-        .join(', ');
       d.warn(
-        `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider one of ${alternatives}.`,
+        `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider ${quoteList(largerSuspendDataStandards(limit))}.`,
       );
     }
   }

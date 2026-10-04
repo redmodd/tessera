@@ -283,7 +283,7 @@ function validateSingleXAPIEntry(
           `Set a static Agent object, or export ${hookRef}.actor from course.runtime.js to resolve one (e.g. from your auth system).`,
       );
     }
-  } else if (typeof actor !== 'object' || actor === null) {
+  } else if (!isRecord(actor)) {
     d.error(
       `course.config.js: ${label}.actor must be an Agent object, got ${describeType(actor)}`,
     );

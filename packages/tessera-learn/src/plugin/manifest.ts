@@ -200,10 +200,16 @@ export function readMetaFile(metaPath: string): {
   if (result.kind !== 'literal') return {};
 
   try {
-    return JSON5.parse(result.text);
+    const meta = JSON5.parse(result.text);
+    if (!isPageList(meta.pages)) delete meta.pages;
+    return meta;
   } catch {
     return {};
   }
+}
+
+export function isPageList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((p) => typeof p === 'string');
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(

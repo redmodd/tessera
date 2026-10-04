@@ -12,6 +12,7 @@ export const RETRY_MODES = ['full', 'incorrect-only'] as const;
 export const SUCCESS_SOURCES = ['quiz', 'fixed', 'none'] as const;
 export const SUCCESS_STATUSES = ['passed', 'failed'] as const;
 export const NAVIGATION_MODES = ['free', 'sequential'] as const;
+export const CHROME_MODES = ['default', 'custom'] as const;
 export const RESUME_POLICIES = ['auto', 'never'] as const;
 export const A11Y_LEVELS = ['warn', 'error'] as const;
 export const A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'] as const;
@@ -119,7 +120,7 @@ export interface CourseConfig {
   };
   /** 'custom' hides the built-in layout so a course-owned shell can take over.
    * A project-root layout.svelte outranks it. */
-  chrome?: 'default' | 'custom';
+  chrome?: (typeof CHROME_MODES)[number];
   navigation: {
     mode: (typeof NAVIGATION_MODES)[number];
   };

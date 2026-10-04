@@ -6,6 +6,7 @@ import {
   parsePageConfigFromSource,
   readSourceFileCached,
   ensureSvelteSuffix,
+  isPageList,
   orderPageFiles,
   walkPages,
   isLiterallyGradedQuestion,
@@ -25,6 +26,7 @@ import type { StandardProfile } from '../../runtime/standards.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
+  isRecord,
   isRequiredGradedPage,
   type QuizConfig,
 } from '../../runtime/types.js';
@@ -85,12 +87,16 @@ function validatePageFile(
 
   const pageConfig = validatePageConfig(content, fileRel, d);
 
-  const quiz = pageConfig?.quiz as { graded?: unknown } | undefined;
+  const quiz = pageConfig?.quiz;
   const isQuiz = !!quiz;
-  const isGradedQuiz = quiz?.graded === true;
+  const isGradedQuiz = isRecord(quiz) && quiz.graded === true;
   validateQuizConfig(quiz, fileRel, d);
 
-  const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
+  const completesOnView = validateCompletesOn(
+    pageConfig?.completesOn,
+    fileRel,
+    d,
+  );
   const declaresGraded =
     validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
     false;
@@ -100,7 +106,7 @@ function validatePageFile(
     fileRel,
     d,
   );
-  const weight = validatePageWeight(pageConfig, fileRel, d);
+  const weight = validatePageWeight(pageConfig?.weight, fileRel, d);
   const graded = isGradedQuiz || declaresGraded;
   const requiredGraded = isRequiredGradedPage({
     graded,
@@ -325,6 +331,10 @@ function validateMetaFile(
   if (!meta.title) {
     d.error(`${metaRel}: missing required "title" field`);
   }
+  if (meta.pages !== undefined && !isPageList(meta.pages)) {
+    d.error(`${metaRel}: "pages" must be an array of page file names`);
+    delete meta.pages;
+  }
 
   return meta;
 }
@@ -394,14 +404,14 @@ function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
 }
 
 function validateCompletesOn(
-  pageConfig: { completesOn?: unknown } | null,
+  completesOn: unknown,
   fileRel: string,
   d: Diagnostics,
 ): boolean {
-  if (!pageConfig || pageConfig.completesOn === undefined) return false;
-  if (pageConfig.completesOn === 'view') return true;
+  if (completesOn === undefined) return false;
+  if (completesOn === 'view') return true;
   d.error(
-    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(pageConfig.completesOn)}`,
+    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(completesOn)}`,
   );
   return false;
 }
@@ -420,11 +430,10 @@ function validateBoolean(
 }
 
 function validatePageWeight(
-  pageConfig: { weight?: unknown } | null,
+  weight: unknown,
   fileRel: string,
   d: Diagnostics,
 ): number | undefined {
-  const weight = pageConfig?.weight;
   if (weight === undefined) return undefined;
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
     d.warn(
@@ -455,11 +464,10 @@ function validateQuizConfig(
   fileRel: string,
   d: Diagnostics,
 ): void {
-  if (!quiz || typeof quiz !== 'object') return;
-  const cfg = quiz as Record<string, unknown>;
+  if (!isRecord(quiz)) return;
 
-  if (cfg.maxAttempts !== undefined) {
-    const val = cfg.maxAttempts;
+  if (quiz.maxAttempts !== undefined) {
+    const val = quiz.maxAttempts;
     if (
       val !== Infinity &&
       (typeof val !== 'number' || val <= 0 || !Number.isFinite(val))
@@ -471,10 +479,10 @@ function validateQuizConfig(
   }
 
   for (const field of ['graded', 'gatesProgress']) {
-    validateBoolean(cfg[field], `quiz.${field}`, fileRel, d);
+    validateBoolean(quiz[field], `quiz.${field}`, fileRel, d);
   }
 
-  for (const key of Object.keys(cfg)) {
+  for (const key of Object.keys(quiz)) {
     if (KNOWN_QUIZ_FIELDS.has(key)) continue;
     d.warn(
       PAGE_LEVEL_FIELDS.has(key)
@@ -484,16 +492,16 @@ function validateQuizConfig(
   }
 
   if (
-    cfg.feedbackMode !== undefined &&
-    !oneOf(FEEDBACK_MODES, cfg.feedbackMode)
+    quiz.feedbackMode !== undefined &&
+    !oneOf(FEEDBACK_MODES, quiz.feedbackMode)
   ) {
     d.error(
-      `${fileRel}: quiz.feedbackMode must be ${quoteList(FEEDBACK_MODES)}, got "${String(cfg.feedbackMode)}"`,
+      `${fileRel}: quiz.feedbackMode must be ${quoteList(FEEDBACK_MODES)}, got "${String(quiz.feedbackMode)}"`,
     );
   }
-  if (cfg.retryMode !== undefined && !oneOf(RETRY_MODES, cfg.retryMode)) {
+  if (quiz.retryMode !== undefined && !oneOf(RETRY_MODES, quiz.retryMode)) {
     d.error(
-      `${fileRel}: quiz.retryMode must be ${quoteList(RETRY_MODES)}, got "${String(cfg.retryMode)}"`,
+      `${fileRel}: quiz.retryMode must be ${quoteList(RETRY_MODES)}, got "${String(quiz.retryMode)}"`,
     );
   }
 }

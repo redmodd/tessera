@@ -269,6 +269,14 @@ describe('readMetaFile', () => {
     expect(meta.pages).toEqual(['a', 'b']);
   });
 
+  it('drops a pages value that is not an array of strings', () => {
+    const path = createFile(
+      'meta-test3/_meta.js',
+      'export default { title: "Lesson", pages: "a" };',
+    );
+    expect(readMetaFile(path)).toEqual({ title: 'Lesson' });
+  });
+
   it('returns empty object for missing file', () => {
     expect(readMetaFile('/nonexistent/_meta.js')).toEqual({});
   });

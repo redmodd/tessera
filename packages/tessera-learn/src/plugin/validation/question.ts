@@ -2,6 +2,7 @@ import JSON5 from 'json5';
 import { staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
+import { isRecord } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import type { Diagnostics } from './diagnostics.js';
@@ -80,10 +81,9 @@ const QUESTION_COMPONENTS: Record<
       if (pairs) {
         const bad = pairs.some(
           (p) =>
-            typeof p !== 'object' ||
-            p === null ||
-            typeof (p as { left?: unknown }).left !== 'string' ||
-            typeof (p as { right?: unknown }).right !== 'string',
+            !isRecord(p) ||
+            typeof p.left !== 'string' ||
+            typeof p.right !== 'string',
         );
         if (bad) {
           d.error(

@@ -672,6 +672,19 @@ describe('_meta.js validation', () => {
       ),
     );
   });
+
+  it('errors on a pages value that is not an array of strings', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: "page" };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'pages/01-section/01-lesson/_meta.js: "pages" must be an array of page file names',
+    );
+  });
 });
 
 // ---- pageConfig Validation ----
@@ -3111,6 +3124,26 @@ describe('resume policy validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('"resume" must be "auto" or "never"'),
+    );
+  });
+
+  it('errors on an unknown chrome value', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  chrome: "cutsom",
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "chrome" must be "default" or "custom", got "cutsom"',
     );
   });
 });

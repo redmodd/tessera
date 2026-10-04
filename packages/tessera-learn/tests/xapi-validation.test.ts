@@ -340,6 +340,13 @@ describe('xapi config validation — array form (fan-out)', () => {
     ).toBeDefined();
   });
 
+  it('rejects an array actor as not an Agent object', () => {
+    const { errors } = validate(destination({ actor: [] }), 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi.actor must be an Agent object, got array',
+    );
+  });
+
   it('rejects an array entry as not an object', () => {
     const { errors } = validate(`[${destination()}, []]`, 'cmi5');
     expect(errors).toContainEqual(

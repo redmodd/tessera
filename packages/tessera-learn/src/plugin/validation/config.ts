@@ -13,6 +13,7 @@ import {
 import {
   A11Y_LEVELS,
   A11Y_STANDARDS,
+  CHROME_MODES,
   NAVIGATION_MODES,
   RESUME_POLICIES,
   SUCCESS_SOURCES,
@@ -64,7 +65,7 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
   return typeof value === 'string' && BCP47_RE.test(value);
 }
 
-const VALID_COMPLETION_MODES = Object.keys({
+const COMPLETION_MODES = Object.keys({
   quiz: true,
   percentage: true,
   manual: true,
@@ -176,9 +177,9 @@ export function parseConfig(
 
   // Validate completion.mode
   if (config.completion?.mode !== undefined) {
-    if (!oneOf(VALID_COMPLETION_MODES, config.completion.mode)) {
+    if (!oneOf(COMPLETION_MODES, config.completion.mode)) {
       d.error(
-        `course.config.js: "completion.mode" must be ${quoteList(VALID_COMPLETION_MODES)}, got "${config.completion.mode}"`,
+        `course.config.js: "completion.mode" must be ${quoteList(COMPLETION_MODES)}, got "${config.completion.mode}"`,
       );
     }
   }
@@ -240,6 +241,12 @@ export function parseConfig(
         `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got "${requireStatus}"`,
       );
     }
+  }
+
+  if (config.chrome !== undefined && !oneOf(CHROME_MODES, config.chrome)) {
+    d.error(
+      `course.config.js: "chrome" must be ${quoteList(CHROME_MODES)}, got "${config.chrome}"`,
+    );
   }
 
   // Validate resume policy
