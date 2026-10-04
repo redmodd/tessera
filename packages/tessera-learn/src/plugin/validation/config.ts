@@ -308,7 +308,7 @@ function validatePercent(
 
 function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
   const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
-  const paths = defaultExportFunctionPaths(source);
+  const paths = defaultExportFunctionPaths(source).filter(Boolean);
   if (paths.length === 0) {
     d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
     return;

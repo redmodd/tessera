@@ -207,7 +207,10 @@ export function resolveConfigRead(
   return {
     ok: true,
     config,
-    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
+    profile:
+      config.export === undefined || isRecord(config.export)
+        ? standardProfile(config.export?.standard ?? DEFAULT_STANDARD)
+        : undefined,
   };
 }
 

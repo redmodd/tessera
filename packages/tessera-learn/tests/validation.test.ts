@@ -217,6 +217,27 @@ describe('config validation', () => {
     );
   });
 
+  it('skips web-only checks when export is not an object', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", language: "en", export: "scorm12" };`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect([...errors, ...warnings]).not.toContainEqual(
+      expect.stringContaining('web'),
+    );
+  });
+
+  it('names the static-literal rule for a function default export', () => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, `export default () => ({ title: "Test" });`);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'course.config.js: the default export must be a static object literal (no variables, function calls, or computed values)',
+    );
+  });
+
   it('errors on invalid completion.mode', () => {
     createValidProject(testRoot);
     writeConfig(
