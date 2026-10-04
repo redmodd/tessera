@@ -647,6 +647,13 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     preview?.kill('SIGTERM');
   });
 
+  function collectStatements(req: Request, statements: any[]): void {
+    if (req.method() !== 'POST' && req.method() !== 'PUT') return;
+    try {
+      statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
+    } catch {}
+  }
+
   /** Route the mock LRS, capturing posted statements and the request headers. */
   async function routeLRS(
     page: Page,
@@ -658,11 +665,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       const url = req.url();
       if (url.includes('/xapi/statements')) {
         headers.push(req.headers());
-        if (req.method() === 'POST' || req.method() === 'PUT') {
-          try {
-            statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
-          } catch {}
-        }
+        collectStatements(req, statements);
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -697,9 +700,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       const req = route.request();
       const url = req.url();
       if (url.includes('/xapi/statements')) {
-        try {
-          statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
-        } catch {}
+        collectStatements(req, statements);
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -782,6 +783,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await page.goto(xapiLaunchURL(BASE));
     await resumeGet;
+    await page.waitForTimeout(1100);
     const aborted = page.waitForEvent('requestfailed', {
       predicate: isStateGet,
       timeout: 2000,
@@ -791,7 +793,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     await expectNoStatementsAfterTerminated(page, statements);
     expect(findStatement(statements, 'terminated').result.duration).toMatch(
-      /^PT/,
+      /^PT[1-9]\d*S$/,
     );
     expect(statePuts).toEqual([]);
   });

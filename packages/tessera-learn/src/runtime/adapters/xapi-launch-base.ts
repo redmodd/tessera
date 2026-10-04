@@ -82,6 +82,21 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
+function linkedController(...signals: AbortSignal[]): AbortController {
+  const controller = new AbortController();
+  for (const source of signals) {
+    if (source.aborted) {
+      controller.abort(source.reason);
+      break;
+    }
+    source.addEventListener('abort', () => controller.abort(source.reason), {
+      once: true,
+      signal: controller.signal,
+    });
+  }
+  return controller;
+}
+
 type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
   'sessionId' | 'cmi5Mode'
@@ -480,44 +495,54 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * state unread, so `stateLoadFailed` withholds every later write.
    */
   override async loadState(): Promise<void> {
-    const signal = AbortSignal.any([
+    const load = linkedController(
       AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS),
       this.#termination.signal,
-    ]);
+    );
     let lastDetail = '';
-    for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-      if (attempt > 0) {
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, backoffMs(attempt - 1));
-          signal.addEventListener(
-            'abort',
-            () => {
+    try {
+      for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+          await new Promise<void>((resolve) => {
+            const wait = linkedController(load.signal);
+            const timer = setTimeout(
+              () => wait.abort(),
+              backoffMs(attempt - 1),
+            );
+            wait.signal.addEventListener('abort', () => {
               clearTimeout(timer);
               resolve();
-            },
-            { once: true },
-          );
-        });
-        if (signal.aborted) break;
-      }
-      try {
-        const [running, exit] = await Promise.all([
-          this.#getStateDoc(this.buildStateUrl(), signal),
-          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), signal),
-        ]);
-        const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
-        this.#stateSeq = latest?.n ?? 0;
-        if (latest) {
-          const { n: _n, ...state } = latest;
-          this.state = state;
-        } else {
-          this.state = null;
+            });
+          });
+          if (load.signal.aborted) break;
         }
-        return;
-      } catch (err) {
-        lastDetail = err instanceof Error ? err.message : String(err);
-        if (signal.aborted) break;
+        const request = linkedController(load.signal);
+        try {
+          const [running, exit] = await Promise.all([
+            this.#getStateDoc(this.buildStateUrl(), request.signal),
+            this.#getStateDoc(
+              this.buildStateUrl(EXIT_STATE_ID),
+              request.signal,
+            ),
+          ]);
+          const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
+          this.#stateSeq = latest?.n ?? 0;
+          if (latest) {
+            const { n: _n, ...state } = latest;
+            this.state = state;
+          } else {
+            this.state = null;
+          }
+          return;
+        } catch (err) {
+          lastDetail = err instanceof Error ? err.message : String(err);
+          if (load.signal.aborted) break;
+        } finally {
+          request.abort();
+        }
       }
+    } finally {
+      load.abort();
     }
     this.stateLoadFailed = true;
     this.state = null;

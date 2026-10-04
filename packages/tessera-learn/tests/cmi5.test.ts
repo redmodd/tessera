@@ -144,6 +144,39 @@ describe('CMI5Adapter', () => {
     expect(stateWrites()).toHaveLength(1);
   });
 
+  it('restores state in browsers without AbortSignal.any', async () => {
+    const saved: SavedState = { b: 2, v: [0, 1, 2], d: 5 };
+    const adapter = await initAdapter({ saved });
+    vi.spyOn(AbortSignal, 'any').mockImplementation(() => {
+      throw new TypeError('AbortSignal.any is not a function');
+    });
+    await adapter.loadState();
+    expect(adapter.getState()).toEqual(saved);
+  });
+
+  it('aborts the other resume GET when one fails, before retrying', async () => {
+    const adapter = await initAdapter();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const exitSignals: AbortSignal[] = [];
+    const lms = cmi5Fetch();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (isRunningStateGet(url, init)) return Promise.resolve(respond(503));
+      if (url.includes('tessera-state-exit') && init?.method === 'GET') {
+        exitSignals.push(init.signal!);
+        return new Promise<Response>((_, reject) => {
+          init.signal!.addEventListener('abort', () =>
+            reject(init.signal!.reason),
+          );
+        });
+      }
+      return lms(url, init);
+    });
+    await adapter.loadState();
+
+    expect(exitSignals).toHaveLength(RETRY_ATTEMPTS);
+    expect(exitSignals.every((s) => s.aborted)).toBe(true);
+  });
+
   it('does not retry a 404, which is a definitive empty answer', async () => {
     const adapter = await initAdapter();
 
