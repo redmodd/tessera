@@ -1,5 +1,5 @@
 import { readCourseConfig } from '../manifest.js';
-import type { Diagnostics } from './diagnostics.js';
+import { oneOf, type Diagnostics } from './diagnostics.js';
 
 /** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
 export const A11Y_IDS = {
@@ -42,22 +42,22 @@ export function isIgnored(
   return id !== null && ignore.has(id);
 }
 
+export const VALID_A11Y_LEVELS = ['warn', 'error'] as const;
+export const VALID_A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'] as const;
+
 export interface A11ySettings {
-  level: 'warn' | 'error';
-  standard: 'wcag2a' | 'wcag2aa' | 'wcag21aa';
+  level: (typeof VALID_A11Y_LEVELS)[number];
+  standard: (typeof VALID_A11Y_STANDARDS)[number];
   ignore: string[];
 }
-
-export const VALID_A11Y_LEVELS = ['warn', 'error'];
-export const VALID_A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'];
 
 /** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
 export function normalizeA11y(raw: unknown): A11ySettings {
   const a11y =
     raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const level = a11y.level === 'error' ? 'error' : 'warn';
-  const standard = VALID_A11Y_STANDARDS.includes(a11y.standard as string)
-    ? (a11y.standard as A11ySettings['standard'])
+  const standard = oneOf(VALID_A11Y_STANDARDS, a11y.standard)
+    ? a11y.standard
     : 'wcag2aa';
   const ignore = Array.isArray(a11y.ignore)
     ? a11y.ignore.filter((x): x is string => typeof x === 'string')

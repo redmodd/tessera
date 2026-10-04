@@ -30,7 +30,7 @@ import {
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import type { Diagnostics } from './diagnostics.js';
+import { oneOf, quoteList, type Diagnostics } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
 import { validateQuestionComponents } from './question.js';
 
@@ -219,7 +219,7 @@ export function validatePages(
     d.error(
       'No pages found. Create at least one section with a lesson and page in pages/',
     );
-    return { hasParseErrors, pages };
+    return { hasParseErrors: false, pages: [] };
   };
 
   if (!existsSync(pagesDir)) return noPages();
@@ -446,9 +446,6 @@ function validatePageWeight(
   return weight;
 }
 
-const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
-const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
-
 const KNOWN_QUIZ_FIELDS = new Set(
   Object.keys({
     graded: true,
@@ -499,18 +496,15 @@ function validateQuizConfig(
 
   if (
     cfg.feedbackMode !== undefined &&
-    !VALID_FEEDBACK_MODES.includes(cfg.feedbackMode as string)
+    !oneOf(FEEDBACK_MODES, cfg.feedbackMode)
   ) {
     d.error(
-      `${fileRel}: quiz.feedbackMode must be "review", "immediate", or "never", got "${String(cfg.feedbackMode)}"`,
+      `${fileRel}: quiz.feedbackMode must be ${quoteList(FEEDBACK_MODES)}, got "${String(cfg.feedbackMode)}"`,
     );
   }
-  if (
-    cfg.retryMode !== undefined &&
-    !VALID_RETRY_MODES.includes(cfg.retryMode as string)
-  ) {
+  if (cfg.retryMode !== undefined && !oneOf(RETRY_MODES, cfg.retryMode)) {
     d.error(
-      `${fileRel}: quiz.retryMode must be "full" or "incorrect-only", got "${String(cfg.retryMode)}"`,
+      `${fileRel}: quiz.retryMode must be ${quoteList(RETRY_MODES)}, got "${String(cfg.retryMode)}"`,
     );
   }
 }

@@ -80,35 +80,32 @@ export function validateXAPIConfig(
 
   // Normalize to array form. The single-object case is shorthand for a
   // one-element array — same machinery, no special case in the runtime.
-  const entries: unknown[] = Array.isArray(raw) ? raw : [raw];
+  const isList = Array.isArray(raw);
+  const entries: unknown[] = isList ? raw : [raw];
 
-  if (Array.isArray(raw)) {
+  if (isList) {
     if (entries.length === 0) {
       d.error(
         'course.config.js: xapi must contain at least one destination, or be omitted',
       );
       return;
     }
+    const endpoints = entries.map((e) =>
+      e && typeof e === 'object'
+        ? (e as { endpoint?: unknown }).endpoint
+        : undefined,
+    );
     // At most one 'lms' entry — more than one is never legitimate.
-    const lmsCount = entries.filter(
-      (e) =>
-        e &&
-        typeof e === 'object' &&
-        (e as { endpoint?: unknown }).endpoint === 'lms',
-    ).length;
-    if (lmsCount > 1) {
+    if (endpoints.filter((ep) => ep === 'lms').length > 1) {
       d.error(
         "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
       );
     }
     // Warn on duplicate explicit endpoints.
     const seen = new Map<string, number>();
-    for (const e of entries) {
-      if (e && typeof e === 'object') {
-        const ep = (e as { endpoint?: unknown }).endpoint;
-        if (typeof ep === 'string' && ep !== 'lms') {
-          seen.set(ep, (seen.get(ep) ?? 0) + 1);
-        }
+    for (const ep of endpoints) {
+      if (typeof ep === 'string' && ep !== 'lms') {
+        seen.set(ep, (seen.get(ep) ?? 0) + 1);
       }
     }
     for (const [ep, count] of seen) {
@@ -127,7 +124,7 @@ export function validateXAPIConfig(
   const ids = new Set<string>();
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
-    const label = Array.isArray(raw) ? `xapi[${i}]` : 'xapi';
+    const label = isList ? `xapi[${i}]` : 'xapi';
     if (!entry || typeof entry !== 'object') {
       d.error(`course.config.js: ${label} must be an object`);
       continue;

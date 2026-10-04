@@ -152,6 +152,13 @@ export type ResolvedConfigRead = CourseConfigRead & {
   profile: StandardProfile | undefined;
 };
 
+export function readResolvedConfig(
+  projectRoot: string,
+  standardOverride?: StandardId,
+): ResolvedConfigRead {
+  return resolveConfigRead(readCourseConfig(projectRoot), standardOverride);
+}
+
 /**
  * Resolve a project's effective export standard once: the CLI `--standard`
  * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
@@ -160,13 +167,6 @@ export type ResolvedConfigRead = CourseConfigRead & {
  * The returned `config` already has the override applied, so consumers read it
  * back directly.
  */
-export function readResolvedConfig(
-  projectRoot: string,
-  standardOverride?: StandardId,
-): ResolvedConfigRead {
-  return resolveConfigRead(readCourseConfig(projectRoot), standardOverride);
-}
-
 export function resolveConfigRead(
   read: CourseConfigRead,
   standardOverride?: StandardId,

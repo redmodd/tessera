@@ -61,10 +61,10 @@ export function validateMediaComponents(
       continue;
     }
 
-    // Video / Audio
+    if (hasSpread) continue;
     const title = props.get('title');
     const titleIsEmpty = title?.kind === 'string' && title.value.trim() === '';
-    if (!hasSpread && (title === undefined || titleIsEmpty)) {
+    if (title === undefined || titleIsEmpty) {
       d.error(
         tag(
           A11Y_IDS.mediaTitle,
@@ -80,12 +80,7 @@ export function validateMediaComponents(
           ? src.raw
           : undefined;
     const isEmbed = srcText !== undefined && isVideoEmbed(srcText);
-    if (
-      name === 'Video' &&
-      !hasSpread &&
-      isEmbed &&
-      props.get('transcript') === undefined
-    ) {
+    if (name === 'Video' && isEmbed && props.get('transcript') === undefined) {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
@@ -95,7 +90,6 @@ export function validateMediaComponents(
     }
     if (
       name === 'Video' &&
-      !hasSpread &&
       srcText !== undefined &&
       !isEmbed &&
       props.get('tracks') === undefined &&
@@ -108,11 +102,7 @@ export function validateMediaComponents(
         ),
       );
     }
-    if (
-      name === 'Audio' &&
-      !hasSpread &&
-      props.get('transcript') === undefined
-    ) {
+    if (name === 'Audio' && props.get('transcript') === undefined) {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,

@@ -57,14 +57,12 @@ export function validateProject(
   clearParseCache();
   const d = new Diagnostics();
 
-  // 1. Check course.config.js exists
   const configPath = resolve(projectRoot, 'course.config.js');
   if (!existsSync(configPath)) {
     d.error('course.config.js not found in project root');
     return d;
   }
 
-  // 2. Parse and validate config
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
   const { config, profile } = parseConfig(
     projectRoot,
@@ -73,10 +71,8 @@ export function validateProject(
     standardOverride,
   );
 
-  // 3. Validate pages directory
   const pageResults = validatePages(projectRoot, d, profile);
 
-  // 4. Contract-bypass checks on project-root shell files
   for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
@@ -84,7 +80,6 @@ export function validateProject(
     }
   }
 
-  // 5. Cross-cutting validations
   if (config) {
     crossValidate(config, pageResults, d, profile);
   }

@@ -26,7 +26,12 @@ import {
   VALID_A11Y_STANDARDS,
   tag,
 } from './a11y.js';
-import { describeType, type Diagnostics } from './diagnostics.js';
+import {
+  describeType,
+  oneOf,
+  quoteList,
+  type Diagnostics,
+} from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
 import { validateXAPIConfig, type XAPIHookRead } from './xapi.js';
 
@@ -59,14 +64,12 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
   return typeof value === 'string' && BCP47_RE.test(value);
 }
 
-const VALID_NAV_MODES = ['free', 'sequential'];
-const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'];
+const VALID_NAV_MODES = ['free', 'sequential'] as const;
+const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'] as const;
 const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
-const VALID_MANUAL_TRIGGERS = ['page'];
-const VALID_SUCCESS_STATUS = ['passed', 'failed'];
-// Derived from the runtime types (single source of truth) — widened to
-// string[] so .includes() accepts an arbitrary author-supplied value.
-const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
+const VALID_MANUAL_TRIGGERS = ['page'] as const;
+const VALID_SUCCESS_STATUS = ['passed', 'failed'] as const;
+const VALID_RESUME = ['auto', 'never'] as const;
 
 export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
   completion?: Partial<
@@ -166,18 +169,18 @@ export function parseConfig(
 
   // Validate navigation.mode
   if (config.navigation?.mode !== undefined) {
-    if (!VALID_NAV_MODES.includes(config.navigation.mode)) {
+    if (!oneOf(VALID_NAV_MODES, config.navigation.mode)) {
       d.error(
-        `course.config.js: "navigation.mode" must be "free" or "sequential", got "${config.navigation.mode}"`,
+        `course.config.js: "navigation.mode" must be ${quoteList(VALID_NAV_MODES)}, got "${config.navigation.mode}"`,
       );
     }
   }
 
   // Validate completion.mode
   if (config.completion?.mode !== undefined) {
-    if (!VALID_COMPLETION_MODES.includes(config.completion.mode)) {
+    if (!oneOf(VALID_COMPLETION_MODES, config.completion.mode)) {
       d.error(
-        `course.config.js: "completion.mode" must be "quiz", "percentage", or "manual", got "${config.completion.mode}"`,
+        `course.config.js: "completion.mode" must be ${quoteList(VALID_COMPLETION_MODES)}, got "${config.completion.mode}"`,
       );
     }
   }
@@ -187,9 +190,9 @@ export function parseConfig(
       d.warn(
         `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
-    } else if (!VALID_MANUAL_TRIGGERS.includes(config.completion.trigger)) {
+    } else if (!oneOf(VALID_MANUAL_TRIGGERS, config.completion.trigger)) {
       d.error(
-        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`,
+        `course.config.js: "completion.trigger" must be ${quoteList(VALID_MANUAL_TRIGGERS)} or omitted, got "${config.completion.trigger}"`,
       );
     }
   }
@@ -201,16 +204,16 @@ export function parseConfig(
       d.error(
         `course.config.js: "success" must be an object like { from: "quiz" }`,
       );
-    } else if (!VALID_SUCCESS_SOURCES.includes(success.from)) {
+    } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
       d.error(
-        `course.config.js: "success.from" must be "quiz", "fixed", or "none", got "${success.from}"`,
+        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got "${success.from}"`,
       );
     } else if (
       success.from === 'fixed' &&
-      !VALID_SUCCESS_STATUS.includes(success.status as string)
+      !oneOf(VALID_SUCCESS_STATUS, success.status)
     ) {
       d.error(
-        `course.config.js: "success.status" must be "passed" or "failed" under success.from: "fixed", got "${success.status}"`,
+        `course.config.js: "success.status" must be ${quoteList(VALID_SUCCESS_STATUS)} under success.from: "fixed", got "${success.status}"`,
       );
     } else {
       successAccepted = true;
@@ -234,21 +237,17 @@ export function parseConfig(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
     }
-    if (manual && !VALID_SUCCESS_STATUS.includes(requireStatus)) {
+    if (manual && !oneOf(VALID_SUCCESS_STATUS, requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be "passed" or "failed" (omit for "unknown"), got "${requireStatus}"`,
+        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(VALID_SUCCESS_STATUS)} (omit for "unknown"), got "${requireStatus}"`,
       );
     }
   }
 
   // Validate resume policy
-  if (
-    config.resume !== undefined &&
-    config.resume !== 'auto' &&
-    config.resume !== 'never'
-  ) {
+  if (config.resume !== undefined && !oneOf(VALID_RESUME, config.resume)) {
     d.error(
-      `course.config.js: "resume" must be "auto" or "never", got "${config.resume}"`,
+      `course.config.js: "resume" must be ${quoteList(VALID_RESUME)}, got "${config.resume}"`,
     );
   }
 
@@ -400,20 +399,17 @@ function validateA11yConfig(raw: unknown, d: Diagnostics): void {
   }
   const a11y = raw as Record<string, unknown>;
 
-  if (
-    a11y.level !== undefined &&
-    !VALID_A11Y_LEVELS.includes(a11y.level as string)
-  ) {
+  if (a11y.level !== undefined && !oneOf(VALID_A11Y_LEVELS, a11y.level)) {
     d.error(
-      `course.config.js: "a11y.level" must be "warn" or "error", got ${JSON.stringify(a11y.level)}`,
+      `course.config.js: "a11y.level" must be ${quoteList(VALID_A11Y_LEVELS)}, got ${JSON.stringify(a11y.level)}`,
     );
   }
   if (
     a11y.standard !== undefined &&
-    !VALID_A11Y_STANDARDS.includes(a11y.standard as string)
+    !oneOf(VALID_A11Y_STANDARDS, a11y.standard)
   ) {
     d.error(
-      `course.config.js: "a11y.standard" must be "wcag2a", "wcag2aa", or "wcag21aa", got ${JSON.stringify(a11y.standard)}`,
+      `course.config.js: "a11y.standard" must be ${quoteList(VALID_A11Y_STANDARDS)}, got ${JSON.stringify(a11y.standard)}`,
     );
   }
   if (a11y.ignore !== undefined) {
