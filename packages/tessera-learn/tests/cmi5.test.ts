@@ -13,6 +13,7 @@ import {
   respond,
   setLaunchParams,
   statementRequests,
+  useFakeTimers,
 } from './helpers.js';
 
 const mockFetch = vi.fn();
@@ -623,6 +624,24 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).toEqual(['initialized', 'terminated']);
     expect(stateWrites()).toHaveLength(0);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('clears the resume backoff timer when terminate cuts the wait short', async () => {
+    const adapter = await initAdapter();
+    routeResumeGet(
+      vi.fn(async (): Promise<Response> => {
+        throw new Error('network down');
+      }),
+    );
+    useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const loading = adapter.loadState();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(1);
+
+    adapter.terminate();
+    await loading;
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('writes the final state to the exit document and keeps saving after terminate', async () => {

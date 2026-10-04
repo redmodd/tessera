@@ -503,9 +503,16 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       const request = linkedController(deadline, this.#termination.signal);
       try {
         if (attempt > 0) {
-          await new Promise((resolve) => {
-            setTimeout(resolve, backoffMs(attempt - 1));
-            request.signal.addEventListener('abort', resolve, { once: true });
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, backoffMs(attempt - 1));
+            request.signal.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true },
+            );
           });
           if (request.signal.aborted) break;
         }
