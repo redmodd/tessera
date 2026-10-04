@@ -802,7 +802,7 @@ describe('_meta.js validation', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      'pages/01-section/01-lesson/_meta.js: "pages" must be an array of page file names',
+      'pages/01-section/01-lesson/_meta.js: "pages" must be an array of page file names, got "page"',
     );
   });
 });
@@ -1376,6 +1376,25 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
       expect.stringContaining(
         'quiz.maxAttempts must be a positive number or Infinity, got -1',
       ),
+    );
+  });
+
+  it.each([
+    ['true', 'boolean'],
+    ['["graded"]', 'array'],
+  ])('errors on a non-object quiz: %s', (quiz, type) => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: ${quiz} };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      `pages/01-section/01-lesson/page.svelte: pageConfig.quiz must be an object, got ${type}`,
     );
   });
 

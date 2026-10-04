@@ -332,7 +332,9 @@ function validateMetaFile(
     d.error(`${metaRel}: missing required "title" field`);
   }
   if ('pages' in rejected) {
-    d.error(`${metaRel}: "pages" must be an array of page file names`);
+    d.error(
+      `${metaRel}: "pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
+    );
   }
 
   return meta;
@@ -446,7 +448,13 @@ function validateQuizConfig(
   fileRel: string,
   d: Diagnostics,
 ): void {
-  if (!isRecord(quiz)) return;
+  if (!quiz) return;
+  if (!isRecord(quiz)) {
+    d.error(
+      `${fileRel}: pageConfig.quiz must be an object, got ${describeType(quiz)}`,
+    );
+    return;
+  }
 
   if (quiz.maxAttempts !== undefined) {
     const val = quiz.maxAttempts;
