@@ -1,5 +1,31 @@
 # tessera-learn
 
+## 0.9.0
+
+### Minor Changes
+
+- 62d8c6e: **Behavior change:** a standalone question answer that scores 100 can no longer be retried, so the built-in question widgets hide Try again after a correct answer. `canRetry` is false until a submit, and `reset()` after a submit counts toward `maxRetries`. A custom widget whose Try again button is gated on `q.correct === false` should gate it on `q.canRetry`, or the button does nothing once retries run out. The lock and the retry count reset when the widget remounts.
+  
+  **Behavior change:** `q.answer` holds only what was passed to `setAnswer()`, as in a quiz. A standalone submit no longer replaces it with the interaction's response.
+  
+  Calling `commit()` again with an unchanged answer no longer reports it again. `response()` may return `undefined` while unanswered: standalone `submit()` no-ops and a quiz scores the question incorrect.
+
+### Patch Changes
+
+- b4b77a6: Closing the course while an `xapi` actor resolver is still running now ends the LMS session instead of leaving the attempt open. `useXAPI()` returns `null` once the session has ended.
+- bed906e: - `vite` 8.3.0 → 8.3.1
+- bd96030: - `@sveltejs/vite-plugin-svelte` 7.3.0 → 7.3.1
+- 514a607: - `@types/node` 26.6.2 → 26.6.3
+  - `@vitest/coverage-v8` 5.0.0 → 5.0.2
+  - `jsdom` 30.1.0 → 30.1.1
+  - `scorm-again` 3.3.7 → 3.4.3
+  - `vitest` 5.0.0 → 5.0.2
+- eaa0674: Validation now catches more `course.config.js`, `_meta.js`, and `pageConfig` mistakes: an unknown `chrome` value, an `export`, `navigation`, `completion`, or `scoring` value other than an object or `null` (so `export: "scorm12"` no longer silently builds for web), a `_meta.js` `title` or `pages` of the wrong type (which used to crash the build), and a `pageConfig.quiz` that is not an object (so `quiz: true` no longer silently makes an ungraded quiz). `success: null` no longer crashes validation.
+  
+  A page listed twice in a `_meta.js` `pages` array now appears once in the course, with a warning, instead of twice. Re-exporting a course that shipped with a duplicate resets learners' saved progress.
+  
+  A default export that isn't a static object literal now says so, and messages that show a rejected value print it as written.
+
 ## 0.8.0
 
 ### Minor Changes
