@@ -55,6 +55,31 @@ async function expectNoStatementsAfterTerminated(
   expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
 }
 
+async function expectPagehideAbortsResumeGet(
+  page: Page,
+  launchURL: string,
+  isResumeGet: (req: Request) => boolean,
+  statements: any[],
+  statePuts: string[],
+): Promise<void> {
+  const resumeGet = page.waitForRequest(isResumeGet);
+  await page.goto(launchURL);
+  await resumeGet;
+  await page.waitForTimeout(1100);
+  const aborted = page.waitForEvent('requestfailed', {
+    predicate: isResumeGet,
+    timeout: 2000,
+  });
+  await exitCourse(page);
+  await aborted;
+
+  await expectNoStatementsAfterTerminated(page, statements);
+  expect(findStatement(statements, 'terminated').result.duration).toMatch(
+    /^PT[1-9]\d*S$/,
+  );
+  expect(statePuts).toEqual([]);
+}
+
 // ---------------------------------------------------------------------------
 // SCORM 1.2
 // ---------------------------------------------------------------------------
@@ -640,23 +665,14 @@ test.describe.serial('LMS round-trip — CMI5', () => {
         await route.fallback();
       },
     );
-    const resumeGet = page.waitForRequest(isResumeGet);
 
-    await page.goto(cmi5LaunchURL(BASE));
-    await resumeGet;
-    await page.waitForTimeout(1100);
-    const aborted = page.waitForEvent('requestfailed', {
-      predicate: isResumeGet,
-      timeout: 2000,
-    });
-    await exitCourse(page);
-    await aborted;
-
-    await expectNoStatementsAfterTerminated(page, statements);
-    expect(findStatement(statements, 'terminated').result.duration).toMatch(
-      /^PT[1-9]\d*S$/,
+    await expectPagehideAbortsResumeGet(
+      page,
+      cmi5LaunchURL(BASE),
+      isResumeGet,
+      statements,
+      statePuts,
     );
-    expect(statePuts).toEqual([]);
   });
 });
 
@@ -816,23 +832,14 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await routeLRSWithState(page, null, statePuts, statements);
     const isStateGet = (req: Request) =>
       req.url().includes('/xapi/activities/state') && req.method() === 'GET';
-    const resumeGet = page.waitForRequest(isStateGet);
 
-    await page.goto(xapiLaunchURL(BASE));
-    await resumeGet;
-    await page.waitForTimeout(1100);
-    const aborted = page.waitForEvent('requestfailed', {
-      predicate: isStateGet,
-      timeout: 2000,
-    });
-    await exitCourse(page);
-    await aborted;
-
-    await expectNoStatementsAfterTerminated(page, statements);
-    expect(findStatement(statements, 'terminated').result.duration).toMatch(
-      /^PT[1-9]\d*S$/,
+    await expectPagehideAbortsResumeGet(
+      page,
+      xapiLaunchURL(BASE),
+      isStateGet,
+      statements,
+      statePuts,
     );
-    expect(statePuts).toEqual([]);
   });
 
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({

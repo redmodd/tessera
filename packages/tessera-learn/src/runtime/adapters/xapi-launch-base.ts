@@ -126,7 +126,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
-  protected terminated = false;
   protected returnURL: string | undefined;
   #activityId = '';
   #registration: string | undefined;
@@ -135,6 +134,10 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSeq = 0;
   #stateSaved = true;
   #termination = new AbortController();
+
+  protected get terminated(): boolean {
+    return this.#termination.signal.aborted;
+  }
 
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
@@ -365,7 +368,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override terminate(unloading = true): void {
     if (this.terminated) return;
-    this.terminated = true;
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {
@@ -503,16 +505,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     try {
       for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
         if (attempt > 0) {
-          await new Promise<void>((resolve) => {
-            const timer = setTimeout(resolve, backoffMs(attempt - 1));
-            load.signal.addEventListener(
-              'abort',
-              () => {
-                clearTimeout(timer);
-                resolve();
-              },
-              { once: true },
-            );
+          await new Promise((resolve) => {
+            setTimeout(resolve, backoffMs(attempt - 1));
+            load.signal.addEventListener('abort', resolve, { once: true });
           });
           if (load.signal.aborted) break;
         }

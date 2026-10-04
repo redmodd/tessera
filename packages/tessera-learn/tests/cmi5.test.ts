@@ -595,17 +595,26 @@ describe('CMI5Adapter', () => {
     ]);
   });
 
-  it('aborts the resume GET in flight on terminate, and still refuses to save', async () => {
-    const adapter = await initAdapter();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const resumeGet = vi.fn(
+  it.each([
+    [
+      'aborts the resume GET in flight',
       (init?: RequestInit) =>
         new Promise<Response>((_, reject) => {
           init?.signal?.addEventListener('abort', () =>
             reject(init.signal!.reason),
           );
         }),
-    );
+    ],
+    [
+      'stops retrying the resume GET',
+      async (): Promise<Response> => {
+        throw new Error('network down');
+      },
+    ],
+  ])('%s on terminate, and still refuses to save', async (_, get) => {
+    const adapter = await initAdapter();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const resumeGet = vi.fn(get);
     routeResumeGet(resumeGet);
     const loading = adapter.loadState();
     await flush();
@@ -617,26 +626,6 @@ describe('CMI5Adapter', () => {
 
     expect(resumeGet).toHaveBeenCalledTimes(1);
     expect(adapter.getState()).toBeNull();
-    expect(stateWrites()).toHaveLength(0);
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it('stops retrying the resume GET once terminated, and still refuses to save', async () => {
-    const adapter = await initAdapter();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const resumeGet = vi.fn(async (): Promise<Response> => {
-      throw new Error('network down');
-    });
-    routeResumeGet(resumeGet);
-    const loading = adapter.loadState();
-    await flush();
-
-    adapter.terminate();
-    await loading;
-    adapter.saveState({ b: 0, v: [0], d: 1 });
-    await flush();
-
-    expect(resumeGet).toHaveBeenCalledTimes(1);
     expect(sentVerbs()).toEqual(['initialized', 'terminated']);
     expect(stateWrites()).toHaveLength(0);
     expect(warn).not.toHaveBeenCalled();
