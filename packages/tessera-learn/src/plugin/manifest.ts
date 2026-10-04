@@ -132,7 +132,7 @@ export const STATIC_LITERAL_RULE =
   'must be a static object literal (no variables, function calls, template literals, or computed values)';
 
 export const READ_FAILURE_MESSAGES: Record<ReadFailure['reason'], string> = {
-  missing: 'not found',
+  missing: 'not found in project root',
   'parse-error': 'could not parse, JavaScript syntax error',
   'no-export': 'must use `export default { ... }` syntax',
   'not-data': `the default export ${STATIC_LITERAL_RULE}`,
@@ -181,13 +181,6 @@ export const OBJECT_CONFIG_SECTIONS = [
 export type ResolvedConfigRead = CourseConfigRead & {
   profile: StandardProfile | undefined;
 };
-
-export function readResolvedConfig(
-  projectRoot: string,
-  standardOverride?: StandardId,
-): ResolvedConfigRead {
-  return resolveConfigRead(readCourseConfig(projectRoot), standardOverride);
-}
 
 /**
  * Resolve a project's effective export standard once: the CLI `--standard`

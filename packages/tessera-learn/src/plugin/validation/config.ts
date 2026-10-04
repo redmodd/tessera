@@ -89,7 +89,10 @@ export function parseConfig(
   projectRoot: string,
   d: Diagnostics,
   standardOverride?: StandardId,
-): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
+): {
+  config: ParsedConfig | null;
+  profile: StandardProfile | undefined;
+} | null {
   const read = readCourseConfig(projectRoot);
   const unreadableExport =
     read.ok &&
@@ -105,7 +108,7 @@ export function parseConfig(
     } else {
       d.error(`course.config.js: ${READ_FAILURE_MESSAGES[read.reason]}`);
     }
-    return { config: null, profile };
+    return read.reason === 'missing' ? null : { config: null, profile };
   }
   const config: ParsedConfig = read.config;
 

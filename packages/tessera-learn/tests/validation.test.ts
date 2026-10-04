@@ -75,7 +75,7 @@ beforeEach(() => {
 describe('config validation', () => {
   it('errors when course.config.js is missing', () => {
     const { errors } = validateProject(testRoot);
-    expect(errors).toContain('course.config.js not found in project root');
+    expect(errors).toEqual(['course.config.js: not found in project root']);
   });
 
   it('passes with valid config', () => {
