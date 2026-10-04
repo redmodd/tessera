@@ -164,7 +164,13 @@ export function readResolvedConfig(
   projectRoot: string,
   standardOverride?: StandardId,
 ): ResolvedConfigRead {
-  const read = readCourseConfig(projectRoot);
+  return resolveConfigRead(readCourseConfig(projectRoot), standardOverride);
+}
+
+export function resolveConfigRead(
+  read: CourseConfigRead,
+  standardOverride?: StandardId,
+): ResolvedConfigRead {
   if (!read.ok) return { ...read, profile: standardProfile(standardOverride) };
   const config: Partial<CourseConfig> = standardOverride
     ? {

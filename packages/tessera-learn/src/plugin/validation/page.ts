@@ -74,7 +74,7 @@ export class ProjectValidator {
    * lesson-level pages — the validation is identical, only the containing
    * directory differs.
    */
-  validatePageFile(
+  #validatePageFile(
     filePath: string,
     navIndex: number,
   ): {
@@ -289,7 +289,7 @@ export class ProjectValidator {
       }
 
       for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
-        const result = this.validatePageFile(
+        const result = this.#validatePageFile(
           resolve(lesson.dir, fileName),
           totalPages,
         );

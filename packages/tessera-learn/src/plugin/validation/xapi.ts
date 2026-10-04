@@ -12,8 +12,7 @@ import {
   STANDARDS,
   STANDARD_IDS,
   httpOrigin,
-  standardProfile,
-  type StandardId,
+  type StandardProfile,
 } from '../../runtime/standards.js';
 import { describeType, type Diagnostics } from './diagnostics.js';
 
@@ -70,7 +69,7 @@ function validateHookIds(
 
 export function validateXAPIConfig(
   raw: unknown,
-  standard: StandardId,
+  profile: StandardProfile | undefined,
   hooks: XAPIHookRead,
   d: Diagnostics,
 ): void {
@@ -136,7 +135,7 @@ export function validateXAPIConfig(
     validateSingleXAPIEntry(
       entry as Record<string, unknown>,
       label,
-      standard,
+      profile,
       hooks,
       ids,
       d,
@@ -148,14 +147,13 @@ export function validateXAPIConfig(
 function validateSingleXAPIEntry(
   entry: Record<string, unknown>,
   label: string,
-  standard: StandardId,
+  profile: StandardProfile | undefined,
   hooks: XAPIHookRead,
   ids: Set<string>,
   d: Diagnostics,
 ): void {
   const endpoint = entry.endpoint;
   const id = entry.id;
-  const profile = standardProfile(standard);
   if (endpoint !== 'lms' && typeof id === 'string' && id) {
     if (ids.has(id)) {
       d.error(
@@ -179,7 +177,7 @@ function validateSingleXAPIEntry(
     // one config can still export to every standard.
     if (profile && !profile.hasLaunchLRS) {
       d.warn(
-        `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${standard}" — ` +
+        `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${profile.id}" — ` +
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
       );
     }
@@ -341,7 +339,7 @@ function validateSingleXAPIEntry(
     }
     if (profile && !profile.derivesLearnerActor) {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is only used under ${STANDARD_IDS.filter((id) => STANDARDS[id].derivesLearnerActor).join('/')} actor synthesis; ignored under "${standard}".`,
+        `course.config.js: ${label}.actorAccountHomePage is only used under ${STANDARD_IDS.filter((id) => STANDARDS[id].derivesLearnerActor).join('/')} actor synthesis; ignored under "${profile.id}".`,
       );
     }
   }
@@ -372,7 +370,7 @@ function validateSingleXAPIEntry(
     }
     if (profile && !profile.hasLaunchLRS) {
       d.warn(
-        `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${standard}" but most analytics tools won't know what to do with it.`,
+        `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${profile.id}" but most analytics tools won't know what to do with it.`,
       );
     }
   }

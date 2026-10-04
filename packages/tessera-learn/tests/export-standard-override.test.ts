@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readResolvedConfig } from '../src/plugin/manifest.js';
 import { validateProject } from '../src/plugin/validation.js';
@@ -89,5 +89,27 @@ describe('validateProject standardOverride', () => {
     writeConfig(`{ export: { standard: "web" } }`);
     const { errors } = validateProject(projectRoot, 'cmi5');
     expect(errors.some((e) => e.includes('"export.standard"'))).toBe(false);
+  });
+
+  it('applies the override to page checks when the config does not parse', () => {
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default {',
+      'utf-8',
+    );
+    const sectionDir = resolve(projectRoot, 'pages', '01-intro');
+    mkdirSync(sectionDir, { recursive: true });
+    writeFileSync(
+      resolve(sectionDir, '01-page.svelte'),
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
+      'utf-8',
+    );
+    const { warnings } = validateProject(projectRoot, 'scorm12');
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'question id "my question" will be rewritten to "my_question" for SCORM 1.2',
+      ),
+    );
   });
 });

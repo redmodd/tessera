@@ -1,8 +1,11 @@
 import { resolve } from 'node:path';
-import { readCourseConfig, readSourceFileCached } from '../manifest.js';
+import {
+  readCourseConfig,
+  readSourceFileCached,
+  resolveConfigRead,
+} from '../manifest.js';
 import { defaultExportFunctionPaths } from '../ast.js';
 import {
-  DEFAULT_STANDARD,
   STANDARD_IDS,
   standardProfile,
   type StandardId,
@@ -83,16 +86,18 @@ export function parseConfig(
   standardOverride?: StandardId,
 ): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const read = readCourseConfig(projectRoot);
-  if (!read.ok) {
-    // 'missing' can't occur — validateProject checks existsSync first.
-    if (read.reason === 'no-export') {
+  const resolved = resolveConfigRead(read, standardOverride);
+  const { profile } = resolved;
+  if (!resolved.ok) {
+    // 'missing' can't occur: validateProject checks existsSync first.
+    if (resolved.reason === 'no-export') {
       d.error('course.config.js: must use `export default { ... }` syntax');
-    } else if (read.reason === 'parse-error') {
+    } else if (resolved.reason === 'parse-error') {
       reportConfigParseError(projectRoot, d);
     }
-    return { config: null, profile: undefined };
+    return { config: null, profile };
   }
-  const config: ParsedConfig = read.config;
+  const config: ParsedConfig = resolved.config;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
@@ -142,26 +147,16 @@ export function parseConfig(
     );
   }
 
-  // Validate export.standard
-  if (config.export?.standard !== undefined) {
-    if (!standardProfile(config.export.standard)) {
-      d.error(
-        `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${config.export.standard}"`,
-      );
-    }
-  }
-
-  // Apply the override after validating the file value above, so every
-  // standard-dependent check below (identity, csp, xapi, crossValidate) sees
-  // what actually ships.
-  if (standardOverride) {
-    config.export = { ...config.export, standard: standardOverride };
+  // The file's value, not the override: a --standard run still flags a bad one.
+  const fileStandard = read.ok ? read.config.export?.standard : undefined;
+  if (fileStandard !== undefined && !standardProfile(fileStandard)) {
+    d.error(
+      `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${fileStandard}"`,
+    );
   }
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
   // SCORM identity is owned by the LMS, so only nudge for the others.
-  const standard = config.export?.standard ?? DEFAULT_STANDARD;
-  const profile = standardProfile(standard);
   if (profile && !profile.derivesLearnerActor && !courseIdentity(config)) {
     d.warn(
       `course.config.js: no "id" set, so the ${profile.packaged ? `${profile.name} activity id` : 'web storage key'} falls back to a fixed value that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
@@ -282,7 +277,7 @@ export function parseConfig(
     d,
   );
 
-  validateXAPIConfig(config.xapi, standard, runtimeHooks, d);
+  validateXAPIConfig(config.xapi, profile, runtimeHooks, d);
 
   return { config, profile };
 }
