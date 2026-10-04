@@ -12,14 +12,12 @@ import {
 import {
   generateManifest,
   walkPages,
-  OBJECT_CONFIG_SECTIONS,
   READ_FAILURE_MESSAGES,
   type CourseConfigRead,
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
 import {
-  isRecord,
   isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
@@ -268,11 +266,7 @@ function tesseraConfigDefaultsPlugin(): Plugin {
 }
 
 /** Fill runtime defaults into a parsed course.config.js. Exported for tests. */
-export function mergeCourseConfig(rawConfig: Partial<CourseConfig>) {
-  const userConfig = { ...rawConfig };
-  for (const key of OBJECT_CONFIG_SECTIONS) {
-    if (!isRecord(userConfig[key])) delete userConfig[key];
-  }
+export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
   const success = resolveSuccess(userConfig);
   const unjudgedManual =
     userConfig.completion?.mode === 'manual' && success.from !== 'quiz';

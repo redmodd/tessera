@@ -49,6 +49,15 @@ describe('readResolvedConfig', () => {
     expect(read.ok && read.config.export).toEqual({ standard: 'cmi5' });
   });
 
+  it('drops a non-object section and resolves the default standard', () => {
+    writeConfig(
+      `{ title: "x", navigation: "sequential", completion: "manual", scoring: 70, export: "scorm12" }`,
+    );
+    const read = readResolvedConfig(projectRoot);
+    expect(read.ok && read.config).toEqual({ title: 'x' });
+    expect(read.profile?.id).toBe('web');
+  });
+
   it('resolves no profile for an unreadable config with no override', () => {
     const read = readResolvedConfig(projectRoot);
     expect(read.ok).toBe(false);

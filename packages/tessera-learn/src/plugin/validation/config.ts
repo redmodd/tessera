@@ -90,7 +90,14 @@ export function parseConfig(
   standardOverride?: StandardId,
 ): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const read = readCourseConfig(projectRoot);
-  const { profile } = resolveConfigRead(read, standardOverride);
+  const unreadableExport =
+    read.ok &&
+    !standardOverride &&
+    read.config.export !== undefined &&
+    !isRecord(read.config.export);
+  const profile = unreadableExport
+    ? undefined
+    : resolveConfigRead(read, standardOverride).profile;
   if (!read.ok) {
     if (read.reason === 'not-data') {
       reportNonDataConfig(projectRoot, d);

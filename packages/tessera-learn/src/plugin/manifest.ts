@@ -194,30 +194,25 @@ export function readResolvedConfig(
  * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
  * config with no override, or a standard outside the table, fails closed with
  * no `profile` so callers withhold standard-specific output rather than guess.
- * The returned `config` already has the override applied, so consumers read it
- * back directly.
+ * The returned `config` drops any non-object section and already has the
+ * override applied, so consumers read it back directly.
  */
 export function resolveConfigRead(
   read: CourseConfigRead,
   standardOverride?: StandardId,
 ): ResolvedConfigRead {
   if (!read.ok) return { ...read, profile: standardProfile(standardOverride) };
-  const config: Partial<CourseConfig> = standardOverride
-    ? {
-        ...read.config,
-        export: {
-          ...(isRecord(read.config.export) && read.config.export),
-          standard: standardOverride,
-        },
-      }
-    : read.config;
+  const config = { ...read.config };
+  for (const key of OBJECT_CONFIG_SECTIONS) {
+    if (!isRecord(config[key])) delete config[key];
+  }
+  if (standardOverride) {
+    config.export = { ...config.export, standard: standardOverride };
+  }
   return {
     ok: true,
     config,
-    profile:
-      config.export === undefined || isRecord(config.export)
-        ? standardProfile(config.export?.standard ?? DEFAULT_STANDARD)
-        : undefined,
+    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
   };
 }
 
