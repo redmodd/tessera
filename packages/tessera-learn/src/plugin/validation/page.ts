@@ -94,7 +94,7 @@ function validatePageFile(
   const pageConfig = validatePageConfig(content, fileRel, d);
 
   const quiz = pageConfig?.quiz;
-  const isQuiz = !!quiz;
+  const isQuiz = isRecord(quiz);
   const isGradedQuiz = isRecord(quiz) && quiz.graded === true;
   validateQuizConfig(quiz, fileRel, d);
 
@@ -448,7 +448,7 @@ function validateQuizConfig(
   fileRel: string,
   d: Diagnostics,
 ): void {
-  if (!quiz) return;
+  if (quiz == null || quiz === false) return;
   if (!isRecord(quiz)) {
     d.error(
       `${fileRel}: pageConfig.quiz must be an object, got ${describeType(quiz)}`,

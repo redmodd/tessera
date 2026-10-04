@@ -1381,6 +1381,8 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
 
   it.each([
     ['true', 'boolean'],
+    ['0', 'number'],
+    ['""', 'string'],
     ['["graded"]', 'array'],
   ])('errors on a non-object quiz: %s', (quiz, type) => {
     createValidProject(testRoot);
@@ -1392,10 +1394,11 @@ export const pageConfig = { title: "Quiz", quiz: ${quiz} };
 </script>
 <h1>Quiz</h1>`,
     );
-    const { errors } = validateProject(testRoot);
+    const { errors, warnings } = validateProject(testRoot);
     expect(errors).toContain(
       `pages/01-section/01-lesson/page.svelte: pageConfig.quiz must be an object, got ${type}`,
     );
+    expect(warnings.some((w) => w.includes('quiz page'))).toBe(false);
   });
 
   it('quotes a string quiz.maxAttempts', () => {

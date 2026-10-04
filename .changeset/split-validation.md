@@ -4,6 +4,6 @@
 
 Validation now catches more `course.config.js`, `_meta.js`, and `pageConfig` mistakes: an unknown `chrome` value, an `export`, `navigation`, `completion`, or `scoring` value that is not an object (so `export: "scorm12"` no longer silently builds for web), a `_meta.js` `title` or `pages` of the wrong type (which used to crash the build), and a `pageConfig.quiz` that is not an object (so `quiz: true` no longer silently makes an ungraded quiz). `success: null` no longer crashes validation.
 
-A page listed twice in a `_meta.js` `pages` array now appears once in the course, with a warning, instead of twice.
+A page listed twice in a `_meta.js` `pages` array now appears once in the course, with a warning, instead of twice. Re-exporting a course that shipped with a duplicate resets learners' saved progress.
 
 A default export that isn't a static object literal now says so, and messages that show a rejected value print it as written.

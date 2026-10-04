@@ -448,7 +448,7 @@ export function generateManifest(
         }
 
         const questions =
-          pageConfig.graded === true && !pageConfig.quiz
+          pageConfig.graded === true && !isRecord(pageConfig.quiz)
             ? listedGradedQuestions(
                 findComponents(
                   readSourceFileCached(filePath),
@@ -461,7 +461,7 @@ export function generateManifest(
           title: pageConfig.title || titleCase(pageSlug),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
-          quiz: pageConfig.quiz || null,
+          quiz: isRecord(pageConfig.quiz) ? pageConfig.quiz : null,
           ...(pageConfig.graded === true ? { graded: true } : {}),
           ...(pageConfig.required === false ? { required: false } : {}),
           ...(pageConfig.weight !== undefined

@@ -744,6 +744,17 @@ export const pageConfig = { title: "Exam", quiz: { graded: true } }
     expect(manifest.pages[0].quiz).toEqual({ graded: true });
   });
 
+  it('treats a non-object pageConfig.quiz as no quiz', () => {
+    createFile(
+      '01-intro/exam.svelte',
+      `<script module>
+export const pageConfig = { title: "Exam", quiz: true }
+</script>`,
+    );
+
+    expect(generateManifest(root).pages[0].quiz).toBeNull();
+  });
+
   it('generates correct importPath', () => {
     createFile(
       '01-intro/01-welcome/_meta.js',
