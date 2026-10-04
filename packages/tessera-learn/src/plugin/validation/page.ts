@@ -261,9 +261,16 @@ export function validatePages(
           : validateMetaFile(lesson.metaPath, projectRoot, d);
 
       if (meta?.pages) {
-        const listed = new Set(meta.pages.map(ensureSvelteSuffix));
+        const listed = new Set<string>();
         for (const pageName of meta.pages) {
           const fileName = ensureSvelteSuffix(pageName);
+          if (listed.has(fileName)) {
+            d.warn(
+              `${relative(projectRoot, lesson.metaPath)}: pages array lists ${formatValue(pageName)} more than once, so only the first entry counts`,
+            );
+            continue;
+          }
+          listed.add(fileName);
           if (!lesson.files.includes(fileName)) {
             d.error(
               `${relative(projectRoot, lesson.metaPath)}: pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,

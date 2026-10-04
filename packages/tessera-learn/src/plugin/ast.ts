@@ -356,7 +356,10 @@ export function defaultExportFunctionPaths(jsSource: string): string[] {
       );
     }
   };
-  visit((exported?.declaration as Node | undefined) ?? null, '');
+  const root = unwrapTsCast(
+    (exported?.declaration as Node | undefined) ?? null,
+  );
+  if (root?.type === 'ObjectExpression') visit(root, '');
   return paths;
 }
 

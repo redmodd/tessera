@@ -234,7 +234,7 @@ describe('config validation', () => {
     writeConfig(testRoot, `export default () => ({ title: "Test" });`);
     const { errors } = validateProject(testRoot);
     expect(errors).toContain(
-      'course.config.js: the default export must be a static object literal (no variables, function calls, or computed values)',
+      'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
     );
   });
 
@@ -723,7 +723,7 @@ describe('_meta.js validation', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContain(
-      'pages/01-section/_meta.js: the default export must be a static object literal (no variables, function calls, or computed values)',
+      'pages/01-section/_meta.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
     );
   });
 
@@ -752,6 +752,20 @@ describe('_meta.js validation', () => {
       expect.stringContaining(
         'pages array lists "missing-page" but missing-page.svelte not found',
       ),
+    );
+  });
+
+  it('warns once when the pages array lists a page more than once', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: ["page", "page.svelte"] };',
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+    expect(warnings).toContain(
+      'pages/01-section/01-lesson/_meta.js: pages array lists "page.svelte" more than once, so only the first entry counts',
     );
   });
 
@@ -2954,12 +2968,12 @@ describe('parse failures', () => {
     [
       'a non-data value',
       'export default { title: someVariable };',
-      'the default export must be a static object literal (no variables, function calls, or computed values)',
+      'the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
     ],
     [
       'a variable default export',
       'const config = { title: "T" };\nexport default config;',
-      'the default export must be a static object literal (no variables, function calls, or computed values)',
+      'the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
     ],
   ])('names a course.config.js with %s', (_case, source, message) => {
     createValidProject(testRoot);
@@ -3349,7 +3363,7 @@ describe('resume policy validation', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      'course.config.js: "resume" must be "auto" or "never", got [NaN,{"n":-Infinity}]',
+      'course.config.js: "resume" must be "auto" or "never", got [NaN,{n:-Infinity}]',
     );
   });
 });

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import {
+  OBJECT_CONFIG_SECTIONS,
   readCourseConfig,
   readSourceFileCached,
   resolveConfigRead,
@@ -106,12 +107,7 @@ export function parseConfig(
     }
   }
 
-  for (const key of [
-    'navigation',
-    'completion',
-    'scoring',
-    'export',
-  ] as const) {
+  for (const key of OBJECT_CONFIG_SECTIONS) {
     if (config[key] !== undefined && !isRecord(config[key])) {
       d.error(
         `course.config.js: "${key}" must be an object, got ${describeType(config[key])}`,
@@ -308,7 +304,7 @@ function validatePercent(
 
 function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
   const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
-  const paths = defaultExportFunctionPaths(source).filter(Boolean);
+  const paths = defaultExportFunctionPaths(source);
   if (paths.length === 0) {
     d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
     return;

@@ -1,4 +1,5 @@
-import { isRecord, oneOf } from '../../runtime/types.js';
+import JSON5 from 'json5';
+import { oneOf } from '../../runtime/types.js';
 
 export interface ValidationResult {
   errors: string[];
@@ -33,15 +34,7 @@ export function quoteList(values: readonly string[]): string {
 }
 
 export function formatValue(value: unknown): string {
-  if (typeof value === 'number') return String(value);
-  if (Array.isArray(value)) return `[${value.map(formatValue).join(',')}]`;
-  if (isRecord(value)) {
-    const entries = Object.entries(value).map(
-      ([k, v]) => `${JSON.stringify(k)}:${formatValue(v)}`,
-    );
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value) ?? String(value);
+  return JSON5.stringify(value, { quote: '"' }) ?? String(value);
 }
 
 export function oneOfError(

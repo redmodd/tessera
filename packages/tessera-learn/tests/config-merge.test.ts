@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeCourseConfig } from '../src/plugin/index.js';
+import type { CourseConfig } from '../src/runtime/types.js';
 
 describe('mergeCourseConfig', () => {
   it('defaults title to "Untitled Course" when absent', () => {
@@ -49,5 +50,18 @@ describe('mergeCourseConfig', () => {
 
   it('keeps an author-supplied resume policy', () => {
     expect(mergeCourseConfig({ resume: 'never' }).resume).toBe('never');
+  });
+
+  it('replaces a non-object section with its defaults', () => {
+    const merged = mergeCourseConfig({
+      navigation: 'sequential',
+      completion: 'manual',
+      scoring: 70,
+      export: 'scorm12',
+    } as unknown as Partial<CourseConfig>);
+    expect(merged.navigation).toEqual({ mode: 'free' });
+    expect(merged.completion).toEqual(mergeCourseConfig({}).completion);
+    expect(merged.scoring).toEqual({ passingScore: 70 });
+    expect(merged.export).toEqual({ standard: 'web' });
   });
 });

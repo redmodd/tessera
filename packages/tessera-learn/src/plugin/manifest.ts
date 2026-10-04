@@ -129,7 +129,7 @@ export interface ReadFailure {
 }
 
 export const STATIC_LITERAL_RULE =
-  'must be a static object literal (no variables, function calls, or computed values)';
+  'must be a static object literal (no variables, function calls, template literals, or computed values)';
 
 export const READ_FAILURE_MESSAGES: Record<ReadFailure['reason'], string> = {
   missing: 'not found',
@@ -170,6 +170,13 @@ export function readCourseConfig(projectRoot: string): CourseConfigRead {
     ? { ok: true, config: read.value as Partial<CourseConfig> }
     : read;
 }
+
+export const OBJECT_CONFIG_SECTIONS = [
+  'navigation',
+  'completion',
+  'scoring',
+  'export',
+] as const;
 
 export type ResolvedConfigRead = CourseConfigRead & {
   profile: StandardProfile | undefined;
@@ -308,9 +315,7 @@ export function extractPageConfig(filePath: string): PageConfig {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
-    throw new Error(
-      `${filePath}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
-    );
+    throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
   }
   return {};
 }
@@ -502,12 +507,11 @@ export function orderPageFiles(
     return allFiles;
   }
 
-  const listed = pagesArray.map(ensureSvelteSuffix);
-  const listedSet = new Set(listed);
-  const unlisted = allFiles.filter((f) => !listedSet.has(f)).sort();
+  const listed = new Set(pagesArray.map(ensureSvelteSuffix));
+  const unlisted = allFiles.filter((f) => !listed.has(f)).sort();
 
   // Only include listed files that actually exist
-  const validListed = listed.filter((f) => allFiles.includes(f));
+  const validListed = [...listed].filter((f) => allFiles.includes(f));
 
   return [...validListed, ...unlisted];
 }

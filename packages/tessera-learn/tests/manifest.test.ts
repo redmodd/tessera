@@ -123,6 +123,12 @@ describe('orderPageFiles', () => {
     const result = orderPageFiles(all, ['missing', 'one']);
     expect(result).toEqual(['one.svelte', 'two.svelte']);
   });
+
+  it('keeps a file listed more than once at its first position', () => {
+    const all = ['one.svelte', 'two.svelte'];
+    const result = orderPageFiles(all, ['two', 'one', 'two.svelte']);
+    expect(result).toEqual(['two.svelte', 'one.svelte']);
+  });
 });
 
 // ---------- defaultExportObjectLiteral ----------
