@@ -81,7 +81,7 @@ describe('validateProject standardOverride', () => {
     writeConfig(`{ export: { standard: "scorm13" } }`);
     const { errors } = validateProject(projectRoot, 'scorm12');
     expect(errors).toContainEqual(
-      expect.stringContaining('"export.standard" must be one of'),
+      expect.stringContaining('"export.standard" must be "'),
     );
   });
 

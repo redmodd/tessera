@@ -192,7 +192,7 @@ function validatePageFile(
       graded,
       requiredGraded,
       hasQuiz: isQuiz,
-      ...(weight !== undefined ? { weight } : {}),
+      weight,
       completesOnView,
     },
     parseError: false,
@@ -268,7 +268,7 @@ export function validatePages(
         resolve(lesson.dir, fileName),
         ctx,
       );
-      if (parseError) hasParseErrors = true;
+      hasParseErrors ||= parseError;
       pages.push(page);
     }
   };
@@ -280,17 +280,16 @@ export function validatePages(
     const sectionMeta = validateMetaFile(section.metaPath, sectionRel, d);
 
     for (const lesson of section.lessons) {
-      if (lesson.name === null) {
-        // Flat lesson uses the section _meta, already validated above.
-        validateLesson(lesson, sectionMeta);
-      } else {
-        const meta = validateMetaFile(
-          lesson.metaPath,
-          relative(projectRoot, lesson.dir),
-          d,
-        );
-        validateLesson(lesson, meta);
-      }
+      // Flat lesson uses the section _meta, already validated above.
+      const meta =
+        lesson.name === null
+          ? sectionMeta
+          : validateMetaFile(
+              lesson.metaPath,
+              relative(projectRoot, lesson.dir),
+              d,
+            );
+      validateLesson(lesson, meta);
     }
 
     // The page-count delta covers both the no-lessons and empty-lessons cases.

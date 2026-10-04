@@ -80,7 +80,8 @@ export function validateMediaComponents(
           ? src.raw
           : undefined;
     const isEmbed = srcText !== undefined && isVideoEmbed(srcText);
-    if (name === 'Video' && isEmbed && props.get('transcript') === undefined) {
+    const hasTranscript = props.has('transcript');
+    if (name === 'Video' && isEmbed && !hasTranscript) {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
@@ -92,8 +93,8 @@ export function validateMediaComponents(
       name === 'Video' &&
       srcText !== undefined &&
       !isEmbed &&
-      props.get('tracks') === undefined &&
-      props.get('transcript') === undefined
+      !props.has('tracks') &&
+      !hasTranscript
     ) {
       d.warn(
         tag(
@@ -102,7 +103,7 @@ export function validateMediaComponents(
         ),
       );
     }
-    if (name === 'Audio' && props.get('transcript') === undefined) {
+    if (name === 'Audio' && !hasTranscript) {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,

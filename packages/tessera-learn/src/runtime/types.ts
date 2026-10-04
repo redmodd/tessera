@@ -10,6 +10,11 @@ import type { StandardId } from './standards.js';
 export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
 export const SUCCESS_SOURCES = ['quiz', 'fixed', 'none'] as const;
+export const SUCCESS_STATUSES = ['passed', 'failed'] as const;
+export const NAVIGATION_MODES = ['free', 'sequential'] as const;
+export const RESUME_POLICIES = ['auto', 'never'] as const;
+export const A11Y_LEVELS = ['warn', 'error'] as const;
+export const A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'] as const;
 
 /**
  * Trimmed course identity, or '' when absent. Single source of truth for the
@@ -21,7 +26,10 @@ export function courseIdentity(config: { id?: unknown }): string {
 }
 
 interface SuccessSource {
-  completion?: { mode?: string; requireSuccessStatus?: 'passed' | 'failed' };
+  completion?: {
+    mode?: string;
+    requireSuccessStatus?: (typeof SUCCESS_STATUSES)[number];
+  };
   success?: SuccessConfig;
 }
 
@@ -99,7 +107,7 @@ export interface CourseConfig {
   version?: string;
   /** Resume policy. 'auto' (default) restores saved progress unless the page
    * structure changed since it was saved; 'never' always starts fresh. */
-  resume?: 'auto' | 'never';
+  resume?: (typeof RESUME_POLICIES)[number];
   /** BCP-47 language tag for <html lang>. Defaults to 'en'. WCAG 3.1.1. */
   language?: string;
   /** Accessibility checker configuration. */
@@ -110,7 +118,7 @@ export interface CourseConfig {
     fontFamily?: string;
   };
   navigation: {
-    mode: 'free' | 'sequential';
+    mode: (typeof NAVIGATION_MODES)[number];
   };
   completion: ManualCompletion | QuizCompletion | PercentageCompletion;
   /**
@@ -142,9 +150,9 @@ export interface CourseConfig {
 /** Accessibility checker configuration. */
 export interface A11yConfig {
   /** Build-gate severity for promotable Tier-1 rules + Tier-1a warnings. */
-  level?: 'warn' | 'error';
+  level?: (typeof A11Y_LEVELS)[number];
   /** axe ruleset tags for the Tier-2 runtime auditor. */
-  standard?: 'wcag2a' | 'wcag2aa' | 'wcag21aa';
+  standard?: (typeof A11Y_STANDARDS)[number];
   /** Per-rule escape hatch matched literally against each diagnostic's ID. */
   ignore?: string[];
 }
@@ -156,7 +164,7 @@ export interface A11yConfig {
  */
 export type SuccessConfig =
   | { from: Exclude<(typeof SUCCESS_SOURCES)[number], 'fixed'>; status?: never }
-  | { from: 'fixed'; status: 'passed' | 'failed' };
+  | { from: 'fixed'; status: (typeof SUCCESS_STATUSES)[number] };
 
 export interface ManualCompletion {
   mode: 'manual';
@@ -170,7 +178,7 @@ export interface ManualCompletion {
    * When set, markComplete() also flips successStatus. Omit for unknown.
    * Alias for `success: { from: "fixed", status }`, which outranks it.
    */
-  requireSuccessStatus?: 'passed' | 'failed';
+  requireSuccessStatus?: (typeof SUCCESS_STATUSES)[number];
 }
 
 export interface QuizCompletion {

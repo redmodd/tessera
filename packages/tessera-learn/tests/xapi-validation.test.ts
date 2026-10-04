@@ -263,7 +263,7 @@ describe('xapi config validation — explicit endpoint', () => {
       'bogus',
     );
     expect(
-      errors.find((e) => e.includes('"export.standard" must be one of')),
+      errors.find((e) => e.includes('"export.standard" must be "')),
     ).toBeDefined();
     expect(
       warnings.filter(

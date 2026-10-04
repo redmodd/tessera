@@ -7,12 +7,16 @@ import {
 import { defaultExportFunctionPaths } from '../ast.js';
 import {
   STANDARD_IDS,
-  standardProfile,
   type StandardId,
   type StandardProfile,
 } from '../../runtime/standards.js';
 import {
+  A11Y_LEVELS,
+  A11Y_STANDARDS,
+  NAVIGATION_MODES,
+  RESUME_POLICIES,
   SUCCESS_SOURCES,
+  SUCCESS_STATUSES,
   courseIdentity,
   type CourseConfig,
   type ManualCompletion,
@@ -20,12 +24,7 @@ import {
 } from '../../runtime/types.js';
 import { contrastRatio } from '../a11y/contrast.js';
 import { isCspOverrides } from '../csp.js';
-import {
-  A11Y_IDS,
-  VALID_A11Y_LEVELS,
-  VALID_A11Y_STANDARDS,
-  tag,
-} from './a11y.js';
+import { A11Y_IDS, tag } from './a11y.js';
 import {
   describeType,
   oneOf,
@@ -33,7 +32,6 @@ import {
   type Diagnostics,
 } from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
-import { validateXAPIConfig, type XAPIHookRead } from './xapi.js';
 
 // Known top-level config fields
 const KNOWN_CONFIG_FIELDS = new Set([
@@ -64,12 +62,8 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
   return typeof value === 'string' && BCP47_RE.test(value);
 }
 
-const VALID_NAV_MODES = ['free', 'sequential'] as const;
 const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'] as const;
-const EXPORT_STANDARD_LIST = STANDARD_IDS.map((s) => `"${s}"`).join(', ');
 const VALID_MANUAL_TRIGGERS = ['page'] as const;
-const VALID_SUCCESS_STATUS = ['passed', 'failed'] as const;
-const VALID_RESUME = ['auto', 'never'] as const;
 
 export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
   completion?: Partial<
@@ -82,7 +76,6 @@ export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
 export function parseConfig(
   projectRoot: string,
   d: Diagnostics,
-  runtimeHooks: XAPIHookRead,
   standardOverride?: StandardId,
 ): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const read = readCourseConfig(projectRoot);
@@ -148,9 +141,9 @@ export function parseConfig(
 
   // The file's value, not the override: a --standard run still flags a bad one.
   const fileStandard = config.export?.standard;
-  if (fileStandard !== undefined && !standardProfile(fileStandard)) {
+  if (fileStandard !== undefined && !oneOf(STANDARD_IDS, fileStandard)) {
     d.error(
-      `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${fileStandard}"`,
+      `course.config.js: "export.standard" must be ${quoteList(STANDARD_IDS)}, got "${fileStandard}"`,
     );
   }
 
@@ -169,9 +162,9 @@ export function parseConfig(
 
   // Validate navigation.mode
   if (config.navigation?.mode !== undefined) {
-    if (!oneOf(VALID_NAV_MODES, config.navigation.mode)) {
+    if (!oneOf(NAVIGATION_MODES, config.navigation.mode)) {
       d.error(
-        `course.config.js: "navigation.mode" must be ${quoteList(VALID_NAV_MODES)}, got "${config.navigation.mode}"`,
+        `course.config.js: "navigation.mode" must be ${quoteList(NAVIGATION_MODES)}, got "${config.navigation.mode}"`,
       );
     }
   }
@@ -210,10 +203,10 @@ export function parseConfig(
       );
     } else if (
       success.from === 'fixed' &&
-      !oneOf(VALID_SUCCESS_STATUS, success.status)
+      !oneOf(SUCCESS_STATUSES, success.status)
     ) {
       d.error(
-        `course.config.js: "success.status" must be ${quoteList(VALID_SUCCESS_STATUS)} under success.from: "fixed", got "${success.status}"`,
+        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got "${success.status}"`,
       );
     } else {
       successAccepted = true;
@@ -237,17 +230,17 @@ export function parseConfig(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
     }
-    if (manual && !oneOf(VALID_SUCCESS_STATUS, requireStatus)) {
+    if (manual && !oneOf(SUCCESS_STATUSES, requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(VALID_SUCCESS_STATUS)} (omit for "unknown"), got "${requireStatus}"`,
+        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got "${requireStatus}"`,
       );
     }
   }
 
   // Validate resume policy
-  if (config.resume !== undefined && !oneOf(VALID_RESUME, config.resume)) {
+  if (config.resume !== undefined && !oneOf(RESUME_POLICIES, config.resume)) {
     d.error(
-      `course.config.js: "resume" must be ${quoteList(VALID_RESUME)}, got "${config.resume}"`,
+      `course.config.js: "resume" must be ${quoteList(RESUME_POLICIES)}, got "${config.resume}"`,
     );
   }
 
@@ -271,8 +264,6 @@ export function parseConfig(
     config.completion?.percentageThreshold,
     d,
   );
-
-  validateXAPIConfig(config.xapi, profile, runtimeHooks, d);
 
   return { config, profile };
 }
@@ -399,17 +390,14 @@ function validateA11yConfig(raw: unknown, d: Diagnostics): void {
   }
   const a11y = raw as Record<string, unknown>;
 
-  if (a11y.level !== undefined && !oneOf(VALID_A11Y_LEVELS, a11y.level)) {
+  if (a11y.level !== undefined && !oneOf(A11Y_LEVELS, a11y.level)) {
     d.error(
-      `course.config.js: "a11y.level" must be ${quoteList(VALID_A11Y_LEVELS)}, got ${JSON.stringify(a11y.level)}`,
+      `course.config.js: "a11y.level" must be ${quoteList(A11Y_LEVELS)}, got ${JSON.stringify(a11y.level)}`,
     );
   }
-  if (
-    a11y.standard !== undefined &&
-    !oneOf(VALID_A11Y_STANDARDS, a11y.standard)
-  ) {
+  if (a11y.standard !== undefined && !oneOf(A11Y_STANDARDS, a11y.standard)) {
     d.error(
-      `course.config.js: "a11y.standard" must be ${quoteList(VALID_A11Y_STANDARDS)}, got ${JSON.stringify(a11y.standard)}`,
+      `course.config.js: "a11y.standard" must be ${quoteList(A11Y_STANDARDS)}, got ${JSON.stringify(a11y.standard)}`,
     );
   }
   if (a11y.ignore !== undefined) {
