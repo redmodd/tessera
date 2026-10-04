@@ -38,6 +38,7 @@ import {
   isIgnored,
   readA11ySettings,
 } from './validation.js';
+import { quoteList } from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
@@ -61,7 +62,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
   const profile = standardProfile(standardOverride);
   if (standardOverride && !profile) {
     throw new Error(
-      `standardOverride must be one of ${STANDARD_IDS.join(', ')}, got "${standardOverride}"`,
+      `standardOverride must be ${quoteList(STANDARD_IDS)}, got "${standardOverride}"`,
     );
   }
   const ctx = new BuildContext(profile?.id);

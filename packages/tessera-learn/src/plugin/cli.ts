@@ -6,6 +6,7 @@ import { runNew } from './new-cli.js';
 import { runDuplicate } from './duplicate-cli.js';
 import { resolveCourse, type ResolvedCourse } from './course-root.js';
 import { STANDARD_IDS, type StandardId } from '../runtime/standards.js';
+import { quoteList } from './validation/diagnostics.js';
 
 interface Flag<T extends string = string> {
   name: string;
@@ -200,7 +201,7 @@ function parseCommandArgs(
   if (typeof flagValue !== 'string') return { help: false, positionals };
   if (!flag.choices.includes(flagValue)) {
     return {
-      error: `--${flag.name} must be one of: ${flag.choices.join(', ')}, got "${flagValue}"`,
+      error: `--${flag.name} must be ${quoteList(flag.choices)}, got "${flagValue}"`,
     };
   }
   return { help: false, positionals, flagValue };
