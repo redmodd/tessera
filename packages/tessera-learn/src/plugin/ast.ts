@@ -312,17 +312,21 @@ export function defaultExportObjectLiteral(
 ): NamedObjectLiteral | { kind: 'parse-error' } {
   const program = parseJsModule(jsSource);
   if (!program) return { kind: 'parse-error' };
-  for (const node of (program.body as Node[]) ?? []) {
-    if (node.type !== 'ExportDefaultDeclaration') continue;
-    const decl = unwrapTsCast(
-      (node as { declaration?: Node }).declaration ?? null,
-    );
-    if (decl && decl.type === 'ObjectExpression') {
-      return { kind: 'literal', text: jsSource.slice(decl.start, decl.end) };
-    }
-    return { kind: 'invalid' };
-  }
-  return { kind: 'none' };
+  const value = defaultExportValue(program);
+  if (value === undefined) return { kind: 'none' };
+  return value?.type === 'ObjectExpression'
+    ? { kind: 'literal', text: jsSource.slice(value.start, value.end) }
+    : { kind: 'invalid' };
+}
+
+/** The `export default` value, or undefined when the module has none. */
+function defaultExportValue(program: Node): Node | null | undefined {
+  const exported = ((program.body as Node[]) ?? []).find(
+    (node) => node.type === 'ExportDefaultDeclaration',
+  );
+  return (
+    exported && unwrapTsCast((exported.declaration as Node | undefined) ?? null)
+  );
 }
 
 /**
@@ -336,12 +340,7 @@ export function defaultExportFunctions(jsSource: string): {
   rest: string | null;
 } {
   const program = parseJsModule(jsSource);
-  const exported = ((program?.body as Node[]) ?? []).find(
-    (node) => node.type === 'ExportDefaultDeclaration',
-  );
-  const root = unwrapTsCast(
-    (exported?.declaration as Node | undefined) ?? null,
-  );
+  const root = program && defaultExportValue(program);
   if (root?.type !== 'ObjectExpression') return { paths: [], rest: null };
   const paths: string[] = [];
   const replaced: { start: number; end: number; text: string }[] = [];

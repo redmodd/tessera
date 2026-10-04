@@ -123,7 +123,7 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-export interface ReadFailure {
+interface ReadFailure {
   ok: false;
   reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
 }
@@ -440,8 +440,9 @@ export function generateManifest(
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
 
+        const quiz = isRecord(pageConfig.quiz) ? pageConfig.quiz : null;
         const questions =
-          pageConfig.graded === true && !isRecord(pageConfig.quiz)
+          pageConfig.graded === true && !quiz
             ? listedGradedQuestions(
                 findComponents(
                   readSourceFileCached(filePath),
@@ -454,7 +455,7 @@ export function generateManifest(
           title: pageConfig.title || titleCase(pageSlug),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
-          quiz: isRecord(pageConfig.quiz) ? pageConfig.quiz : null,
+          quiz,
           ...(pageConfig.graded === true ? { graded: true } : {}),
           ...(pageConfig.required === false ? { required: false } : {}),
           ...(pageConfig.weight !== undefined

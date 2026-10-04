@@ -29,10 +29,7 @@ export function courseIdentity(config: { id?: unknown }): string {
 }
 
 interface SuccessSource {
-  completion?: {
-    mode?: string;
-    requireSuccessStatus?: Verdict;
-  };
+  completion?: { mode?: string; requireSuccessStatus?: Verdict };
   success?: SuccessConfig;
 }
 

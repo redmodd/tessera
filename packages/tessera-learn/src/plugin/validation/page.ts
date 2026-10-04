@@ -95,7 +95,7 @@ function validatePageFile(
 
   const quiz = pageConfig?.quiz;
   const isQuiz = isRecord(quiz);
-  const isGradedQuiz = isRecord(quiz) && quiz.graded === true;
+  const isGradedQuiz = isQuiz && quiz.graded === true;
   validateQuizConfig(quiz, fileRel, d);
 
   checkOneOf(

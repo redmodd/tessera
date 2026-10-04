@@ -300,13 +300,9 @@ export function parseConfig(
   return { config, profile };
 }
 
-function validatePercent(
-  key: string,
-  value: number | undefined,
-  d: Diagnostics,
-): void {
+function validatePercent(key: string, value: unknown, d: Diagnostics): void {
   if (value === undefined) return;
-  if (!Number.isFinite(value) || value < 0 || value > 100) {
+  if (!(typeof value === 'number' && value >= 0 && value <= 100)) {
     d.error(
       `course.config.js: "${key}" must be 0–100, got ${formatValue(value)}`,
     );
