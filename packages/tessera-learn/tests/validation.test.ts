@@ -3005,6 +3005,27 @@ describe('parse failures', () => {
     );
   });
 
+  it.each([
+    ['an arrow function', '{ title: "T", onX: () => 1 }', []],
+    ['a method', '{ title: "T", onX() {} }', []],
+    ['a getter', '{ title: "T", get onX() { return 1; } }', []],
+    [
+      'a function beside a variable',
+      '{ title: t, onX() {} }',
+      [
+        'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+      ],
+    ],
+  ])('names a course.config.js with %s', (_case, literal, others: string[]) => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, `const t = "T";\nexport default ${literal};`);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual([
+      expect.stringContaining('course.config.js: "onX" is a function'),
+      ...others,
+    ]);
+  });
+
   it('surfaces an unparseable page as a validator error', () => {
     createValidProject(testRoot);
     writePage(testRoot, `<MultipleChoice question={ />`);

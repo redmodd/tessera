@@ -327,15 +327,24 @@ export function defaultExportObjectLiteral(
 
 /**
  * Paths (e.g. `xapi[0].auth`) of function values inside the `export default`
- * object literal. JSON5 can't parse those, so the validator names them.
+ * object literal, plus the literal's text with each function replaced by
+ * `null` (null when the default export is not an object literal). JSON5 can't
+ * parse functions, so the validator names them and checks the rest separately.
  */
-export function defaultExportFunctionPaths(jsSource: string): string[] {
+export function defaultExportFunctions(jsSource: string): {
+  paths: string[];
+  rest: string | null;
+} {
   const program = parseJsModule(jsSource);
-  if (!program) return [];
-  const exported = ((program.body as Node[]) ?? []).find(
+  const exported = ((program?.body as Node[]) ?? []).find(
     (node) => node.type === 'ExportDefaultDeclaration',
   );
+  const root = unwrapTsCast(
+    (exported?.declaration as Node | undefined) ?? null,
+  );
+  if (root?.type !== 'ObjectExpression') return { paths: [], rest: null };
   const paths: string[] = [];
+  const replaced: { start: number; end: number; text: string }[] = [];
   const visit = (node: Node | null, path: string): void => {
     const value = unwrapTsCast(node);
     if (!value) return;
@@ -344,11 +353,22 @@ export function defaultExportFunctionPaths(jsSource: string): string[] {
       value.type === 'FunctionExpression'
     ) {
       paths.push(path);
+      replaced.push({ start: value.start, end: value.end, text: 'null' });
     } else if (value.type === 'ObjectExpression') {
       for (const property of value.properties as Node[]) {
         const key = property.type === 'Property' ? propertyKey(property) : null;
         if (key === null) continue;
-        visit(property.value as Node, path ? `${path}.${key}` : key);
+        const keyPath = path ? `${path}.${key}` : key;
+        if (property.method || property.kind !== 'init') {
+          paths.push(keyPath);
+          replaced.push({
+            start: property.start,
+            end: property.end,
+            text: `${JSON.stringify(key)}: null`,
+          });
+        } else {
+          visit(property.value as Node, keyPath);
+        }
       }
     } else if (value.type === 'ArrayExpression') {
       (value.elements as (Node | null)[]).forEach((element, i) =>
@@ -356,11 +376,15 @@ export function defaultExportFunctionPaths(jsSource: string): string[] {
       );
     }
   };
-  const root = unwrapTsCast(
-    (exported?.declaration as Node | undefined) ?? null,
-  );
-  if (root?.type === 'ObjectExpression') visit(root, '');
-  return paths;
+  visit(root, '');
+  let rest = '';
+  let from = root.start;
+  for (const { start, end, text } of replaced) {
+    rest += jsSource.slice(from, start) + text;
+    from = end;
+  }
+  rest += jsSource.slice(from, root.end);
+  return { paths, rest };
 }
 
 /** Keys of each `xapi` export entry: `'unknown'` where not statically readable. */

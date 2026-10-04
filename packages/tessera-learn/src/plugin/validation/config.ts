@@ -1,3 +1,4 @@
+import JSON5 from 'json5';
 import { resolve } from 'node:path';
 import {
   OBJECT_CONFIG_SECTIONS,
@@ -6,7 +7,7 @@ import {
   resolveConfigRead,
   READ_FAILURE_MESSAGES,
 } from '../manifest.js';
-import { defaultExportFunctionPaths } from '../ast.js';
+import { defaultExportFunctions } from '../ast.js';
 import {
   STANDARD_IDS,
   type StandardId,
@@ -311,16 +312,25 @@ function validatePercent(
 
 function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
   const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
-  const paths = defaultExportFunctionPaths(source);
-  if (paths.length === 0) {
-    d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
-    return;
-  }
+  const { paths, rest } = defaultExportFunctions(source);
   for (const path of paths) {
     d.error(
       `course.config.js: "${path}" is a function, but course.config.js is data only. ` +
         'Export it from course.runtime.js instead (see "Runtime hooks" in the authoring guide).',
     );
+  }
+  if (!isJson5(rest)) {
+    d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
+  }
+}
+
+function isJson5(text: string | null): boolean {
+  if (text === null) return false;
+  try {
+    JSON5.parse(text);
+    return true;
+  } catch {
+    return false;
   }
 }
 
