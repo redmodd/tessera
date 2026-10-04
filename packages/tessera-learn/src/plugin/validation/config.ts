@@ -2,10 +2,10 @@ import JSON5 from 'json5';
 import { resolve } from 'node:path';
 import {
   OBJECT_CONFIG_SECTIONS,
-  readCourseConfig,
   readSourceFileCached,
   resolveConfigRead,
   READ_FAILURE_MESSAGES,
+  type CourseConfigRead,
 } from '../manifest.js';
 import { defaultExportFunctions } from '../ast.js';
 import {
@@ -87,17 +87,14 @@ export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
 
 export function parseConfig(
   projectRoot: string,
+  read: CourseConfigRead,
   d: Diagnostics,
   standardOverride?: StandardId,
-): {
-  config: ParsedConfig | null;
-  profile: StandardProfile | undefined;
-} | null {
-  const read = readCourseConfig(projectRoot);
+): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const unreadableExport =
     read.ok &&
     !standardOverride &&
-    read.config.export !== undefined &&
+    read.config.export != null &&
     !isRecord(read.config.export);
   const profile = unreadableExport
     ? undefined
@@ -108,7 +105,7 @@ export function parseConfig(
     } else {
       d.error(`course.config.js: ${READ_FAILURE_MESSAGES[read.reason]}`);
     }
-    return read.reason === 'missing' ? null : { config: null, profile };
+    return { config: null, profile };
   }
   const config: ParsedConfig = read.config;
 
@@ -119,7 +116,7 @@ export function parseConfig(
   }
 
   for (const key of OBJECT_CONFIG_SECTIONS) {
-    if (config[key] !== undefined && !isRecord(config[key])) {
+    if (config[key] != null && !isRecord(config[key])) {
       d.error(
         `course.config.js: "${key}" must be an object, got ${describeType(config[key])}`,
       );

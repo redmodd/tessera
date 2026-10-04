@@ -68,10 +68,10 @@ describe('resolveConfigRead', () => {
     expect(read.profile).toBeUndefined();
   });
 
-  it.each(['scorm13', ''])(
-    'resolves no profile for a standard of "%s"',
+  it.each(['"scorm13"', '""', 'null'])(
+    'resolves no profile for a standard of %s',
     (standard) => {
-      writeConfig(`{ export: { standard: "${standard}" } }`);
+      writeConfig(`{ export: { standard: ${standard} } }`);
       expect(readResolvedConfig().profile).toBeUndefined();
     },
   );

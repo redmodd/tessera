@@ -202,10 +202,13 @@ export function resolveConfigRead(
   if (standardOverride) {
     config.export = { ...config.export, standard: standardOverride };
   }
+  const standard = config.export?.standard;
   return {
     ok: true,
     config,
-    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
+    profile: standardProfile(
+      standard === undefined ? DEFAULT_STANDARD : standard,
+    ),
   };
 }
 

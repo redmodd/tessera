@@ -1,4 +1,5 @@
 import { clearParseCache } from './ast.js';
+import { readCourseConfig, READ_FAILURE_MESSAGES } from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
 import { applyA11ySettings, normalizeA11y } from './validation/a11y.js';
 import {
@@ -38,10 +39,18 @@ export function validateProject(
   clearParseCache();
   const d = new Diagnostics();
 
+  const read = readCourseConfig(projectRoot);
+  if (!read.ok && read.reason === 'missing') {
+    d.error(`course.config.js: ${READ_FAILURE_MESSAGES.missing}`);
+    return d;
+  }
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
-  const parsed = parseConfig(projectRoot, d, standardOverride);
-  if (!parsed) return d;
-  const { config, profile } = parsed;
+  const { config, profile } = parseConfig(
+    projectRoot,
+    read,
+    d,
+    standardOverride,
+  );
   if (config) validateXAPIConfig(config.xapi, profile, runtimeHooks, d);
 
   const pageResults = validatePages(projectRoot, d, profile);

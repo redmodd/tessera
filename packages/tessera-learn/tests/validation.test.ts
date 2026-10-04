@@ -78,6 +78,12 @@ describe('config validation', () => {
     expect(errors).toEqual(['course.config.js: not found in project root']);
   });
 
+  it('reports only the missing course.config.js beside a broken course.runtime.js', () => {
+    writeFile(testRoot, 'course.runtime.js', 'export default {');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual(['course.config.js: not found in project root']);
+  });
+
   it('passes with valid config', () => {
     createValidProject(testRoot);
     const { errors, warnings } = validateProject(testRoot);
@@ -215,6 +221,15 @@ describe('config validation', () => {
     expect(errors).toContain(
       `course.config.js: "${key}" must be an object, got ${type}`,
     );
+  });
+
+  it('treats null sections as unset', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", id: "x", language: "en", navigation: null, completion: null, scoring: null, export: null };`,
+    );
+    expect(validateProject(testRoot).errors).toEqual([]);
   });
 
   it('skips web-only checks when export is not an object', () => {
@@ -755,17 +770,20 @@ describe('_meta.js validation', () => {
     );
   });
 
-  it('warns once when the pages array lists a page more than once', () => {
+  it('warns for each repeated entry in the pages array', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/01-lesson/_meta.js',
-      'export default { title: "Lesson", pages: ["page", "page.svelte"] };',
+      'export default { title: "Lesson", pages: ["page", "page.svelte", "page"] };',
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toEqual([]);
     expect(warnings).toContain(
-      'pages/01-section/01-lesson/_meta.js: pages array lists "page.svelte" more than once, so only the first entry counts',
+      'pages/01-section/01-lesson/_meta.js: pages array lists the same page as "page" and "page.svelte", so only the first entry counts',
+    );
+    expect(warnings).toContain(
+      'pages/01-section/01-lesson/_meta.js: pages array lists "page" more than once, so only the first entry counts',
     );
   });
 
@@ -3009,6 +3027,9 @@ describe('parse failures', () => {
     ['an arrow function', '{ title: "T", onX: () => 1 }', []],
     ['a method', '{ title: "T", onX() {} }', []],
     ['a getter', '{ title: "T", get onX() { return 1; } }', []],
+    ['a parenthesized arrow function', '{ title: "T", onX: (() => 1) }', []],
+    ['a cast function', '{ title: "T", onX: (function () {}) as any }', []],
+    ['a parenthesized default export', '({ title: "T", onX: () => 1 })', []],
     [
       'a function beside a variable',
       '{ title: t, onX() {} }',
@@ -3023,6 +3044,14 @@ describe('parse failures', () => {
     expect(errors).toEqual([
       expect.stringContaining('course.config.js: "onX" is a function'),
       ...others,
+    ]);
+  });
+
+  it('names a parenthesized function inside an array', () => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, 'export default { title: "T", onX: [(() => 1)] };');
+    expect(validateProject(testRoot).errors).toEqual([
+      expect.stringContaining('course.config.js: "onX[0]" is a function'),
     ]);
   });
 

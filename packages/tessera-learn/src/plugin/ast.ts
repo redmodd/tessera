@@ -250,30 +250,35 @@ const TsParser = Parser.extend(
   tsPlugin() as unknown as Parameters<typeof Parser.extend>[0],
 );
 
+function parseJs(source: string, preserveParens = false): Node | null {
+  try {
+    return TsParser.parse(source, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      preserveParens,
+    }) as unknown as Node;
+  } catch {
+    return null;
+  }
+}
+
 function parseJsModule(source: string): Node | null {
   const cached = jsModuleCache.get(source);
   if (cached !== undefined) return cached;
-  let result: Node | null;
-  try {
-    result = TsParser.parse(source, {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-    }) as unknown as Node;
-  } catch {
-    result = null;
-  }
+  const result = parseJs(source);
   jsModuleCache.set(source, result);
   return result;
 }
 
-function unwrapTsCast(node: Node | null): Node | null {
+function unwrapExpression(node: Node | null): Node | null {
   let current = node;
   while (
     current &&
     (current.type === 'TSAsExpression' ||
       current.type === 'TSSatisfiesExpression' ||
       current.type === 'TSTypeAssertion' ||
-      current.type === 'TSNonNullExpression')
+      current.type === 'TSNonNullExpression' ||
+      current.type === 'ParenthesizedExpression')
   ) {
     current = (current as { expression?: Node }).expression ?? null;
   }
@@ -292,7 +297,7 @@ function findPageConfigInProgram(
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
       if (id.type !== 'Identifier' || id.name !== 'pageConfig') continue;
-      const init = unwrapTsCast(decl.init as Node | null);
+      const init = unwrapExpression(decl.init as Node | null);
       if (init && init.type === 'ObjectExpression') {
         return { kind: 'literal', text: source.slice(init.start, init.end) };
       }
@@ -325,7 +330,8 @@ function defaultExportValue(program: Node): Node | null | undefined {
     (node) => node.type === 'ExportDefaultDeclaration',
   );
   return (
-    exported && unwrapTsCast((exported.declaration as Node | undefined) ?? null)
+    exported &&
+    unwrapExpression((exported.declaration as Node | undefined) ?? null)
   );
 }
 
@@ -339,20 +345,20 @@ export function defaultExportFunctions(jsSource: string): {
   paths: string[];
   rest: string | null;
 } {
-  const program = parseJsModule(jsSource);
+  const program = parseJs(jsSource, true);
   const root = program && defaultExportValue(program);
   if (root?.type !== 'ObjectExpression') return { paths: [], rest: null };
   const paths: string[] = [];
   const replaced: { start: number; end: number; text: string }[] = [];
   const visit = (node: Node | null, path: string): void => {
-    const value = unwrapTsCast(node);
-    if (!value) return;
+    const value = unwrapExpression(node);
+    if (!node || !value) return;
     if (
       value.type === 'ArrowFunctionExpression' ||
       value.type === 'FunctionExpression'
     ) {
       paths.push(path);
-      replaced.push({ start: value.start, end: value.end, text: 'null' });
+      replaced.push({ start: node.start, end: node.end, text: 'null' });
     } else if (value.type === 'ObjectExpression') {
       for (const property of value.properties as Node[]) {
         const key = property.type === 'Property' ? propertyKey(property) : null;
@@ -517,7 +523,7 @@ function isReferenced(program: Node, name: string, binding: Node): boolean {
 function objectLiteralEntries(
   node: Node | null,
 ): Map<string, Node> | 'unknown' {
-  const value = unwrapTsCast(node);
+  const value = unwrapExpression(node);
   if (value?.type !== 'ObjectExpression') return 'unknown';
   const entries = new Map<string, Node>();
   for (const property of value.properties as Node[]) {
@@ -644,7 +650,7 @@ function useQuestionLocalNames(node: Node): string[] {
 }
 
 function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
-  const options = unwrapTsCast((call.arguments as Node[])?.[0] ?? null);
+  const options = unwrapExpression((call.arguments as Node[])?.[0] ?? null);
   if (!options || options.type !== 'ObjectExpression') return 'unknown';
   let unknown = false;
   for (const property of (options.properties as Node[]) ?? []) {
@@ -657,7 +663,7 @@ function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
       continue;
     }
     if (propertyKey(property) !== 'graded') continue;
-    const value = unwrapTsCast(property.value as Node);
+    const value = unwrapExpression(property.value as Node);
     if (value?.type !== 'Literal') return 'unknown';
     if (value.value === true) return 'graded';
     if (value.value !== false) return 'unknown';
