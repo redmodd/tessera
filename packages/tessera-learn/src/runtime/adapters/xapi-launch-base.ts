@@ -504,15 +504,15 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
         if (attempt > 0) {
           await new Promise<void>((resolve) => {
-            const wait = linkedController(load.signal);
-            const timer = setTimeout(
-              () => wait.abort(),
-              backoffMs(attempt - 1),
+            const timer = setTimeout(resolve, backoffMs(attempt - 1));
+            load.signal.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true },
             );
-            wait.signal.addEventListener('abort', () => {
-              clearTimeout(timer);
-              resolve();
-            });
           });
           if (load.signal.aborted) break;
         }

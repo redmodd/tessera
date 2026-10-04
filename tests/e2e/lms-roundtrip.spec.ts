@@ -621,6 +621,43 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await expectNoStatementsAfterTerminated(page, statements);
   });
+
+  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
+    page,
+  }) => {
+    const statements = await installCmi5Mock(page);
+    const statePuts: string[] = [];
+    const isResumeGet = (req: Request) =>
+      req.url().includes('/xapi/activities/state') &&
+      !req.url().includes('stateId=LMS.LaunchData') &&
+      req.method() === 'GET';
+    await page.route(
+      'http://cmi5-mock.test/xapi/activities/state**',
+      async (route) => {
+        const req = route.request();
+        if (isResumeGet(req)) return;
+        if (req.method() === 'PUT') statePuts.push(req.postData() ?? '');
+        await route.fallback();
+      },
+    );
+    const resumeGet = page.waitForRequest(isResumeGet);
+
+    await page.goto(cmi5LaunchURL(BASE));
+    await resumeGet;
+    await page.waitForTimeout(1100);
+    const aborted = page.waitForEvent('requestfailed', {
+      predicate: isResumeGet,
+      timeout: 2000,
+    });
+    await exitCourse(page);
+    await aborted;
+
+    await expectNoStatementsAfterTerminated(page, statements);
+    expect(findStatement(statements, 'terminated').result.duration).toMatch(
+      /^PT[1-9]\d*S$/,
+    );
+    expect(statePuts).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
