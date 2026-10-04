@@ -2,8 +2,10 @@
  * Persistence API: the lifecycle statuses and saved course state that adapters exchange.
  */
 
+import type { Verdict } from './types.js';
+
 export type CompletionStatus = 'incomplete' | 'complete';
-export type SuccessStatus = 'passed' | 'failed' | 'unknown';
+export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
 /** One page's entry in `SavedState.g`. */

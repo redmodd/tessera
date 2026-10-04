@@ -212,9 +212,9 @@ export function readMetaFile(metaPath: string): {
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
-  const meta = read.value as MetaFile;
-  if (meta.pages === undefined || isStringArray(meta.pages)) return { meta };
-  return { meta: { ...meta, pages: undefined }, problem: 'invalid-pages' };
+  const { pages, ...meta } = read.value as MetaFile & { pages?: unknown };
+  if (isStringArray(pages)) return { meta: { ...meta, pages } };
+  return pages == null ? { meta } : { meta, problem: 'invalid-pages' };
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(

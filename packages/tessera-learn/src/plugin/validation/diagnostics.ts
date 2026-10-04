@@ -1,4 +1,4 @@
-import { oneOf } from '../../runtime/types.js';
+import { isRecord, oneOf } from '../../runtime/types.js';
 import type { ReadFailure } from '../manifest.js';
 
 export interface ValidationResult {
@@ -34,7 +34,15 @@ export function quoteList(values: readonly string[]): string {
 }
 
 export function formatValue(value: unknown): string {
-  return typeof value === 'number' ? String(value) : JSON.stringify(value);
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return `[${value.map(formatValue).join(',')}]`;
+  if (isRecord(value)) {
+    const entries = Object.entries(value).map(
+      ([k, v]) => `${JSON.stringify(k)}:${formatValue(v)}`,
+    );
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 export function oneOfError(

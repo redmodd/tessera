@@ -717,6 +717,30 @@ describe('_meta.js validation', () => {
     );
   });
 
+  it('errors on a non-string _meta.js title', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: { en: "Intro" } };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'pages/01-section/_meta.js: "title" must be a string, got object',
+    );
+  });
+
+  it('treats a null pages value as no pages list', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: null };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+  });
+
   it('errors on a pages value that is not an array of strings', () => {
     createValidProject(testRoot);
     writeFile(
@@ -3263,6 +3287,26 @@ describe('resume policy validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       'course.config.js: "resume" must be "auto" or "never", got ["auto"]',
+    );
+  });
+
+  it('prints a nested NaN or Infinity as written', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: [NaN, { n: -Infinity }],
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "resume" must be "auto" or "never", got [NaN,{"n":-Infinity}]',
     );
   });
 });

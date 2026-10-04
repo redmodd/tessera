@@ -32,6 +32,7 @@ import {
 import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
+  describeType,
   formatValue,
   READ_FAILURE_MESSAGES,
   STATIC_LITERAL_RULE,
@@ -316,7 +317,11 @@ function validateMetaFile(
     return null;
   }
 
-  if (!meta.title) {
+  if (meta.title !== undefined && typeof meta.title !== 'string') {
+    d.error(
+      `${metaRel}: "title" must be a string, got ${describeType(meta.title)}`,
+    );
+  } else if (!meta.title) {
     d.error(`${metaRel}: missing required "title" field`);
   }
   if (problem === 'invalid-pages') {

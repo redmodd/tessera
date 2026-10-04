@@ -280,6 +280,14 @@ describe('readMetaFile', () => {
     });
   });
 
+  it('treats a null pages value as absent', () => {
+    const path = createFile(
+      'meta-test4/_meta.js',
+      'export default { title: "Lesson", pages: null };',
+    );
+    expect(readMetaFile(path)).toEqual({ meta: { title: 'Lesson' } });
+  });
+
   it('returns empty meta for missing file', () => {
     expect(readMetaFile('/nonexistent/_meta.js')).toEqual({
       meta: {},
