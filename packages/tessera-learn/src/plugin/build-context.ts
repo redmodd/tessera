@@ -2,7 +2,8 @@ import type { ResolvedConfig } from 'vite';
 import { existsSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import {
-  readResolvedConfig,
+  readCourseConfig,
+  resolveConfigRead,
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
@@ -54,6 +55,9 @@ export class BuildContext {
   }
 
   readConfig(): ResolvedConfigRead {
-    return readResolvedConfig(this.root, this.standardOverride);
+    return resolveConfigRead(
+      readCourseConfig(this.root),
+      this.standardOverride,
+    );
   }
 }

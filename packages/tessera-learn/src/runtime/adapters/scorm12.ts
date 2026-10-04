@@ -5,6 +5,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
+import type { Verdict } from '../types.js';
 import {
   BaseScormAdapter,
   findLMSAPI,
@@ -65,7 +66,7 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
-  #successStatus: 'passed' | 'failed' | null = null;
+  #successStatus: Verdict | null = null;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);

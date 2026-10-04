@@ -237,6 +237,13 @@ describe('xapi config validation — explicit endpoint', () => {
     ).toBeDefined();
   });
 
+  it('prints a non-string registration as JSON', () => {
+    const { errors } = validate(destination({ registration: 5 }), 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi.registration must be a UUID v4, got 5',
+    );
+  });
+
   it('warns on registration under non-cmi5', () => {
     const { warnings } = validate(
       destination({ registration: '550e8400-e29b-41d4-a716-446655440000' }),
@@ -263,7 +270,7 @@ describe('xapi config validation — explicit endpoint', () => {
       'bogus',
     );
     expect(
-      errors.find((e) => e.includes('"export.standard" must be one of')),
+      errors.find((e) => e.includes('"export.standard" must be "')),
     ).toBeDefined();
     expect(
       warnings.filter(
@@ -338,6 +345,20 @@ describe('xapi config validation — array form (fan-out)', () => {
     expect(
       errors.find((e) => e.includes('at least one destination')),
     ).toBeDefined();
+  });
+
+  it('rejects an array actor as not an Agent object', () => {
+    const { errors } = validate(destination({ actor: [] }), 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi.actor must be an Agent object, got array',
+    );
+  });
+
+  it('rejects an array entry as not an object', () => {
+    const { errors } = validate(`[${destination()}, []]`, 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi[1] must be an object',
+    );
   });
 
   it('errors when more than one entry uses endpoint: "lms"', () => {

@@ -118,7 +118,7 @@ describe('main dispatch', () => {
     [['export', 'getting-started', '--standrd', 'scorm2004'], "'--standrd'"],
     [
       ['a11y', 'getting-started', '--threshold', 'nope'],
-      '--threshold must be one of',
+      '--threshold must be "',
     ],
     [['a11y', 'getting-started', '--build'], "Unknown option '--build'"],
     [

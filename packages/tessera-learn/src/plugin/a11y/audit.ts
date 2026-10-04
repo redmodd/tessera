@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import type { PreviewServer } from 'vite';
 import { generateManifest } from '../manifest.js';
-import { readA11ySettings, type A11ySettings } from '../validation.js';
+import { readA11ySettings, type A11ySettings } from '../validation/a11y.js';
 
 export interface AuditOptions {
   /** Minimum violation impact that fails the run (CI gate). Default 'serious'. */

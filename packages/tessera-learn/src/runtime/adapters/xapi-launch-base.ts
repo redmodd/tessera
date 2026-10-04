@@ -3,6 +3,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
+import type { Verdict } from '../types.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatCorrectPattern } from '../interaction-format.js';
 import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
@@ -194,7 +195,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   /** Scaled score to attach to Passed/Failed, or null to omit. cmi5 overrides for masteryScore gating. */
-  protected scoreForSuccess(_status: 'passed' | 'failed'): number | null {
+  protected scoreForSuccess(_status: Verdict): number | null {
     return this.scaled;
   }
 

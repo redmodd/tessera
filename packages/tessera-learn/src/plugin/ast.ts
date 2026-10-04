@@ -18,6 +18,12 @@ export type PropValue =
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
+export function isLiteralTrue(prop: PropValue | undefined): boolean {
+  return (
+    prop?.kind === 'bool' || (prop?.kind === 'expr' && prop.raw === 'true')
+  );
+}
+
 export interface ComponentMatch {
   name: string;
   props: Map<string, PropValue>;
@@ -244,30 +250,35 @@ const TsParser = Parser.extend(
   tsPlugin() as unknown as Parameters<typeof Parser.extend>[0],
 );
 
+function parseJs(source: string, preserveParens = false): Node | null {
+  try {
+    return TsParser.parse(source, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      preserveParens,
+    }) as unknown as Node;
+  } catch {
+    return null;
+  }
+}
+
 function parseJsModule(source: string): Node | null {
   const cached = jsModuleCache.get(source);
   if (cached !== undefined) return cached;
-  let result: Node | null;
-  try {
-    result = TsParser.parse(source, {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-    }) as unknown as Node;
-  } catch {
-    result = null;
-  }
+  const result = parseJs(source);
   jsModuleCache.set(source, result);
   return result;
 }
 
-function unwrapTsCast(node: Node | null): Node | null {
+function unwrapExpression(node: Node | null): Node | null {
   let current = node;
   while (
     current &&
     (current.type === 'TSAsExpression' ||
       current.type === 'TSSatisfiesExpression' ||
       current.type === 'TSTypeAssertion' ||
-      current.type === 'TSNonNullExpression')
+      current.type === 'TSNonNullExpression' ||
+      current.type === 'ParenthesizedExpression')
   ) {
     current = (current as { expression?: Node }).expression ?? null;
   }
@@ -286,7 +297,7 @@ function findPageConfigInProgram(
     for (const decl of declaration.declarations as Node[]) {
       const id = decl.id as Node;
       if (id.type !== 'Identifier' || id.name !== 'pageConfig') continue;
-      const init = unwrapTsCast(decl.init as Node | null);
+      const init = unwrapExpression(decl.init as Node | null);
       if (init && init.type === 'ObjectExpression') {
         return { kind: 'literal', text: source.slice(init.start, init.end) };
       }
@@ -306,43 +317,63 @@ export function defaultExportObjectLiteral(
 ): NamedObjectLiteral | { kind: 'parse-error' } {
   const program = parseJsModule(jsSource);
   if (!program) return { kind: 'parse-error' };
-  for (const node of (program.body as Node[]) ?? []) {
-    if (node.type !== 'ExportDefaultDeclaration') continue;
-    const decl = unwrapTsCast(
-      (node as { declaration?: Node }).declaration ?? null,
-    );
-    if (decl && decl.type === 'ObjectExpression') {
-      return { kind: 'literal', text: jsSource.slice(decl.start, decl.end) };
-    }
-    return { kind: 'invalid' };
-  }
-  return { kind: 'none' };
+  const value = defaultExportValue(program);
+  if (value === undefined) return { kind: 'none' };
+  return value?.type === 'ObjectExpression'
+    ? { kind: 'literal', text: jsSource.slice(value.start, value.end) }
+    : { kind: 'invalid' };
+}
+
+/** The `export default` value, or undefined when the module has none. */
+function defaultExportValue(program: Node): Node | null | undefined {
+  const exported = ((program.body as Node[]) ?? []).find(
+    (node) => node.type === 'ExportDefaultDeclaration',
+  );
+  return (
+    exported &&
+    unwrapExpression((exported.declaration as Node | undefined) ?? null)
+  );
 }
 
 /**
  * Paths (e.g. `xapi[0].auth`) of function values inside the `export default`
- * object literal. JSON5 can't parse those, so the validator names them.
+ * object literal, plus the literal's text with each function replaced by
+ * `null` (null when the default export is not an object literal). JSON5 can't
+ * parse functions, so the validator names them and checks the rest separately.
  */
-export function defaultExportFunctionPaths(jsSource: string): string[] {
-  const program = parseJsModule(jsSource);
-  if (!program) return [];
-  const exported = ((program.body as Node[]) ?? []).find(
-    (node) => node.type === 'ExportDefaultDeclaration',
-  );
+export function defaultExportFunctions(jsSource: string): {
+  paths: string[];
+  rest: string | null;
+} {
+  const program = parseJs(jsSource, true);
+  const root = program && defaultExportValue(program);
+  if (root?.type !== 'ObjectExpression') return { paths: [], rest: null };
   const paths: string[] = [];
+  const replaced: { start: number; end: number; text: string }[] = [];
   const visit = (node: Node | null, path: string): void => {
-    const value = unwrapTsCast(node);
-    if (!value) return;
+    const value = unwrapExpression(node);
+    if (!node || !value) return;
     if (
       value.type === 'ArrowFunctionExpression' ||
       value.type === 'FunctionExpression'
     ) {
       paths.push(path);
+      replaced.push({ start: node.start, end: node.end, text: 'null' });
     } else if (value.type === 'ObjectExpression') {
       for (const property of value.properties as Node[]) {
         const key = property.type === 'Property' ? propertyKey(property) : null;
         if (key === null) continue;
-        visit(property.value as Node, path ? `${path}.${key}` : key);
+        const keyPath = path ? `${path}.${key}` : key;
+        if (property.method || property.kind !== 'init') {
+          paths.push(keyPath);
+          replaced.push({
+            start: property.start,
+            end: property.end,
+            text: `${JSON.stringify(key)}: null`,
+          });
+        } else {
+          visit(property.value as Node, keyPath);
+        }
       }
     } else if (value.type === 'ArrayExpression') {
       (value.elements as (Node | null)[]).forEach((element, i) =>
@@ -350,8 +381,15 @@ export function defaultExportFunctionPaths(jsSource: string): string[] {
       );
     }
   };
-  visit((exported?.declaration as Node | undefined) ?? null, '');
-  return paths;
+  visit(root, '');
+  let rest = '';
+  let from = root.start;
+  for (const { start, end, text } of replaced) {
+    rest += jsSource.slice(from, start) + text;
+    from = end;
+  }
+  rest += jsSource.slice(from, root.end);
+  return { paths, rest };
 }
 
 /** Keys of each `xapi` export entry: `'unknown'` where not statically readable. */
@@ -485,7 +523,7 @@ function isReferenced(program: Node, name: string, binding: Node): boolean {
 function objectLiteralEntries(
   node: Node | null,
 ): Map<string, Node> | 'unknown' {
-  const value = unwrapTsCast(node);
+  const value = unwrapExpression(node);
   if (value?.type !== 'ObjectExpression') return 'unknown';
   const entries = new Map<string, Node>();
   for (const property of value.properties as Node[]) {
@@ -612,7 +650,7 @@ function useQuestionLocalNames(node: Node): string[] {
 }
 
 function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
-  const options = unwrapTsCast((call.arguments as Node[])?.[0] ?? null);
+  const options = unwrapExpression((call.arguments as Node[])?.[0] ?? null);
   if (!options || options.type !== 'ObjectExpression') return 'unknown';
   let unknown = false;
   for (const property of (options.properties as Node[]) ?? []) {
@@ -625,7 +663,7 @@ function callGradedState(call: Node): 'graded' | 'none' | 'unknown' {
       continue;
     }
     if (propertyKey(property) !== 'graded') continue;
-    const value = unwrapTsCast(property.value as Node);
+    const value = unwrapExpression(property.value as Node);
     if (value?.type !== 'Literal') return 'unknown';
     if (value.value === true) return 'graded';
     if (value.value !== false) return 'unknown';

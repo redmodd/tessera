@@ -356,6 +356,32 @@ describe('export packaging gate', () => {
     );
   });
 
+  it.each([
+    [
+      'a syntax error',
+      'export default {',
+      'changed after validation: could not parse, JavaScript syntax error.',
+    ],
+    [
+      'a non-data value',
+      'export default { title: someVariable };',
+      'changed after validation: the default export must be a static object literal',
+    ],
+  ])(
+    'reports a course.config.js that breaks mid-build with %s',
+    async (_case, source, message) => {
+      writeConfig('scorm12');
+      const { entry, exporter } = buildPlugins();
+      writeBundle(exporter);
+      (entry.closeBundle as any).call(entry);
+      writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
+
+      await expect(
+        (exporter.closeBundle as any).call(exporter),
+      ).rejects.toThrow(message);
+    },
+  );
+
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
     writeConfig('scorm12');
     seedStaleDist();

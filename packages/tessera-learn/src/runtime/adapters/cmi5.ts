@@ -3,6 +3,7 @@ import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
+import type { Verdict } from '../types.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -224,9 +225,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    * author asserted the verb, so on contradiction keep the verb and drop
    * the score (and warn).
    */
-  protected override scoreForSuccess(
-    status: 'passed' | 'failed',
-  ): number | null {
+  protected override scoreForSuccess(status: Verdict): number | null {
     const { scaled } = this;
     if (scaled === null) return null;
     if (this.masteryScore !== null) {

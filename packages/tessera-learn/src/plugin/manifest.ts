@@ -5,10 +5,16 @@ import {
   clearParseCache,
   defaultExportObjectLiteral,
   findComponents,
+  isLiteralTrue,
   pageConfigLiteral,
   type ComponentMatch,
 } from './ast.js';
-import type { CourseConfig, QuizConfig } from '../runtime/types.js';
+import {
+  isRecord,
+  isStringArray,
+  type CourseConfig,
+  type QuizConfig,
+} from '../runtime/types.js';
 import {
   QUESTION_ID_PREFIX,
   questionId,
@@ -117,15 +123,39 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-export { defaultExportObjectLiteral as extractDefaultExportObjectLiteral } from './ast.js';
+interface ReadFailure {
+  ok: false;
+  reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
+}
+
+export const STATIC_LITERAL_RULE =
+  'must be a static object literal (no variables, function calls, template literals, or computed values)';
+
+export const READ_FAILURE_MESSAGES: Record<ReadFailure['reason'], string> = {
+  missing: 'not found in project root',
+  'parse-error': 'could not parse, JavaScript syntax error',
+  'no-export': 'must use `export default { ... }` syntax',
+  'not-data': `the default export ${STATIC_LITERAL_RULE}`,
+};
+
+function readDefaultExport(
+  path: string,
+): { ok: true; value: unknown } | ReadFailure {
+  if (!existsSync(path)) return { ok: false, reason: 'missing' };
+  const result = defaultExportObjectLiteral(readSourceFileCached(path));
+  if (result.kind === 'parse-error')
+    return { ok: false, reason: 'parse-error' };
+  if (result.kind === 'none') return { ok: false, reason: 'no-export' };
+  if (result.kind === 'invalid') return { ok: false, reason: 'not-data' };
+  try {
+    return { ok: true, value: JSON5.parse(result.text) };
+  } catch {
+    return { ok: false, reason: 'not-data' };
+  }
+}
 
 export type CourseConfigRead =
-  | { ok: true; config: Partial<CourseConfig> }
-  | {
-      ok: false;
-      reason: 'missing' | 'no-export' | 'parse-error';
-      error?: unknown;
-    };
+  { ok: true; config: Partial<CourseConfig> } | ReadFailure;
 
 /**
  * Read and JSON5-parse the `export default { ... }` literal from a project's
@@ -135,18 +165,18 @@ export type CourseConfigRead =
  * that just need a value can fall back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
-  const configPath = resolve(projectRoot, 'course.config.js');
-  if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
-  const result = defaultExportObjectLiteral(readSourceFileCached(configPath));
-  if (result.kind === 'parse-error')
-    return { ok: false, reason: 'parse-error' };
-  if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
-  try {
-    return { ok: true, config: JSON5.parse(result.text) };
-  } catch (error) {
-    return { ok: false, reason: 'parse-error', error };
-  }
+  const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
+  return read.ok
+    ? { ok: true, config: read.value as Partial<CourseConfig> }
+    : read;
 }
+
+export const OBJECT_CONFIG_SECTIONS = [
+  'navigation',
+  'completion',
+  'scoring',
+  'export',
+] as const;
 
 export type ResolvedConfigRead = CourseConfigRead & {
   profile: StandardProfile | undefined;
@@ -157,47 +187,56 @@ export type ResolvedConfigRead = CourseConfigRead & {
  * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
  * config with no override, or a standard outside the table, fails closed with
  * no `profile` so callers withhold standard-specific output rather than guess.
- * The returned `config` already has the override applied, so consumers read it
- * back directly.
+ * The returned `config` drops any non-object section and already has the
+ * override applied, so consumers read it back directly.
  */
-export function readResolvedConfig(
-  projectRoot: string,
+export function resolveConfigRead(
+  read: CourseConfigRead,
   standardOverride?: StandardId,
 ): ResolvedConfigRead {
-  const read = readCourseConfig(projectRoot);
   if (!read.ok) return { ...read, profile: standardProfile(standardOverride) };
-  const config: Partial<CourseConfig> = standardOverride
-    ? {
-        ...read.config,
-        export: { ...read.config.export, standard: standardOverride },
-      }
-    : read.config;
+  const config = { ...read.config };
+  for (const key of OBJECT_CONFIG_SECTIONS) {
+    if (!isRecord(config[key])) delete config[key];
+  }
+  if (standardOverride) {
+    config.export = { ...config.export, standard: standardOverride };
+  }
+  const standard = config.export?.standard;
   return {
     ok: true,
     config,
-    profile: standardProfile(config.export?.standard ?? DEFAULT_STANDARD),
+    profile: standardProfile(
+      standard === undefined ? DEFAULT_STANDARD : standard,
+    ),
   };
 }
 
-/**
- * Read a _meta.js file and extract its default export object.
- * Uses the same JSON5 approach as pageConfig extraction — find the object literal
- * after `export default` and parse it.
- */
-export function readMetaFile(metaPath: string): {
+export interface MetaFile {
   title?: string;
   pages?: string[];
+}
+
+/**
+ * Read a _meta.js file's `export default { ... }` literal. `meta` is always
+ * usable: empty when the read fails (`problem` says why), and without any
+ * field of the wrong type (`rejected` holds those values for the validator).
+ */
+export function readMetaFile(metaPath: string): {
+  meta: MetaFile;
+  problem?: ReadFailure['reason'];
+  rejected?: { title?: unknown; pages?: unknown };
 } {
-  if (!existsSync(metaPath)) return {};
-
-  const result = defaultExportObjectLiteral(readSourceFileCached(metaPath));
-  if (result.kind !== 'literal') return {};
-
-  try {
-    return JSON5.parse(result.text);
-  } catch {
-    return {};
-  }
+  const read = readDefaultExport(metaPath);
+  if (!read.ok) return { meta: {}, problem: read.reason };
+  const { title, pages } = read.value as Record<string, unknown>;
+  const meta: MetaFile = {};
+  const rejected: { title?: unknown; pages?: unknown } = {};
+  if (typeof title === 'string') meta.title = title;
+  else if (title !== undefined) rejected.title = title;
+  if (isStringArray(pages)) meta.pages = pages;
+  else if (pages != null) rejected.pages = pages;
+  return { meta, rejected };
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
@@ -222,11 +261,7 @@ export function staticQuestionId({
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
-  const graded = props.get('graded');
-  return (
-    graded?.kind === 'bool' ||
-    (graded?.kind === 'expr' && graded.raw === 'true')
-  );
+  return isLiteralTrue(props.get('graded'));
 }
 
 /** Graded built-in questions whose ids the source fixes, wherever they render. */
@@ -271,9 +306,7 @@ export function extractPageConfig(filePath: string): PageConfig {
   const result = parsePageConfigFromSource(readSourceFileCached(filePath));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
-    throw new Error(
-      `${filePath}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
-    );
+    throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
   }
   return {};
 }
@@ -369,7 +402,7 @@ export function generateManifest(
   let pageIndex = 0;
 
   for (const walkedSection of walked) {
-    const sectionMeta = readMetaFile(walkedSection.metaPath);
+    const sectionMeta = readMetaFile(walkedSection.metaPath).meta;
     const sectionSlug = deriveSlug(walkedSection.name);
 
     const section: ManifestSection = {
@@ -384,7 +417,7 @@ export function generateManifest(
       const isFlat = walkedLesson.name === null;
       const lessonMeta = isFlat
         ? sectionMeta
-        : readMetaFile(walkedLesson.metaPath);
+        : readMetaFile(walkedLesson.metaPath).meta;
       const lessonSlug = isFlat ? sectionSlug : deriveSlug(walkedLesson.name!);
       const relDir = isFlat
         ? `/pages/${walkedSection.name}`
@@ -410,8 +443,9 @@ export function generateManifest(
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
 
+        const quiz = isRecord(pageConfig.quiz) ? pageConfig.quiz : null;
         const questions =
-          pageConfig.graded === true && !pageConfig.quiz
+          pageConfig.graded === true && !quiz
             ? listedGradedQuestions(
                 findComponents(
                   readSourceFileCached(filePath),
@@ -424,7 +458,7 @@ export function generateManifest(
           title: pageConfig.title || titleCase(pageSlug),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
-          quiz: pageConfig.quiz || null,
+          quiz,
           ...(pageConfig.graded === true ? { graded: true } : {}),
           ...(pageConfig.required === false ? { required: false } : {}),
           ...(pageConfig.weight !== undefined
@@ -465,12 +499,11 @@ export function orderPageFiles(
     return allFiles;
   }
 
-  const listed = pagesArray.map(ensureSvelteSuffix);
-  const listedSet = new Set(listed);
-  const unlisted = allFiles.filter((f) => !listedSet.has(f)).sort();
+  const listed = new Set(pagesArray.map(ensureSvelteSuffix));
+  const unlisted = allFiles.filter((f) => !listed.has(f)).sort();
 
   // Only include listed files that actually exist
-  const validListed = listed.filter((f) => allFiles.includes(f));
+  const validListed = [...listed].filter((f) => allFiles.includes(f));
 
   return [...validListed, ...unlisted];
 }

@@ -75,7 +75,13 @@ beforeEach(() => {
 describe('config validation', () => {
   it('errors when course.config.js is missing', () => {
     const { errors } = validateProject(testRoot);
-    expect(errors).toContain('course.config.js not found in project root');
+    expect(errors).toEqual(['course.config.js: not found in project root']);
+  });
+
+  it('reports only the missing course.config.js beside a broken course.runtime.js', () => {
+    writeFile(testRoot, 'course.runtime.js', 'export default {');
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual(['course.config.js: not found in project root']);
   });
 
   it('passes with valid config', () => {
@@ -200,6 +206,53 @@ describe('config validation', () => {
     );
   });
 
+  it.each([
+    ['export', '"scorm12"', 'string'],
+    ['navigation', '"free"', 'string'],
+    ['completion', '["quiz"]', 'array'],
+    ['scoring', '70', 'number'],
+  ])('errors when %s is not an object', (key, value, type) => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", language: "en", ${key}: ${value} };`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      `course.config.js: "${key}" must be an object, got ${type}`,
+    );
+  });
+
+  it('treats null sections as unset', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", id: "x", language: "en", navigation: null, completion: null, scoring: null, export: null };`,
+    );
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
+
+  it('skips web-only checks when export is not an object', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", language: "en", export: "scorm12" };`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect([...errors, ...warnings]).not.toContainEqual(
+      expect.stringContaining('web'),
+    );
+  });
+
+  it('names the static-literal rule for a function default export', () => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, `export default () => ({ title: "Test" });`);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+    );
+  });
+
   it('errors on invalid completion.mode', () => {
     createValidProject(testRoot);
     writeConfig(
@@ -235,7 +288,7 @@ describe('config validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        '"export.standard" must be one of "web", "scorm12", "scorm2004", "cmi5", "xapi", got "tin-can"',
+        '"export.standard" must be "web", "scorm12", "scorm2004", "cmi5", or "xapi", got "tin-can"',
       ),
     );
   });
@@ -367,6 +420,24 @@ describe('config validation', () => {
     );
   });
 
+  it('quotes a string passingScore', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: "70" },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"scoring.passingScore" must be 0–100, got "70"'),
+    );
+  });
+
   it('errors on NaN passingScore and percentageThreshold', () => {
     createValidProject(testRoot);
     writeConfig(
@@ -461,6 +532,24 @@ describe('config validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('"title" must be a string, got number'),
+    );
+  });
+
+  it('names null, not object, when title is null', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: null,
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"title" must be a string, got null'),
     );
   });
 
@@ -627,6 +716,32 @@ describe('_meta.js validation', () => {
     );
   });
 
+  it('errors on a _meta.js with no default export', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export const title = "S";',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'pages/01-section/_meta.js: must use `export default { ... }` syntax',
+    );
+  });
+
+  it('errors on a _meta.js default export that is not data', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: sectionTitle };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'pages/01-section/_meta.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+    );
+  });
+
   it('errors on _meta.js missing title', () => {
     createValidProject(testRoot);
     writeFile(
@@ -652,6 +767,60 @@ describe('_meta.js validation', () => {
       expect.stringContaining(
         'pages array lists "missing-page" but missing-page.svelte not found',
       ),
+    );
+  });
+
+  it('warns for each repeated entry in the pages array', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: ["page", "page.svelte", "page"] };',
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+    expect(warnings).toContain(
+      'pages/01-section/01-lesson/_meta.js: pages array lists the same page as "page" and "page.svelte", so only the first entry counts',
+    );
+    expect(warnings).toContain(
+      'pages/01-section/01-lesson/_meta.js: pages array lists "page" more than once, so only the first entry counts',
+    );
+  });
+
+  it('errors on a non-string _meta.js title', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: { en: "Intro" } };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'pages/01-section/_meta.js: "title" must be a string, got object',
+    );
+  });
+
+  it('treats a null pages value as no pages list', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: null };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+  });
+
+  it('errors on a pages value that is not an array of strings', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/_meta.js',
+      'export default { title: "Lesson", pages: "page" };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'pages/01-section/01-lesson/_meta.js: "pages" must be an array of page file names, got "page"',
     );
   });
 });
@@ -748,6 +917,24 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('pageConfig must be a static object literal'),
+    );
+  });
+
+  it('names Infinity, not null, for an infinite pageConfig.weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", weight: Infinity, quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.weight Infinity is not a positive finite number',
+      ),
     );
   });
 
@@ -1206,6 +1393,46 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
     expect(errors).toContainEqual(
       expect.stringContaining(
         'quiz.maxAttempts must be a positive number or Infinity, got -1',
+      ),
+    );
+  });
+
+  it.each([
+    ['true', 'boolean'],
+    ['0', 'number'],
+    ['""', 'string'],
+    ['["graded"]', 'array'],
+  ])('errors on a non-object quiz: %s', (quiz, type) => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: ${quiz} };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContain(
+      `pages/01-section/01-lesson/page.svelte: pageConfig.quiz must be an object, got ${type}`,
+    );
+    expect(warnings.some((w) => w.includes('quiz page'))).toBe(false);
+  });
+
+  it('quotes a string quiz.maxAttempts', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { maxAttempts: "3" } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'quiz.maxAttempts must be a positive number or Infinity, got "3"',
       ),
     );
   });
@@ -2772,6 +2999,62 @@ describe('AST reach — constructs the regex scanner used to skip', () => {
 });
 
 describe('parse failures', () => {
+  it.each([
+    [
+      'a syntax error',
+      'export default {',
+      'could not parse, JavaScript syntax error',
+    ],
+    [
+      'a non-data value',
+      'export default { title: someVariable };',
+      'the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+    ],
+    [
+      'a variable default export',
+      'const config = { title: "T" };\nexport default config;',
+      'the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+    ],
+  ])('names a course.config.js with %s', (_case, source, message) => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, source);
+    expect(validateProject(testRoot).errors).toContain(
+      `course.config.js: ${message}`,
+    );
+  });
+
+  it.each([
+    ['an arrow function', '{ title: "T", onX: () => 1 }', []],
+    ['a method', '{ title: "T", onX() {} }', []],
+    ['a getter', '{ title: "T", get onX() { return 1; } }', []],
+    ['a parenthesized arrow function', '{ title: "T", onX: (() => 1) }', []],
+    ['a cast function', '{ title: "T", onX: (function () {}) as any }', []],
+    ['a parenthesized default export', '({ title: "T", onX: () => 1 })', []],
+    [
+      'a function beside a variable',
+      '{ title: t, onX() {} }',
+      [
+        'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+      ],
+    ],
+  ])('names a course.config.js with %s', (_case, literal, others: string[]) => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, `const t = "T";\nexport default ${literal};`);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toEqual([
+      expect.stringContaining('course.config.js: "onX" is a function'),
+      ...others,
+    ]);
+  });
+
+  it('names a parenthesized function inside an array', () => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, 'export default { title: "T", onX: [(() => 1)] };');
+    expect(validateProject(testRoot).errors).toEqual([
+      expect.stringContaining('course.config.js: "onX[0]" is a function'),
+    ]);
+  });
+
   it('surfaces an unparseable page as a validator error', () => {
     createValidProject(testRoot);
     writePage(testRoot, `<MultipleChoice question={ />`);
@@ -3095,6 +3378,66 @@ describe('resume policy validation', () => {
       expect.stringContaining('"resume" must be "auto" or "never"'),
     );
   });
+
+  it('errors on an unknown chrome value', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  chrome: "cutsom",
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "chrome" must be "default" or "custom", got "cutsom"',
+    );
+  });
+
+  it('prints a non-string value as JSON', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: ["auto"],
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "resume" must be "auto" or "never", got ["auto"]',
+    );
+  });
+
+  it('prints a nested NaN or Infinity as written', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: [NaN, { n: -Infinity }],
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "resume" must be "auto" or "never", got [NaN,{n:-Infinity}]',
+    );
+  });
 });
 
 // ---- success block ----
@@ -3246,6 +3589,15 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       expect.stringContaining(
         '"completion.requireSuccessStatus" is ignored when "success" is set',
       ),
+    );
+  });
+
+  it('reports a null success block on a course with graded pages', () => {
+    createValidProject(testRoot);
+    withSuccess('null');
+    writeGradedPage(testRoot, 'quiz');
+    expect(validateProject(testRoot).errors).toContainEqual(
+      expect.stringContaining('"success" must be an object'),
     );
   });
 

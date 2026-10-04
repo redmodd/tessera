@@ -1,3 +1,5 @@
+import { isRecord } from '../runtime/types.js';
+
 // Baseline Content-Security-Policy for web exports, as a per-directive object so
 // course.config.js can extend individual directives (union, never replace).
 // 'unsafe-inline' stays because Vite injects an inline modulepreload polyfill and
@@ -26,9 +28,7 @@ const CSP_SOURCE = /^[^\s;,"<>]+$/;
 
 export function isCspOverrides(v: unknown): v is Record<string, string[]> {
   return (
-    typeof v === 'object' &&
-    v !== null &&
-    !Array.isArray(v) &&
+    isRecord(v) &&
     Object.entries(v).every(
       ([directive, sources]) =>
         CSP_DIRECTIVE.test(directive) &&
