@@ -10,6 +10,7 @@ import {
   type ComponentMatch,
 } from './ast.js';
 import {
+  isRecord,
   isStringArray,
   type CourseConfig,
   type QuizConfig,
@@ -144,7 +145,8 @@ function readDefaultExport(
   const result = defaultExportObjectLiteral(readSourceFileCached(path));
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
-  if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
+  if (result.kind === 'none') return { ok: false, reason: 'no-export' };
+  if (result.kind === 'invalid') return { ok: false, reason: 'not-data' };
   try {
     return { ok: true, value: JSON5.parse(result.text) };
   } catch {
@@ -196,7 +198,10 @@ export function resolveConfigRead(
   const config: Partial<CourseConfig> = standardOverride
     ? {
         ...read.config,
-        export: { ...read.config.export, standard: standardOverride },
+        export: {
+          ...(isRecord(read.config.export) && read.config.export),
+          standard: standardOverride,
+        },
       }
     : read.config;
   return {

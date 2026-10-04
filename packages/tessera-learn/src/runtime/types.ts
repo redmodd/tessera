@@ -44,7 +44,7 @@ interface SuccessSource {
  */
 export function resolveSuccess(config: SuccessSource): SuccessConfig {
   const declared = config.success;
-  if (declared === undefined) {
+  if (!isRecord(declared)) {
     if (config.completion?.mode !== 'manual') return { from: 'quiz' };
     return asserted(config.completion.requireSuccessStatus);
   }

@@ -43,6 +43,12 @@ describe('readResolvedConfig', () => {
     });
   });
 
+  it('replaces a non-object export with the override', () => {
+    writeConfig(`{ export: "scorm12" }`);
+    const read = readResolvedConfig(projectRoot, 'cmi5');
+    expect(read.ok && read.config.export).toEqual({ standard: 'cmi5' });
+  });
+
   it('resolves no profile for an unreadable config with no override', () => {
     const read = readResolvedConfig(projectRoot);
     expect(read.ok).toBe(false);

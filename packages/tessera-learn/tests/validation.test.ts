@@ -2935,6 +2935,11 @@ describe('parse failures', () => {
       'export default { title: someVariable };',
       'the default export must be a static object literal (no variables, function calls, or computed values)',
     ],
+    [
+      'a variable default export',
+      'const config = { title: "T" };\nexport default config;',
+      'the default export must be a static object literal (no variables, function calls, or computed values)',
+    ],
   ])('names a course.config.js with %s', (_case, source, message) => {
     createValidProject(testRoot);
     writeConfig(testRoot, source);
@@ -3477,6 +3482,15 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       expect.stringContaining(
         '"completion.requireSuccessStatus" is ignored when "success" is set',
       ),
+    );
+  });
+
+  it('reports a null success block on a course with graded pages', () => {
+    createValidProject(testRoot);
+    withSuccess('null');
+    writeGradedPage(testRoot, 'quiz');
+    expect(validateProject(testRoot).errors).toContainEqual(
+      expect.stringContaining('"success" must be an object'),
     );
   });
 
