@@ -212,10 +212,8 @@ function validateSingleXAPIEntry(
       : `xapi[<${label}.id>]`;
 
   // Explicit endpoint — must be an absolute http(s) URL.
-  let url: URL;
-  try {
-    url = new URL(endpoint);
-  } catch {
+  const url = URL.parse(endpoint);
+  if (!url) {
     d.error(
       `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got "${endpoint}"`,
     );
@@ -279,15 +277,11 @@ function validateSingleXAPIEntry(
     d.error(`course.config.js: ${label}.activityId is required`);
   } else if (typeof activityId !== 'string') {
     d.error(`course.config.js: ${label}.activityId must be a string`);
-  } else {
-    try {
-      // Any absolute IRI — the URL constructor accepts uncommon schemes.
-      new URL(activityId);
-    } catch {
-      d.error(
-        `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`,
-      );
-    }
+  } else if (!URL.canParse(activityId)) {
+    // Any absolute IRI: the URL parser accepts uncommon schemes.
+    d.error(
+      `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`,
+    );
   }
 
   // actor — required under web; optional otherwise.
@@ -323,14 +317,10 @@ function validateSingleXAPIEntry(
       d.error(
         `course.config.js: ${label}.actorAccountHomePage must be a string`,
       );
-    } else {
-      try {
-        new URL(aahp);
-      } catch {
-        d.error(
-          `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`,
-        );
-      }
+    } else if (!URL.canParse(aahp)) {
+      d.error(
+        `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`,
+      );
     }
     if (actor !== undefined || actorHook === 'yes') {
       d.warn(

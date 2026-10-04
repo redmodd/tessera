@@ -1,21 +1,22 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clearParseCache } from './ast.js';
+import { readSourceFileCached } from './manifest.js';
 import {
   largerSuspendDataStandards,
   type StandardId,
   type StandardProfile,
 } from '../runtime/standards.js';
 import { resolveSuccess } from '../runtime/types.js';
+import { applyA11ySettings, normalizeA11y } from './validation/a11y.js';
 import {
   Diagnostics,
-  applyA11ySettings,
-  normalizeA11y,
   type ValidationResult,
 } from './validation/diagnostics.js';
 import { parseConfig, type ParsedConfig } from './validation/config.js';
 import {
-  ProjectValidator,
+  validateContractBypass,
+  validatePages,
   type PageInfo,
   type PagesValidationResult,
 } from './validation/page.js';
@@ -25,8 +26,7 @@ export {
   isIgnored,
   readA11ySettings,
   type A11ySettings,
-  type ValidationResult,
-} from './validation/diagnostics.js';
+} from './validation/a11y.js';
 export { isPlausibleLanguageTag } from './validation/config.js';
 
 /** Print notes (cyan), then warnings (yellow), then errors (red). Shared by the dev/build plugin and the CLI. */
@@ -45,8 +45,6 @@ export function reportValidationIssues({
     console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
   }
 }
-
-// ---------- Main ----------
 
 /**
  * Validate a Tessera project at the given root.
@@ -76,11 +74,15 @@ export function validateProject(
   );
 
   // 3. Validate pages directory
-  const validator = new ProjectValidator(projectRoot, d, profile);
-  const pageResults = validator.validatePages();
+  const pageResults = validatePages(projectRoot, d, profile);
 
   // 4. Contract-bypass checks on project-root shell files
-  validator.validateShellFiles();
+  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+    const shellPath = resolve(projectRoot, shellFile);
+    if (existsSync(shellPath)) {
+      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
+    }
+  }
 
   // 5. Cross-cutting validations
   if (config) {
@@ -90,8 +92,6 @@ export function validateProject(
   applyA11ySettings(d, normalizeA11y(config?.a11y));
   return d;
 }
-
-// ---------- Cross-Cutting Validations ----------
 
 function reportEffectiveWeights(
   pageResults: PagesValidationResult,
@@ -248,7 +248,7 @@ function crossValidate(
   }
 
   if (isManual) {
-    const firstPage = pageResults.pages.find((p) => p.navIndex === 0);
+    const firstPage = pageResults.pages[0];
     if (firstPage?.completesOnView) {
       d.warn(
         `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`,
@@ -267,16 +267,18 @@ function crossValidate(
     //
     // We can't statically detect calls to `useQuestion({ graded: true })` or
     // `usePersistence`, so reserve a fixed buffer per page for those.
+    const totalPages = pageResults.pages.length;
+    const totalQuizzes = pageResults.pages.filter((p) => p.hasQuiz).length;
     let visitedChars = 0;
-    for (let i = 0; i < pageResults.totalPages; i++) {
+    for (let i = 0; i < totalPages; i++) {
       visitedChars += String(i).length + 1; // digit chars + comma
     }
     const overhead = 60; // top-level JSON overhead with all keys
     // The `g` entry wrapper is budgeted once in standaloneBytes; a quiz adds
     // only its own fields.
-    const quizBytes = pageResults.totalQuizzes * 14; // g entry: "s":100,"a":2,
-    const chunkBytes = pageResults.totalPages * 12; // c: "NNN":NN,
-    const standaloneBytes = pageResults.totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
+    const quizBytes = totalQuizzes * 14; // g entry: "s":100,"a":2,
+    const chunkBytes = totalPages * 12; // c: "NNN":NN,
+    const standaloneBytes = totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
     const userStateBuffer = 256; // usePersistence headroom
     const estimatedSize =
       overhead +
@@ -292,7 +294,7 @@ function crossValidate(
         .map((id) => `"${id}"`)
         .join(', ');
       d.warn(
-        `Course has ${pageResults.totalPages} pages with ${pageResults.totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider one of ${alternatives}.`,
+        `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider one of ${alternatives}.`,
       );
     }
   }

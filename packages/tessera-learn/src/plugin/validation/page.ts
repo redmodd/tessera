@@ -29,13 +29,13 @@ import {
   isRequiredGradedPage,
   type QuizConfig,
 } from '../../runtime/types.js';
-import { A11Y_IDS, tag, type Diagnostics } from './diagnostics.js';
+import { A11Y_IDS, tag } from './a11y.js';
+import type { Diagnostics } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
 import { validateQuestionComponents } from './question.js';
 
 export interface PageInfo {
   fileRel: string;
-  navIndex: number;
   graded: boolean;
   requiredGraded: boolean;
   hasQuiz: boolean;
@@ -44,241 +44,215 @@ export interface PageInfo {
 }
 
 export interface PagesValidationResult {
-  totalPages: number;
-  totalQuizzes: number;
   hasParseErrors: boolean;
   pages: PageInfo[];
 }
 
-export class ProjectValidator {
-  #projectRoot: string;
-  #d: Diagnostics;
-  #profile: StandardProfile | undefined;
-  #assetsDir: string;
+interface PageContext {
+  projectRoot: string;
+  d: Diagnostics;
+  profile: StandardProfile | undefined;
+  assetsDir: string;
   // One existsSync per unique asset for the whole pass.
-  #assetExistsCache = new Map<string, boolean>();
+  assetExistsCache: Map<string, boolean>;
+}
 
-  constructor(
-    projectRoot: string,
-    d: Diagnostics,
-    profile: StandardProfile | undefined,
-  ) {
-    this.#projectRoot = projectRoot;
-    this.#d = d;
-    this.#profile = profile;
-    this.#assetsDir = resolve(projectRoot, 'assets');
-  }
+/**
+ * Validate a single page .svelte file. Used for both section-level (flat) and
+ * lesson-level pages: the validation is identical, only the containing
+ * directory differs.
+ */
+function validatePageFile(
+  filePath: string,
+  { projectRoot, d, profile, assetsDir, assetExistsCache }: PageContext,
+): { page: PageInfo; parseError: boolean } {
+  const fileRel = relative(projectRoot, filePath);
+  const content = readSourceFileCached(filePath);
 
-  /**
-   * Validate a single page .svelte file. Used for both section-level (flat) and
-   * lesson-level pages — the validation is identical, only the containing
-   * directory differs.
-   */
-  #validatePageFile(
-    filePath: string,
-    navIndex: number,
-  ): {
-    page: PageInfo;
-    isQuiz: boolean;
-    parseError: boolean;
-  } {
-    const projectRoot = this.#projectRoot;
-    const d = this.#d;
-    const fileRel = relative(projectRoot, filePath);
-    const content = readSourceFileCached(filePath);
-
-    const parseError = getParseError(content);
-    if (parseError) {
-      d.error(`${fileRel}: could not parse — ${parseError}`);
-      return {
-        page: {
-          fileRel,
-          navIndex,
-          graded: false,
-          requiredGraded: false,
-          hasQuiz: false,
-          completesOnView: false,
-        },
-        isQuiz: false,
-        parseError: true,
-      };
-    }
-
-    const pageConfig = validatePageConfig(content, fileRel, d);
-
-    const isQuiz = !!pageConfig?.quiz;
-    let isGradedQuiz = false;
-    if (pageConfig?.quiz) {
-      validateQuizConfig(pageConfig.quiz, fileRel, d);
-      if ((pageConfig.quiz as { graded?: unknown }).graded === true) {
-        isGradedQuiz = true;
-      }
-    }
-
-    const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
-    const declaresGraded =
-      validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
-      false;
-    const declaresRequired = validateBoolean(
-      pageConfig?.required,
-      'pageConfig.required',
-      fileRel,
-      d,
-    );
-    const weight = validatePageWeight(pageConfig, fileRel, d);
-    const graded = isGradedQuiz || declaresGraded;
-    const requiredGraded = isRequiredGradedPage({
-      graded,
-      required: declaresRequired,
-    });
-    const hasCustomWidget = hasLocalModuleImport(content);
-    const questionComponents =
-      findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
-    const useQuestions = useQuestionGrading(content);
-    if (declaresGraded && isQuiz && !isGradedQuiz) {
-      d.error(
-        `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
-          "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
-          'and it never completes. ' +
-          'Use quiz: { graded: true }, or drop graded: true.',
-      );
-    }
-    for (const [field, value] of [
-      ['required', declaresRequired],
-      ['weight', weight],
-    ] as const) {
-      if (value !== undefined && !graded) {
-        d.warn(
-          `${fileRel}: pageConfig.${field} only applies to a graded page. ` +
-            'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
-            'so it is ignored.',
-        );
-      }
-    }
-    if (
-      declaresGraded &&
-      !isQuiz &&
-      splitsAcrossBranches(listedGradedQuestions(questionComponents))
-    ) {
-      d.warn(
-        `${fileRel}: graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
-          'The page counts as answered only once every graded question on it is, ' +
-          'so a learner shown only one branch can never finish it. ' +
-          'Put each branch on its own page, or drop graded from the branch questions.',
-      );
-    }
-    const gradesUndeclared =
-      !declaresGraded &&
-      !isQuiz &&
-      (useQuestions === 'graded' ||
-        questionComponents.some(isLiterallyGradedQuestion));
-    if (gradesUndeclared) {
-      d.error(
-        `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
-          'so its score never reaches the course score or passed/failed. Add graded: true to ' +
-          'pageConfig, or drop graded from the question.',
-      );
-    }
-
-    validateAssetRefs(
-      content,
-      fileRel,
-      this.#assetsDir,
-      d,
-      this.#assetExistsCache,
-    );
-    validateQuestionComponents(questionComponents, fileRel, d, this.#profile);
-    validateMediaComponents(content, fileRel, d);
-    validateHeadingOrder(content, fileRel, d);
-    validateContractBypass(content, fileRel, d);
-    if (
-      (isQuiz || declaresGraded) &&
-      useQuestions === 'absent' &&
-      questionComponents.length === 0 &&
-      !hasCustomWidget
-    ) {
-      d.warn(
-        `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
-          `components or useQuestion() calls — it will have nothing to score`,
-      );
-    } else if (
-      declaresGraded &&
-      !isQuiz &&
-      !hasCustomWidget &&
-      !questionComponents.some(isGradedQuestion) &&
-      (useQuestions === 'absent' || useQuestions === 'none')
-    ) {
-      d.warn(
-        `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
-          `the page can never earn a score, so under completion.mode "percentage" it ` +
-          `never completes. Mark at least one question component \`graded\`, or build one ` +
-          `with useQuestion({ graded: true }).`,
-      );
-    }
-
+  const parseError = getParseError(content);
+  if (parseError) {
+    d.error(`${fileRel}: could not parse — ${parseError}`);
     return {
       page: {
         fileRel,
-        navIndex,
-        graded,
-        requiredGraded,
-        hasQuiz: isQuiz,
-        ...(weight !== undefined ? { weight } : {}),
-        completesOnView,
+        graded: false,
+        requiredGraded: false,
+        hasQuiz: false,
+        completesOnView: false,
       },
-      isQuiz,
-      parseError: false,
+      parseError: true,
     };
   }
 
-  validatePages(): PagesValidationResult {
-    const projectRoot = this.#projectRoot;
-    const d = this.#d;
-    const pagesDir = resolve(projectRoot, 'pages');
-    const pages: PageInfo[] = [];
-    let totalPages = 0;
-    let totalQuizzes = 0;
-    let hasParseErrors = false;
+  const pageConfig = validatePageConfig(content, fileRel, d);
 
-    const noPages = (): PagesValidationResult => {
-      d.error(
-        'No pages found. Create at least one section with a lesson and page in pages/',
+  const quiz = pageConfig?.quiz as { graded?: unknown } | undefined;
+  const isQuiz = !!quiz;
+  const isGradedQuiz = quiz?.graded === true;
+  validateQuizConfig(quiz, fileRel, d);
+
+  const completesOnView = validateCompletesOn(pageConfig, fileRel, d);
+  const declaresGraded =
+    validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
+    false;
+  const declaresRequired = validateBoolean(
+    pageConfig?.required,
+    'pageConfig.required',
+    fileRel,
+    d,
+  );
+  const weight = validatePageWeight(pageConfig, fileRel, d);
+  const graded = isGradedQuiz || declaresGraded;
+  const requiredGraded = isRequiredGradedPage({
+    graded,
+    required: declaresRequired,
+  });
+  const hasCustomWidget = hasLocalModuleImport(content);
+  const questionComponents =
+    findComponents(content, QUESTION_COMPONENT_NAMES) ?? [];
+  const useQuestions = useQuestionGrading(content);
+  if (declaresGraded && isQuiz && !isGradedQuiz) {
+    d.error(
+      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+        "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
+        'and it never completes. ' +
+        'Use quiz: { graded: true }, or drop graded: true.',
+    );
+  }
+  for (const [field, value] of [
+    ['required', declaresRequired],
+    ['weight', weight],
+  ] as const) {
+    if (value !== undefined && !graded) {
+      d.warn(
+        `${fileRel}: pageConfig.${field} only applies to a graded page. ` +
+          'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
+          'so it is ignored.',
       );
-      return { totalPages, totalQuizzes, hasParseErrors, pages };
-    };
-
-    if (!existsSync(pagesDir)) return noPages();
-
-    // walkPages only descends into section dirs, so scan pages/ root separately.
-    for (const entry of readdirSync(pagesDir)) {
-      const fullPath = resolve(pagesDir, entry);
-      if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
-        d.warn(
-          `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
-        );
-      }
     }
+  }
+  if (
+    declaresGraded &&
+    !isQuiz &&
+    splitsAcrossBranches(listedGradedQuestions(questionComponents))
+  ) {
+    d.warn(
+      `${fileRel}: graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
+        'The page counts as answered only once every graded question on it is, ' +
+        'so a learner shown only one branch can never finish it. ' +
+        'Put each branch on its own page, or drop graded from the branch questions.',
+    );
+  }
+  const gradesUndeclared =
+    !declaresGraded &&
+    !isQuiz &&
+    (useQuestions === 'graded' ||
+      questionComponents.some(isLiterallyGradedQuestion));
+  if (gradesUndeclared) {
+    d.error(
+      `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
+        'so its score never reaches the course score or passed/failed. Add graded: true to ' +
+        'pageConfig, or drop graded from the question.',
+    );
+  }
 
-    const sections = walkPages(pagesDir);
-    if (sections.length === 0) return noPages();
+  validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
+  validateQuestionComponents(questionComponents, fileRel, d, profile);
+  validateMediaComponents(content, fileRel, d);
+  validateHeadingOrder(content, fileRel, d);
+  validateContractBypass(content, fileRel, d);
+  if (
+    (isQuiz || declaresGraded) &&
+    useQuestions === 'absent' &&
+    questionComponents.length === 0 &&
+    !hasCustomWidget
+  ) {
+    d.warn(
+      `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
+        `components or useQuestion() calls — it will have nothing to score`,
+    );
+  } else if (
+    declaresGraded &&
+    !isQuiz &&
+    !hasCustomWidget &&
+    !questionComponents.some(isGradedQuestion) &&
+    (useQuestions === 'absent' || useQuestions === 'none')
+  ) {
+    d.warn(
+      `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
+        `the page can never earn a score, so under completion.mode "percentage" it ` +
+        `never completes. Mark at least one question component \`graded\`, or build one ` +
+        `with useQuestion({ graded: true }).`,
+    );
+  }
 
-    // For a flat lesson `meta` is the section's _meta. Same ordering as generateManifest.
-    const validateLesson = (
-      lesson: WalkedLesson,
-      meta: { pages?: string[] } | null,
-    ): void => {
-      if (meta?.pages) {
-        for (const pageName of meta.pages) {
-          const fileName = ensureSvelteSuffix(pageName);
-          if (!lesson.files.includes(fileName)) {
-            d.error(
-              `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
-            );
-          }
+  return {
+    page: {
+      fileRel,
+      graded,
+      requiredGraded,
+      hasQuiz: isQuiz,
+      ...(weight !== undefined ? { weight } : {}),
+      completesOnView,
+    },
+    parseError: false,
+  };
+}
+
+export function validatePages(
+  projectRoot: string,
+  d: Diagnostics,
+  profile: StandardProfile | undefined,
+): PagesValidationResult {
+  const ctx: PageContext = {
+    projectRoot,
+    d,
+    profile,
+    assetsDir: resolve(projectRoot, 'assets'),
+    assetExistsCache: new Map(),
+  };
+  const pagesDir = resolve(projectRoot, 'pages');
+  const pages: PageInfo[] = [];
+  let hasParseErrors = false;
+
+  const noPages = (): PagesValidationResult => {
+    d.error(
+      'No pages found. Create at least one section with a lesson and page in pages/',
+    );
+    return { hasParseErrors, pages };
+  };
+
+  if (!existsSync(pagesDir)) return noPages();
+
+  // walkPages only descends into section dirs, so scan pages/ root separately.
+  for (const entry of readdirSync(pagesDir)) {
+    const fullPath = resolve(pagesDir, entry);
+    if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
+      d.warn(
+        `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
+      );
+    }
+  }
+
+  const sections = walkPages(pagesDir);
+  if (sections.length === 0) return noPages();
+
+  // For a flat lesson `meta` is the section's _meta. Same ordering as generateManifest.
+  const validateLesson = (
+    lesson: WalkedLesson,
+    meta: { pages?: string[] } | null,
+  ): void => {
+    if (meta?.pages) {
+      for (const pageName of meta.pages) {
+        const fileName = ensureSvelteSuffix(pageName);
+        if (!lesson.files.includes(fileName)) {
+          d.error(
+            `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
+          );
         }
       }
-      if (meta?.pages && meta.pages.length > 0) {
-        const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
+      const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
+      if (listedSet.size > 0) {
         for (const file of lesson.files) {
           if (!listedSet.has(file)) {
             d.warn(
@@ -287,65 +261,48 @@ export class ProjectValidator {
           }
         }
       }
+    }
 
-      for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
-        const result = this.#validatePageFile(
-          resolve(lesson.dir, fileName),
-          totalPages,
+    for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
+      const { page, parseError } = validatePageFile(
+        resolve(lesson.dir, fileName),
+        ctx,
+      );
+      if (parseError) hasParseErrors = true;
+      pages.push(page);
+    }
+  };
+
+  for (const section of sections) {
+    const sectionRel = relative(projectRoot, section.dir);
+    const pagesBeforeSection = pages.length;
+
+    const sectionMeta = validateMetaFile(section.metaPath, sectionRel, d);
+
+    for (const lesson of section.lessons) {
+      if (lesson.name === null) {
+        // Flat lesson uses the section _meta, already validated above.
+        validateLesson(lesson, sectionMeta);
+      } else {
+        const meta = validateMetaFile(
+          lesson.metaPath,
+          relative(projectRoot, lesson.dir),
+          d,
         );
-        totalPages++;
-        if (result.isQuiz) totalQuizzes++;
-        if (result.parseError) hasParseErrors = true;
-        pages.push(result.page);
-      }
-    };
-
-    for (const section of sections) {
-      const sectionRel = relative(projectRoot, section.dir);
-      const pagesBeforeSection = totalPages;
-
-      const sectionMeta = validateMetaFile(section.metaPath, sectionRel, d);
-
-      for (const lesson of section.lessons) {
-        if (lesson.name === null) {
-          // Flat lesson uses the section _meta, already validated above.
-          validateLesson(lesson, sectionMeta);
-        } else {
-          const meta = validateMetaFile(
-            lesson.metaPath,
-            relative(projectRoot, lesson.dir),
-            d,
-          );
-          validateLesson(lesson, meta);
-        }
-      }
-
-      // The page-count delta covers both the no-lessons and empty-lessons cases.
-      if (totalPages === pagesBeforeSection) {
-        d.warn(`${sectionRel}: section contributed no pages and will be empty`);
+        validateLesson(lesson, meta);
       }
     }
 
-    if (totalPages === 0) return noPages();
-
-    return { totalPages, totalQuizzes, hasParseErrors, pages };
-  }
-
-  validateShellFiles(): void {
-    for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
-      const shellPath = resolve(this.#projectRoot, shellFile);
-      if (existsSync(shellPath)) {
-        validateContractBypass(
-          readSourceFileCached(shellPath),
-          shellFile,
-          this.#d,
-        );
-      }
+    // The page-count delta covers both the no-lessons and empty-lessons cases.
+    if (pages.length === pagesBeforeSection) {
+      d.warn(`${sectionRel}: section contributed no pages and will be empty`);
     }
   }
+
+  if (pages.length === 0) return noPages();
+
+  return { hasParseErrors, pages };
 }
-
-// ---------- _meta.js Validation ----------
 
 function validateMetaFile(
   metaPath: string,
@@ -383,8 +340,6 @@ function validateMetaFile(
   return meta;
 }
 
-// ---------- pageConfig Validation ----------
-
 function validatePageConfig(
   content: string,
   fileRel: string,
@@ -421,6 +376,22 @@ const KNOWN_PAGE_FIELDS = new Set(
     completesOn: true,
   } satisfies Record<keyof PageConfig, true>),
 );
+
+// A local import may wrap useQuestion, so its presence suppresses the "no
+// questions" warning: false negatives are fine for an advisory heuristic.
+function hasLocalModuleImport(content: string): boolean {
+  return scriptImports(content).some(({ from }) => {
+    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
+    const file = from.slice(from.lastIndexOf('/') + 1);
+    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+  });
+}
+
+function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
+  if (hasSpread) return true;
+  const graded = props.get('graded');
+  return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
+}
 
 function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
   const seen = new Map<number, string>();
@@ -474,8 +445,6 @@ function validatePageWeight(
   }
   return weight;
 }
-
-// ---------- Quiz Config Validation ----------
 
 const VALID_FEEDBACK_MODES: readonly string[] = FEEDBACK_MODES;
 const VALID_RETRY_MODES: readonly string[] = RETRY_MODES;
@@ -546,8 +515,6 @@ function validateQuizConfig(
   }
 }
 
-// ---------- Heading Order Validation (rule 1.6) ----------
-
 /** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 
@@ -567,7 +534,7 @@ function stripRepeated(input: string, patterns: RegExp[]): string {
 }
 
 /**
- * Warn on a skipped heading level (e.g. h2 → h4). Scripts, styles, and comments
+ * Rule 1.6: warn on a skipped heading level (e.g. h2 → h4). Scripts, styles, and comments
  * are stripped first so string literals, CSS, and commented-out markup can't be
  * miscounted. No "one h1 per page" check — the layout owns the page h1 and child
  * components emit headings a static scan can't see; that belongs to the Tier-2
@@ -594,34 +561,16 @@ function validateHeadingOrder(
   }
 }
 
-// ---------- Contract Bypass Detection ----------
-
 const QUIZ_COMPLETE_DISPATCH_RE =
   /(?:new\s+CustomEvent\s*\(\s*['"]tessera-quiz-complete['"]|dispatchEvent\s*\([\s\S]{0,120}tessera-quiz-complete)/;
 const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
-
-// A local import may wrap useQuestion, so its presence suppresses the "no
-// questions" warning: false negatives are fine for an advisory heuristic.
-function hasLocalModuleImport(content: string): boolean {
-  return scriptImports(content).some(({ from }) => {
-    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
-    const file = from.slice(from.lastIndexOf('/') + 1);
-    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
-  });
-}
-
-function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
-  if (hasSpread) return true;
-  const graded = props.get('graded');
-  return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
-}
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check
  * source text for known escape hatches — they never inspect course content,
  * so they constrain how you wire things up, not what you build.
  */
-function validateContractBypass(
+export function validateContractBypass(
   content: string,
   fileRel: string,
   d: Diagnostics,

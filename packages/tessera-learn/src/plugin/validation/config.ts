@@ -24,10 +24,9 @@ import {
   A11Y_IDS,
   VALID_A11Y_LEVELS,
   VALID_A11Y_STANDARDS,
-  describeType,
   tag,
-  type Diagnostics,
-} from './diagnostics.js';
+} from './a11y.js';
+import { describeType, type Diagnostics } from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
 import { validateXAPIConfig, type XAPIHookRead } from './xapi.js';
 
@@ -69,8 +68,6 @@ const VALID_SUCCESS_STATUS = ['passed', 'failed'];
 // string[] so .includes() accepts an arbitrary author-supplied value.
 const VALID_SUCCESS_SOURCES: readonly string[] = SUCCESS_SOURCES;
 
-// ---------- Config Validation ----------
-
 export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
   completion?: Partial<
     Pick<CourseConfig['completion'], 'mode'> &
@@ -86,18 +83,17 @@ export function parseConfig(
   standardOverride?: StandardId,
 ): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const read = readCourseConfig(projectRoot);
-  const resolved = resolveConfigRead(read, standardOverride);
-  const { profile } = resolved;
-  if (!resolved.ok) {
+  const { profile } = resolveConfigRead(read, standardOverride);
+  if (!read.ok) {
     // 'missing' can't occur: validateProject checks existsSync first.
-    if (resolved.reason === 'no-export') {
+    if (read.reason === 'no-export') {
       d.error('course.config.js: must use `export default { ... }` syntax');
-    } else if (resolved.reason === 'parse-error') {
+    } else if (read.reason === 'parse-error') {
       reportConfigParseError(projectRoot, d);
     }
     return { config: null, profile };
   }
-  const config: ParsedConfig = resolved.config;
+  const config: ParsedConfig = read.config;
 
   // Check for unknown fields
   for (const key of Object.keys(config)) {
@@ -148,7 +144,7 @@ export function parseConfig(
   }
 
   // The file's value, not the override: a --standard run still flags a bad one.
-  const fileStandard = read.ok ? read.config.export?.standard : undefined;
+  const fileStandard = config.export?.standard;
   if (fileStandard !== undefined && !standardProfile(fileStandard)) {
     d.error(
       `course.config.js: "export.standard" must be one of ${EXPORT_STANDARD_LIST}, got "${fileStandard}"`,
@@ -265,7 +261,7 @@ export function parseConfig(
       );
     } else if (profile?.packaged) {
       d.warn(
-        `course.config.js: "export.csp" is ignored when "export.standard" is "${config.export.standard}" (the CSP meta is web-export only)`,
+        `course.config.js: "export.csp" is ignored when "export.standard" is "${profile.id}" (the CSP meta is web-export only)`,
       );
     }
   }
@@ -307,8 +303,6 @@ function reportConfigParseError(projectRoot: string, d: Diagnostics): void {
     );
   }
 }
-
-// ---------- Branding Validation ----------
 
 // Permissive approximation of the browser's accepted color set: hex 3/4/6/8,
 // any CSS functional notation (rgb/hsl/hwb/lab/lch/oklab/oklch/color), or a
@@ -358,7 +352,6 @@ function validateBranding(
         'course.config.js "branding.logo"',
         resolve(projectRoot, 'assets'),
         d,
-        new Map(),
       );
     }
   }
@@ -396,8 +389,6 @@ function validateBranding(
     );
   }
 }
-
-// ---------- a11y Config Validation ----------
 
 /** Shape-check the `a11y` block. Malformed values can't be silenced by `ignore`. */
 function validateA11yConfig(raw: unknown, d: Diagnostics): void {

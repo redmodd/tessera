@@ -3,26 +3,27 @@ import { staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import type { QuestionComponentName } from '../../components/util.js';
-import { A11Y_IDS, tag, type Diagnostics } from './diagnostics.js';
+import { A11Y_IDS, tag } from './a11y.js';
+import type { Diagnostics } from './diagnostics.js';
 
-function staticArray(prop: PropValue | undefined): unknown[] | null {
-  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
+function staticValue(prop: PropValue | undefined): unknown {
+  if (prop?.kind !== 'expr') return undefined;
   try {
-    const parsed = JSON5.parse(prop.raw);
-    return Array.isArray(parsed) ? parsed : null;
+    return JSON5.parse(prop.raw);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
+function staticArray(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
+  const value = staticValue(prop);
+  return Array.isArray(value) ? value : null;
+}
+
 function staticNumber(prop: PropValue | undefined): number | null {
-  if (prop?.kind !== 'expr') return null;
-  try {
-    const parsed = JSON5.parse(prop.raw);
-    return typeof parsed === 'number' ? parsed : null;
-  } catch {
-    return null;
-  }
+  const value = staticValue(prop);
+  return typeof value === 'number' ? value : null;
 }
 
 interface QuestionComponentRule {

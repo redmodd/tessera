@@ -2,12 +2,17 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { findComponents } from '../ast.js';
 import { isVideoEmbed } from '../../components/video-embed.js';
-import { A11Y_IDS, tag, type Diagnostics } from './diagnostics.js';
+import { A11Y_IDS, tag } from './a11y.js';
+import type { Diagnostics } from './diagnostics.js';
 
-// ---------- Media Component Validation (rules 1.3 / 1.4) ----------
+const MEDIA_COMPONENT_NAMES: ReadonlySet<string> = new Set([
+  'Image',
+  'Video',
+  'Audio',
+]);
 
 /**
- * Sibling to validateQuestionComponents kept out of QUESTION_COMPONENTS
+ * Rules 1.3 / 1.4. Sibling to validateQuestionComponents kept out of QUESTION_COMPONENTS
  * so media isn't treated as gradable questions.
  * Non-static (kind 'expr') values are skipped, matching the rest of the linter.
  */
@@ -16,10 +21,7 @@ export function validateMediaComponents(
   fileRel: string,
   d: Diagnostics,
 ): void {
-  const components = findComponents(
-    content,
-    new Set(['Image', 'Video', 'Audio']),
-  );
+  const components = findComponents(content, MEDIA_COMPONENT_NAMES);
   if (!components) return;
   for (const { name, props, hasSpread } of components) {
     if (name === 'Image') {
@@ -121,19 +123,15 @@ export function validateMediaComponents(
   }
 }
 
-// ---------- Asset Reference Validation ----------
-
 const ASSET_REF_RE = /\$assets\/([^\s"'`)]+)/g;
 
 /** Match $assets/... refs in any context (src attrs, import statements, url() etc) and dedupe. */
-function collectAssetRefs(content: string): string[] {
-  const seen = new Set<string>();
-  let match: RegExpExecArray | null;
-  ASSET_REF_RE.lastIndex = 0;
-  while ((match = ASSET_REF_RE.exec(content)) !== null) {
-    seen.add(match[1].replace(/[?#].*$/, ''));
-  }
-  return [...seen];
+function collectAssetRefs(content: string): Set<string> {
+  return new Set(
+    Array.from(content.matchAll(ASSET_REF_RE), (m) =>
+      m[1].replace(/[?#].*$/, ''),
+    ),
+  );
 }
 
 export function validateAssetRefs(
@@ -141,7 +139,7 @@ export function validateAssetRefs(
   fileRel: string,
   assetsDir: string,
   d: Diagnostics,
-  existsCache: Map<string, boolean>,
+  existsCache = new Map<string, boolean>(),
 ): void {
   for (const assetPath of collectAssetRefs(content)) {
     const fullAssetPath = resolve(assetsDir, assetPath);
