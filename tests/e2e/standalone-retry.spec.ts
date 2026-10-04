@@ -24,7 +24,6 @@ interface Mode {
   standard: Standard;
   port: number;
   launch(page: Page, base: string): Promise<Results>;
-  fixme?: string;
 }
 
 function scormMode(
@@ -43,7 +42,8 @@ function scormMode(
         return Object.keys(data)
           .filter(
             (k) =>
-              /^cmi\.interactions\.\d+\.id$/.test(k) && data[k] === 'q_retry',
+              /^cmi\.interactions\.\d+\.id$/.test(k) &&
+              /^q[-_]retry$/.test(data[k]),
           )
           .map((k) => data[k.replace(/id$/, 'result')] === 'correct');
       };
@@ -53,11 +53,7 @@ function scormMode(
 
 const MODES: Mode[] = [
   scormMode('scorm12', 5314, installScorm12Mock),
-  {
-    ...scormMode('scorm2004', 5315, installScorm2004Mock),
-    fixme:
-      'scorm-again rejects a second cmi.interactions.n.id with the same value (351), which stalls the write queue (#266)',
-  },
+  scormMode('scorm2004', 5315, installScorm2004Mock),
   {
     standard: 'cmi5',
     port: 5316,
@@ -74,7 +70,6 @@ const MODES: Mode[] = [
 
 for (const mode of MODES) {
   test.describe.serial(`standalone retry trail: ${mode.standard}`, () => {
-    test.fixme(!!mode.fixme, mode.fixme);
     const BASE = `http://localhost:${mode.port}`;
     let preview: ChildProcess;
 
