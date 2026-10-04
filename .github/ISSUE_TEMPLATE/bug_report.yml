@@ -15,7 +15,7 @@ body:
       label: Reproduction
       description: |
         Steps to reproduce, or a minimal repo / code sample.
-        Note which export mode the issue affects (SCORM 1.2 / SCORM 2004 / cmi5 / web).
+        Note which export mode the issue affects (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI / web).
     validations:
       required: true
   - type: input

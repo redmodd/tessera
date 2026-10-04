@@ -12,6 +12,7 @@
 - [ ] SCORM 1.2
 - [ ] SCORM 2004
 - [ ] cmi5
+- [ ] xAPI
 - [ ] Web
 - [ ] N/A
 
