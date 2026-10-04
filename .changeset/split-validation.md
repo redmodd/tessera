@@ -4,7 +4,7 @@
 
 `tessera validate --standard` now applies that standard to page checks even when `course.config.js` does not parse.
 
-An unknown `chrome` value in `course.config.js` is now a validation error, so `tessera dev` and `tessera export` stop on it as well as `tessera validate`.
+An unknown `chrome` value in `course.config.js` is now a validation error, so `tessera dev` and `tessera export` stop on it as well as `tessera validate`. So is an `export`, `navigation`, `completion`, or `scoring` value that is not an object. These used to pass, so `export: "scorm12"` built for web.
 
 A `_meta.js` `pages` value that is not an array of strings is now a validation error instead of crashing the build. A non-string `_meta.js` `title` is now a validation error.
 
