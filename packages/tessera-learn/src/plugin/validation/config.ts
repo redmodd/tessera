@@ -6,6 +6,7 @@ import {
   STANDARD_IDS,
   standardProfile,
   type StandardId,
+  type StandardProfile,
 } from '../../runtime/standards.js';
 import {
   SUCCESS_SOURCES,
@@ -80,7 +81,7 @@ export function parseConfig(
   d: Diagnostics,
   runtimeHooks: XAPIHookRead,
   standardOverride?: StandardId,
-): ParsedConfig | null {
+): { config: ParsedConfig | null; profile: StandardProfile | undefined } {
   const read = readCourseConfig(projectRoot);
   if (!read.ok) {
     // 'missing' can't occur — validateProject checks existsSync first.
@@ -89,7 +90,7 @@ export function parseConfig(
     } else if (read.reason === 'parse-error') {
       reportConfigParseError(projectRoot, d);
     }
-    return null;
+    return { config: null, profile: undefined };
   }
   const config: ParsedConfig = read.config;
 
@@ -283,7 +284,7 @@ export function parseConfig(
 
   validateXAPIConfig(config.xapi, standard, runtimeHooks, d);
 
-  return config;
+  return { config, profile };
 }
 
 function validatePercent(

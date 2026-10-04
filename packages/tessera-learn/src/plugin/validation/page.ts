@@ -51,16 +51,22 @@ export interface PagesValidationResult {
 }
 
 export class ProjectValidator {
-  readonly assetsDir: string;
+  #projectRoot: string;
+  #d: Diagnostics;
+  #profile: StandardProfile | undefined;
+  #assetsDir: string;
   // One existsSync per unique asset for the whole pass.
-  readonly assetExistsCache = new Map<string, boolean>();
+  #assetExistsCache = new Map<string, boolean>();
 
   constructor(
-    readonly projectRoot: string,
-    readonly d: Diagnostics,
-    readonly profile: StandardProfile | undefined,
+    projectRoot: string,
+    d: Diagnostics,
+    profile: StandardProfile | undefined,
   ) {
-    this.assetsDir = resolve(projectRoot, 'assets');
+    this.#projectRoot = projectRoot;
+    this.#d = d;
+    this.#profile = profile;
+    this.#assetsDir = resolve(projectRoot, 'assets');
   }
 
   /**
@@ -76,7 +82,8 @@ export class ProjectValidator {
     isQuiz: boolean;
     parseError: boolean;
   } {
-    const { projectRoot, d } = this;
+    const projectRoot = this.#projectRoot;
+    const d = this.#d;
     const fileRel = relative(projectRoot, filePath);
     const content = readSourceFileCached(filePath);
 
@@ -176,11 +183,11 @@ export class ProjectValidator {
     validateAssetRefs(
       content,
       fileRel,
-      this.assetsDir,
+      this.#assetsDir,
       d,
-      this.assetExistsCache,
+      this.#assetExistsCache,
     );
-    validateQuestionComponents(questionComponents, fileRel, d, this.profile);
+    validateQuestionComponents(questionComponents, fileRel, d, this.#profile);
     validateMediaComponents(content, fileRel, d);
     validateHeadingOrder(content, fileRel, d);
     validateContractBypass(content, fileRel, d);
@@ -225,7 +232,8 @@ export class ProjectValidator {
   }
 
   validatePages(): PagesValidationResult {
-    const { projectRoot, d } = this;
+    const projectRoot = this.#projectRoot;
+    const d = this.#d;
     const pagesDir = resolve(projectRoot, 'pages');
     const pages: PageInfo[] = [];
     let totalPages = 0;
@@ -325,12 +333,12 @@ export class ProjectValidator {
 
   validateShellFiles(): void {
     for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
-      const shellPath = resolve(this.projectRoot, shellFile);
+      const shellPath = resolve(this.#projectRoot, shellFile);
       if (existsSync(shellPath)) {
         validateContractBypass(
           readSourceFileCached(shellPath),
           shellFile,
-          this.d,
+          this.#d,
         );
       }
     }

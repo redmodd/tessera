@@ -2,9 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clearParseCache } from './ast.js';
 import {
-  DEFAULT_STANDARD,
   largerSuspendDataStandards,
-  standardProfile,
   type StandardId,
   type StandardProfile,
 } from '../runtime/standards.js';
@@ -70,10 +68,14 @@ export function validateProject(
 
   // 2. Parse and validate config
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
-  const config = parseConfig(projectRoot, d, runtimeHooks, standardOverride);
+  const { config, profile } = parseConfig(
+    projectRoot,
+    d,
+    runtimeHooks,
+    standardOverride,
+  );
 
   // 3. Validate pages directory
-  const profile = standardProfile(config?.export?.standard ?? DEFAULT_STANDARD);
   const validator = new ProjectValidator(projectRoot, d, profile);
   const pageResults = validator.validatePages();
 
