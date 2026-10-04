@@ -560,6 +560,22 @@ describe('CMI5Adapter', () => {
     ]);
   });
 
+  it('sends Terminated without a state write when terminated while saved state loads', async () => {
+    const adapter = await initAdapter();
+    const resume = Promise.withResolvers<Response>();
+    routeResumeGet(vi.fn(() => resume.promise));
+    const loading = adapter.loadState();
+    await flush();
+
+    adapter.terminate();
+    resume.resolve(Response.json({ b: 1, n: 1 }));
+    await loading;
+    await flush();
+
+    expect(sentVerbs()).toEqual(['initialized', 'terminated']);
+    expect(stateWrites()).toHaveLength(0);
+  });
+
   it('writes the final state to the exit document and keeps saving after terminate', async () => {
     const adapter = await initAdapter();
     await adapter.loadState();

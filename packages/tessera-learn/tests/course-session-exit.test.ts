@@ -301,6 +301,46 @@ describe('ending a CourseSession', () => {
     expect(session.canExit).toBe(false);
   });
 
+  it('terminates without saving or reporting on pagehide while saved state loads', async () => {
+    const load = Promise.withResolvers<void>();
+    const setCompletionStatus = vi.fn();
+    const { adapter, calls } = recordingAdapter({
+      loadState: () => load.promise,
+      setCompletionStatus,
+    });
+    const { session } = createSession({ adapter });
+    const started = session.start();
+    await flush();
+
+    pagehide();
+    load.resolve();
+    await started;
+    await flush();
+
+    expect(calls).toEqual(['terminate']);
+    expect(setCompletionStatus).not.toHaveBeenCalled();
+    expect(session.persistenceReady).toBe(false);
+  });
+
+  it('ends a session restored from the back/forward cache after pagehide while saved state loads', async () => {
+    const load = Promise.withResolvers<void>();
+    const { adapter, calls } = recordingAdapter({
+      loadState: () => load.promise,
+    });
+    const { session } = createSession({ adapter });
+    const started = session.start();
+    await flush();
+
+    enterBfcache();
+    load.resolve();
+    await started;
+    restoreFromBfcache();
+    await flush();
+
+    expect(session.exitPhase).toBe('ended');
+    expect(calls).toEqual(['terminate']);
+  });
+
   it('ends a session restored from the back/forward cache after pagehide', async () => {
     const { adapter, calls } = recordingAdapter();
     const { session } = await startSession({ adapter });

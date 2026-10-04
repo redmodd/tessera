@@ -762,6 +762,45 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(statePuts).toHaveLength(0);
   });
 
+  test('pagehide while the resume GET is pending sends Terminated and writes no state', async ({
+    page,
+  }) => {
+    const statements: any[] = [];
+    const statePuts: string[] = [];
+    await page.route('http://xapi-mock.test/**', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (url.includes('/xapi/statements')) {
+        try {
+          statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
+        } catch {}
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(['stmt-id']),
+        });
+        return;
+      }
+      if (url.includes('/xapi/activities/state')) {
+        if (req.method() === 'PUT') {
+          statePuts.push(req.postData() ?? '');
+          await route.fulfill({ status: 204, body: '' });
+        }
+        return;
+      }
+      await route.fulfill({ status: 200, body: '{}' });
+    });
+
+    await page.goto(xapiLaunchURL(BASE));
+    await expect
+      .poll(() => findStatement(statements, 'initialized'))
+      .toBeTruthy();
+    await exitCourse(page);
+
+    await expectNoStatementsAfterTerminated(page, statements);
+    expect(statePuts).toEqual([]);
+  });
+
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
     page,
   }) => {

@@ -138,6 +138,10 @@ export class CourseSession {
     }
     if (this.#lifetime.signal.aborted) return null;
 
+    const { signal } = this.#lifetime;
+    window.addEventListener('pagehide', this.#onPagehide, { signal });
+    window.addEventListener('pageshow', this.#onPageshow, { signal });
+
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
     try {
@@ -145,7 +149,7 @@ export class CourseSession {
     } catch (err) {
       console.warn('Tessera: resume state load failed', err);
     }
-    if (this.#lifetime.signal.aborted) return null;
+    if (this.#lifetime.signal.aborted || this.#terminated) return null;
 
     // An LMS-supplied mastery score is the authoritative pass threshold for
     // this launch and overrides the manifest.
@@ -174,10 +178,6 @@ export class CourseSession {
       this.#persistPending = false;
       this.#requestPersist();
     }
-
-    const { signal } = this.#lifetime;
-    window.addEventListener('pagehide', this.#onPagehide, { signal });
-    window.addEventListener('pageshow', this.#onPageshow, { signal });
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
@@ -399,6 +399,7 @@ export class CourseSession {
     if (this.#terminated) return false;
     this.#terminated = true;
     registerXAPIClient(null);
+    if (!this.#persistenceReady) return true;
     const adapter = this.#adapter;
     adapter.saveState(this.#serialize());
     adapter.setDuration(this.#duration.sessionSeconds);
