@@ -18,6 +18,12 @@ export type PropValue =
   | { kind: 'expr'; raw: string }
   | { kind: 'bool' };
 
+export function isLiteralTrue(prop: PropValue | undefined): boolean {
+  return (
+    prop?.kind === 'bool' || (prop?.kind === 'expr' && prop.raw === 'true')
+  );
+}
+
 export interface ComponentMatch {
   name: string;
   props: Map<string, PropValue>;

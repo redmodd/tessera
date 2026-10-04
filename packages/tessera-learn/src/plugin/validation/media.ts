@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { findComponents } from '../ast.js';
+import { findComponents, isLiteralTrue } from '../ast.js';
 import { isVideoEmbed } from '../../components/video-embed.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import type { Diagnostics } from './diagnostics.js';
@@ -38,9 +38,7 @@ export function validateMediaComponents(
         );
         continue;
       }
-      const hasDecorative =
-        decorative?.kind === 'bool' ||
-        (decorative?.kind === 'expr' && decorative.raw.trim() === 'true');
+      const hasDecorative = isLiteralTrue(decorative);
       const altIsEmpty = alt?.kind === 'string' && alt.value.trim() === '';
       if (!hasDecorative && !hasSpread && (alt === undefined || altIsEmpty)) {
         d.error(

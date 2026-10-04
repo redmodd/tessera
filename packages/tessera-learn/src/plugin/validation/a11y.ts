@@ -2,9 +2,10 @@ import { readCourseConfig } from '../manifest.js';
 import {
   A11Y_STANDARDS,
   isRecord,
+  oneOf,
   type A11yConfig,
 } from '../../runtime/types.js';
-import { oneOf, type Diagnostics } from './diagnostics.js';
+import type { Diagnostics } from './diagnostics.js';
 
 /** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
 export const A11Y_IDS = {

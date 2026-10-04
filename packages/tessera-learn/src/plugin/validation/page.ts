@@ -30,7 +30,7 @@ import {
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import { oneOf, quoteList, type Diagnostics } from './diagnostics.js';
+import { checkOneOf, type Diagnostics } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
 import { validateQuestionComponents } from './question.js';
 
@@ -252,6 +252,7 @@ export function validatePages(
           : validateMetaFile(lesson.metaPath, projectRoot, d);
 
       if (meta?.pages) {
+        const listed = new Set(meta.pages.map(ensureSvelteSuffix));
         for (const pageName of meta.pages) {
           const fileName = ensureSvelteSuffix(pageName);
           if (!lesson.files.includes(fileName)) {
@@ -260,10 +261,9 @@ export function validatePages(
             );
           }
         }
-        const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
-        if (listedSet.size > 0) {
+        if (listed.size > 0) {
           for (const file of lesson.files) {
-            if (!listedSet.has(file)) {
+            if (!listed.has(file)) {
               d.warn(
                 `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
               );
@@ -451,10 +451,7 @@ function validateQuizConfig(
 
   if (quiz.maxAttempts !== undefined) {
     const val = quiz.maxAttempts;
-    if (
-      val !== Infinity &&
-      (typeof val !== 'number' || val <= 0 || !Number.isFinite(val))
-    ) {
+    if (typeof val !== 'number' || !(val > 0)) {
       d.error(
         `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`,
       );
@@ -474,19 +471,13 @@ function validateQuizConfig(
     );
   }
 
-  if (
-    quiz.feedbackMode !== undefined &&
-    !oneOf(FEEDBACK_MODES, quiz.feedbackMode)
-  ) {
-    d.error(
-      `${fileRel}: quiz.feedbackMode must be ${quoteList(FEEDBACK_MODES)}, got "${String(quiz.feedbackMode)}"`,
-    );
-  }
-  if (quiz.retryMode !== undefined && !oneOf(RETRY_MODES, quiz.retryMode)) {
-    d.error(
-      `${fileRel}: quiz.retryMode must be ${quoteList(RETRY_MODES)}, got "${String(quiz.retryMode)}"`,
-    );
-  }
+  checkOneOf(
+    d,
+    `${fileRel}: quiz.feedbackMode`,
+    FEEDBACK_MODES,
+    quiz.feedbackMode,
+  );
+  checkOneOf(d, `${fileRel}: quiz.retryMode`, RETRY_MODES, quiz.retryMode);
 }
 
 /** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */

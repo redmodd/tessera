@@ -5,6 +5,7 @@ import {
   clearParseCache,
   defaultExportObjectLiteral,
   findComponents,
+  isLiteralTrue,
   pageConfigLiteral,
   type ComponentMatch,
 } from './ast.js';
@@ -204,15 +205,16 @@ export function readMetaFile(metaPath: string): {
     return { meta: {}, problem: 'parse-error' };
   if (result.kind !== 'literal') return { meta: {}, problem: 'not-literal' };
 
-  let meta;
+  let meta: Omit<MetaFile, 'pages'> & { pages?: unknown };
   try {
     meta = JSON5.parse(result.text);
   } catch {
     return { meta: {}, problem: 'not-literal' };
   }
-  if (meta.pages === undefined || isStringArray(meta.pages)) return { meta };
-  delete meta.pages;
-  return { meta, problem: 'invalid-pages' };
+  const { pages, ...rest } = meta;
+  if (pages === undefined || isStringArray(pages))
+    return { meta: { ...rest, pages } };
+  return { meta: rest, problem: 'invalid-pages' };
 }
 
 export function isStringArray(value: unknown): value is string[] {
@@ -241,11 +243,7 @@ export function staticQuestionId({
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
-  const graded = props.get('graded');
-  return (
-    graded?.kind === 'bool' ||
-    (graded?.kind === 'expr' && graded.raw === 'true')
-  );
+  return isLiteralTrue(props.get('graded'));
 }
 
 /** Graded built-in questions whose ids the source fixes, wherever they render. */

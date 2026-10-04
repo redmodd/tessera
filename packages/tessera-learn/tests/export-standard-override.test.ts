@@ -67,7 +67,7 @@ describe('readResolvedConfig', () => {
 describe('tesseraPlugin standardOverride', () => {
   it('rejects an override outside the allowed set', () => {
     expect(() => tesseraPlugin({ standardOverride: 'scorm13' })).toThrow(
-      /standardOverride must be ".*", or "xapi", got "scorm13"/,
+      /standardOverride must be ".*", got "scorm13"/,
     );
   });
 

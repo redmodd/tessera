@@ -3146,6 +3146,26 @@ describe('resume policy validation', () => {
       'course.config.js: "chrome" must be "default" or "custom", got "cutsom"',
     );
   });
+
+  it('prints a non-string value as JSON', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  id: "urn:uuid:test-course",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+  resume: ["auto"],
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      'course.config.js: "resume" must be "auto" or "never", got ["auto"]',
+    );
+  });
 });
 
 // ---- success block ----

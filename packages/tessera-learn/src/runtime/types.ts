@@ -51,8 +51,8 @@ export function resolveSuccess(config: SuccessSource): SuccessConfig {
   return { from: 'none' };
 }
 
-function asserted(status: string | undefined): SuccessConfig {
-  return status === 'passed' || status === 'failed'
+function asserted(status: unknown): SuccessConfig {
+  return oneOf(SUCCESS_STATUSES, status)
     ? { from: 'fixed', status }
     : { from: 'none' };
 }
@@ -83,6 +83,15 @@ export function isGradedPage(page: {
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function oneOf<T extends string>(
+  values: readonly T[],
+  value: unknown,
+): value is T {
+  return (
+    typeof value === 'string' && (values as readonly string[]).includes(value)
+  );
 }
 
 export function isPageIndex(index: number, totalPages: number): boolean {

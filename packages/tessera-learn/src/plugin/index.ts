@@ -31,13 +31,9 @@ import {
   standardProfile,
   type LMSStandard,
 } from '../runtime/standards.js';
-import {
-  validateProject,
-  reportValidationIssues,
-  isPlausibleLanguageTag,
-  isIgnored,
-  readA11ySettings,
-} from './validation.js';
+import { validateProject, reportValidationIssues } from './validation.js';
+import { isIgnored, readA11ySettings } from './validation/a11y.js';
+import { isPlausibleLanguageTag } from './validation/config.js';
 import { quoteList } from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';

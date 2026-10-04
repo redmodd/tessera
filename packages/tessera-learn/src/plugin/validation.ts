@@ -13,13 +13,6 @@ import { crossValidate } from './validation/course.js';
 import { validateContractBypass, validatePages } from './validation/page.js';
 import { readRuntimeXAPIHooks, validateXAPIConfig } from './validation/xapi.js';
 
-export {
-  isIgnored,
-  readA11ySettings,
-  type A11ySettings,
-} from './validation/a11y.js';
-export { isPlausibleLanguageTag } from './validation/config.js';
-
 /** Print notes (cyan), then warnings (yellow), then errors (red). Shared by the dev/build plugin and the CLI. */
 export function reportValidationIssues({
   errors,

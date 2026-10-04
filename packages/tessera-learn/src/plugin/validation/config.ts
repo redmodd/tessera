@@ -21,6 +21,7 @@ import {
   SUCCESS_STATUSES,
   courseIdentity,
   isRecord,
+  oneOf,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
@@ -29,8 +30,8 @@ import { contrastRatio } from '../a11y/contrast.js';
 import { isCspOverrides } from '../csp.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import {
+  checkOneOf,
   describeType,
-  oneOf,
   quoteList,
   type Diagnostics,
 } from './diagnostics.js';
@@ -145,12 +146,12 @@ export function parseConfig(
   }
 
   // The file's value, not the override: a --standard run still flags a bad one.
-  const fileStandard = config.export?.standard;
-  if (fileStandard !== undefined && !oneOf(STANDARD_IDS, fileStandard)) {
-    d.error(
-      `course.config.js: "export.standard" must be ${quoteList(STANDARD_IDS)}, got "${fileStandard}"`,
-    );
-  }
+  checkOneOf(
+    d,
+    'course.config.js: "export.standard"',
+    STANDARD_IDS,
+    config.export?.standard,
+  );
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
   // SCORM identity is owned by the LMS, so only nudge for the others.
@@ -164,25 +165,18 @@ export function parseConfig(
     validateA11yConfig(config.a11y, d);
   }
 
-  const navigationMode = config.navigation?.mode;
-  if (
-    navigationMode !== undefined &&
-    !oneOf(NAVIGATION_MODES, navigationMode)
-  ) {
-    d.error(
-      `course.config.js: "navigation.mode" must be ${quoteList(NAVIGATION_MODES)}, got "${navigationMode}"`,
-    );
-  }
-
-  const completionMode = config.completion?.mode;
-  if (
-    completionMode !== undefined &&
-    !oneOf(COMPLETION_MODES, completionMode)
-  ) {
-    d.error(
-      `course.config.js: "completion.mode" must be ${quoteList(COMPLETION_MODES)}, got "${completionMode}"`,
-    );
-  }
+  checkOneOf(
+    d,
+    'course.config.js: "navigation.mode"',
+    NAVIGATION_MODES,
+    config.navigation?.mode,
+  );
+  checkOneOf(
+    d,
+    'course.config.js: "completion.mode"',
+    COMPLETION_MODES,
+    config.completion?.mode,
+  );
 
   if (config.completion?.trigger !== undefined) {
     if (config.completion.mode !== 'manual') {
@@ -191,7 +185,7 @@ export function parseConfig(
       );
     } else if (config.completion.trigger !== 'page') {
       d.error(
-        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`,
+        `course.config.js: "completion.trigger" must be "page" or omitted, got ${JSON.stringify(config.completion.trigger)}`,
       );
     }
   }
@@ -205,14 +199,14 @@ export function parseConfig(
       );
     } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
       d.error(
-        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got "${success.from}"`,
+        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got ${JSON.stringify(success.from)}`,
       );
     } else if (
       success.from === 'fixed' &&
       !oneOf(SUCCESS_STATUSES, success.status)
     ) {
       d.error(
-        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got "${success.status}"`,
+        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got ${JSON.stringify(success.status)}`,
       );
     } else {
       successAccepted = true;
@@ -238,22 +232,13 @@ export function parseConfig(
     }
     if (manual && !oneOf(SUCCESS_STATUSES, requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got "${requireStatus}"`,
+        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got ${JSON.stringify(requireStatus)}`,
       );
     }
   }
 
-  if (config.chrome !== undefined && !oneOf(CHROME_MODES, config.chrome)) {
-    d.error(
-      `course.config.js: "chrome" must be ${quoteList(CHROME_MODES)}, got "${config.chrome}"`,
-    );
-  }
-
-  if (config.resume !== undefined && !oneOf(RESUME_POLICIES, config.resume)) {
-    d.error(
-      `course.config.js: "resume" must be ${quoteList(RESUME_POLICIES)}, got "${config.resume}"`,
-    );
-  }
+  checkOneOf(d, 'course.config.js: "chrome"', CHROME_MODES, config.chrome);
+  checkOneOf(d, 'course.config.js: "resume"', RESUME_POLICIES, config.resume);
 
   if (config.export?.csp !== undefined) {
     const csp = config.export.csp;
@@ -398,16 +383,13 @@ function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
     return;
   }
 
-  if (a11y.level !== undefined && !oneOf(A11Y_LEVELS, a11y.level)) {
-    d.error(
-      `course.config.js: "a11y.level" must be ${quoteList(A11Y_LEVELS)}, got ${JSON.stringify(a11y.level)}`,
-    );
-  }
-  if (a11y.standard !== undefined && !oneOf(A11Y_STANDARDS, a11y.standard)) {
-    d.error(
-      `course.config.js: "a11y.standard" must be ${quoteList(A11Y_STANDARDS)}, got ${JSON.stringify(a11y.standard)}`,
-    );
-  }
+  checkOneOf(d, 'course.config.js: "a11y.level"', A11Y_LEVELS, a11y.level);
+  checkOneOf(
+    d,
+    'course.config.js: "a11y.standard"',
+    A11Y_STANDARDS,
+    a11y.standard,
+  );
   if (a11y.ignore !== undefined && !isStringArray(a11y.ignore)) {
     d.error(
       `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,

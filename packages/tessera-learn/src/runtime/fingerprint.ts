@@ -1,5 +1,6 @@
 import type { Manifest } from '../plugin/manifest.js';
 import type { SavedState } from './persistence.js';
+import type { CourseConfig } from './types.js';
 
 // Bumped when the SavedState layout changes, so blobs written by an older
 // runtime fail the fingerprint gate instead of half-restoring.
@@ -25,7 +26,7 @@ export function structureFingerprint(manifest: Manifest): string {
 export function shouldRestore(
   saved: SavedState,
   currentFingerprint: string,
-  resume: 'auto' | 'never' = 'auto',
+  resume: CourseConfig['resume'] = 'auto',
 ): boolean {
   if (resume === 'never') return false;
   if (saved.f !== currentFingerprint) {

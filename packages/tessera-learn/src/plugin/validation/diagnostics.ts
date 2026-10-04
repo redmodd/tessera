@@ -1,3 +1,5 @@
+import { oneOf } from '../../runtime/types.js';
+
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
@@ -30,11 +32,15 @@ export function quoteList(values: readonly string[]): string {
   return OR_LIST.format(values.map((v) => JSON.stringify(v)));
 }
 
-export function oneOf<T extends string>(
-  values: readonly T[],
+export function checkOneOf(
+  d: Diagnostics,
+  field: string,
+  values: readonly string[],
   value: unknown,
-): value is T {
-  return (
-    typeof value === 'string' && (values as readonly string[]).includes(value)
-  );
+): void {
+  if (value !== undefined && !oneOf(values, value)) {
+    d.error(
+      `${field} must be ${quoteList(values)}, got ${JSON.stringify(value)}`,
+    );
+  }
 }
