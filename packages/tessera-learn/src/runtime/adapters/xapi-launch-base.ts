@@ -473,8 +473,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * Resume GET of the running and exit state documents, retried on the shared
    * LMS backoff schedule; the one with the higher write sequence wins. A 404,
    * an empty body, or an unparseable one is a definitive answer and returns
-   * with saving enabled. Exhausting the attempts or the deadline leaves the
-   * stored state unread, so `stateLoadFailed` withholds every later write.
+   * with saving enabled. Exhausting the attempts or the deadline, or
+   * terminating first, leaves the stored state unread, so `stateLoadFailed`
+   * withholds every later write.
    */
   override async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
@@ -482,7 +483,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
       if (attempt > 0) {
         await new Promise((r) => setTimeout(r, backoffMs(attempt - 1)));
-        if (deadline.aborted) break;
+        if (deadline.aborted || this.terminated) break;
       }
       try {
         const [running, exit] = await Promise.all([
@@ -500,11 +501,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
-        if (deadline.aborted) break;
+        if (deadline.aborted || this.terminated) break;
       }
     }
     this.stateLoadFailed = true;
     this.state = null;
+    if (this.terminated) return;
     console.warn(
       `Tessera ${this.logName}: State API GET failed after ${RETRY_ATTEMPTS} attempts (${lastDetail}); resume disabled, and progress will not be saved this launch so the unread state is left intact.`,
     );

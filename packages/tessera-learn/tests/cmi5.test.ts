@@ -560,20 +560,25 @@ describe('CMI5Adapter', () => {
     ]);
   });
 
-  it('sends Terminated without a state write when terminated while saved state loads', async () => {
+  it('stops retrying the resume GET once terminated, and still refuses to save', async () => {
     const adapter = await initAdapter();
-    const resume = Promise.withResolvers<Response>();
-    routeResumeGet(vi.fn(() => resume.promise));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const resumeGet = vi.fn(async (): Promise<Response> => {
+      throw new Error('network down');
+    });
+    routeResumeGet(resumeGet);
     const loading = adapter.loadState();
     await flush();
 
     adapter.terminate();
-    resume.resolve(Response.json({ b: 1, n: 1 }));
     await loading;
+    adapter.saveState({ b: 0, v: [0], d: 1 });
     await flush();
 
+    expect(resumeGet).toHaveBeenCalledTimes(1);
     expect(sentVerbs()).toEqual(['initialized', 'terminated']);
     expect(stateWrites()).toHaveLength(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('writes the final state to the exit document and keeps saving after terminate', async () => {

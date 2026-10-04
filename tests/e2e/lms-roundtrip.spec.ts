@@ -767,6 +767,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     const statements: any[] = [];
     const statePuts: string[] = [];
+    let stateGets = 0;
     await page.route('http://xapi-mock.test/**', async (route) => {
       const req = route.request();
       const url = req.url();
@@ -785,6 +786,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
         if (req.method() === 'PUT') {
           statePuts.push(req.postData() ?? '');
           await route.fulfill({ status: 204, body: '' });
+        } else {
+          stateGets++;
         }
         return;
       }
@@ -792,9 +795,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     });
 
     await page.goto(xapiLaunchURL(BASE));
-    await expect
-      .poll(() => findStatement(statements, 'initialized'))
-      .toBeTruthy();
+    await expect.poll(() => stateGets).toBeGreaterThan(0);
     await exitCourse(page);
 
     await expectNoStatementsAfterTerminated(page, statements);

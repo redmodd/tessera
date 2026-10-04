@@ -183,7 +183,7 @@ describe('exiting a course', () => {
     await exiting;
 
     expect(calls.slice(launched)).toEqual(
-      EXIT_SEQUENCE.with(1, 'setDuration:10'),
+      EXIT_SEQUENCE.with(0, 'setDuration:10'),
     );
   });
 

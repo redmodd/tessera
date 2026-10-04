@@ -399,10 +399,10 @@ export class CourseSession {
     if (this.#terminated) return false;
     this.#terminated = true;
     registerXAPIClient(null);
-    if (!this.#persistenceReady) return true;
     const adapter = this.#adapter;
-    adapter.saveState(this.#serialize());
     adapter.setDuration(this.#duration.sessionSeconds);
+    if (!this.#persistenceReady) return true;
+    adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
     adapter.setExit(
       this.#progress.reportedCompletionStatus === 'complete'

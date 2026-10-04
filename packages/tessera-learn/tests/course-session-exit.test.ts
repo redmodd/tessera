@@ -301,7 +301,8 @@ describe('ending a CourseSession', () => {
     expect(session.canExit).toBe(false);
   });
 
-  it('terminates without saving or reporting on pagehide while saved state loads', async () => {
+  it('terminates with the elapsed duration but without saving or reporting on pagehide while saved state loads', async () => {
+    useFakeTimers({ toFake: ['Date'] });
     const load = Promise.withResolvers<void>();
     const setCompletionStatus = vi.fn();
     const { adapter, calls } = recordingAdapter({
@@ -312,12 +313,13 @@ describe('ending a CourseSession', () => {
     const started = session.start();
     await flush();
 
+    vi.advanceTimersByTime(8_000);
     pagehide();
     load.resolve();
     await started;
     await flush();
 
-    expect(calls).toEqual(['terminate']);
+    expect(calls).toEqual(['setDuration:8', 'terminate']);
     expect(setCompletionStatus).not.toHaveBeenCalled();
     expect(session.persistenceReady).toBe(false);
   });
@@ -338,7 +340,7 @@ describe('ending a CourseSession', () => {
     await flush();
 
     expect(session.exitPhase).toBe('ended');
-    expect(calls).toEqual(['terminate']);
+    expect(calls).toEqual(['setDuration:0', 'terminate']);
   });
 
   it('ends a session restored from the back/forward cache after pagehide', async () => {
