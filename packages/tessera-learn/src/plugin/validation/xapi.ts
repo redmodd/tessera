@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readSourceFileCached } from '../manifest.js';
+import { readSourceFileCached, READ_FAILURE_MESSAGES } from '../manifest.js';
 import { readCourseRuntimeExports, type RuntimeXAPIHooks } from '../ast.js';
 import {
   validateAgent,
@@ -15,12 +15,7 @@ import {
   type StandardProfile,
 } from '../../runtime/standards.js';
 import { isRecord, type XAPIExplicitConfig } from '../../runtime/types.js';
-import {
-  describeType,
-  formatValue,
-  READ_FAILURE_MESSAGES,
-  type Diagnostics,
-} from './diagnostics.js';
+import { describeType, formatValue, type Diagnostics } from './diagnostics.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

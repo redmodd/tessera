@@ -127,6 +127,16 @@ export interface ReadFailure {
   reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
 }
 
+export const STATIC_LITERAL_RULE =
+  'must be a static object literal (no variables, function calls, or computed values)';
+
+export const READ_FAILURE_MESSAGES: Record<ReadFailure['reason'], string> = {
+  missing: 'not found',
+  'parse-error': 'could not parse, JavaScript syntax error',
+  'no-export': 'must use `export default { ... }` syntax',
+  'not-data': `the default export ${STATIC_LITERAL_RULE}`,
+};
+
 function readDefaultExport(
   path: string,
 ): { ok: true; value: unknown } | ReadFailure {
@@ -203,18 +213,24 @@ export interface MetaFile {
 
 /**
  * Read a _meta.js file's `export default { ... }` literal. `meta` is always
- * usable (empty on failure, `pages` dropped when malformed); `problem` says
- * what went wrong so the validator can report it.
+ * usable: empty when the read fails (`problem` says why), and without any
+ * field of the wrong type (`rejected` holds those values for the validator).
  */
 export function readMetaFile(metaPath: string): {
   meta: MetaFile;
-  problem?: ReadFailure['reason'] | 'invalid-pages';
+  problem?: ReadFailure['reason'];
+  rejected?: { title?: unknown; pages?: unknown };
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
-  const { pages, ...meta } = read.value as MetaFile & { pages?: unknown };
-  if (isStringArray(pages)) return { meta: { ...meta, pages } };
-  return pages == null ? { meta } : { meta, problem: 'invalid-pages' };
+  const { title, pages } = read.value as Record<string, unknown>;
+  const meta: MetaFile = {};
+  const rejected: { title?: unknown; pages?: unknown } = {};
+  if (typeof title === 'string') meta.title = title;
+  else if (title !== undefined) rejected.title = title;
+  if (isStringArray(pages)) meta.pages = pages;
+  else if (pages != null) rejected.pages = pages;
+  return { meta, rejected };
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(

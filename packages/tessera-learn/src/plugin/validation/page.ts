@@ -10,6 +10,8 @@ import {
   isLiterallyGradedQuestion,
   listedGradedQuestions,
   QUESTION_COMPONENT_NAMES,
+  READ_FAILURE_MESSAGES,
+  STATIC_LITERAL_RULE,
   type MetaFile,
   type PageConfig,
 } from '../manifest.js';
@@ -34,8 +36,6 @@ import {
   checkOneOf,
   describeType,
   formatValue,
-  READ_FAILURE_MESSAGES,
-  STATIC_LITERAL_RULE,
   type Diagnostics,
 } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
@@ -78,7 +78,7 @@ function validatePageFile(
 
   const parseError = getParseError(content);
   if (parseError) {
-    d.error(`${fileRel}: could not parse — ${parseError}`);
+    d.error(`${fileRel}: could not parse, ${parseError}`);
     return {
       page: {
         fileRel,
@@ -308,23 +308,23 @@ function validateMetaFile(
   projectRoot: string,
   d: Diagnostics,
 ): MetaFile | null {
-  const { meta, problem } = readMetaFile(metaPath);
+  const { meta, problem, rejected = {} } = readMetaFile(metaPath);
   if (problem === 'missing') return null;
 
   const metaRel = relative(projectRoot, metaPath);
-  if (problem && problem !== 'invalid-pages') {
+  if (problem) {
     d.error(`${metaRel}: ${READ_FAILURE_MESSAGES[problem]}`);
     return null;
   }
 
-  if (meta.title !== undefined && typeof meta.title !== 'string') {
+  if ('title' in rejected) {
     d.error(
-      `${metaRel}: "title" must be a string, got ${describeType(meta.title)}`,
+      `${metaRel}: "title" must be a string, got ${describeType(rejected.title)}`,
     );
   } else if (!meta.title) {
     d.error(`${metaRel}: missing required "title" field`);
   }
-  if (problem === 'invalid-pages') {
+  if ('pages' in rejected) {
     d.error(`${metaRel}: "pages" must be an array of page file names`);
   }
 

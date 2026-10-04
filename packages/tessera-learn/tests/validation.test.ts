@@ -200,6 +200,23 @@ describe('config validation', () => {
     );
   });
 
+  it.each([
+    ['export', '"scorm12"', 'string'],
+    ['navigation', '"free"', 'string'],
+    ['completion', '["quiz"]', 'array'],
+    ['scoring', '70', 'number'],
+  ])('errors when %s is not an object', (key, value, type) => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default { title: "Test", language: "en", ${key}: ${value} };`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      `course.config.js: "${key}" must be an object, got ${type}`,
+    );
+  });
+
   it('errors on invalid completion.mode', () => {
     createValidProject(testRoot);
     writeConfig(

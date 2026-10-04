@@ -276,7 +276,18 @@ describe('readMetaFile', () => {
     );
     expect(readMetaFile(path)).toEqual({
       meta: { title: 'Lesson' },
-      problem: 'invalid-pages',
+      rejected: { pages: 'a' },
+    });
+  });
+
+  it('drops a title that is not a string', () => {
+    const path = createFile(
+      'meta-test5/_meta.js',
+      'export default { title: { en: "Intro" } };',
+    );
+    expect(readMetaFile(path)).toEqual({
+      meta: {},
+      rejected: { title: { en: 'Intro' } },
     });
   });
 
@@ -285,7 +296,10 @@ describe('readMetaFile', () => {
       'meta-test4/_meta.js',
       'export default { title: "Lesson", pages: null };',
     );
-    expect(readMetaFile(path)).toEqual({ meta: { title: 'Lesson' } });
+    expect(readMetaFile(path)).toEqual({
+      meta: { title: 'Lesson' },
+      rejected: {},
+    });
   });
 
   it('returns empty meta for missing file', () => {
@@ -425,6 +439,15 @@ describe('generateManifest', () => {
     expect(manifest.pages[2].title).toBe('Overview');
     expect(manifest.pages[2].slug).toBe('overview');
     expect(manifest.pages[2].index).toBe(2);
+  });
+
+  it('falls back to the folder name for a non-string _meta.js title', () => {
+    createFile(
+      '01-intro/_meta.js',
+      'export default { title: { en: "Intro" } };',
+    );
+    createFile('01-intro/page.svelte', '<h1>Hi</h1>');
+    expect(generateManifest(root).sections[0].title).toBe('Intro');
   });
 
   it('carries pageConfig.graded and weight onto the manifest page', () => {

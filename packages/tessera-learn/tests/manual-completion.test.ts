@@ -103,7 +103,7 @@ describe('manual completion — validation', () => {
       validate(courseConfig('mode: "manual", trigger: "scroll"')).errors,
     ).toContainEqual(
       expect.stringContaining(
-        '"completion.trigger" must be "page", got "scroll"',
+        '"completion.trigger" must be "page" or omitted, got "scroll"',
       ),
     );
   });

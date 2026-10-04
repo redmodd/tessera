@@ -10,14 +10,14 @@ import type { StandardId } from './standards.js';
 export const FEEDBACK_MODES = ['review', 'immediate', 'never'] as const;
 export const RETRY_MODES = ['full', 'incorrect-only'] as const;
 export const SUCCESS_SOURCES = ['quiz', 'fixed', 'none'] as const;
-export const SUCCESS_STATUSES = ['passed', 'failed'] as const;
+export const VERDICTS = ['passed', 'failed'] as const;
 export const NAVIGATION_MODES = ['free', 'sequential'] as const;
 export const CHROME_MODES = ['default', 'custom'] as const;
 export const RESUME_POLICIES = ['auto', 'never'] as const;
 export const A11Y_LEVELS = ['warn', 'error'] as const;
 export const A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'] as const;
 
-export type Verdict = (typeof SUCCESS_STATUSES)[number];
+export type Verdict = (typeof VERDICTS)[number];
 
 /**
  * Trimmed course identity, or '' when absent. Single source of truth for the
@@ -54,9 +54,7 @@ export function resolveSuccess(config: SuccessSource): SuccessConfig {
 }
 
 function asserted(status: unknown): SuccessConfig {
-  return oneOf(SUCCESS_STATUSES, status)
-    ? { from: 'fixed', status }
-    : { from: 'none' };
+  return oneOf(VERDICTS, status) ? { from: 'fixed', status } : { from: 'none' };
 }
 
 /**

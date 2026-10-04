@@ -12,6 +12,7 @@ import {
 import {
   generateManifest,
   walkPages,
+  READ_FAILURE_MESSAGES,
   type CourseConfigRead,
   type Manifest,
   type ResolvedConfigRead,
@@ -34,11 +35,7 @@ import {
 import { validateProject, reportValidationIssues } from './validation.js';
 import { isIgnored, readA11ySettings } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
-import {
-  formatValue,
-  quoteList,
-  READ_FAILURE_MESSAGES,
-} from './validation/diagnostics.js';
+import { formatValue, quoteList } from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';

@@ -3,6 +3,7 @@ import {
   readCourseConfig,
   readSourceFileCached,
   resolveConfigRead,
+  READ_FAILURE_MESSAGES,
 } from '../manifest.js';
 import { defaultExportFunctionPaths } from '../ast.js';
 import {
@@ -17,7 +18,7 @@ import {
   NAVIGATION_MODES,
   RESUME_POLICIES,
   SUCCESS_SOURCES,
-  SUCCESS_STATUSES,
+  VERDICTS,
   courseIdentity,
   isRecord,
   isStringArray,
@@ -34,7 +35,6 @@ import {
   describeType,
   formatValue,
   oneOfError,
-  READ_FAILURE_MESSAGES,
   type Diagnostics,
 } from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
@@ -103,6 +103,19 @@ export function parseConfig(
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
       d.warn(`course.config.js: unknown field "${key}" — will be ignored`);
+    }
+  }
+
+  for (const key of [
+    'navigation',
+    'completion',
+    'scoring',
+    'export',
+  ] as const) {
+    if (config[key] !== undefined && !isRecord(config[key])) {
+      d.error(
+        `course.config.js: "${key}" must be an object, got ${describeType(config[key])}`,
+      );
     }
   }
 
@@ -184,12 +197,14 @@ export function parseConfig(
       d.warn(
         `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
-    } else {
-      checkOneOf(
-        'course.config.js: "completion.trigger"',
-        ['page'],
-        config.completion.trigger,
-        d,
+    } else if (config.completion.trigger !== 'page') {
+      d.error(
+        oneOfError(
+          'course.config.js: "completion.trigger"',
+          ['page'],
+          config.completion.trigger,
+          ' or omitted',
+        ),
       );
     }
   }
@@ -209,14 +224,11 @@ export function parseConfig(
           success.from,
         ),
       );
-    } else if (
-      success.from === 'fixed' &&
-      !oneOf(SUCCESS_STATUSES, success.status)
-    ) {
+    } else if (success.from === 'fixed' && !oneOf(VERDICTS, success.status)) {
       d.error(
         oneOfError(
           'course.config.js: "success.status"',
-          SUCCESS_STATUSES,
+          VERDICTS,
           success.status,
           ' under success.from: "fixed"',
         ),
@@ -243,11 +255,11 @@ export function parseConfig(
         `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
     }
-    if (manual && !oneOf(SUCCESS_STATUSES, requireStatus)) {
+    if (manual && !oneOf(VERDICTS, requireStatus)) {
       d.error(
         oneOfError(
           'course.config.js: "completion.requireSuccessStatus"',
-          SUCCESS_STATUSES,
+          VERDICTS,
           requireStatus,
           ' (omit for "unknown")',
         ),

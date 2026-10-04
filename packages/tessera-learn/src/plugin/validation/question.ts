@@ -17,6 +17,7 @@ function staticValue(prop: PropValue | undefined): unknown {
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   const value = staticValue(prop);
   return Array.isArray(value) ? value : null;
 }
