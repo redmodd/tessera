@@ -18,6 +18,7 @@ import {
   SUCCESS_SOURCES,
   SUCCESS_STATUSES,
   courseIdentity,
+  isRecord,
   type CourseConfig,
   type ManualCompletion,
   type PercentageCompletion,
@@ -33,25 +34,26 @@ import {
 } from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
 
-// Known top-level config fields
-const KNOWN_CONFIG_FIELDS = new Set([
-  'title',
-  'id',
-  'description',
-  'author',
-  'version',
-  'resume',
-  'language',
-  'branding',
-  'navigation',
-  'completion',
-  'success',
-  'scoring',
-  'export',
-  'chrome',
-  'xapi',
-  'a11y',
-]);
+const KNOWN_CONFIG_FIELDS = new Set(
+  Object.keys({
+    title: true,
+    id: true,
+    description: true,
+    author: true,
+    version: true,
+    resume: true,
+    language: true,
+    branding: true,
+    navigation: true,
+    completion: true,
+    success: true,
+    scoring: true,
+    export: true,
+    chrome: true,
+    xapi: true,
+    a11y: true,
+  } satisfies Record<keyof CourseConfig, true>),
+);
 
 // Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
 // plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
@@ -62,8 +64,11 @@ export function isPlausibleLanguageTag(value: unknown): value is string {
   return typeof value === 'string' && BCP47_RE.test(value);
 }
 
-const VALID_COMPLETION_MODES = ['quiz', 'percentage', 'manual'] as const;
-const VALID_MANUAL_TRIGGERS = ['page'] as const;
+const VALID_COMPLETION_MODES = Object.keys({
+  quiz: true,
+  percentage: true,
+  manual: true,
+} satisfies Record<CourseConfig['completion']['mode'], true>);
 
 export type ParsedConfig = Partial<Omit<CourseConfig, 'completion'>> & {
   completion?: Partial<
@@ -105,7 +110,7 @@ export function parseConfig(
   // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
     d.error(
-      `course.config.js: "title" must be a string, got ${typeof config.title}`,
+      `course.config.js: "title" must be a string, got ${describeType(config.title)}`,
     );
   } else if (config.title === undefined || config.title === '') {
     d.warn(
@@ -183,9 +188,9 @@ export function parseConfig(
       d.warn(
         `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
-    } else if (!oneOf(VALID_MANUAL_TRIGGERS, config.completion.trigger)) {
+    } else if (config.completion.trigger !== 'page') {
       d.error(
-        `course.config.js: "completion.trigger" must be ${quoteList(VALID_MANUAL_TRIGGERS)} or omitted, got "${config.completion.trigger}"`,
+        `course.config.js: "completion.trigger" must be "page" or omitted, got "${config.completion.trigger}"`,
       );
     }
   }
@@ -193,7 +198,7 @@ export function parseConfig(
   const success = config.success;
   let successAccepted = false;
   if (success !== undefined) {
-    if (!success || typeof success !== 'object' || Array.isArray(success)) {
+    if (!isRecord(success)) {
       d.error(
         `course.config.js: "success" must be an object like { from: "quiz" }`,
       );
@@ -318,23 +323,22 @@ function isPlausibleColor(value: string): boolean {
  * <img src>, an unparseable color falls back to theme defaults.
  */
 function validateBranding(
-  raw: unknown,
+  branding: unknown,
   projectRoot: string,
   d: Diagnostics,
 ): void {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+  if (!isRecord(branding)) {
     d.warn(
-      `course.config.js: "branding" must be an object, got ${describeType(raw)} — will be ignored`,
+      `course.config.js: "branding" must be an object, got ${describeType(branding)} — will be ignored`,
     );
     return;
   }
-  const branding = raw as Record<string, unknown>;
 
   const logo = branding.logo;
   if (logo !== undefined) {
     if (typeof logo !== 'string') {
       d.warn(
-        `course.config.js: "branding.logo" must be a string, got ${typeof logo}`,
+        `course.config.js: "branding.logo" must be a string, got ${describeType(logo)}`,
       );
     } else {
       validateAssetRefs(
@@ -350,7 +354,7 @@ function validateBranding(
   if (primaryColor !== undefined) {
     if (typeof primaryColor !== 'string') {
       d.warn(
-        `course.config.js: "branding.primaryColor" must be a string, got ${typeof primaryColor}`,
+        `course.config.js: "branding.primaryColor" must be a string, got ${describeType(primaryColor)}`,
       );
     } else if (!isPlausibleColor(primaryColor)) {
       d.warn(
@@ -375,20 +379,19 @@ function validateBranding(
   const fontFamily = branding.fontFamily;
   if (fontFamily !== undefined && typeof fontFamily !== 'string') {
     d.warn(
-      `course.config.js: "branding.fontFamily" must be a string, got ${typeof fontFamily}`,
+      `course.config.js: "branding.fontFamily" must be a string, got ${describeType(fontFamily)}`,
     );
   }
 }
 
 /** Shape-check the `a11y` block. Malformed values can't be silenced by `ignore`. */
-function validateA11yConfig(raw: unknown, d: Diagnostics): void {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
+  if (!isRecord(a11y)) {
     d.error(
-      `course.config.js: "a11y" must be an object, got ${describeType(raw)}`,
+      `course.config.js: "a11y" must be an object, got ${describeType(a11y)}`,
     );
     return;
   }
-  const a11y = raw as Record<string, unknown>;
 
   if (a11y.level !== undefined && !oneOf(A11Y_LEVELS, a11y.level)) {
     d.error(

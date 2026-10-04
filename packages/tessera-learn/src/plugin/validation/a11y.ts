@@ -1,5 +1,9 @@
 import { readCourseConfig } from '../manifest.js';
-import { A11Y_STANDARDS, type A11yConfig } from '../../runtime/types.js';
+import {
+  A11Y_STANDARDS,
+  isRecord,
+  type A11yConfig,
+} from '../../runtime/types.js';
 import { oneOf, type Diagnostics } from './diagnostics.js';
 
 /** Tier-1b rule IDs. `a11y.ignore` matches these literally. */
@@ -47,8 +51,7 @@ export type A11ySettings = Required<A11yConfig>;
 
 /** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
 export function normalizeA11y(raw: unknown): A11ySettings {
-  const a11y =
-    raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const a11y = isRecord(raw) ? raw : {};
   const level = a11y.level === 'error' ? 'error' : 'warn';
   const standard = oneOf(A11Y_STANDARDS, a11y.standard)
     ? a11y.standard

@@ -464,6 +464,24 @@ describe('config validation', () => {
     );
   });
 
+  it('names null, not object, when title is null', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: null,
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"title" must be a string, got null'),
+    );
+  });
+
   it('warns only when a $assets branding.logo is missing from assets/', () => {
     createValidProject(testRoot);
     writeConfig(

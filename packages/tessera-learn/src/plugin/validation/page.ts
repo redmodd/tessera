@@ -11,7 +11,6 @@ import {
   isLiterallyGradedQuestion,
   listedGradedQuestions,
   QUESTION_COMPONENT_NAMES,
-  type WalkedLesson,
   type PageConfig,
 } from '../manifest.js';
 import {
@@ -234,46 +233,7 @@ export function validatePages(
     }
   }
 
-  const sections = walkPages(pagesDir);
-  if (sections.length === 0) return noPages();
-
-  // For a flat lesson `meta` is the section's _meta. Same ordering as generateManifest.
-  const validateLesson = (
-    lesson: WalkedLesson,
-    meta: { pages?: string[] } | null,
-  ): void => {
-    if (meta?.pages) {
-      for (const pageName of meta.pages) {
-        const fileName = ensureSvelteSuffix(pageName);
-        if (!lesson.files.includes(fileName)) {
-          d.error(
-            `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
-          );
-        }
-      }
-      const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
-      if (listedSet.size > 0) {
-        for (const file of lesson.files) {
-          if (!listedSet.has(file)) {
-            d.warn(
-              `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
-            );
-          }
-        }
-      }
-    }
-
-    for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
-      const { page, parseError } = validatePageFile(
-        resolve(lesson.dir, fileName),
-        ctx,
-      );
-      hasParseErrors ||= parseError;
-      pages.push(page);
-    }
-  };
-
-  for (const section of sections) {
+  for (const section of walkPages(pagesDir)) {
     const sectionRel = relative(projectRoot, section.dir);
     const pagesBeforeSection = pages.length;
 
@@ -289,7 +249,37 @@ export function validatePages(
               relative(projectRoot, lesson.dir),
               d,
             );
-      validateLesson(lesson, meta);
+
+      if (meta?.pages) {
+        for (const pageName of meta.pages) {
+          const fileName = ensureSvelteSuffix(pageName);
+          if (!lesson.files.includes(fileName)) {
+            d.error(
+              `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
+            );
+          }
+        }
+        const listedSet = new Set(meta.pages.map(ensureSvelteSuffix));
+        if (listedSet.size > 0) {
+          for (const file of lesson.files) {
+            if (!listedSet.has(file)) {
+              d.warn(
+                `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
+              );
+            }
+          }
+        }
+      }
+
+      // Same ordering as generateManifest.
+      for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
+        const { page, parseError } = validatePageFile(
+          resolve(lesson.dir, fileName),
+          ctx,
+        );
+        hasParseErrors ||= parseError;
+        pages.push(page);
+      }
     }
 
     // The page-count delta covers both the no-lessons and empty-lessons cases.

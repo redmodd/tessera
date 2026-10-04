@@ -340,6 +340,13 @@ describe('xapi config validation — array form (fan-out)', () => {
     ).toBeDefined();
   });
 
+  it('rejects an array entry as not an object', () => {
+    const { errors } = validate(`[${destination()}, []]`, 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi[1] must be an object',
+    );
+  });
+
   it('errors when more than one entry uses endpoint: "lms"', () => {
     const { errors } = validate(
       `[

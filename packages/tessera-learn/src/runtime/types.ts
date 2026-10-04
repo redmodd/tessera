@@ -117,6 +117,9 @@ export interface CourseConfig {
     primaryColor?: string;
     fontFamily?: string;
   };
+  /** 'custom' hides the built-in layout so a course-owned shell can take over.
+   * A project-root layout.svelte outranks it. */
+  chrome?: 'default' | 'custom';
   navigation: {
     mode: (typeof NAVIGATION_MODES)[number];
   };

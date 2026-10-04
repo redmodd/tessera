@@ -14,6 +14,7 @@ import {
   httpOrigin,
   type StandardProfile,
 } from '../../runtime/standards.js';
+import { isRecord } from '../../runtime/types.js';
 import { describeType, type Diagnostics } from './diagnostics.js';
 
 const UUID_RE =
@@ -91,9 +92,7 @@ export function validateXAPIConfig(
       return;
     }
     const endpoints = entries.map((e) =>
-      e && typeof e === 'object'
-        ? (e as { endpoint?: unknown }).endpoint
-        : undefined,
+      isRecord(e) ? e.endpoint : undefined,
     );
     // At most one 'lms' entry — more than one is never legitimate.
     if (endpoints.filter((ep) => ep === 'lms').length > 1) {
@@ -125,18 +124,11 @@ export function validateXAPIConfig(
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const label = isList ? `xapi[${i}]` : 'xapi';
-    if (!entry || typeof entry !== 'object') {
+    if (!isRecord(entry)) {
       d.error(`course.config.js: ${label} must be an object`);
       continue;
     }
-    validateSingleXAPIEntry(
-      entry as Record<string, unknown>,
-      label,
-      profile,
-      hooks,
-      ids,
-      d,
-    );
+    validateSingleXAPIEntry(entry, label, profile, hooks, ids, d);
   }
   validateHookIds(hooks, ids, d);
 }
