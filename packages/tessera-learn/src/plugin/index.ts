@@ -429,7 +429,7 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
           );
         }
         throw new Error(
-          `[tessera:export] course.config.js: failed to parse export-default object literal — ${(read.error as Error).message}`,
+          `[tessera:export] course.config.js: failed to parse export-default object literal — ${read.reason === 'not-data' ? (read.error as Error).message : 'JavaScript syntax error'}`,
         );
       }
 

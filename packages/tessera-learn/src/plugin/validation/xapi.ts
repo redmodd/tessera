@@ -15,7 +15,7 @@ import {
   type StandardProfile,
 } from '../../runtime/standards.js';
 import { isRecord } from '../../runtime/types.js';
-import { describeType, type Diagnostics } from './diagnostics.js';
+import { describeType, formatValue, type Diagnostics } from './diagnostics.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -348,7 +348,7 @@ function validateSingleXAPIEntry(
   if (registration !== undefined) {
     if (typeof registration !== 'string' || !UUID_RE.test(registration)) {
       d.error(
-        `course.config.js: ${label}.registration must be a UUID v4, got "${String(registration)}"`,
+        `course.config.js: ${label}.registration must be a UUID v4, got ${formatValue(registration)}`,
       );
     }
     if (profile && !profile.hasLaunchLRS) {

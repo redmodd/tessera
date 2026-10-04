@@ -1,11 +1,11 @@
 import JSON5 from 'json5';
-import { isStringArray, staticQuestionId } from '../manifest.js';
+import { staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
-import { isRecord } from '../../runtime/types.js';
+import { isRecord, isStringArray } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import type { Diagnostics } from './diagnostics.js';
+import { formatValue, type Diagnostics } from './diagnostics.js';
 
 function staticValue(prop: PropValue | undefined): unknown {
   if (prop?.kind !== 'expr') return undefined;
@@ -113,7 +113,7 @@ const QUESTION_COMPONENTS: Record<
             idx >= targets.length
           ) {
             d.error(
-              `${fileRel}: <Sorting> correct contains ${JSON.stringify(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
+              `${fileRel}: <Sorting> correct contains ${formatValue(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
             );
             break;
           }

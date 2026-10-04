@@ -7,3 +7,5 @@
 `tessera validate` now rejects an unknown `chrome` value in `course.config.js`.
 
 A `_meta.js` `pages` value that is not an array of strings is now a validation error instead of crashing the build.
+
+Validation messages now print the offending value as written: a string is quoted, and `NaN` or `Infinity` no longer shows as `null`.

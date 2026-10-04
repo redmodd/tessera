@@ -9,7 +9,11 @@ import {
   pageConfigLiteral,
   type ComponentMatch,
 } from './ast.js';
-import type { CourseConfig, QuizConfig } from '../runtime/types.js';
+import {
+  isStringArray,
+  type CourseConfig,
+  type QuizConfig,
+} from '../runtime/types.js';
 import {
   QUESTION_ID_PREFIX,
   questionId,
@@ -118,13 +122,27 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
+type ReadFailure =
+  | { ok: false; reason: 'missing' | 'parse-error' | 'no-export' }
+  | { ok: false; reason: 'not-data'; error: unknown };
+
+function readDefaultExport(
+  path: string,
+): { ok: true; value: unknown } | ReadFailure {
+  if (!existsSync(path)) return { ok: false, reason: 'missing' };
+  const result = defaultExportObjectLiteral(readSourceFileCached(path));
+  if (result.kind === 'parse-error')
+    return { ok: false, reason: 'parse-error' };
+  if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
+  try {
+    return { ok: true, value: JSON5.parse(result.text) };
+  } catch (error) {
+    return { ok: false, reason: 'not-data', error };
+  }
+}
+
 export type CourseConfigRead =
-  | { ok: true; config: Partial<CourseConfig> }
-  | {
-      ok: false;
-      reason: 'missing' | 'no-export' | 'parse-error';
-      error?: unknown;
-    };
+  { ok: true; config: Partial<CourseConfig> } | ReadFailure;
 
 /**
  * Read and JSON5-parse the `export default { ... }` literal from a project's
@@ -134,17 +152,10 @@ export type CourseConfigRead =
  * that just need a value can fall back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
-  const configPath = resolve(projectRoot, 'course.config.js');
-  if (!existsSync(configPath)) return { ok: false, reason: 'missing' };
-  const result = defaultExportObjectLiteral(readSourceFileCached(configPath));
-  if (result.kind === 'parse-error')
-    return { ok: false, reason: 'parse-error' };
-  if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
-  try {
-    return { ok: true, config: JSON5.parse(result.text) };
-  } catch (error) {
-    return { ok: false, reason: 'parse-error', error };
-  }
+  const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
+  return read.ok
+    ? { ok: true, config: read.value as Partial<CourseConfig> }
+    : read;
 }
 
 export type ResolvedConfigRead = CourseConfigRead & {
@@ -196,29 +207,16 @@ export interface MetaFile {
  */
 export function readMetaFile(metaPath: string): {
   meta: MetaFile;
-  problem?: 'missing' | 'parse-error' | 'not-literal' | 'invalid-pages';
+  problem?: ReadFailure['reason'] | 'invalid-pages';
 } {
-  if (!existsSync(metaPath)) return { meta: {}, problem: 'missing' };
-
-  const result = defaultExportObjectLiteral(readSourceFileCached(metaPath));
-  if (result.kind === 'parse-error')
-    return { meta: {}, problem: 'parse-error' };
-  if (result.kind !== 'literal') return { meta: {}, problem: 'not-literal' };
-
-  let meta: Omit<MetaFile, 'pages'> & { pages?: unknown };
-  try {
-    meta = JSON5.parse(result.text);
-  } catch {
-    return { meta: {}, problem: 'not-literal' };
-  }
-  const { pages, ...rest } = meta;
+  const read = readDefaultExport(metaPath);
+  if (!read.ok) return { meta: {}, problem: read.reason };
+  const { pages, ...rest } = read.value as Omit<MetaFile, 'pages'> & {
+    pages?: unknown;
+  };
   if (pages === undefined || isStringArray(pages))
     return { meta: { ...rest, pages } };
   return { meta: rest, problem: 'invalid-pages' };
-}
-
-export function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(

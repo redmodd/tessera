@@ -32,15 +32,17 @@ export function quoteList(values: readonly string[]): string {
   return OR_LIST.format(values.map((v) => JSON.stringify(v)));
 }
 
+export function formatValue(value: unknown): string {
+  return typeof value === 'number' ? String(value) : JSON.stringify(value);
+}
+
 export function checkOneOf(
-  d: Diagnostics,
   field: string,
   values: readonly string[],
   value: unknown,
+  d: Diagnostics,
 ): void {
   if (value !== undefined && !oneOf(values, value)) {
-    d.error(
-      `${field} must be ${quoteList(values)}, got ${JSON.stringify(value)}`,
-    );
+    d.error(`${field} must be ${quoteList(values)}, got ${formatValue(value)}`);
   }
 }

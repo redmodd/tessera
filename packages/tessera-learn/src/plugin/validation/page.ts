@@ -30,7 +30,7 @@ import {
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import { checkOneOf, type Diagnostics } from './diagnostics.js';
+import { checkOneOf, formatValue, type Diagnostics } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
 import { validateQuestionComponents } from './question.js';
 
@@ -91,11 +91,13 @@ function validatePageFile(
   const isGradedQuiz = isRecord(quiz) && quiz.graded === true;
   validateQuizConfig(quiz, fileRel, d);
 
-  const completesOnView = validateCompletesOn(
+  checkOneOf(
+    `${fileRel}: pageConfig.completesOn`,
+    ['view'],
     pageConfig?.completesOn,
-    fileRel,
     d,
   );
+  const completesOnView = pageConfig?.completesOn === 'view';
   const declaresGraded =
     validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
     false;
@@ -307,7 +309,7 @@ function validateMetaFile(
     d.error(`${metaRel}: could not parse — JavaScript syntax error`);
     return null;
   }
-  if (problem === 'not-literal') {
+  if (problem === 'no-export' || problem === 'not-data') {
     d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
     return null;
   }
@@ -386,19 +388,6 @@ function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
   return false;
 }
 
-function validateCompletesOn(
-  completesOn: unknown,
-  fileRel: string,
-  d: Diagnostics,
-): boolean {
-  if (completesOn === undefined) return false;
-  if (completesOn === 'view') return true;
-  d.error(
-    `${fileRel}: pageConfig.completesOn must be "view", got ${JSON.stringify(completesOn)}`,
-  );
-  return false;
-}
-
 function validateBoolean(
   value: unknown,
   label: string,
@@ -406,9 +395,7 @@ function validateBoolean(
   d: Diagnostics,
 ): boolean | undefined {
   if (value === undefined || typeof value === 'boolean') return value;
-  d.error(
-    `${fileRel}: ${label} must be a boolean, got ${JSON.stringify(value)}`,
-  );
+  d.error(`${fileRel}: ${label} must be a boolean, got ${formatValue(value)}`);
   return undefined;
 }
 
@@ -420,7 +407,7 @@ function validatePageWeight(
   if (weight === undefined) return undefined;
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
     d.warn(
-      `${fileRel}: pageConfig.weight ${JSON.stringify(weight)} is not a positive finite number and is ignored (treated as 1)`,
+      `${fileRel}: pageConfig.weight ${formatValue(weight)} is not a positive finite number and is ignored (treated as 1)`,
     );
     return undefined;
   }
@@ -453,7 +440,7 @@ function validateQuizConfig(
     const val = quiz.maxAttempts;
     if (typeof val !== 'number' || !(val > 0)) {
       d.error(
-        `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${String(val)}`,
+        `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${formatValue(val)}`,
       );
     }
   }
@@ -472,12 +459,12 @@ function validateQuizConfig(
   }
 
   checkOneOf(
-    d,
     `${fileRel}: quiz.feedbackMode`,
     FEEDBACK_MODES,
     quiz.feedbackMode,
+    d,
   );
-  checkOneOf(d, `${fileRel}: quiz.retryMode`, RETRY_MODES, quiz.retryMode);
+  checkOneOf(`${fileRel}: quiz.retryMode`, RETRY_MODES, quiz.retryMode, d);
 }
 
 /** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */

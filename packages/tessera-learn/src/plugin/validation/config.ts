@@ -1,6 +1,5 @@
 import { resolve } from 'node:path';
 import {
-  isStringArray,
   readCourseConfig,
   readSourceFileCached,
   resolveConfigRead,
@@ -21,6 +20,7 @@ import {
   SUCCESS_STATUSES,
   courseIdentity,
   isRecord,
+  isStringArray,
   oneOf,
   type CourseConfig,
   type ManualCompletion,
@@ -32,6 +32,7 @@ import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
   describeType,
+  formatValue,
   quoteList,
   type Diagnostics,
 } from './diagnostics.js';
@@ -92,7 +93,7 @@ export function parseConfig(
     // 'missing' can't occur: validateProject checks existsSync first.
     if (read.reason === 'no-export') {
       d.error('course.config.js: must use `export default { ... }` syntax');
-    } else if (read.reason === 'parse-error') {
+    } else {
       reportConfigParseError(projectRoot, d);
     }
     return { config: null, profile };
@@ -140,17 +141,17 @@ export function parseConfig(
     d.warn(
       tag(
         A11Y_IDS.lang,
-        `course.config.js: "language" (${JSON.stringify(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
+        `course.config.js: "language" (${formatValue(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
       ),
     );
   }
 
   // The file's value, not the override: a --standard run still flags a bad one.
   checkOneOf(
-    d,
     'course.config.js: "export.standard"',
     STANDARD_IDS,
     config.export?.standard,
+    d,
   );
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
@@ -166,16 +167,16 @@ export function parseConfig(
   }
 
   checkOneOf(
-    d,
     'course.config.js: "navigation.mode"',
     NAVIGATION_MODES,
     config.navigation?.mode,
+    d,
   );
   checkOneOf(
-    d,
     'course.config.js: "completion.mode"',
     COMPLETION_MODES,
     config.completion?.mode,
+    d,
   );
 
   if (config.completion?.trigger !== undefined) {
@@ -185,7 +186,7 @@ export function parseConfig(
       );
     } else if (config.completion.trigger !== 'page') {
       d.error(
-        `course.config.js: "completion.trigger" must be "page" or omitted, got ${JSON.stringify(config.completion.trigger)}`,
+        `course.config.js: "completion.trigger" must be "page" or omitted, got ${formatValue(config.completion.trigger)}`,
       );
     }
   }
@@ -199,14 +200,14 @@ export function parseConfig(
       );
     } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
       d.error(
-        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got ${JSON.stringify(success.from)}`,
+        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got ${formatValue(success.from)}`,
       );
     } else if (
       success.from === 'fixed' &&
       !oneOf(SUCCESS_STATUSES, success.status)
     ) {
       d.error(
-        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got ${JSON.stringify(success.status)}`,
+        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got ${formatValue(success.status)}`,
       );
     } else {
       successAccepted = true;
@@ -232,13 +233,13 @@ export function parseConfig(
     }
     if (manual && !oneOf(SUCCESS_STATUSES, requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got ${JSON.stringify(requireStatus)}`,
+        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got ${formatValue(requireStatus)}`,
       );
     }
   }
 
-  checkOneOf(d, 'course.config.js: "chrome"', CHROME_MODES, config.chrome);
-  checkOneOf(d, 'course.config.js: "resume"', RESUME_POLICIES, config.resume);
+  checkOneOf('course.config.js: "chrome"', CHROME_MODES, config.chrome, d);
+  checkOneOf('course.config.js: "resume"', RESUME_POLICIES, config.resume, d);
 
   if (config.export?.csp !== undefined) {
     const csp = config.export.csp;
@@ -270,7 +271,9 @@ function validatePercent(
 ): void {
   if (value === undefined) return;
   if (!Number.isFinite(value) || value < 0 || value > 100) {
-    d.error(`course.config.js: "${key}" must be 0–100, got ${value}`);
+    d.error(
+      `course.config.js: "${key}" must be 0–100, got ${formatValue(value)}`,
+    );
   }
 }
 
@@ -383,12 +386,12 @@ function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
     return;
   }
 
-  checkOneOf(d, 'course.config.js: "a11y.level"', A11Y_LEVELS, a11y.level);
+  checkOneOf('course.config.js: "a11y.level"', A11Y_LEVELS, a11y.level, d);
   checkOneOf(
-    d,
     'course.config.js: "a11y.standard"',
     A11Y_STANDARDS,
     a11y.standard,
+    d,
   );
   if (a11y.ignore !== undefined && !isStringArray(a11y.ignore)) {
     d.error(

@@ -367,6 +367,24 @@ describe('config validation', () => {
     );
   });
 
+  it('quotes a string passingScore', () => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: "70" },
+  export: { standard: "web" },
+};`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('"scoring.passingScore" must be 0–100, got "70"'),
+    );
+  });
+
   it('errors on NaN passingScore and percentageThreshold', () => {
     createValidProject(testRoot);
     writeConfig(
@@ -779,6 +797,24 @@ export const pageConfig = { title: "ok", quiz: { graded: function() {} } };
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('pageConfig must be a static object literal'),
+    );
+  });
+
+  it('names Infinity, not null, for an infinite pageConfig.weight', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", weight: Infinity, quiz: { graded: true } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'pageConfig.weight Infinity is not a positive finite number',
+      ),
     );
   });
 
@@ -1237,6 +1273,24 @@ export const pageConfig = { title: "Quiz", quiz: { maxAttempts: -1, graded: true
     expect(errors).toContainEqual(
       expect.stringContaining(
         'quiz.maxAttempts must be a positive number or Infinity, got -1',
+      ),
+    );
+  });
+
+  it('quotes a string quiz.maxAttempts', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      `<script module>
+export const pageConfig = { title: "Quiz", quiz: { maxAttempts: "3" } };
+</script>
+<h1>Quiz</h1>`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'quiz.maxAttempts must be a positive number or Infinity, got "3"',
       ),
     );
   });

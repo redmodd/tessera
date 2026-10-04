@@ -237,6 +237,13 @@ describe('xapi config validation — explicit endpoint', () => {
     ).toBeDefined();
   });
 
+  it('prints a non-string registration as JSON', () => {
+    const { errors } = validate(destination({ registration: 5 }), 'cmi5');
+    expect(errors).toContainEqual(
+      'course.config.js: xapi.registration must be a UUID v4, got 5',
+    );
+  });
+
   it('warns on registration under non-cmi5', () => {
     const { warnings } = validate(
       destination({ registration: '550e8400-e29b-41d4-a716-446655440000' }),
