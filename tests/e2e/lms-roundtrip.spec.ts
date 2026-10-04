@@ -62,10 +62,11 @@ async function expectPagehideAbortsResumeGet(
   statements: any[],
   statePuts: string[],
 ): Promise<void> {
+  await page.clock.install();
   const resumeGet = page.waitForRequest(isResumeGet);
   await page.goto(launchURL);
   await resumeGet;
-  await page.waitForTimeout(1100);
+  await page.clock.fastForward(1_100);
   const aborted = page.waitForEvent('requestfailed', {
     predicate: isResumeGet,
     timeout: 2000,
@@ -700,60 +701,35 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     preview?.kill('SIGTERM');
   });
 
-  function collectStatements(req: Request, statements: any[]): void {
-    if (req.method() !== 'POST' && req.method() !== 'PUT') return;
-    try {
-      statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
-    } catch {}
-  }
-
-  /** Route the mock LRS, capturing posted statements and the request headers. */
+  /**
+   * Route the mock LRS. `statements` and `headers` collect what the statements
+   * endpoint receives and `statePuts` the state writes; `stateGet` scripts the
+   * resume read (404 by default, null leaves it unanswered).
+   */
   async function routeLRS(
     page: Page,
-    statements: any[],
-    headers: Array<Record<string, string>>,
+    {
+      statements = [],
+      headers = [],
+      stateGet = { status: 404, body: '{}' },
+      statePuts = [],
+    }: {
+      statements?: any[];
+      headers?: Array<Record<string, string>>;
+      stateGet?: { status: number; body: string } | null;
+      statePuts?: string[];
+    },
   ): Promise<void> {
     await page.route('http://xapi-mock.test/**', async (route) => {
       const req = route.request();
       const url = req.url();
       if (url.includes('/xapi/statements')) {
         headers.push(req.headers());
-        collectStatements(req, statements);
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(['stmt-id']),
-        });
-        return;
-      }
-      if (url.includes('/xapi/activities/state')) {
-        // No saved state on first launch, and no fetch-token endpoint exists.
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: '{}',
-        });
-        return;
-      }
-      await route.fulfill({ status: 200, body: '{}' });
-    });
-  }
-
-  /**
-   * `stateGet` scripts the resume read (null leaves it unanswered);
-   * `statePuts` collects attempted writes and `statements` posted statements.
-   */
-  async function routeLRSWithState(
-    page: Page,
-    stateGet: { status: number; body: string } | null,
-    statePuts: string[],
-    statements: any[] = [],
-  ): Promise<void> {
-    await page.route('http://xapi-mock.test/**', async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (url.includes('/xapi/statements')) {
-        collectStatements(req, statements);
+        if (req.method() === 'POST' || req.method() === 'PUT') {
+          try {
+            statements.push(...[JSON.parse(req.postData() ?? '{}')].flat());
+          } catch {}
+        }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -786,7 +762,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     // structure fingerprint, which the resume gate now requires.
     const stateGet = { status: 404, body: '{}' };
     const statePuts: string[] = [];
-    await routeLRSWithState(page, stateGet, statePuts);
+    await routeLRS(page, { stateGet, statePuts });
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -812,7 +788,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     page,
   }) => {
     const statePuts: string[] = [];
-    await routeLRSWithState(page, { status: 500, body: '{}' }, statePuts);
+    await routeLRS(page, { stateGet: { status: 500, body: '{}' }, statePuts });
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -829,7 +805,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     const statements: any[] = [];
     const statePuts: string[] = [];
-    await routeLRSWithState(page, null, statePuts, statements);
+    await routeLRS(page, { stateGet: null, statePuts, statements });
     const isStateGet = (req: Request) =>
       req.url().includes('/xapi/activities/state') && req.method() === 'GET';
 
@@ -847,7 +823,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     const statements: any[] = [];
     const headers: Array<Record<string, string>> = [];
-    await routeLRS(page, statements, headers);
+    await routeLRS(page, { statements, headers });
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -875,7 +851,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     const statements: any[] = [];
     const headers: Array<Record<string, string>> = [];
-    await routeLRS(page, statements, headers);
+    await routeLRS(page, { statements, headers });
 
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
@@ -943,7 +919,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     page,
   }) => {
     const statements: any[] = [];
-    await routeLRS(page, statements, []);
+    await routeLRS(page, { statements });
 
     await page.goto(xapiLaunchURL(BASE));
     await expectRestoreToEndSession(page);

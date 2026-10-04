@@ -43,6 +43,12 @@ function isRunningStateGet(url: string, options?: RequestInit): boolean {
   );
 }
 
+function pendingUntilAborted(init?: RequestInit): Promise<Response> {
+  return new Promise((_, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+  });
+}
+
 describe('CMI5Adapter.connect', () => {
   it('connects when all params are present', () => {
     setLaunchParams(CMI5_LAUNCH);
@@ -163,11 +169,7 @@ describe('CMI5Adapter', () => {
       if (isRunningStateGet(url, init)) return Promise.resolve(respond(503));
       if (url.includes('tessera-state-exit') && init?.method === 'GET') {
         exitSignals.push(init.signal!);
-        return new Promise<Response>((_, reject) => {
-          init.signal!.addEventListener('abort', () =>
-            reject(init.signal!.reason),
-          );
-        });
+        return pendingUntilAborted(init);
       }
       return lms(url, init);
     });
@@ -596,15 +598,7 @@ describe('CMI5Adapter', () => {
   });
 
   it.each([
-    [
-      'aborts the resume GET in flight',
-      (init?: RequestInit) =>
-        new Promise<Response>((_, reject) => {
-          init?.signal?.addEventListener('abort', () =>
-            reject(init.signal!.reason),
-          );
-        }),
-    ],
+    ['aborts the resume GET in flight', pendingUntilAborted],
     [
       'stops retrying the resume GET',
       async (): Promise<Response> => {

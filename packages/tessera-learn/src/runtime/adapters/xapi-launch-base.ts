@@ -135,7 +135,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSaved = true;
   #termination = new AbortController();
 
-  protected get terminated(): boolean {
+  get #terminated(): boolean {
     return this.#termination.signal.aborted;
   }
 
@@ -367,7 +367,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override terminate(unloading = true): void {
-    if (this.terminated) return;
+    if (this.#terminated) return;
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {
@@ -388,7 +388,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   override async exit(deadline: Promise<unknown>): Promise<void> {
     const settles = (task: Promise<unknown>) =>
       Promise.race([task.then(() => true), deadline.then(() => false)]);
-    if (!this.terminated) {
+    if (!this.#terminated) {
       const saved =
         !this.publisher ||
         ((await settles(this.publisher.drained())) && this.#stateSaved);
@@ -436,7 +436,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   /** Enqueue a lifecycle statement fire-and-forget. `label` names it in both the LRS-reject and send-failure warnings. */
   protected dispatch(label: string, partial: PartialStatement): void {
-    if (!this.publisher || this.terminated) return;
+    if (!this.publisher || this.#terminated) return;
     void this.#report(
       label,
       this.publisher.sendStatement(partial).then((r) => r.destinations[0]),
@@ -531,7 +531,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     }
     this.stateLoadFailed = true;
     this.state = null;
-    if (this.terminated) return;
+    if (this.#terminated) return;
     console.warn(
       `Tessera ${this.logName}: State API GET failed after ${RETRY_ATTEMPTS} attempts (${lastDetail}); resume disabled, and progress will not be saved this launch so the unread state is left intact.`,
     );
