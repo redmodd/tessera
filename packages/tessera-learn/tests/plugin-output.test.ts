@@ -357,11 +357,15 @@ describe('export packaging gate', () => {
   });
 
   it.each([
-    ['a syntax error', 'export default {', /— JavaScript syntax error$/],
+    [
+      'a syntax error',
+      'export default {',
+      'changed after validation: could not parse, JavaScript syntax error.',
+    ],
     [
       'a non-data value',
       'export default { title: someVariable };',
-      /— JSON5: invalid character/,
+      'changed after validation: the default export must be a static object literal',
     ],
   ])(
     'reports a course.config.js that breaks mid-build with %s',

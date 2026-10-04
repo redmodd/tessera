@@ -30,7 +30,13 @@ import {
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import { checkOneOf, formatValue, type Diagnostics } from './diagnostics.js';
+import {
+  checkOneOf,
+  formatValue,
+  READ_FAILURE_MESSAGES,
+  STATIC_LITERAL_RULE,
+  type Diagnostics,
+} from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
 import { validateQuestionComponents } from './question.js';
 
@@ -259,7 +265,7 @@ export function validatePages(
           const fileName = ensureSvelteSuffix(pageName);
           if (!lesson.files.includes(fileName)) {
             d.error(
-              `${relative(projectRoot, lesson.metaPath)}: pages array lists "${pageName}" but ${fileName} not found in this directory`,
+              `${relative(projectRoot, lesson.metaPath)}: pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,
             );
           }
         }
@@ -305,18 +311,8 @@ function validateMetaFile(
   if (problem === 'missing') return null;
 
   const metaRel = relative(projectRoot, metaPath);
-  if (problem === 'parse-error') {
-    d.error(`${metaRel}: could not parse — JavaScript syntax error`);
-    return null;
-  }
-  if (problem === 'no-export') {
-    d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
-    return null;
-  }
-  if (problem === 'not-data') {
-    d.error(
-      `${metaRel}: the default export must be a static object literal (no variables, function calls, or computed values)`,
-    );
+  if (problem && problem !== 'invalid-pages') {
+    d.error(`${metaRel}: ${READ_FAILURE_MESSAGES[problem]}`);
     return null;
   }
 
@@ -349,9 +345,7 @@ function validatePageConfig(
     return result.value;
   }
   if (result.kind === 'invalid') {
-    d.error(
-      `${fileRel}: pageConfig must be a static object literal (no variables, function calls, or computed values)`,
-    );
+    d.error(`${fileRel}: pageConfig ${STATIC_LITERAL_RULE}`);
   }
   return null;
 }

@@ -663,6 +663,19 @@ describe('_meta.js validation', () => {
     );
   });
 
+  it('errors on a _meta.js with no default export', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export const title = "S";',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'pages/01-section/_meta.js: must use `export default { ... }` syntax',
+    );
+  });
+
   it('errors on a _meta.js default export that is not data', () => {
     createValidProject(testRoot);
     writeFile(
@@ -2874,7 +2887,7 @@ describe('parse failures', () => {
     [
       'a syntax error',
       'export default {',
-      'could not parse — JavaScript syntax error',
+      'could not parse, JavaScript syntax error',
     ],
     [
       'a non-data value',

@@ -14,8 +14,13 @@ import {
   httpOrigin,
   type StandardProfile,
 } from '../../runtime/standards.js';
-import { isRecord } from '../../runtime/types.js';
-import { describeType, formatValue, type Diagnostics } from './diagnostics.js';
+import { isRecord, type XAPIExplicitConfig } from '../../runtime/types.js';
+import {
+  describeType,
+  formatValue,
+  READ_FAILURE_MESSAGES,
+  type Diagnostics,
+} from './diagnostics.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,7 +31,7 @@ const LAUNCH_INHERITED_FIELDS = [
   'activityId',
   'registration',
   'actorAccountHomePage',
-];
+] satisfies (keyof XAPIExplicitConfig)[];
 
 const ACTOR_DERIVING_STANDARDS = STANDARD_IDS.filter(
   (id) => STANDARDS[id].derivesLearnerActor,
@@ -42,7 +47,7 @@ export function readRuntimeXAPIHooks(
   if (!existsSync(runtimePath)) return 'none';
   const runtime = readCourseRuntimeExports(readSourceFileCached(runtimePath));
   if (!runtime) {
-    d.error('course.runtime.js: could not parse, JavaScript syntax error');
+    d.error(`course.runtime.js: ${READ_FAILURE_MESSAGES['parse-error']}`);
     return 'unknown';
   }
   if (runtime.hasDefaultExport) {
@@ -127,7 +132,7 @@ export function validateXAPIConfig(
         );
       }
     }
-  } else if (typeof raw !== 'object') {
+  } else if (!isRecord(raw)) {
     d.error('course.config.js: xapi must be an object or an array of objects');
     return;
   }
@@ -159,7 +164,7 @@ function validateSingleXAPIEntry(
   if (endpoint !== 'lms' && validId !== undefined) {
     if (ids.has(validId)) {
       d.error(
-        `course.config.js: xapi has more than one destination with id ${JSON.stringify(validId)}; ids must be unique`,
+        `course.config.js: xapi has more than one destination with id ${formatValue(validId)}; ids must be unique`,
       );
     }
     ids.add(validId);
@@ -209,13 +214,13 @@ function validateSingleXAPIEntry(
   const url = URL.parse(endpoint);
   if (!url) {
     d.error(
-      `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got "${endpoint}"`,
+      `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got ${formatValue(endpoint)}`,
     );
     return;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     d.error(
-      `course.config.js: ${label}.endpoint must use http: or https:, got "${url.protocol}"`,
+      `course.config.js: ${label}.endpoint must use http: or https:, got ${formatValue(url.protocol)}`,
     );
     return;
   }
@@ -274,7 +279,7 @@ function validateSingleXAPIEntry(
   } else if (!URL.canParse(activityId)) {
     // Any absolute IRI: the URL parser accepts uncommon schemes.
     d.error(
-      `course.config.js: ${label}.activityId must be an absolute IRI, got "${activityId}"`,
+      `course.config.js: ${label}.activityId must be an absolute IRI, got ${formatValue(activityId)}`,
     );
   }
 

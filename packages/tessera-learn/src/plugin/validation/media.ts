@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { findComponents, isLiteralTrue } from '../ast.js';
 import { isVideoEmbed } from '../../components/video-embed.js';
 import { A11Y_IDS, tag } from './a11y.js';
-import type { Diagnostics } from './diagnostics.js';
+import { formatValue, type Diagnostics } from './diagnostics.js';
 
 const MEDIA_COMPONENT_NAMES: ReadonlySet<string> = new Set([
   'Image',
@@ -33,7 +33,7 @@ export function validateMediaComponents(
         d.error(
           tag(
             A11Y_IDS.imageAlt,
-            `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${JSON.stringify(decorative.value)}`,
+            `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${formatValue(decorative.value)}`,
           ),
         );
         continue;

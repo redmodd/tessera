@@ -33,7 +33,8 @@ import {
   checkOneOf,
   describeType,
   formatValue,
-  quoteList,
+  oneOfError,
+  READ_FAILURE_MESSAGES,
   type Diagnostics,
 } from './diagnostics.js';
 import { validateAssetRefs } from './media.js';
@@ -90,13 +91,10 @@ export function parseConfig(
   const read = readCourseConfig(projectRoot);
   const { profile } = resolveConfigRead(read, standardOverride);
   if (!read.ok) {
-    // 'missing' can't occur: validateProject checks existsSync first.
-    if (read.reason === 'no-export') {
-      d.error('course.config.js: must use `export default { ... }` syntax');
-    } else if (read.reason === 'parse-error') {
-      d.error('course.config.js: could not parse — JavaScript syntax error');
-    } else {
+    if (read.reason === 'not-data') {
       reportNonDataConfig(projectRoot, d);
+    } else {
+      d.error(`course.config.js: ${READ_FAILURE_MESSAGES[read.reason]}`);
     }
     return { config: null, profile };
   }
@@ -205,14 +203,23 @@ export function parseConfig(
       );
     } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
       d.error(
-        `course.config.js: "success.from" must be ${quoteList(SUCCESS_SOURCES)}, got ${formatValue(success.from)}`,
+        oneOfError(
+          'course.config.js: "success.from"',
+          SUCCESS_SOURCES,
+          success.from,
+        ),
       );
     } else if (
       success.from === 'fixed' &&
       !oneOf(SUCCESS_STATUSES, success.status)
     ) {
       d.error(
-        `course.config.js: "success.status" must be ${quoteList(SUCCESS_STATUSES)} under success.from: "fixed", got ${formatValue(success.status)}`,
+        oneOfError(
+          'course.config.js: "success.status"',
+          SUCCESS_STATUSES,
+          success.status,
+          ' under success.from: "fixed"',
+        ),
       );
     } else {
       successAccepted = true;
@@ -238,7 +245,12 @@ export function parseConfig(
     }
     if (manual && !oneOf(SUCCESS_STATUSES, requireStatus)) {
       d.error(
-        `course.config.js: "completion.requireSuccessStatus" must be ${quoteList(SUCCESS_STATUSES)} (omit for "unknown"), got ${formatValue(requireStatus)}`,
+        oneOfError(
+          'course.config.js: "completion.requireSuccessStatus"',
+          SUCCESS_STATUSES,
+          requireStatus,
+          ' (omit for "unknown")',
+        ),
       );
     }
   }
@@ -286,9 +298,7 @@ function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
   const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
   const paths = defaultExportFunctionPaths(source);
   if (paths.length === 0) {
-    d.error(
-      'course.config.js: the default export must be a static object literal (no variables, function calls, or computed values)',
-    );
+    d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
     return;
   }
   for (const path of paths) {
@@ -358,7 +368,7 @@ function validateBranding(
       );
     } else if (!isPlausibleColor(primaryColor)) {
       d.warn(
-        `course.config.js: "branding.primaryColor" "${primaryColor}" does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
+        `course.config.js: "branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
       );
     } else {
       // Rule 1.7: primaryColor is used both as links on the default white page

@@ -1,4 +1,5 @@
 import { oneOf } from '../../runtime/types.js';
+import type { ReadFailure } from '../manifest.js';
 
 export interface ValidationResult {
   errors: string[];
@@ -36,6 +37,15 @@ export function formatValue(value: unknown): string {
   return typeof value === 'number' ? String(value) : JSON.stringify(value);
 }
 
+export function oneOfError(
+  field: string,
+  values: readonly string[],
+  value: unknown,
+  note = '',
+): string {
+  return `${field} must be ${quoteList(values)}${note}, got ${formatValue(value)}`;
+}
+
 export function checkOneOf(
   field: string,
   values: readonly string[],
@@ -43,6 +53,16 @@ export function checkOneOf(
   d: Diagnostics,
 ): void {
   if (value !== undefined && !oneOf(values, value)) {
-    d.error(`${field} must be ${quoteList(values)}, got ${formatValue(value)}`);
+    d.error(oneOfError(field, values, value));
   }
 }
+
+export const STATIC_LITERAL_RULE =
+  'must be a static object literal (no variables, function calls, or computed values)';
+
+export const READ_FAILURE_MESSAGES: Record<ReadFailure['reason'], string> = {
+  missing: 'not found',
+  'parse-error': 'could not parse, JavaScript syntax error',
+  'no-export': 'must use `export default { ... }` syntax',
+  'not-data': `the default export ${STATIC_LITERAL_RULE}`,
+};

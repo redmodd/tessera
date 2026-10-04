@@ -34,7 +34,11 @@ import {
 import { validateProject, reportValidationIssues } from './validation.js';
 import { isIgnored, readA11ySettings } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
-import { quoteList } from './validation/diagnostics.js';
+import {
+  formatValue,
+  quoteList,
+  READ_FAILURE_MESSAGES,
+} from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
@@ -58,7 +62,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
   const profile = standardProfile(standardOverride);
   if (standardOverride && !profile) {
     throw new Error(
-      `standardOverride must be ${quoteList(STANDARD_IDS)}, got "${standardOverride}"`,
+      `standardOverride must be ${quoteList(STANDARD_IDS)}, got ${formatValue(standardOverride)}`,
     );
   }
   const ctx = new BuildContext(profile?.id);
@@ -415,21 +419,8 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
       const read = ctx.readConfig();
       if (!read.ok) {
-        // Validation already required a parseable course.config.js — getting
-        // here means it vanished or broke mid-build. Surface that loudly
-        // rather than shipping a bundle with no LMS export silently.
-        if (read.reason === 'missing') {
-          throw new Error(
-            '[tessera:export] course.config.js not found at closeBundle. The file must exist for the export step to run.',
-          );
-        }
-        if (read.reason === 'no-export') {
-          throw new Error(
-            '[tessera:export] course.config.js: could not locate `export default { ... }`. Cannot determine export.standard.',
-          );
-        }
         throw new Error(
-          `[tessera:export] course.config.js: failed to parse export-default object literal — ${read.reason === 'not-data' ? (read.error as Error).message : 'JavaScript syntax error'}`,
+          `[tessera:export] course.config.js changed after validation: ${READ_FAILURE_MESSAGES[read.reason]}. The export step needs it to package the course.`,
         );
       }
 

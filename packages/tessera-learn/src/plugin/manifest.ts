@@ -122,9 +122,10 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-type ReadFailure =
-  | { ok: false; reason: 'missing' | 'parse-error' | 'no-export' }
-  | { ok: false; reason: 'not-data'; error: unknown };
+export interface ReadFailure {
+  ok: false;
+  reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
+}
 
 function readDefaultExport(
   path: string,
@@ -136,8 +137,8 @@ function readDefaultExport(
   if (result.kind !== 'literal') return { ok: false, reason: 'no-export' };
   try {
     return { ok: true, value: JSON5.parse(result.text) };
-  } catch (error) {
-    return { ok: false, reason: 'not-data', error };
+  } catch {
+    return { ok: false, reason: 'not-data' };
   }
 }
 
@@ -211,12 +212,9 @@ export function readMetaFile(metaPath: string): {
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
-  const { pages, ...rest } = read.value as Omit<MetaFile, 'pages'> & {
-    pages?: unknown;
-  };
-  if (pages === undefined || isStringArray(pages))
-    return { meta: { ...rest, pages } };
-  return { meta: rest, problem: 'invalid-pages' };
+  const meta = read.value as MetaFile;
+  if (meta.pages === undefined || isStringArray(meta.pages)) return { meta };
+  return { meta: { ...meta, pages: undefined }, problem: 'invalid-pages' };
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
