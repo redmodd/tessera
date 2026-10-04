@@ -93,8 +93,10 @@ export function parseConfig(
     // 'missing' can't occur: validateProject checks existsSync first.
     if (read.reason === 'no-export') {
       d.error('course.config.js: must use `export default { ... }` syntax');
+    } else if (read.reason === 'parse-error') {
+      d.error('course.config.js: could not parse — JavaScript syntax error');
     } else {
-      reportConfigParseError(projectRoot, d);
+      reportNonDataConfig(projectRoot, d);
     }
     return { config: null, profile };
   }
@@ -184,9 +186,12 @@ export function parseConfig(
       d.warn(
         `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
       );
-    } else if (config.completion.trigger !== 'page') {
-      d.error(
-        `course.config.js: "completion.trigger" must be "page" or omitted, got ${formatValue(config.completion.trigger)}`,
+    } else {
+      checkOneOf(
+        'course.config.js: "completion.trigger"',
+        ['page'],
+        config.completion.trigger,
+        d,
       );
     }
   }
@@ -277,11 +282,13 @@ function validatePercent(
   }
 }
 
-function reportConfigParseError(projectRoot: string, d: Diagnostics): void {
+function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
   const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
   const paths = defaultExportFunctionPaths(source);
   if (paths.length === 0) {
-    d.error('course.config.js: could not parse — JavaScript syntax error');
+    d.error(
+      'course.config.js: the default export must be a static object literal (no variables, function calls, or computed values)',
+    );
     return;
   }
   for (const path of paths) {

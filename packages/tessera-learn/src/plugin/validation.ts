@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clearParseCache } from './ast.js';
-import { readSourceFileCached } from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
 import { applyA11ySettings, normalizeA11y } from './validation/a11y.js';
 import {
@@ -10,7 +9,7 @@ import {
 } from './validation/diagnostics.js';
 import { parseConfig } from './validation/config.js';
 import { crossValidate } from './validation/course.js';
-import { validateContractBypass, validatePages } from './validation/page.js';
+import { validatePages, validateShells } from './validation/page.js';
 import { readRuntimeXAPIHooks, validateXAPIConfig } from './validation/xapi.js';
 
 /** Print notes (cyan), then warnings (yellow), then errors (red). Shared by the dev/build plugin and the CLI. */
@@ -53,12 +52,7 @@ export function validateProject(
 
   const pageResults = validatePages(projectRoot, d, profile);
 
-  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
-    const shellPath = resolve(projectRoot, shellFile);
-    if (existsSync(shellPath)) {
-      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
-    }
-  }
+  validateShells(projectRoot, d);
 
   if (config) {
     crossValidate(config, pageResults, d, profile);

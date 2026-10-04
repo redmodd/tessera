@@ -309,8 +309,14 @@ function validateMetaFile(
     d.error(`${metaRel}: could not parse — JavaScript syntax error`);
     return null;
   }
-  if (problem === 'no-export' || problem === 'not-data') {
+  if (problem === 'no-export') {
     d.error(`${metaRel}: syntax error — must export default { title: "..." }`);
+    return null;
+  }
+  if (problem === 'not-data') {
+    d.error(
+      `${metaRel}: the default export must be a static object literal (no variables, function calls, or computed values)`,
+    );
     return null;
   }
 
@@ -522,7 +528,7 @@ const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
  * source text for known escape hatches — they never inspect course content,
  * so they constrain how you wire things up, not what you build.
  */
-export function validateContractBypass(
+function validateContractBypass(
   content: string,
   fileRel: string,
   d: Diagnostics,
@@ -538,5 +544,14 @@ export function validateContractBypass(
       `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
         `(useQuiz, useQuestion, useNavigation, …) instead`,
     );
+  }
+}
+
+export function validateShells(projectRoot: string, d: Diagnostics): void {
+  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+    const shellPath = resolve(projectRoot, shellFile);
+    if (existsSync(shellPath)) {
+      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
+    }
   }
 }

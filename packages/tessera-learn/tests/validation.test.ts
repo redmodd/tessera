@@ -663,6 +663,19 @@ describe('_meta.js validation', () => {
     );
   });
 
+  it('errors on a _meta.js default export that is not data', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: sectionTitle };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'pages/01-section/_meta.js: the default export must be a static object literal (no variables, function calls, or computed values)',
+    );
+  });
+
   it('errors on _meta.js missing title', () => {
     createValidProject(testRoot);
     writeFile(
@@ -2857,6 +2870,25 @@ describe('AST reach — constructs the regex scanner used to skip', () => {
 });
 
 describe('parse failures', () => {
+  it.each([
+    [
+      'a syntax error',
+      'export default {',
+      'could not parse — JavaScript syntax error',
+    ],
+    [
+      'a non-data value',
+      'export default { title: someVariable };',
+      'the default export must be a static object literal (no variables, function calls, or computed values)',
+    ],
+  ])('names a course.config.js with %s', (_case, source, message) => {
+    createValidProject(testRoot);
+    writeConfig(testRoot, source);
+    expect(validateProject(testRoot).errors).toContain(
+      `course.config.js: ${message}`,
+    );
+  });
+
   it('surfaces an unparseable page as a validator error', () => {
     createValidProject(testRoot);
     writePage(testRoot, `<MultipleChoice question={ />`);

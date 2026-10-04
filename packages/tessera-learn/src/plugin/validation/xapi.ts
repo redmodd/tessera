@@ -55,11 +55,11 @@ export function readRuntimeXAPIHooks(
 
 function hookState(
   hooks: XAPIHookRead,
-  id: unknown,
+  id: string | undefined,
   key: 'auth' | 'actor',
 ): 'yes' | 'no' | 'unknown' {
   if (hooks === 'unknown') return 'unknown';
-  if (hooks === 'none' || typeof id !== 'string') return 'no';
+  if (hooks === 'none' || id === undefined) return 'no';
   const keys = hooks.get(id);
   if (keys === 'unknown') return 'unknown';
   return keys?.has(key) ? 'yes' : 'no';
@@ -155,13 +155,14 @@ function validateSingleXAPIEntry(
 ): void {
   const endpoint = entry.endpoint;
   const id = entry.id;
-  if (endpoint !== 'lms' && typeof id === 'string' && id) {
-    if (ids.has(id)) {
+  const validId = typeof id === 'string' && id !== '' ? id : undefined;
+  if (endpoint !== 'lms' && validId !== undefined) {
+    if (ids.has(validId)) {
       d.error(
-        `course.config.js: xapi has more than one destination with id ${JSON.stringify(id)}; ids must be unique`,
+        `course.config.js: xapi has more than one destination with id ${JSON.stringify(validId)}; ids must be unique`,
       );
     }
-    ids.add(id);
+    ids.add(validId);
   }
   if (endpoint === undefined) {
     d.error(`course.config.js: ${label}.endpoint is required`);
@@ -196,12 +197,12 @@ function validateSingleXAPIEntry(
     d.error(
       `course.config.js: ${label}.id is required. course.runtime.js keys its xapi resolvers by it.`,
     );
-  } else if (typeof id !== 'string' || id === '') {
+  } else if (validId === undefined) {
     d.error(`course.config.js: ${label}.id must be a non-empty string`);
   }
   const hookRef =
-    typeof id === 'string' && id
-      ? `xapi[${JSON.stringify(id)}]`
+    validId !== undefined
+      ? `xapi[${JSON.stringify(validId)}]`
       : `xapi[<${label}.id>]`;
 
   // Explicit endpoint — must be an absolute http(s) URL.
@@ -232,7 +233,7 @@ function validateSingleXAPIEntry(
 
   // auth: required for explicit endpoints, from the config or a resolver.
   const auth = entry.auth;
-  const authHook = hookState(hooks, id, 'auth');
+  const authHook = hookState(hooks, validId, 'auth');
   if (auth === undefined) {
     if (authHook === 'no') {
       d.error(
@@ -279,7 +280,7 @@ function validateSingleXAPIEntry(
 
   // actor — required under web; optional otherwise.
   const actor = entry.actor;
-  const actorHook = hookState(hooks, id, 'actor');
+  const actorHook = hookState(hooks, validId, 'actor');
   if (actor === undefined) {
     if (profile?.packaged === false && actorHook === 'no') {
       d.error(

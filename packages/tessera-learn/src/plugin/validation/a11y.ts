@@ -1,5 +1,6 @@
 import { readCourseConfig } from '../manifest.js';
 import {
+  A11Y_LEVELS,
   A11Y_STANDARDS,
   isRecord,
   oneOf,
@@ -53,7 +54,7 @@ export type A11ySettings = Required<A11yConfig>;
 /** Normalize the raw `a11y` config to defaults, ignoring malformed pieces. */
 export function normalizeA11y(raw: unknown): A11ySettings {
   const a11y = isRecord(raw) ? raw : {};
-  const level = a11y.level === 'error' ? 'error' : 'warn';
+  const level = oneOf(A11Y_LEVELS, a11y.level) ? a11y.level : 'warn';
   const standard = oneOf(A11Y_STANDARDS, a11y.standard)
     ? a11y.standard
     : 'wcag2aa';

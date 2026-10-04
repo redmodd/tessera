@@ -17,6 +17,8 @@ export const RESUME_POLICIES = ['auto', 'never'] as const;
 export const A11Y_LEVELS = ['warn', 'error'] as const;
 export const A11Y_STANDARDS = ['wcag2a', 'wcag2aa', 'wcag21aa'] as const;
 
+export type Verdict = (typeof SUCCESS_STATUSES)[number];
+
 /**
  * Trimmed course identity, or '' when absent. Single source of truth for the
  * "is there a usable id?" check shared by the web storage key, the cmi5/xAPI
@@ -29,7 +31,7 @@ export function courseIdentity(config: { id?: unknown }): string {
 interface SuccessSource {
   completion?: {
     mode?: string;
-    requireSuccessStatus?: (typeof SUCCESS_STATUSES)[number];
+    requireSuccessStatus?: Verdict;
   };
   success?: SuccessConfig;
 }
@@ -181,7 +183,7 @@ export interface A11yConfig {
  */
 export type SuccessConfig =
   | { from: Exclude<(typeof SUCCESS_SOURCES)[number], 'fixed'>; status?: never }
-  | { from: 'fixed'; status: (typeof SUCCESS_STATUSES)[number] };
+  | { from: 'fixed'; status: Verdict };
 
 export interface ManualCompletion {
   mode: 'manual';
@@ -195,7 +197,7 @@ export interface ManualCompletion {
    * When set, markComplete() also flips successStatus. Omit for unknown.
    * Alias for `success: { from: "fixed", status }`, which outranks it.
    */
-  requireSuccessStatus?: (typeof SUCCESS_STATUSES)[number];
+  requireSuccessStatus?: Verdict;
 }
 
 export interface QuizCompletion {
