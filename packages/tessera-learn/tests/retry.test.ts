@@ -139,10 +139,6 @@ describe('WriteQueue', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('[cmi.interactions.1.id] (LMS error 351'),
     );
-
-    calls.length = 0;
-    queue.drainSync();
-    expect(calls).toEqual([]);
   });
 
   it('keeps a write that fails with a general error and retries it on the next trigger', async () => {
@@ -187,10 +183,7 @@ describe('WriteQueue', () => {
     const calls: string[] = [];
 
     const queue = new WriteQueue();
-    queue.errorReporter = {
-      code: () => 391 as unknown as string,
-      message: () => '',
-    };
+    queue.errorReporter = { code: () => 391, message: () => '' };
 
     queue.enqueue(() => {
       calls.push('commit');

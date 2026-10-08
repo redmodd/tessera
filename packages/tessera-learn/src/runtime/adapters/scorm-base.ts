@@ -60,7 +60,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly errorReporter: LMSErrorReporter;
   #terminated = false;
   #suspendOverflowWarned = false;
-  protected interactionCount = 0;
+  #interactionCount = 0;
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
     super();
@@ -172,7 +172,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     if (countRaw === '' || countRaw === '0') return;
     const n = parseInt(countRaw, 10);
     if (Number.isFinite(n) && n >= 0) {
-      this.interactionCount = n;
+      this.#interactionCount = n;
     } else {
       console.warn(
         `Tessera: LMS returned non-numeric cmi.interactions._count="${countRaw}"; new interactions will be written from index 0 and may overwrite prior session records`,
@@ -222,10 +222,10 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       },
     );
     let n: number | null = null;
-    const idKey = () => `cmi.interactions.${this.interactionCount}.id`;
+    const idKey = () => `cmi.interactions.${this.#interactionCount}.id`;
     this.queue.enqueue(() => {
       const result = this.dialect.setValue(this.api, idKey(), id);
-      if (lmsCallSucceeded(result)) n = this.interactionCount++;
+      if (lmsCallSucceeded(result)) n = this.#interactionCount++;
       return result;
     }, idKey);
     for (const [suffix, value] of fields) {

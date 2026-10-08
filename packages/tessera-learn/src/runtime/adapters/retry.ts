@@ -4,7 +4,7 @@
  * Cloud uses the diagnostic to name the offending data-model element.
  */
 export interface LMSErrorReporter {
-  code(): string;
+  code(): unknown;
   message(code: string): string;
   diagnostic?(code: string): string;
 }
@@ -41,17 +41,6 @@ type CallContext = string | (() => string) | undefined;
 function formatContext(context: CallContext): string {
   const resolved = typeof context === 'function' ? context() : context;
   return resolved ? ` [${resolved}]` : '';
-}
-
-function logRetryGiveUp(
-  errorReporter: LMSErrorReporter | undefined,
-  lastErrCode: string,
-  context: CallContext,
-): void {
-  const ctx = formatContext(context);
-  console.warn(
-    `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
-  );
 }
 
 function formatLMSErrorDetail(
@@ -167,7 +156,9 @@ async function retryLoop(
       lastError,
     );
   }
-  logRetryGiveUp(errorReporter, lastErrCode, context);
+  console.warn(
+    `Tessera: LMS call failed after retries${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
+  );
   return 'failed';
 }
 
@@ -183,6 +174,11 @@ export function callSync(fn: () => unknown): boolean {
   }
 }
 
+interface QueueEntry {
+  fn: () => unknown;
+  context?: CallContext;
+}
+
 /**
  * Sequential write queue for LMS operations.
  * Enqueues operations and flushes them sequentially with retry.
@@ -190,11 +186,6 @@ export function callSync(fn: () => unknown): boolean {
  * so it cannot block the writes queued behind it. Any other failure stops
  * the queue and is retried on the next flush trigger.
  */
-interface QueueEntry {
-  fn: () => unknown;
-  context?: CallContext;
-}
-
 export class WriteQueue {
   #queue: QueueEntry[] = [];
   #flushing = false;

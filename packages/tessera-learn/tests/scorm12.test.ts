@@ -712,6 +712,9 @@ describe('SCORM12Adapter', () => {
         'correct',
       );
       expect(keys.some((k) => k.startsWith('cmi.interactions.1.'))).toBe(false);
+      expect(keys.filter((k) => k === 'cmi.interactions.0.type')).toHaveLength(
+        1,
+      );
     });
   });
 
