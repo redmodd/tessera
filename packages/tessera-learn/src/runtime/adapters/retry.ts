@@ -4,7 +4,7 @@
  * Cloud uses the diagnostic to name the offending data-model element.
  */
 export interface LMSErrorReporter {
-  code(): string;
+  code(): unknown;
   message(code: string): string;
   diagnostic?(code: string): string;
 }
@@ -18,28 +18,28 @@ export function backoffMs(attempt: number): number {
 }
 
 // SCORM SetValue may return string "false" or boolean false; everything else is success.
-function lmsCallSucceeded(result: unknown): boolean {
+export function lmsCallSucceeded(result: unknown): boolean {
   return result !== false && result !== 'false';
 }
 
 function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   if (!reporter) return '';
   try {
-    return reporter.code();
+    return String(reporter.code() ?? '');
   } catch {
     return '';
   }
 }
 
-function logRetryGiveUp(
-  errorReporter: LMSErrorReporter | undefined,
-  lastErrCode: string,
-  context: string | undefined,
-): void {
-  const ctx = context ? ` [${context}]` : '';
-  console.warn(
-    `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
-  );
+const PERMANENT_LMS_ERRORS = new Set([
+  132, 133, 142, 143, 201, 301, 351, 401, 402, 403, 404, 405, 406, 407, 408,
+]);
+
+type CallContext = string | (() => string);
+
+function formatContext(context: CallContext | undefined): string {
+  const resolved = typeof context === 'function' ? context() : context;
+  return resolved ? ` [${resolved}]` : '';
 }
 
 function formatLMSErrorDetail(
@@ -65,20 +65,23 @@ function formatLMSErrorDetail(
 /** Sync call that warns with the LMS error code on failure (terminate-path). */
 export function callSyncOrWarn(
   fn: () => unknown,
-  context: string,
+  context: CallContext | undefined,
   errorReporter?: LMSErrorReporter,
 ): boolean {
   let ok: boolean;
   try {
     ok = lmsCallSucceeded(fn());
   } catch (err) {
-    console.warn(`Tessera: LMS call threw [${context}] during terminate`, err);
+    console.warn(
+      `Tessera: LMS call threw${formatContext(context)} during terminate`,
+      err,
+    );
     return false;
   }
   if (!ok) {
     const code = readLastErrorCode(errorReporter);
     console.warn(
-      `Tessera: LMS call failed [${context}] during terminate${formatLMSErrorDetail(errorReporter, code)}`,
+      `Tessera: LMS call failed${formatContext(context)} during terminate${formatLMSErrorDetail(errorReporter, code)}`,
     );
   }
   return ok;
@@ -92,7 +95,7 @@ export function callSyncOrWarn(
  * If `errorReporter` is provided, the SCORM `GetLastError` /
  * `GetErrorString` pair is read after each failure and surfaced in the
  * final warning so production triage can name the real failure
- * (e.g., "201 Invalid argument error" or "405 Incorrect Data Type").
+ * (e.g., "101 General Exception" or "102 General Initialization Failure").
  *
  * Note: During page unload (pagehide/beforeunload), only the first
  * synchronous attempt will execute — async retries with setTimeout
@@ -105,11 +108,12 @@ export async function withRetry(
   errorReporter?: LMSErrorReporter,
   context?: string,
 ): Promise<boolean> {
-  return (await retryLoop(fn, maxRetries, errorReporter, context)) === 'ok';
+  return (
+    (await retryLoop(fn, maxRetries, errorReporter, context, false)) === 'ok'
+  );
 }
 
-// `aborted` skips the give-up warning that `failed` logs.
-type RetryOutcome = 'ok' | 'failed' | 'aborted';
+type RetryOutcome = 'ok' | 'failed' | 'rejected' | 'aborted';
 
 interface RetryHooks {
   onBackoff(): void;
@@ -121,7 +125,8 @@ async function retryLoop(
   fn: () => unknown,
   maxRetries: number,
   errorReporter: LMSErrorReporter | undefined,
-  context: string | undefined,
+  context: CallContext | undefined,
+  dropRejected: boolean,
   hooks?: RetryHooks,
 ): Promise<RetryOutcome> {
   let lastErrCode = '';
@@ -136,6 +141,16 @@ async function retryLoop(
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
+    if (
+      dropRejected &&
+      !threw &&
+      PERMANENT_LMS_ERRORS.has(Number(lastErrCode))
+    ) {
+      console.warn(
+        `Tessera: LMS rejected the call${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, not retrying`,
+      );
+      return 'rejected';
+    }
     if (attempt < maxRetries - 1) {
       hooks?.onBackoff();
       await new Promise((r) => setTimeout(r, backoffMs(attempt)));
@@ -143,36 +158,29 @@ async function retryLoop(
     }
   }
   if (threw) {
-    const ctx = context ? ` [${context}]` : '';
-    console.warn(`Tessera: LMS call threw${ctx} on final retry`, lastError);
+    console.warn(
+      `Tessera: LMS call threw${formatContext(context)} on final retry`,
+      lastError,
+    );
   }
-  logRetryGiveUp(errorReporter, lastErrCode, context);
+  console.warn(
+    `Tessera: LMS call failed after retries${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
+  );
   return 'failed';
 }
 
-/**
- * Synchronous single-attempt LMS call. Used during page unload
- * where async retries cannot run.
- */
-export function callSync(fn: () => unknown): boolean {
-  try {
-    return lmsCallSucceeded(fn());
-  } catch {
-    return false;
-  }
+interface QueueEntry {
+  fn: () => unknown;
+  context?: CallContext;
 }
 
 /**
  * Sequential write queue for LMS operations.
  * Enqueues operations and flushes them sequentially with retry.
- * If an operation fails after retries, the queue stops and retries
- * the failed operation on the next flush trigger.
+ * An operation the LMS rejects with a permanent error is logged and dropped
+ * so it cannot block the writes queued behind it. Any other failure stops
+ * the queue and is retried on the next flush trigger.
  */
-interface QueueEntry {
-  fn: () => unknown;
-  context?: string;
-}
-
 export class WriteQueue {
   #queue: QueueEntry[] = [];
   #flushing = false;
@@ -190,7 +198,7 @@ export class WriteQueue {
   /**
    * Enqueue an operation and trigger a flush.
    */
-  enqueue(fn: () => unknown, context?: string): void {
+  enqueue(fn: () => unknown, context?: CallContext): void {
     this.#queue.push({ fn, context });
     if (!this.#flushing) {
       void this.#flush();
@@ -198,8 +206,10 @@ export class WriteQueue {
   }
 
   /**
-   * Flush the queue sequentially. If an operation fails after retries,
-   * re-insert it at the front and stop — retry on next trigger.
+   * Flush the queue sequentially. An operation the LMS rejects with a
+   * permanent error is dropped after one attempt. Any other failure is
+   * re-inserted at the front after retries and the flush stops, so the
+   * next trigger (or drainSync) runs it again.
    *
    * `#inFlight` is marked *only* while awaiting a backoff: drainSync re-runs
    * an in-flight entry synchronously, which is only safe when the current
@@ -222,6 +232,7 @@ export class WriteQueue {
         RETRY_ATTEMPTS,
         this.errorReporter,
         entry.context,
+        true,
         {
           // The next attempt is gated on a backoff timer that won't fire
           // during page unload; drainSync re-runs the entry instead.
@@ -260,17 +271,17 @@ export class WriteQueue {
     this.#aborted = true;
     this.#flushing = false;
     if (this.#inFlight) {
-      // The async flush's withRetry was suspended at a setTimeout backoff
+      // The async flush's retryLoop was suspended at a setTimeout backoff
       // that won't fire before the page tears down. Run the entry once
       // synchronously so its write isn't lost. The async flush will see
       // the abort flag when (if) it ever resumes and exit cleanly.
       const entry = this.#inFlight;
       this.#inFlight = null;
-      callSync(entry.fn);
+      callSyncOrWarn(entry.fn, entry.context, this.errorReporter);
     }
     while (this.#queue.length > 0) {
       const entry = this.#queue.shift()!;
-      callSync(entry.fn);
+      callSyncOrWarn(entry.fn, entry.context, this.errorReporter);
     }
   }
 

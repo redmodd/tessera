@@ -681,6 +681,40 @@ describe('SCORM12Adapter', () => {
       expect(v['correct_responses.0.pattern']).toBeUndefined();
       expect(v.result).toBeUndefined();
     });
+
+    it('reuses the index of an interaction whose id the LMS rejects', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      let code = '0';
+      api.LMSSetValue.mockImplementation((key, value) => {
+        code = value === 'q1' ? '201' : '0';
+        return code === '0' ? 'true' : 'false';
+      });
+      api.LMSGetLastError.mockImplementation(() => code);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'other', response: 'a', correct: 'a' },
+        true,
+      );
+      adapter.reportInteraction(
+        'q2',
+        { type: 'other', response: 'b', correct: 'b' },
+        true,
+      );
+      await flush();
+      expect(api.LMSSetValue.mock.calls.map(([key]) => key)).toEqual([
+        'cmi.interactions.0.id',
+        'cmi.interactions.0.id',
+        'cmi.interactions.0.type',
+        'cmi.interactions.0.correct_responses.0.pattern',
+        'cmi.interactions.0.student_response',
+        'cmi.interactions.0.result',
+        'cmi.interactions.0.time',
+      ]);
+      expect(api.LMSSetValue).toHaveBeenCalledWith(
+        'cmi.interactions.0.id',
+        'q2',
+      );
+    });
   });
 
   // ---- error logging (parity with cmi5) ----
@@ -735,24 +769,31 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/Terminate.*during terminate/);
     });
 
-    it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      await adapter.init();
-      api.LMSSetValue.mockReturnValue('false');
-      api.LMSGetLastError.mockReturnValue('405');
-      api.LMSGetErrorString.mockReturnValue('Incorrect Data Type');
-      api.LMSGetDiagnostic.mockReturnValue(
-        'student_response invalid CMIFeedback',
-      );
-      useFakeTimers();
-      adapter.setScore(85);
-      await vi.runAllTimersAsync();
-      const messages = printed(warn);
-      expect(messages).toMatch(/cmi\.core\.score\.raw/);
-      expect(messages).toMatch(/405/);
-      expect(messages).toMatch(/Incorrect Data Type/);
-      expect(messages).toMatch(/student_response invalid CMIFeedback/);
-    });
+    it.each([
+      ['101', 'General Exception', /failed after retries/],
+      ['405', 'Incorrect Data Type', /not retrying/],
+    ])(
+      'SetValue failure %s names the cmi key and includes diagnostic',
+      async (code, message, outcome) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await adapter.init();
+        api.LMSSetValue.mockReturnValue('false');
+        api.LMSGetLastError.mockReturnValue(code);
+        api.LMSGetErrorString.mockReturnValue(message);
+        api.LMSGetDiagnostic.mockReturnValue(
+          'student_response invalid CMIFeedback',
+        );
+        useFakeTimers();
+        adapter.setScore(85);
+        await vi.runAllTimersAsync();
+        const messages = printed(warn);
+        expect(messages).toMatch(/cmi\.core\.score\.raw/);
+        expect(messages).toContain(code);
+        expect(messages).toContain(message);
+        expect(messages).toMatch(/student_response invalid CMIFeedback/);
+        expect(messages).toMatch(outcome);
+      },
+    );
   });
 
   describe('deriveActor', () => {
