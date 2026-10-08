@@ -109,11 +109,10 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(0);
   });
 
-  it('stops on failure and retries on next trigger', async () => {
+  it('drops a write that fails every retry and flushes the rest', async () => {
     useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
-    let failFirst = true;
 
     const queue = new WriteQueue();
 
@@ -122,10 +121,9 @@ describe('WriteQueue', () => {
       return 'true';
     });
     queue.enqueue(() => {
-      calls.push('b-attempt');
-      if (failFirst) return false; // fail all retries
-      return 'true';
-    });
+      calls.push('b');
+      return false;
+    }, 'cmi.interactions.1.id');
     queue.enqueue(() => {
       calls.push('c');
       return 'true';
@@ -133,11 +131,12 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(calls).toEqual(['a', 'b-attempt', 'b-attempt', 'b-attempt']);
-    expect(queue.pending).toBe(2); // b and c still pending
+    expect(calls).toEqual(['a', 'b', 'b', 'b', 'c']);
+    expect(queue.pending).toBe(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('[cmi.interactions.1.id]'),
+    );
 
-    // Now let b succeed on next trigger
-    failFirst = false;
     calls.length = 0;
     queue.enqueue(() => {
       calls.push('d');
@@ -146,8 +145,7 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(calls).toEqual(['b-attempt', 'c', 'd']);
-    expect(queue.pending).toBe(0);
+    expect(calls).toEqual(['d']);
   });
 
   it('drainSync executes all pending operations synchronously', () => {

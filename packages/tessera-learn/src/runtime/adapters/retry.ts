@@ -165,8 +165,8 @@ export function callSync(fn: () => unknown): boolean {
 /**
  * Sequential write queue for LMS operations.
  * Enqueues operations and flushes them sequentially with retry.
- * If an operation fails after retries, the queue stops and retries
- * the failed operation on the next flush trigger.
+ * An operation that fails every retry is logged and dropped so it
+ * cannot block the writes queued behind it.
  */
 interface QueueEntry {
   fn: () => unknown;
@@ -198,8 +198,9 @@ export class WriteQueue {
   }
 
   /**
-   * Flush the queue sequentially. If an operation fails after retries,
-   * re-insert it at the front and stop — retry on next trigger.
+   * Flush the queue sequentially. An operation that fails every retry is
+   * dropped: SCORM rejects a SetValue the same way every time, and a failed
+   * Commit is superseded by the next one.
    *
    * `#inFlight` is marked *only* while awaiting a backoff: drainSync re-runs
    * an in-flight entry synchronously, which is only safe when the current
@@ -237,11 +238,6 @@ export class WriteQueue {
 
       // Aborted: drainSync already re-ran this entry synchronously.
       if (outcome === 'aborted') {
-        this.#flushing = false;
-        return;
-      }
-      if (outcome === 'failed') {
-        this.#queue.unshift(entry);
         this.#flushing = false;
         return;
       }
