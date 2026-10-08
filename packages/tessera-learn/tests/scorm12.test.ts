@@ -681,6 +681,38 @@ describe('SCORM12Adapter', () => {
       expect(v['correct_responses.0.pattern']).toBeUndefined();
       expect(v.result).toBeUndefined();
     });
+
+    it('reuses the index of an interaction whose id the LMS rejects', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      api.LMSSetValue.mockImplementation((key, value) =>
+        value === 'q1' ? 'false' : 'true',
+      );
+      api.LMSGetLastError.mockImplementation(() =>
+        api.LMSSetValue.mock.results.at(-1)?.value === 'false' ? '201' : '0',
+      );
+      adapter.reportInteraction(
+        'q1',
+        { type: 'other', response: 'a', correct: 'a' },
+        true,
+      );
+      adapter.reportInteraction(
+        'q2',
+        { type: 'other', response: 'b', correct: 'b' },
+        true,
+      );
+      await flush();
+      const keys = api.LMSSetValue.mock.calls.map(([key]) => key);
+      expect(keys.filter((k) => k === 'cmi.interactions.0.id')).toHaveLength(2);
+      expect(api.LMSSetValue).toHaveBeenCalledWith(
+        'cmi.interactions.0.id',
+        'q2',
+      );
+      expect(api.LMSSetValue).toHaveBeenCalledWith(
+        'cmi.interactions.0.result',
+        'correct',
+      );
+      expect(keys.some((k) => k.startsWith('cmi.interactions.1.'))).toBe(false);
+    });
   });
 
   // ---- error logging (parity with cmi5) ----

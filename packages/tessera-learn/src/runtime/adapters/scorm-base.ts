@@ -209,7 +209,6 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   ): void {
     if (!this.canWrite()) return;
     const [[idSuffix, id], ...fields] = buildScormInteractionFields(
-      '',
       questionId,
       interaction,
       correct,
@@ -223,8 +222,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       },
     );
     let n: number | null = null;
-    const idKey = () =>
-      `cmi.interactions.${n ?? this.interactionCount}${idSuffix}`;
+    const idKey = () => `cmi.interactions.${this.interactionCount}${idSuffix}`;
     this.queue.enqueue(() => {
       const result = this.dialect.setValue(this.api, idKey(), id);
       if (lmsCallSucceeded(result)) n = this.interactionCount++;
