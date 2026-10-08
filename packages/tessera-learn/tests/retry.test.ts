@@ -109,37 +109,40 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(0);
   });
 
-  it('drops a write the LMS rejects with a data-model error and flushes the rest', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
-    let code = '0';
+  it.each(['351', 351])(
+    'drops a write the LMS rejects with data-model error %j and flushes the rest',
+    async (rejected) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const calls: string[] = [];
+      let code: unknown = '0';
 
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => code, message: () => '' };
+      const queue = new WriteQueue();
+      queue.errorReporter = { code: () => code, message: () => '' };
 
-    queue.enqueue(() => {
-      calls.push('a');
-      return 'true';
-    });
-    queue.enqueue(() => {
-      calls.push('b');
-      code = '351';
-      return 'false';
-    }, 'cmi.interactions.1.id');
-    queue.enqueue(() => {
-      calls.push('c');
-      code = '0';
-      return 'true';
-    });
+      queue.enqueue(() => {
+        calls.push('a');
+        return 'true';
+      });
+      queue.enqueue(() => {
+        calls.push('b');
+        code = rejected;
+        return 'false';
+      }, 'cmi.interactions.1.id');
+      queue.enqueue(() => {
+        calls.push('c');
+        code = '0';
+        return 'true';
+      });
 
-    await flush();
+      await flush();
 
-    expect(calls).toEqual(['a', 'b', 'c']);
-    expect(queue.pending).toBe(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('[cmi.interactions.1.id] (LMS error 351'),
-    );
-  });
+      expect(calls).toEqual(['a', 'b', 'c']);
+      expect(queue.pending).toBe(0);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[cmi.interactions.1.id] (LMS error 351'),
+      );
+    },
+  );
 
   it('keeps a write that fails with a general error and retries it on the next trigger', async () => {
     useFakeTimers();
@@ -175,27 +178,6 @@ describe('WriteQueue', () => {
 
     expect(calls).toEqual(['b', 'c', 'd']);
     expect(queue.pending).toBe(0);
-  });
-
-  it('drops a write the LMS rejects with a numeric error code', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
-
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => 351, message: () => '' };
-
-    queue.enqueue(() => {
-      calls.push('b');
-      return 'false';
-    }, 'cmi.interactions.0.id');
-
-    await flush();
-
-    expect(calls).toEqual(['b']);
-    expect(queue.pending).toBe(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('(LMS error 351'),
-    );
   });
 
   it.each([

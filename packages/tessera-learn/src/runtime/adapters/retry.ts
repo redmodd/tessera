@@ -32,8 +32,7 @@ function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
 }
 
 const PERMANENT_LMS_ERRORS = new Set([
-  132, 133, 142, 143, 201, 202, 203, 301, 351, 401, 402, 403, 404, 405, 406,
-  407, 408,
+  132, 133, 142, 143, 201, 301, 351, 401, 402, 403, 404, 405, 406, 407, 408,
 ]);
 
 type CallContext = string | (() => string) | undefined;
