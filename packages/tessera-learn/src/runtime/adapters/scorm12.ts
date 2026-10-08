@@ -96,8 +96,8 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   setSuccessStatus(status: SuccessStatus): void {
-    // SCORM 1.2 has no "unknown" lesson_status — clear the success override
-    // so completion status drives lesson_status until a real result is known.
+    // SCORM 1.2 has no "unknown" lesson_status, so null leaves it to
+    // completion status.
     this.#successStatus = status === 'unknown' ? null : status;
     this.#flushLessonStatus();
   }
