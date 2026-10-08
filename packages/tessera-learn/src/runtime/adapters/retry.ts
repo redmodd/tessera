@@ -25,7 +25,7 @@ export function lmsCallSucceeded(result: unknown): boolean {
 function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   if (!reporter) return '';
   try {
-    return reporter.code();
+    return String(reporter.code() ?? '');
   } catch {
     return '';
   }
@@ -97,7 +97,8 @@ export function callSyncOrWarn(
 
 /**
  * Retry wrapper for LMS API calls.
- * Retries up to maxRetries times with exponential backoff.
+ * Retries up to maxRetries times with exponential backoff, or stops after
+ * one attempt when the LMS error code marks a permanent rejection.
  * Returns true if the call eventually succeeded, false otherwise.
  *
  * If `errorReporter` is provided, the SCORM `GetLastError` /

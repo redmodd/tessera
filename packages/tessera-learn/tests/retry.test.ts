@@ -181,6 +181,28 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(0);
   });
 
+  it('keeps a commit failure the LMS reports as a numeric 391', async () => {
+    useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: string[] = [];
+
+    const queue = new WriteQueue();
+    queue.errorReporter = {
+      code: () => 391 as unknown as string,
+      message: () => '',
+    };
+
+    queue.enqueue(() => {
+      calls.push('commit');
+      return 'false';
+    }, 'Commit');
+
+    await vi.runAllTimersAsync();
+
+    expect(calls).toEqual(['commit', 'commit', 'commit']);
+    expect(queue.pending).toBe(1);
+  });
+
   it('drainSync runs a write kept after a general error', async () => {
     useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
