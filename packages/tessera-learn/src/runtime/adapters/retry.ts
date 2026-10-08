@@ -31,9 +31,10 @@ function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   }
 }
 
-function isPermanentLMSError(code: string): boolean {
-  return /^(13[23]|14[23]|[2-4]\d\d)$/.test(code) && code !== '391';
-}
+const PERMANENT_LMS_ERRORS = new Set(
+  `132 133 142 143 201 202 203 301 351
+   401 402 403 404 405 406 407 408`.split(/\s+/),
+);
 
 type CallContext = string | (() => string) | undefined;
 
@@ -148,7 +149,7 @@ async function retryLoop(
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
-    if (!threw && isPermanentLMSError(lastErrCode)) {
+    if (!threw && PERMANENT_LMS_ERRORS.has(lastErrCode)) {
       console.warn(
         `Tessera: LMS rejected the call${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, not retrying`,
       );

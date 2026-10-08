@@ -203,6 +203,25 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(1);
   });
 
+  it('keeps a write that fails with a code outside the SCORM error tables', async () => {
+    useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: string[] = [];
+
+    const queue = new WriteQueue();
+    queue.errorReporter = { code: () => '250', message: () => '' };
+
+    queue.enqueue(() => {
+      calls.push('b');
+      return 'false';
+    }, 'cmi.location');
+
+    await vi.runAllTimersAsync();
+
+    expect(calls).toEqual(['b', 'b', 'b']);
+    expect(queue.pending).toBe(1);
+  });
+
   it('drainSync runs a write kept after a general error', async () => {
     useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});

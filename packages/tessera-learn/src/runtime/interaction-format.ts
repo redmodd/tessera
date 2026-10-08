@@ -228,11 +228,8 @@ export function buildScormInteractionFields(
   interaction: Interaction,
   correct: boolean | null,
   spec: ScormInteractionSpec,
-): Array<[string, string]> {
-  const fields: Array<[string, string]> = [
-    ['.id', spec.format.identifier(questionId)],
-    ['.type', spec.typeValue],
-  ];
+): { id: string; fields: Array<[string, string]> } {
+  const fields: Array<[string, string]> = [['.type', spec.typeValue]];
   const patterns = formatCorrectPattern(interaction, spec.format);
   if (patterns !== null) {
     patterns.forEach((pattern, n) => {
@@ -250,5 +247,5 @@ export function buildScormInteractionFields(
     ]);
   }
   fields.push([`.${spec.timestampField}`, spec.timestamp]);
-  return fields;
+  return { id: spec.format.identifier(questionId), fields };
 }
