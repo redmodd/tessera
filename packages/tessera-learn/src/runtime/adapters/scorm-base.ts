@@ -229,7 +229,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       return result;
     }, idKey);
     for (const [suffix, value] of fields) {
-      const key = () => `cmi.interactions.${n}${suffix}`;
+      const key = () => `cmi.interactions.${n}.${suffix}`;
       this.queue.enqueue(
         () => n === null || this.dialect.setValue(this.api, key(), value),
         key,

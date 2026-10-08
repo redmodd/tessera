@@ -144,63 +144,48 @@ describe('WriteQueue', () => {
     },
   );
 
-  it('keeps a write that fails with a general error and retries it on the next trigger', async () => {
-    useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
-    let failing = true;
-
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => '101', message: () => '' };
-
-    queue.enqueue(() => {
-      calls.push('b');
-      return failing ? 'false' : 'true';
-    }, 'cmi.completion_status');
-    queue.enqueue(() => {
-      calls.push('c');
-      return 'true';
-    });
-
-    await vi.runAllTimersAsync();
-
-    expect(calls).toEqual(['b', 'b', 'b']);
-    expect(queue.pending).toBe(2);
-
-    failing = false;
-    calls.length = 0;
-    queue.enqueue(() => {
-      calls.push('d');
-      return 'true';
-    });
-
-    await vi.runAllTimersAsync();
-
-    expect(calls).toEqual(['b', 'c', 'd']);
-    expect(queue.pending).toBe(0);
-  });
-
   it.each([
+    ['a general error', '101'],
     ['a commit failure reported as a numeric 391', 391],
     ['a code outside the SCORM error tables', '250'],
-  ])('keeps a write that fails with %s', async (_, code) => {
-    useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
+  ])(
+    'keeps a write that fails with %s and retries it on the next trigger',
+    async (_, code) => {
+      useFakeTimers();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const calls: string[] = [];
+      let failing = true;
 
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => code, message: () => '' };
+      const queue = new WriteQueue();
+      queue.errorReporter = { code: () => code, message: () => '' };
 
-    queue.enqueue(() => {
-      calls.push('b');
-      return 'false';
-    });
+      queue.enqueue(() => {
+        calls.push('b');
+        return failing ? 'false' : 'true';
+      });
+      queue.enqueue(() => {
+        calls.push('c');
+        return 'true';
+      });
 
-    await vi.runAllTimersAsync();
+      await vi.runAllTimersAsync();
 
-    expect(calls).toEqual(['b', 'b', 'b']);
-    expect(queue.pending).toBe(1);
-  });
+      expect(calls).toEqual(['b', 'b', 'b']);
+      expect(queue.pending).toBe(2);
+
+      failing = false;
+      calls.length = 0;
+      queue.enqueue(() => {
+        calls.push('d');
+        return 'true';
+      });
+
+      await vi.runAllTimersAsync();
+
+      expect(calls).toEqual(['b', 'c', 'd']);
+      expect(queue.pending).toBe(0);
+    },
+  );
 
   it('drainSync executes all pending operations synchronously', () => {
     const calls: number[] = [];

@@ -35,9 +35,9 @@ const PERMANENT_LMS_ERRORS = new Set([
   132, 133, 142, 143, 201, 301, 351, 401, 402, 403, 404, 405, 406, 407, 408,
 ]);
 
-type CallContext = string | (() => string) | undefined;
+type CallContext = string | (() => string);
 
-function formatContext(context: CallContext): string {
+function formatContext(context: CallContext | undefined): string {
   const resolved = typeof context === 'function' ? context() : context;
   return resolved ? ` [${resolved}]` : '';
 }
@@ -121,7 +121,7 @@ async function retryLoop(
   fn: () => unknown,
   maxRetries: number,
   errorReporter: LMSErrorReporter | undefined,
-  context: CallContext,
+  context: CallContext | undefined,
   hooks?: RetryHooks,
 ): Promise<RetryOutcome> {
   let lastErrCode = '';

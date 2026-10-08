@@ -229,23 +229,20 @@ export function buildScormInteractionFields(
   correct: boolean | null,
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
-  const fields: Array<[string, string]> = [['.type', spec.typeValue]];
+  const fields: Array<[string, string]> = [['type', spec.typeValue]];
   const patterns = formatCorrectPattern(interaction, spec.format);
   if (patterns !== null) {
     patterns.forEach((pattern, n) => {
-      fields.push([`.correct_responses.${n}.pattern`, pattern]);
+      fields.push([`correct_responses.${n}.pattern`, pattern]);
     });
   }
-  fields.push([
-    `.${spec.responseField}`,
-    formatResponse(interaction, spec.format),
-  ]);
+  fields.push([spec.responseField, formatResponse(interaction, spec.format)]);
   if (correct !== null) {
     fields.push([
-      '.result',
+      'result',
       correct ? spec.resultLabels.correct : spec.resultLabels.incorrect,
     ]);
   }
-  fields.push([`.${spec.timestampField}`, spec.timestamp]);
+  fields.push([spec.timestampField, spec.timestamp]);
   return { id: spec.format.identifier(questionId), fields };
 }
