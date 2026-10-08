@@ -107,6 +107,49 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
   });
+
+  test('a failing score holds lesson_status at incomplete until the course completes, then reports failed', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await page
+      .locator('.tessera-nav-page', { hasText: /^\s*Exam\s*$/ })
+      .click();
+    await waitForCustomQuiz(page);
+    await page
+      .locator('[data-question-id="q-planet"] .tessera-mc-option')
+      .nth(0)
+      .click();
+    await page
+      .locator('[data-question-id="q-water"] input[type="text"]')
+      .fill('H2O');
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '50',
+        'cmi.core.lesson_status': 'incomplete',
+      });
+
+    await page.locator('.tessera-nav-page', { hasText: 'Inline Exam' }).click();
+    await page
+      .locator('[data-question-id="q-inline-planet"] input')
+      .nth(1)
+      .check();
+    await page
+      .locator('[data-question-id="q-inline-ocean"] input')
+      .nth(2)
+      .check();
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '50',
+        'cmi.core.lesson_status': 'failed',
+      });
+  });
 });
 
 // ---------------------------------------------------------------------------

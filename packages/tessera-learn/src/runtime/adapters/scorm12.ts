@@ -103,15 +103,12 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   }
 
   #flushLessonStatus(): void {
-    const heldFailed =
+    const success =
       this.#successStatus === 'failed' &&
-      this.#completionStatus === 'incomplete';
-    this.set(
-      'cmi.core.lesson_status',
-      heldFailed
-        ? this.#completionStatus
-        : (this.#successStatus ?? this.#completionStatus),
-    );
+      this.#completionStatus === 'incomplete'
+        ? null
+        : this.#successStatus;
+    this.set('cmi.core.lesson_status', success ?? this.#completionStatus);
   }
 
   setExit(mode: ExitMode): void {
