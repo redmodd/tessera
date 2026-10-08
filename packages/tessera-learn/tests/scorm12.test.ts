@@ -769,25 +769,31 @@ describe('SCORM12Adapter', () => {
       expect(messages).toMatch(/Terminate.*during terminate/);
     });
 
-    it('SetValue retry give-up names the cmi key and includes diagnostic', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      await adapter.init();
-      api.LMSSetValue.mockReturnValue('false');
-      api.LMSGetLastError.mockReturnValue('101');
-      api.LMSGetErrorString.mockReturnValue('General Exception');
-      api.LMSGetDiagnostic.mockReturnValue(
-        'student_response invalid CMIFeedback',
-      );
-      useFakeTimers();
-      adapter.setScore(85);
-      await vi.runAllTimersAsync();
-      const messages = printed(warn);
-      expect(messages).toMatch(/cmi\.core\.score\.raw/);
-      expect(messages).toMatch(/101/);
-      expect(messages).toMatch(/General Exception/);
-      expect(messages).toMatch(/student_response invalid CMIFeedback/);
-      expect(messages).toMatch(/failed after retries/);
-    });
+    it.each([
+      ['101', 'General Exception', /failed after retries/],
+      ['405', 'Incorrect Data Type', /not retrying/],
+    ])(
+      'SetValue failure %s names the cmi key and includes diagnostic',
+      async (code, message, outcome) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await adapter.init();
+        api.LMSSetValue.mockReturnValue('false');
+        api.LMSGetLastError.mockReturnValue(code);
+        api.LMSGetErrorString.mockReturnValue(message);
+        api.LMSGetDiagnostic.mockReturnValue(
+          'student_response invalid CMIFeedback',
+        );
+        useFakeTimers();
+        adapter.setScore(85);
+        await vi.runAllTimersAsync();
+        const messages = printed(warn);
+        expect(messages).toMatch(/cmi\.core\.score\.raw/);
+        expect(messages).toContain(code);
+        expect(messages).toContain(message);
+        expect(messages).toMatch(/student_response invalid CMIFeedback/);
+        expect(messages).toMatch(outcome);
+      },
+    );
   });
 
   describe('deriveActor', () => {
