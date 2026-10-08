@@ -49,7 +49,7 @@ export class CourseSession {
   #launched = $state(false);
   #terminated = $state(false);
   #exitPhase = $state<ExitPhase | null>(null);
-  #duration = new DurationTracker(0);
+  #duration = new DurationTracker();
   #xapiClient: XAPIClient | null = null;
 
   // Each usePersistence call site namespaces under its own key. Saved to SavedState.u.
@@ -138,6 +138,10 @@ export class CourseSession {
     }
     if (this.#lifetime.signal.aborted) return null;
 
+    const { signal } = this.#lifetime;
+    window.addEventListener('pagehide', this.#onPagehide, { signal });
+    window.addEventListener('pageshow', this.#onPageshow, { signal });
+
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
     try {
@@ -145,7 +149,7 @@ export class CourseSession {
     } catch (err) {
       console.warn('Tessera: resume state load failed', err);
     }
-    if (this.#lifetime.signal.aborted) return null;
+    if (this.#lifetime.signal.aborted || this.#terminated) return null;
 
     // An LMS-supplied mastery score is the authoritative pass threshold for
     // this launch and overrides the manifest.
@@ -174,10 +178,6 @@ export class CourseSession {
       this.#persistPending = false;
       this.#requestPersist();
     }
-
-    const { signal } = this.#lifetime;
-    window.addEventListener('pagehide', this.#onPagehide, { signal });
-    window.addEventListener('pageshow', this.#onPageshow, { signal });
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
@@ -233,7 +233,7 @@ export class CourseSession {
     if (isRecord(saved.u)) {
       this.#userState = { ...this.#userState, ...saved.u };
     }
-    this.#duration = new DurationTracker(saved.d);
+    this.#duration.setPrevious(saved.d);
     // After progress, so the bookmark's page is unlocked.
     this.#nav.goToPage(saved.b);
 
@@ -400,8 +400,9 @@ export class CourseSession {
     this.#terminated = true;
     registerXAPIClient(null);
     const adapter = this.#adapter;
-    adapter.saveState(this.#serialize());
     adapter.setDuration(this.#duration.sessionSeconds);
+    if (!this.#persistenceReady) return true;
+    adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
     adapter.setExit(
       this.#progress.reportedCompletionStatus === 'complete'

@@ -73,8 +73,8 @@ export function recordingAdapter(overrides: Partial<BaseAdapter> = {}) {
 }
 
 export const EXIT_SEQUENCE = [
-  'saveState',
   'setDuration:0',
+  'saveState',
   'setExit:suspend',
   'commit',
   'terminate',

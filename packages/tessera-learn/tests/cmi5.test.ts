@@ -13,6 +13,7 @@ import {
   respond,
   setLaunchParams,
   statementRequests,
+  useFakeTimers,
 } from './helpers.js';
 
 const mockFetch = vi.fn();
@@ -41,6 +42,12 @@ function isRunningStateGet(url: string, options?: RequestInit): boolean {
     !url.includes('tessera-state-exit') &&
     (!options || options.method === 'GET')
   );
+}
+
+function pendingUntilAborted(init?: RequestInit): Promise<Response> {
+  return new Promise((_, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+  });
 }
 
 describe('CMI5Adapter.connect', () => {
@@ -86,10 +93,12 @@ describe('CMI5Adapter', () => {
     return assign;
   }
 
-  function routeResumeGet(resumeGet: Mock<() => Promise<Response>>): void {
+  function routeResumeGet(
+    resumeGet: Mock<(init?: RequestInit) => Promise<Response>>,
+  ): void {
     const lms = cmi5Fetch();
     mockFetch.mockImplementation((url: string, init?: RequestInit) =>
-      isRunningStateGet(url, init) ? resumeGet() : lms(url, init),
+      isRunningStateGet(url, init) ? resumeGet(init) : lms(url, init),
     );
   }
 
@@ -140,6 +149,35 @@ describe('CMI5Adapter', () => {
     adapter.saveState({ b: 3, v: [0, 1, 2, 3], d: 9 });
     await flush();
     expect(stateWrites()).toHaveLength(1);
+  });
+
+  it('restores state in browsers without AbortSignal.any', async () => {
+    const saved: SavedState = { b: 2, v: [0, 1, 2], d: 5 };
+    const adapter = await initAdapter({ saved });
+    vi.spyOn(AbortSignal, 'any').mockImplementation(() => {
+      throw new TypeError('AbortSignal.any is not a function');
+    });
+    await adapter.loadState();
+    expect(adapter.getState()).toEqual(saved);
+  });
+
+  it('aborts the other resume GET when one fails, before retrying', async () => {
+    const adapter = await initAdapter();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const exitSignals: AbortSignal[] = [];
+    const lms = cmi5Fetch();
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (isRunningStateGet(url, init)) return Promise.resolve(respond(503));
+      if (url.includes('tessera-state-exit') && init?.method === 'GET') {
+        exitSignals.push(init.signal!);
+        return pendingUntilAborted(init);
+      }
+      return lms(url, init);
+    });
+    await adapter.loadState();
+
+    expect(exitSignals).toHaveLength(RETRY_ATTEMPTS);
+    expect(exitSignals.every((s) => s.aborted)).toBe(true);
   });
 
   it('does not retry a 404, which is a definitive empty answer', async () => {
@@ -558,6 +596,52 @@ describe('CMI5Adapter', () => {
       `${VERB}completed`,
       `${VERB}terminated`,
     ]);
+  });
+
+  it.each([
+    ['aborts the resume GET in flight', pendingUntilAborted],
+    [
+      'stops retrying the resume GET',
+      async (): Promise<Response> => {
+        throw new Error('network down');
+      },
+    ],
+  ])('%s on terminate, and still refuses to save', async (_, get) => {
+    const adapter = await initAdapter();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const resumeGet = vi.fn(get);
+    routeResumeGet(resumeGet);
+    const loading = adapter.loadState();
+    await flush();
+
+    adapter.terminate();
+    await loading;
+    adapter.saveState({ b: 0, v: [0], d: 1 });
+    await flush();
+
+    expect(resumeGet).toHaveBeenCalledTimes(1);
+    expect(adapter.getState()).toBeNull();
+    expect(sentVerbs()).toEqual(['initialized', 'terminated']);
+    expect(stateWrites()).toHaveLength(0);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('clears the resume backoff timer when terminate cuts the wait short', async () => {
+    const adapter = await initAdapter();
+    routeResumeGet(
+      vi.fn(async (): Promise<Response> => {
+        throw new Error('network down');
+      }),
+    );
+    useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const loading = adapter.loadState();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(1);
+
+    adapter.terminate();
+    await loading;
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('writes the final state to the exit document and keeps saving after terminate', async () => {

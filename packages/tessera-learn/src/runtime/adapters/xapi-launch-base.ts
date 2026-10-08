@@ -82,6 +82,21 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
+function linkedController(...signals: AbortSignal[]): AbortController {
+  const controller = new AbortController();
+  for (const source of signals) {
+    if (source.aborted) {
+      controller.abort(source.reason);
+      break;
+    }
+    source.addEventListener('abort', () => controller.abort(source.reason), {
+      once: true,
+      signal: controller.signal,
+    });
+  }
+  return controller;
+}
+
 type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
   'sessionId' | 'cmi5Mode'
@@ -111,7 +126,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
-  protected terminated = false;
   protected returnURL: string | undefined;
   #activityId = '';
   #registration: string | undefined;
@@ -119,6 +133,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #finalSend: Promise<void> | null = null;
   #stateSeq = 0;
   #stateSaved = true;
+  #termination = new AbortController();
+
+  get #terminated(): boolean {
+    return this.#termination.signal.aborted;
+  }
 
   static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
     const adapter = new this();
@@ -348,8 +367,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override terminate(unloading = true): void {
-    if (this.terminated) return;
-    this.terminated = true;
+    if (this.#terminated) return;
+    this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {
       this.publisher.markUnloading();
@@ -369,7 +388,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   override async exit(deadline: Promise<unknown>): Promise<void> {
     const settles = (task: Promise<unknown>) =>
       Promise.race([task.then(() => true), deadline.then(() => false)]);
-    if (!this.terminated) {
+    if (!this.#terminated) {
       const saved =
         !this.publisher ||
         ((await settles(this.publisher.drained())) && this.#stateSaved);
@@ -417,7 +436,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   /** Enqueue a lifecycle statement fire-and-forget. `label` names it in both the LRS-reject and send-failure warnings. */
   protected dispatch(label: string, partial: PartialStatement): void {
-    if (!this.publisher || this.terminated) return;
+    if (!this.publisher || this.#terminated) return;
     void this.#report(
       label,
       this.publisher.sendStatement(partial).then((r) => r.destinations[0]),
@@ -473,21 +492,33 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * Resume GET of the running and exit state documents, retried on the shared
    * LMS backoff schedule; the one with the higher write sequence wins. A 404,
    * an empty body, or an unparseable one is a definitive answer and returns
-   * with saving enabled. Exhausting the attempts or the deadline leaves the
-   * stored state unread, so `stateLoadFailed` withholds every later write.
+   * with saving enabled. Exhausting the attempts or the deadline, or
+   * terminating first (which aborts the read in flight), leaves the stored
+   * state unread, so `stateLoadFailed` withholds every later write.
    */
   override async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
     let lastDetail = '';
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-      if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, backoffMs(attempt - 1)));
-        if (deadline.aborted) break;
-      }
+      const request = linkedController(deadline, this.#termination.signal);
       try {
+        if (attempt > 0) {
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, backoffMs(attempt - 1));
+            request.signal.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true },
+            );
+          });
+          if (request.signal.aborted) break;
+        }
         const [running, exit] = await Promise.all([
-          this.#getStateDoc(this.buildStateUrl(), deadline),
-          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), deadline),
+          this.#getStateDoc(this.buildStateUrl(), request.signal),
+          this.#getStateDoc(this.buildStateUrl(EXIT_STATE_ID), request.signal),
         ]);
         const latest = (exit?.n ?? 0) > (running?.n ?? 0) ? exit : running;
         this.#stateSeq = latest?.n ?? 0;
@@ -500,11 +531,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
-        if (deadline.aborted) break;
+        if (request.signal.aborted) break;
+      } finally {
+        request.abort();
       }
     }
     this.stateLoadFailed = true;
     this.state = null;
+    if (this.#terminated) return;
     console.warn(
       `Tessera ${this.logName}: State API GET failed after ${RETRY_ATTEMPTS} attempts (${lastDetail}); resume disabled, and progress will not be saved this launch so the unread state is left intact.`,
     );

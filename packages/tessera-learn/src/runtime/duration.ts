@@ -14,7 +14,7 @@ export class DurationTracker {
   #accumulated = 0;
   #pausedAt: number | null = null;
 
-  constructor(previousSeconds: number = 0) {
+  setPrevious(previousSeconds: number): void {
     this.#accumulated =
       Number.isFinite(previousSeconds) && previousSeconds > 0
         ? previousSeconds

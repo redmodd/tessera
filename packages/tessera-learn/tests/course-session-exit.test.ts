@@ -10,7 +10,14 @@ import {
 import type { SavedState } from '../src/runtime/persistence.js';
 import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { CourseSession } from '../src/runtime/course-session.svelte.js';
-import { flush, manualConfig, stubAdapter, useFakeTimers } from './helpers.js';
+import { structureFingerprint } from '../src/runtime/fingerprint.js';
+import {
+  createManifest,
+  flush,
+  manualConfig,
+  stubAdapter,
+  useFakeTimers,
+} from './helpers.js';
 import {
   bfcacheRoundTrip,
   buildXAPIStub,
@@ -299,6 +306,77 @@ describe('ending a CourseSession', () => {
     pagehide();
 
     expect(session.canExit).toBe(false);
+  });
+
+  it('terminates with the elapsed duration but without saving or reporting on pagehide while saved state loads', async () => {
+    useFakeTimers({ toFake: ['Date'] });
+    const load = Promise.withResolvers<void>();
+    const setCompletionStatus = vi.fn();
+    const { adapter, calls } = recordingAdapter({
+      loadState: () => load.promise,
+      setCompletionStatus,
+    });
+    const { session } = createSession({ adapter });
+    const started = session.start();
+    await flush();
+
+    vi.advanceTimersByTime(8_000);
+    pagehide();
+    load.resolve();
+    await started;
+    await flush();
+
+    expect(calls).toEqual(['setDuration:8', 'terminate']);
+    expect(setCompletionStatus).not.toHaveBeenCalled();
+    expect(session.persistenceReady).toBe(false);
+  });
+
+  it('counts the saved state load in a resumed session duration', async () => {
+    useFakeTimers({ toFake: ['Date'] });
+    const manifest = createManifest(2);
+    const load = Promise.withResolvers<void>();
+    const { adapter, calls } = recordingAdapter({
+      loadState: () => load.promise,
+      getState: () =>
+        ({
+          b: 0,
+          v: [0],
+          d: 100,
+          f: structureFingerprint(manifest),
+        }) as SavedState,
+    });
+    const { session } = createSession({ adapter, manifest });
+    const started = session.start();
+    await flush();
+
+    vi.advanceTimersByTime(3_000);
+    load.resolve();
+    await started;
+    vi.advanceTimersByTime(1_000);
+    pagehide();
+
+    expect(calls.slice(-EXIT_SEQUENCE.length)).toEqual(
+      EXIT_SEQUENCE.with(0, 'setDuration:4'),
+    );
+  });
+
+  it('ends a session restored from the back/forward cache after pagehide while saved state loads', async () => {
+    const load = Promise.withResolvers<void>();
+    const { adapter, calls } = recordingAdapter({
+      loadState: () => load.promise,
+    });
+    const { session } = createSession({ adapter });
+    const started = session.start();
+    await flush();
+
+    enterBfcache();
+    load.resolve();
+    await started;
+    restoreFromBfcache();
+    await flush();
+
+    expect(session.exitPhase).toBe('ended');
+    expect(calls).toEqual(['setDuration:0', 'terminate']);
   });
 
   it('ends a session restored from the back/forward cache after pagehide', async () => {
