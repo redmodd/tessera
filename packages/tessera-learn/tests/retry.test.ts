@@ -177,37 +177,42 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(0);
   });
 
-  it('keeps a commit failure the LMS reports as a numeric 391', async () => {
-    useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('drops a write the LMS rejects with a numeric error code', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
 
     const queue = new WriteQueue();
-    queue.errorReporter = { code: () => 391, message: () => '' };
-
-    queue.enqueue(() => {
-      calls.push('commit');
-      return 'false';
-    }, 'Commit');
-
-    await vi.runAllTimersAsync();
-
-    expect(calls).toEqual(['commit', 'commit', 'commit']);
-    expect(queue.pending).toBe(1);
-  });
-
-  it('keeps a write that fails with a code outside the SCORM error tables', async () => {
-    useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
-
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => '250', message: () => '' };
+    queue.errorReporter = { code: () => 351, message: () => '' };
 
     queue.enqueue(() => {
       calls.push('b');
       return 'false';
-    }, 'cmi.location');
+    }, 'cmi.interactions.0.id');
+
+    await flush();
+
+    expect(calls).toEqual(['b']);
+    expect(queue.pending).toBe(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('(LMS error 351'),
+    );
+  });
+
+  it.each([
+    ['a commit failure reported as a numeric 391', 391],
+    ['a code outside the SCORM error tables', '250'],
+  ])('keeps a write that fails with %s', async (_, code) => {
+    useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: string[] = [];
+
+    const queue = new WriteQueue();
+    queue.errorReporter = { code: () => code, message: () => '' };
+
+    queue.enqueue(() => {
+      calls.push('b');
+      return 'false';
+    });
 
     await vi.runAllTimersAsync();
 

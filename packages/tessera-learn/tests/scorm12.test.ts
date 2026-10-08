@@ -684,12 +684,12 @@ describe('SCORM12Adapter', () => {
 
     it('reuses the index of an interaction whose id the LMS rejects', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
-      api.LMSSetValue.mockImplementation((key, value) =>
-        value === 'q1' ? 'false' : 'true',
-      );
-      api.LMSGetLastError.mockImplementation(() =>
-        api.LMSSetValue.mock.results.at(-1)?.value === 'false' ? '201' : '0',
-      );
+      let code = '0';
+      api.LMSSetValue.mockImplementation((key, value) => {
+        code = value === 'q1' ? '201' : '0';
+        return code === '0' ? 'true' : 'false';
+      });
+      api.LMSGetLastError.mockImplementation(() => code);
       adapter.reportInteraction(
         'q1',
         { type: 'other', response: 'a', correct: 'a' },
@@ -701,19 +701,18 @@ describe('SCORM12Adapter', () => {
         true,
       );
       await flush();
-      const keys = api.LMSSetValue.mock.calls.map(([key]) => key);
-      expect(keys.filter((k) => k === 'cmi.interactions.0.id')).toHaveLength(2);
+      expect(api.LMSSetValue.mock.calls.map(([key]) => key)).toEqual([
+        'cmi.interactions.0.id',
+        'cmi.interactions.0.id',
+        'cmi.interactions.0.type',
+        'cmi.interactions.0.correct_responses.0.pattern',
+        'cmi.interactions.0.student_response',
+        'cmi.interactions.0.result',
+        'cmi.interactions.0.time',
+      ]);
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.interactions.0.id',
         'q2',
-      );
-      expect(api.LMSSetValue).toHaveBeenCalledWith(
-        'cmi.interactions.0.result',
-        'correct',
-      );
-      expect(keys.some((k) => k.startsWith('cmi.interactions.1.'))).toBe(false);
-      expect(keys.filter((k) => k === 'cmi.interactions.0.type')).toHaveLength(
-        1,
       );
     });
   });

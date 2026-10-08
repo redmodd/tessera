@@ -31,10 +31,10 @@ function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   }
 }
 
-const PERMANENT_LMS_ERRORS = new Set(
-  `132 133 142 143 201 202 203 301 351
-   401 402 403 404 405 406 407 408`.split(/\s+/),
-);
+const PERMANENT_LMS_ERRORS = new Set([
+  132, 133, 142, 143, 201, 202, 203, 301, 351, 401, 402, 403, 404, 405, 406,
+  407, 408,
+]);
 
 type CallContext = string | (() => string) | undefined;
 
@@ -110,7 +110,6 @@ export async function withRetry(
   return (await retryLoop(fn, maxRetries, errorReporter, context)) === 'ok';
 }
 
-// `aborted` skips the give-up warning that `failed` logs.
 type RetryOutcome = 'ok' | 'failed' | 'rejected' | 'aborted';
 
 interface RetryHooks {
@@ -138,7 +137,7 @@ async function retryLoop(
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
-    if (!threw && PERMANENT_LMS_ERRORS.has(lastErrCode)) {
+    if (!threw && PERMANENT_LMS_ERRORS.has(Number(lastErrCode))) {
       console.warn(
         `Tessera: LMS rejected the call${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, not retrying`,
       );
