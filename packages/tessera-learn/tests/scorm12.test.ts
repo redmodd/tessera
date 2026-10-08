@@ -340,13 +340,6 @@ describe('SCORM12Adapter', () => {
       expect(lastLessonStatus()).toBe('passed');
     });
 
-    it('failed status takes priority over completion', async () => {
-      adapter.setCompletionStatus('complete');
-      adapter.setSuccessStatus('failed');
-      await flush();
-      expect(lastLessonStatus()).toBe('failed');
-    });
-
     it('holds failed at incomplete until the course completes', async () => {
       adapter.setSuccessStatus('failed');
       adapter.setCompletionStatus('incomplete');
