@@ -65,20 +65,23 @@ function formatLMSErrorDetail(
 /** Sync call that warns with the LMS error code on failure (terminate-path). */
 export function callSyncOrWarn(
   fn: () => unknown,
-  context: string,
+  context: CallContext | undefined,
   errorReporter?: LMSErrorReporter,
 ): boolean {
   let ok: boolean;
   try {
     ok = lmsCallSucceeded(fn());
   } catch (err) {
-    console.warn(`Tessera: LMS call threw [${context}] during terminate`, err);
+    console.warn(
+      `Tessera: LMS call threw${formatContext(context)} during terminate`,
+      err,
+    );
     return false;
   }
   if (!ok) {
     const code = readLastErrorCode(errorReporter);
     console.warn(
-      `Tessera: LMS call failed [${context}] during terminate${formatLMSErrorDetail(errorReporter, code)}`,
+      `Tessera: LMS call failed${formatContext(context)} during terminate${formatLMSErrorDetail(errorReporter, code)}`,
     );
   }
   return ok;
@@ -86,14 +89,13 @@ export function callSyncOrWarn(
 
 /**
  * Retry wrapper for LMS API calls.
- * Retries up to maxRetries times with exponential backoff, or stops after
- * one attempt when the LMS error code marks a permanent rejection.
+ * Retries up to maxRetries times with exponential backoff.
  * Returns true if the call eventually succeeded, false otherwise.
  *
  * If `errorReporter` is provided, the SCORM `GetLastError` /
  * `GetErrorString` pair is read after each failure and surfaced in the
  * final warning so production triage can name the real failure
- * (e.g., "201 Invalid argument error" or "405 Incorrect Data Type").
+ * (e.g., "101 General Exception" or "102 General Initialization Failure").
  *
  * Note: During page unload (pagehide/beforeunload), only the first
  * synchronous attempt will execute — async retries with setTimeout
@@ -106,7 +108,9 @@ export async function withRetry(
   errorReporter?: LMSErrorReporter,
   context?: string,
 ): Promise<boolean> {
-  return (await retryLoop(fn, maxRetries, errorReporter, context)) === 'ok';
+  return (
+    (await retryLoop(fn, maxRetries, errorReporter, context, false)) === 'ok'
+  );
 }
 
 type RetryOutcome = 'ok' | 'failed' | 'rejected' | 'aborted';
@@ -122,6 +126,7 @@ async function retryLoop(
   maxRetries: number,
   errorReporter: LMSErrorReporter | undefined,
   context: CallContext | undefined,
+  dropRejected: boolean,
   hooks?: RetryHooks,
 ): Promise<RetryOutcome> {
   let lastErrCode = '';
@@ -136,7 +141,11 @@ async function retryLoop(
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
-    if (!threw && PERMANENT_LMS_ERRORS.has(Number(lastErrCode))) {
+    if (
+      dropRejected &&
+      !threw &&
+      PERMANENT_LMS_ERRORS.has(Number(lastErrCode))
+    ) {
       console.warn(
         `Tessera: LMS rejected the call${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, not retrying`,
       );
@@ -158,18 +167,6 @@ async function retryLoop(
     `Tessera: LMS call failed after retries${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
   );
   return 'failed';
-}
-
-/**
- * Synchronous single-attempt LMS call. Used during page unload
- * where async retries cannot run.
- */
-export function callSync(fn: () => unknown): boolean {
-  try {
-    return lmsCallSucceeded(fn());
-  } catch {
-    return false;
-  }
 }
 
 interface QueueEntry {
@@ -235,6 +232,7 @@ export class WriteQueue {
         RETRY_ATTEMPTS,
         this.errorReporter,
         entry.context,
+        true,
         {
           // The next attempt is gated on a backoff timer that won't fire
           // during page unload; drainSync re-runs the entry instead.
@@ -279,11 +277,11 @@ export class WriteQueue {
       // the abort flag when (if) it ever resumes and exit cleanly.
       const entry = this.#inFlight;
       this.#inFlight = null;
-      callSync(entry.fn);
+      callSyncOrWarn(entry.fn, entry.context, this.errorReporter);
     }
     while (this.#queue.length > 0) {
       const entry = this.#queue.shift()!;
-      callSync(entry.fn);
+      callSyncOrWarn(entry.fn, entry.context, this.errorReporter);
     }
   }
 

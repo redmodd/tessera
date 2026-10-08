@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   withRetry,
-  callSync,
+  callSyncOrWarn,
   WriteQueue,
 } from '../src/runtime/adapters/retry.js';
 import { flush, useFakeTimers } from './helpers.js';
@@ -52,6 +52,16 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it('retries even when the LMS reports a data-model error code', async () => {
+    const fn = vi.fn().mockReturnValueOnce('false').mockReturnValueOnce('true');
+    const result = await withRetry(fn, 3, {
+      code: () => '301',
+      message: () => '',
+    });
+    expect(result).toBe(true);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it('returns false after all retries exhausted', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fn = vi.fn().mockReturnValue(false);
@@ -64,24 +74,27 @@ describe('withRetry', () => {
   });
 });
 
-describe('callSync', () => {
+describe('callSyncOrWarn', () => {
   it('returns true on success', () => {
-    expect(callSync(() => 'true')).toBe(true);
+    expect(callSyncOrWarn(() => 'true', 'Commit')).toBe(true);
   });
 
   it('returns false on false return', () => {
-    expect(callSync(() => false)).toBe(false);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(callSyncOrWarn(() => false, 'Commit')).toBe(false);
   });
 
   it('returns false on "false" string', () => {
-    expect(callSync(() => 'false')).toBe(false);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(callSyncOrWarn(() => 'false', 'Commit')).toBe(false);
   });
 
   it('returns false on thrown error', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(
-      callSync(() => {
+      callSyncOrWarn(() => {
         throw new Error('fail');
-      }),
+      }, 'Commit'),
     ).toBe(false);
   });
 });
@@ -148,6 +161,7 @@ describe('WriteQueue', () => {
     ['a general error', '101'],
     ['a commit failure reported as a numeric 391', 391],
     ['a code outside the SCORM error tables', '250'],
+    ['no error code', ''],
   ])(
     'keeps a write that fails with %s and retries it on the next trigger',
     async (_, code) => {
@@ -227,6 +241,22 @@ describe('WriteQueue', () => {
     // fire during unload — so we re-run it sync). Then 'b' runs.
     expect(calls).toEqual(['a', 'a', 'b']);
     expect(queue.pending).toBe(0);
+  });
+
+  it('drainSync warns with the LMS error for each write that fails at unload', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const queue = new WriteQueue();
+    queue.errorReporter = { code: () => '101', message: () => '' };
+
+    queue.enqueue(() => 'false', 'cmi.location');
+    queue.enqueue(() => 'false', 'cmi.exit');
+    queue.drainSync();
+
+    for (const key of ['cmi.location', 'cmi.exit']) {
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`[${key}] during terminate (LMS error 101`),
+      );
+    }
   });
 
   it('drainSync re-runs the in-flight entry caught mid-backoff', async () => {
