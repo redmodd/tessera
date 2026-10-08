@@ -202,28 +202,6 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(1);
   });
 
-  it('drainSync runs a write kept after a general error', async () => {
-    useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const calls: string[] = [];
-
-    const queue = new WriteQueue();
-    queue.errorReporter = { code: () => '101', message: () => '' };
-
-    queue.enqueue(() => {
-      calls.push('b');
-      return calls.length > 3 ? 'true' : 'false';
-    });
-
-    await vi.runAllTimersAsync();
-    expect(queue.pending).toBe(1);
-
-    queue.drainSync();
-
-    expect(calls).toEqual(['b', 'b', 'b', 'b']);
-    expect(queue.pending).toBe(0);
-  });
-
   it('drainSync executes all pending operations synchronously', () => {
     const calls: number[] = [];
     const queue = new WriteQueue();

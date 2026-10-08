@@ -773,8 +773,8 @@ describe('SCORM12Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       api.LMSSetValue.mockReturnValue('false');
-      api.LMSGetLastError.mockReturnValue('405');
-      api.LMSGetErrorString.mockReturnValue('Incorrect Data Type');
+      api.LMSGetLastError.mockReturnValue('101');
+      api.LMSGetErrorString.mockReturnValue('General Exception');
       api.LMSGetDiagnostic.mockReturnValue(
         'student_response invalid CMIFeedback',
       );
@@ -783,9 +783,10 @@ describe('SCORM12Adapter', () => {
       await vi.runAllTimersAsync();
       const messages = printed(warn);
       expect(messages).toMatch(/cmi\.core\.score\.raw/);
-      expect(messages).toMatch(/405/);
-      expect(messages).toMatch(/Incorrect Data Type/);
+      expect(messages).toMatch(/101/);
+      expect(messages).toMatch(/General Exception/);
       expect(messages).toMatch(/student_response invalid CMIFeedback/);
+      expect(messages).toMatch(/failed after retries/);
     });
   });
 
