@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-In SCORM 1.2 and SCORM 2004, a write the LMS rejects on every retry is now logged and dropped, so later writes (bookmark, suspend data, interactions, scores) still reach the LMS.
+In SCORM 1.2 and SCORM 2004, a write the LMS rejects with a data-model error is now logged and dropped without retrying, so later writes (bookmark, suspend data, interactions, scores) still reach the LMS. An interaction whose id the LMS rejects no longer shifts later interactions to an index the LMS refuses.

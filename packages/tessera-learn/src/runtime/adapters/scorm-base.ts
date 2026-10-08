@@ -6,7 +6,12 @@ import type {
 } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
-import { WriteQueue, callSyncOrWarn, withRetry } from './retry.js';
+import {
+  WriteQueue,
+  callSyncOrWarn,
+  lmsCallSucceeded,
+  withRetry,
+} from './retry.js';
 import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { parseMastery } from './format.js';
@@ -203,9 +208,8 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     correct: boolean | null,
   ): void {
     if (!this.canWrite()) return;
-    const n = this.interactionCount++;
-    const fields = buildScormInteractionFields(
-      `cmi.interactions.${n}`,
+    const [[idSuffix, id], ...fields] = buildScormInteractionFields(
+      '',
       questionId,
       interaction,
       correct,
@@ -218,8 +222,20 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         format: this.dialect.profile.interactionFormat,
       },
     );
-    for (const [key, value] of fields) {
-      this.set(key, value);
+    let n: number | null = null;
+    const idKey = () =>
+      `cmi.interactions.${n ?? this.interactionCount}${idSuffix}`;
+    this.queue.enqueue(() => {
+      const result = this.dialect.setValue(this.api, idKey(), id);
+      if (lmsCallSucceeded(result)) n = this.interactionCount++;
+      return result;
+    }, idKey);
+    for (const [suffix, value] of fields) {
+      const key = () => `cmi.interactions.${n}${suffix}`;
+      this.queue.enqueue(
+        () => n === null || this.dialect.setValue(this.api, key(), value),
+        key,
+      );
     }
   }
 

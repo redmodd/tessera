@@ -18,7 +18,7 @@ export function backoffMs(attempt: number): number {
 }
 
 // SCORM SetValue may return string "false" or boolean false; everything else is success.
-function lmsCallSucceeded(result: unknown): boolean {
+export function lmsCallSucceeded(result: unknown): boolean {
   return result !== false && result !== 'false';
 }
 
@@ -31,12 +31,23 @@ function readLastErrorCode(reporter: LMSErrorReporter | undefined): string {
   }
 }
 
+function isPermanentLMSError(code: string): boolean {
+  return /^(13[23]|14[23]|[2-4]\d\d)$/.test(code) && code !== '391';
+}
+
+type CallContext = string | (() => string) | undefined;
+
+function formatContext(context: CallContext): string {
+  const resolved = typeof context === 'function' ? context() : context;
+  return resolved ? ` [${resolved}]` : '';
+}
+
 function logRetryGiveUp(
   errorReporter: LMSErrorReporter | undefined,
   lastErrCode: string,
-  context: string | undefined,
+  context: CallContext,
 ): void {
-  const ctx = context ? ` [${context}]` : '';
+  const ctx = formatContext(context);
   console.warn(
     `Tessera: LMS call failed after retries${ctx}${formatLMSErrorDetail(errorReporter, lastErrCode)}, continuing without persistence`,
   );
@@ -109,7 +120,7 @@ export async function withRetry(
 }
 
 // `aborted` skips the give-up warning that `failed` logs.
-type RetryOutcome = 'ok' | 'failed' | 'aborted';
+type RetryOutcome = 'ok' | 'failed' | 'rejected' | 'aborted';
 
 interface RetryHooks {
   onBackoff(): void;
@@ -121,7 +132,7 @@ async function retryLoop(
   fn: () => unknown,
   maxRetries: number,
   errorReporter: LMSErrorReporter | undefined,
-  context: string | undefined,
+  context: CallContext,
   hooks?: RetryHooks,
 ): Promise<RetryOutcome> {
   let lastErrCode = '';
@@ -136,6 +147,12 @@ async function retryLoop(
       lastError = err;
     }
     lastErrCode = readLastErrorCode(errorReporter);
+    if (!threw && isPermanentLMSError(lastErrCode)) {
+      console.warn(
+        `Tessera: LMS rejected the call${formatContext(context)}${formatLMSErrorDetail(errorReporter, lastErrCode)}, not retrying`,
+      );
+      return 'rejected';
+    }
     if (attempt < maxRetries - 1) {
       hooks?.onBackoff();
       await new Promise((r) => setTimeout(r, backoffMs(attempt)));
@@ -143,8 +160,10 @@ async function retryLoop(
     }
   }
   if (threw) {
-    const ctx = context ? ` [${context}]` : '';
-    console.warn(`Tessera: LMS call threw${ctx} on final retry`, lastError);
+    console.warn(
+      `Tessera: LMS call threw${formatContext(context)} on final retry`,
+      lastError,
+    );
   }
   logRetryGiveUp(errorReporter, lastErrCode, context);
   return 'failed';
@@ -165,12 +184,13 @@ export function callSync(fn: () => unknown): boolean {
 /**
  * Sequential write queue for LMS operations.
  * Enqueues operations and flushes them sequentially with retry.
- * An operation that fails every retry is logged and dropped so it
- * cannot block the writes queued behind it.
+ * An operation the LMS rejects with a permanent error is logged and dropped
+ * so it cannot block the writes queued behind it. Any other failure stops
+ * the queue and is retried on the next flush trigger.
  */
 interface QueueEntry {
   fn: () => unknown;
-  context?: string;
+  context?: CallContext;
 }
 
 export class WriteQueue {
@@ -190,7 +210,7 @@ export class WriteQueue {
   /**
    * Enqueue an operation and trigger a flush.
    */
-  enqueue(fn: () => unknown, context?: string): void {
+  enqueue(fn: () => unknown, context?: CallContext): void {
     this.#queue.push({ fn, context });
     if (!this.#flushing) {
       void this.#flush();
@@ -198,9 +218,10 @@ export class WriteQueue {
   }
 
   /**
-   * Flush the queue sequentially. An operation that fails every retry is
-   * dropped: SCORM rejects a SetValue the same way every time, and a failed
-   * Commit is superseded by the next one.
+   * Flush the queue sequentially. An operation the LMS rejects with a
+   * permanent error is dropped after one attempt. Any other failure is
+   * re-inserted at the front after retries and the flush stops, so the
+   * next trigger (or drainSync) runs it again.
    *
    * `#inFlight` is marked *only* while awaiting a backoff: drainSync re-runs
    * an in-flight entry synchronously, which is only safe when the current
@@ -241,6 +262,11 @@ export class WriteQueue {
         this.#flushing = false;
         return;
       }
+      if (outcome === 'failed') {
+        this.#queue.unshift(entry);
+        this.#flushing = false;
+        return;
+      }
     }
 
     this.#flushing = false;
@@ -256,7 +282,7 @@ export class WriteQueue {
     this.#aborted = true;
     this.#flushing = false;
     if (this.#inFlight) {
-      // The async flush's withRetry was suspended at a setTimeout backoff
+      // The async flush's retryLoop was suspended at a setTimeout backoff
       // that won't fire before the page tears down. Run the entry once
       // synchronously so its write isn't lost. The async flush will see
       // the abort flag when (if) it ever resumes and exit cleanly.

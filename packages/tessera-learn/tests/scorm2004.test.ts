@@ -610,6 +610,38 @@ describe('SCORM2004Adapter', () => {
       expect(api.SetValue).toHaveBeenCalledWith('cmi.interactions.0.id', 'q1');
       expect(api.SetValue).toHaveBeenCalledWith('cmi.interactions.1.id', 'q2');
     });
+
+    it('reuses the index of an interaction whose id the LMS rejects', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      api.SetValue.mockImplementation((key, value) =>
+        value === 'q1' ? 'false' : 'true',
+      );
+      api.GetLastError.mockImplementation(() =>
+        api.SetValue.mock.results.at(-1)?.value === 'false' ? '351' : '0',
+      );
+      adapter.reportInteraction(
+        'q1',
+        { type: 'other', response: 'a', correct: 'a' },
+        true,
+      );
+      adapter.reportInteraction(
+        'q2',
+        { type: 'other', response: 'b', correct: 'b' },
+        true,
+      );
+      await flush();
+      const keys = api.SetValue.mock.calls.map(([key]) => key);
+      expect(keys.filter((k) => k === 'cmi.interactions.0.id')).toHaveLength(2);
+      expect(api.SetValue).toHaveBeenCalledWith('cmi.interactions.0.id', 'q2');
+      expect(api.SetValue).toHaveBeenCalledWith(
+        'cmi.interactions.0.result',
+        'correct',
+      );
+      expect(keys.some((k) => k.startsWith('cmi.interactions.1.'))).toBe(false);
+      expect(keys.filter((k) => k === 'cmi.interactions.0.type')).toHaveLength(
+        1,
+      );
+    });
   });
 
   describe('deriveActor', () => {

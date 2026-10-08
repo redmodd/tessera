@@ -109,12 +109,13 @@ describe('WriteQueue', () => {
     expect(queue.pending).toBe(0);
   });
 
-  it('drops a write that fails every retry and flushes the rest', async () => {
-    useFakeTimers();
+  it('drops a write the LMS rejects with a data-model error and flushes the rest', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: string[] = [];
+    let code = '0';
 
     const queue = new WriteQueue();
+    queue.errorReporter = { code: () => code, message: () => '' };
 
     queue.enqueue(() => {
       calls.push('a');
@@ -122,8 +123,41 @@ describe('WriteQueue', () => {
     });
     queue.enqueue(() => {
       calls.push('b');
-      return false;
+      code = '351';
+      return 'false';
     }, 'cmi.interactions.1.id');
+    queue.enqueue(() => {
+      calls.push('c');
+      code = '0';
+      return 'true';
+    });
+
+    await flush();
+
+    expect(calls).toEqual(['a', 'b', 'c']);
+    expect(queue.pending).toBe(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('[cmi.interactions.1.id] (LMS error 351'),
+    );
+
+    calls.length = 0;
+    queue.drainSync();
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps a write that fails with a general error and retries it on the next trigger', async () => {
+    useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: string[] = [];
+    let failing = true;
+
+    const queue = new WriteQueue();
+    queue.errorReporter = { code: () => '101', message: () => '' };
+
+    queue.enqueue(() => {
+      calls.push('b');
+      return failing ? 'false' : 'true';
+    }, 'cmi.completion_status');
     queue.enqueue(() => {
       calls.push('c');
       return 'true';
@@ -131,12 +165,10 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(calls).toEqual(['a', 'b', 'b', 'b', 'c']);
-    expect(queue.pending).toBe(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('[cmi.interactions.1.id]'),
-    );
+    expect(calls).toEqual(['b', 'b', 'b']);
+    expect(queue.pending).toBe(2);
 
+    failing = false;
     calls.length = 0;
     queue.enqueue(() => {
       calls.push('d');
@@ -145,7 +177,30 @@ describe('WriteQueue', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(calls).toEqual(['d']);
+    expect(calls).toEqual(['b', 'c', 'd']);
+    expect(queue.pending).toBe(0);
+  });
+
+  it('drainSync runs a write kept after a general error', async () => {
+    useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: string[] = [];
+
+    const queue = new WriteQueue();
+    queue.errorReporter = { code: () => '101', message: () => '' };
+
+    queue.enqueue(() => {
+      calls.push('b');
+      return calls.length > 3 ? 'true' : 'false';
+    });
+
+    await vi.runAllTimersAsync();
+    expect(queue.pending).toBe(1);
+
+    queue.drainSync();
+
+    expect(calls).toEqual(['b', 'b', 'b', 'b']);
+    expect(queue.pending).toBe(0);
   });
 
   it('drainSync executes all pending operations synchronously', () => {
