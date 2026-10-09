@@ -1,4 +1,4 @@
-import { readCourseConfig } from '../manifest.js';
+import type { CourseConfigRead } from '../manifest.js';
 import {
   A11Y_LEVELS,
   A11Y_STANDARDS,
@@ -64,8 +64,7 @@ export function normalizeA11y(raw: unknown): A11ySettings {
   return { level, standard, ignore };
 }
 
-export function readA11ySettings(projectRoot: string): A11ySettings {
-  const read = readCourseConfig(projectRoot);
+export function readA11ySettings(read: CourseConfigRead): A11ySettings {
   return normalizeA11y(read.ok ? read.config.a11y : undefined);
 }
 

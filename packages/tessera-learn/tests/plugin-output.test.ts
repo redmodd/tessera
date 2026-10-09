@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -8,7 +8,7 @@ import {
   readdirSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import type { Plugin } from 'vite';
+import { normalizePath, type Plugin } from 'vite';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -158,15 +158,19 @@ describe('generated index.html Content-Security-Policy', () => {
 
 describe('export packaging gate', () => {
   function buildPlugins() {
+    const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
+    mkdirSync(lesson, { recursive: true });
+    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
     const get = resolvedPlugins(projectRoot, 'build');
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
+    (validation.buildStart as any).call(validation);
     (entry.buildStart as any).call(entry);
     (get('tessera:manifest').load as any).handler.call({
       addWatchFile() {},
     });
-    return { entry, exporter, validation };
+    return { entry, exporter, validation, get };
   }
 
   function seedStaleDist() {
@@ -357,28 +361,33 @@ describe('export packaging gate', () => {
   });
 
   it.each([
+    ['a syntax error', 'export default {'],
+    ['a non-data value', 'export default { title: someVariable };'],
+    ['a non-object export', 'export default { export: "scorm12" };'],
     [
-      'a syntax error',
-      'export default {',
-      'changed after validation: could not parse, JavaScript syntax error.',
-    ],
-    [
-      'a non-data value',
-      'export default { title: someVariable };',
-      'changed after validation: the default export must be a static object literal',
+      'an unknown standard',
+      'export default { export: { standard: "scorm13" } };',
     ],
   ])(
-    'reports a course.config.js that breaks mid-build with %s',
-    async (_case, source, message) => {
+    'packages the validated config when course.config.js changes mid-build to %s',
+    async (_case, source) => {
       writeConfig('scorm12');
-      const { entry, exporter } = buildPlugins();
+      seedStaleDist();
+      const { entry, exporter, get } = buildPlugins();
+      writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
+      expect((get('tessera:adapter').load as any).handler()).toContain(
+        'SCORM12Adapter',
+      );
       writeBundle(exporter);
       (entry.closeBundle as any).call(entry);
-      writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
+      await (exporter.closeBundle as any).call(exporter);
 
-      await expect(
-        (exporter.closeBundle as any).call(exporter),
-      ).rejects.toThrow(message);
+      expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+        true,
+      );
+      expect(
+        readdirSync(projectRoot).filter((f) => f.endsWith('.zip')),
+      ).toHaveLength(1);
     },
   );
 
@@ -457,5 +466,30 @@ describe('xapi setup virtual module', () => {
         ),
       ).toContain(real);
     }
+  });
+});
+
+describe('dev config revalidation', () => {
+  it('reports errors when course.config.js changes', () => {
+    writeConfig('web');
+    const validation = findPlugin('tessera:validation', 'serve');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default {',
+      'utf-8',
+    );
+
+    (validation.hotUpdate as any).call(
+      { environment: { name: 'client' } },
+      {
+        type: 'update',
+        file: normalizePath(resolve(projectRoot, 'course.config.js')),
+      },
+    );
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: could not parse'),
+    );
   });
 });

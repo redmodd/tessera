@@ -40,6 +40,7 @@ export class BuildContext {
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
+  validatedConfig: ResolvedConfigRead | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
 
@@ -55,9 +56,9 @@ export class BuildContext {
   }
 
   readConfig(): ResolvedConfigRead {
-    return resolveConfigRead(
-      readCourseConfig(this.root),
-      this.standardOverride,
+    return (
+      this.validatedConfig ??
+      resolveConfigRead(readCourseConfig(this.root), this.standardOverride)
     );
   }
 }
