@@ -12,7 +12,8 @@ import {
 import {
   generateManifest,
   walkPages,
-  READ_FAILURE_MESSAGES,
+  readCourseConfig,
+  resolveConfigRead,
   type CourseConfigRead,
   type Manifest,
   type ResolvedConfigRead,
@@ -81,7 +82,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
             if (ctx.isBuild) {
               ctx.a11yWarnings.push(msg);
             } else if (
-              !readA11ySettings(ctx.root).ignore.includes(warning.code)
+              !readA11ySettings(ctx.readConfig()).ignore.includes(warning.code)
             ) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
@@ -329,8 +330,14 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       runValidation(ctx);
     },
 
+    hotUpdate({ file }) {
+      if (this.environment.name !== 'client') return;
+      if (file !== normalizePath(resolve(ctx.root, 'course.config.js'))) return;
+      reportValidationIssues(validateProject(ctx.root, ctx.standardOverride));
+    },
+
     buildStart() {
-      if (ctx.isBuild) runValidation(ctx);
+      if (ctx.isBuild) ctx.validatedConfig = runValidation(ctx);
     },
   };
 }
@@ -346,7 +353,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 
     buildEnd() {
       if (ctx.a11yWarnings.length === 0) return;
-      const settings = readA11ySettings(ctx.root);
+      const settings = readA11ySettings(ctx.readConfig());
       const ignored = new Set(settings.ignore);
       const warnings = ctx.a11yWarnings.filter(
         (msg) => !isIgnored(msg, ignored),
@@ -364,14 +371,16 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
   };
 }
 
-function runValidation(ctx: BuildContext): void {
-  const result = validateProject(ctx.root, ctx.standardOverride);
+function runValidation(ctx: BuildContext): ResolvedConfigRead {
+  const read = readCourseConfig(ctx.root);
+  const result = validateProject(ctx.root, ctx.standardOverride, read);
   reportValidationIssues(result);
   if (result.errors.length > 0) {
     throw new Error(
       `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
     );
   }
+  return resolveConfigRead(read, ctx.standardOverride);
 }
 
 // ---------- Export Plugin ----------
@@ -414,23 +423,17 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
       if (isAuditBuild()) return;
 
-      const read = ctx.readConfig();
-      if (!read.ok) {
-        throw new Error(
-          `[tessera:export] course.config.js changed after validation: ${READ_FAILURE_MESSAGES[read.reason]}. The export step needs it to package the course.`,
-        );
-      }
-
       if (!ctx.manifest) {
         throw new Error(
           '[tessera:export] the page manifest was never generated, so the export cannot tell which pages are graded.',
         );
       }
 
+      const read = ctx.readConfig();
       await runExport(
         ctx.root,
         ctx.outDir,
-        mergeCourseConfig(read.config),
+        mergeCourseConfig(read.ok ? read.config : {}),
         ctx.manifest.pages.some(isRequiredGradedPage),
       );
     },

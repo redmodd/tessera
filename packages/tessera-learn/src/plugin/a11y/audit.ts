@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import type { PreviewServer } from 'vite';
-import { generateManifest } from '../manifest.js';
+import { generateManifest, readCourseConfig } from '../manifest.js';
 import { readA11ySettings, type A11ySettings } from '../validation/a11y.js';
 
 export interface AuditOptions {
@@ -353,7 +353,7 @@ export async function runAudit(
   }
   const { chromium, AxeBuilder } = deps.deps;
 
-  const settings = readA11ySettings(projectRoot);
+  const settings = readA11ySettings(readCourseConfig(projectRoot));
   const tags = axeTags(settings.standard);
   const disableRules = axeIgnoreRules(settings.ignore);
 
