@@ -300,7 +300,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   test.describe('LMS mastery_score', () => {
     test.use({ lmsData: { 'cmi.student_data.mastery_score': '60' } });
 
-    test('a 66.67 escapes failed against mastery_score 60 despite passingScore 70', async ({
+    test('a 66.67 passes against mastery_score 60 despite passingScore 70', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -308,13 +308,12 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       await openQuiz(page, 'Graded Assessment');
 
       await answerGradedQuiz(page, { q1Correct: false });
+      await finishFreeCourse(page);
 
-      // Without the override a 66.67 against passingScore 70 would be failed,
-      // and failed is not held back the way passed is.
       await expect
         .poll(() => scormData(page))
         .toMatchObject({
-          'cmi.core.lesson_status': 'incomplete',
+          'cmi.core.lesson_status': 'passed',
           'cmi.core.score.raw': '66.67',
         });
     });
@@ -328,7 +327,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       },
     });
 
-    test('a 66.67 stays failed against mastery_score 67 after the LMS rescores on exit', async ({
+    test('the LMS rescores a held 66.67 failed against mastery_score 67 on exit', async ({
       page,
     }) => {
       await page.goto(BASE);
@@ -337,15 +336,19 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
 
       await answerGradedQuiz(page, { q1Correct: false });
 
-      const failed = {
-        'cmi.core.lesson_status': 'failed',
-        'cmi.core.score.raw': '66.67',
-      };
-      await expect.poll(() => scormData(page)).toMatchObject(failed);
+      await expect
+        .poll(() => scormData(page))
+        .toMatchObject({
+          'cmi.core.lesson_status': 'incomplete',
+          'cmi.core.score.raw': '66.67',
+        });
 
       await exitCourse(page);
 
-      expect(await scormData(page)).toMatchObject(failed);
+      expect(await scormData(page)).toMatchObject({
+        'cmi.core.lesson_status': 'failed',
+        'cmi.core.score.raw': '66.67',
+      });
     });
   });
 });

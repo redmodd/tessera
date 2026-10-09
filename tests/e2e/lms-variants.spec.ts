@@ -387,7 +387,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
     await answerExam(page, false);
 
     await expect.poll(() => courseScore(page), { timeout: 5000 }).toBe('25');
-    expect(await lessonStatus(page)).toBe('failed');
+    expect(await lessonStatus(page)).toBe('incomplete');
   });
 
   test('a graded question behind a reveal holds the exam open until answered', async ({

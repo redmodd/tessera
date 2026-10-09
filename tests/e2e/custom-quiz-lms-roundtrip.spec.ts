@@ -38,12 +38,15 @@ async function waitForCustomQuiz(page: Page): Promise<void> {
  * Submit button — no per-question Next/Continue cycling like the built-in.
  * Answer both, click Submit, wait for the bridge to fire.
  */
-async function answerCustomQuizCorrectly(page: Page): Promise<void> {
+async function answerCustomQuiz(
+  page: Page,
+  { planetCorrect = true } = {},
+): Promise<void> {
   await page.locator('.tessera-nav-page', { hasText: /^\s*Exam\s*$/ }).click();
   await waitForCustomQuiz(page);
   await page
     .locator('[data-question-id="q-planet"] .tessera-mc-option')
-    .nth(1)
+    .nth(planetCorrect ? 1 : 0)
     .click();
   await page
     .locator('[data-question-id="q-water"] input[type="text"]')
@@ -93,9 +96,9 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     page,
   }) => {
     await page.goto(BASE);
-    // First page is intro; answerCustomQuizCorrectly navigates to the Exam
+    // First page is intro; answerCustomQuiz navigates to the Exam
     // page and waits for the custom-quiz shell before answering.
-    await answerCustomQuizCorrectly(page);
+    await answerCustomQuiz(page);
 
     await expect
       .poll(() => scormData(page))
@@ -106,6 +109,38 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
 
     expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
     expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
+  });
+
+  test('a failing score holds lesson_status at incomplete until the course completes, then reports failed', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await answerCustomQuiz(page, { planetCorrect: false });
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '50',
+        'cmi.core.lesson_status': 'incomplete',
+      });
+
+    await page.locator('.tessera-nav-page', { hasText: 'Inline Exam' }).click();
+    await page
+      .locator('[data-question-id="q-inline-planet"] input')
+      .nth(1)
+      .check();
+    await page
+      .locator('[data-question-id="q-inline-ocean"] input')
+      .nth(2)
+      .check();
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.score.raw': '50',
+        'cmi.core.lesson_status': 'failed',
+      });
   });
 });
 
@@ -148,7 +183,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
     page,
   }) => {
     await page.goto(BASE);
-    await answerCustomQuizCorrectly(page);
+    await answerCustomQuiz(page);
 
     await expect
       .poll(() => scormData(page))
@@ -193,7 +228,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     const statements = await installCmi5Mock(page);
 
     await page.goto(cmi5LaunchURL(BASE));
-    await answerCustomQuizCorrectly(page);
+    await answerCustomQuiz(page);
 
     await expect
       .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {
@@ -263,7 +298,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
     });
 
     await page.goto(xapiLaunchURL(BASE));
-    await answerCustomQuizCorrectly(page);
+    await answerCustomQuiz(page);
 
     await expect
       .poll(() => findStatement(statements, 'scored')?.result?.score?.scaled, {

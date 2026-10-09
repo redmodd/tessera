@@ -1123,15 +1123,16 @@ OAuth at the publisher level, statement signing/attachment helpers, offline/Inde
 
 The runtime translates author intent into adapter calls automatically. The author-relevant differences:
 
-| Concern              | SCORM 1.2                                                                                           | SCORM 2004 4th                                                 | cmi5                                 |
-| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
-| Completion + success | One field (`lesson_status`); no "unknown" — `failed` reports at once, `passed` waits for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
-| Score scale to LMS   | `score.raw` (0–100)                                                                                 | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                                         | 64000 chars                                                    | LRS-defined (typically unbounded)    |
-| Resume after reload  | From `cmi.suspend_data`                                                                             | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
+| Concern              | SCORM 1.2                                                                                | SCORM 2004 4th                                                 | cmi5                                 |
+| -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
+| Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
+| Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
+| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                              | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Resume after reload  | From `cmi.suspend_data`                                                                  | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
 
+- **A failing learner who cannot complete stays `incomplete` on SCORM 1.2**, with the score: under `completion.mode: "quiz"` they never complete, and in any mode a failed `gatesProgress` quiz locks the pages after it. An LMS that rescores against a mastery score on exit records `failed` itself.
 - **Keep persisted state small under SCORM 1.2** — it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
 - **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5. Read it via `useQuiz().passingScore`.
 - **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
