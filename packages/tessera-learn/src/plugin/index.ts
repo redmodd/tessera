@@ -332,7 +332,10 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
 
     hotUpdate({ file }) {
       if (this.environment.name !== 'client') return;
-      if (file !== normalizePath(resolve(ctx.root, 'course.config.js'))) return;
+      const watched = ['course.config.js', 'course.runtime.js'].map((name) =>
+        normalizePath(resolve(ctx.root, name)),
+      );
+      if (!watched.includes(file)) return;
       reportValidationIssues(validateProject(ctx.root, ctx.standardOverride));
     },
 
