@@ -3,7 +3,9 @@ import { findPackageJSON } from 'node:module';
 import { dirname, join } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
 
-const scormAgainRoot = dirname(findPackageJSON('scorm-again', import.meta.url)!);
+const scormAgainRoot = dirname(
+  findPackageJSON('scorm-again', import.meta.url)!,
+);
 type LmsData = Record<string, string>;
 
 export const test = base.extend<{ lmsData: LmsData }>({
