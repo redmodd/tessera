@@ -1,8 +1,11 @@
 // E2E LMS doubles backed by scorm-again; spec-illegal writes surface in window.__scormErrors.
-import { createRequire } from 'node:module';
+import { findPackageJSON } from 'node:module';
+import { dirname, join } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
 
-const require = createRequire(import.meta.url);
+const scormAgainRoot = dirname(
+  findPackageJSON('scorm-again', import.meta.url)!,
+);
 type LmsData = Record<string, string>;
 
 export const test = base.extend<{ lmsData: LmsData }>({
@@ -31,7 +34,7 @@ async function installScormMock(
 ): Promise<void> {
   const { version, global, prefix: p, end } = SCORM_DIALECTS[standard];
   await page.addInitScript({
-    path: require.resolve(`scorm-again/${standard}`),
+    path: join(scormAgainRoot, 'dist', `${standard}.js`),
   });
   await page.addInitScript(`
 (() => {
