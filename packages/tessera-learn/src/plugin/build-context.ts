@@ -56,9 +56,17 @@ export class BuildContext {
   }
 
   readConfig(): ResolvedConfigRead {
-    return (
-      this.validatedConfig ??
-      resolveConfigRead(readCourseConfig(this.root), this.standardOverride)
-    );
+    if (!this.isBuild) {
+      return resolveConfigRead(
+        readCourseConfig(this.root),
+        this.standardOverride,
+      );
+    }
+    if (!this.validatedConfig) {
+      throw new Error(
+        '[tessera] course.config.js was read before validation ran.',
+      );
+    }
+    return this.validatedConfig;
   }
 }

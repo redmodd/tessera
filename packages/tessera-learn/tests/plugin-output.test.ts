@@ -23,6 +23,16 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
+function validatedBuild(): (name: string) => Plugin {
+  const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
+  mkdirSync(lesson, { recursive: true });
+  writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
+  const get = resolvedPlugins(projectRoot, 'build');
+  const validation = get('tessera:validation');
+  (validation.buildStart as any).call(validation);
+  return get;
+}
+
 function writeConfig(standard: string) {
   writeFileSync(
     resolve(projectRoot, 'course.config.js'),
@@ -57,7 +67,7 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
-    const plugin = findPlugin('tessera:index-html');
+    const plugin = validatedBuild()('tessera:index-html');
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
@@ -68,7 +78,7 @@ describe('generated index.html Content-Security-Policy', () => {
       `export default ${body};`,
       'utf-8',
     );
-    const plugin = findPlugin('tessera:index-html');
+    const plugin = validatedBuild()('tessera:index-html');
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
@@ -86,16 +96,23 @@ describe('generated index.html Content-Security-Policy', () => {
     expect(html).toContain("worker-src 'self' blob:");
   });
 
-  it('fails closed (no CSP) when the config cannot be read', () => {
+  it('writes no index.html when the config cannot be read', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     writeFileSync(
       resolve(projectRoot, 'course.config.js'),
       'export default {',
       'utf-8',
     );
+    expect(() => validatedBuild()).toThrow('Tessera validation failed');
+    expect(existsSync(resolve(projectRoot, 'index.html'))).toBe(false);
+  });
+
+  it('refuses to read the config before validation runs', () => {
+    writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
-    (plugin.buildStart as any).call(plugin);
-    const html = readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
-    expect(html).not.toContain('Content-Security-Policy');
+    expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
+      'course.config.js was read before validation ran',
+    );
   });
 
   it('omits the CSP meta for LMS packages (would break iframe bridges)', () => {
@@ -158,14 +175,10 @@ describe('generated index.html Content-Security-Policy', () => {
 
 describe('export packaging gate', () => {
   function buildPlugins() {
-    const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
-    mkdirSync(lesson, { recursive: true });
-    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
-    const get = resolvedPlugins(projectRoot, 'build');
+    const get = validatedBuild();
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
-    (validation.buildStart as any).call(validation);
     (entry.buildStart as any).call(entry);
     (get('tessera:manifest').load as any).handler.call({
       addWatchFile() {},
@@ -434,7 +447,7 @@ describe('xapi setup virtual module', () => {
       `export default ${body};`,
       'utf-8',
     );
-    const plugin = findPlugin('tessera:xapi-setup');
+    const plugin = validatedBuild()('tessera:xapi-setup');
     return (plugin.load as any).handler.call({});
   }
 
@@ -453,7 +466,7 @@ describe('xapi setup virtual module', () => {
   it('wires the client for an explicit endpoint alongside an inert lms entry', () => {
     expect(
       loadSetup(
-        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { endpoint: "https://lrs.example/xapi/", auth: "Basic x", actor: { mbox: "mailto:a@b.c" } }] }`,
+        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { id: "lrs", endpoint: "https://lrs.example/xapi/", auth: "eDp5", actor: { mbox: "mailto:a@b.c" }, activityId: "https://example.com/course" }] }`,
       ),
     ).toContain(real);
   });
@@ -470,26 +483,22 @@ describe('xapi setup virtual module', () => {
 });
 
 describe('dev config revalidation', () => {
-  it('reports errors when course.config.js changes', () => {
-    writeConfig('web');
-    const validation = findPlugin('tessera:validation', 'serve');
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      'export default {',
-      'utf-8',
-    );
+  it.each(['course.config.js', 'course.runtime.js'])(
+    'reports errors when %s changes',
+    (file) => {
+      writeConfig('web');
+      const validation = findPlugin('tessera:validation', 'serve');
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      writeFileSync(resolve(projectRoot, file), 'export default {', 'utf-8');
 
-    (validation.hotUpdate as any).call(
-      { environment: { name: 'client' } },
-      {
-        type: 'update',
-        file: normalizePath(resolve(projectRoot, 'course.config.js')),
-      },
-    );
+      (validation.hotUpdate as any).call(
+        { environment: { name: 'client' } },
+        { type: 'update', file: normalizePath(resolve(projectRoot, file)) },
+      );
 
-    expect(errors).toHaveBeenCalledWith(
-      expect.stringContaining('course.config.js: could not parse'),
-    );
-  });
+      expect(errors).toHaveBeenCalledWith(
+        expect.stringContaining(`${file}: could not parse`),
+      );
+    },
+  );
 });
