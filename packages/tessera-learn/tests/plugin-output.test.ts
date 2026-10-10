@@ -481,13 +481,17 @@ describe('xapi setup virtual module', () => {
 });
 
 describe('dev config revalidation', () => {
-  async function hotUpdate(file: string, read: () => unknown = () => '') {
+  async function hotUpdate(
+    file: string,
+    read: () => unknown = () => '',
+    type = 'update',
+  ) {
     const validation = findPlugin('tessera:validation', 'serve');
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     await (validation.hotUpdate as any).call(
       { environment: { name: 'client' } },
       {
-        type: 'update',
+        type,
         file: normalizePath(resolve(projectRoot, file)),
         read,
       },
@@ -516,5 +520,17 @@ describe('dev config revalidation', () => {
     );
 
     expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('revalidates a deleted file without reading it', async () => {
+    const errors = await hotUpdate(
+      'course.config.js',
+      () => Promise.reject(new Error('ENOENT')),
+      'delete',
+    );
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: not found in project root'),
+    );
   });
 });
