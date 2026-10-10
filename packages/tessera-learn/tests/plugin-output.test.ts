@@ -106,7 +106,7 @@ describe('generated index.html Content-Security-Policy', () => {
     writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
     expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
-      'course.config.js was read before validation ran',
+      'course.config.js has no validated snapshot',
     );
   });
 
@@ -121,7 +121,7 @@ describe('generated index.html Content-Security-Policy', () => {
       'Tessera validation failed',
     );
     expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
-      'course.config.js was read before validation ran',
+      'course.config.js has no validated snapshot',
     );
   });
 

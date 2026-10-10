@@ -47,7 +47,7 @@ describe('BuildContext.validate', () => {
     ctx.validate();
 
     expect(() => ctx.validatedConfig()).toThrow(
-      'course.config.js was read before validation ran',
+      'course.config.js has no validated snapshot',
     );
   });
 });

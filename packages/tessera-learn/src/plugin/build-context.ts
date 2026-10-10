@@ -85,7 +85,7 @@ export class BuildContext {
   validatedConfig(): ValidatedConfig {
     if (!this.#validatedConfig) {
       throw new Error(
-        '[tessera] course.config.js was read before validation ran.',
+        '[tessera] course.config.js has no validated snapshot. A build keeps one once its validation passes.',
       );
     }
     return this.#validatedConfig;
