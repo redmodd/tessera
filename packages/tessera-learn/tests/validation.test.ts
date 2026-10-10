@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { readCourseConfig } from '../src/plugin/manifest.js';
@@ -1613,6 +1613,20 @@ describe('structure validation', () => {
       ),
     );
   });
+
+  it.each(['99-gone', '01-section/01-lesson/gone.svelte', 'gone.svelte'])(
+    'skips the dangling symlink pages/%s',
+    (entry) => {
+      createValidProject(testRoot);
+      symlinkSync(
+        resolve(testRoot, 'missing'),
+        resolve(testRoot, 'pages', entry),
+      );
+      const { errors, warnings } = validateProject(testRoot);
+      expect(errors).toEqual([]);
+      expect(warnings).not.toContainEqual(expect.stringContaining('gone'));
+    },
+  );
 
   it('treats section-level .svelte files as flat-mode pages', () => {
     createValidProject(testRoot);

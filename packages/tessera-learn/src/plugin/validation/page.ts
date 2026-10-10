@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import {
+  entryStat,
   parsePageConfigFromSource,
   readMetaFile,
   readSourceFileCached,
@@ -239,10 +240,9 @@ export function validatePages(
 
   // walkPages only descends into section dirs, so scan pages/ root separately.
   for (const entry of readdirSync(pagesDir)) {
-    const fullPath = resolve(pagesDir, entry);
-    if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
+    if (entry.endsWith('.svelte') && entryStat(pagesDir, entry)?.isFile()) {
       d.warn(
-        `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
+        `${relative(projectRoot, resolve(pagesDir, entry))}: this file is outside the section/lesson structure and will be ignored`,
       );
     }
   }

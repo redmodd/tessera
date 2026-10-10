@@ -6,11 +6,11 @@ import {
   rmSync,
   existsSync,
   readdirSync,
-  symlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
+import * as validation from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -542,11 +542,9 @@ describe('dev config revalidation', () => {
   });
 
   it('reports a validation that throws instead of failing the hot update', async () => {
-    writeConfig('web');
-    symlinkSync(
-      resolve(projectRoot, 'missing'),
-      resolve(projectRoot, 'pages', '01-section'),
-    );
+    vi.spyOn(validation, 'validateProject').mockImplementation(() => {
+      throw new Error('ENOENT: no such file or directory');
+    });
 
     expect(await hotUpdate('course.config.js')).toHaveBeenCalledWith(
       expect.stringContaining('validation could not run: ENOENT'),

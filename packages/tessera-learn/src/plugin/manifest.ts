@@ -321,16 +321,21 @@ export function extractPageConfig(filePath: string): PageConfig {
   return {};
 }
 
+/** Stat a directory entry, or undefined when it is gone or a dangling symlink. */
+export function entryStat(dirPath: string, name: string) {
+  return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
+}
+
 /**
  * Get sorted subdirectories of a given path.
  */
 function getSortedDirs(dirPath: string): string[] {
   if (!existsSync(dirPath)) return [];
   return readdirSync(dirPath)
-    .filter((name) => {
-      const full = resolve(dirPath, name);
-      return statSync(full).isDirectory() && !name.startsWith('.');
-    })
+    .filter(
+      (name) =>
+        !name.startsWith('.') && entryStat(dirPath, name)?.isDirectory(),
+    )
     .sort();
 }
 
@@ -340,7 +345,9 @@ function getSortedDirs(dirPath: string): string[] {
 function getSvelteFiles(dirPath: string): string[] {
   if (!existsSync(dirPath)) return [];
   return readdirSync(dirPath)
-    .filter((name) => name.endsWith('.svelte'))
+    .filter(
+      (name) => name.endsWith('.svelte') && entryStat(dirPath, name)?.isFile(),
+    )
     .sort();
 }
 
