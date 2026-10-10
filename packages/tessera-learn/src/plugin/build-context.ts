@@ -8,6 +8,7 @@ import {
   type ResolvedConfigRead,
 } from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
+import { reportValidationIssues, validateProject } from './validation.js';
 
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
@@ -40,7 +41,7 @@ export class BuildContext {
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
-  validatedConfig: ResolvedConfigRead | null = null;
+  #validatedConfig: ResolvedConfigRead | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
 
@@ -55,6 +56,18 @@ export class BuildContext {
     }
   }
 
+  validate(): void {
+    const read = readCourseConfig(this.root);
+    const result = validateProject(this.root, this.standardOverride, read);
+    reportValidationIssues(result);
+    if (result.errors.length > 0) {
+      throw new Error(
+        `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
+      );
+    }
+    this.#validatedConfig = resolveConfigRead(read, this.standardOverride);
+  }
+
   readConfig(): ResolvedConfigRead {
     if (!this.isBuild) {
       return resolveConfigRead(
@@ -62,11 +75,11 @@ export class BuildContext {
         this.standardOverride,
       );
     }
-    if (!this.validatedConfig) {
+    if (!this.#validatedConfig) {
       throw new Error(
         '[tessera] course.config.js was read before validation ran.',
       );
     }
-    return this.validatedConfig;
+    return this.#validatedConfig;
   }
 }

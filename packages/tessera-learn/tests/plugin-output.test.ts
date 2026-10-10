@@ -67,9 +67,7 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
-    const plugin = validatedBuild()('tessera:index-html');
-    (plugin.buildStart as any).call(plugin);
-    return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
+    return renderIndexHtml();
   }
 
   function buildHtmlFromConfig(body: string): string {
@@ -78,6 +76,10 @@ describe('generated index.html Content-Security-Policy', () => {
       `export default ${body};`,
       'utf-8',
     );
+    return renderIndexHtml();
+  }
+
+  function renderIndexHtml(): string {
     const plugin = validatedBuild()('tessera:index-html');
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');

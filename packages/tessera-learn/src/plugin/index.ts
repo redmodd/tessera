@@ -12,8 +12,6 @@ import {
 import {
   generateManifest,
   walkPages,
-  readCourseConfig,
-  resolveConfigRead,
   type CourseConfigRead,
   type Manifest,
   type ResolvedConfigRead,
@@ -327,7 +325,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer() {
-      runValidation(ctx);
+      ctx.validate();
     },
 
     hotUpdate({ file }) {
@@ -340,7 +338,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     },
 
     buildStart() {
-      if (ctx.isBuild) ctx.validatedConfig = runValidation(ctx);
+      if (ctx.isBuild) ctx.validate();
     },
   };
 }
@@ -372,18 +370,6 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
       reportValidationIssues({ errors: [], warnings });
     },
   };
-}
-
-function runValidation(ctx: BuildContext): ResolvedConfigRead {
-  const read = readCourseConfig(ctx.root);
-  const result = validateProject(ctx.root, ctx.standardOverride, read);
-  reportValidationIssues(result);
-  if (result.errors.length > 0) {
-    throw new Error(
-      `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
-    );
-  }
-  return resolveConfigRead(read, ctx.standardOverride);
 }
 
 // ---------- Export Plugin ----------
