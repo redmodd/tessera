@@ -4,7 +4,6 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   readCourseConfig,
   resolveConfigRead,
-  type CourseConfigRead,
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
@@ -50,10 +49,7 @@ export class BuildContext {
   a11yWarnings: string[] = [];
   #validatedConfig: ValidatedConfig | null = null;
 
-  constructor(
-    readonly standardOverride?: StandardId,
-    private readonly configRead?: CourseConfigRead,
-  ) {}
+  constructor(readonly standardOverride?: StandardId) {}
 
   configure(config: ResolvedConfig): void {
     this.root = config.root;
@@ -68,9 +64,7 @@ export class BuildContext {
 
   validate(): ValidationResult {
     this.#validatedConfig = null;
-    const read =
-      (this.isBuild ? this.configRead : undefined) ??
-      readCourseConfig(this.root);
+    const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
     reportValidationIssues(result);
     if (result.errors.length > 0) {

@@ -48,34 +48,6 @@ describe('BuildContext.validate', () => {
       'course.config.js was read before validation ran',
     );
   });
-
-  function givenReadOverBrokenFile(command: 'build' | 'serve') {
-    const courseRoot = tempDir();
-    writeLessonPage(courseRoot);
-    writeFileSync(resolve(courseRoot, 'course.config.js'), 'export default {');
-    const ctx = new BuildContext(undefined, {
-      ok: true,
-      config: { title: 'Course', language: 'en', id: 'urn:course' },
-    });
-    ctx.configure(resolvedConfig(courseRoot, command));
-    return ctx;
-  }
-
-  it('validates the read a build was given instead of the file', () => {
-    const ctx = givenReadOverBrokenFile('build');
-
-    ctx.validate();
-
-    expect(ctx.validatedConfig().config.title).toBe('Course');
-  });
-
-  it('validates the file on the dev server, which serves the file', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    expect(() => givenReadOverBrokenFile('serve').validate()).toThrow(
-      'Tessera validation failed',
-    );
-  });
 });
 
 describe('isInside', () => {
