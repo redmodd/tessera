@@ -9,7 +9,7 @@ import {
   utimesSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { normalizePath, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -469,25 +469,4 @@ describe('xapi setup virtual module', () => {
       ).toContain(real);
     }
   });
-});
-
-describe('dev config revalidation', () => {
-  it.each(['course.config.js', 'course.runtime.js'])(
-    'reports errors when %s changes',
-    (file) => {
-      writeConfig('web');
-      const validation = findPlugin('tessera:validation', 'serve');
-      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-      writeFileSync(resolve(projectRoot, file), 'export default {', 'utf-8');
-
-      (validation.hotUpdate as any).call(
-        { environment: { name: 'client' } },
-        { type: 'update', file: normalizePath(resolve(projectRoot, file)) },
-      );
-
-      expect(errors).toHaveBeenCalledWith(
-        expect.stringContaining(`${file}: could not parse`),
-      );
-    },
-  );
 });

@@ -30,7 +30,7 @@ import {
   standardProfile,
   type LMSStandard,
 } from '../runtime/standards.js';
-import { validateProject, reportValidationIssues } from './validation.js';
+import { reportValidationIssues } from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
 import { formatValue, quoteList } from './validation/diagnostics.js';
@@ -329,15 +329,6 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
 
     configureServer() {
       ctx.validate();
-    },
-
-    hotUpdate({ file }) {
-      if (this.environment.name !== 'client') return;
-      const watched = ['course.config.js', 'course.runtime.js'].map((name) =>
-        normalizePath(resolve(ctx.root, name)),
-      );
-      if (!watched.includes(file)) return;
-      reportValidationIssues(validateProject(ctx.root, ctx.standardOverride));
     },
 
     buildStart() {
