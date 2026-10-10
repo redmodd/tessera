@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -489,7 +489,15 @@ describe('dev terminal clearing', () => {
 });
 
 describe('dev revalidation', () => {
-  async function hotUpdate(
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function notify(
     file: string,
     {
       read = () => '' as unknown,
@@ -498,10 +506,16 @@ describe('dev revalidation', () => {
     } = {},
   ) {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await (validation.hotUpdate as any).call(
+    (validation.hotUpdate as any).call(
       { environment: { name: 'client' } },
       { type, file: normalizePath(resolve(projectRoot, file)), read },
     );
+    return errors;
+  }
+
+  async function hotUpdate(...change: Parameters<typeof notify>) {
+    const errors = notify(...change);
+    await vi.runAllTimersAsync();
     return errors;
   }
 
@@ -543,19 +557,35 @@ describe('dev revalidation', () => {
     },
   );
 
-  it('validates once for asset changes the watcher reports apart', async () => {
-    writeLessonPage(projectRoot);
+  it.each(['assets', 'pages/01-section/01-lesson'])(
+    'validates once for files the watcher reports apart under %s',
+    async (dir) => {
+      writeLessonPage(projectRoot);
+      writeConfigSource('export default {');
+      const validation = findPlugin('tessera:validation', 'serve');
+
+      notify(`${dir}/a.svelte`, { validation, type: 'create' });
+      await vi.advanceTimersByTimeAsync(30);
+      expect(
+        await hotUpdate(`${dir}/b.svelte`, { validation, type: 'create' }),
+      ).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('leaves the hot update to Vite without waiting for the validation', () => {
     writeConfigSource('export default {');
     const validation = findPlugin('tessera:validation', 'serve');
 
-    const first = hotUpdate('assets/a.svg', { validation, type: 'create' });
-    await new Promise((done) => setTimeout(done, 5));
-    const [errors] = await Promise.all([
-      first,
-      hotUpdate('assets/b.svg', { validation, type: 'create' }),
-    ]);
-
-    expect(errors).toHaveBeenCalledOnce();
+    expect(
+      (validation.hotUpdate as any).call(
+        { environment: { name: 'client' } },
+        {
+          type: 'update',
+          file: normalizePath(resolve(projectRoot, 'course.config.js')),
+          read: () => '',
+        },
+      ),
+    ).toBeUndefined();
   });
 
   it('validates once for saves that land together', async () => {
@@ -576,7 +606,7 @@ describe('dev revalidation', () => {
     writeConfigSource('');
     const validation = findPlugin('tessera:validation', 'serve');
     const slowSave = async () => {
-      await new Promise((done) => setTimeout(done, 5));
+      await new Promise((done) => setTimeout(done, 200));
       writeConfig('web');
     };
 
@@ -642,6 +672,40 @@ describe('dev revalidation', () => {
     );
   });
 
+  it('reports errors on a restart that rebuilds the plugin', () => {
+    writeLessonPage(projectRoot);
+    writeConfig('web');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const start = () => {
+      const validation = findPlugin('tessera:validation', 'serve');
+      (validation.configureServer as any).call(validation);
+    };
+
+    start();
+    writeConfigSource('export default {');
+    start();
+
+    expect(errors).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('course.config.js: could not parse'),
+    );
+  });
+
+  it('reports every standing warning again on a restart', () => {
+    writeLessonPage(projectRoot);
+    writeConfig('web');
+    const validation = findPlugin('tessera:validation', 'serve');
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const start = () => (validation.configureServer as any).call(validation);
+
+    start();
+    const standing = warnings.mock.calls.length;
+    expect(standing).toBeGreaterThan(0);
+
+    start();
+    expect(warnings).toHaveBeenCalledTimes(standing * 2);
+  });
+
   it('refuses to start a server on a project with errors', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     writeConfigSource('export default {');
@@ -698,5 +762,30 @@ describe('dev revalidation', () => {
 
     await save(withUnknownField);
     expect(warnings).not.toHaveBeenCalled();
+  });
+
+  it('reports a warning that comes back while an unrelated error stands', async () => {
+    writeLessonPage(projectRoot);
+    writeFileSync(
+      resolve(projectRoot, 'pages', '01-section', '01-lesson', 'broken.svelte'),
+      '<script module>export const pageConfig = makeConfig();</script>',
+    );
+    const validation = findPlugin('tessera:validation', 'serve');
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const unknownField = expect.stringContaining('unknown field "extra"');
+    const save = async (extra: string) => {
+      writeConfigSource(
+        `export default { title: "T", export: { standard: "web" }${extra} };`,
+      );
+      await hotUpdate('course.config.js', { validation });
+    };
+
+    await save(', extra: 1');
+    await save('');
+    expect(warnings).toHaveBeenCalledWith(unknownField);
+    warnings.mockClear();
+
+    await save(', extra: 1');
+    expect(warnings).toHaveBeenCalledWith(unknownField);
   });
 });

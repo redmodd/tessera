@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdirSync, rmdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
@@ -160,48 +160,107 @@ describe('entry plugin', () => {
 });
 
 describe('manifest plugin', () => {
-  it('reloads only when a page change alters the manifest', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function writeIntroPage(name: string) {
+    const introDir = resolve(projectRoot, 'pages', '01-intro');
+    mkdirSync(introDir, { recursive: true });
+    writeFileSync(resolve(introDir, name), '<h1>Welcome</h1>');
+  }
+
+  it('reloads only when a page change alters the manifest', async () => {
+    const environment = fakeEnvironment();
+    const plugin = tesseraSubPlugin('tessera:manifest');
+    load(plugin);
+    writeIntroPage('welcome.svelte');
+    const settled = async (
+      type: HotUpdateOptions['type'],
+      ...file: string[]
+    ) => {
+      hotUpdate(plugin, environment, type, ...file);
+      await vi.runAllTimersAsync();
+    };
+
+    await settled('update', 'course.config.js');
+    await settled('update', 'pages', 'notes.txt');
+    await settled('update', 'pages', 'foo_meta.js');
+    await settled('create', 'pages-old', 'intro.svelte');
+    expect(environment.sent).toEqual([]);
+
+    await settled('create', 'pages', '01-intro', 'welcome.svelte');
+    expect(environment.sent).toHaveLength(1);
+    expect(environment.invalidated).toEqual(['\0virtual:tessera-manifest']);
+
+    await settled('update', 'pages', '01-intro', 'welcome.svelte');
+    expect(environment.sent).toHaveLength(1);
+
+    writeFileSync(
+      resolve(projectRoot, 'pages', '01-intro', '_meta.js'),
+      `export default { title: 'Getting Started' };`,
+    );
+    await settled('create', 'pages', '01-intro', '_meta.js');
+    expect(environment.sent).toHaveLength(2);
+  });
+
+  it('reloads once for page changes the watcher reports apart', async () => {
     const environment = fakeEnvironment();
     const plugin = tesseraSubPlugin('tessera:manifest');
     load(plugin);
 
-    const introDir = resolve(projectRoot, 'pages', '01-intro');
-    mkdirSync(introDir);
-    writeFileSync(resolve(introDir, 'welcome.svelte'), '<h1>Welcome</h1>');
+    for (const name of ['a.svelte', 'b.svelte', 'c.svelte']) {
+      writeIntroPage(name);
+      hotUpdate(plugin, environment, 'create', 'pages', '01-intro', name);
+      await vi.advanceTimersByTimeAsync(30);
+    }
+    await vi.runAllTimersAsync();
 
-    hotUpdate(plugin, environment, 'update', 'course.config.js');
-    hotUpdate(plugin, environment, 'update', 'pages', 'notes.txt');
-    hotUpdate(plugin, environment, 'update', 'pages', 'foo_meta.js');
-    hotUpdate(plugin, environment, 'create', 'pages-old', 'intro.svelte');
+    expect(environment.sent).toEqual([{ type: 'full-reload' }]);
+  });
+
+  it('leaves a page save to HMR while the manifest is checked', () => {
+    const environment = fakeEnvironment();
+    const plugin = tesseraSubPlugin('tessera:manifest');
+    load(plugin);
+    writeIntroPage('welcome.svelte');
+
+    expect(
+      hotUpdate(
+        plugin,
+        environment,
+        'create',
+        'pages',
+        '01-intro',
+        'welcome.svelte',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('reports a manifest that cannot be generated and recovers on the next change', async () => {
+    const environment = fakeEnvironment();
+    const plugin = tesseraSubPlugin('tessera:manifest');
+    load(plugin);
+    writeIntroPage('welcome.svelte');
+    const metaPath = resolve(projectRoot, 'pages', '01-intro', '_meta.js');
+    mkdirSync(metaPath);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    hotUpdate(plugin, environment, 'create', 'pages', '01-intro', '_meta.js');
+    await vi.runAllTimersAsync();
+    expect(errors).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('EISDIR'),
+    );
     expect(environment.sent).toEqual([]);
 
-    hotUpdate(
-      plugin,
-      environment,
-      'create',
-      'pages',
-      '01-intro',
-      'welcome.svelte',
-    );
-    expect(environment.sent).toHaveLength(1);
-
-    load(plugin);
-    hotUpdate(
-      plugin,
-      environment,
-      'update',
-      'pages',
-      '01-intro',
-      'welcome.svelte',
-    );
-    expect(environment.sent).toHaveLength(1);
-
-    writeFileSync(
-      resolve(introDir, '_meta.js'),
-      `export default { title: 'Getting Started' };`,
-    );
-    hotUpdate(plugin, environment, 'create', 'pages', '01-intro', '_meta.js');
-    expect(environment.sent).toHaveLength(2);
+    rmdirSync(metaPath);
+    hotUpdate(plugin, environment, 'delete', 'pages', '01-intro', '_meta.js');
+    await vi.runAllTimersAsync();
+    expect(environment.sent).toEqual([{ type: 'full-reload' }]);
   });
 
   it('watches the page and _meta.js files the manifest reads', () => {

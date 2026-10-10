@@ -1,4 +1,4 @@
-import type { Plugin, Rollup } from 'vite';
+import type { DevEnvironment, Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve, dirname, join, relative } from 'node:path';
@@ -12,6 +12,7 @@ import {
 import {
   COURSE_CONFIG_FILE,
   generateManifest,
+  readCourseConfig,
   walkPages,
   type CourseConfigRead,
   type Manifest,
@@ -47,7 +48,7 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { COURSE_RUNTIME_FILE } from './validation/xapi.js';
-import { virtualModule } from './virtual-module.js';
+import { reloadVirtualModule, virtualModule } from './virtual-module.js';
 import {
   BuildContext,
   isInside,
@@ -337,10 +338,15 @@ const VALIDATED_ROOT_FILES = [
   ...SHELL_FILES,
 ];
 
-// The watcher reports a copied folder or a checkout one file at a time. An
-// asset event has no save to wait on, so the re-validation waits this long
-// after the last one to cover the whole burst.
-const ASSET_BURST_MS = 50;
+interface DevSession {
+  failing: boolean;
+  reported: Set<string>;
+}
+
+// Kept per project root for the life of the process, not per plugin instance:
+// Vite reloads vite.config.js on a restart and builds a new instance from it,
+// and that restart must not be taken for a first start.
+const devSessions = new Map<string, DevSession>();
 
 function isPageSource(projectRoot: string, file: string): boolean {
   return (
@@ -357,21 +363,19 @@ function isValidatedSource(projectRoot: string, file: string): boolean {
 }
 
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
-  let serving = false;
-  let failing = false;
-  const reported = new Set<string>();
-  const saves: Promise<unknown>[] = [];
-  let pass: Promise<void> | undefined;
-
-  function remember({ errors, warnings, infos = [] }: ValidationResult) {
-    if (errors.length === 0) reported.clear();
-    for (const notice of [...warnings, ...infos]) reported.add(notice);
-  }
-
   function revalidate(): void {
+    let session = devSessions.get(ctx.root);
+    if (!session) {
+      session = { failing: false, reported: new Set() };
+      devSessions.set(ctx.root, session);
+    }
+    const { reported } = session;
     let result: ValidationResult;
+    let configRead = false;
     try {
-      result = validateProject(ctx.root, ctx.standardOverride);
+      const read = readCourseConfig(ctx.root);
+      result = validateProject(ctx.root, ctx.standardOverride, read);
+      configRead = read.ok;
     } catch (error) {
       result = {
         errors: [`validation could not run: ${(error as Error).message}`],
@@ -380,24 +384,21 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     }
     const unreported = (notice: string) => !reported.has(notice);
     const infos = (result.infos ?? []).filter(unreported);
-    if (failing && result.errors.length === 0) {
+    if (session.failing && result.errors.length === 0) {
       infos.push('validation errors resolved');
     }
-    failing = result.errors.length > 0;
+    session.failing = result.errors.length > 0;
     reportValidationIssues({
       errors: result.errors,
       warnings: result.warnings.filter(unreported),
       infos,
     });
-    remember(result);
-  }
-
-  async function revalidateOnceSaved(): Promise<void> {
-    do {
-      await Promise.all(saves.splice(0));
-    } while (saves.length > 0);
-    pass = undefined;
-    revalidate();
+    // A run that cannot read the config skips the checks that depend on it,
+    // so a notice it does not repeat may still stand.
+    if (configRead) reported.clear();
+    for (const notice of [...result.warnings, ...(result.infos ?? [])]) {
+      reported.add(notice);
+    }
   }
 
   return {
@@ -405,23 +406,29 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer() {
-      if (serving) return revalidate();
-      remember(ctx.validate());
-      serving = true;
+      const restarted = devSessions.get(ctx.root);
+      if (restarted) {
+        restarted.reported.clear();
+        return revalidate();
+      }
+      const { warnings, infos = [] } = ctx.validate();
+      devSessions.set(ctx.root, {
+        failing: false,
+        reported: new Set([...warnings, ...infos]),
+      });
     },
 
+    // Nothing is returned, so Vite does not hold the hot update for the result.
     hotUpdate({ type, file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
-      const isSource = isValidatedSource(ctx.root, file);
-      const assetsChanged =
-        type !== 'update' && isInside(resolve(ctx.root, 'assets'), file);
-      if (!isSource && !assetsChanged) return;
-      saves.push(
-        isSource
-          ? Promise.allSettled([waitForSave()])
-          : new Promise((done) => setTimeout(done, ASSET_BURST_MS)),
-      );
-      return (pass ??= revalidateOnceSaved());
+      if (isValidatedSource(ctx.root, file)) {
+        ctx.devChanges.settle(revalidate, waitForSave());
+      } else if (
+        type !== 'update' &&
+        isInside(resolve(ctx.root, 'assets'), file)
+      ) {
+        ctx.devChanges.settle(revalidate);
+      }
     },
 
     buildStart() {
@@ -532,34 +539,55 @@ function manifestModule(manifest: Manifest): string {
 }
 
 function tesseraManifestPlugin(ctx: BuildContext): Plugin {
-  let loaded: string | undefined;
+  const name = 'tessera:manifest';
+  const virtualId = 'virtual:tessera-manifest';
+  // The module the client loaded last, or was last told to reload for.
+  let current: string | undefined;
+  let client: DevEnvironment | undefined;
+  let changes: string[] = [];
 
-  return virtualModule(
-    'tessera:manifest',
-    'virtual:tessera-manifest',
-    function () {
-      const pagesDir = resolve(ctx.root, 'pages');
-      const sections = walkPages(pagesDir);
-      ctx.manifest = generateManifest(pagesDir, sections);
+  function reloadIfChanged(): void {
+    const cause =
+      changes.length === 1
+        ? changes[0]
+        : `${changes.length} changes under pages/`;
+    changes = [];
+    const next = manifestModule(generateManifest(resolve(ctx.root, 'pages')));
+    if (next === current || !client) return;
+    current = next;
+    reloadVirtualModule(client, name, virtualId, cause);
+  }
 
-      for (const section of sections) {
-        for (const { metaPath } of [section, ...section.lessons]) {
-          if (existsSync(metaPath)) this.addWatchFile(metaPath);
-        }
-        for (const lesson of section.lessons) {
-          for (const file of lesson.files) {
-            this.addWatchFile(resolve(lesson.dir, file));
-          }
+  const plugin = virtualModule(name, virtualId, function () {
+    const pagesDir = resolve(ctx.root, 'pages');
+    const sections = walkPages(pagesDir);
+    ctx.manifest = generateManifest(pagesDir, sections);
+
+    for (const section of sections) {
+      for (const { metaPath } of [section, ...section.lessons]) {
+        if (existsSync(metaPath)) this.addWatchFile(metaPath);
+      }
+      for (const lesson of section.lessons) {
+        for (const file of lesson.files) {
+          this.addWatchFile(resolve(lesson.dir, file));
         }
       }
+    }
 
-      loaded = manifestModule(ctx.manifest);
-      return loaded;
-    },
-    (_type, file) =>
-      isPageSource(ctx.root, file) &&
-      manifestModule(generateManifest(resolve(ctx.root, 'pages'))) !== loaded,
-  );
+    current = manifestModule(ctx.manifest);
+    return current;
+  });
+
+  // A page save goes on to HMR at once. The manifest is compared once the
+  // burst it belongs to settles, and a change to it reloads the page then.
+  plugin.hotUpdate = function ({ type, file }) {
+    if (this.environment.name !== 'client') return;
+    if (!isPageSource(ctx.root, file)) return;
+    client = this.environment;
+    changes.push(`${type}: ${relative(ctx.root, file)}`);
+    ctx.devChanges.settle(reloadIfChanged);
+  };
+  return plugin;
 }
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
