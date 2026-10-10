@@ -14,7 +14,6 @@ import {
   walkPages,
   type CourseConfigRead,
   type Manifest,
-  type ResolvedConfigRead,
 } from './manifest.js';
 import {
   isRequiredGradedPage,
@@ -32,7 +31,7 @@ import {
   type LMSStandard,
 } from '../runtime/standards.js';
 import { validateProject, reportValidationIssues } from './validation.js';
-import { isIgnored, readA11ySettings } from './validation/a11y.js';
+import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
 import { formatValue, quoteList } from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
@@ -42,7 +41,11 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
-import { BuildContext, projectFileRel } from './build-context.js';
+import {
+  BuildContext,
+  projectFileRel,
+  type ValidatedConfig,
+} from './build-context.js';
 
 import { AUDIT_ENV_FLAG } from './a11y/audit.js';
 
@@ -80,7 +83,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
             if (ctx.isBuild) {
               ctx.a11yWarnings.push(msg);
             } else if (
-              !readA11ySettings(ctx.readConfig()).ignore.includes(warning.code)
+              !a11ySettingsFrom(ctx.readConfig()).ignore.includes(warning.code)
             ) {
               reportValidationIssues({ errors: [], warnings: [msg] });
             }
@@ -141,7 +144,7 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
     // For build mode: write index.html so Rollup can find it
     buildStart() {
       if (ctx.isBuild) {
-        const read = ctx.readConfig();
+        const read = ctx.validatedConfig();
         writeFileSync(
           resolve(ctx.root, 'index.html'),
           generateIndexHtml(readLanguage(read), cspMeta(read)),
@@ -186,9 +189,9 @@ function readLanguage(read: CourseConfigRead): string {
 // could break) and never on the dev server (a meta connect-src would block
 // Vite's HMR websocket). `export.csp` extends the baseline per-directive, or
 // `false` drops the meta for deployments that set a CSP header themselves.
-function cspMeta(read: ResolvedConfigRead): string {
-  if (!read.profile || read.profile.packaged) return '';
-  const csp = read.ok ? read.config.export?.csp : undefined;
+function cspMeta(read: ValidatedConfig): string {
+  if (read.profile.packaged) return '';
+  const csp = read.config.export?.csp;
   if (csp === false) return '';
   return `\n  <meta http-equiv="Content-Security-Policy" content="${buildCsp(csp)}" />`;
 }
@@ -354,7 +357,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 
     buildEnd() {
       if (ctx.a11yWarnings.length === 0) return;
-      const settings = readA11ySettings(ctx.readConfig());
+      const settings = a11ySettingsFrom(ctx.readConfig());
       const ignored = new Set(settings.ignore);
       const warnings = ctx.a11yWarnings.filter(
         (msg) => !isIgnored(msg, ignored),
@@ -418,11 +421,10 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         );
       }
 
-      const read = ctx.readConfig();
       await runExport(
         ctx.root,
         ctx.outDir,
-        mergeCourseConfig(read.ok ? read.config : {}),
+        mergeCourseConfig(ctx.validatedConfig().config),
         ctx.manifest.pages.some(isRequiredGradedPage),
       );
     },
@@ -516,7 +518,7 @@ export function createAdapter(config, options) {
 function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
   return virtualModule('tessera:xapi-setup', 'virtual:tessera-xapi-setup', () =>
     // The audit runs offline, so it never wires real LRS destinations.
-    !ctx.isBuild || (!isAuditBuild() && wiresXAPIClient(ctx.readConfig()))
+    !ctx.isBuild || (!isAuditBuild() && wiresXAPIClient(ctx.validatedConfig()))
       ? `export { buildXAPIClient } from 'tessera-learn/runtime/xapi/setup.js';`
       : `export async function buildXAPIClient() { return null; }`,
   );
@@ -524,12 +526,9 @@ function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
 
 // The launch standards (cmi5, plain xAPI) own a publisher the runtime can share
 // for `endpoint: 'lms'`, so they wire the client regardless of explicit xapi config.
-function wiresXAPIClient(read: ResolvedConfigRead): boolean {
-  const entries =
-    read.ok && read.config.xapi != null ? [read.config.xapi].flat() : [];
-  return (
-    entries.some((e) => e?.endpoint !== 'lms') || !!read.profile?.hasLaunchLRS
-  );
+function wiresXAPIClient({ config, profile }: ValidatedConfig): boolean {
+  const entries = config.xapi != null ? [config.xapi].flat() : [];
+  return entries.some((e) => e?.endpoint !== 'lms') || profile.hasLaunchLRS;
 }
 
 function tesseraFirstPagePreloadPlugin(ctx: BuildContext): Plugin {

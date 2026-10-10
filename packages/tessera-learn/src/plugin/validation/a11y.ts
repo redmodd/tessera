@@ -64,7 +64,7 @@ export function normalizeA11y(raw: unknown): A11ySettings {
   return { level, standard, ignore };
 }
 
-export function readA11ySettings(read: CourseConfigRead): A11ySettings {
+export function a11ySettingsFrom(read: CourseConfigRead): A11ySettings {
   return normalizeA11y(read.ok ? read.config.a11y : undefined);
 }
 

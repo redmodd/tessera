@@ -7,8 +7,13 @@ import {
   type Manifest,
   type ResolvedConfigRead,
 } from './manifest.js';
-import type { StandardId } from '../runtime/standards.js';
+import type { StandardId, StandardProfile } from '../runtime/standards.js';
 import { reportValidationIssues, validateProject } from './validation.js';
+
+export type ValidatedConfig = ResolvedConfigRead & {
+  ok: true;
+  profile: StandardProfile;
+};
 
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
@@ -41,7 +46,7 @@ export class BuildContext {
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
-  #validatedConfig: ResolvedConfigRead | null = null;
+  #validatedConfig: ValidatedConfig | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
 
@@ -57,29 +62,32 @@ export class BuildContext {
   }
 
   validate(): void {
+    this.#validatedConfig = null;
     const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
     reportValidationIssues(result);
-    if (result.errors.length > 0) {
+    const resolved = resolveConfigRead(read, this.standardOverride);
+    const { profile } = resolved;
+    if (result.errors.length > 0 || !resolved.ok || !profile) {
       throw new Error(
         `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
       );
     }
-    this.#validatedConfig = resolveConfigRead(read, this.standardOverride);
+    this.#validatedConfig = { ...resolved, profile };
   }
 
-  readConfig(): ResolvedConfigRead {
-    if (!this.isBuild) {
-      return resolveConfigRead(
-        readCourseConfig(this.root),
-        this.standardOverride,
-      );
-    }
+  validatedConfig(): ValidatedConfig {
     if (!this.#validatedConfig) {
       throw new Error(
         '[tessera] course.config.js was read before validation ran.',
       );
     }
     return this.#validatedConfig;
+  }
+
+  readConfig(): ResolvedConfigRead {
+    return this.isBuild
+      ? this.validatedConfig()
+      : resolveConfigRead(readCourseConfig(this.root), this.standardOverride);
   }
 }
