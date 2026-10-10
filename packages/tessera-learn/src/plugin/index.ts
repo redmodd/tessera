@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, dirname, join, relative, sep } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -340,12 +340,19 @@ const VALIDATED_ROOT_FILES = [
   'quiz.svelte',
 ];
 
-function isValidatedSource(projectRoot: string, file: string): boolean {
-  const [top, ...nested] = relative(projectRoot, file).split(sep);
-  if (nested.length === 0) return VALIDATED_ROOT_FILES.includes(top);
+function isPageSource(projectRoot: string, file: string): boolean {
   return (
-    top === 'pages' &&
-    (file.endsWith('.svelte') || nested.at(-1) === '_meta.js')
+    file.startsWith(`${normalizePath(resolve(projectRoot, 'pages'))}/`) &&
+    (file.endsWith('.svelte') || file.endsWith('/_meta.js'))
+  );
+}
+
+function isValidatedSource(projectRoot: string, file: string): boolean {
+  return (
+    isPageSource(projectRoot, file) ||
+    VALIDATED_ROOT_FILES.some(
+      (name) => file === normalizePath(resolve(projectRoot, name)),
+    )
   );
 }
 
@@ -532,14 +539,9 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
       loaded = manifestModule(ctx.manifest);
       return loaded;
     },
-    (_type, file) => {
-      const pagesDir = resolve(ctx.root, 'pages');
-      return (
-        file.startsWith(normalizePath(pagesDir) + '/') &&
-        (file.endsWith('.svelte') || file.endsWith('/_meta.js')) &&
-        manifestModule(generateManifest(pagesDir)) !== loaded
-      );
-    },
+    (_type, file) =>
+      isPageSource(ctx.root, file) &&
+      manifestModule(generateManifest(resolve(ctx.root, 'pages'))) !== loaded,
   );
 }
 
