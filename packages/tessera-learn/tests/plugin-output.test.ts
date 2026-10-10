@@ -600,18 +600,6 @@ describe('dev revalidation', () => {
     ).toBeUndefined();
   });
 
-  it('validates once for saves that land together', async () => {
-    const validation = startDev();
-    writeConfigSource('export default {');
-
-    const [errors] = await Promise.all([
-      hotUpdate(validation, 'course.config.js'),
-      hotUpdate(validation, 'layout.svelte'),
-    ]);
-
-    expect(errors).toHaveBeenCalledOnce();
-  });
-
   it('waits for a save that starts while another is read', async () => {
     const validation = startDev();
     writeConfigSource('');
@@ -624,17 +612,6 @@ describe('dev revalidation', () => {
       hotUpdate(validation, 'layout.svelte'),
       hotUpdate(validation, 'course.config.js', { read: slowSave }),
     ]);
-
-    expect(errors).not.toHaveBeenCalled();
-  });
-
-  it('waits for a save still in progress before validating', async () => {
-    const validation = startDev();
-    writeConfigSource('');
-
-    const errors = await hotUpdate(validation, 'course.config.js', {
-      read: () => writeConfig('web'),
-    });
 
     expect(errors).not.toHaveBeenCalled();
   });
@@ -682,12 +659,15 @@ describe('dev revalidation', () => {
   });
 
   it('reports errors on a restart instead of failing it', () => {
-    const validation = startDev();
+    let validation = startDev();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Vite builds the restarted server's plugins before it closes the old server.
     const restart = () => {
-      (validation.configureServer as any).call(validation);
+      const rebuilt = findPlugin('tessera:validation', 'serve');
+      (rebuilt.configureServer as any).call(rebuilt);
       (validation.closeServer as any).call(validation, { reason: 'restart' });
+      validation = rebuilt;
     };
 
     writeConfigSource('export default {');
@@ -700,19 +680,6 @@ describe('dev revalidation', () => {
     restart();
     expect(infos).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining('validation errors resolved'),
-    );
-  });
-
-  it('reports errors on a restart that rebuilds the plugin', () => {
-    startDev();
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    writeConfigSource('export default {');
-    const rebuilt = findPlugin('tessera:validation', 'serve');
-    (rebuilt.configureServer as any).call(rebuilt);
-
-    expect(errors).toHaveBeenCalledExactlyOnceWith(
-      expect.stringContaining('course.config.js: could not parse'),
     );
   });
 

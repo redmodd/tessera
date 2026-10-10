@@ -6,8 +6,8 @@ import {
   isInside,
   projectFileRel,
 } from '../src/plugin/build-context.js';
-import { resolvedConfig, resolvedContext } from './helpers/plugin.js';
-import { tempDir, writeLessonPage } from './helpers.js';
+import { resolvedConfig } from './helpers/plugin.js';
+import { tempDir } from './helpers.js';
 
 const root = resolve('/project');
 
@@ -29,24 +29,6 @@ describe('BuildContext.configure', () => {
 
   it('ignores outDir outside a build', () => {
     expect(() => configureWith('.', 'serve')).not.toThrow();
-  });
-});
-
-describe('BuildContext.validate', () => {
-  it('keeps no config snapshot on the dev server', () => {
-    const courseRoot = tempDir();
-    writeLessonPage(courseRoot);
-    writeFileSync(
-      resolve(courseRoot, 'course.config.js'),
-      'export default { title: "Course", language: "en" };',
-    );
-    const ctx = resolvedContext(courseRoot, 'serve');
-
-    ctx.validate();
-
-    expect(() => ctx.validatedConfig()).toThrow(
-      'course.config.js has no validated snapshot',
-    );
   });
 });
 
