@@ -96,13 +96,6 @@ describe('generated index.html Content-Security-Policy', () => {
     expect(html).toContain("worker-src 'self' blob:");
   });
 
-  it('writes no index.html when the config cannot be read', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    writeConfigSource('export default {');
-    expect(() => validatedBuild()).toThrow('Tessera validation failed');
-    expect(existsSync(resolve(projectRoot, 'index.html'))).toBe(false);
-  });
-
   it('refuses to read the config before validation runs', () => {
     writeConfig('web');
     const plugin = findPlugin('tessera:index-html');

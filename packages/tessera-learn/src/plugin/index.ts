@@ -357,7 +357,7 @@ function tesseraA11yCompilerPlugin(ctx: BuildContext): Plugin {
 
     buildEnd() {
       if (ctx.a11yWarnings.length === 0) return;
-      const settings = a11ySettingsFrom(ctx.readConfig());
+      const settings = a11ySettingsFrom(ctx.validatedConfig());
       const ignored = new Set(settings.ignore);
       const warnings = ctx.a11yWarnings.filter(
         (msg) => !isIgnored(msg, ignored),
@@ -504,7 +504,7 @@ function tesseraAdapterPlugin(ctx: BuildContext): Plugin {
 
     // The audit renders headless with no LMS in the frame chain; the SCORM/
     // cmi5 adapters throw when their API is absent, so render with WebAdapter.
-    const profile = isAuditBuild() ? undefined : ctx.readConfig().profile;
+    const profile = isAuditBuild() ? undefined : ctx.validatedConfig().profile;
     if (profile?.packaged) return generateLmsAdapterModule(profile.id);
     return `
 import { WebAdapter } from 'tessera-learn/runtime/adapters/web.js';
@@ -528,7 +528,7 @@ function tesseraXAPISetupPlugin(ctx: BuildContext): Plugin {
 // for `endpoint: 'lms'`, so they wire the client regardless of explicit xapi config.
 function wiresXAPIClient({ config, profile }: ValidatedConfig): boolean {
   const entries = config.xapi != null ? [config.xapi].flat() : [];
-  return entries.some((e) => e?.endpoint !== 'lms') || profile.hasLaunchLRS;
+  return entries.some((e) => e.endpoint !== 'lms') || profile.hasLaunchLRS;
 }
 
 function tesseraFirstPagePreloadPlugin(ctx: BuildContext): Plugin {
