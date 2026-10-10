@@ -6,7 +6,6 @@ import {
   rmSync,
   existsSync,
   readdirSync,
-  utimesSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
@@ -24,23 +23,22 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
-function validatedBuild(): (name: string) => Plugin {
+function writeLessonPage() {
   const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
   mkdirSync(lesson, { recursive: true });
   writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
+}
+
+function validatedBuild(): (name: string) => Plugin {
+  writeLessonPage();
   const get = resolvedPlugins(projectRoot, 'build');
   const validation = get('tessera:validation');
   (validation.buildStart as any).call(validation);
   return get;
 }
 
-let configWrites = 0;
-
 function writeConfigSource(source: string) {
-  const configPath = resolve(projectRoot, 'course.config.js');
-  writeFileSync(configPath, source, 'utf-8');
-  configWrites += 1;
-  utimesSync(configPath, configWrites, configWrites);
+  writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
 }
 
 function writeConfig(standard: string) {
@@ -483,22 +481,40 @@ describe('xapi setup virtual module', () => {
 });
 
 describe('dev config revalidation', () => {
+  async function hotUpdate(file: string, read: () => unknown = () => '') {
+    const validation = findPlugin('tessera:validation', 'serve');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await (validation.hotUpdate as any).call(
+      { environment: { name: 'client' } },
+      {
+        type: 'update',
+        file: normalizePath(resolve(projectRoot, file)),
+        read,
+      },
+    );
+    return errors;
+  }
+
   it.each(['course.config.js', 'course.runtime.js'])(
     'reports errors when %s changes',
-    (file) => {
+    async (file) => {
       writeConfig('web');
-      const validation = findPlugin('tessera:validation', 'serve');
-      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
       writeFileSync(resolve(projectRoot, file), 'export default {', 'utf-8');
 
-      (validation.hotUpdate as any).call(
-        { environment: { name: 'client' } },
-        { type: 'update', file: normalizePath(resolve(projectRoot, file)) },
-      );
-
-      expect(errors).toHaveBeenCalledWith(
+      expect(await hotUpdate(file)).toHaveBeenCalledWith(
         expect.stringContaining(`${file}: could not parse`),
       );
     },
   );
+
+  it('waits for a save still in progress before validating', async () => {
+    writeLessonPage();
+    writeConfigSource('');
+
+    const errors = await hotUpdate('course.config.js', () =>
+      writeConfig('web'),
+    );
+
+    expect(errors).not.toHaveBeenCalled();
+  });
 });
