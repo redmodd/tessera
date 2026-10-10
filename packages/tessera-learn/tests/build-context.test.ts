@@ -50,6 +50,23 @@ describe('BuildContext.validate', () => {
       'course.config.js was read before validation ran',
     );
   });
+
+  it('validates the read it was given instead of the file', () => {
+    const courseRoot = tempDir();
+    const lesson = resolve(courseRoot, 'pages', '01-section', '01-lesson');
+    mkdirSync(lesson, { recursive: true });
+    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>');
+    writeFileSync(resolve(courseRoot, 'course.config.js'), 'export default {');
+    const ctx = new BuildContext(undefined, {
+      ok: true,
+      config: { title: 'Course', language: 'en', id: 'urn:course' },
+    });
+    ctx.configure(resolvedConfig(courseRoot, 'build'));
+
+    ctx.validate();
+
+    expect(ctx.validatedConfig().config.title).toBe('Course');
+  });
 });
 
 describe('isInside', () => {

@@ -60,15 +60,20 @@ function isAuditBuild(): boolean {
   return process.env[AUDIT_ENV_FLAG] === '1';
 }
 
-export function tesseraPlugin(options: { standardOverride?: string } = {}) {
-  const { standardOverride } = options;
+export interface TesseraPluginOptions {
+  standardOverride?: string;
+  configRead?: CourseConfigRead;
+}
+
+export function tesseraPlugin(options: TesseraPluginOptions = {}) {
+  const { standardOverride, configRead } = options;
   const profile = standardProfile(standardOverride);
   if (standardOverride && !profile) {
     throw new Error(
       `standardOverride must be ${quoteList(STANDARD_IDS)}, got ${formatValue(standardOverride)}`,
     );
   }
-  const ctx = new BuildContext(profile?.id);
+  const ctx = new BuildContext(profile?.id, configRead);
   return [
     {
       name: 'tessera:context',

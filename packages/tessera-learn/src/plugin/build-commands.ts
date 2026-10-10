@@ -28,7 +28,7 @@ export async function runBuild(
     projectRoot,
     workspaceRoot,
     { command: 'build', mode: 'production' },
-    standardOverride,
+    { standardOverride },
   );
   await vite.build(config);
   return 0;

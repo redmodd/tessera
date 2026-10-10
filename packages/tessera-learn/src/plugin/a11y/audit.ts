@@ -353,7 +353,8 @@ export async function runAudit(
   }
   const { chromium, AxeBuilder } = deps.deps;
 
-  const settings = a11ySettingsFrom(readCourseConfig(projectRoot));
+  const configRead = readCourseConfig(projectRoot);
+  const settings = a11ySettingsFrom(configRead);
   const tags = axeTags(settings.standard);
   const disableRules = axeIgnoreRules(settings.ignore);
 
@@ -370,6 +371,7 @@ export async function runAudit(
       command: 'build',
       mode: 'production',
     },
+    { configRead },
   );
 
   // A throwaway web build, kept out of dist/ so a real LMS export is untouched.

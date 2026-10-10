@@ -2,8 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ConfigEnv, InlineConfig } from 'vite';
-import { tesseraPlugin } from './index.js';
-import type { StandardId } from '../runtime/standards.js';
+import { tesseraPlugin, type TesseraPluginOptions } from './index.js';
 
 // Base Vite config for every Tessera command (dev, export, a11y build).
 // configFile:false disables Vite's own discovery — there is no vite.config.js —
@@ -16,13 +15,13 @@ import type { StandardId } from '../runtime/standards.js';
 export function buildInlineConfig(
   projectRoot: string,
   workspaceRoot: string,
-  standardOverride?: StandardId,
+  pluginOptions?: TesseraPluginOptions,
 ): InlineConfig {
   return {
     root: projectRoot,
     configFile: false,
     clearScreen: false,
-    plugins: [tesseraPlugin({ standardOverride })],
+    plugins: [tesseraPlugin(pluginOptions)],
     resolve: { alias: { $shared: resolve(workspaceRoot, 'shared') } },
     server: { fs: { allow: [workspaceRoot] } },
   };
@@ -49,10 +48,10 @@ export async function resolveTesseraConfig(
   projectRoot: string,
   workspaceRoot: string,
   env: ConfigEnv,
-  standardOverride?: StandardId,
+  pluginOptions?: TesseraPluginOptions,
 ): Promise<InlineConfig> {
   const vite = await import('vite');
-  const base = buildInlineConfig(projectRoot, workspaceRoot, standardOverride);
+  const base = buildInlineConfig(projectRoot, workspaceRoot, pluginOptions);
   const user = await loadUserConfig(projectRoot, env);
   return user ? vite.mergeConfig(base, user) : base;
 }
