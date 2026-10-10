@@ -448,7 +448,6 @@ describe('runExport', () => {
       mergeCourseConfig({
         title: 'Test',
         version: '1.0.0',
-        export: { standard: 'web' },
       }),
       STANDARDS.web,
       true,
@@ -465,7 +464,6 @@ describe('runExport', () => {
       mergeCourseConfig({
         title: 'Test Course',
         version: '2.0.0',
-        export: { standard: 'scorm12' },
       }),
       STANDARDS.scorm12,
       true,
@@ -493,7 +491,6 @@ describe('runExport', () => {
       mergeCourseConfig({
         title: 'Test Course',
         version: '1.0.0',
-        export: { standard: 'scorm2004' },
       }),
       STANDARDS.scorm2004,
       true,
@@ -520,7 +517,6 @@ describe('runExport', () => {
         version: '1.0.0',
         completion: { mode: 'quiz' },
         scoring: { passingScore: 80 },
-        export: { standard: 'cmi5' },
       },
       STANDARDS.cmi5,
       true,
@@ -540,7 +536,6 @@ describe('runExport', () => {
       mergeCourseConfig({
         title: 'My Amazing Course!',
         version: '3.2.1',
-        export: { standard: 'scorm12' },
       }),
       STANDARDS.scorm12,
       true,
@@ -561,7 +556,6 @@ describe('runExport', () => {
       mergeCourseConfig({
         title: 'Test Course',
         version: '1.0.0',
-        export: { standard: 'scorm12' },
       }),
       STANDARDS.scorm12,
       true,
