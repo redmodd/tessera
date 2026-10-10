@@ -421,10 +421,12 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
         );
       }
 
+      const { config, profile } = ctx.validatedConfig();
       await runExport(
         ctx.root,
         ctx.outDir,
-        mergeCourseConfig(ctx.validatedConfig().config),
+        mergeCourseConfig(config),
+        profile,
         ctx.manifest.pages.some(isRequiredGradedPage),
       );
     },
