@@ -78,6 +78,7 @@ function validatePageFile(
 
   const parseError = getParseError(content);
   if (parseError) {
+    d.partial = true;
     d.error(`${fileRel}: could not parse, ${parseError}`);
     return {
       page: {
@@ -322,6 +323,7 @@ function validateMetaFile(
 
   const metaRel = relative(projectRoot, metaPath);
   if (problem) {
+    d.partial = true;
     d.error(`${metaRel}: ${READ_FAILURE_MESSAGES[problem]}`);
     return null;
   }

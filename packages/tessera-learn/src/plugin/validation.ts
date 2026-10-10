@@ -43,6 +43,7 @@ export function validateProject(
 ): ValidationResult {
   startParseRun();
   const d = new Diagnostics();
+  d.partial = !read.ok;
 
   if (!read.ok && read.reason === 'missing') {
     d.error(`course.config.js: ${READ_FAILURE_MESSAGES.missing}`);

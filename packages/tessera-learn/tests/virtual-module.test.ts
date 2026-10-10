@@ -47,8 +47,19 @@ function hotUpdate(
   type: HotUpdateOptions['type'],
   ...segments: string[]
 ) {
+  return hotUpdateOf(plugin, environment, type, segments, []);
+}
+
+function hotUpdateOf(
+  plugin: Plugin,
+  environment: Environment,
+  type: HotUpdateOptions['type'],
+  segments: string[],
+  modules: { id: string }[],
+) {
   const file = normalizePath(resolve(projectRoot, ...segments));
-  return (plugin.hotUpdate as any).call({ environment }, { type, file });
+  const hook = plugin.hotUpdate as any;
+  return (hook.handler ?? hook).call({ environment }, { type, file, modules });
 }
 
 describe('virtualModule', () => {
@@ -230,30 +241,60 @@ describe('manifest plugin', () => {
     writeIntroPage('welcome.svelte');
 
     expect(
-      hotUpdate(
+      hotUpdateOf(
         plugin,
         environment,
-        'create',
-        'pages',
-        '01-intro',
-        'welcome.svelte',
+        'update',
+        ['pages', '01-intro', 'welcome.svelte'],
+        [{ id: 'welcome' }],
       ),
     ).toBeUndefined();
+    expect(environment.invalidated).toEqual([]);
   });
+
+  it.each([
+    ['create', 'stray.svelte'],
+    ['delete', 'stray.svelte'],
+    ['update', '_meta.js'],
+  ] as const)(
+    'holds the reload Vite sends on a page source %s until the burst settles',
+    async (type, name) => {
+      const environment = fakeEnvironment();
+      const plugin = tesseraSubPlugin('tessera:manifest');
+      load(plugin);
+
+      expect(
+        hotUpdateOf(plugin, environment, type, ['pages', name], [{ id: 'a' }]),
+      ).toEqual([]);
+      expect(environment.invalidated).toEqual(['a']);
+      expect(environment.sent).toEqual([]);
+
+      await vi.runAllTimersAsync();
+      expect(environment.sent).toEqual([{ type: 'full-reload' }]);
+    },
+  );
 
   it('reports a manifest that cannot be generated and recovers on the next change', async () => {
     const environment = fakeEnvironment();
     const plugin = tesseraSubPlugin('tessera:manifest');
-    load(plugin);
     writeIntroPage('welcome.svelte');
+    load(plugin);
     const metaPath = resolve(projectRoot, 'pages', '01-intro', '_meta.js');
     mkdirSync(metaPath);
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    hotUpdate(plugin, environment, 'create', 'pages', '01-intro', '_meta.js');
+    hotUpdateOf(
+      plugin,
+      environment,
+      'create',
+      ['pages', '01-intro', 'stray.svelte'],
+      [{ id: 'pages' }],
+    );
     await vi.runAllTimersAsync();
     expect(errors).toHaveBeenCalledExactlyOnceWith(
-      expect.stringContaining('EISDIR'),
+      expect.stringContaining(
+        'the page manifest could not be generated: EISDIR',
+      ),
     );
     expect(environment.sent).toEqual([]);
 

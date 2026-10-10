@@ -5,6 +5,8 @@ export interface ValidationResult {
   errors: string[];
   warnings: string[];
   infos?: string[];
+  /** Set when a source could not be read, so the checks that depend on it did not run. */
+  partial?: boolean;
 }
 
 /** Collects diagnostics so checkers thread one argument, not three. */
@@ -12,6 +14,7 @@ export class Diagnostics implements ValidationResult {
   errors: string[] = [];
   warnings: string[] = [];
   infos: string[] = [];
+  partial = false;
   error(message: string): void {
     this.errors.push(message);
   }

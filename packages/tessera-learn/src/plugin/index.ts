@@ -1,4 +1,9 @@
-import type { DevEnvironment, Plugin, Rollup } from 'vite';
+import type {
+  DevEnvironment,
+  EnvironmentModuleNode,
+  Plugin,
+  Rollup,
+} from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve, dirname, join, relative } from 'node:path';
@@ -12,7 +17,6 @@ import {
 import {
   COURSE_CONFIG_FILE,
   generateManifest,
-  readCourseConfig,
   walkPages,
   type CourseConfigRead,
   type Manifest,
@@ -343,7 +347,7 @@ interface DevSession {
   reported: Set<string>;
 }
 
-// Kept per project root for the life of the process, not per plugin instance:
+// Kept per project root while its server is open, not per plugin instance:
 // Vite reloads vite.config.js on a restart and builds a new instance from it,
 // and that restart must not be taken for a first start.
 const devSessions = new Map<string, DevSession>();
@@ -364,22 +368,18 @@ function isValidatedSource(projectRoot: string, file: string): boolean {
 
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
   function revalidate(): void {
-    let session = devSessions.get(ctx.root);
-    if (!session) {
-      session = { failing: false, reported: new Set() };
-      devSessions.set(ctx.root, session);
-    }
+    // A burst can settle after the server has closed.
+    const session = devSessions.get(ctx.root);
+    if (!session) return;
     const { reported } = session;
     let result: ValidationResult;
-    let configRead = false;
     try {
-      const read = readCourseConfig(ctx.root);
-      result = validateProject(ctx.root, ctx.standardOverride, read);
-      configRead = read.ok;
+      result = validateProject(ctx.root, ctx.standardOverride);
     } catch (error) {
       result = {
         errors: [`validation could not run: ${(error as Error).message}`],
         warnings: [],
+        partial: true,
       };
     }
     const unreported = (notice: string) => !reported.has(notice);
@@ -393,9 +393,9 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       warnings: result.warnings.filter(unreported),
       infos,
     });
-    // A run that cannot read the config skips the checks that depend on it,
-    // so a notice it does not repeat may still stand.
-    if (configRead) reported.clear();
+    // A run that cannot read a source skips the checks that depend on it, so
+    // a notice it does not repeat may still stand.
+    if (!result.partial) reported.clear();
     for (const notice of [...result.warnings, ...(result.infos ?? [])]) {
       reported.add(notice);
     }
@@ -418,11 +418,18 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       });
     },
 
+    closeServer({ reason }) {
+      if (reason === 'close') devSessions.delete(ctx.root);
+    },
+
     // Nothing is returned, so Vite does not hold the hot update for the result.
     hotUpdate({ type, file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
       if (isValidatedSource(ctx.root, file)) {
-        ctx.devChanges.settle(revalidate, waitForSave());
+        ctx.devChanges.settle(
+          revalidate,
+          type === 'delete' ? undefined : waitForSave(),
+        );
       } else if (
         type !== 'update' &&
         isInside(resolve(ctx.root, 'assets'), file)
@@ -545,15 +552,31 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
   let current: string | undefined;
   let client: DevEnvironment | undefined;
   let changes: string[] = [];
+  // Set once a reload Vite was about to send has been held for the burst.
+  let reloadHeld = false;
 
   function reloadIfChanged(): void {
+    let next: string;
+    try {
+      next = manifestModule(generateManifest(resolve(ctx.root, 'pages')));
+    } catch (error) {
+      // The changes and a held reload stay for the next burst.
+      reportValidationIssues({
+        errors: [
+          `the page manifest could not be generated: ${(error as Error).message}`,
+        ],
+        warnings: [],
+      });
+      return;
+    }
     const cause =
       changes.length === 1
         ? changes[0]
         : `${changes.length} changes under pages/`;
+    const reload = reloadHeld || next !== current;
     changes = [];
-    const next = manifestModule(generateManifest(resolve(ctx.root, 'pages')));
-    if (next === current || !client) return;
+    reloadHeld = false;
+    if (!reload || !client) return;
     current = next;
     reloadVirtualModule(client, name, virtualId, cause);
   }
@@ -580,12 +603,27 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
 
   // A page save goes on to HMR at once. The manifest is compared once the
   // burst it belongs to settles, and a change to it reloads the page then.
-  plugin.hotUpdate = function ({ type, file }) {
-    if (this.environment.name !== 'client') return;
-    if (!isPageSource(ctx.root, file)) return;
-    client = this.environment;
-    changes.push(`${type}: ${relative(ctx.root, file)}`);
-    ctx.devChanges.settle(reloadIfChanged);
+  // Any other change under pages/ has Vite reload the page per file, ahead of
+  // the manifest, so that reload is held and one is sent with the manifest.
+  plugin.hotUpdate = {
+    // After vite:import-glob has added the pages module for a new or removed page.
+    order: 'post',
+    handler({ type, file, modules, timestamp }) {
+      if (this.environment.name !== 'client') return;
+      if (!isPageSource(ctx.root, file)) return;
+      client = this.environment;
+      changes.push(`${type}: ${relative(ctx.root, file)}`);
+      ctx.devChanges.settle(reloadIfChanged);
+      if (type === 'update' && file.endsWith('.svelte')) return;
+      if (modules.length === 0) return;
+      const invalidated = new Set<EnvironmentModuleNode>();
+      const { moduleGraph } = this.environment;
+      for (const mod of modules) {
+        moduleGraph.invalidateModule(mod, invalidated, timestamp, true);
+      }
+      reloadHeld = true;
+      return [];
+    },
   };
   return plugin;
 }
