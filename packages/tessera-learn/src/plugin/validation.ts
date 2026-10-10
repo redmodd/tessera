@@ -1,4 +1,4 @@
-import { clearParseCache } from './ast.js';
+import { startParseRun } from './ast.js';
 import {
   readCourseConfig,
   READ_FAILURE_MESSAGES,
@@ -41,7 +41,7 @@ export function validateProject(
   standardOverride?: StandardId,
   read: CourseConfigRead = readCourseConfig(projectRoot),
 ): ValidationResult {
-  clearParseCache();
+  startParseRun();
   const d = new Diagnostics();
 
   if (!read.ok && read.reason === 'missing') {

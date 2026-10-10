@@ -426,6 +426,24 @@ describe('generateManifest', () => {
     expect(parse).not.toHaveBeenCalled();
   });
 
+  it('parses only the page that changed since the last validation', () => {
+    const projectRoot = tempDir();
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default { title: "T" };',
+    );
+    writeLessonPage(projectRoot);
+    const edited = resolve(projectRoot, 'pages/01-section/01-lesson/b.svelte');
+    writeFileSync(edited, '<h1>Before</h1>');
+
+    validateProject(projectRoot);
+    writeFileSync(edited, '<h1>After</h1>');
+    vi.mocked(parse).mockClear();
+    validateProject(projectRoot);
+
+    expect(parse).toHaveBeenCalledOnce();
+  });
+
   it('generates correct manifest for standard course structure', () => {
     setupStandardCourse();
     const manifest = generateManifest(root);
