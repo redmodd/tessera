@@ -393,8 +393,8 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       warnings: result.warnings.filter(unreported),
       infos,
     });
-    // A run that cannot read a source skips the checks that depend on it, so
-    // a notice it does not repeat may still stand.
+    // A run that cannot read a source or resolve the export standard skips the
+    // checks that depend on it, so a notice it does not repeat may still stand.
     if (!result.partial) reported.clear();
     for (const notice of [...result.warnings, ...(result.infos ?? [])]) {
       reported.add(notice);

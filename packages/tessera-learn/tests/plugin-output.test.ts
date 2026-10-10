@@ -772,31 +772,44 @@ describe('dev revalidation', () => {
     expect(warnings).toHaveBeenCalledWith(unknownField);
   });
 
+  const xapiConfig = `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "https://lrs.example/xapi/", activityId: "https://example.com/course", actorAccountHomePage: "https://example.com" } };`;
+
   it.each([
     [
-      'page.svelte',
+      `${lessonDir}/page.svelte`,
       '<script module>export const pageConfig = { weight: 2 };</script>',
       '<script module>export const pageConfig = {</script>',
     ],
     [
-      '_meta.js',
+      `${lessonDir}/_meta.js`,
       `export default { title: "Lesson", pages: ["page", "page"] };`,
       'export default {',
     ],
+    [
+      'course.config.js',
+      `export default { title: "T", export: { standard: "scorm12", csp: false } };`,
+      `export default { title: "T", export: { standard: "scrom12", csp: false } };`,
+    ],
+    [
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => "Basic eDp5", actor: () => ({}) } };`,
+      'export const xapi = {',
+      xapiConfig,
+    ],
   ])(
-    'does not repeat a standing warning once %s parses again',
-    async (name, source, typo) => {
+    'does not repeat a standing warning once the error in %s is fixed',
+    async (file, source, typo, config?: string) => {
       const validation = startDev();
+      if (config) writeConfigSource(config);
       const warnings = vi.mocked(console.warn);
       const save = async (content: string) => {
-        writeFileSync(resolve(projectRoot, lessonDir, name), content);
-        await hotUpdate(validation, `${lessonDir}/${name}`);
+        writeFileSync(resolve(projectRoot, file), content);
+        await hotUpdate(validation, file);
       };
+      warnings.mockClear();
 
       await save(source);
-      expect(warnings).toHaveBeenLastCalledWith(
-        expect.stringContaining(`${lessonDir}/${name}`),
-      );
+      expect(warnings).toHaveBeenCalled();
       warnings.mockClear();
 
       await save(typo);

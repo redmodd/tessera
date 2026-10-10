@@ -44,6 +44,7 @@ export function readRuntimeXAPIHooks(
   if (!existsSync(runtimePath)) return 'none';
   const runtime = readCourseRuntimeExports(readFileSync(runtimePath, 'utf-8'));
   if (!runtime) {
+    d.partial = true;
     d.error(`course.runtime.js: ${READ_FAILURE_MESSAGES['parse-error']}`);
     return 'unknown';
   }

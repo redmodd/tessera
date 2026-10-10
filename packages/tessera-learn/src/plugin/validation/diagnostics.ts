@@ -5,7 +5,7 @@ export interface ValidationResult {
   errors: string[];
   warnings: string[];
   infos?: string[];
-  /** Set when a source could not be read, so the checks that depend on it did not run. */
+  /** Set when a source could not be read or the export standard is unknown, so the checks that depend on it did not run. */
   partial?: boolean;
 }
 
