@@ -38,7 +38,7 @@ it('reloads the client once for a new page, with the manifest that lists it', as
   // Vite resolves symlinks in the root, and the watcher reports files under it.
   const added = join(
     server.config.root,
-    ...['pages', '01-section', '01-lesson', 'added.svelte'],
+    'pages/01-section/01-lesson/added.svelte',
   );
   writeFileSync(added, '<h1>Added</h1>');
   server.watcher.emit('add', normalizePath(added));

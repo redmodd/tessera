@@ -410,13 +410,18 @@ export const pageConfig = { title: 'Single Quotes' }
 // ---------- generateManifest ----------
 
 describe('generateManifest', () => {
-  it('reuses the pages a validation has parsed', () => {
+  function validProject(): string {
     const projectRoot = tempDir();
     writeFileSync(
       resolve(projectRoot, 'course.config.js'),
       'export default { title: "T" };',
     );
     writeLessonPage(projectRoot);
+    return projectRoot;
+  }
+
+  it('reuses the pages a validation has parsed', () => {
+    const projectRoot = validProject();
 
     validateProject(projectRoot);
     vi.mocked(parse).mockClear();
@@ -427,12 +432,7 @@ describe('generateManifest', () => {
   });
 
   it('parses only the page that changed since the last validation', () => {
-    const projectRoot = tempDir();
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      'export default { title: "T" };',
-    );
-    writeLessonPage(projectRoot);
+    const projectRoot = validProject();
     const edited = resolve(projectRoot, 'pages/01-section/01-lesson/b.svelte');
     writeFileSync(edited, '<h1>Before</h1>');
 

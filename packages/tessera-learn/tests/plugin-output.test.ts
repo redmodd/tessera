@@ -513,16 +513,15 @@ describe('dev revalidation', () => {
     file: string,
     { read = () => '' as unknown, type = 'update' } = {},
   ) {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    (validation.hotUpdate as any).call(
+    return (validation.hotUpdate as any).call(
       { environment: { name: 'client' } },
       { type, file: normalizePath(resolve(projectRoot, file)), read },
     );
-    return errors;
   }
 
   async function hotUpdate(...change: Parameters<typeof notify>) {
-    const errors = notify(...change);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    notify(...change);
     await vi.runAllTimersAsync();
     return errors;
   }
@@ -588,16 +587,7 @@ describe('dev revalidation', () => {
     const validation = startDev();
     writeConfigSource('export default {');
 
-    expect(
-      (validation.hotUpdate as any).call(
-        { environment: { name: 'client' } },
-        {
-          type: 'update',
-          file: normalizePath(resolve(projectRoot, 'course.config.js')),
-          read: () => '',
-        },
-      ),
-    ).toBeUndefined();
+    expect(notify(validation, 'course.config.js')).toBeUndefined();
   });
 
   it('waits for a save that starts while another is read', async () => {
