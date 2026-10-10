@@ -280,9 +280,14 @@ export function parsePageConfigFromSource(
   }
 }
 
-/** Stat a directory entry, or undefined when it is gone or a dangling symlink. */
+/** Stat a directory entry, or undefined when it is gone or a symlink that does not resolve. */
 export function entryStat(dirPath: string, name: string) {
-  return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
+  try {
+    return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ELOOP') return undefined;
+    throw error;
+  }
 }
 
 /**

@@ -1628,6 +1628,15 @@ describe('structure validation', () => {
     },
   );
 
+  it('skips a symlink that points at itself', () => {
+    createValidProject(testRoot);
+    const link = resolve(testRoot, 'pages/01-section/01-lesson/loop.svelte');
+    symlinkSync(link, link);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+    expect(warnings).not.toContainEqual(expect.stringContaining('loop'));
+  });
+
   it('treats section-level .svelte files as flat-mode pages', () => {
     createValidProject(testRoot);
     writeFile(
