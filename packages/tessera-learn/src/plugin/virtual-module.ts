@@ -1,18 +1,5 @@
-import type { DevEnvironment, HotUpdateOptions, Plugin, Rollup } from 'vite';
+import type { HotUpdateOptions, Plugin, Rollup } from 'vite';
 import { relative } from 'node:path';
-
-export function reloadVirtualModule(
-  environment: DevEnvironment,
-  name: string,
-  virtualId: string,
-  cause: string,
-): void {
-  const { moduleGraph, hot, logger } = environment;
-  logger.info(`[${name}] Reloading (${cause})`, { timestamp: true });
-  const mod = moduleGraph.getModuleById('\0' + virtualId);
-  if (mod) moduleGraph.invalidateModule(mod);
-  hot.send({ type: 'full-reload' });
-}
 
 export function virtualModule(
   name: string,
@@ -38,12 +25,14 @@ export function virtualModule(
   plugin.hotUpdate = function ({ type, file }) {
     if (this.environment.name !== 'client') return;
     if (!shouldReload(type, file)) return;
-    reloadVirtualModule(
-      this.environment,
-      name,
-      virtualId,
-      `${type}: ${relative(this.environment.config.root, file)}`,
+    const { moduleGraph, hot, logger, config } = this.environment;
+    logger.info(
+      `[${name}] Reloading (${type}: ${relative(config.root, file)})`,
+      { timestamp: true },
     );
+    const mod = moduleGraph.getModuleById(resolvedId);
+    if (mod) moduleGraph.invalidateModule(mod);
+    hot.send({ type: 'full-reload' });
     return [];
   };
   return plugin;

@@ -1,9 +1,4 @@
-import type {
-  DevEnvironment,
-  EnvironmentModuleNode,
-  Plugin,
-  Rollup,
-} from 'vite';
+import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve, dirname, join, relative } from 'node:path';
@@ -52,7 +47,7 @@ import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
 import { COURSE_RUNTIME_FILE } from './validation/xapi.js';
-import { reloadVirtualModule, virtualModule } from './virtual-module.js';
+import { virtualModule } from './virtual-module.js';
 import {
   BuildContext,
   isInside,
@@ -546,86 +541,34 @@ function manifestModule(manifest: Manifest): string {
 }
 
 function tesseraManifestPlugin(ctx: BuildContext): Plugin {
-  const name = 'tessera:manifest';
-  const virtualId = 'virtual:tessera-manifest';
-  // The module the client loaded last, or was last told to reload for.
-  let current: string | undefined;
-  let client: DevEnvironment | undefined;
-  let changes: string[] = [];
-  // Set once a reload Vite was about to send has been held for the burst.
-  let reloadHeld = false;
+  let loaded: string | undefined;
 
-  function reloadIfChanged(): void {
-    let next: string;
-    try {
-      next = manifestModule(generateManifest(resolve(ctx.root, 'pages')));
-    } catch (error) {
-      // The changes and a held reload stay for the next burst.
-      reportValidationIssues({
-        errors: [
-          `the page manifest could not be generated: ${(error as Error).message}`,
-        ],
-        warnings: [],
-      });
-      return;
-    }
-    const cause =
-      changes.length === 1
-        ? changes[0]
-        : `${changes.length} changes under pages/`;
-    const reload = reloadHeld || next !== current;
-    changes = [];
-    reloadHeld = false;
-    if (!reload || !client) return;
-    current = next;
-    reloadVirtualModule(client, name, virtualId, cause);
-  }
+  return virtualModule(
+    'tessera:manifest',
+    'virtual:tessera-manifest',
+    function () {
+      const pagesDir = resolve(ctx.root, 'pages');
+      const sections = walkPages(pagesDir);
+      ctx.manifest = generateManifest(pagesDir, sections);
 
-  const plugin = virtualModule(name, virtualId, function () {
-    const pagesDir = resolve(ctx.root, 'pages');
-    const sections = walkPages(pagesDir);
-    ctx.manifest = generateManifest(pagesDir, sections);
-
-    for (const section of sections) {
-      for (const { metaPath } of [section, ...section.lessons]) {
-        if (existsSync(metaPath)) this.addWatchFile(metaPath);
-      }
-      for (const lesson of section.lessons) {
-        for (const file of lesson.files) {
-          this.addWatchFile(resolve(lesson.dir, file));
+      for (const section of sections) {
+        for (const { metaPath } of [section, ...section.lessons]) {
+          if (existsSync(metaPath)) this.addWatchFile(metaPath);
+        }
+        for (const lesson of section.lessons) {
+          for (const file of lesson.files) {
+            this.addWatchFile(resolve(lesson.dir, file));
+          }
         }
       }
-    }
 
-    current = manifestModule(ctx.manifest);
-    return current;
-  });
-
-  // A page save goes on to HMR at once. The manifest is compared once the
-  // burst it belongs to settles, and a change to it reloads the page then.
-  // Any other change under pages/ has Vite reload the page per file, ahead of
-  // the manifest, so that reload is held and one is sent with the manifest.
-  plugin.hotUpdate = {
-    // After vite:import-glob has added the pages module for a new or removed page.
-    order: 'post',
-    handler({ type, file, modules, timestamp }) {
-      if (this.environment.name !== 'client') return;
-      if (!isPageSource(ctx.root, file)) return;
-      client = this.environment;
-      changes.push(`${type}: ${relative(ctx.root, file)}`);
-      ctx.devChanges.settle(reloadIfChanged);
-      if (type === 'update' && file.endsWith('.svelte')) return;
-      if (modules.length === 0) return;
-      const invalidated = new Set<EnvironmentModuleNode>();
-      const { moduleGraph } = this.environment;
-      for (const mod of modules) {
-        moduleGraph.invalidateModule(mod, invalidated, timestamp, true);
-      }
-      reloadHeld = true;
-      return [];
+      loaded = manifestModule(ctx.manifest);
+      return loaded;
     },
-  };
-  return plugin;
+    (_type, file) =>
+      isPageSource(ctx.root, file) &&
+      manifestModule(generateManifest(resolve(ctx.root, 'pages'))) !== loaded,
+  );
 }
 
 function generateLmsAdapterModule(standard: LMSStandard): string {
