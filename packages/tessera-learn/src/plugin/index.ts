@@ -381,22 +381,18 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       if (!isValidatedSource(ctx.root, file)) return;
       await Promise.allSettled([waitForSave()]);
       const result = revalidate();
-      const resolved = failing && result.errors.length === 0;
-      failing = result.errors.length > 0;
       const unreported = (notice: string) => !reported.has(notice);
+      const infos = (result.infos ?? []).filter(unreported);
+      if (failing && result.errors.length === 0) {
+        infos.push('validation errors resolved');
+      }
+      failing = result.errors.length > 0;
       reportValidationIssues({
         errors: result.errors,
         warnings: result.warnings.filter(unreported),
-        infos: result.infos?.filter(unreported),
+        infos,
       });
       remember(result);
-      if (resolved) {
-        reportValidationIssues({
-          errors: [],
-          warnings: [],
-          infos: ['validation errors resolved'],
-        });
-      }
     },
 
     buildStart() {
