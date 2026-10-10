@@ -62,6 +62,7 @@ function isAuditBuild(): boolean {
 
 export interface TesseraPluginOptions {
   standardOverride?: string;
+  /** Builds validate and package this read in place of course.config.js. The dev server reads the file. */
   configRead?: CourseConfigRead;
 }
 

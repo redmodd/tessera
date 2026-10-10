@@ -68,7 +68,9 @@ export class BuildContext {
 
   validate(): ValidationResult {
     this.#validatedConfig = null;
-    const read = this.configRead ?? readCourseConfig(this.root);
+    const read =
+      (this.isBuild ? this.configRead : undefined) ??
+      readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
     reportValidationIssues(result);
     if (result.errors.length > 0) {
