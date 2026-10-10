@@ -9,7 +9,8 @@ import {
   symlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { normalizePath, type Plugin } from 'vite';
+import { normalizePath, resolveConfig, type Plugin } from 'vite';
+import { tesseraPlugin } from '../src/plugin/index.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -467,6 +468,29 @@ describe('xapi setup virtual module', () => {
         ),
       ).toContain(real);
     }
+  });
+});
+
+describe('dev terminal clearing', () => {
+  async function resolvedClearScreen(clearScreen?: boolean) {
+    const config = await resolveConfig(
+      {
+        root: projectRoot,
+        configFile: false,
+        clearScreen,
+        plugins: [tesseraPlugin()],
+      },
+      'serve',
+    );
+    return config.clearScreen;
+  }
+
+  it('keeps Vite from clearing diagnostics off the terminal', async () => {
+    expect(await resolvedClearScreen()).toBe(false);
+  });
+
+  it('leaves clearing on for a config that asks for it', async () => {
+    expect(await resolvedClearScreen(true)).toBe(true);
   });
 });
 

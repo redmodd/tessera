@@ -266,6 +266,7 @@ function tesseraConfigDefaultsPlugin(): Plugin {
       const root = config.root || process.cwd();
       return {
         base: './',
+        clearScreen: config.clearScreen ?? false,
         build: { assetsDir: 'tessera' },
         resolve: { alias: { $assets: resolve(root, 'assets') } },
         // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer

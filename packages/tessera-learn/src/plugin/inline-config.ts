@@ -20,7 +20,6 @@ export function buildInlineConfig(
   return {
     root: projectRoot,
     configFile: false,
-    clearScreen: false,
     plugins: [tesseraPlugin(pluginOptions)],
     resolve: { alias: { $shared: resolve(workspaceRoot, 'shared') } },
     server: { fs: { allow: [workspaceRoot] } },
