@@ -491,9 +491,11 @@ describe('dev terminal clearing', () => {
 describe('dev revalidation', () => {
   async function hotUpdate(
     file: string,
-    read: () => unknown = () => '',
-    validation = findPlugin('tessera:validation', 'serve'),
-    type = 'update',
+    {
+      read = () => '' as unknown,
+      validation = findPlugin('tessera:validation', 'serve'),
+      type = 'update',
+    } = {},
   ) {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     await (validation.hotUpdate as any).call(
@@ -534,7 +536,7 @@ describe('dev revalidation', () => {
       writeConfigSource('export default {');
       const read = vi.fn();
 
-      const errors = await hotUpdate('assets/logo.svg', read, undefined, type);
+      const errors = await hotUpdate('assets/logo.svg', { read, type });
 
       expect(errors).toHaveBeenCalledOnce();
       expect(read).not.toHaveBeenCalled();
@@ -547,8 +549,8 @@ describe('dev revalidation', () => {
     const validation = findPlugin('tessera:validation', 'serve');
 
     const [errors] = await Promise.all([
-      hotUpdate('course.config.js', undefined, validation),
-      hotUpdate('layout.svelte', undefined, validation),
+      hotUpdate('course.config.js', { validation }),
+      hotUpdate('layout.svelte', { validation }),
     ]);
 
     expect(errors).toHaveBeenCalledOnce();
@@ -564,8 +566,8 @@ describe('dev revalidation', () => {
     };
 
     const [errors] = await Promise.all([
-      hotUpdate('layout.svelte', undefined, validation),
-      hotUpdate('course.config.js', slowSave, validation),
+      hotUpdate('layout.svelte', { validation }),
+      hotUpdate('course.config.js', { read: slowSave, validation }),
     ]);
 
     expect(errors).not.toHaveBeenCalled();
@@ -575,17 +577,17 @@ describe('dev revalidation', () => {
     writeLessonPage(projectRoot);
     writeConfigSource('');
 
-    const errors = await hotUpdate('course.config.js', () =>
-      writeConfig('web'),
-    );
+    const errors = await hotUpdate('course.config.js', {
+      read: () => writeConfig('web'),
+    });
 
     expect(errors).not.toHaveBeenCalled();
   });
 
   it('revalidates a file that is gone before it can be read', async () => {
-    const errors = await hotUpdate('course.config.js', () =>
-      Promise.reject(new Error('ENOENT')),
-    );
+    const errors = await hotUpdate('course.config.js', {
+      read: () => Promise.reject(new Error('ENOENT')),
+    });
 
     expect(errors).toHaveBeenCalledWith(
       expect.stringContaining('course.config.js: not found in project root'),
@@ -641,14 +643,14 @@ describe('dev revalidation', () => {
     const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     writeConfig('web');
-    await hotUpdate('course.config.js', undefined, validation);
+    await hotUpdate('course.config.js', { validation });
     writeConfigSource('export default {');
-    await hotUpdate('course.config.js', undefined, validation);
+    await hotUpdate('course.config.js', { validation });
     expect(infos).not.toHaveBeenCalled();
 
     writeConfig('web');
-    await hotUpdate('course.config.js', undefined, validation);
-    await hotUpdate('course.config.js', undefined, validation);
+    await hotUpdate('course.config.js', { validation });
+    await hotUpdate('course.config.js', { validation });
     expect(infos).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining('validation errors resolved'),
     );
@@ -662,7 +664,7 @@ describe('dev revalidation', () => {
     const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const save = async (source: string) => {
       writeConfigSource(source);
-      return hotUpdate('course.config.js', undefined, validation);
+      return hotUpdate('course.config.js', { validation });
     };
 
     (validation.configureServer as any).call(validation);
