@@ -334,9 +334,13 @@ const VALIDATED_ROOT_FILES = [
   ...SHELL_FILES,
 ];
 
+function isUnder(projectRoot: string, dir: string, file: string): boolean {
+  return file.startsWith(`${normalizePath(resolve(projectRoot, dir))}/`);
+}
+
 function isPageSource(projectRoot: string, file: string): boolean {
   return (
-    file.startsWith(`${normalizePath(resolve(projectRoot, 'pages'))}/`) &&
+    isUnder(projectRoot, 'pages', file) &&
     (file.endsWith('.svelte') || file.endsWith('/_meta.js'))
   );
 }
@@ -349,23 +353,47 @@ function isValidatedSource(projectRoot: string, file: string): boolean {
 }
 
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
+  let serving = false;
   let failing = false;
   const reported = new Set<string>();
+  const saves: Promise<unknown>[] = [];
+  let pass: Promise<void> | undefined;
 
   function remember({ errors, warnings, infos = [] }: ValidationResult) {
     if (errors.length === 0) reported.clear();
     for (const notice of [...warnings, ...infos]) reported.add(notice);
   }
 
-  function revalidate(): ValidationResult {
+  function revalidate(): void {
+    let result: ValidationResult;
     try {
-      return validateProject(ctx.root, ctx.standardOverride);
+      result = validateProject(ctx.root, ctx.standardOverride);
     } catch (error) {
-      return {
+      result = {
         errors: [`validation could not run: ${(error as Error).message}`],
         warnings: [],
       };
     }
+    const unreported = (notice: string) => !reported.has(notice);
+    const infos = (result.infos ?? []).filter(unreported);
+    if (failing && result.errors.length === 0) {
+      infos.push('validation errors resolved');
+    }
+    failing = result.errors.length > 0;
+    reportValidationIssues({
+      errors: result.errors,
+      warnings: result.warnings.filter(unreported),
+      infos,
+    });
+    remember(result);
+  }
+
+  async function revalidateOnceSaved(): Promise<void> {
+    do {
+      await Promise.all(saves.splice(0));
+    } while (saves.length > 0);
+    pass = undefined;
+    revalidate();
   }
 
   return {
@@ -373,26 +401,19 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer() {
+      if (serving) return revalidate();
       remember(ctx.validate());
+      serving = true;
     },
 
-    async hotUpdate({ file, read: waitForSave }) {
+    hotUpdate({ type, file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
-      if (!isValidatedSource(ctx.root, file)) return;
-      await Promise.allSettled([waitForSave()]);
-      const result = revalidate();
-      const unreported = (notice: string) => !reported.has(notice);
-      const infos = (result.infos ?? []).filter(unreported);
-      if (failing && result.errors.length === 0) {
-        infos.push('validation errors resolved');
-      }
-      failing = result.errors.length > 0;
-      reportValidationIssues({
-        errors: result.errors,
-        warnings: result.warnings.filter(unreported),
-        infos,
-      });
-      remember(result);
+      const isSource = isValidatedSource(ctx.root, file);
+      const assetsChanged =
+        type !== 'update' && isUnder(ctx.root, 'assets', file);
+      if (!isSource && !assetsChanged) return;
+      if (isSource) saves.push(Promise.allSettled([waitForSave()]));
+      return (pass ??= revalidateOnceSaved());
     },
 
     buildStart() {
