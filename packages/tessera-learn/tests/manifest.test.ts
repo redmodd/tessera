@@ -335,21 +335,16 @@ describe('readMetaFile', () => {
 
 describe('extractPageConfig', () => {
   it('extracts title from pageConfig', () => {
-    const path = createFile(
-      'page-test/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = { title: "My Page" }
 </script>
-<h1>Hi</h1>`,
-    );
-    const config = extractPageConfig(path);
+<h1>Hi</h1>`;
+    const config = extractPageConfig(source, 'page.svelte');
     expect(config.title).toBe('My Page');
   });
 
   it('extracts quiz config', () => {
-    const path = createFile(
-      'page-quiz/quiz.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = {
   title: "Quiz",
   quiz: {
@@ -359,9 +354,8 @@ export const pageConfig = {
   }
 }
 </script>
-<h1>Quiz</h1>`,
-    );
-    const config = extractPageConfig(path);
+<h1>Quiz</h1>`;
+    const config = extractPageConfig(source, 'page.svelte');
     expect(config.title).toBe('Quiz');
     expect(config.quiz).toEqual({
       graded: true,
@@ -371,42 +365,33 @@ export const pageConfig = {
   });
 
   it('returns empty object when no module script', () => {
-    const path = createFile('page-none/page.svelte', '<h1>Hello</h1>');
-    expect(extractPageConfig(path)).toEqual({});
+    const source = '<h1>Hello</h1>';
+    expect(extractPageConfig(source, 'page.svelte')).toEqual({});
   });
 
   it('returns empty object when no pageConfig export', () => {
-    const path = createFile(
-      'page-no-config/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const something = "else";
-</script>`,
-    );
-    expect(extractPageConfig(path)).toEqual({});
+</script>`;
+    expect(extractPageConfig(source, 'page.svelte')).toEqual({});
   });
 
   it('handles Infinity in maxAttempts', () => {
-    const path = createFile(
-      'page-inf/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = {
   title: "Unlimited",
   quiz: { graded: true, maxAttempts: Infinity }
 }
-</script>`,
-    );
-    const config = extractPageConfig(path);
+</script>`;
+    const config = extractPageConfig(source, 'page.svelte');
     expect(config.quiz!.maxAttempts).toBe(Infinity);
   });
 
   it('handles single-quoted strings', () => {
-    const path = createFile(
-      'page-single/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = { title: 'Single Quotes' }
-</script>`,
-    );
-    const config = extractPageConfig(path);
+</script>`;
+    const config = extractPageConfig(source, 'page.svelte');
     expect(config.title).toBe('Single Quotes');
   });
 });

@@ -280,9 +280,12 @@ export function parsePageConfigFromSource(
   }
 }
 
-/** Extract pageConfig from a .svelte file. Throws on parse failure. */
-export function extractPageConfig(filePath: string): PageConfig {
-  const result = parsePageConfigFromSource(readFileSync(filePath, 'utf-8'));
+/** Extract pageConfig from a .svelte source. Throws on parse failure. */
+export function extractPageConfig(
+  source: string,
+  filePath: string,
+): PageConfig {
+  const result = parsePageConfigFromSource(source);
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
     throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
@@ -422,9 +425,11 @@ export function generateManifest(
         const filePath = resolve(walkedLesson.dir, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
+        let source = '';
         let pageConfig: PageConfig = {};
         try {
-          pageConfig = extractPageConfig(filePath);
+          source = readFileSync(filePath, 'utf-8');
+          pageConfig = extractPageConfig(source, filePath);
         } catch (e) {
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
@@ -433,10 +438,7 @@ export function generateManifest(
         const questions =
           pageConfig.graded === true && !quiz
             ? listedGradedQuestions(
-                findComponents(
-                  readFileSync(filePath, 'utf-8'),
-                  QUESTION_COMPONENT_NAMES,
-                ) ?? [],
+                findComponents(source, QUESTION_COMPONENT_NAMES) ?? [],
               ).map((q) => q.id)
             : [];
         const page: ManifestPage = {
