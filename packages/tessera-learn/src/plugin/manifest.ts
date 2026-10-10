@@ -280,7 +280,7 @@ export function parsePageConfigFromSource(
 }
 
 /** Stat a directory entry, or undefined when it is gone or a symlink that does not resolve. */
-export function entryStat(dirPath: string, name: string) {
+function entryStat(dirPath: string, name: string) {
   try {
     return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
   } catch (error) {
@@ -305,7 +305,7 @@ function getSortedDirs(dirPath: string): string[] {
 /**
  * Get .svelte files in a directory.
  */
-function getSvelteFiles(dirPath: string): string[] {
+export function getSvelteFiles(dirPath: string): string[] {
   if (!existsSync(dirPath)) return [];
   return readdirSync(dirPath)
     .filter(

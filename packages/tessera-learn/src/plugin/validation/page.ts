@@ -1,7 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import {
-  entryStat,
+  getSvelteFiles,
   parsePageConfigFromSource,
   readMetaFile,
   ensureSvelteSuffix,
@@ -238,12 +238,10 @@ export function validatePages(
   if (!existsSync(pagesDir)) return noPages();
 
   // walkPages only descends into section dirs, so scan pages/ root separately.
-  for (const entry of readdirSync(pagesDir)) {
-    if (entry.endsWith('.svelte') && entryStat(pagesDir, entry)?.isFile()) {
-      d.warn(
-        `${relative(projectRoot, resolve(pagesDir, entry))}: this file is outside the section/lesson structure and will be ignored`,
-      );
-    }
+  for (const entry of getSvelteFiles(pagesDir)) {
+    d.warn(
+      `${relative(projectRoot, resolve(pagesDir, entry))}: this file is outside the section/lesson structure and will be ignored`,
+    );
   }
 
   for (const section of walkPages(pagesDir)) {
