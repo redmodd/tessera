@@ -14,7 +14,7 @@ import {
   resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
-import { standardProfile, type LMSStandard } from '../runtime/standards.js';
+import type { LMSStandard, StandardProfile } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 
 function slugify(text: string): string {
@@ -347,16 +347,14 @@ export async function runExport(
   projectRoot: string,
   outDir: string,
   config: ExportConfig,
+  profile: StandardProfile,
   hasRequiredGradedPage: boolean,
 ): Promise<void> {
-  const standard = config.export.standard;
   const slug = slugify(config.title) || 'tessera-course';
   const version = config.version || '1.0.0';
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
 
-  const profile = standardProfile(standard);
-  if (!profile) return; // unknown standard: the validator rejects these upstream
   if (!profile.packaged) {
     const files = collectFiles(outDir);
     let totalSize = 0;

@@ -15,6 +15,7 @@ import {
   runExport,
 } from '../src/plugin/export.js';
 import { mergeCourseConfig } from '../src/plugin/index.js';
+import { STANDARDS } from '../src/runtime/standards.js';
 import { tempDir } from './helpers.js';
 
 let testRoot: string;
@@ -449,6 +450,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'web' },
       }),
+      STANDARDS.web,
       true,
     );
     // No zip should exist
@@ -465,6 +467,7 @@ describe('runExport', () => {
         version: '2.0.0',
         export: { standard: 'scorm12' },
       }),
+      STANDARDS.scorm12,
       true,
     );
 
@@ -492,6 +495,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm2004' },
       }),
+      STANDARDS.scorm2004,
       true,
     );
 
@@ -518,6 +522,7 @@ describe('runExport', () => {
         scoring: { passingScore: 80 },
         export: { standard: 'cmi5' },
       },
+      STANDARDS.cmi5,
       true,
     );
 
@@ -537,6 +542,7 @@ describe('runExport', () => {
         version: '3.2.1',
         export: { standard: 'scorm12' },
       }),
+      STANDARDS.scorm12,
       true,
     );
 
@@ -557,6 +563,7 @@ describe('runExport', () => {
         version: '1.0.0',
         export: { standard: 'scorm12' },
       }),
+      STANDARDS.scorm12,
       true,
     );
 

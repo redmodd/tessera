@@ -66,11 +66,16 @@ export class BuildContext {
     const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
     reportValidationIssues(result);
-    const resolved = resolveConfigRead(read, this.standardOverride);
-    const { profile } = resolved;
-    if (result.errors.length > 0 || !resolved.ok || !profile) {
+    if (result.errors.length > 0) {
       throw new Error(
         `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
+      );
+    }
+    const resolved = resolveConfigRead(read, this.standardOverride);
+    const { profile } = resolved;
+    if (!resolved.ok || !profile) {
+      throw new Error(
+        '[tessera] course.config.js passed validation without a readable config and export standard.',
       );
     }
     this.#validatedConfig = { ...resolved, profile };
