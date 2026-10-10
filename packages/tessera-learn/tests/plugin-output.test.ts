@@ -543,6 +543,21 @@ describe('dev revalidation', () => {
     },
   );
 
+  it('validates once for asset changes the watcher reports apart', async () => {
+    writeLessonPage(projectRoot);
+    writeConfigSource('export default {');
+    const validation = findPlugin('tessera:validation', 'serve');
+
+    const first = hotUpdate('assets/a.svg', { validation, type: 'create' });
+    await new Promise((done) => setTimeout(done, 5));
+    const [errors] = await Promise.all([
+      first,
+      hotUpdate('assets/b.svg', { validation, type: 'create' }),
+    ]);
+
+    expect(errors).toHaveBeenCalledOnce();
+  });
+
   it('validates once for saves that land together', async () => {
     writeLessonPage(projectRoot);
     writeConfigSource('export default {');

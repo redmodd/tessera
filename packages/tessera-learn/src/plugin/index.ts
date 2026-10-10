@@ -335,6 +335,11 @@ const VALIDATED_ROOT_FILES = [
   ...SHELL_FILES,
 ];
 
+// The watcher reports a copied folder or a checkout one file at a time. An
+// asset event has no save to wait on, so the re-validation waits this long
+// after the last one to cover the whole burst.
+const ASSET_BURST_MS = 50;
+
 function isPageSource(projectRoot: string, file: string): boolean {
   return (
     isInside(resolve(projectRoot, 'pages'), file) &&
@@ -409,7 +414,11 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       const assetsChanged =
         type !== 'update' && isInside(resolve(ctx.root, 'assets'), file);
       if (!isSource && !assetsChanged) return;
-      if (isSource) saves.push(Promise.allSettled([waitForSave()]));
+      saves.push(
+        isSource
+          ? Promise.allSettled([waitForSave()])
+          : new Promise((done) => setTimeout(done, ASSET_BURST_MS)),
+      );
       return (pass ??= revalidateOnceSaved());
     },
 
