@@ -419,11 +419,6 @@ export function generateManifest(
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
         const parsed = parsePageConfigFromSource(source);
-        if (parsed.kind === 'invalid') {
-          console.warn(
-            `[tessera warning] ${filePath}: pageConfig ${STATIC_LITERAL_RULE}`,
-          );
-        }
         const pageConfig: PageConfig = parsed.kind === 'ok' ? parsed.value : {};
 
         const quiz = isRecord(pageConfig.quiz) ? pageConfig.quiz : null;

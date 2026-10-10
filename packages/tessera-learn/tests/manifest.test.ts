@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -445,20 +445,14 @@ describe('generateManifest', () => {
     expect(generateManifest(root).sections[0].title).toBe('Intro');
   });
 
-  it('warns and derives the title for a pageConfig that is not a static literal', () => {
-    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const path = createFile(
+  it('derives the title for a pageConfig that is not a static literal', () => {
+    createFile(
       '01-intro/first-page.svelte',
       `<script module>
 export const pageConfig = { title: someTitle }
 </script>`,
     );
     expect(generateManifest(root).pages[0].title).toBe('First Page');
-    expect(warnings).toHaveBeenCalledExactlyOnceWith(
-      expect.stringContaining(
-        `${path}: pageConfig must be a static object literal`,
-      ),
-    );
   });
 
   it('carries pageConfig.graded and weight onto the manifest page', () => {
