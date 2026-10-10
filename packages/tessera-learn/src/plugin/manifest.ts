@@ -123,10 +123,9 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-interface ReadFailure {
-  ok: false;
-  reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
-}
+type ReadFailure =
+  | { ok: false; reason: 'missing' | 'parse-error' | 'no-export' }
+  | { ok: false; reason: 'not-data'; source: string };
 
 export const STATIC_LITERAL_RULE =
   'must be a static object literal (no variables, function calls, template literals, or computed values)';
@@ -142,15 +141,17 @@ function readDefaultExport(
   path: string,
 ): { ok: true; value: unknown } | ReadFailure {
   if (!existsSync(path)) return { ok: false, reason: 'missing' };
-  const result = defaultExportObjectLiteral(readSourceFileCached(path));
+  const source = readSourceFileCached(path);
+  const result = defaultExportObjectLiteral(source);
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
   if (result.kind === 'none') return { ok: false, reason: 'no-export' };
-  if (result.kind === 'invalid') return { ok: false, reason: 'not-data' };
+  if (result.kind === 'invalid')
+    return { ok: false, reason: 'not-data', source };
   try {
     return { ok: true, value: JSON5.parse(result.text) };
   } catch {
-    return { ok: false, reason: 'not-data' };
+    return { ok: false, reason: 'not-data', source };
   }
 }
 
