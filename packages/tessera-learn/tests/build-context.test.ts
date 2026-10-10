@@ -6,7 +6,7 @@ import {
   isInside,
   projectFileRel,
 } from '../src/plugin/build-context.js';
-import { resolvedConfig } from './helpers/plugin.js';
+import { resolvedConfig, resolvedContext } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
 const root = resolve('/project');
@@ -29,6 +29,26 @@ describe('BuildContext.configure', () => {
 
   it('ignores outDir outside a build', () => {
     expect(() => configureWith('.', 'serve')).not.toThrow();
+  });
+});
+
+describe('BuildContext.validate', () => {
+  it('keeps no config snapshot on the dev server', () => {
+    const courseRoot = tempDir();
+    const lesson = resolve(courseRoot, 'pages', '01-section', '01-lesson');
+    mkdirSync(lesson, { recursive: true });
+    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>');
+    writeFileSync(
+      resolve(courseRoot, 'course.config.js'),
+      'export default { title: "Course", language: "en" };',
+    );
+    const ctx = resolvedContext(courseRoot, 'serve');
+
+    ctx.validate();
+
+    expect(() => ctx.validatedConfig()).toThrow(
+      'course.config.js was read before validation ran',
+    );
   });
 });
 

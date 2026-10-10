@@ -71,6 +71,7 @@ export class BuildContext {
         `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
       );
     }
+    if (!this.isBuild) return;
     const resolved = resolveConfigRead(read, this.standardOverride);
     const { profile } = resolved;
     if (!resolved.ok || !profile) {
