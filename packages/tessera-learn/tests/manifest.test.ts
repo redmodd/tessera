@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parse } from 'svelte/compiler';
 import {
   generateManifest,
   parsePageConfigFromSource,
@@ -11,8 +12,14 @@ import {
   deriveSlug,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
+import { validateProject } from '../src/plugin/validation.js';
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
-import { tempDir } from './helpers.js';
+import { tempDir, writeLessonPage } from './helpers.js';
+
+vi.mock('svelte/compiler', async (importOriginal) => {
+  const compiler = await importOriginal<typeof import('svelte/compiler')>();
+  return { ...compiler, parse: vi.fn(compiler.parse) };
+});
 
 let root: string;
 
@@ -403,6 +410,22 @@ export const pageConfig = { title: 'Single Quotes' }
 // ---------- generateManifest ----------
 
 describe('generateManifest', () => {
+  it('reuses the pages a validation has parsed', () => {
+    const projectRoot = tempDir();
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default { title: "T" };',
+    );
+    writeLessonPage(projectRoot);
+
+    validateProject(projectRoot);
+    vi.mocked(parse).mockClear();
+    const manifest = generateManifest(resolve(projectRoot, 'pages'));
+
+    expect(manifest.totalPages).toBe(1);
+    expect(parse).not.toHaveBeenCalled();
+  });
+
   it('generates correct manifest for standard course structure', () => {
     setupStandardCourse();
     const manifest = generateManifest(root);

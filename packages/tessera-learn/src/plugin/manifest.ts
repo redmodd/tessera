@@ -2,7 +2,6 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
 import {
-  clearParseCache,
   defaultExportObjectLiteral,
   findComponents,
   isLiteralTrue,
@@ -377,7 +376,6 @@ export function generateManifest(
   pagesDir: string,
   walked: WalkedSection[] = walkPages(pagesDir),
 ): Manifest {
-  clearParseCache();
   const sections: ManifestSection[] = [];
   const flatPages: ManifestPage[] = [];
   let pageIndex = 0;
