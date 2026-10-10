@@ -280,19 +280,6 @@ export function parsePageConfigFromSource(
   }
 }
 
-/** Extract pageConfig from a .svelte source. Throws on parse failure. */
-export function extractPageConfig(
-  source: string,
-  filePath: string,
-): PageConfig {
-  const result = parsePageConfigFromSource(source);
-  if (result.kind === 'ok') return result.value;
-  if (result.kind === 'invalid') {
-    throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
-  }
-  return {};
-}
-
 /** Stat a directory entry, or undefined when it is gone or a dangling symlink. */
 export function entryStat(dirPath: string, name: string) {
   return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
@@ -426,13 +413,18 @@ export function generateManifest(
         const pageSlug = deriveSlug(fileName, true);
 
         let source = '';
-        let pageConfig: PageConfig = {};
         try {
           source = readFileSync(filePath, 'utf-8');
-          pageConfig = extractPageConfig(source, filePath);
         } catch (e) {
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
+        const parsed = parsePageConfigFromSource(source);
+        if (parsed.kind === 'invalid') {
+          console.warn(
+            `[tessera warning] ${filePath}: pageConfig ${STATIC_LITERAL_RULE}`,
+          );
+        }
+        const pageConfig: PageConfig = parsed.kind === 'ok' ? parsed.value : {};
 
         const quiz = isRecord(pageConfig.quiz) ? pageConfig.quiz : null;
         const questions =
