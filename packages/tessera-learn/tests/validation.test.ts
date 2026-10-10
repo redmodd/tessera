@@ -1698,19 +1698,22 @@ describe('asset reference validation', () => {
     );
   });
 
-  it('strips Vite query suffixes (?raw) before checking existence', () => {
-    createValidProject(testRoot);
-    writeFile(testRoot, 'assets/intro.txt', 'A transcript.');
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script>import intro from '$assets/intro.txt?raw';</script>`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('$assets/intro.txt')),
-    ).toHaveLength(0);
-  });
+  it.each(['?raw', '#top', '?raw#top', '#top?raw'])(
+    'strips a %s suffix before checking existence',
+    (suffix) => {
+      createValidProject(testRoot);
+      writeFile(testRoot, 'assets/intro.txt', 'A transcript.');
+      writeFile(
+        testRoot,
+        'pages/01-section/01-lesson/page.svelte',
+        `<script>import intro from '$assets/intro.txt${suffix}';</script>`,
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(
+        warnings.filter((w) => w.includes('$assets/intro.txt')),
+      ).toHaveLength(0);
+    },
+  );
 });
 
 // ---- Question Component Validation ----
