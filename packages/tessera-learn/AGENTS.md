@@ -747,7 +747,7 @@ export: {
 
 ### Validation
 
-The plugin validates on every dev start and build (page syntax, manifest shape, `pageConfig`, question components, asset references, data-contract bypass). Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates when `course.config.js` or `course.runtime.js` changes; those errors print and the server keeps running. Run `pnpm validate <course>` to check without building.
+The plugin validates on every dev start and build (page syntax, manifest shape, `pageConfig`, question components, asset references, data-contract bypass). Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates when a page, `_meta.js`, `layout.svelte`, `quiz.svelte`, `course.config.js` or `course.runtime.js` is saved; those errors print and the server keeps running. Run `pnpm validate <course>` to check without building.
 
 ---
 

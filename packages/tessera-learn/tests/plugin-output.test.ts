@@ -488,7 +488,7 @@ describe('dev terminal clearing', () => {
   });
 });
 
-describe('dev config revalidation', () => {
+describe('dev revalidation', () => {
   async function hotUpdate(
     file: string,
     read: () => unknown = () => '',
@@ -511,6 +511,28 @@ describe('dev config revalidation', () => {
       expect(await hotUpdate(file)).toHaveBeenCalledWith(
         expect.stringContaining(`${file}: could not parse`),
       );
+    },
+  );
+
+  it.each([
+    'layout.svelte',
+    'quiz.svelte',
+    'pages/01-section/_meta.js',
+    'pages/01-section/01-lesson/page.svelte',
+  ])('revalidates when %s changes', async (file) => {
+    writeConfigSource('export default {');
+
+    expect(await hotUpdate(file)).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: could not parse'),
+    );
+  });
+
+  it.each(['assets/logo.svg', 'pages/01-section/notes.md', 'notes.svelte'])(
+    'does not revalidate when %s changes',
+    async (file) => {
+      writeConfigSource('export default {');
+
+      expect(await hotUpdate(file)).not.toHaveBeenCalled();
     },
   );
 

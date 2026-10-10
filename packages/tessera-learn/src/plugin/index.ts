@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative, sep } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -333,6 +333,22 @@ function tesseraPagesPlugin(): Plugin {
 
 // ---------- Validation Plugin ----------
 
+const VALIDATED_ROOT_FILES = [
+  'course.config.js',
+  'course.runtime.js',
+  'layout.svelte',
+  'quiz.svelte',
+];
+
+function isValidatedSource(projectRoot: string, file: string): boolean {
+  const [top, ...nested] = relative(projectRoot, file).split(sep);
+  if (nested.length === 0) return VALIDATED_ROOT_FILES.includes(top);
+  return (
+    top === 'pages' &&
+    (file.endsWith('.svelte') || nested.at(-1) === '_meta.js')
+  );
+}
+
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
   let failing = false;
   const reported = new Set<string>();
@@ -363,10 +379,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
 
     async hotUpdate({ file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
-      const watched = ['course.config.js', 'course.runtime.js'].map((name) =>
-        normalizePath(resolve(ctx.root, name)),
-      );
-      if (!watched.includes(file)) return;
+      if (!isValidatedSource(ctx.root, file)) return;
       await Promise.allSettled([waitForSave()]);
       const result = revalidate();
       const resolved = failing && result.errors.length === 0;
