@@ -77,37 +77,6 @@ export function ensureSvelteSuffix(name: string): string {
   return name.endsWith('.svelte') ? name : `${name}.svelte`;
 }
 
-// ---------- File read cache ----------
-
-const COARSEST_MTIME_TICK_MS = 2000;
-
-/**
- * Module-level cache of source file contents keyed by absolute path with
- * mtime invalidation. Both `validateProject` and `generateManifest` read the
- * same .svelte / _meta.js / course.config.js files during a single build;
- * sharing the read avoids the second disk hit (and matters most on cold-cache
- * CI runs and large courses). A file modified within the last
- * `COARSEST_MTIME_TICK_MS` is not cached, since it can change again without
- * its mtime moving.
- */
-const fileContentCache = new Map<
-  string,
-  { mtimeMs: number; content: string }
->();
-
-export function readSourceFileCached(filePath: string): string {
-  const stat = statSync(filePath);
-  const cached = fileContentCache.get(filePath);
-  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.content;
-  const content = readFileSync(filePath, 'utf-8');
-  if (Date.now() - stat.mtimeMs > COARSEST_MTIME_TICK_MS) {
-    fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
-  } else {
-    fileContentCache.delete(filePath);
-  }
-  return content;
-}
-
 // ---------- Helpers ----------
 
 /** Strip numeric prefix and hyphen: "01-introduction" → "introduction" */
@@ -149,7 +118,7 @@ function readDefaultExport(
   path: string,
 ): { ok: true; value: unknown } | ReadFailure {
   if (!existsSync(path)) return { ok: false, reason: 'missing' };
-  const source = readSourceFileCached(path);
+  const source = readFileSync(path, 'utf-8');
   const result = defaultExportObjectLiteral(source);
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
@@ -168,10 +137,10 @@ export type CourseConfigRead =
 
 /**
  * Read and JSON5-parse the `export default { ... }` literal from a project's
- * course.config.js. Shared by the build plugin and the validator so the read,
- * cache, and parse rules live in one place. The discriminated `reason` lets
- * the validator emit precise errors while callers that just need a value can
- * fall back on `!ok`.
+ * course.config.js. Shared by the build plugin and the validator so the read
+ * and parse rules live in one place. The discriminated `reason` lets the
+ * validator emit precise errors while callers that just need a value can fall
+ * back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
@@ -313,7 +282,7 @@ export function parsePageConfigFromSource(
 
 /** Extract pageConfig from a .svelte file. Throws on parse failure. */
 export function extractPageConfig(filePath: string): PageConfig {
-  const result = parsePageConfigFromSource(readSourceFileCached(filePath));
+  const result = parsePageConfigFromSource(readFileSync(filePath, 'utf-8'));
   if (result.kind === 'ok') return result.value;
   if (result.kind === 'invalid') {
     throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
@@ -465,7 +434,7 @@ export function generateManifest(
           pageConfig.graded === true && !quiz
             ? listedGradedQuestions(
                 findComponents(
-                  readSourceFileCached(filePath),
+                  readFileSync(filePath, 'utf-8'),
                   QUESTION_COMPONENT_NAMES,
                 ) ?? [],
               ).map((q) => q.id)

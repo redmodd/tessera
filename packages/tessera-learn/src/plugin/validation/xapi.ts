@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readSourceFileCached, READ_FAILURE_MESSAGES } from '../manifest.js';
+import { READ_FAILURE_MESSAGES } from '../manifest.js';
 import { readCourseRuntimeExports, type RuntimeXAPIHooks } from '../ast.js';
 import {
   validateAgent,
@@ -40,7 +40,7 @@ export function readRuntimeXAPIHooks(
 ): XAPIHookRead {
   const runtimePath = resolve(projectRoot, 'course.runtime.js');
   if (!existsSync(runtimePath)) return 'none';
-  const runtime = readCourseRuntimeExports(readSourceFileCached(runtimePath));
+  const runtime = readCourseRuntimeExports(readFileSync(runtimePath, 'utf-8'));
   if (!runtime) {
     d.error(`course.runtime.js: ${READ_FAILURE_MESSAGES['parse-error']}`);
     return 'unknown';

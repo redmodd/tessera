@@ -1,10 +1,9 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import {
   entryStat,
   parsePageConfigFromSource,
   readMetaFile,
-  readSourceFileCached,
   ensureSvelteSuffix,
   orderPageFiles,
   walkPages,
@@ -75,7 +74,7 @@ function validatePageFile(
   { projectRoot, d, profile, assetsDir, assetExistsCache }: PageContext,
 ): { page: PageInfo; parseError: boolean } {
   const fileRel = relative(projectRoot, filePath);
-  const content = readSourceFileCached(filePath);
+  const content = readFileSync(filePath, 'utf-8');
 
   const parseError = getParseError(content);
   if (parseError) {
@@ -570,7 +569,7 @@ export function validateShells(projectRoot: string, d: Diagnostics): void {
   for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
-      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
+      validateContractBypass(readFileSync(shellPath, 'utf-8'), shellFile, d);
     }
   }
 }
