@@ -21,4 +21,9 @@ describe('buildInlineConfig', () => {
     const config = buildInlineConfig(courseRoot, workspaceRoot);
     expect(config.server?.fs?.allow).toContain(workspaceRoot);
   });
+
+  it('keeps Vite from clearing dev diagnostics off the terminal', () => {
+    const config = buildInlineConfig(courseRoot, workspaceRoot);
+    expect(config.clearScreen).toBe(false);
+  });
 });
