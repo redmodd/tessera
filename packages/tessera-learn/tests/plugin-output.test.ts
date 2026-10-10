@@ -10,7 +10,7 @@ import {
 import { resolve } from 'node:path';
 import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
-import * as validation from '../src/plugin/validation.js';
+import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir, writeLessonPage } from './helpers.js';
 
@@ -100,7 +100,7 @@ describe('generated index.html Content-Security-Policy', () => {
     writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
     expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
-      'course.config.js was read before validation ran',
+      'course.config.js has no validated snapshot',
     );
   });
 
@@ -115,7 +115,7 @@ describe('generated index.html Content-Security-Policy', () => {
       'Tessera validation failed',
     );
     expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
-      'course.config.js was read before validation ran',
+      'course.config.js has no validated snapshot',
     );
   });
 
@@ -558,7 +558,7 @@ describe('dev revalidation', () => {
   });
 
   it('reports a validation that throws instead of failing the hot update', async () => {
-    vi.spyOn(validation, 'validateProject').mockImplementation(() => {
+    vi.spyOn(validationModule, 'validateProject').mockImplementation(() => {
       throw new Error('ENOENT: no such file or directory');
     });
 
