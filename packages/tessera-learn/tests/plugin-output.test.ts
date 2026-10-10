@@ -470,20 +470,12 @@ describe('xapi setup virtual module', () => {
 });
 
 describe('dev config revalidation', () => {
-  async function hotUpdate(
-    file: string,
-    read: () => unknown = () => '',
-    type = 'update',
-  ) {
+  async function hotUpdate(file: string, read: () => unknown = () => '') {
     const validation = findPlugin('tessera:validation', 'serve');
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     await (validation.hotUpdate as any).call(
       { environment: { name: 'client' } },
-      {
-        type,
-        file: normalizePath(resolve(projectRoot, file)),
-        read,
-      },
+      { file: normalizePath(resolve(projectRoot, file)), read },
     );
     return errors;
   }
@@ -511,11 +503,9 @@ describe('dev config revalidation', () => {
     expect(errors).not.toHaveBeenCalled();
   });
 
-  it('revalidates a deleted file without reading it', async () => {
-    const errors = await hotUpdate(
-      'course.config.js',
-      () => Promise.reject(new Error('ENOENT')),
-      'delete',
+  it('revalidates a file that is gone before it can be read', async () => {
+    const errors = await hotUpdate('course.config.js', () =>
+      Promise.reject(new Error('ENOENT')),
     );
 
     expect(errors).toHaveBeenCalledWith(

@@ -331,13 +331,13 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       ctx.validate();
     },
 
-    async hotUpdate({ type, file, read: waitForSave }) {
+    async hotUpdate({ file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
       const watched = ['course.config.js', 'course.runtime.js'].map((name) =>
         normalizePath(resolve(ctx.root, name)),
       );
       if (!watched.includes(file)) return;
-      if (type !== 'delete') await waitForSave();
+      await Promise.allSettled([waitForSave()]);
       reportValidationIssues(validateProject(ctx.root, ctx.standardOverride));
     },
 
