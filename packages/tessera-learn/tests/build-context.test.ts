@@ -7,7 +7,7 @@ import {
   projectFileRel,
 } from '../src/plugin/build-context.js';
 import { resolvedConfig, resolvedContext } from './helpers/plugin.js';
-import { tempDir } from './helpers.js';
+import { tempDir, writeLessonPage } from './helpers.js';
 
 const root = resolve('/project');
 
@@ -35,9 +35,7 @@ describe('BuildContext.configure', () => {
 describe('BuildContext.validate', () => {
   it('keeps no config snapshot on the dev server', () => {
     const courseRoot = tempDir();
-    const lesson = resolve(courseRoot, 'pages', '01-section', '01-lesson');
-    mkdirSync(lesson, { recursive: true });
-    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>');
+    writeLessonPage(courseRoot);
     writeFileSync(
       resolve(courseRoot, 'course.config.js'),
       'export default { title: "Course", language: "en" };',
@@ -53,9 +51,7 @@ describe('BuildContext.validate', () => {
 
   it('validates the read it was given instead of the file', () => {
     const courseRoot = tempDir();
-    const lesson = resolve(courseRoot, 'pages', '01-section', '01-lesson');
-    mkdirSync(lesson, { recursive: true });
-    writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>');
+    writeLessonPage(courseRoot);
     writeFileSync(resolve(courseRoot, 'course.config.js'), 'export default {');
     const ctx = new BuildContext(undefined, {
       ok: true,

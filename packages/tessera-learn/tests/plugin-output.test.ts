@@ -12,7 +12,7 @@ import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
 import * as validation from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
-import { tempDir } from './helpers.js';
+import { tempDir, writeLessonPage } from './helpers.js';
 
 let projectRoot: string;
 
@@ -25,14 +25,8 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
-function writeLessonPage() {
-  const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
-  mkdirSync(lesson, { recursive: true });
-  writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
-}
-
 function validatedBuild(): (name: string) => Plugin {
-  writeLessonPage();
+  writeLessonPage(projectRoot);
   const get = resolvedPlugins(projectRoot, 'build');
   const validation = get('tessera:validation');
   (validation.buildStart as any).call(validation);
@@ -521,7 +515,7 @@ describe('dev config revalidation', () => {
   );
 
   it('waits for a save still in progress before validating', async () => {
-    writeLessonPage();
+    writeLessonPage(projectRoot);
     writeConfigSource('');
 
     const errors = await hotUpdate('course.config.js', () =>
@@ -552,7 +546,7 @@ describe('dev config revalidation', () => {
   });
 
   it('says when the errors it reported are resolved', async () => {
-    writeLessonPage();
+    writeLessonPage(projectRoot);
     const validation = findPlugin('tessera:validation', 'serve');
     const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -571,7 +565,7 @@ describe('dev config revalidation', () => {
   });
 
   it('reports a warning once and an error on every save', async () => {
-    writeLessonPage();
+    writeLessonPage(projectRoot);
     writeConfig('web');
     const withUnknownField = `export default { title: "T", export: { standard: "web" }, extra: 1 };`;
     const validation = findPlugin('tessera:validation', 'serve');
