@@ -33,7 +33,11 @@ import {
 import { validateProject, reportValidationIssues } from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
-import { formatValue, quoteList } from './validation/diagnostics.js';
+import {
+  formatValue,
+  quoteList,
+  type ValidationResult,
+} from './validation/diagnostics.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
@@ -323,6 +327,19 @@ function tesseraPagesPlugin(): Plugin {
 // ---------- Validation Plugin ----------
 
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
+  let failing = false;
+
+  function revalidate(): ValidationResult {
+    try {
+      return validateProject(ctx.root, ctx.standardOverride);
+    } catch (error) {
+      return {
+        errors: [`validation could not run: ${(error as Error).message}`],
+        warnings: [],
+      };
+    }
+  }
+
   return {
     name: 'tessera:validation',
     enforce: 'pre',
@@ -338,7 +355,17 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       );
       if (!watched.includes(file)) return;
       await Promise.allSettled([waitForSave()]);
-      reportValidationIssues(validateProject(ctx.root, ctx.standardOverride));
+      const result = revalidate();
+      const resolved = failing && result.errors.length === 0;
+      failing = result.errors.length > 0;
+      reportValidationIssues(result);
+      if (resolved) {
+        reportValidationIssues({
+          errors: [],
+          warnings: [],
+          infos: ['validation errors resolved'],
+        });
+      }
     },
 
     buildStart() {

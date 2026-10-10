@@ -6,6 +6,7 @@ import {
   rmSync,
   existsSync,
   readdirSync,
+  symlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
@@ -470,8 +471,11 @@ describe('xapi setup virtual module', () => {
 });
 
 describe('dev config revalidation', () => {
-  async function hotUpdate(file: string, read: () => unknown = () => '') {
-    const validation = findPlugin('tessera:validation', 'serve');
+  async function hotUpdate(
+    file: string,
+    read: () => unknown = () => '',
+    validation = findPlugin('tessera:validation', 'serve'),
+  ) {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     await (validation.hotUpdate as any).call(
       { environment: { name: 'client' } },
@@ -510,6 +514,37 @@ describe('dev config revalidation', () => {
 
     expect(errors).toHaveBeenCalledWith(
       expect.stringContaining('course.config.js: not found in project root'),
+    );
+  });
+
+  it('reports a validation that throws instead of failing the hot update', async () => {
+    writeConfig('web');
+    symlinkSync(
+      resolve(projectRoot, 'missing'),
+      resolve(projectRoot, 'pages', '01-section'),
+    );
+
+    expect(await hotUpdate('course.config.js')).toHaveBeenCalledWith(
+      expect.stringContaining('validation could not run: ENOENT'),
+    );
+  });
+
+  it('says when the errors it reported are resolved', async () => {
+    writeLessonPage();
+    const validation = findPlugin('tessera:validation', 'serve');
+    const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    writeConfig('web');
+    await hotUpdate('course.config.js', undefined, validation);
+    writeConfigSource('export default {');
+    await hotUpdate('course.config.js', undefined, validation);
+    expect(infos).not.toHaveBeenCalled();
+
+    writeConfig('web');
+    await hotUpdate('course.config.js', undefined, validation);
+    await hotUpdate('course.config.js', undefined, validation);
+    expect(infos).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('validation errors resolved'),
     );
   });
 });
