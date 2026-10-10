@@ -565,8 +565,10 @@ function validateContractBypass(
   }
 }
 
+export const SHELL_FILES = ['layout.svelte', 'quiz.svelte'];
+
 export function validateShells(projectRoot: string, d: Diagnostics): void {
-  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+  for (const shellFile of SHELL_FILES) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
       validateContractBypass(readFileSync(shellPath, 'utf-8'), shellFile, d);

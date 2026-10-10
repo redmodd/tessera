@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -33,6 +33,7 @@ import {
 import { validateProject, reportValidationIssues } from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
+import { SHELL_FILES } from './validation/page.js';
 import {
   formatValue,
   quoteList,
@@ -330,8 +331,7 @@ function tesseraPagesPlugin(): Plugin {
 const VALIDATED_ROOT_FILES = [
   'course.config.js',
   'course.runtime.js',
-  'layout.svelte',
-  'quiz.svelte',
+  ...SHELL_FILES,
 ];
 
 function isPageSource(projectRoot: string, file: string): boolean {
@@ -344,9 +344,7 @@ function isPageSource(projectRoot: string, file: string): boolean {
 function isValidatedSource(projectRoot: string, file: string): boolean {
   return (
     isPageSource(projectRoot, file) ||
-    VALIDATED_ROOT_FILES.some(
-      (name) => file === normalizePath(resolve(projectRoot, name)),
-    )
+    VALIDATED_ROOT_FILES.includes(relative(projectRoot, file))
   );
 }
 
