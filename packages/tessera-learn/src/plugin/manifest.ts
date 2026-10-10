@@ -162,8 +162,8 @@ export type CourseConfigRead =
  * Read and JSON5-parse the `export default { ... }` literal from a project's
  * course.config.js. Shared by the build plugin and the validator so the read,
  * cache, and parse rules live in one place. The discriminated `reason` lets
- * callers that care (export, validation) emit precise errors while callers
- * that just need a value can fall back on `!ok`.
+ * the validator emit precise errors while callers that just need a value can
+ * fall back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
@@ -187,7 +187,8 @@ export type ResolvedConfigRead = CourseConfigRead & {
  * Resolve a project's effective export standard once: the CLI `--standard`
  * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
  * config with no override, or a standard outside the table, fails closed with
- * no `profile` so callers withhold standard-specific output rather than guess.
+ * no `profile` so the validator skips standard-specific checks rather than
+ * guess.
  * The returned `config` drops any non-object section and already has the
  * override applied, so consumers read it back directly.
  */

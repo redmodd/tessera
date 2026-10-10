@@ -255,7 +255,6 @@ describe('config validation', () => {
   });
 
   it('judges a non-data read by its own source, not the file on disk', () => {
-    createValidProject(testRoot);
     writeConfig(testRoot, `export default { title: someTitle };`);
     const read = readCourseConfig(testRoot);
     createValidProject(testRoot);
