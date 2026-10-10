@@ -131,6 +131,8 @@ function readDefaultExport(
   }
 }
 
+export const COURSE_CONFIG_FILE = 'course.config.js';
+
 export type CourseConfigRead =
   { ok: true; config: Partial<CourseConfig> } | ReadFailure;
 
@@ -142,7 +144,7 @@ export type CourseConfigRead =
  * back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
-  const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
+  const read = readDefaultExport(resolve(projectRoot, COURSE_CONFIG_FILE));
   return read.ok
     ? { ok: true, config: read.value as Partial<CourseConfig> }
     : read;

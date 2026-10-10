@@ -10,6 +10,7 @@ import {
   rmSync,
 } from 'node:fs';
 import {
+  COURSE_CONFIG_FILE,
   generateManifest,
   walkPages,
   type CourseConfigRead,
@@ -45,6 +46,7 @@ import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
+import { COURSE_RUNTIME_FILE } from './validation/xapi.js';
 import { virtualModule } from './virtual-module.js';
 import {
   BuildContext,
@@ -302,7 +304,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
 
 function tesseraConfigPlugin(ctx: BuildContext): Plugin {
   return virtualModule('tessera:config', 'virtual:tessera-config', function () {
-    const configPath = resolve(ctx.root, 'course.config.js');
+    const configPath = resolve(ctx.root, COURSE_CONFIG_FILE);
     if (existsSync(configPath)) this.addWatchFile(configPath);
     // The runtime reads export.standard too, so the override must apply to
     // the bundled config, not just the manifest/adapter.
@@ -330,8 +332,8 @@ function tesseraPagesPlugin(): Plugin {
 // ---------- Validation Plugin ----------
 
 const VALIDATED_ROOT_FILES = [
-  'course.config.js',
-  'course.runtime.js',
+  COURSE_CONFIG_FILE,
+  COURSE_RUNTIME_FILE,
   ...SHELL_FILES,
 ];
 
