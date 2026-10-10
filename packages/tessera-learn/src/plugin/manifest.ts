@@ -79,6 +79,8 @@ export function ensureSvelteSuffix(name: string): string {
 
 // ---------- File read cache ----------
 
+const COARSEST_MTIME_TICK_MS = 2000;
+
 /**
  * Module-level cache of source file contents keyed by absolute path with
  * mtime invalidation. Both `validateProject` and `generateManifest` read the
@@ -88,8 +90,6 @@ export function ensureSvelteSuffix(name: string): string {
  * `COARSEST_MTIME_TICK_MS` is not cached, since it can change again without
  * its mtime moving.
  */
-const COARSEST_MTIME_TICK_MS = 2000;
-
 const fileContentCache = new Map<
   string,
   { mtimeMs: number; content: string }
