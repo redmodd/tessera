@@ -48,6 +48,7 @@ import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
 import {
   BuildContext,
+  isInside,
   projectFileRel,
   type ValidatedConfig,
 } from './build-context.js';
@@ -334,13 +335,9 @@ const VALIDATED_ROOT_FILES = [
   ...SHELL_FILES,
 ];
 
-function isUnder(projectRoot: string, dir: string, file: string): boolean {
-  return file.startsWith(`${normalizePath(resolve(projectRoot, dir))}/`);
-}
-
 function isPageSource(projectRoot: string, file: string): boolean {
   return (
-    isUnder(projectRoot, 'pages', file) &&
+    isInside(resolve(projectRoot, 'pages'), file) &&
     (file.endsWith('.svelte') || file.endsWith('/_meta.js'))
   );
 }
@@ -410,7 +407,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       if (this.environment.name !== 'client') return;
       const isSource = isValidatedSource(ctx.root, file);
       const assetsChanged =
-        type !== 'update' && isUnder(ctx.root, 'assets', file);
+        type !== 'update' && isInside(resolve(ctx.root, 'assets'), file);
       if (!isSource && !assetsChanged) return;
       if (isSource) saves.push(Promise.allSettled([waitForSave()]));
       return (pass ??= revalidateOnceSaved());
