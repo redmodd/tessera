@@ -84,8 +84,12 @@ export function ensureSvelteSuffix(name: string): string {
  * mtime invalidation. Both `validateProject` and `generateManifest` read the
  * same .svelte / _meta.js / course.config.js files during a single build;
  * sharing the read avoids the second disk hit (and matters most on cold-cache
- * CI runs and large courses).
+ * CI runs and large courses). A file modified within the last
+ * `COARSEST_MTIME_TICK_MS` is not cached, since it can change again without
+ * its mtime moving.
  */
+const COARSEST_MTIME_TICK_MS = 2000;
+
 const fileContentCache = new Map<
   string,
   { mtimeMs: number; content: string }
@@ -96,7 +100,9 @@ export function readSourceFileCached(filePath: string): string {
   const cached = fileContentCache.get(filePath);
   if (cached && cached.mtimeMs === stat.mtimeMs) return cached.content;
   const content = readFileSync(filePath, 'utf-8');
-  fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
+  if (Date.now() - stat.mtimeMs > COARSEST_MTIME_TICK_MS) {
+    fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
+  }
   return content;
 }
 

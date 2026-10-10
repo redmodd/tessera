@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   generateManifest,
   extractPageConfig,
   parsePageConfigFromSource,
   readMetaFile,
+  readSourceFileCached,
   orderPageFiles,
   stripPrefix,
   titleCase,
@@ -766,5 +767,25 @@ export const pageConfig = { title: "Exam", quiz: true }
     expect(manifest.pages[0].importPath).toBe(
       '/pages/01-intro/01-welcome/hello.svelte',
     );
+  });
+});
+
+describe('readSourceFileCached', () => {
+  function rewriteKeepingMtime(mtime: Date): string {
+    const file = resolve(tempDir(), 'page.svelte');
+    for (const content of ['first', 'second']) {
+      writeFileSync(file, content, 'utf-8');
+      utimesSync(file, mtime, mtime);
+      readSourceFileCached(file);
+    }
+    return readSourceFileCached(file);
+  }
+
+  it('rereads a just-modified file rewritten without its mtime moving', () => {
+    expect(rewriteKeepingMtime(new Date())).toBe('second');
+  });
+
+  it('serves a settled file from the cache', () => {
+    expect(rewriteKeepingMtime(new Date(0))).toBe('first');
   });
 });
