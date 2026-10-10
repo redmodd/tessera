@@ -31,7 +31,7 @@ function slugify(text: string): string {
 
 type ExportConfig = Pick<
   CourseConfig,
-  'title' | 'id' | 'description' | 'version' | 'scoring' | 'export'
+  'title' | 'id' | 'description' | 'version' | 'scoring'
 > &
   Partial<Pick<CourseConfig, 'completion' | 'success'>>;
 
