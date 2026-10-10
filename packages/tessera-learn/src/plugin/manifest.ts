@@ -102,6 +102,8 @@ export function readSourceFileCached(filePath: string): string {
   const content = readFileSync(filePath, 'utf-8');
   if (Date.now() - stat.mtimeMs > COARSEST_MTIME_TICK_MS) {
     fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
+  } else {
+    fileContentCache.delete(filePath);
   }
   return content;
 }

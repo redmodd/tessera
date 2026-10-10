@@ -788,4 +788,18 @@ describe('readSourceFileCached', () => {
   it('serves a settled file from the cache', () => {
     expect(rewriteKeepingMtime(new Date(0))).toBe('first');
   });
+
+  it('drops the cached content once the file is modified', () => {
+    const file = resolve(tempDir(), 'page.svelte');
+    const settled = new Date(0);
+    writeFileSync(file, 'first', 'utf-8');
+    utimesSync(file, settled, settled);
+    readSourceFileCached(file);
+    writeFileSync(file, 'second', 'utf-8');
+    readSourceFileCached(file);
+    writeFileSync(file, 'third', 'utf-8');
+    utimesSync(file, settled, settled);
+
+    expect(readSourceFileCached(file)).toBe('third');
+  });
 });
