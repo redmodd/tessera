@@ -2,7 +2,6 @@ import JSON5 from 'json5';
 import { resolve } from 'node:path';
 import {
   OBJECT_CONFIG_SECTIONS,
-  readSourceFileCached,
   resolveConfigRead,
   READ_FAILURE_MESSAGES,
   type CourseConfigRead,
@@ -101,7 +100,7 @@ export function parseConfig(
     : resolveConfigRead(read, standardOverride).profile;
   if (!read.ok) {
     if (read.reason === 'not-data') {
-      reportNonDataConfig(projectRoot, d);
+      reportNonDataConfig(read.source, d);
     } else {
       d.error(`course.config.js: ${READ_FAILURE_MESSAGES[read.reason]}`);
     }
@@ -306,8 +305,7 @@ function validatePercent(key: string, value: unknown, d: Diagnostics): void {
   }
 }
 
-function reportNonDataConfig(projectRoot: string, d: Diagnostics): void {
-  const source = readSourceFileCached(resolve(projectRoot, 'course.config.js'));
+function reportNonDataConfig(source: string, d: Diagnostics): void {
   const { paths, rest } = defaultExportFunctions(source);
   for (const path of paths) {
     d.error(

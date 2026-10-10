@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
+import { readCourseConfig } from '../src/plugin/manifest.js';
 import { tempDir } from './helpers.js';
 
 let testRoot: string;
@@ -248,6 +249,16 @@ describe('config validation', () => {
     createValidProject(testRoot);
     writeConfig(testRoot, `export default () => ({ title: "Test" });`);
     const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
+    );
+  });
+
+  it('judges a non-data read by its own source, not the file on disk', () => {
+    writeConfig(testRoot, `export default { title: someTitle };`);
+    const read = readCourseConfig(testRoot);
+    createValidProject(testRoot);
+    const { errors } = validateProject(testRoot, undefined, read);
     expect(errors).toContain(
       'course.config.js: the default export must be a static object literal (no variables, function calls, template literals, or computed values)',
     );

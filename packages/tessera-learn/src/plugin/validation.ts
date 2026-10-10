@@ -1,5 +1,9 @@
 import { clearParseCache } from './ast.js';
-import { readCourseConfig, READ_FAILURE_MESSAGES } from './manifest.js';
+import {
+  readCourseConfig,
+  READ_FAILURE_MESSAGES,
+  type CourseConfigRead,
+} from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
 import { applyA11ySettings, normalizeA11y } from './validation/a11y.js';
 import {
@@ -35,11 +39,11 @@ export function reportValidationIssues({
 export function validateProject(
   projectRoot: string,
   standardOverride?: StandardId,
+  read: CourseConfigRead = readCourseConfig(projectRoot),
 ): ValidationResult {
   clearParseCache();
   const d = new Diagnostics();
 
-  const read = readCourseConfig(projectRoot);
   if (!read.ok && read.reason === 'missing') {
     d.error(`course.config.js: ${READ_FAILURE_MESSAGES.missing}`);
     return d;
