@@ -415,6 +415,8 @@ export function generateManifest(
         const filePath = resolve(walkedLesson.dir, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
+        // A page deleted mid-walk must not throw: in dev this runs in the
+        // manifest plugin's hotUpdate, where a throw skips the reload.
         let source = '';
         try {
           source = readFileSync(filePath, 'utf-8');
