@@ -6,6 +6,7 @@ import {
   rmSync,
   existsSync,
   readdirSync,
+  utimesSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
@@ -33,8 +34,13 @@ function validatedBuild(): (name: string) => Plugin {
   return get;
 }
 
+let configWrites = 0;
+
 function writeConfigSource(source: string) {
-  writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
+  const configPath = resolve(projectRoot, 'course.config.js');
+  writeFileSync(configPath, source, 'utf-8');
+  configWrites += 1;
+  utimesSync(configPath, configWrites, configWrites);
 }
 
 function writeConfig(standard: string) {
