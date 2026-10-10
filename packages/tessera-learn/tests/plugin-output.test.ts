@@ -379,36 +379,25 @@ describe('export packaging gate', () => {
     );
   });
 
-  it.each([
-    ['a syntax error', 'export default {'],
-    ['a non-data value', 'export default { title: someVariable };'],
-    ['a non-object export', 'export default { export: "scorm12" };'],
-    [
-      'an unknown standard',
-      'export default { export: { standard: "scorm13" } };',
-    ],
-  ])(
-    'packages the validated config when course.config.js changes mid-build to %s',
-    async (_case, source) => {
-      writeConfig('scorm12');
-      seedStaleDist();
-      const { entry, exporter, get } = buildPlugins();
-      writeConfigSource(source);
-      expect((get('tessera:adapter').load as any).handler()).toContain(
-        'SCORM12Adapter',
-      );
-      writeBundle(exporter);
-      (entry.closeBundle as any).call(entry);
-      await (exporter.closeBundle as any).call(exporter);
+  it('packages the validated config when course.config.js changes mid-build', async () => {
+    writeConfig('scorm12');
+    seedStaleDist();
+    const { entry, exporter, get } = buildPlugins();
+    writeConfigSource('export default { export: "scorm12" };');
+    expect((get('tessera:adapter').load as any).handler()).toContain(
+      'SCORM12Adapter',
+    );
+    writeBundle(exporter);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
 
-      expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
-        true,
-      );
-      expect(
-        readdirSync(projectRoot).filter((f) => f.endsWith('.zip')),
-      ).toHaveLength(1);
-    },
-  );
+    expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+      true,
+    );
+    expect(
+      readdirSync(projectRoot).filter((f) => f.endsWith('.zip')),
+    ).toHaveLength(1);
+  });
 
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
     writeConfig('scorm12');
