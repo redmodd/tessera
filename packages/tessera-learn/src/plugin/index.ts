@@ -333,6 +333,12 @@ function tesseraPagesPlugin(): Plugin {
 
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
   let failing = false;
+  const reported = new Set<string>();
+
+  function remember({ errors, warnings, infos = [] }: ValidationResult) {
+    if (errors.length === 0) reported.clear();
+    for (const notice of [...warnings, ...infos]) reported.add(notice);
+  }
 
   function revalidate(): ValidationResult {
     try {
@@ -350,7 +356,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer() {
-      ctx.validate();
+      remember(ctx.validate());
     },
 
     async hotUpdate({ file, read: waitForSave }) {
@@ -363,7 +369,13 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       const result = revalidate();
       const resolved = failing && result.errors.length === 0;
       failing = result.errors.length > 0;
-      reportValidationIssues(result);
+      const unreported = (notice: string) => !reported.has(notice);
+      reportValidationIssues({
+        errors: result.errors,
+        warnings: result.warnings.filter(unreported),
+        infos: result.infos?.filter(unreported),
+      });
+      remember(result);
       if (resolved) {
         reportValidationIssues({
           errors: [],

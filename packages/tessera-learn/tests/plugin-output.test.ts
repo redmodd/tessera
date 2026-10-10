@@ -547,4 +547,33 @@ describe('dev config revalidation', () => {
       expect.stringContaining('validation errors resolved'),
     );
   });
+
+  it('reports a warning once and an error on every save', async () => {
+    writeLessonPage();
+    writeConfig('web');
+    const withUnknownField = `export default { title: "T", export: { standard: "web" }, extra: 1 };`;
+    const validation = findPlugin('tessera:validation', 'serve');
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const save = async (source: string) => {
+      writeConfigSource(source);
+      return hotUpdate('course.config.js', undefined, validation);
+    };
+
+    (validation.configureServer as any).call(validation);
+    expect(warnings).toHaveBeenCalled();
+    warnings.mockClear();
+
+    await save(withUnknownField);
+    expect(warnings).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('unknown field "extra"'),
+    );
+    warnings.mockClear();
+
+    const errors = await save('export default {');
+    await save('export default {');
+    expect(errors).toHaveBeenCalledTimes(2);
+
+    await save(withUnknownField);
+    expect(warnings).not.toHaveBeenCalled();
+  });
 });
