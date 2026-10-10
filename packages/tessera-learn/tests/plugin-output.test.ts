@@ -502,19 +502,9 @@ describe('dev revalidation', () => {
     return errors;
   }
 
-  it.each(['course.config.js', 'course.runtime.js'])(
-    'reports errors when %s changes',
-    async (file) => {
-      writeConfig('web');
-      writeFileSync(resolve(projectRoot, file), 'export default {', 'utf-8');
-
-      expect(await hotUpdate(file)).toHaveBeenCalledWith(
-        expect.stringContaining(`${file}: could not parse`),
-      );
-    },
-  );
-
   it.each([
+    'course.config.js',
+    'course.runtime.js',
     'layout.svelte',
     'quiz.svelte',
     'pages/01-section/_meta.js',
