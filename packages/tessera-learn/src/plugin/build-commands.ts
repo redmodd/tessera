@@ -13,7 +13,12 @@ export async function runDev(
   const server = await vite.createServer(config);
   await server.listen();
   server.printUrls();
-  server.bindCLIShortcuts({ print: true });
+  server.bindCLIShortcuts({
+    print: true,
+    customShortcuts: [
+      { key: 'c', description: 'clear console', action: () => console.clear() },
+    ],
+  });
   // Never resolve: the CLI wrapper would process.exit and kill the server.
   return new Promise<number>(() => {});
 }

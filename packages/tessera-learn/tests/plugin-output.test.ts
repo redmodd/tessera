@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -6,12 +6,15 @@ import {
   rmSync,
   existsSync,
   readdirSync,
-  utimesSync,
+  symlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import type { Plugin } from 'vite';
+import { EventEmitter } from 'node:events';
+import { normalizePath, resolveConfig, type Plugin } from 'vite';
+import { tesseraPlugin } from '../src/plugin/index.js';
+import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
-import { tempDir } from './helpers.js';
+import { tempDir, writeLessonPage } from './helpers.js';
 
 // svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
 const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
@@ -40,22 +43,15 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
 }
 
 function validatedBuild(): (name: string) => Plugin {
-  const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
-  mkdirSync(lesson, { recursive: true });
-  writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
+  writeLessonPage(projectRoot);
   const get = resolvedPlugins(projectRoot, 'build');
   const validation = get('tessera:validation');
   (validation.buildStart as any).call(validation);
   return get;
 }
 
-let configWrites = 0;
-
 function writeConfigSource(source: string) {
-  const configPath = resolve(projectRoot, 'course.config.js');
-  writeFileSync(configPath, source, 'utf-8');
-  configWrites += 1;
-  utimesSync(configPath, configWrites, configWrites);
+  writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
 }
 
 function writeConfig(standard: string) {
@@ -510,4 +506,533 @@ describe('xapi setup virtual module', () => {
       ).toContain(real);
     }
   });
+});
+
+describe('dev terminal clearing', () => {
+  async function resolvedClearScreen(clearScreen?: boolean) {
+    const config = await resolveConfig(
+      {
+        root: projectRoot,
+        configFile: false,
+        clearScreen,
+        plugins: [tesseraPlugin()],
+      },
+      'serve',
+    );
+    return config.clearScreen;
+  }
+
+  it('keeps Vite from clearing diagnostics off the terminal', async () => {
+    expect(await resolvedClearScreen()).toBe(false);
+  });
+
+  it('leaves clearing on for a config that asks for it', async () => {
+    expect(await resolvedClearScreen(true)).toBe(true);
+  });
+});
+
+describe('dev revalidation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const lessonDir = 'pages/01-section/01-lesson';
+  let watcher: EventEmitter;
+
+  // Vite runs the hook configureServer returns once every plugin has configured the server.
+  function configure(validation: Plugin): void {
+    watcher = new EventEmitter();
+    (validation.configureServer as any).call(validation, { watcher })();
+  }
+
+  function startDev(): Plugin {
+    writeLessonPage(projectRoot);
+    writeConfig('web');
+    const validation = findPlugin('tessera:validation', 'serve');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    configure(validation);
+    return validation;
+  }
+
+  function notify(
+    validation: Plugin,
+    file: string,
+    { read = () => '' as unknown, type = 'update' } = {},
+  ) {
+    return (validation.hotUpdate as any).call(
+      { environment: { name: 'client' } },
+      { type, file: normalizePath(resolve(projectRoot, file)), read },
+    );
+  }
+
+  async function hotUpdate(...change: Parameters<typeof notify>) {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    notify(...change);
+    await vi.runAllTimersAsync();
+    return errors;
+  }
+
+  // The watcher reports a folder to its own listeners, not to the hotUpdate hook.
+  async function folderChange(event: 'addDir' | 'unlinkDir', dir: string) {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    watcher.emit(event, resolve(projectRoot, dir));
+    await vi.runAllTimersAsync();
+    return errors;
+  }
+
+  it.each([
+    'course.config.js',
+    'course.runtime.js',
+    'layout.svelte',
+    'quiz.svelte',
+    'pages/01-section/_meta.js',
+    `${lessonDir}/page.svelte`,
+  ])('revalidates when %s changes', async (file) => {
+    const validation = startDev();
+    writeConfigSource('export default {');
+
+    expect(await hotUpdate(validation, file)).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: could not parse'),
+    );
+  });
+
+  it.each(['assets/logo.svg', 'pages/01-section/notes.md', 'notes.svelte'])(
+    'does not revalidate when %s changes',
+    async (file) => {
+      const validation = startDev();
+      writeConfigSource('export default {');
+
+      expect(await hotUpdate(validation, file)).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['create', 'delete'])(
+    'revalidates on an asset %s without reading the asset',
+    async (type) => {
+      const validation = startDev();
+      writeConfigSource('export default {');
+      const read = vi.fn();
+
+      const errors = await hotUpdate(validation, 'assets/logo.svg', {
+        read,
+        type,
+      });
+
+      expect(errors).toHaveBeenCalledOnce();
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['addDir', 'unlinkDir'] as const)(
+    'revalidates on a folder %s under pages/',
+    async (event) => {
+      startDev();
+      writeConfigSource('export default {');
+
+      expect(
+        await folderChange(event, 'pages/02-empty'),
+      ).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('does not revalidate on a folder change outside pages/', async () => {
+    startDev();
+    writeConfigSource('export default {');
+
+    expect(await folderChange('addDir', 'assets/icons')).not.toHaveBeenCalled();
+  });
+
+  it.each(['assets', lessonDir])(
+    'validates once for files the watcher reports apart under %s',
+    async (dir) => {
+      const validation = startDev();
+      writeConfigSource('export default {');
+
+      notify(validation, `${dir}/a.svelte`, { type: 'create' });
+      await vi.advanceTimersByTimeAsync(30);
+      expect(
+        await hotUpdate(validation, `${dir}/b.svelte`, { type: 'create' }),
+      ).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('leaves the hot update to Vite without waiting for the validation', () => {
+    const validation = startDev();
+    writeConfigSource('export default {');
+
+    expect(notify(validation, 'course.config.js')).toBeUndefined();
+  });
+
+  it('waits for a save that starts while another is read', async () => {
+    const validation = startDev();
+    writeConfigSource('');
+    const slowSave = async () => {
+      await new Promise((done) => setTimeout(done, 200));
+      writeConfig('web');
+    };
+
+    const [errors] = await Promise.all([
+      hotUpdate(validation, 'layout.svelte'),
+      hotUpdate(validation, 'course.config.js', { read: slowSave }),
+    ]);
+
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('revalidates a file that is gone before it can be read', async () => {
+    const validation = startDev();
+    rmSync(resolve(projectRoot, 'course.config.js'));
+
+    const errors = await hotUpdate(validation, 'course.config.js', {
+      read: () => Promise.reject(new Error('ENOENT')),
+    });
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: not found in project root'),
+    );
+  });
+
+  it('revalidates a deleted file without waiting on a read of it', async () => {
+    const validation = startDev();
+    rmSync(resolve(projectRoot, 'course.config.js'));
+    const read = vi.fn();
+
+    const errors = await hotUpdate(validation, 'course.config.js', {
+      read,
+      type: 'delete',
+    });
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('course.config.js: not found in project root'),
+    );
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('reports a validation that throws instead of failing the hot update', async () => {
+    const validation = startDev();
+    vi.spyOn(validationModule, 'validateProject').mockImplementation(() => {
+      throw new Error('ENOENT: no such file or directory');
+    });
+
+    expect(
+      await hotUpdate(validation, 'course.config.js'),
+    ).toHaveBeenCalledWith(
+      expect.stringContaining('validation could not run: ENOENT'),
+    );
+  });
+
+  it('reports errors on a restart instead of failing it', async () => {
+    let validation = startDev();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Vite builds the restarted server's plugins before it closes the old server.
+    const restart = async () => {
+      const rebuilt = findPlugin('tessera:validation', 'serve');
+      configure(rebuilt);
+      (validation.closeServer as any).call(validation, { reason: 'restart' });
+      validation = rebuilt;
+      await vi.runAllTimersAsync();
+    };
+
+    writeConfigSource('export default {');
+    await restart();
+    expect(errors).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('course.config.js: could not parse'),
+    );
+
+    writeConfig('web');
+    await restart();
+    expect(infos).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('validation errors resolved'),
+    );
+  });
+
+  it('reports every standing warning again on a restart', async () => {
+    const validation = startDev();
+    const warnings = vi.mocked(console.warn);
+    const standing = warnings.mock.calls.length;
+    expect(standing).toBeGreaterThan(0);
+
+    configure(validation);
+    await vi.runAllTimersAsync();
+    expect(warnings).toHaveBeenCalledTimes(standing * 2);
+  });
+
+  it('refuses to start a server on a project with errors', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfigSource('export default {');
+    const validation = findPlugin('tessera:validation', 'serve');
+
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
+  });
+
+  it('refuses a project with errors again once its server has closed', () => {
+    const validation = startDev();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    (validation.closeServer as any).call(validation, { reason: 'close' });
+    writeConfigSource('export default {');
+
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
+  });
+
+  it('refuses a project with errors after a start that another plugin failed', () => {
+    writeLessonPage(projectRoot);
+    writeConfig('web');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = findPlugin('tessera:validation', 'serve');
+    (failed.configureServer as any).call(failed, {
+      watcher: new EventEmitter(),
+    });
+
+    writeConfigSource('export default {');
+    const validation = findPlugin('tessera:validation', 'serve');
+
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
+  });
+
+  it('keeps revalidating when another server on the same root closes', async () => {
+    const validation = startDev();
+    const other = findPlugin('tessera:validation', 'serve');
+    configure(other);
+    (other.closeServer as any).call(other, { reason: 'close' });
+    writeConfigSource('export default {');
+
+    expect(await hotUpdate(validation, 'course.config.js')).toHaveBeenCalled();
+  });
+
+  it('validates once when a restart lands inside a burst', async () => {
+    const validation = startDev();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfigSource('export default {');
+
+    notify(validation, 'course.config.js');
+    const rebuilt = findPlugin('tessera:validation', 'serve');
+    configure(rebuilt);
+    (validation.closeServer as any).call(validation, { reason: 'restart' });
+    await vi.runAllTimersAsync();
+
+    expect(errors).toHaveBeenCalledOnce();
+  });
+
+  it('says when the errors it reported are resolved', async () => {
+    const validation = startDev();
+    const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await hotUpdate(validation, 'course.config.js');
+    writeConfigSource('export default {');
+    await hotUpdate(validation, 'course.config.js');
+    expect(infos).not.toHaveBeenCalled();
+
+    writeConfig('web');
+    await hotUpdate(validation, 'course.config.js');
+    await hotUpdate(validation, 'course.config.js');
+    expect(infos).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('validation errors resolved'),
+    );
+  });
+
+  it('reports a warning once and an error on every save', async () => {
+    const withUnknownField = `export default { title: "T", export: { standard: "web" }, extra: 1 };`;
+    const validation = startDev();
+    const warnings = vi.mocked(console.warn);
+    const save = async (source: string) => {
+      writeConfigSource(source);
+      return hotUpdate(validation, 'course.config.js');
+    };
+
+    expect(warnings).toHaveBeenCalled();
+    warnings.mockClear();
+
+    await save(withUnknownField);
+    expect(warnings).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('unknown field "extra"'),
+    );
+    warnings.mockClear();
+
+    const errors = await save('export default {');
+    await save('export default {');
+    expect(errors).toHaveBeenCalledTimes(2);
+
+    await save(withUnknownField);
+    expect(warnings).not.toHaveBeenCalled();
+  });
+
+  const scormConfig = (endpoint: string) =>
+    `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "${endpoint}", activityId: "https://example.com/course", auth: "eDp5", actorAccountHomePage: "https://example.com" } };`;
+
+  const writeGradedPage = (name: string, weight?: number) =>
+    writeFileSync(
+      resolve(projectRoot, lessonDir, name),
+      `<script module>export const pageConfig = { graded: true${weight ? `, weight: ${weight}` : ''} };</script>`,
+    );
+
+  it.each<[string, string, () => void, () => void]>([
+    [
+      'unknown field "extra"',
+      'course.config.js',
+      () => writeConfigSource(`export default { title: "T", extra: 1 };`),
+      () => writeConfigSource(`export default { title: "T" };`),
+    ],
+    [
+      'xapi.endpoint should end with a slash',
+      'course.config.js',
+      () => writeConfigSource(scormConfig('https://lrs.example/xapi')),
+      () => writeConfigSource(scormConfig('https://lrs.example/xapi/')),
+    ],
+    [
+      'outside the section/lesson structure',
+      'pages/stray.svelte',
+      () => writeFileSync(resolve(projectRoot, 'pages/stray.svelte'), ''),
+      () => rmSync(resolve(projectRoot, 'pages/stray.svelte')),
+    ],
+    // The watcher reports nothing for a link that does not resolve, so another save stands in.
+    [
+      'symlink does not resolve',
+      `${lessonDir}/page.svelte`,
+      () =>
+        symlinkSync('missing', resolve(projectRoot, lessonDir, 'gone.svelte')),
+      () => rmSync(resolve(projectRoot, lessonDir, 'gone.svelte')),
+    ],
+    [
+      'graded without a pageConfig.weight',
+      `${lessonDir}/unweighted.svelte`,
+      () => {
+        writeGradedPage('weighted.svelte', 2);
+        writeGradedPage('unweighted.svelte');
+      },
+      () => rmSync(resolve(projectRoot, lessonDir, 'unweighted.svelte')),
+    ],
+  ])(
+    'reports a "%s" warning that comes back while an unrelated error stands',
+    async (warning, file, raise, clear) => {
+      const validation = startDev();
+      writeFileSync(
+        resolve(projectRoot, lessonDir, 'broken.svelte'),
+        '<script module>export const pageConfig = makeConfig();</script>',
+      );
+      const warnings = vi.mocked(console.warn);
+      const expected = expect.stringContaining(warning);
+      const change = async (apply: () => void) => {
+        apply();
+        await hotUpdate(validation, file);
+      };
+
+      await change(raise);
+      await change(clear);
+      expect(warnings).toHaveBeenCalledWith(expected);
+      warnings.mockClear();
+
+      await change(raise);
+      expect(warnings).toHaveBeenCalledWith(expected);
+    },
+  );
+
+  it('reports an empty section again when its folder comes back', async () => {
+    startDev();
+    const warnings = vi.mocked(console.warn);
+    const expected = expect.stringContaining('section contributed no pages');
+    const dir = 'pages/02-empty';
+
+    mkdirSync(resolve(projectRoot, dir));
+    await folderChange('addDir', dir);
+    expect(warnings).toHaveBeenCalledWith(expected);
+    rmSync(resolve(projectRoot, dir), { recursive: true });
+    await folderChange('unlinkDir', dir);
+    warnings.mockClear();
+
+    mkdirSync(resolve(projectRoot, dir));
+    await folderChange('addDir', dir);
+    expect(warnings).toHaveBeenCalledWith(expected);
+  });
+
+  it('reports a warning that comes back on one page while another cannot be parsed', async () => {
+    const validation = startDev();
+    const warnings = vi.mocked(console.warn);
+    const savePage = async (name: string, source: string) => {
+      writeFileSync(resolve(projectRoot, lessonDir, name), source);
+      await hotUpdate(validation, `${lessonDir}/${name}`);
+    };
+    const weighted =
+      '<script module>export const pageConfig = { weight: 2 };</script>';
+
+    await savePage(
+      'broken.svelte',
+      '<script module>export const pageConfig = {</script>',
+    );
+    await savePage('other.svelte', weighted);
+    await savePage('other.svelte', '<h1>Other</h1>');
+    warnings.mockClear();
+
+    await savePage('other.svelte', weighted);
+    expect(warnings).toHaveBeenCalledWith(
+      expect.stringContaining('other.svelte: pageConfig.weight only applies'),
+    );
+  });
+
+  const xapiConfig = `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "https://lrs.example/xapi/", activityId: "https://example.com/course", actorAccountHomePage: "https://example.com" } };`;
+
+  it.each([
+    [
+      `${lessonDir}/page.svelte`,
+      '<script module>export const pageConfig = { weight: 2 };</script>',
+      '<script module>export const pageConfig = {</script>',
+    ],
+    [
+      `${lessonDir}/page.svelte`,
+      '<script module>export const pageConfig = { weight: 2 };</script>',
+      '<script module>export const pageConfig = { weight: w };</script>',
+    ],
+    [
+      `${lessonDir}/_meta.js`,
+      `export default { title: "Lesson", pages: ["page", "page"] };`,
+      'export default {',
+    ],
+    [
+      `${lessonDir}/_meta.js`,
+      `export default { title: "Lesson", pages: ["page", "page"] };`,
+      `export default { title: "Lesson", pages: "page" };`,
+    ],
+    [
+      'course.config.js',
+      `export default { title: "T", export: { standard: "web" }, completion: { mode: "percentage", trigger: "page" } };`,
+      `export default { title: "T", export: { standard: "web" }, completion: "percentage" };`,
+    ],
+    [
+      'course.config.js',
+      `export default { title: "T", export: { standard: "scorm12", csp: false } };`,
+      `export default { title: "T", export: { standard: "scrom12", csp: false } };`,
+    ],
+    [
+      'course.runtime.js',
+      `export const xapi = { lrs: { auth: () => "Basic eDp5", actor: () => ({}) } };`,
+      'export const xapi = {',
+      xapiConfig,
+    ],
+  ])(
+    'does not repeat a standing warning once the error in %s is fixed',
+    async (file, source, typo, config?: string) => {
+      const validation = startDev();
+      if (config) writeConfigSource(config);
+      const warnings = vi.mocked(console.warn);
+      const save = async (content: string) => {
+        writeFileSync(resolve(projectRoot, file), content);
+        await hotUpdate(validation, file);
+      };
+      warnings.mockClear();
+
+      await save(source);
+      expect(warnings).toHaveBeenCalled();
+      warnings.mockClear();
+
+      await save(typo);
+      await save(source);
+      expect(warnings).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -171,6 +171,12 @@ export function tempDir(): string {
   return dir;
 }
 
+export function writeLessonPage(courseRoot: string): void {
+  const lesson = join(courseRoot, 'pages', '01-section', '01-lesson');
+  mkdirSync(lesson, { recursive: true });
+  writeFileSync(join(lesson, 'page.svelte'), '<h1>Page</h1>');
+}
+
 export function makeWorkspace(courses: string[] = []): string {
   const root = tempDir();
   mkdirSync(join(root, 'courses'));

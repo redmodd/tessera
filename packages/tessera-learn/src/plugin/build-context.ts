@@ -9,6 +9,7 @@ import {
 } from './manifest.js';
 import type { StandardId, StandardProfile } from '../runtime/standards.js';
 import { reportValidationIssues, validateProject } from './validation.js';
+import type { Diagnostics } from './validation/diagnostics.js';
 
 export type ValidatedConfig = ResolvedConfigRead & {
   ok: true;
@@ -65,7 +66,7 @@ export class BuildContext {
     }
   }
 
-  validate(): void {
+  validate(): Diagnostics {
     this.#validatedConfig = null;
     const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
@@ -75,7 +76,7 @@ export class BuildContext {
         `Tessera validation failed with ${result.errors.length} error(s). Fix the errors above to continue.`,
       );
     }
-    if (!this.isBuild) return;
+    if (!this.isBuild) return result;
     const resolved = resolveConfigRead(read, this.standardOverride);
     const { profile } = resolved;
     if (!resolved.ok || !profile) {
@@ -84,6 +85,7 @@ export class BuildContext {
       );
     }
     this.#validatedConfig = { ...resolved, profile };
+    return result;
   }
 
   validatedConfig(): ValidatedConfig {

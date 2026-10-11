@@ -2,7 +2,6 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, basename, extname } from 'node:path';
 import JSON5 from 'json5';
 import {
-  clearParseCache,
   defaultExportObjectLiteral,
   findComponents,
   isLiteralTrue,
@@ -77,29 +76,6 @@ export function ensureSvelteSuffix(name: string): string {
   return name.endsWith('.svelte') ? name : `${name}.svelte`;
 }
 
-// ---------- File read cache ----------
-
-/**
- * Module-level cache of source file contents keyed by absolute path with
- * mtime invalidation. Both `validateProject` and `generateManifest` read the
- * same .svelte / _meta.js / course.config.js files during a single build;
- * sharing the read avoids the second disk hit (and matters most on cold-cache
- * CI runs and large courses).
- */
-const fileContentCache = new Map<
-  string,
-  { mtimeMs: number; content: string }
->();
-
-export function readSourceFileCached(filePath: string): string {
-  const stat = statSync(filePath);
-  const cached = fileContentCache.get(filePath);
-  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.content;
-  const content = readFileSync(filePath, 'utf-8');
-  fileContentCache.set(filePath, { mtimeMs: stat.mtimeMs, content });
-  return content;
-}
-
 // ---------- Helpers ----------
 
 /** Strip numeric prefix and hyphen: "01-introduction" → "introduction" */
@@ -141,7 +117,7 @@ function readDefaultExport(
   path: string,
 ): { ok: true; value: unknown } | ReadFailure {
   if (!existsSync(path)) return { ok: false, reason: 'missing' };
-  const source = readSourceFileCached(path);
+  const source = readFileSync(path, 'utf-8');
   const result = defaultExportObjectLiteral(source);
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
@@ -155,18 +131,20 @@ function readDefaultExport(
   }
 }
 
+export const COURSE_CONFIG_FILE = 'course.config.js';
+
 export type CourseConfigRead =
   { ok: true; config: Partial<CourseConfig> } | ReadFailure;
 
 /**
  * Read and JSON5-parse the `export default { ... }` literal from a project's
- * course.config.js. Shared by the build plugin and the validator so the read,
- * cache, and parse rules live in one place. The discriminated `reason` lets
- * the validator emit precise errors while callers that just need a value can
- * fall back on `!ok`.
+ * course.config.js. Shared by the build plugin and the validator so the read
+ * and parse rules live in one place. The discriminated `reason` lets the
+ * validator emit precise errors while callers that just need a value can fall
+ * back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
-  const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
+  const read = readDefaultExport(resolve(projectRoot, COURSE_CONFIG_FILE));
   return read.ok
     ? { ok: true, config: read.value as Partial<CourseConfig> }
     : read;
@@ -303,37 +281,51 @@ export function parsePageConfigFromSource(
   }
 }
 
-/** Extract pageConfig from a .svelte file. Throws on parse failure. */
-export function extractPageConfig(filePath: string): PageConfig {
-  const result = parsePageConfigFromSource(readSourceFileCached(filePath));
-  if (result.kind === 'ok') return result.value;
-  if (result.kind === 'invalid') {
-    throw new Error(`${filePath}: pageConfig ${STATIC_LITERAL_RULE}`);
+/** Stat a directory entry, or undefined when it is gone or a symlink that does not resolve. */
+function entryStat(dirPath: string, name: string) {
+  try {
+    return statSync(resolve(dirPath, name), { throwIfNoEntry: false });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ELOOP') return undefined;
+    throw error;
   }
-  return {};
+}
+
+interface DirEntries {
+  /** Sorted folder names, dot names left out. */
+  dirs: string[];
+  /** Sorted `.svelte` file names. */
+  files: string[];
+  /** Paths of symlinks that do not resolve and that the walker would take if they did. */
+  unresolved: string[];
 }
 
 /**
- * Get sorted subdirectories of a given path.
+ * Read a directory once. A folder counts only where `holdsFolders`, and only a
+ * symlink costs a stat. A dot name is never reported as unresolved, since an
+ * editor's lock file is a dangling link named after the page beside it.
  */
-function getSortedDirs(dirPath: string): string[] {
-  if (!existsSync(dirPath)) return [];
-  return readdirSync(dirPath)
-    .filter((name) => {
-      const full = resolve(dirPath, name);
-      return statSync(full).isDirectory() && !name.startsWith('.');
-    })
-    .sort();
-}
-
-/**
- * Get .svelte files in a directory.
- */
-function getSvelteFiles(dirPath: string): string[] {
-  if (!existsSync(dirPath)) return [];
-  return readdirSync(dirPath)
-    .filter((name) => name.endsWith('.svelte'))
-    .sort();
+function readEntries(dirPath: string, holdsFolders: boolean): DirEntries {
+  const entries: DirEntries = { dirs: [], files: [], unresolved: [] };
+  if (!existsSync(dirPath)) return entries;
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const { name } = entry;
+    const hidden = name.startsWith('.');
+    const isPage = name.endsWith('.svelte');
+    const isFolder = holdsFolders && !hidden;
+    if (!isPage && !isFolder) continue;
+    const stat = entry.isSymbolicLink() ? entryStat(dirPath, name) : entry;
+    if (!stat) {
+      if (!hidden) entries.unresolved.push(resolve(dirPath, name));
+    } else if (stat.isDirectory()) {
+      if (isFolder) entries.dirs.push(name);
+    } else if (stat.isFile() && isPage) {
+      entries.files.push(name);
+    }
+  }
+  entries.dirs.sort();
+  entries.files.sort();
+  return entries;
 }
 
 // ---------- Course structure walker ----------
@@ -356,37 +348,50 @@ export interface WalkedSection {
   lessons: WalkedLesson[];
 }
 
+export interface WalkedCourse {
+  sections: WalkedSection[];
+  /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
+  strayFiles: string[];
+  /** Paths of symlinks left out of the course because they do not resolve. */
+  unresolved: string[];
+}
+
 /**
  * Enumerate the course's section → lesson → file structure. Section-level
  * `.svelte` files become an implicit flat lesson (`name: null`) ordered before
  * the section's explicit lesson directories. Shared by manifest generation and
  * build-time validation so the two never disagree on which files are pages.
  */
-export function walkPages(pagesDir: string): WalkedSection[] {
+export function walkPages(pagesDir: string): WalkedCourse {
+  const root = readEntries(pagesDir, true);
+  const { unresolved } = root;
   const sections: WalkedSection[] = [];
-  for (const sectionName of getSortedDirs(pagesDir)) {
+  for (const sectionName of root.dirs) {
     const dir = resolve(pagesDir, sectionName);
     const metaPath = resolve(dir, '_meta.js');
+    const section = readEntries(dir, true);
+    unresolved.push(...section.unresolved);
     const lessons: WalkedLesson[] = [];
 
-    const flatFiles = getSvelteFiles(dir);
-    if (flatFiles.length > 0) {
-      lessons.push({ name: null, dir, metaPath, files: flatFiles });
+    if (section.files.length > 0) {
+      lessons.push({ name: null, dir, metaPath, files: section.files });
     }
 
-    for (const lessonName of getSortedDirs(dir)) {
+    for (const lessonName of section.dirs) {
       const lessonDir = resolve(dir, lessonName);
+      const lesson = readEntries(lessonDir, false);
+      unresolved.push(...lesson.unresolved);
       lessons.push({
         name: lessonName,
         dir: lessonDir,
         metaPath: resolve(lessonDir, '_meta.js'),
-        files: getSvelteFiles(lessonDir),
+        files: lesson.files,
       });
     }
 
     sections.push({ name: sectionName, dir, metaPath, lessons });
   }
-  return sections;
+  return { sections, strayFiles: root.files, unresolved };
 }
 
 // ---------- Main ----------
@@ -396,9 +401,8 @@ export function walkPages(pagesDir: string): WalkedSection[] {
  */
 export function generateManifest(
   pagesDir: string,
-  walked: WalkedSection[] = walkPages(pagesDir),
+  walked: WalkedSection[] = walkPages(pagesDir).sections,
 ): Manifest {
-  clearParseCache();
   const sections: ManifestSection[] = [];
   const flatPages: ManifestPage[] = [];
   let pageIndex = 0;
@@ -438,21 +442,22 @@ export function generateManifest(
         const filePath = resolve(walkedLesson.dir, fileName);
         const pageSlug = deriveSlug(fileName, true);
 
-        let pageConfig: PageConfig = {};
+        // A page deleted mid-walk must not throw: in dev a throw here skips
+        // the manifest reload.
+        let source = '';
         try {
-          pageConfig = extractPageConfig(filePath);
+          source = readFileSync(filePath, 'utf-8');
         } catch (e) {
           console.warn(`[tessera warning] ${(e as Error).message}`);
         }
+        const parsed = parsePageConfigFromSource(source);
+        const pageConfig: PageConfig = parsed.kind === 'ok' ? parsed.value : {};
 
         const quiz = isRecord(pageConfig.quiz) ? pageConfig.quiz : null;
         const questions =
           pageConfig.graded === true && !quiz
             ? listedGradedQuestions(
-                findComponents(
-                  readSourceFileCached(filePath),
-                  QUESTION_COMPONENT_NAMES,
-                ) ?? [],
+                findComponents(source, QUESTION_COMPONENT_NAMES) ?? [],
               ).map((q) => q.id)
             : [];
         const page: ManifestPage = {

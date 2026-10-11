@@ -53,31 +53,55 @@ interface CacheEntry {
   error: string | null;
 }
 
-const rootCache = new Map<string, CacheEntry>();
-const jsModuleCache = new Map<string, Node | null>();
+/**
+ * Parse results keyed by source text. A run that finishes drops the entries
+ * nothing has read since the last one finished, so the next run parses only
+ * the sources that changed.
+ */
+class ParseCache<T> {
+  #entries = new Map<string, T>();
+  #read = new Set<string>();
 
-/** Drop every cached root. Call at the start of a run to scope the cache. */
-export function clearParseCache(): void {
-  rootCache.clear();
-  jsModuleCache.clear();
+  get(source: string, parseSource: (source: string) => T): T {
+    this.#read.add(source);
+    let entry = this.#entries.get(source);
+    if (entry === undefined) {
+      entry = parseSource(source);
+      this.#entries.set(source, entry);
+    }
+    return entry;
+  }
+
+  dropUnread(): void {
+    for (const source of this.#entries.keys()) {
+      if (!this.#read.has(source)) this.#entries.delete(source);
+    }
+    this.#read.clear();
+  }
+}
+
+const rootCache = new ParseCache<CacheEntry>();
+const jsModuleCache = new ParseCache<Node | null>();
+
+/** Call at the end of a run that read every source, so one cut short drops nothing. */
+export function dropUnreadParses(): void {
+  rootCache.dropUnread();
+  jsModuleCache.dropUnread();
 }
 
 function parseRoot(source: string): CacheEntry {
-  const cached = rootCache.get(source);
-  if (cached !== undefined) return cached;
-  let entry: CacheEntry;
-  try {
-    entry = {
-      root: parse(source, { modern: true }) as unknown as Node,
-      error: null,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const firstLine = message.split('\n')[0].trim();
-    entry = { root: null, error: firstLine || 'parse error' };
-  }
-  rootCache.set(source, entry);
-  return entry;
+  return rootCache.get(source, () => {
+    try {
+      return {
+        root: parse(source, { modern: true }) as unknown as Node,
+        error: null,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const firstLine = message.split('\n')[0].trim();
+      return { root: null, error: firstLine || 'parse error' };
+    }
+  });
 }
 
 function walkNodes(
@@ -263,11 +287,7 @@ function parseJs(source: string, preserveParens = false): Node | null {
 }
 
 function parseJsModule(source: string): Node | null {
-  const cached = jsModuleCache.get(source);
-  if (cached !== undefined) return cached;
-  const result = parseJs(source);
-  jsModuleCache.set(source, result);
-  return result;
+  return jsModuleCache.get(source, parseJs);
 }
 
 function unwrapExpression(node: Node | null): Node | null {
