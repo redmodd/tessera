@@ -33,6 +33,7 @@ This file holds what every task needs. The topics below live in `docs/` beside i
 | Custom question widget, quiz shell, layout, navigation or progress UI              | [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md), then [`node_modules/tessera-learn/docs/recipes.md`](docs/recipes.md) for worked examples |
 | Custom xAPI statements, a second LRS                                               | [`node_modules/tessera-learn/docs/xapi.md`](docs/xapi.md)                                                                                             |
 | Export packages, the web CSP, per-LMS behaviour, testing in an LMS                 | [`node_modules/tessera-learn/docs/export.md`](docs/export.md)                                                                                         |
+| Updating `tessera-learn` to a newer version                                        | [`node_modules/tessera-learn/docs/updating.md`](docs/updating.md)                                                                                     |
 
 ---
 
@@ -100,7 +101,7 @@ Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button u
 
 ### Updating the framework
 
-`pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so a bump needs no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
+Follow [`node_modules/tessera-learn/docs/updating.md`](docs/updating.md) instead of running `pnpm add tessera-learn@latest` on its own: an update can need workspace and course edits, and can reset learners' saved progress.
 
 ### Customising the build (optional)
 

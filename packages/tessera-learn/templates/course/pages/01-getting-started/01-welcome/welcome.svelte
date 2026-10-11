@@ -11,7 +11,7 @@
 <p>This is a basic demo page of your Tessera course.</p>
 
 <p>
-  Point your agent to <code>AGENTS.md</code> at the workspace root for the
+  Point your assistant to <code>AGENTS.md</code> at the workspace root for the
   authoring guide. The button below is imported from the workspace design system
   via <code>$shared</code>.
 </p>
