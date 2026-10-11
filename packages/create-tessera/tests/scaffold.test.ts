@@ -91,7 +91,7 @@ describe('create-tessera workspace scaffold', () => {
     expect(existsSync(resolve(ws, 'package.json'))).toBe(true);
     expect(existsSync(resolve(ws, '.gitignore'))).toBe(true);
     expect(existsSync(resolve(ws, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(resolve(ws, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(resolve(ws, 'CLAUDE.md'))).toBe(false);
     expect(existsSync(resolve(ws, 'README.md'))).toBe(true);
     expect(existsSync(resolve(ws, 'shared/Button.svelte'))).toBe(true);
     expect(existsSync(resolve(ws, 'shared/tokens.css'))).toBe(true);
@@ -207,12 +207,10 @@ describe('create-tessera workspace scaffold', () => {
     );
   });
 
-  it('scaffolds AGENTS.md/CLAUDE.md as identical root pointers, not a copy of the guide', () => {
+  it('scaffolds AGENTS.md as a root pointer, not a copy of the guide', () => {
     runCLI('my-courses', testDir);
     const ws = resolve(testDir, 'my-courses');
     const agents = readFileSync(resolve(ws, 'AGENTS.md'), 'utf-8');
-    const claude = readFileSync(resolve(ws, 'CLAUDE.md'), 'utf-8');
-    expect(claude).toBe(agents);
     expect(agents).toContain('@./node_modules/tessera-learn/AGENTS.md');
     expect(agents).toContain('## Project notes');
     expect(agents.length).toBeLessThan(2000);

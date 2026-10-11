@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,12 +77,10 @@ type Tokens = Record<string, string>;
 
 // Scaffold the workspace shell, then stamp the first course under courses/.
 function scaffold(dir: string, tokens: Tokens) {
+  // The AGENTS.md pointer lives only at the workspace root: `tessera new` never
+  // stamps one per course, and its @-import path resolves to node_modules only
+  // from here.
   copyTemplate(resolve(PKG_ROOT, 'templates/workspace'), dir, tokens);
-  // CLAUDE.md and AGENTS.md are the same pointer stub under two names so each
-  // agent finds one (Claude Code reads CLAUDE.md, others read AGENTS.md). They
-  // live only at the workspace root — `tessera new` never stamps per-course
-  // pointers, and the @-import path resolves to node_modules only from here.
-  copyFileSync(join(dir, 'AGENTS.md'), join(dir, 'CLAUDE.md'));
 
   copyTemplate(
     resolve(PKG_ROOT, 'templates', 'course'),

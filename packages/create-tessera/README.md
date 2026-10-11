@@ -37,12 +37,12 @@ The scaffolder creates a workspace directory with:
 - `package.json`: the one package — owns `tessera-learn`, Svelte, and the reserved scripts
 - `courses/starter-course/`: a seed course (`course.config.js`, `pages/`, `styles/`, …)
 - `shared/`: a design system shared across courses, imported as `$shared` (`Button.svelte`, `tokens.css`)
-- `AGENTS.md` and `CLAUDE.md`: small pointers to the authoring guide (see below)
+- `AGENTS.md`: a small pointer to the authoring guide (see below)
 - `.gitignore`
 
 A **course** is a self-contained folder under `courses/`. The workspace seeds one (`starter-course`); add more with `pnpm tessera new <name>`, which stamps `courses/<name>/` without re-installing (the workspace already owns the dependencies). Each course exports independently to its own LMS package.
 
-The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version — there's no copy to maintain in the workspace. The scaffolded `CLAUDE.md` imports it (Claude Code reads `CLAUDE.md` and loads the guide automatically); the scaffolded `AGENTS.md` points other agents (Codex, Cursor, …) at the same file. Both live at the workspace root only — open the workspace folder (not an individual course) so the guide stays in scope and `$shared` resolves.
+The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version, with no copy to maintain in the workspace. The scaffolded `AGENTS.md` points your agent (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
 
 The Vite build is owned by the `tessera` CLI: there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js` to the course folder; see the authoring guide.
 
@@ -77,7 +77,7 @@ pnpm add tessera-learn@latest
 
 To pin a specific release instead of the newest (for reproducible builds, or to avoid an unwanted major), name the version: `pnpm add tessera-learn@<version>` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
 
-The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your workspace tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically — your `CLAUDE.md` / `AGENTS.md` pointers don't change.
+The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your workspace tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically, and your `AGENTS.md` pointer doesn't change.
 
 ## Documentation
 

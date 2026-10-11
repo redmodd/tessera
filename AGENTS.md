@@ -2,7 +2,7 @@
 
 This file is for working **on Tessera itself** — the framework runtime and its tooling.
 
-> **Authoring a course?** The course authoring guide is **`packages/tessera-learn/AGENTS.md`**. That's the single canonical reference for writing course content; `tessera-learn` ships it, so it installs into every project at `node_modules/tessera-learn/AGENTS.md`. Scaffolded projects don't copy it — they get small `CLAUDE.md` / `AGENTS.md` pointers to it. Don't look here for authoring guidance.
+> **Authoring a course?** The course authoring guide is **`packages/tessera-learn/AGENTS.md`**. That's the single canonical reference for writing course content; `tessera-learn` ships it, so it installs into every project at `node_modules/tessera-learn/AGENTS.md`. Scaffolded projects don't copy it: they get a small `AGENTS.md` pointer to it. Don't look here for authoring guidance.
 
 ---
 
@@ -11,7 +11,7 @@ This file is for working **on Tessera itself** — the framework runtime and its
 A pnpm workspace with two published packages plus an end-to-end harness:
 
 - **`tessera-learn`** — the framework: an LMS-tracking runtime + Vite plugin + the `tessera` CLI. Svelte 5. One adapter layer over SCORM 1.2 / SCORM 2004 4th Edition / cmi5 / xAPI 1.0.3 / static web. Owns and ships the course authoring guide (`AGENTS.md`).
-- **`create-tessera`** — the `npm create tessera` scaffolder. Scaffolds small `CLAUDE.md` / `AGENTS.md` pointers to `tessera-learn`'s authoring guide (no copy).
+- **`create-tessera`**: the `npm create tessera` scaffolder. Scaffolds a small `AGENTS.md` pointer to `tessera-learn`'s authoring guide (no copy).
 
 The adapter layer is the spine: `createAdapter()` picks one implementation from the course's export standard, and everything downstream stays mode-agnostic.
 
@@ -24,7 +24,7 @@ const adapter = createAdapter(config); // → SCORM12 | SCORM2004 | CMI5 | XAPI 
 ```
 packages/
   tessera-learn/     # runtime + Vite plugin + tessera CLI; owns + ships AGENTS.md (the authoring guide)
-  create-tessera/    # scaffolder CLI; scaffolds CLAUDE.md/AGENTS.md pointers to the guide
+  create-tessera/    # scaffolder CLI; scaffolds an AGENTS.md pointer to the guide
 tests/
   e2e/               # Playwright specs across all export modes
   fixtures/          # course projects the e2e suite drives (committed)
@@ -56,7 +56,7 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 - **Build before e2e.** The fixtures import `tessera-learn`'s Vite plugin from its built `dist/`, so `pnpm build` must run first.
 - **Fixtures are committed and hand-tailored.** `tests/fixtures/*` are tracked source, not scaffolder output — edit them like any other code; don't regenerate them with `npm create tessera`. Only `tests/.e2e-variants/` (per-run build output) is gitignored.
 - **Five delivery modes, always.** Any change to the runtime API surface or an adapter must hold across SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / web. Prefer a unit test in `packages/tessera-learn/tests/` plus an e2e roundtrip, and note in the PR which modes you tested.
-- **The authoring guide is owned by `tessera-learn`.** Edit `packages/tessera-learn/AGENTS.md` directly — it ships in that package's `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy anywhere else: `create-tessera` scaffolds only a small pointer stub (`packages/create-tessera/templates/workspace/AGENTS.md`, copied to `CLAUDE.md` at scaffold time). The repo-root `AGENTS.md` (this file) is a separate dev guide, unrelated to the authoring guide.
+- **The authoring guide is owned by `tessera-learn`.** Edit `packages/tessera-learn/AGENTS.md` directly: it ships in that package's `files` field, so it installs into every scaffolded project at `node_modules/tessera-learn/AGENTS.md`. There is no copy anywhere else: `create-tessera` scaffolds only a small pointer stub (`packages/create-tessera/templates/workspace/AGENTS.md`). The repo-root `AGENTS.md` (this file) is a separate dev guide, unrelated to the authoring guide.
 - **Releases run on changesets; the two packages version-lock.** CI gates every PR on `pnpm changeset status --since=origin/main`, so **any PR that changes a file under a published package (`packages/tessera-learn/` or `packages/create-tessera/`) needs a `pnpm changeset`** — including no-API-impact refactors, their tests, and in-package docs. An _empty_ changeset does **not** satisfy the gate; use a real `patch` when there's no user-facing change. Only PRs confined to root-level files (root docs, CI, the top-level `tests/` suite) can skip it. `create-tessera` and `tessera-learn` release in lockstep (changesets `fixed`) — a changeset for either bumps both to the same version, which is what lets `create-tessera` pin `tessera-learn` to its own version. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Package internals
