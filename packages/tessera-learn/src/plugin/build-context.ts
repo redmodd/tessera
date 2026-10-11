@@ -57,7 +57,7 @@ export class BuildContext {
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
   #validatedConfig: ValidatedConfig | null = null;
-  #validatedSources: Map<string, string | null> | null = null;
+  #validatedSources: Map<string, string> | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
 
@@ -101,6 +101,7 @@ export class BuildContext {
   /** Throws when a source no longer holds what the build's validation read. */
   assertSourcesUnchanged(): void {
     const validated = this.#validatedSources;
+    this.#validatedSources = null;
     if (!validated) return;
     const current = readValidatedSources(this.root);
     const changed = [...new Set([...validated.keys(), ...current.keys()])]

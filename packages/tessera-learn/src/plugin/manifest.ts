@@ -394,6 +394,17 @@ export function walkPages(pagesDir: string): WalkedCourse {
   return { sections, strayFiles: root.files, unresolved };
 }
 
+/** The `_meta.js` and page paths of walked sections. A `_meta.js` may be absent. */
+export function pageSourcePaths(sections: WalkedSection[]): string[] {
+  return sections.flatMap((section) => [
+    section.metaPath,
+    ...section.lessons.flatMap((lesson) => [
+      lesson.metaPath,
+      ...lesson.files.map((file) => resolve(lesson.dir, file)),
+    ]),
+  ]);
+}
+
 // ---------- Main ----------
 
 /**

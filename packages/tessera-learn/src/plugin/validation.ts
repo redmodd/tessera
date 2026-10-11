@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { dropUnreadParses } from './ast.js';
 import {
   COURSE_CONFIG_FILE,
+  pageSourcePaths,
   readCourseConfig,
   READ_FAILURE_MESSAGES,
   walkPages,
@@ -55,30 +56,40 @@ export const VALIDATED_ROOT_FILES = [
   ...SHELL_FILES,
 ];
 
+function readIfPresent(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
 /**
- * The content of each file `validateProject` reads and a build then reads
- * again, by project-relative path, with null for a file that is absent.
+ * The content of each file `validateProject` looks at and a build then reads
+ * again, by project-relative path. A section or lesson folder is listed with a
+ * trailing separator and no content, so an empty one counts.
  * course.config.js is left out: a build keeps the read it validated.
  */
-export function readValidatedSources(
-  projectRoot: string,
-): Map<string, string | null> {
-  const paths = VALIDATED_ROOT_FILES.filter(
-    (file) => file !== COURSE_CONFIG_FILE,
-  ).map((file) => resolve(projectRoot, file));
-  for (const section of walkPages(resolve(projectRoot, 'pages')).sections) {
-    paths.push(section.metaPath);
-    for (const lesson of section.lessons) {
-      paths.push(lesson.metaPath);
-      for (const file of lesson.files) paths.push(resolve(lesson.dir, file));
-    }
+export function readValidatedSources(projectRoot: string): Map<string, string> {
+  const pagesDir = resolve(projectRoot, 'pages');
+  const { sections, strayFiles } = walkPages(pagesDir);
+  const sources = new Map<string, string>();
+  for (const { dir } of sections.flatMap((s) => [s, ...s.lessons])) {
+    sources.set(relative(projectRoot, dir) + sep, '');
   }
-  return new Map(
-    paths.map((path) => [
-      relative(projectRoot, path),
-      existsSync(path) ? readFileSync(path, 'utf-8') : null,
-    ]),
-  );
+  const files = [
+    ...VALIDATED_ROOT_FILES.filter((file) => file !== COURSE_CONFIG_FILE).map(
+      (file) => resolve(projectRoot, file),
+    ),
+    ...strayFiles.map((file) => resolve(pagesDir, file)),
+    ...pageSourcePaths(sections),
+  ];
+  for (const path of files) {
+    const source = readIfPresent(path);
+    if (source !== undefined) sources.set(relative(projectRoot, path), source);
+  }
+  return sources;
 }
 
 /**

@@ -46,7 +46,7 @@ function validatedBuild(): (name: string) => Plugin {
   writeLessonPage(projectRoot);
   const get = resolvedPlugins(projectRoot, 'build');
   const validation = get('tessera:validation');
-  (validation.buildStart as any).call(validation);
+  (validation.buildStart as any).handler.call(validation);
   return get;
 }
 
@@ -96,7 +96,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
   function renderIndexHtml(): string {
     const plugin = validatedBuild()('tessera:index-html');
-    (plugin.buildStart as any).call(plugin);
+    (plugin.buildStart as any).handler.call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
 
@@ -116,7 +116,7 @@ describe('generated index.html Content-Security-Policy', () => {
   it('refuses to read the config before validation runs', () => {
     writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
-    expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
+    expect(() => (plugin.buildStart as any).handler.call(plugin)).toThrow(
       'course.config.js has no validated snapshot',
     );
   });
@@ -128,10 +128,10 @@ describe('generated index.html Content-Security-Policy', () => {
     const validation = get('tessera:validation');
     const plugin = get('tessera:index-html');
     writeConfigSource('export default {');
-    expect(() => (validation.buildStart as any).call(validation)).toThrow(
-      'Tessera validation failed',
-    );
-    expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
+    expect(() =>
+      (validation.buildStart as any).handler.call(validation),
+    ).toThrow('Tessera validation failed');
+    expect(() => (plugin.buildStart as any).handler.call(plugin)).toThrow(
       'course.config.js has no validated snapshot',
     );
   });
@@ -200,7 +200,7 @@ describe('export packaging gate', () => {
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
-    (entry.buildStart as any).call(entry);
+    (entry.buildStart as any).handler.call(entry);
     (get('tessera:manifest').load as any).handler.call({
       addWatchFile() {},
     });
@@ -455,7 +455,9 @@ describe('export packaging gate', () => {
     writeConfigSource(
       'export default { title: "Course", export: { standard: "scorm12" }, resume: "sometimes" };',
     );
-    expect(() => (validation.buildStart as any).call(validation)).toThrow();
+    expect(() =>
+      (validation.buildStart as any).handler.call(validation),
+    ).toThrow();
 
     for (let i = 0; i < 2; i++) {
       (entry.closeBundle as any).call(entry);
@@ -510,6 +512,17 @@ describe('sources changed after validation', () => {
       'course.runtime.js',
       (path) => writeFileSync(path, 'export const xapi = {};'),
     ],
+    [
+      'a page added outside the section/lesson structure',
+      'pages/stray.svelte',
+      (path) => writeFileSync(path, '<h1>Stray</h1>'),
+    ],
+    ['an added empty section', 'pages/02-empty/', (path) => mkdirSync(path)],
+    [
+      'an added empty lesson',
+      'pages/01-section/02-empty/',
+      (path) => mkdirSync(path),
+    ],
   ])('fails the build on %s', (_change, file, change) => {
     const validation = validatedPlugin();
     change(resolve(projectRoot, file));
@@ -534,9 +547,9 @@ describe('sources changed after validation', () => {
       resolve(projectRoot, page),
       '<script module>\nexport const pageConfig = { title: someTitle };\n</script>',
     );
-    expect(() => (validation.buildStart as any).call(validation)).toThrow(
-      'Tessera validation failed',
-    );
+    expect(() =>
+      (validation.buildStart as any).handler.call(validation),
+    ).toThrow('Tessera validation failed');
     expect(() => buildEnd(validation)).not.toThrow();
   });
 });

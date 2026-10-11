@@ -12,6 +12,7 @@ import {
 import {
   COURSE_CONFIG_FILE,
   generateManifest,
+  pageSourcePaths,
   walkPages,
   type CourseConfigRead,
   type Manifest,
@@ -158,16 +159,20 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
     name: 'tessera:index-html',
     enforce: 'pre',
 
-    // For build mode: write index.html so Rollup can find it
-    buildStart() {
-      if (ctx.isBuild) {
-        const read = ctx.validatedConfig();
-        writeFileSync(
-          resolve(ctx.root, 'index.html'),
-          generateIndexHtml(readLanguage(read), cspMeta(read)),
-          'utf-8',
-        );
-      }
+    // For build mode: write index.html so Rollup can find it. The validation
+    // it reads is ordered 'post', so this is too.
+    buildStart: {
+      order: 'post',
+      handler() {
+        if (ctx.isBuild) {
+          const read = ctx.validatedConfig();
+          writeFileSync(
+            resolve(ctx.root, 'index.html'),
+            generateIndexHtml(readLanguage(read), cspMeta(read)),
+            'utf-8',
+          );
+        }
+      },
     },
 
     // For build mode: clean up temporary index.html
@@ -465,8 +470,13 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       }
     },
 
-    buildStart() {
-      if (ctx.isBuild) ctx.validate();
+    // After every other plugin's buildStart, so a source one of them writes
+    // there is validated.
+    buildStart: {
+      order: 'post',
+      handler() {
+        if (ctx.isBuild) ctx.validate();
+      },
     },
 
     // Every module is loaded by now, and nothing is written yet.
@@ -588,15 +598,8 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
       const { sections } = walkPages(pagesDir);
       ctx.manifest = generateManifest(pagesDir, sections);
 
-      for (const section of sections) {
-        for (const { metaPath } of [section, ...section.lessons]) {
-          if (existsSync(metaPath)) this.addWatchFile(metaPath);
-        }
-        for (const lesson of section.lessons) {
-          for (const file of lesson.files) {
-            this.addWatchFile(resolve(lesson.dir, file));
-          }
-        }
+      for (const path of pageSourcePaths(sections)) {
+        if (existsSync(path)) this.addWatchFile(path);
       }
 
       loaded = manifestModule(ctx.manifest);
