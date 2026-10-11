@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'svelte/compiler';
 import {
@@ -442,6 +442,21 @@ describe('generateManifest', () => {
     validateProject(projectRoot);
 
     expect(parse).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the parsed pages through a validation that cannot find course.config.js', () => {
+    const projectRoot = validProject();
+    const config = resolve(projectRoot, 'course.config.js');
+    const source = readFileSync(config, 'utf-8');
+
+    validateProject(projectRoot);
+    rmSync(config);
+    validateProject(projectRoot);
+    writeFileSync(config, source);
+    vi.mocked(parse).mockClear();
+    validateProject(projectRoot);
+
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('generates correct manifest for standard course structure', () => {

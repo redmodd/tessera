@@ -1,4 +1,4 @@
-import { startParseRun } from './ast.js';
+import { dropUnreadParses } from './ast.js';
 import {
   COURSE_CONFIG_FILE,
   readCourseConfig,
@@ -61,7 +61,6 @@ export function validateProject(
   standardOverride?: StandardId,
   read: CourseConfigRead = readCourseConfig(projectRoot),
 ): Diagnostics {
-  startParseRun();
   const d = new Diagnostics();
   d.partial = !read.ok;
 
@@ -79,6 +78,7 @@ export function validateProject(
   });
 
   const pageResults = validatePages(projectRoot, d, profile);
+  d.courseChecksSkipped = pageResults.hasParseErrors;
 
   validateShells(projectRoot, d);
 
@@ -88,5 +88,6 @@ export function validateProject(
 
   if (config) applyA11ySettings(d, normalizeA11y(config.a11y));
   else dropA11yDiagnostics(d);
+  dropUnreadParses();
   return d;
 }

@@ -9,6 +9,7 @@ import {
   symlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { EventEmitter } from 'node:events';
 import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
 import * as validationModule from '../src/plugin/validation.js';
@@ -540,10 +541,12 @@ describe('dev revalidation', () => {
   });
 
   const lessonDir = 'pages/01-section/01-lesson';
+  let watcher: EventEmitter;
 
   // Vite runs the hook configureServer returns once every plugin has configured the server.
   function configure(validation: Plugin): void {
-    (validation.configureServer as any).call(validation)();
+    watcher = new EventEmitter();
+    (validation.configureServer as any).call(validation, { watcher })();
   }
 
   function startDev(): Plugin {
@@ -569,6 +572,14 @@ describe('dev revalidation', () => {
   async function hotUpdate(...change: Parameters<typeof notify>) {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     notify(...change);
+    await vi.runAllTimersAsync();
+    return errors;
+  }
+
+  // The watcher reports a folder to its own listeners, not to the hotUpdate hook.
+  async function folderChange(event: 'addDir' | 'unlinkDir', dir: string) {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    watcher.emit(event, resolve(projectRoot, dir));
     await vi.runAllTimersAsync();
     return errors;
   }
@@ -615,6 +626,25 @@ describe('dev revalidation', () => {
       expect(read).not.toHaveBeenCalled();
     },
   );
+
+  it.each(['addDir', 'unlinkDir'] as const)(
+    'revalidates on a folder %s under pages/',
+    async (event) => {
+      startDev();
+      writeConfigSource('export default {');
+
+      expect(
+        await folderChange(event, 'pages/02-empty'),
+      ).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('does not revalidate on a folder change outside pages/', async () => {
+    startDev();
+    writeConfigSource('export default {');
+
+    expect(await folderChange('addDir', 'assets/icons')).not.toHaveBeenCalled();
+  });
 
   it.each(['assets', lessonDir])(
     'validates once for files the watcher reports apart under %s',
@@ -756,7 +786,9 @@ describe('dev revalidation', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const failed = findPlugin('tessera:validation', 'serve');
-    (failed.configureServer as any).call(failed);
+    (failed.configureServer as any).call(failed, {
+      watcher: new EventEmitter(),
+    });
 
     writeConfigSource('export default {');
     const validation = findPlugin('tessera:validation', 'serve');
@@ -834,6 +866,12 @@ describe('dev revalidation', () => {
   const scormConfig = (endpoint: string) =>
     `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "${endpoint}", activityId: "https://example.com/course", auth: "eDp5", actorAccountHomePage: "https://example.com" } };`;
 
+  const writeGradedPage = (name: string, weight?: number) =>
+    writeFileSync(
+      resolve(projectRoot, lessonDir, name),
+      `<script module>export const pageConfig = { graded: true${weight ? `, weight: ${weight}` : ''} };</script>`,
+    );
+
   it.each<[string, string, () => void, () => void]>([
     [
       'unknown field "extra"',
@@ -853,18 +891,22 @@ describe('dev revalidation', () => {
       () => writeFileSync(resolve(projectRoot, 'pages/stray.svelte'), ''),
       () => rmSync(resolve(projectRoot, 'pages/stray.svelte')),
     ],
-    [
-      'section contributed no pages',
-      'pages/02-empty/page.svelte',
-      () => mkdirSync(resolve(projectRoot, 'pages/02-empty')),
-      () => rmSync(resolve(projectRoot, 'pages/02-empty'), { recursive: true }),
-    ],
+    // The watcher reports nothing for a link that does not resolve, so another save stands in.
     [
       'symlink does not resolve',
-      `${lessonDir}/gone.svelte`,
+      `${lessonDir}/page.svelte`,
       () =>
         symlinkSync('missing', resolve(projectRoot, lessonDir, 'gone.svelte')),
       () => rmSync(resolve(projectRoot, lessonDir, 'gone.svelte')),
+    ],
+    [
+      'graded without a pageConfig.weight',
+      `${lessonDir}/unweighted.svelte`,
+      () => {
+        writeGradedPage('weighted.svelte', 2);
+        writeGradedPage('unweighted.svelte');
+      },
+      () => rmSync(resolve(projectRoot, lessonDir, 'unweighted.svelte')),
     ],
   ])(
     'reports a "%s" warning that comes back while an unrelated error stands',
@@ -890,6 +932,24 @@ describe('dev revalidation', () => {
       expect(warnings).toHaveBeenCalledWith(expected);
     },
   );
+
+  it('reports an empty section again when its folder comes back', async () => {
+    startDev();
+    const warnings = vi.mocked(console.warn);
+    const expected = expect.stringContaining('section contributed no pages');
+    const dir = 'pages/02-empty';
+
+    mkdirSync(resolve(projectRoot, dir));
+    await folderChange('addDir', dir);
+    expect(warnings).toHaveBeenCalledWith(expected);
+    rmSync(resolve(projectRoot, dir), { recursive: true });
+    await folderChange('unlinkDir', dir);
+    warnings.mockClear();
+
+    mkdirSync(resolve(projectRoot, dir));
+    await folderChange('addDir', dir);
+    expect(warnings).toHaveBeenCalledWith(expected);
+  });
 
   it('reports a warning that comes back on one page while another cannot be parsed', async () => {
     const validation = startDev();

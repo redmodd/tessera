@@ -54,37 +54,39 @@ interface CacheEntry {
 }
 
 /**
- * Parse results keyed by source text. An entry lives through the run that used
- * it and the one after, so a run parses only the sources that changed since
- * the last one and a source no run reads any more is dropped.
+ * Parse results keyed by source text. A run that finishes drops the entries
+ * nothing has read since the last one finished, so the next run parses only
+ * the sources that changed.
  */
 class ParseCache<T> {
-  #current = new Map<string, T>();
-  #previous = new Map<string, T>();
-
-  startRun(): void {
-    this.#previous = this.#current;
-    this.#current = new Map();
-  }
+  #entries = new Map<string, T>();
+  #read = new Set<string>();
 
   get(source: string, parseSource: (source: string) => T): T {
-    let entry = this.#current.get(source);
+    this.#read.add(source);
+    let entry = this.#entries.get(source);
     if (entry === undefined) {
-      entry = this.#previous.get(source);
-      if (entry === undefined) entry = parseSource(source);
-      this.#current.set(source, entry);
+      entry = parseSource(source);
+      this.#entries.set(source, entry);
     }
     return entry;
+  }
+
+  dropUnread(): void {
+    for (const source of this.#entries.keys()) {
+      if (!this.#read.has(source)) this.#entries.delete(source);
+    }
+    this.#read.clear();
   }
 }
 
 const rootCache = new ParseCache<CacheEntry>();
 const jsModuleCache = new ParseCache<Node | null>();
 
-/** Call at the start of a run, so the cache keeps only what the last run used. */
-export function startParseRun(): void {
-  rootCache.startRun();
-  jsModuleCache.startRun();
+/** Call at the end of a run that read every source, so one cut short drops nothing. */
+export function dropUnreadParses(): void {
+  rootCache.dropUnread();
+  jsModuleCache.dropUnread();
 }
 
 function parseRoot(source: string): CacheEntry {

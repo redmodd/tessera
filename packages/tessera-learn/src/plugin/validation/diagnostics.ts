@@ -14,6 +14,8 @@ export class Diagnostics implements ValidationResult {
   infos: string[] = [];
   /** Set when the config, the runtime file or the export standard could not be read, so a check on any source may have been skipped. */
   partial = false;
+  /** Set when a page could not be parsed, so the checks on the course as a whole skipped what needs every page. */
+  courseChecksSkipped = false;
   #source: string | undefined;
   #sources = new Map<string, string>();
 
@@ -52,13 +54,13 @@ export class Diagnostics implements ValidationResult {
 
   /**
    * Whether a warning or note an earlier run raised for `source` may still
-   * stand though this run did not repeat it. An error can end a source's
-   * checks early, and the course-wide checks need every source.
+   * stand though this run did not repeat it. An error on a source can end
+   * its checks early.
    */
   mayStand(source: string | undefined): boolean {
     if (this.partial) return true;
     return source === undefined
-      ? this.errors.length > 0
+      ? this.courseChecksSkipped
       : this.errors.some((error) => this.sourceOf(error) === source);
   }
 }

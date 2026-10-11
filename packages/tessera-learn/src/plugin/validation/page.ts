@@ -1,12 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import {
-  getSvelteFiles,
   parsePageConfigFromSource,
   readMetaFile,
   ensureSvelteSuffix,
   orderPageFiles,
-  unresolvedSymlinks,
   walkPages,
   isLiterallyGradedQuestion,
   listedGradedQuestions,
@@ -247,8 +245,8 @@ export function validatePages(
     const rel = relative(projectRoot, path);
     d.within(rel, () => d.warn(`${rel}: ${message}`));
   };
-  const warnUnresolvedSymlinks = (dir: string, holdsFolders: boolean) => {
-    for (const name of unresolvedSymlinks(dir, holdsFolders)) {
+  const warnUnresolvedSymlinks = (dir: string, names: string[]) => {
+    for (const name of names) {
       warnAbout(
         resolve(dir, name),
         'symlink does not resolve, so it is left out of the course',
@@ -256,23 +254,23 @@ export function validatePages(
     }
   };
 
-  // walkPages only descends into section dirs, so scan pages/ root separately.
-  for (const entry of getSvelteFiles(pagesDir)) {
+  const course = walkPages(pagesDir);
+  for (const entry of course.strayFiles) {
     warnAbout(
       resolve(pagesDir, entry),
       'this file is outside the section/lesson structure and will be ignored',
     );
   }
-  warnUnresolvedSymlinks(pagesDir, true);
+  warnUnresolvedSymlinks(pagesDir, course.unresolved);
 
-  for (const section of walkPages(pagesDir)) {
+  for (const section of course.sections) {
     const pagesBeforeSection = pages.length;
 
     const sectionMeta = validateMeta(section.metaPath);
-    warnUnresolvedSymlinks(section.dir, true);
+    warnUnresolvedSymlinks(section.dir, section.unresolved);
 
     for (const lesson of section.lessons) {
-      if (lesson.name !== null) warnUnresolvedSymlinks(lesson.dir, false);
+      warnUnresolvedSymlinks(lesson.dir, lesson.unresolved);
       // Flat lesson uses the section _meta, already validated above.
       const meta =
         lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);

@@ -291,58 +291,41 @@ function entryStat(dirPath: string, name: string) {
   }
 }
 
-/** Sorted names of a directory's entries of one kind. Only a symlink costs a stat, and one that does not resolve is neither kind. */
-function entryNames(
-  dirPath: string,
-  kind: 'isFile' | 'isDirectory',
-  wanted: (name: string) => boolean,
-): string[] {
-  if (!existsSync(dirPath)) return [];
-  return readdirSync(dirPath, { withFileTypes: true })
-    .filter(
-      (entry) =>
-        wanted(entry.name) &&
-        (entry.isSymbolicLink() ? entryStat(dirPath, entry.name) : entry)?.[
-          kind
-        ](),
-    )
-    .map((entry) => entry.name)
-    .sort();
+interface DirEntries {
+  /** Sorted folder names, dot names left out. */
+  dirs: string[];
+  /** Sorted `.svelte` file names. */
+  files: string[];
+  /** Symlinks that do not resolve and that the walker would take if they did. */
+  unresolved: string[];
 }
 
 /**
- * Get sorted subdirectories of a given path.
+ * Read a directory once. A folder counts only where `holdsFolders`, and only a
+ * symlink costs a stat. A dot name is never reported as unresolved, since an
+ * editor's lock file is a dangling link named after the page beside it.
  */
-function getSortedDirs(dirPath: string): string[] {
-  return entryNames(dirPath, 'isDirectory', (name) => !name.startsWith('.'));
-}
-
-/**
- * Get .svelte files in a directory.
- */
-export function getSvelteFiles(dirPath: string): string[] {
-  return entryNames(dirPath, 'isFile', (name) => name.endsWith('.svelte'));
-}
-
-/**
- * Names of the symlinks in a directory that do not resolve and that the walker
- * would take if they did: a page, or a folder where `holdsFolders`. Dot names
- * are left out, since an editor's lock file is a dangling link named after the
- * page beside it.
- */
-export function unresolvedSymlinks(
-  dirPath: string,
-  holdsFolders: boolean,
-): string[] {
-  return readdirSync(dirPath, { withFileTypes: true })
-    .filter(
-      (entry) =>
-        entry.isSymbolicLink() &&
-        !entry.name.startsWith('.') &&
-        (holdsFolders || entry.name.endsWith('.svelte')) &&
-        !entryStat(dirPath, entry.name),
-    )
-    .map((entry) => entry.name);
+function readEntries(dirPath: string, holdsFolders: boolean): DirEntries {
+  const entries: DirEntries = { dirs: [], files: [], unresolved: [] };
+  if (!existsSync(dirPath)) return entries;
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const { name } = entry;
+    const hidden = name.startsWith('.');
+    const isPage = name.endsWith('.svelte');
+    const isFolder = holdsFolders && !hidden;
+    if (!isPage && !isFolder) continue;
+    const stat = entry.isSymbolicLink() ? entryStat(dirPath, name) : entry;
+    if (!stat) {
+      if (!hidden) entries.unresolved.push(name);
+    } else if (stat.isDirectory()) {
+      if (isFolder) entries.dirs.push(name);
+    } else if (stat.isFile() && isPage) {
+      entries.files.push(name);
+    }
+  }
+  entries.dirs.sort();
+  entries.files.sort();
+  return entries;
 }
 
 // ---------- Course structure walker ----------
@@ -356,6 +339,8 @@ export interface WalkedLesson {
   metaPath: string;
   /** Sorted raw `.svelte` filenames in `dir` (pre-ordering). */
   files: string[];
+  /** Symlinks in `dir` left out because they do not resolve. A flat lesson's are its section's. */
+  unresolved: string[];
 }
 
 export interface WalkedSection {
@@ -363,6 +348,14 @@ export interface WalkedSection {
   dir: string;
   metaPath: string;
   lessons: WalkedLesson[];
+  unresolved: string[];
+}
+
+export interface WalkedCourse {
+  sections: WalkedSection[];
+  /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
+  strayFiles: string[];
+  unresolved: string[];
 }
 
 /**
@@ -371,31 +364,45 @@ export interface WalkedSection {
  * the section's explicit lesson directories. Shared by manifest generation and
  * build-time validation so the two never disagree on which files are pages.
  */
-export function walkPages(pagesDir: string): WalkedSection[] {
-  const sections: WalkedSection[] = [];
-  for (const sectionName of getSortedDirs(pagesDir)) {
+export function walkPages(pagesDir: string): WalkedCourse {
+  const root = readEntries(pagesDir, true);
+  const sections = root.dirs.map((sectionName): WalkedSection => {
     const dir = resolve(pagesDir, sectionName);
     const metaPath = resolve(dir, '_meta.js');
+    const section = readEntries(dir, true);
     const lessons: WalkedLesson[] = [];
 
-    const flatFiles = getSvelteFiles(dir);
-    if (flatFiles.length > 0) {
-      lessons.push({ name: null, dir, metaPath, files: flatFiles });
+    if (section.files.length > 0) {
+      lessons.push({
+        name: null,
+        dir,
+        metaPath,
+        files: section.files,
+        unresolved: [],
+      });
     }
 
-    for (const lessonName of getSortedDirs(dir)) {
+    for (const lessonName of section.dirs) {
       const lessonDir = resolve(dir, lessonName);
+      const { files, unresolved } = readEntries(lessonDir, false);
       lessons.push({
         name: lessonName,
         dir: lessonDir,
         metaPath: resolve(lessonDir, '_meta.js'),
-        files: getSvelteFiles(lessonDir),
+        files,
+        unresolved,
       });
     }
 
-    sections.push({ name: sectionName, dir, metaPath, lessons });
-  }
-  return sections;
+    return {
+      name: sectionName,
+      dir,
+      metaPath,
+      lessons,
+      unresolved: section.unresolved,
+    };
+  });
+  return { sections, strayFiles: root.files, unresolved: root.unresolved };
 }
 
 // ---------- Main ----------
@@ -405,7 +412,7 @@ export function walkPages(pagesDir: string): WalkedSection[] {
  */
 export function generateManifest(
   pagesDir: string,
-  walked: WalkedSection[] = walkPages(pagesDir),
+  walked: WalkedSection[] = walkPages(pagesDir).sections,
 ): Manifest {
   const sections: ManifestSection[] = [];
   const flatPages: ManifestPage[] = [];

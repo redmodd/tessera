@@ -409,7 +409,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     name: 'tessera:validation',
     enforce: 'pre',
 
-    configureServer() {
+    configureServer(server) {
       let session = devSessions.get(ctx.root);
       if (session) {
         // The restart joins a burst still waiting, so the two validate once.
@@ -425,6 +425,15 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
         remember(session, ctx.validate());
       }
       const opened = session;
+      // The hotUpdate hook covers files only, and a folder alone can add or
+      // remove an empty section.
+      const pagesDir = resolve(ctx.root, 'pages');
+      const onFolderChange = (dir: string) => {
+        if (isInside(pagesDir, dir)) opened.changes.settle(revalidate);
+      };
+      server.watcher
+        .on('addDir', onFolderChange)
+        .on('unlinkDir', onFolderChange);
       // Counted once every plugin has configured the server: a server that
       // fails before then never starts, so it is never closed either.
       return () => {
@@ -571,7 +580,7 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
     'virtual:tessera-manifest',
     function () {
       const pagesDir = resolve(ctx.root, 'pages');
-      const sections = walkPages(pagesDir);
+      const { sections } = walkPages(pagesDir);
       ctx.manifest = generateManifest(pagesDir, sections);
 
       for (const section of sections) {
