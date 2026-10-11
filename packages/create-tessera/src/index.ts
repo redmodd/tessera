@@ -42,7 +42,9 @@ Examples:
 Add more courses to an existing workspace from its root:
   pnpm tessera new <name>
 
-To update the framework, bump the dependency from the workspace root:
+To update the framework, read the changelog first:
+  https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md
+Then bump the dependency from the workspace root:
   pnpm add tessera-learn@latest
 `;
 

@@ -100,7 +100,14 @@ Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button u
 
 ### Updating the framework
 
-Before bumping, read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) (not in `node_modules`) for every version between the installed one and the target. Apply the course changes it lists, and warn the author before installing a release that resets learners' saved progress. Then `pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so those need no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
+1. Note the installed version: `version` in `node_modules/tessera-learn/package.json`.
+2. `pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin).
+3. Read `node_modules/tessera-learn/CHANGELOG.md` for every version above the old one, up to the one now installed.
+4. Apply the course changes those entries list, in every course. Entries labelled **Breaking** or **Behavior change** always need a look.
+5. Run `pnpm validate <course>` on every course and fix what it reports.
+6. Before the author exports, tell them about every entry that says saved progress or saved state is reset or discarded: learners start over when the re-exported course replaces the old one in the LMS. To stay on the old version, `pnpm add tessera-learn@<old version>`.
+
+The framework owns the build, reserved scripts and this guide, so those need no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
 
 ### Customising the build (optional)
 

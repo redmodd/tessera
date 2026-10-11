@@ -32,7 +32,7 @@ This scaffolds a [workspace](https://tesseralearn.dev/docs/workspace/) with one 
 
 ## Commands
 
-Every command works on one course. Name it, or `cd` into the course folder and leave the name off.
+Every command works on one course. Name it, or `cd` into the course folder and leave the name off. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
 
 ```bash
 pnpm dev <course>       # live preview, hot-reloads as you edit
@@ -63,7 +63,7 @@ Tessera is a runtime built on Svelte and Vite, and pages are `.svelte` files, so
 
 ## Updating an existing workspace
 
-From the workspace root, run `pnpm add tessera-learn@latest`. Every course moves together. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](./packages/tessera-learn/CHANGELOG.md) first, or ask your assistant to apply it for you. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) for details.
+Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](./packages/tessera-learn/CHANGELOG.md) before you update. Then, from the workspace root, run `pnpm add tessera-learn@latest`. Every course moves together. Or ask your assistant to do the update, and tell it to read the changelog and apply what changed. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) for details.
 
 ## Documentation
 

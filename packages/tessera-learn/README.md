@@ -16,6 +16,10 @@ pnpm create tessera@latest my-courses
 
 That creates a [workspace](https://tesseralearn.dev/docs/workspace/) with Tessera wired up, a seed course, and a root `AGENTS.md` that points to the authoring guide. Add more courses with `pnpm tessera new <name>`.
 
+## Updating
+
+Some releases change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) before you update. Then run `pnpm add tessera-learn@latest` from the workspace root.
+
 ## What's included
 
 - **Hooks** (`tessera-learn`): `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`, `useXAPI`.

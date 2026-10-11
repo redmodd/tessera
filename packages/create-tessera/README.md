@@ -37,11 +37,13 @@ Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md` or `CL
 
 ## Updating an existing workspace
 
-Updating is a plain dependency bump: there is no `create-tessera upgrade` verb. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first, or ask your assistant to apply it for you. Then, from the workspace root:
+There is no `create-tessera upgrade` verb: you update by bumping the `tessera-learn` dependency. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first. Then, from the workspace root:
 
 ```bash
 pnpm add tessera-learn@latest
 ```
+
+Or ask your assistant to do the update, and tell it to read the changelog and apply what changed. After the update, the changelog is also at `node_modules/tessera-learn/CHANGELOG.md`.
 
 Every course moves together, and the authoring guide updates with the dependency. To pin a specific release instead of the newest, name the version: `pnpm add tessera-learn@<version>`.
 

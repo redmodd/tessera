@@ -39,6 +39,7 @@
     "AGENTS.md",
     "docs",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "exports": {
