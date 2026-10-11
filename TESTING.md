@@ -72,12 +72,17 @@ pnpm exec playwright test --headed --project=free-mode
 pnpm exec playwright test --debug tests/e2e/navigation.spec.ts
 ```
 
-A failed test leaves its artifacts in `test-results/`. The suite writes no HTML report or trace on a local run, so ask for one when you need it:
+A failed test leaves an `error-context.md` and a `trace.zip` in `test-results/`. Open the trace with:
+
+```bash
+pnpm exec playwright show-trace test-results/<test>/trace.zip
+```
+
+The suite writes no HTML report. Ask for one when you want a browsable summary:
 
 ```bash
 pnpm exec playwright test --reporter=html   # writes playwright-report/
 pnpm exec playwright show-report
-pnpm exec playwright test --trace on        # a trace.zip per test under test-results/
 ```
 
 ## How the e2e suite is wired
@@ -146,7 +151,7 @@ If you change a fixture's content, treat it like any other source change: commit
 CI uploads these artifacts:
 
 - `coverage-24` and `coverage-26`: `packages/*/coverage/` from each unit-test job, on every run
-- `playwright-report`: `test-results/` from the e2e job when it fails, with a trace for each test that failed and was retried
+- `playwright-report`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
 
 Download from the failed run's Actions page. For Playwright traces:
 

@@ -19,7 +19,7 @@ export default defineConfig({
   // fixture and rebuilding mid-suite.
   globalSetup: './tests/e2e/global-setup.ts',
   use: {
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   // Each test file gets its own BrowserContext, so localStorage and per-test
   // state are isolated. GitHub-hosted ubuntu runners have 4 cores; cap workers
