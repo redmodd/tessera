@@ -20,6 +20,8 @@ tests/.e2e-variants/
 # Logs
 *.log
 docs
+# The authoring guide's reference files ship in the package.
+!/packages/tessera-learn/docs/
 
 # Secrets
 .env
