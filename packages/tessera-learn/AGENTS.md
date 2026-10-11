@@ -1,5 +1,7 @@
 # AGENTS.md: Tessera Course Authoring Guide
 
+> **Scope:** authoring courses in a Tessera workspace. In the framework monorepo (where this file is `packages/tessera-learn/AGENTS.md`) these rules do not govern framework source: follow the repo-root `AGENTS.md`, and update this guide when a change alters what it documents.
+
 Tessera is an LMS-tracking runtime for interactive learning content (SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / static web). It owns tracking, progress, completion/success rollup, persistence, and navigation gating. You own the presentation layer.
 
 This is the canonical reference for authoring a Tessera course. Read it before generating or editing course code. You are reading `node_modules/tessera-learn/AGENTS.md`; it updates when you bump `tessera-learn`.
@@ -23,14 +25,14 @@ This is the canonical reference for authoring a Tessera course. Read it before g
 
 ## Reference files
 
-This file holds what every task needs. The topics below live in `docs/` beside it (`node_modules/tessera-learn/docs/`). **Read the matching file before starting such a task.**
+This file holds what every task needs. The topics below live in `docs/` beside it. **Read the matching file before starting such a task.** Link paths in this guide are relative to this file: open `docs/scoring.md` as `node_modules/tessera-learn/docs/scoring.md`.
 
-| Task                                                                               | Read                                                                                            |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Graded pages, course score weighting, optional pages, pass/fail, manual completion | [`docs/scoring.md`](docs/scoring.md)                                                            |
-| Custom question widget, quiz shell, layout, navigation or progress UI              | [`docs/hooks.md`](docs/hooks.md), then [`docs/recipes.md`](docs/recipes.md) for worked examples |
-| Custom xAPI statements, a second LRS                                               | [`docs/xapi.md`](docs/xapi.md)                                                                  |
-| Export packages, the web CSP, per-LMS behaviour, testing in an LMS                 | [`docs/export.md`](docs/export.md)                                                              |
+| Task                                                                               | Read                                                                                                                                                  |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Graded pages, course score weighting, optional pages, pass/fail, manual completion | [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md)                                                                                       |
+| Custom question widget, quiz shell, layout, navigation or progress UI              | [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md), then [`node_modules/tessera-learn/docs/recipes.md`](docs/recipes.md) for worked examples |
+| Custom xAPI statements, a second LRS                                               | [`node_modules/tessera-learn/docs/xapi.md`](docs/xapi.md)                                                                                             |
+| Export packages, the web CSP, per-LMS behaviour, testing in an LMS                 | [`node_modules/tessera-learn/docs/export.md`](docs/export.md)                                                                                         |
 
 ---
 
@@ -187,9 +189,9 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 ## Authoring Surfaces
 
 1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
-2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime. See [`docs/hooks.md`](docs/hooks.md).
+2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime. See [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md).
 3. **Custom layout**: `layout.svelte` at the course root replaces the default chrome. See [Custom Layouts](docs/recipes.md#custom-layouts).
-4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`.
+4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`. See [`useQuiz`](docs/hooks.md#usequiz) and [Recipe 2](docs/recipes.md#recipe-2-custom-quiz-shell-via-quizsvelte).
 5. **Custom xAPI**: `useXAPI()` emits your own verbs. See [Custom xAPI](docs/xapi.md#custom-xapi-statements).
 6. **Runtime hooks**: `course.runtime.js` at the course root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
 
@@ -405,7 +407,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 Pass `weight` (default 1; non-positive or non-finite counts as 1) to change how much a question pulls on the page score, inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places. In a quiz each `score` is 0 or 100; standalone it is what `score()` returns, clamped to 0–100. Weights change the page score only: each question is still reported to the LMS as one pass/fail interaction.
 
-Per-page weighting, optional pages, pass/fail and manual completion are in [`docs/scoring.md`](docs/scoring.md).
+Per-page weighting, optional pages, pass/fail and manual completion are in [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md).
 
 ### Question types
 
@@ -630,7 +632,7 @@ export function canAccess(ctx) {
 
 `AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. `canAccess` replaces the preset, so compose with it: `resolveAccess(config)` returns the preset for `navigation.mode`, and `freeAccess` / `sequentialAccess` are re-exported.
 
-Build output, the web export CSP and per-LMS behaviour are in [`docs/export.md`](docs/export.md).
+Build output, the web export CSP and per-LMS behaviour are in [`node_modules/tessera-learn/docs/export.md`](docs/export.md).
 
 ### Validation
 

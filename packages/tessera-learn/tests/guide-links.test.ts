@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const PKG_ROOT = resolve(import.meta.dirname, '..');
 const GUIDE_FILES = [
   'AGENTS.md',
-  ...readdirSync(resolve(PKG_ROOT, 'docs'))
+  ...readdirSync(resolve(PKG_ROOT, 'docs'), {
+    recursive: true,
+    encoding: 'utf-8',
+  })
     .filter((file) => file.endsWith('.md'))
     .map((file) => `docs/${file}`),
 ];
+const SHIPPED = new Set(GUIDE_FILES.map((file) => resolve(PKG_ROOT, file)));
 
 function prose(file: string): string {
   return readFileSync(file, 'utf-8').replace(/^```[\s\S]*?^```/gm, '');
@@ -33,7 +37,7 @@ describe('authoring guide links', () => {
       /\]\((?!https?:)([^)#]*)(?:#([^)]+))?\)/g,
     )) {
       const targetPath = target ? resolve(dirname(path), target) : path;
-      if (!existsSync(targetPath)) broken.push(target);
+      if (!SHIPPED.has(targetPath)) broken.push(target);
       else if (anchor && !anchors(targetPath).has(anchor))
         broken.push(`${target}#${anchor}`);
     }
@@ -42,6 +46,7 @@ describe('authoring guide links', () => {
 
   it('routes to every reference file from AGENTS.md', () => {
     const core = readFileSync(resolve(PKG_ROOT, 'AGENTS.md'), 'utf-8');
-    for (const file of GUIDE_FILES.slice(1)) expect(core).toContain(file);
+    for (const file of GUIDE_FILES.slice(1))
+      expect(core).toContain(`node_modules/tessera-learn/${file}`);
   });
 });
