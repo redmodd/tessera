@@ -89,21 +89,21 @@ pnpm exec playwright show-report
 
 Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Nine projects each target a different fixture / mode:
 
-| Project           | Port | Fixture                         | Specs                                              |
-| ----------------- | ---- | ------------------------------- | -------------------------------------------------- |
-| `free-mode`       | 5180 | `tests/fixtures/free`           | most non-mode-specific specs                       |
-| `sequential-mode` | 5181 | `tests/fixtures/sequential`     | `sequential.spec.ts`                               |
-| `custom-layout`   | 5182 | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`                          |
-| `custom-quiz`     | 5183 | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`                              |
-| `mobile`          | 5180 | `tests/fixtures/free` (375x667) | `mobile.spec.ts`                                   |
-| `export`          | n/a  | pre-built variants              | `export.spec.ts`                                   |
-| `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`                            |
-| `lms-variants`    | n/a  | pre-built variants              | `lms-variants.spec.ts`, `standalone-retry.spec.ts` |
-| `a11y-audit`      | n/a  | pre-built variants              | `a11y-audit.spec.ts`                               |
+| Project           | Port | Fixture                         | Specs                                                        |
+| ----------------- | ---- | ------------------------------- | ------------------------------------------------------------ |
+| `free-mode`       | 5180 | `tests/fixtures/free`           | every spec no other project runs                             |
+| `sequential-mode` | 5181 | `tests/fixtures/sequential`     | `sequential.spec.ts`                                         |
+| `custom-layout`   | 5182 | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`                                    |
+| `custom-quiz`     | 5183 | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`                                        |
+| `mobile`          | 5180 | `tests/fixtures/free` (375x667) | `mobile.spec.ts`                                             |
+| `export`          | n/a  | pre-built variants              | `export.spec.ts`, `cli-export.spec.ts`                       |
+| `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`, `custom-quiz-lms-roundtrip.spec.ts` |
+| `lms-variants`    | n/a  | pre-built variants              | `lms-variants.spec.ts`, `standalone-retry.spec.ts`           |
+| `a11y-audit`      | n/a  | pre-built variants              | `a11y-audit.spec.ts`                                         |
 
 ### The variant pre-build
 
-The `export`, `lms`, `lms-variants` and `a11y-audit` projects don't run a dev server. They read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
+The `export`, `lms`, `lms-variants` and `a11y-audit` projects don't use the dev servers, though Playwright starts all four for any project. They read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
 
 Building those mid-test would mutate the source fixtures and serialise the suite. Instead, [`tests/e2e/global-setup.ts`](./tests/e2e/global-setup.ts) runs once before any spec:
 
@@ -150,8 +150,8 @@ If you change a fixture's content, treat it like any other source change: commit
 
 CI uploads these artifacts:
 
-- `coverage-24` and `coverage-26`: `packages/*/coverage/` from each unit-test job, on every run
-- `playwright-report`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
+- `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
+- `playwright-test-results`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
 
 Download from the failed run's Actions page. For Playwright traces:
 

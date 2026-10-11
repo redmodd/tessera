@@ -722,11 +722,11 @@ export function canAccess(ctx) {
 | `cmi5`            | cmi5 package (AU + manifest)                | `<title>-<version>.zip`   |
 | `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `<title>-<version>.zip`   |
 
-`<title>` is the slugified `title` and `<version>` the `version` from `course.config.js` (`my-course-1.0.0.zip`). The name carries no standard, and each export replaces the course's previous zip.
+`<title>` is the slugified `title` and `<version>` the `version` from `course.config.js` (`my-course-1.0.0.zip`). The name carries no standard, and each packaged export first deletes every `<title>-*.zip` in the course folder.
 
 Upload the zip via your LMS's import flow; drop `dist/` (web) on any static host.
 
-`--standard <web|scorm12|scorm2004|cmi5|xapi>` overrides `export.standard` for one build without editing `course.config.js`, e.g. `pnpm export <course> --standard scorm2004`. To package the same course for several LMSs from one config, move or rename each zip before the next export. `pnpm validate <course> --standard <value>` takes the same flag to preview validation against the overridden standard. An unknown value fails before the build runs.
+`--standard <web|scorm12|scorm2004|cmi5|xapi>` overrides `export.standard` for one build without editing `course.config.js`, e.g. `pnpm export <course> --standard scorm2004`. To package the same course for several LMSs from one config, move each zip out of the course folder before the next export. `pnpm validate <course> --standard <value>` takes the same flag to preview validation against the overridden standard. An unknown value fails before the build runs.
 
 ### Web export Content-Security-Policy
 

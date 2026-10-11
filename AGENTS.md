@@ -81,4 +81,4 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 
-`release.yml` runs changesets on `main`. CI uploads `coverage-<node>` on every run and `playwright-report` when e2e fails; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).
+`release.yml` runs changesets on `main`. CI uploads `coverage-<node>` on every run and `playwright-test-results` when e2e fails; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).

@@ -13,10 +13,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI ? 'dot' : 'list',
-  // Pre-builds the five export-standard variants of tests/fixtures/free into
-  // tests/.e2e-variants/{web,scorm12,scorm2004,cmi5,xapi} so the export and lms
-  // projects can read pre-built dist/ output instead of mutating the source
-  // fixture and rebuilding mid-suite.
+  // Pre-builds every fixture variant in global-setup.ts's FIXTURES map into
+  // tests/.e2e-variants/{fixture}/{standard} so specs read pre-built dist/
+  // output instead of mutating the source fixtures and rebuilding mid-suite.
   globalSetup: './tests/e2e/global-setup.ts',
   use: {
     trace: 'retain-on-failure',
