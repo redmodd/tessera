@@ -37,3 +37,11 @@ guide and has a **Project notes** section where you add your own context (audien
 tone, brand). If Claude Code does not pick it up, add a `CLAUDE.md` containing
 `@AGENTS.md` beside it (see
 [when Claude Code reads `AGENTS.md`](https://code.claude.com/docs/en/memory#agents-md)).
+
+## Updating
+
+Some updates change how courses are written, and some reset learners' saved
+progress, so read the
+[changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md)
+before you update. Then run `pnpm add tessera-learn@latest` from the workspace
+root, or ask your assistant to update the framework.
