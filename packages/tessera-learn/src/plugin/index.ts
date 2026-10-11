@@ -1,7 +1,7 @@
 import type { Plugin, Rollup } from 'vite';
 import { normalizePath } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative } from 'node:path';
 import {
   existsSync,
   readdirSync,
@@ -10,6 +10,7 @@ import {
   rmSync,
 } from 'node:fs';
 import {
+  COURSE_CONFIG_FILE,
   generateManifest,
   walkPages,
   type CourseConfigRead,
@@ -30,10 +31,19 @@ import {
   standardProfile,
   type LMSStandard,
 } from '../runtime/standards.js';
-import { reportValidationIssues } from './validation.js';
+import {
+  validateProject,
+  reportValidationIssues,
+  VALIDATED_ROOT_FILES,
+} from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
-import { formatValue, quoteList } from './validation/diagnostics.js';
+import {
+  Diagnostics,
+  formatValue,
+  quoteList,
+} from './validation/diagnostics.js';
+import { ChangeBurst } from './change-burst.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
@@ -43,6 +53,7 @@ import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
 import {
   BuildContext,
+  isInside,
   projectFileRel,
   type ContextPluginApi,
   type ValidatedConfig,
@@ -262,6 +273,7 @@ function tesseraConfigDefaultsPlugin(): Plugin {
       const root = config.root || process.cwd();
       return {
         base: './',
+        clearScreen: config.clearScreen ?? false,
         build: { assetsDir: 'tessera' },
         resolve: { alias: { $assets: resolve(root, 'assets') } },
         // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer
@@ -300,7 +312,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
 
 function tesseraConfigPlugin(ctx: BuildContext): Plugin {
   return virtualModule('tessera:config', 'virtual:tessera-config', function () {
-    const configPath = resolve(ctx.root, 'course.config.js');
+    const configPath = resolve(ctx.root, COURSE_CONFIG_FILE);
     if (existsSync(configPath)) this.addWatchFile(configPath);
     // The runtime reads export.standard too, so the override must apply to
     // the bundled config, not just the manifest/adapter.
@@ -327,13 +339,121 @@ function tesseraPagesPlugin(): Plugin {
 
 // ---------- Validation Plugin ----------
 
+interface DevSession {
+  /** Servers open on the root. A restart opens the new one before it closes the old. */
+  servers: number;
+  failing: boolean;
+  /** The warnings and notes already printed, each with the source file it is about. */
+  reported: Map<string, string | undefined>;
+  changes: ChangeBurst;
+}
+
+// Kept per project root while a server is open on it, not per plugin instance:
+// Vite reloads vite.config.js on a restart and builds a new instance from it,
+// and that restart must not be taken for a first start.
+const devSessions = new Map<string, DevSession>();
+
+function remember(session: DevSession, result: Diagnostics): void {
+  for (const notice of [...result.warnings, ...result.infos]) {
+    session.reported.set(notice, result.sourceOf(notice));
+  }
+}
+
+function isPageSource(projectRoot: string, file: string): boolean {
+  return (
+    isInside(resolve(projectRoot, 'pages'), file) &&
+    (file.endsWith('.svelte') || file.endsWith('/_meta.js'))
+  );
+}
+
+function isValidatedSource(projectRoot: string, file: string): boolean {
+  return (
+    isPageSource(projectRoot, file) ||
+    VALIDATED_ROOT_FILES.includes(relative(projectRoot, file))
+  );
+}
+
 function tesseraValidationPlugin(ctx: BuildContext): Plugin {
+  function revalidate(): void {
+    // A burst can settle after the server has closed.
+    const session = devSessions.get(ctx.root);
+    if (!session) return;
+    const { reported } = session;
+    let result: Diagnostics;
+    try {
+      result = validateProject(ctx.root, ctx.standardOverride);
+    } catch (error) {
+      result = new Diagnostics();
+      result.partial = true;
+      result.error(`validation could not run: ${(error as Error).message}`);
+    }
+    const unreported = (notice: string) => !reported.has(notice);
+    const infos = result.infos.filter(unreported);
+    if (session.failing && result.errors.length === 0) {
+      infos.push('validation errors resolved');
+    }
+    session.failing = result.errors.length > 0;
+    reportValidationIssues({
+      errors: result.errors,
+      warnings: result.warnings.filter(unreported),
+      infos,
+    });
+    // A notice that is gone is forgotten, so it prints again if it comes back.
+    for (const [notice, source] of reported) {
+      if (!result.mayStand(source)) reported.delete(notice);
+    }
+    remember(session, result);
+  }
+
   return {
     name: 'tessera:validation',
     enforce: 'pre',
 
     configureServer() {
-      ctx.validate();
+      let session = devSessions.get(ctx.root);
+      if (session) {
+        // The restart joins a burst still waiting, so the two validate once.
+        session.reported.clear();
+        session.changes.settle(revalidate);
+      } else {
+        session = {
+          servers: 0,
+          failing: false,
+          reported: new Map(),
+          changes: new ChangeBurst(),
+        };
+        remember(session, ctx.validate());
+      }
+      const opened = session;
+      // Counted once every plugin has configured the server: a server that
+      // fails before then never starts, so it is never closed either.
+      return () => {
+        opened.servers++;
+        devSessions.set(ctx.root, opened);
+      };
+    },
+
+    closeServer() {
+      const session = devSessions.get(ctx.root);
+      if (session && --session.servers === 0) devSessions.delete(ctx.root);
+    },
+
+    // Nothing is returned, so Vite does not hold the hot update for the result.
+    hotUpdate({ type, file, read: waitForSave }) {
+      if (this.environment.name !== 'client') return;
+      const changes = devSessions.get(ctx.root)?.changes;
+      if (!changes) return;
+      if (isValidatedSource(ctx.root, file)) {
+        changes.settle(
+          revalidate,
+          type === 'delete' ? undefined : waitForSave(),
+        );
+      } else if (
+        type !== 'update' &&
+        isInside(resolve(ctx.root, 'assets'), file)
+      ) {
+        changes.settle(revalidate);
+      }
     },
 
     buildStart() {
@@ -468,14 +588,9 @@ function tesseraManifestPlugin(ctx: BuildContext): Plugin {
       loaded = manifestModule(ctx.manifest);
       return loaded;
     },
-    (_type, file) => {
-      const pagesDir = resolve(ctx.root, 'pages');
-      return (
-        file.startsWith(normalizePath(pagesDir) + '/') &&
-        (file.endsWith('.svelte') || file.endsWith('/_meta.js')) &&
-        manifestModule(generateManifest(pagesDir)) !== loaded
-      );
-    },
+    (_type, file) =>
+      isPageSource(ctx.root, file) &&
+      manifestModule(generateManifest(resolve(ctx.root, 'pages'))) !== loaded,
   );
 }
 

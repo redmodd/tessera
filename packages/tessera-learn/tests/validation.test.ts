@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { readCourseConfig } from '../src/plugin/manifest.js';
@@ -1614,6 +1614,61 @@ describe('structure validation', () => {
     );
   });
 
+  it.each(['99-gone', '01-section/01-lesson/gone.svelte', 'gone.svelte'])(
+    'skips the dangling symlink pages/%s',
+    (entry) => {
+      createValidProject(testRoot);
+      symlinkSync(
+        resolve(testRoot, 'missing'),
+        resolve(testRoot, 'pages', entry),
+      );
+      const { errors, warnings } = validateProject(testRoot);
+      expect(errors).toEqual([]);
+      expect(warnings).toContainEqual(
+        expect.stringContaining(`pages/${entry}: symlink does not resolve`),
+      );
+    },
+  );
+
+  it('walks a symlink that resolves as the file or folder it points at', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'shared/lesson/linked.svelte',
+      '<script module>export const pageConfig = { extra: 1 };</script>',
+    );
+    symlinkSync(
+      resolve(testRoot, 'shared/lesson'),
+      resolve(testRoot, 'pages/01-section/02-linked'),
+    );
+    symlinkSync(
+      resolve(testRoot, 'shared/lesson/linked.svelte'),
+      resolve(testRoot, 'pages/01-section/01-lesson/linked.svelte'),
+    );
+    const { warnings } = validateProject(testRoot);
+    for (const lesson of ['01-lesson', '02-linked']) {
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          `${lesson}/linked.svelte: unknown field pageConfig.extra`,
+        ),
+      );
+    }
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('symlink does not resolve'),
+    );
+  });
+
+  it('skips a symlink that points at itself', () => {
+    createValidProject(testRoot);
+    const link = resolve(testRoot, 'pages/01-section/01-lesson/loop.svelte');
+    symlinkSync(link, link);
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toEqual([]);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('loop.svelte: symlink does not resolve'),
+    );
+  });
+
   it('treats section-level .svelte files as flat-mode pages', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1698,19 +1753,22 @@ describe('asset reference validation', () => {
     );
   });
 
-  it('strips Vite query suffixes (?raw) before checking existence', () => {
-    createValidProject(testRoot);
-    writeFile(testRoot, 'assets/intro.txt', 'A transcript.');
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      `<script>import intro from '$assets/intro.txt?raw';</script>`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('$assets/intro.txt')),
-    ).toHaveLength(0);
-  });
+  it.each(['?raw', '#top', '?raw#top', '#top?raw'])(
+    'strips a %s suffix before checking existence',
+    (suffix) => {
+      createValidProject(testRoot);
+      writeFile(testRoot, 'assets/intro.txt', 'A transcript.');
+      writeFile(
+        testRoot,
+        'pages/01-section/01-lesson/page.svelte',
+        `<script>import intro from '$assets/intro.txt${suffix}';</script>`,
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(
+        warnings.filter((w) => w.includes('$assets/intro.txt')),
+      ).toHaveLength(0);
+    },
+  );
 });
 
 // ---- Question Component Validation ----
@@ -3327,6 +3385,19 @@ describe('a11y config block — level and ignore', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('leaves out the diagnostics a11y.ignore may cover when the config cannot be read', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<h1>Title</h1><h3>Skipped</h3><Image src="$assets/x.png" />`,
+    );
+    writeConfig(testRoot, 'export default {');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'course.config.js: could not parse')).toBe(true);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
   });
 
   it("level: 'error' promotes a promotable warning to an error", () => {

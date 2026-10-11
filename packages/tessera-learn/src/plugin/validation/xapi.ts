@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readSourceFileCached, READ_FAILURE_MESSAGES } from '../manifest.js';
+import { READ_FAILURE_MESSAGES } from '../manifest.js';
 import { readCourseRuntimeExports, type RuntimeXAPIHooks } from '../ast.js';
 import {
   validateAgent,
@@ -34,14 +34,17 @@ const ACTOR_DERIVING_STANDARDS = STANDARD_IDS.filter(
 
 type XAPIHookRead = RuntimeXAPIHooks | 'none' | 'unknown';
 
+export const COURSE_RUNTIME_FILE = 'course.runtime.js';
+
 export function readRuntimeXAPIHooks(
   projectRoot: string,
   d: Diagnostics,
 ): XAPIHookRead {
-  const runtimePath = resolve(projectRoot, 'course.runtime.js');
+  const runtimePath = resolve(projectRoot, COURSE_RUNTIME_FILE);
   if (!existsSync(runtimePath)) return 'none';
-  const runtime = readCourseRuntimeExports(readSourceFileCached(runtimePath));
+  const runtime = readCourseRuntimeExports(readFileSync(runtimePath, 'utf-8'));
   if (!runtime) {
+    d.partial = true;
     d.error(`course.runtime.js: ${READ_FAILURE_MESSAGES['parse-error']}`);
     return 'unknown';
   }

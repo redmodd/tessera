@@ -12,14 +12,54 @@ export class Diagnostics implements ValidationResult {
   errors: string[] = [];
   warnings: string[] = [];
   infos: string[] = [];
+  /** Set when the config, the runtime file or the export standard could not be read, so a check on any source may have been skipped. */
+  partial = false;
+  #source: string | undefined;
+  #sources = new Map<string, string>();
+
   error(message: string): void {
     this.errors.push(message);
+    this.#record(message);
   }
   warn(message: string): void {
     this.warnings.push(message);
+    this.#record(message);
   }
   info(message: string): void {
     this.infos.push(message);
+    this.#record(message);
+  }
+
+  #record(message: string): void {
+    if (this.#source !== undefined) this.#sources.set(message, this.#source);
+  }
+
+  /** Run the checks of one source file, so what they raise is known to be about it. */
+  within<T>(source: string, check: () => T): T {
+    const outer = this.#source;
+    this.#source = source;
+    try {
+      return check();
+    } finally {
+      this.#source = outer;
+    }
+  }
+
+  /** The source file a diagnostic was raised for, or undefined for one about the course as a whole. */
+  sourceOf(message: string): string | undefined {
+    return this.#sources.get(message);
+  }
+
+  /**
+   * Whether a warning or note an earlier run raised for `source` may still
+   * stand though this run did not repeat it. An error can end a source's
+   * checks early, and the course-wide checks need every source.
+   */
+  mayStand(source: string | undefined): boolean {
+    if (this.partial) return true;
+    return source === undefined
+      ? this.errors.length > 0
+      : this.errors.some((error) => this.sourceOf(error) === source);
   }
 }
 

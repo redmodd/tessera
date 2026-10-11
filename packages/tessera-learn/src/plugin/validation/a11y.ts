@@ -68,6 +68,13 @@ export function a11ySettingsFrom(read: CourseConfigRead): A11ySettings {
   return normalizeA11y(read.ok ? read.config.a11y : undefined);
 }
 
+/** Drop every tagged diagnostic: with the config unreadable, nothing says which ones it ignores or promotes. */
+export function dropA11yDiagnostics(d: Diagnostics): void {
+  const untagged = (msg: string) => diagnosticId(msg) === null;
+  d.errors = d.errors.filter(untagged);
+  d.warnings = d.warnings.filter(untagged);
+}
+
 /**
  * Apply `a11y.ignore` (drop tagged diagnostics) and `a11y.level` (promote the
  * promotable a11y warnings to errors) to a result in place. `ignore` suppresses

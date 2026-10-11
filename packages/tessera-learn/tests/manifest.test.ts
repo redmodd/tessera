@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parse } from 'svelte/compiler';
 import {
   generateManifest,
-  extractPageConfig,
   parsePageConfigFromSource,
   readMetaFile,
   orderPageFiles,
@@ -12,8 +12,14 @@ import {
   deriveSlug,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
+import { validateProject } from '../src/plugin/validation.js';
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
-import { tempDir } from './helpers.js';
+import { tempDir, writeLessonPage } from './helpers.js';
+
+vi.mock('svelte/compiler', async (importOriginal) => {
+  const compiler = await importOriginal<typeof import('svelte/compiler')>();
+  return { ...compiler, parse: vi.fn(compiler.parse) };
+});
 
 let root: string;
 
@@ -237,22 +243,6 @@ describe('defaultExportObjectLiteral', () => {
   });
 });
 
-// ---------- parsePageConfigFromSource ----------
-
-describe('parsePageConfigFromSource', () => {
-  it('reads pageConfig from a module script when the template fails to parse', () => {
-    const source = `<script module>
-export const pageConfig = { title: 'X', quiz: { graded: true } };
-</script>
-<h1>page</h1>
-{#if `;
-    expect(parsePageConfigFromSource(source)).toEqual({
-      kind: 'ok',
-      value: { title: 'X', quiz: { graded: true } },
-    });
-  });
-});
-
 // ---------- readMetaFile ----------
 
 describe('readMetaFile', () => {
@@ -331,25 +321,34 @@ describe('readMetaFile', () => {
   });
 });
 
-// ---------- extractPageConfig ----------
+// ---------- parsePageConfigFromSource ----------
 
-describe('extractPageConfig', () => {
+describe('parsePageConfigFromSource', () => {
+  it('reads pageConfig from a module script when the template fails to parse', () => {
+    const source = `<script module>
+export const pageConfig = { title: 'X', quiz: { graded: true } };
+</script>
+<h1>page</h1>
+{#if `;
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: { title: 'X', quiz: { graded: true } },
+    });
+  });
+
   it('extracts title from pageConfig', () => {
-    const path = createFile(
-      'page-test/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = { title: "My Page" }
 </script>
-<h1>Hi</h1>`,
-    );
-    const config = extractPageConfig(path);
-    expect(config.title).toBe('My Page');
+<h1>Hi</h1>`;
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: { title: 'My Page' },
+    });
   });
 
   it('extracts quiz config', () => {
-    const path = createFile(
-      'page-quiz/quiz.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = {
   title: "Quiz",
   quiz: {
@@ -359,61 +358,92 @@ export const pageConfig = {
   }
 }
 </script>
-<h1>Quiz</h1>`,
-    );
-    const config = extractPageConfig(path);
-    expect(config.title).toBe('Quiz');
-    expect(config.quiz).toEqual({
-      graded: true,
-      gatesProgress: true,
-      maxAttempts: 3,
+<h1>Quiz</h1>`;
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: {
+        title: 'Quiz',
+        quiz: { graded: true, gatesProgress: true, maxAttempts: 3 },
+      },
     });
   });
 
-  it('returns empty object when no module script', () => {
-    const path = createFile('page-none/page.svelte', '<h1>Hello</h1>');
-    expect(extractPageConfig(path)).toEqual({});
+  it('finds no config when there is no module script', () => {
+    const source = '<h1>Hello</h1>';
+    expect(parsePageConfigFromSource(source)).toEqual({ kind: 'none' });
   });
 
-  it('returns empty object when no pageConfig export', () => {
-    const path = createFile(
-      'page-no-config/page.svelte',
-      `<script module>
+  it('finds no config when there is no pageConfig export', () => {
+    const source = `<script module>
 export const something = "else";
-</script>`,
-    );
-    expect(extractPageConfig(path)).toEqual({});
+</script>`;
+    expect(parsePageConfigFromSource(source)).toEqual({ kind: 'none' });
   });
 
   it('handles Infinity in maxAttempts', () => {
-    const path = createFile(
-      'page-inf/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = {
   title: "Unlimited",
   quiz: { graded: true, maxAttempts: Infinity }
 }
-</script>`,
-    );
-    const config = extractPageConfig(path);
-    expect(config.quiz!.maxAttempts).toBe(Infinity);
+</script>`;
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: {
+        title: 'Unlimited',
+        quiz: { graded: true, maxAttempts: Infinity },
+      },
+    });
   });
 
   it('handles single-quoted strings', () => {
-    const path = createFile(
-      'page-single/page.svelte',
-      `<script module>
+    const source = `<script module>
 export const pageConfig = { title: 'Single Quotes' }
-</script>`,
-    );
-    const config = extractPageConfig(path);
-    expect(config.title).toBe('Single Quotes');
+</script>`;
+    expect(parsePageConfigFromSource(source)).toEqual({
+      kind: 'ok',
+      value: { title: 'Single Quotes' },
+    });
   });
 });
 
 // ---------- generateManifest ----------
 
 describe('generateManifest', () => {
+  function validProject(): string {
+    const projectRoot = tempDir();
+    writeFileSync(
+      resolve(projectRoot, 'course.config.js'),
+      'export default { title: "T" };',
+    );
+    writeLessonPage(projectRoot);
+    return projectRoot;
+  }
+
+  it('reuses the pages a validation has parsed', () => {
+    const projectRoot = validProject();
+
+    validateProject(projectRoot);
+    vi.mocked(parse).mockClear();
+    const manifest = generateManifest(resolve(projectRoot, 'pages'));
+
+    expect(manifest.totalPages).toBe(1);
+    expect(parse).not.toHaveBeenCalled();
+  });
+
+  it('parses only the page that changed since the last validation', () => {
+    const projectRoot = validProject();
+    const edited = resolve(projectRoot, 'pages/01-section/01-lesson/b.svelte');
+    writeFileSync(edited, '<h1>Before</h1>');
+
+    validateProject(projectRoot);
+    writeFileSync(edited, '<h1>After</h1>');
+    vi.mocked(parse).mockClear();
+    validateProject(projectRoot);
+
+    expect(parse).toHaveBeenCalledOnce();
+  });
+
   it('generates correct manifest for standard course structure', () => {
     setupStandardCourse();
     const manifest = generateManifest(root);
@@ -454,6 +484,16 @@ describe('generateManifest', () => {
     );
     createFile('01-intro/page.svelte', '<h1>Hi</h1>');
     expect(generateManifest(root).sections[0].title).toBe('Intro');
+  });
+
+  it('derives the title for a pageConfig that is not a static literal', () => {
+    createFile(
+      '01-intro/first-page.svelte',
+      `<script module>
+export const pageConfig = { title: someTitle }
+</script>`,
+    );
+    expect(generateManifest(root).pages[0].title).toBe('First Page');
   });
 
   it('carries pageConfig.graded and weight onto the manifest page', () => {

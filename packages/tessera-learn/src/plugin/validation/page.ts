@@ -1,11 +1,12 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import {
+  getSvelteFiles,
   parsePageConfigFromSource,
   readMetaFile,
-  readSourceFileCached,
   ensureSvelteSuffix,
   orderPageFiles,
+  unresolvedSymlinks,
   walkPages,
   isLiterallyGradedQuestion,
   listedGradedQuestions,
@@ -14,6 +15,7 @@ import {
   STATIC_LITERAL_RULE,
   type MetaFile,
   type PageConfig,
+  type WalkedLesson,
 } from '../manifest.js';
 import {
   findComponents,
@@ -74,7 +76,7 @@ function validatePageFile(
   { projectRoot, d, profile, assetsDir, assetExistsCache }: PageContext,
 ): { page: PageInfo; parseError: boolean } {
   const fileRel = relative(projectRoot, filePath);
-  const content = readSourceFileCached(filePath);
+  const content = readFileSync(filePath, 'utf-8');
 
   const parseError = getParseError(content);
   if (parseError) {
@@ -237,67 +239,48 @@ export function validatePages(
 
   if (!existsSync(pagesDir)) return noPages();
 
-  // walkPages only descends into section dirs, so scan pages/ root separately.
-  for (const entry of readdirSync(pagesDir)) {
-    const fullPath = resolve(pagesDir, entry);
-    if (entry.endsWith('.svelte') && statSync(fullPath).isFile()) {
+  const validateMeta = (metaPath: string) =>
+    d.within(relative(projectRoot, metaPath), () =>
+      validateMetaFile(metaPath, projectRoot, d),
+    );
+  const warnUnresolvedSymlinks = (dir: string) => {
+    for (const name of unresolvedSymlinks(dir)) {
       d.warn(
-        `${relative(projectRoot, fullPath)}: this file is outside the section/lesson structure and will be ignored`,
+        `${relative(projectRoot, resolve(dir, name))}: symlink does not resolve, so it is left out of the course`,
       );
     }
+  };
+
+  // walkPages only descends into section dirs, so scan pages/ root separately.
+  for (const entry of getSvelteFiles(pagesDir)) {
+    d.warn(
+      `${relative(projectRoot, resolve(pagesDir, entry))}: this file is outside the section/lesson structure and will be ignored`,
+    );
   }
+  warnUnresolvedSymlinks(pagesDir);
 
   for (const section of walkPages(pagesDir)) {
     const sectionRel = relative(projectRoot, section.dir);
     const pagesBeforeSection = pages.length;
 
-    const sectionMeta = validateMetaFile(section.metaPath, projectRoot, d);
+    const sectionMeta = validateMeta(section.metaPath);
+    warnUnresolvedSymlinks(section.dir);
 
     for (const lesson of section.lessons) {
+      if (lesson.name !== null) warnUnresolvedSymlinks(lesson.dir);
       // Flat lesson uses the section _meta, already validated above.
       const meta =
-        lesson.name === null
-          ? sectionMeta
-          : validateMetaFile(lesson.metaPath, projectRoot, d);
-
-      if (meta?.pages) {
-        const listed = new Map<string, string>();
-        for (const pageName of meta.pages) {
-          const fileName = ensureSvelteSuffix(pageName);
-          const first = listed.get(fileName);
-          if (first !== undefined) {
-            const repeated =
-              first === pageName
-                ? `${formatValue(pageName)} more than once`
-                : `the same page as ${formatValue(first)} and ${formatValue(pageName)}`;
-            d.warn(
-              `${relative(projectRoot, lesson.metaPath)}: pages array lists ${repeated}, so only the first entry counts`,
-            );
-            continue;
-          }
-          listed.set(fileName, pageName);
-          if (!lesson.files.includes(fileName)) {
-            d.error(
-              `${relative(projectRoot, lesson.metaPath)}: pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,
-            );
-          }
-        }
-        if (listed.size > 0) {
-          for (const file of lesson.files) {
-            if (!listed.has(file)) {
-              d.warn(
-                `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
-              );
-            }
-          }
-        }
-      }
+        lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);
+      d.within(relative(projectRoot, lesson.metaPath), () =>
+        validatePageList(lesson, meta?.pages, ctx),
+      );
 
       // Same ordering as generateManifest.
       for (const fileName of orderPageFiles(lesson.files, meta?.pages)) {
-        const { page, parseError } = validatePageFile(
-          resolve(lesson.dir, fileName),
-          ctx,
+        const filePath = resolve(lesson.dir, fileName);
+        const { page, parseError } = d.within(
+          relative(projectRoot, filePath),
+          () => validatePageFile(filePath, ctx),
         );
         hasParseErrors ||= parseError;
         pages.push(page);
@@ -313,6 +296,45 @@ export function validatePages(
   if (pages.length === 0) return noPages();
 
   return { hasParseErrors, pages };
+}
+
+function validatePageList(
+  lesson: WalkedLesson,
+  pages: string[] | undefined,
+  { projectRoot, d }: PageContext,
+): void {
+  if (!pages) return;
+  const metaRel = relative(projectRoot, lesson.metaPath);
+  const listed = new Map<string, string>();
+  for (const pageName of pages) {
+    const fileName = ensureSvelteSuffix(pageName);
+    const first = listed.get(fileName);
+    if (first !== undefined) {
+      const repeated =
+        first === pageName
+          ? `${formatValue(pageName)} more than once`
+          : `the same page as ${formatValue(first)} and ${formatValue(pageName)}`;
+      d.warn(
+        `${metaRel}: pages array lists ${repeated}, so only the first entry counts`,
+      );
+      continue;
+    }
+    listed.set(fileName, pageName);
+    if (!lesson.files.includes(fileName)) {
+      d.error(
+        `${metaRel}: pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,
+      );
+    }
+  }
+  if (listed.size > 0) {
+    for (const file of lesson.files) {
+      if (!listed.has(file)) {
+        d.warn(
+          `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
+        );
+      }
+    }
+  }
 }
 
 function validateMetaFile(
@@ -566,11 +588,13 @@ function validateContractBypass(
   }
 }
 
+export const SHELL_FILES = ['layout.svelte', 'quiz.svelte'];
+
 export function validateShells(projectRoot: string, d: Diagnostics): void {
-  for (const shellFile of ['layout.svelte', 'quiz.svelte']) {
+  for (const shellFile of SHELL_FILES) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
-      validateContractBypass(readSourceFileCached(shellPath), shellFile, d);
+      validateContractBypass(readFileSync(shellPath, 'utf-8'), shellFile, d);
     }
   }
 }
