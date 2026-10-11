@@ -33,7 +33,7 @@ A **course** is a self-contained folder under `courses/`, and each one exports t
 
 The authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, with reference files beside it in `node_modules/tessera-learn/docs/`, so it's always current for your installed version. The scaffolded `AGENTS.md` points your assistant (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
 
-Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it ([details](https://code.claude.com/docs/en/memory#agents-md)). On an older version, or with one of those files in place, add a `CLAUDE.md` containing `@AGENTS.md` beside the scaffolded `AGENTS.md`.
+Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it ([details](https://code.claude.com/docs/en/memory#agents-md)). On an older version, or with one of those files in place, add a `CLAUDE.md` containing `@AGENTS.md` beside the scaffolded `AGENTS.md`.
 
 ## Updating an existing workspace
 
