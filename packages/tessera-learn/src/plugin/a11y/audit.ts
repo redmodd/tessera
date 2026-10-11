@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import type { Plugin, PreviewServer } from 'vite';
-import type { ValidatedConfig } from '../build-context.js';
+import type { ContextPluginApi } from '../build-context.js';
 import { generateManifest } from '../manifest.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
 
@@ -376,7 +376,7 @@ export async function runAudit(
   process.env[AUDIT_ENV_FLAG] = '1';
 
   let server: PreviewServer | undefined;
-  let validatedConfig: (() => ValidatedConfig) | undefined;
+  let contextApi: ContextPluginApi | undefined;
   try {
     console.log('[tessera a11y] Building course…');
     await vite.build(
@@ -387,15 +387,15 @@ export async function runAudit(
           {
             name: 'tessera:a11y-settings',
             configResolved({ plugins }) {
-              validatedConfig = plugins.find(
+              contextApi = plugins.find(
                 (plugin) => plugin.name === 'tessera:context',
-              )?.api.validatedConfig;
+              )?.api;
             },
           } satisfies Plugin,
         ],
       }),
     );
-    const settings = a11ySettingsFrom(validatedConfig!());
+    const settings = a11ySettingsFrom(contextApi!.validatedConfig());
     const tags = axeTags(settings.standard);
     const disableRules = axeIgnoreRules(settings.ignore);
 

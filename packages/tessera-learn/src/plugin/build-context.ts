@@ -15,6 +15,10 @@ export type ValidatedConfig = ResolvedConfigRead & {
   profile: StandardProfile;
 };
 
+export interface ContextPluginApi {
+  validatedConfig(): ValidatedConfig;
+}
+
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
