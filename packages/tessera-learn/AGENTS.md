@@ -1,5 +1,7 @@
 # AGENTS.md: Tessera Course Authoring Guide
 
+> **Scope:** authoring courses in a Tessera workspace. In the framework monorepo (where this file is `packages/tessera-learn/AGENTS.md`) these rules do not govern framework source: follow the repo-root `AGENTS.md`, and update this guide when a change alters what it documents.
+
 Tessera is an LMS-tracking runtime for interactive learning content (SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / static web). It owns tracking, progress, completion/success rollup, persistence, and navigation gating. You own the presentation layer.
 
 This is the canonical reference for authoring a Tessera course. Read it before generating or editing course code. You are reading `node_modules/tessera-learn/AGENTS.md`; it updates when you bump `tessera-learn`.
@@ -21,6 +23,17 @@ This is the canonical reference for authoring a Tessera course. Read it before g
 
 `pnpm dev <course>` never exits: run it in the background, or leave it to the user.
 
+## Reference files
+
+This file holds what every task needs. The topics below live in `docs/` beside it. **Read the matching file before starting such a task.** Link paths in this guide are relative to this file: open `docs/scoring.md` as `node_modules/tessera-learn/docs/scoring.md`.
+
+| Task                                                                               | Read                                                                                                                                                  |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Graded pages, course score weighting, optional pages, pass/fail, manual completion | [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md)                                                                                       |
+| Custom question widget, quiz shell, layout, navigation or progress UI              | [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md), then [`node_modules/tessera-learn/docs/recipes.md`](docs/recipes.md) for worked examples |
+| Custom xAPI statements, a second LRS                                               | [`node_modules/tessera-learn/docs/xapi.md`](docs/xapi.md)                                                                                             |
+| Export packages, the web CSP, per-LMS behaviour, testing in an LMS                 | [`node_modules/tessera-learn/docs/export.md`](docs/export.md)                                                                                         |
+
 ---
 
 ## Workspaces
@@ -36,12 +49,12 @@ my-courses/
 ├── courses/
 │   ├── starter-course/     # a course = course.config.js, pages/, …
 │   └── <next course>/
-└── AGENTS.md / CLAUDE.md   # pointers to this guide (workspace root only)
+└── AGENTS.md               # pointer to this guide (workspace root only)
 ```
 
 Rules:
 
-- **Open the workspace folder**, not an individual course, so the root pointer to this guide stays in scope.
+- **Open the workspace folder**, not an individual course, so the root `AGENTS.md` stays in scope.
 - Everything below "Project Structure" describes a single course: the contents of one `courses/<name>/`.
 - Name the course on every command. A bare command at the workspace root errors and lists courses; it never picks one.
 
@@ -83,11 +96,11 @@ cd courses/<name> && pnpm exec tessera dev   # or cd in and omit the name
 | `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                |
 | `styles/custom.css`          | Empty stylesheet for overrides                                                  |
 
-Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button under an LMS). See [Custom Layouts](#custom-layouts).
+Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button under an LMS). See [Custom Layouts](docs/recipes.md#custom-layouts).
 
 ### Updating the framework
 
-`pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so a bump needs no reconciling. Your root `CLAUDE.md` / `AGENTS.md` are never overwritten: put workspace standards in their Project notes.
+`pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so a bump needs no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
 
 ### Customising the build (optional)
 
@@ -176,10 +189,10 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 ## Authoring Surfaces
 
 1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
-2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime.
-3. **Custom layout**: `layout.svelte` at the course root replaces the default chrome.
-4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`.
-5. **Custom xAPI**: `useXAPI()` emits your own verbs. See [Custom xAPI](#custom-xapi-statements).
+2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime. See [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md).
+3. **Custom layout**: `layout.svelte` at the course root replaces the default chrome. See [Custom Layouts](docs/recipes.md#custom-layouts).
+4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`. See [`useQuiz`](docs/hooks.md#usequiz) and [Recipe 2](docs/recipes.md#recipe-2-custom-quiz-shell-via-quizsvelte).
+5. **Custom xAPI**: `useXAPI()` emits your own verbs. See [Custom xAPI](docs/xapi.md#custom-xapi-statements).
 6. **Runtime hooks**: `course.runtime.js` at the course root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
 
 A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`.
@@ -200,14 +213,14 @@ Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is.
 <h1>Introduction to the Topic</h1>
 ```
 
-| Field         | Type      | Default              | Purpose                                                                            |
-| ------------- | --------- | -------------------- | ---------------------------------------------------------------------------------- |
-| `title`       | `string`  | title-cased filename | Page title (`my-page.svelte` → "My Page")                                          |
-| `quiz`        | `object`  | none                 | Makes the page a quiz page. See [`pageConfig.quiz` fields](#pageconfigquiz-fields) |
-| `graded`      | `boolean` | `false`              | Page counts toward the course score. See [Per-page weighting](#per-page-weighting) |
-| `required`    | `boolean` | `true`               | Graded pages only. See [Per-page weighting](#per-page-weighting)                   |
-| `weight`      | `number`  | `1`                  | Graded pages only. See [Per-page weighting](#per-page-weighting)                   |
-| `completesOn` | `"view"`  | none                 | `completion.mode: "manual"` only. See [Manual completion](#manual-completion)      |
+| Field         | Type      | Default              | Purpose                                                                                           |
+| ------------- | --------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `title`       | `string`  | title-cased filename | Page title (`my-page.svelte` → "My Page")                                                         |
+| `quiz`        | `object`  | none                 | Makes the page a quiz page. See [`pageConfig.quiz` fields](#pageconfigquiz-fields)                |
+| `graded`      | `boolean` | `false`              | Page counts toward the course score. See [Per-page weighting](docs/scoring.md#per-page-weighting) |
+| `required`    | `boolean` | `true`               | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
+| `weight`      | `number`  | `1`                  | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
+| `completesOn` | `"view"`  | none                 | `completion.mode: "manual"` only. See [Manual completion](docs/scoring.md#manual-completion)      |
 
 An unknown field warns and is ignored. Don't skip heading levels in page markup (`<h2>` then `<h4>` warns).
 
@@ -377,7 +390,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 - **Pass every required prop**, listed under [Question types](#question-types). A missing one is a build error.
 - **Question `id`s are unique within a page, and use only letters, digits and inner underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`) and the validator warns.
 - **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime the second registration is renamed (`q1-2`), which changes its `cmi.interactions` key.
-- **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](#recipe-2c-inline-layout-prose-between-questions)).
+- **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
 
 ### `pageConfig.quiz` fields
@@ -394,59 +407,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 Pass `weight` (default 1; non-positive or non-finite counts as 1) to change how much a question pulls on the page score, inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places. In a quiz each `score` is 0 or 100; standalone it is what `score()` returns, clamped to 0–100. Weights change the page score only: each question is still reported to the LMS as one pass/fail interaction.
 
-### Per-page weighting
-
-Three top-level `pageConfig` fields control a page's share of the **course** score. All sit beside `quiz`, not inside it.
-
-| Field      | Type      | Default | Effect                                                                            |
-| ---------- | --------- | ------- | --------------------------------------------------------------------------------- |
-| `graded`   | `boolean` | `false` | The page counts toward the course score                                           |
-| `required` | `boolean` | `true`  | Graded only. `true`: counts as 0 until answered. `false`: left out until answered |
-| `weight`   | `number`  | `1`     | How hard the page pulls, relative to other graded pages. Must be positive         |
-
-```svelte
-<script module>
-  export const pageConfig = {
-    title: 'Final Exam',
-    weight: 75,
-    quiz: { graded: true },
-  };
-</script>
-```
-
-Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, which are the same pages that decide success status. Weights are relative: make them sum to 100 to read as percentages, or use bare ratios like `2` and `3`. `validate`, `dev` and `export` print the effective percentages, and warn when percentage-style weights miss 100 or when a graded page beside weighted ones declares no `weight` (it counts as 1).
-
-**A page is graded when it declares it.** `quiz: { graded: true }` covers quiz pages; `graded: true` beside `quiz: { graded: false }` is an error. A page whose graded content is standalone `useQuestion` calls needs `graded: true`, because the build cannot see a `useQuestion({ graded: true })` call inside your own component:
-
-```svelte
-<script module>
-  export const pageConfig = { title: 'Final Exam', graded: true, weight: 75 };
-</script>
-```
-
-- **Required graded pages count as 0 until answered**, so a skipped exam sinks the course score. The LMS gets no score until every required graded page is answered or the course is complete.
-- **A page of standalone questions is answered once every graded question on it is**, including ones behind a reveal or `{#if}`. Until then, visiting it doesn't complete it under `completion.mode: "percentage"`.
-- **Give every graded built-in question a literal `id="…"` and a bare `graded`.** A question the build can't read (a custom component, spread props, `graded={expr}`, `id={expr}`) counts only once it renders.
-- **Don't split graded questions across the branches of an `{#if}`, `{#each}`/`{:else}` or `{#await}`.** A learner shown only one branch can never finish the page. `tessera validate` warns.
-- **A graded question on a page without `graded: true` never reaches the course score or passed/failed.** `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
-
-**`required: false` makes a graded page optional.** Use it for practice quizzes beside a required exam:
-
-```svelte
-<script module>
-  export const pageConfig = {
-    title: 'Practice',
-    required: false,
-    quiz: { graded: true }, // or graded: true on a standalone page
-  };
-</script>
-```
-
-- **`required` doesn't change page completion.** Under `completion.mode: "percentage"` and `navigation.mode: "sequential"` an optional page counts as completed, and unlocks the next page, only once answered, like any graded page.
-- **An optional page answered after a pass never lowers what the LMS has**; see [Success criterion](#success-criterion). Use `graded: false` if a page's score should never move the course score.
-- **`completion.mode: "quiz"` needs a required graded page.** `tessera validate` errors without one.
-
-A page's own score is the weighted mean of the **graded** standalone questions answered on it. Practice questions (`graded: false`, the default) never count, so they are safe to mix onto a graded page. Give a `graded: true` page at least one graded question: with none it never earns a score, never completes and never unlocks the next page. `tessera validate` warns.
+Per-page weighting, optional pages, pass/fail and manual completion are in [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md).
 
 ### Question types
 
@@ -487,84 +448,7 @@ All four types work outside `<Quiz>` for inline practice. `MultipleChoice` and `
 <MultipleChoice graded question="..." options={[...]} correct={0} />
 ```
 
-Inside `<Quiz>` the quiz owns grading, so `graded` is ignored there. For a custom widget, build it with `useQuestion` (see [Recipe 3](#recipe-3-graded-standalone-question)).
-
----
-
-## Manual completion
-
-Use `completion.mode: "manual"` when the author owns the completion moment (final page read, "click to acknowledge") rather than a quiz score or visit ratio. Two triggers, both always active; first-to-fire wins, re-marks are idempotent (completion is monotonic: you can't un-complete):
-
-- **Page frontmatter**: `completesOn: "view"` (the only value) in a page's `pageConfig`; fires when that page renders.
-- **Runtime hook**: `useCompletion().markComplete()`, composed with any event (modal close, video-ended, timer). Outside manual mode it's a no-op with a one-shot dev warning, so it's safe in shared components.
-
-```svelte
-<script module>
-  export const pageConfig = { title: "You're done", completesOn: 'view' };
-</script>
-```
-
-```svelte
-<script>
-  import { useCompletion } from 'tessera-learn';
-  const { markComplete, completionStatus } = useCompletion();
-</script>
-
-<button
-  onclick={() => markComplete()}
-  disabled={completionStatus === 'complete'}
->
-  I acknowledge
-</button>
-```
-
-**Build-time check:** `completion: { mode: "manual", trigger: "page" }` fails the build when no page declares `completesOn: "view"`. Omitted, the dev runtime warns once after 60s if completion hasn't fired.
-
-### Success status
-
-By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion. It is an alias for `success: { from: "fixed", status }`; see [Success criterion](#success-criterion) to judge a quiz instead.
-
-| Adapter        | `markComplete()`, default                                       | with `requireSuccessStatus: "passed"` |
-| -------------- | --------------------------------------------------------------- | ------------------------------------- |
-| SCORM 1.2      | `lesson_status = "completed"`                                   | `lesson_status = "passed"`            |
-| SCORM 2004 4th | `completion_status = "completed"`, `success_status = "unknown"` | `success_status = "passed"`           |
-| cmi5           | **Completed** (no Passed/Failed)                                | **Passed** alongside **Completed**    |
-| xapi           | **Completed** (no Passed/Failed)                                | **Passed** alongside **Completed**    |
-| web            | `localStorage` only                                             | `localStorage` only                   |
-
-### Rules and non-goals
-
-- A graded quiz reports its score but does **not** drive completion under manual: `markComplete()`/`completesOn` does. It drives success only under `success: { from: "quiz" }` (without it the build warns; set `graded: false` to silence).
-- Per-learner conditional **completion** → use `useCompletion()` in a custom `$effect`/component, not config.
-
----
-
-## Success criterion
-
-`completion.mode` decides what makes a course **complete**. `success` decides what makes it **passed**, independently. Omit `success` and the mode supplies it:
-
-| `completion.mode` | implied `success`                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------- |
-| `"quiz"`          | `{ from: "quiz" }`                                                                  |
-| `"percentage"`    | `{ from: "quiz" }`                                                                  |
-| `"manual"`        | `{ from: "fixed", status: requireSuccessStatus }` when set, else `{ from: "none" }` |
-
-| `success.from` | Verdict                                                                                                                                                    |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"quiz"`       | graded average vs `scoring.passingScore`: `failed` once every required graded page has a score or the course completes, `passed` once the course completes |
-| `"fixed"`      | asserts `status` (`"passed"` / `"failed"`) when the course completes                                                                                       |
-| `"none"`       | never sends a verdict; completion and score still report                                                                                                   |
-
-```js
-completion: { mode: 'manual' },
-success: { from: 'quiz' },   // trigger completes, quiz decides pass/fail
-```
-
-- Under `completion.mode: "manual"` with `success: { from: "quiz" }`, `passingScore` defaults to 70 rather than manual mode's 0.
-- **A `passed` is never taken back**, even when the score later drops or the learner resumes. From the pass on the LMS keeps the best score reached, and a completion is never taken back either. A `failed` can still turn into `passed`.
-- **A learner who completes without attempting a required graded page reads `failed`** (it counts as 0). A skipped optional page leaves the average instead, so a course whose graded pages are all optional and all skipped stays `"unknown"`.
-- **cmi5 `moveOn` is `CompletedAndPassed`** whenever the course is sure to send a verdict: a fixed one, or a quiz one with at least one **required** graded page. Otherwise it is `Completed`, so a verdict sent off optional pages alone never gates credit.
-- Set `success: { from: "none" }` for a graded quiz that reports a score but should not gate credit. `tessera validate` warns when a quiz verdict has no required page to judge.
+Inside `<Quiz>` the quiz owns grading, so `graded` is ignored there. For a custom widget, build it with `useQuestion` (see [Recipe 3](docs/recipes.md#recipe-3-graded-standalone-question)).
 
 ---
 
@@ -710,8 +594,8 @@ export default {
 | `navigation.mode: "sequential"` | Pages unlock one at a time as each completes: a plain page on view, a quiz page on submit, a `graded: true` page once every graded question on it is answered                                                                                                                                                                                                          |
 | `completion.mode: "percentage"` | Completes when `completedPages / totalPages * 100 >= percentageThreshold`. A quiz page counts only once its quiz has been submitted (pass or fail), and a `graded: true` page only once every graded question on it is answered.                                                                                                                                       |
 | `completion.mode: "quiz"`       | Completes when the graded average >= `scoring.passingScore`. Needs a required graded page                                                                                                                                                                                                                                                                              |
-| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](#manual-completion)                                                                                                                                                                                                                                                                                    |
-| `success.from`                  | What judges pass/fail, independent of completion. See [Success criterion](#success-criterion)                                                                                                                                                                                                                                                                          |
+| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](docs/scoring.md#manual-completion)                                                                                                                                                                                                                                                                     |
+| `success.from`                  | What judges pass/fail, independent of completion. See [Success criterion](docs/scoring.md#success-criterion)                                                                                                                                                                                                                                                           |
 | `a11y.level: "error"`           | Promotes captions/transcript, empty question labels, heading order, contrast, language and Svelte a11y warnings to errors. Missing `alt` and missing media `title` are errors at either level                                                                                                                                                                          |
 | `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs). Suppresses a matching diagnostic at any severity, the missing `alt` / `title` errors included                                                                                                                                                     |
 
@@ -723,10 +607,10 @@ Every field has a default, so `export default { title: "My Course" }` is complet
 
 `course.config.js` is data only: a function value in it fails the build. Functions go in an optional `course.runtime.js` at the course root, as named exports:
 
-| Export      | Type                                     | Purpose                                                                                                                     |
-| ----------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `canAccess` | `(ctx: AccessContext) => boolean`        | Custom page access. Replaces the `navigation.mode` preset. See [Custom access rules](#custom-access-rules).                 |
-| `xapi`      | `{ [destinationId]: { auth?, actor? } }` | Resolvers for explicit xAPI destinations, keyed by their `id`. See [Configure the destination](#configure-the-destination). |
+| Export      | Type                                     | Purpose                                                                                                                                 |
+| ----------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `canAccess` | `(ctx: AccessContext) => boolean`        | Custom page access. Replaces the `navigation.mode` preset. See [Custom access rules](#custom-access-rules).                             |
+| `xapi`      | `{ [destinationId]: { auth?, actor? } }` | Resolvers for explicit xAPI destinations, keyed by their `id`. See [Configure the destination](docs/xapi.md#configure-the-destination). |
 
 Both exports are optional. `course.config.js` and `course.runtime.js` both ship in the client bundle, so every value in them is public: never put a secret in either.
 
@@ -748,41 +632,7 @@ export function canAccess(ctx) {
 
 `AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. `canAccess` replaces the preset, so compose with it: `resolveAccess(config)` returns the preset for `navigation.mode`, and `freeAccess` / `sequentialAccess` are re-exported.
 
-### Build output
-
-`pnpm export <course>` writes into the course folder:
-
-| `export.standard` | What ships                                  | Where                     |
-| ----------------- | ------------------------------------------- | ------------------------- |
-| `web`             | Static site (HTML/CSS/JS + `assets/`)       | `dist/` (any static host) |
-| `scorm12`         | SCORM 1.2 package                           | `<title>-<version>.zip`   |
-| `scorm2004`       | SCORM 2004 4th Edition package              | `<title>-<version>.zip`   |
-| `cmi5`            | cmi5 package (AU + manifest)                | `<title>-<version>.zip`   |
-| `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `<title>-<version>.zip`   |
-
-`<title>` is the slugified `title` and `<version>` the `version` from `course.config.js` (`my-course-1.0.0.zip`). The name carries no standard, and each packaged export first deletes every `<title>-*.zip` in the course folder.
-
-Upload the zip via your LMS's import flow; drop `dist/` (web) on any static host.
-
-To package one course for several LMSs, export once per `--standard` and move each zip out of the course folder before the next export. An unknown `--standard` value fails before the build runs.
-
-### Web export Content-Security-Policy
-
-Web builds emit a baseline CSP `<meta>` (LMS packages and the dev server don't). It allows any `https:` for images/media/frames/network, but **not** for scripts, styles, or fonts, so a CDN script/stylesheet/font is blocked until you allow its origin. Extend per-directive via `export.csp` (sources are **appended** to the baseline, never replaced):
-
-```js
-export: {
-  standard: 'web',
-  csp: {
-    'style-src': ['https://fonts.googleapis.com'],
-    'font-src': ['https://fonts.gstatic.com'],
-  },
-}
-```
-
-- `export.csp: false` drops the meta entirely (use when your host sets a CSP header).
-- To **tighten** or replace a directive, use a `transformIndexHtml` hook: `export.csp` only adds.
-- Ignored unless `standard` is `'web'`.
+Build output, the web export CSP and per-LMS behaviour are in [`node_modules/tessera-learn/docs/export.md`](docs/export.md).
 
 ### Validation
 
@@ -799,753 +649,3 @@ Two passes plus components that are accessible by construction.
 **Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 
 Ruleset and severity come from the `a11y` block: see [Field behaviour](#field-behaviour).
-
----
-
-## Hooks Reference
-
-Seven hooks plus two helpers. Each hook is synchronous and must be called during component setup inside a Tessera course. The built-in components use only these exports, so anything a built-in does, a custom component can do too.
-
-```js
-import {
-  useQuestion,
-  useQuiz,
-  useNavigation,
-  useProgress,
-  useCompletion,
-  usePersistence,
-  useCourse,
-  isCorrect,
-  resolveAsset,
-} from 'tessera-learn';
-import type { Interaction } from 'tessera-learn';
-```
-
-### The `Question` model
-
-`useQuiz()` and `useQuestion()` share the same per-question object: a shell iterates `quiz.questions`, a widget gets its `Question` from `useQuestion()`. No indexes, no `getContext`.
-
-```ts
-interface Question {
-  readonly id: string;
-  readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null on a restored result (see `useQuiz().restored`)
-  readonly answer: unknown;
-  readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
-  readonly feedbackVisible: boolean;
-  readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100, no retry
-  readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
-  setAnswer(answer: unknown): void;
-  commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
-}
-```
-
-Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to render the "already correct" banner.
-
-A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
-
-`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
-
-```ts
-type Interaction =
-  | {
-      type: 'choice';
-      response: string[];
-      correct?: string[];
-      options?: string[];
-    }
-  | {
-      type: 'sequencing';
-      response: string[]; // ordered ids
-      correct?: string[];
-      options?: string[];
-    }
-  | { type: 'true-false'; response: boolean; correct?: boolean }
-  | {
-      type: 'fill-in' | 'long-fill-in';
-      response: string;
-      correct?: string[]; // accepted answers
-      caseMatters?: boolean;
-    }
-  | {
-      type: 'matching';
-      response: [string, string][];
-      correct?: [string, string][];
-      optionPairs?: { left: string[]; right: string[] };
-    }
-  | {
-      type: 'numeric';
-      response: number;
-      correct?: { min?: number; max?: number };
-    }
-  | { type: 'likert' | 'other'; response: string; correct?: string }
-  | {
-      type: 'performance';
-      response: [string, string | number][]; // [stepId, value]
-      correct?: [string, string | number][];
-    };
-```
-
-For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names, SCORM 1.2 maps each to its index in `options` (omit `options` and SCORM 1.2 slugs the literal identifier).
-
-```ts
-response: () => ({
-  type: 'choice',
-  response: selected ? [selected] : [],
-  correct: ['speed-limit'],
-  options: ['stop', 'yield', 'speed-limit', 'merge'],
-});
-// SCORM 1.2 → "2"   SCORM 2004 → "speed-limit"   cmi5 → "speed-limit"
-
-// sequencing: response/correct are ordered id lists; options carries every id
-response: () => ({
-  type: 'sequencing',
-  response: order, // e.g. ['mercury', 'venus', 'earth']
-  correct: ['mercury', 'venus', 'earth'],
-  options: ['venus', 'earth', 'mercury'],
-});
-```
-
-### `useQuestion`
-
-Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
-
-- **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
-- **Standalone:** the widget owns Check/Retry. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
-
-```ts
-function useQuestion(opts: {
-  id: string; // unique on the page; LMS interaction id (letters, digits, inner underscores)
-  graded?: boolean; // standalone only
-  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
-  score?: () => number; // standalone-only override (0–100)
-  weight?: number; // page-level rollup weight (default 1)
-  maxRetries?: number; // standalone retry cap per mount (default Infinity); ignored inside a quiz
-  complete?: () => boolean; // is the answer fully specified? default true
-  reset?: () => void;
-}): Question & {
-  submit(): void; // standalone: own check. quiz: no-op
-  reset(): void; // clear the answer; after a standalone submit, same as retry()
-  retry(): void; // standalone: no-op unless canRetry. Always a no-op inside a quiz
-  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit. A remount starts over.
-  readonly retryCount: number;
-  readonly mode: 'standalone' | 'quiz';
-  setRender(render: unknown): void;
-};
-```
-
-See [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a full widget and [Recipe 3](#recipe-3-graded-standalone-question) for a graded standalone.
-
-### `useQuiz`
-
-Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Throws on a page without `pageConfig.quiz`.
-
-- **A custom shell must render `children`**, visibly or hidden. Questions register only when they mount, so a shell that drops `children` has nothing to score.
-- **Only `submit()` scores the quiz.** It reports every question to the LMS, records the page score and marks the quiz Completed/Passed/Failed.
-- **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`. Dispatching it yourself is a build error.
-- **Widgets call `setAnswer()` only; the shell decides when an answer is final.** Call `q.commit()` to report one question before the end (the built-in `<Quiz>` does when `feedbackMode: 'immediate'` reveals it), and still call `submit()` at the end.
-
-```ts
-function useQuiz(opts?: { element?: () => HTMLElement | null }): {
-  readonly state: 'answering' | 'submitted' | 'reviewing';
-  readonly questions: ReadonlyArray<Question>;
-  readonly canSubmit: boolean;
-  readonly canRetry: boolean;
-  readonly score: number; // 0–100, to 2 decimal places; the attempt just submitted, or the restored result
-  readonly bestScore: number; // highest across attempts; this is what the LMS gets
-  readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
-  readonly attemptCount: number;
-  readonly restored: boolean; // results came from saved progress, not this session
-  readonly feedbackMode: 'review' | 'immediate' | 'never'; // pageConfig.quiz value, default 'review'
-  readonly maxAttempts: number; // pageConfig.quiz value, default Infinity
-  submit(): void;
-  retry(): void;
-  startReview(): void;
-  exitReview(): void;
-  revealFeedback(q: Question): void; // immediate-feedback flow
-};
-```
-
-- **Show `bestScore` whenever `bestScore > score`.** `score` is the latest attempt; the LMS and the navigation gate use `bestScore`.
-- **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the score and attempt count, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
-- **Read `passingScore` from this hook**, not from `course.config.js`: an LMS mastery score overrides the config at launch.
-
-### `useNavigation`
-
-```ts
-function useNavigation(): {
-  readonly currentPage: ManifestPage;
-  readonly currentPageIndex: number;
-  readonly pages: ManifestPage[];
-  goTo(slug: string): void;
-  goToIndex(index: number): void; // no-op for a locked page or an index that is not a whole number in range
-  next(): void;
-  prev(): void;
-  readonly canGoNext: boolean; // false when the next page is locked
-  readonly canGoPrev: boolean; // false when the previous page is locked
-  canAccess(slug: string): boolean; // first page with that slug; slugs repeat across lessons
-  canAccessIndex(index: number): boolean; // use this when iterating pages or sections
-  readonly sections: ManifestSection[]; // course tree: { title, slug, lessons: [{ title, slug, pages }] }
-  prefetch(index: number): void; // start loading a page's module, e.g. on hover; no-op for locked pages
-};
-```
-
-Each `ManifestPage` exposes `slug`, `title`, and `index`.
-
-### `useProgress`
-
-```ts
-function useProgress(): {
-  readonly visitedPages: Set<number>;
-  readonly completedPages: number; // visited pages, minus graded pages still awaiting a score
-  quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
-  pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the page on screen
-  readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; what successStatus is judged on
-  readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
-  readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
-  readonly completionStatus: 'incomplete' | 'complete'; // live, so it can drop after the LMS is told complete; the LMS stays complete
-  readonly successStatus: 'unknown' | 'passed' | 'failed'; // passed only once the course completes, then held
-  markVisited(pageIndex: number): void; // no-op for an index that is not a page in the course
-  markChunk(pageIndex: number, chunkIndex: number): void; // same, and for a chunkIndex that is not a whole number
-};
-```
-
-`pageScore`: a standalone-question page renders no score on its own, so read it and print it as is.
-
-- **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
-- **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
-
-`gradedScore`: the course average that `successStatus` is judged on. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page is answered.
-
-- **Unanswered required graded pages count as 0**, so a learner who has aced two of four equally weighted required quizzes reads 50%. Show it after the graded pages, or label it ("course score so far").
-- **Print it as is.** Rounding it further can print "70%" beside `failed` when the average is 69.67.
-- **Don't derive pass/fail from it.** Read `successStatus`. `passingScore` is 0 under manual mode with no quiz verdict, so guard any pass mark you display.
-
-```svelte
-<script>
-  import { useProgress } from 'tessera-learn';
-  const progress = useProgress();
-  const { average, attempted } = $derived(progress.gradedScore);
-</script>
-
-{#if attempted}
-  <p>Course score so far: {average}%</p>
-  {#if progress.passingScore > 0}
-    <p>Pass mark: {progress.passingScore}% &middot; {progress.successStatus}</p>
-  {/if}
-{/if}
-```
-
-### `useCompletion`
-
-Active under `completion.mode: "manual"` only. See [Manual completion](#manual-completion).
-
-```ts
-function useCompletion(): {
-  markComplete(): void; // idempotent: only the first call per session has an effect
-  readonly completionStatus: 'incomplete' | 'complete'; // live, same as useProgress().completionStatus
-};
-```
-
-### `usePersistence<T>(key)`
-
-Per-widget persistent state, JSON-serializable only: a value that isn't (a `BigInt`, a cycle) lasts the session but is left out of the save, with a console warning. Survives reload on every adapter (`localStorage` / SCORM `cmi.suspend_data` / xAPI State API). Reads sync; writes batched. Keys are namespaced per course. Keep values small: see the cap under [LMS behaviour](#lms-behaviour).
-
-```ts
-function usePersistence<T>(key: string): {
-  get(): T | null;
-  set(value: T): void;
-};
-```
-
-Usage in [Recipe 1](#recipe-1-custom-draw-a-line-question) (persists partial progress).
-
-### `useCourse`
-
-Course identity from `course.config.js`, for layouts and headers, and the session's exit. Use it instead of importing the config file.
-
-```ts
-function useCourse(): {
-  readonly title: string;
-  readonly logo: string | undefined; // branding.logo with $assets/ resolved, ready for <img src>; undefined when unset or empty
-  readonly canExit: boolean; // true under an LMS once the launch finishes, until the session ends; false on the web
-  exit(): Promise<void>;
-};
-```
-
-`exit()`:
-
-- Saves progress and ends the LMS session. Does nothing while `canExit` is false.
-- Sends the learner to the cmi5 `returnURL` when there is one; otherwise shows a "Session ended" screen.
-- Does not confirm, and the session cannot resume. The default layout's **Exit course** button confirms first; a custom layout must confirm in a `<dialog>`, never `window.confirm()` (sandboxed LMS iframes make it return false without asking).
-
-```svelte
-<script>
-  import { useCourse } from 'tessera-learn';
-  const course = useCourse();
-  let confirmExit = $state();
-</script>
-
-{#if course.canExit}
-  <button onclick={() => confirmExit.showModal()}>Exit course</button>
-  <dialog bind:this={confirmExit} aria-label="Exit the course?">
-    <p>Exit the course? Your progress will be saved.</p>
-    <button onclick={() => confirmExit.close()}>Cancel</button>
-    <button onclick={() => course.exit()}>Exit course</button>
-  </dialog>
-{/if}
-```
-
-### `isCorrect(interaction)`
-
-Pure helper. Returns `true`, `false`, or `null` (when the interaction has no `correct`).
-
-```ts
-function isCorrect(i: Interaction): boolean | null;
-```
-
----
-
-## Custom xAPI statements
-
-The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated; `cmi.*` writes under SCORM) is sent automatically. To emit your own verbs, use `useXAPI()`:
-
-```ts
-import { useXAPI } from 'tessera-learn';
-
-const xapi = useXAPI(); // XAPIClient | null
-xapi?.sendStatement({
-  verb: { id: 'http://adlnet.gov/expapi/verbs/experienced' },
-  object: { id: `${xapi.getActivityId()}#diagram-1` },
-});
-```
-
-`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured, before adapter init resolves, or once the session has ended (Exit or page close): **null-check and degrade gracefully**. The client exposes `sendStatement(statement, options?)`, `getActivityId()`, `getActor()` and `getSessionId()`; the getters read the first destination. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
-
-### Configure the destination
-
-`config.xapi` is one destination or an array, always explicit (no implicit default). Every explicit destination needs a unique `id`. Pick one of three shapes.
-
-An explicit LRS, with its resolvers in `course.runtime.js`:
-
-```js
-// course.config.js
-export default {
-  // ...
-  xapi: {
-    id: 'lrs',
-    endpoint: 'https://lrs.example.com/xapi/',
-    activityId: 'https://example.com/courses/intro-to-x',
-  },
-};
-```
-
-```js
-// course.runtime.js: resolvers for destination "lrs"
-export const xapi = {
-  lrs: {
-    auth: () => fetch('/api/lrs-token').then((r) => r.text()),
-    actor: () => getCurrentUser(),
-  },
-};
-```
-
-The LMS launch LRS (cmi5 / xapi; ignored under other standards). It takes no other field:
-
-```js
-// course.config.js
-export default {
-  // ...
-  xapi: { endpoint: 'lms' },
-};
-```
-
-A fan-out, with at most one `'lms'` entry:
-
-```js
-// course.config.js
-export default {
-  // ...
-  xapi: [
-    { endpoint: 'lms' },
-    {
-      id: 'analytics',
-      endpoint: 'https://analytics.example.com/xapi/',
-      activityId: 'https://example.com/courses/intro-to-x',
-    },
-  ],
-};
-```
-
-| Field   | In `course.config.js`                   | In `course.runtime.js` `xapi[id]`                            |
-| ------- | --------------------------------------- | ------------------------------------------------------------ |
-| `auth`  | credential string (ships in the bundle) | `() => string \| Promise<string>`, re-invoked once on 401    |
-| `actor` | static Agent object                     | `() => Agent \| Promise<Agent>`, resolved once per page load |
-
-- Set each field in one file, not both. `auth` is required in one of them.
-- Every `xapi` export key must match an explicit destination `id`. Write the export as an object literal so the build can check the pairing.
-
-Each destination has its own queue, auth resolver, and retry loop. One UUID per `sendStatement` is reused across destinations (idempotent dedupe).
-
-### Per-mode behaviour
-
-| Mode          | `xapi` not set     | `xapi.endpoint: 'lms'`  | `xapi: {endpoint, ...}` (explicit)                      |
-| ------------- | ------------------ | ----------------------- | ------------------------------------------------------- |
-| **cmi5**      | `useXAPI()` → null | Inherits launch LRS     | Independent publisher; `actor` defaults to launch actor |
-| **xapi**      | `useXAPI()` → null | Inherits launch LRS     | Independent publisher; `actor` defaults to launch actor |
-| **scorm12**   | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.core.student_id` |
-| **scorm2004** | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` derived from `cmi.learner_id`      |
-| **web**       | `useXAPI()` → null | Ignored (build warning) | Independent; `actor` **required** (config or resolver)  |
-
-### Gotchas
-
-- **Actor priority:** an author-supplied actor (`xapi.actor` or a `course.runtime.js` resolver) always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model. If the SCORM LMS supplies no learner id, that destination is skipped with a console warning, so `useXAPI()` is null when it was the only one. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
-- **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` resolver or run a proxy.
-- **No static `auth` string in production** (it ships in the bundle and the build warns). Export an `auth` resolver that fetches a server-brokered short-lived token. CORS must allow the served origin.
-- **`actor` is resolved once per page load** (no mid-session identity change; reload to switch).
-- **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
-- **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.
-
-### `sendStatement` return shape
-
-```ts
-const result = await xapi.sendStatement({ verb, object });
-// { statementId, statement, destinations: [{ endpoint, ok, status?, error? }, ...] }
-```
-
-`destinations[]` lets you handle partial failures under fan-out. The publisher validates only: `verb.id` non-empty, `object.id` non-empty when supplied, `result.score.scaled` in `[-1, 1]` when supplied, and that the statement is JSON-serializable. Everything else passes through; the LRS reports shape errors via `destinations[].error`.
-
-### Not supported
-
-OAuth at the publisher level, statement signing/attachment helpers, offline/IndexedDB queue, State API under SCORM and web, voiding, mid-session actor refresh, group actors.
-
----
-
-## LMS behaviour
-
-The runtime translates author intent into adapter calls automatically. The author-relevant differences:
-
-| Concern              | SCORM 1.2                                                                                | SCORM 2004 4th                                                 | cmi5 / xapi                          |
-| -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
-| Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
-| Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                              | 64000 chars                                                    | LRS-defined (typically unbounded)    |
-| Resume after reload  | From `cmi.suspend_data`                                                                  | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
-
-Author-facing consequences:
-
-- **A failing learner who cannot complete stays `incomplete` on SCORM 1.2**, with the score: under `completion.mode: "quiz"` they never complete, and in any mode a failed `gatesProgress` quiz locks the pages after it. An LMS that rescores against a mastery score on exit records `failed` itself.
-- **Keep persisted state small under SCORM 1.2**: it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
-- **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5.
-- **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
-- A failed `adapter.init()` renders a visible "This course can't run here" panel, never a silent degradation.
-
-### Local testing
-
-| Standard  | How to test                                                                                |
-| --------- | ------------------------------------------------------------------------------------------ |
-| scorm12   | Upload the exported zip to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player  |
-| scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                    |
-| cmi5      | Upload the exported zip to SCORM Cloud and use its generated cmi5 dispatch URL             |
-| xapi      | Upload the exported zip to SCORM Cloud (imports `tincan.xml`) and launch the generated URL |
-| web       | Serve `dist/` from any static host                                                         |
-
-Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / interactions look right.
-
----
-
-## Custom Layouts
-
-`layout.svelte` at the course root replaces the default chrome. Scaffolded courses ship one: edit it, or delete it to get the default chrome back. The contract: it receives a single `page` snippet prop and renders it where the active page goes; use hooks for everything else.
-
-```svelte
-<!-- layout.svelte -->
-<script>
-  import { useNavigation, useProgress } from 'tessera-learn';
-
-  let { page } = $props();
-  const nav = useNavigation();
-  const progress = useProgress();
-</script>
-
-<header>
-  <h1>{nav.currentPage.title}</h1>
-  <span>{progress.visitedPages.size} / {nav.pages.length} visited</span>
-</header>
-
-<main>{@render page()}</main>
-
-<footer>
-  <button disabled={!nav.canGoPrev} onclick={() => nav.prev()}>Prev</button>
-  <button disabled={!nav.canGoNext} onclick={() => nav.next()}>Next</button>
-</footer>
-```
-
-A custom layout gets no Exit button; add one with [`useCourse()`](#usecourse).
-
-To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` and compose around it. With no `layout.svelte`, `chrome: 'custom'` in `course.config.js` renders pages with no chrome at all.
-
----
-
-## Cookbook
-
-End-to-end recipes exercising the full hooks API. Adapt to taste.
-
-### Recipe 1: Custom "draw a line" question
-
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); persists partial progress so an interrupted session resumes. Check stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
-
-```svelte
-<!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
-<script module>
-  export const pageConfig = { title: 'Match the elements' };
-</script>
-
-<script>
-  import { useQuestion, usePersistence } from 'tessera-learn';
-
-  const CORRECT = [
-    ['Hydrogen', 'H'],
-    ['Helium', 'He'],
-    ['Lithium', 'Li'],
-  ];
-
-  const store = usePersistence('draw-pairs:v1');
-  let pairs = $state(store.get() ?? []);
-  $effect(() => store.set(pairs));
-
-  const q = useQuestion({
-    id: 'drawPairs1',
-    response: () => ({ type: 'matching', response: pairs, correct: CORRECT }),
-    reset: () => {
-      pairs = [];
-    },
-  });
-
-  function connect(l, r) {
-    pairs = [...pairs.filter(([a]) => a !== l), [l, r]];
-  }
-</script>
-
-<!-- line-drawing UI calls connect(l, r) on drop -->
-
-<button
-  onclick={q.submit}
-  disabled={q.submitted || pairs.length < CORRECT.length}>Check</button
->
-{#if q.correct === true}<p>Correct.</p>{/if}
-{#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
-```
-
-### Recipe 2: Custom quiz shell via `quiz.svelte`
-
-Drop `quiz.svelte` at the course root. It replaces the quiz UI on every quiz page.
-
-```svelte
-<!-- quiz.svelte -->
-<script>
-  import { useQuiz } from 'tessera-learn';
-
-  let { children } = $props();
-
-  const quiz = useQuiz();
-  const answered = $derived(
-    quiz.questions.filter((q) => q.answerComplete).length,
-  );
-</script>
-
-<div class="my-quiz">
-  {#each quiz.questions as q (q.id)}
-    <section data-question-id={q.id}>
-      {#if q.render}{@render q.render()}{/if}
-    </section>
-  {/each}
-
-  {#if quiz.state === 'answering'}
-    <p>{answered} of {quiz.questions.length} answered</p>
-    <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
-      >Submit</button
-    >
-  {:else if quiz.state === 'submitted'}
-    <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
-    {#if quiz.bestScore > quiz.score}<p>Best attempt: {quiz.bestScore}%</p>{/if}
-    {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
-    {#if !quiz.restored}<button onclick={() => quiz.startReview()}
-        >Review</button
-      >{/if}
-  {:else}
-    <button onclick={() => quiz.exitReview()}>Back to results</button>
-  {/if}
-
-  <!-- Required: questions register only when children render. Hidden keeps widget state across submit/review. -->
-  <div style="display:none">{@render children?.()}</div>
-</div>
-```
-
-`children` is the whole page body as one snippet, and built-in widgets render nothing inside it. Two layouts:
-
-| Layout          | `children`       | `q.render()`          | Page prose         |
-| --------------- | ---------------- | --------------------- | ------------------ |
-| Snippet (above) | rendered hidden  | rendered per question | unavailable        |
-| Inline          | rendered visibly | never called          | interleaved freely |
-
-Inline layout needs custom widgets that render their own markup instead of calling `setRender`. Built-in widgets render nothing in that layout.
-
-### Recipe 2b: Custom question widget for a custom quiz shell
-
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does.
-
-```svelte
-<!-- components/MyChoice.svelte -->
-<script>
-  import { onMount } from 'svelte';
-  import { useQuestion } from 'tessera-learn';
-
-  let { id, prompt, options, correct } = $props();
-  let selected = $state(null);
-
-  const q = useQuestion({
-    id,
-    response: () => ({
-      type: 'choice',
-      response: selected !== null ? [String(selected)] : [],
-      correct: [String(correct)],
-    }),
-    reset: () => {
-      selected = null;
-    },
-  });
-
-  onMount(() => q.setRender(view)); // no-op in standalone mode
-
-  function pick(i) {
-    if (q.locked) return;
-    selected = i;
-    q.setAnswer(i);
-  }
-</script>
-
-{#snippet view()}
-  <fieldset disabled={q.locked}>
-    <legend>{prompt}</legend>
-    {#each options as opt, i}
-      {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
-      <label>
-        <input
-          type="radio"
-          name={id}
-          checked={chosen}
-          onchange={() => pick(i)}
-        />
-        {opt}
-      </label>
-    {/each}
-  </fieldset>
-
-  {#if q.feedbackVisible}
-    <p>
-      {q.answer === correct
-        ? 'Correct.'
-        : 'The right answer was ' + options[correct] + '.'}
-    </p>
-  {/if}
-{/snippet}
-
-{#if q.mode === 'standalone'}
-  {@render view()}
-  {#if !q.submitted}
-    <button disabled={selected === null} onclick={q.submit}>Check</button>
-  {/if}
-{/if}
-```
-
-Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
-
-### Recipe 2c: Inline layout (prose between questions)
-
-Render `children` visibly, never call `q.render()`, and let widgets render their own markup. Questions then sit in page order, interleaved with the page's prose.
-
-```svelte
-<!-- quiz.svelte -->
-<div>
-  {@render children?.()}
-  <button disabled={!quiz.canSubmit} onclick={() => quiz.submit()}
-    >Submit</button
-  >
-</div>
-```
-
-```svelte
-<!-- components/InlineChoice.svelte: no setRender, no mode branch -->
-<fieldset disabled={q.locked}>
-  <legend>{prompt}</legend>
-  {#each options as opt, i (i)}
-    <label
-      ><input
-        type="radio"
-        name={id}
-        checked={selected === i}
-        onchange={() => pick(i)}
-      />
-      {opt}</label
-    >
-  {/each}
-</fieldset>
-```
-
-Built-in widgets render nothing in this layout (`QuestionShell` renders inline only when standalone). Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
-
-### Recipe 3: Graded standalone question
-
-A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`; omit `correct` to accept any answer. Course success rolls up across every declared graded page, quiz and standalone pages alike.
-
-```js
-const q = useQuestion({
-  id: 'whyItMatters',
-  graded: true,
-  response: () => ({ type: 'long-fill-in', response: answer }),
-  score: () => (answer.trim().length >= 50 ? 100 : 0),
-  reset: () => {
-    answer = '';
-  },
-});
-```
-
-### Recipe 4: Chunked-reveal page with `markChunk`
-
-Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the highest revealed chunk so the page resumes mid-scroll on reload.
-
-```svelte
-<!-- pages/02-deep-dive/01-concepts/long-read.svelte -->
-<script module>
-  export const pageConfig = { title: 'How it works' };
-</script>
-
-<script>
-  import { useNavigation, useProgress } from 'tessera-learn';
-
-  const nav = useNavigation();
-  const progress = useProgress();
-  const pageIndex = $derived(nav.currentPageIndex);
-
-  const TOTAL_CHUNKS = 4;
-  let revealed = $state(progress.chunkProgress.get(pageIndex) ?? 0);
-
-  function reveal() {
-    revealed = Math.min(revealed + 1, TOTAL_CHUNKS - 1);
-    progress.markChunk(pageIndex, revealed);
-  }
-</script>
-
-{#each Array(revealed + 1) as _, i}
-  <section>
-    <h2>Step {i + 1}</h2>
-    <p>Content for step {i + 1}.</p>
-  </section>
-{/each}
-
-{#if revealed < TOTAL_CHUNKS - 1}
-  <button onclick={reveal}>Show next</button>
-{/if}
-```

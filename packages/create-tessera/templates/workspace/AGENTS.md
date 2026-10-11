@@ -2,10 +2,11 @@
 
 This is a [Tessera](https://www.npmjs.com/package/tessera-learn) **workspace**. It
 owns the dependencies once and holds many courses under `courses/`, with a shared
-design system in `shared/` (imported as `$shared`). The full authoring guide —
-components, hooks, course structure, LMS export, accessibility, and workspaces —
-ships with the framework. Run `pnpm install`, then read it at
-`node_modules/tessera-learn/AGENTS.md` before generating or editing course content.
+design system in `shared/` (imported as `$shared`). The authoring guide ships
+with the framework. Run `pnpm install`, then read
+`node_modules/tessera-learn/AGENTS.md` before generating or editing course
+content. It routes specialised tasks to the reference files in
+`node_modules/tessera-learn/docs/`.
 
 @./node_modules/tessera-learn/AGENTS.md
 

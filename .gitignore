@@ -19,7 +19,7 @@ tests/.e2e-variants/
 
 # Logs
 *.log
-docs
+/docs
 
 # Secrets
 .env

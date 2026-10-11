@@ -32,6 +32,8 @@ pnpm check <course>      # validate + a11y (run before export)
 pnpm export <course>     # build a SCORM / cmi5 / xAPI / web package
 ```
 
-Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md) — it loads the full guide
-and has a **Project notes** section where you add your own context (audience, tone,
-brand).
+Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md): it loads the authoring
+guide and has a **Project notes** section where you add your own context (audience,
+tone, brand). If Claude Code does not pick it up, add a `CLAUDE.md` containing
+`@AGENTS.md` beside it (see
+[when Claude Code reads `AGENTS.md`](https://code.claude.com/docs/en/memory#agents-md)).

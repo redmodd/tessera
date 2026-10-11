@@ -26,7 +26,7 @@ That creates a workspace with Tessera wired up, a seed course, and a root `AGENT
 
 Guides and examples: [tesseralearn.dev](https://tesseralearn.dev).
 
-The full authoring guide ships with this package at `node_modules/tessera-learn/AGENTS.md` — scaffolded projects get a small root `AGENTS.md` that points to it — and is on [GitHub](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/AGENTS.md).
+The authoring guide ships with this package: `node_modules/tessera-learn/AGENTS.md` holds what every task needs and routes the rest to the reference files in `node_modules/tessera-learn/docs/`. Scaffolded projects get a small root `AGENTS.md` that points to it. It is also on [GitHub](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/AGENTS.md).
 
 ## License
 
