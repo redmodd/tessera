@@ -14,4 +14,4 @@ Any PR that changes a file under `packages/tessera-learn/` or `packages/create-t
 
 ## How releases happen
 
-Once changesets land on `main`, the Release workflow opens (or updates) a "Version Packages" PR that bumps versions and updates `CHANGELOG.md`. Merging that PR publishes the new versions to npm.
+Once changesets land on `main`, the Release workflow opens (or updates) a `chore: release` PR that bumps versions and updates `CHANGELOG.md`. Merging that PR publishes the new versions to npm.

@@ -74,7 +74,7 @@ pnpm tessera duplicate intro intro-v2   # copy an existing course
 
 `pnpm export` puts the finished package in the course folder: `courses/<course>/<title>-<version>.zip` for SCORM, cmi5, and xAPI, replacing the previous zip for that course. The `web` standard skips zipping and leaves the built site in `courses/<course>/dist/`.
 
-Every scaffolded workspace ships with `AGENTS.md` at its root, pointing your agent at the full authoring guide inside the installed framework (creating pages, components, hooks, quizzes, custom layouts, custom xAPI, and sharing a design system across courses via `$shared`). The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
+The code below is a basic example of a page. If you don't know what the code means, that's okay, your agent does.
 
 ```svelte
 <script module>
@@ -99,13 +99,13 @@ Once your project is running, ask the agent for what you want:
 
 > _"Add a new section called 'Workplace Safety' with three lessons: an intro page, a video page using `safety-overview.mp4` from assets, and a quiz with five multiple-choice questions about hazard recognition."_
 
-`AGENTS.md` (at the root of your workspace) points the agent at the authoring guide, which teaches it the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
+`AGENTS.md` (at the root of your workspace) points the agent at the authoring guide, which teaches it the conventions: how courses, pages, sections, and lessons are organized; how `pageConfig` and `course.config.js` work; which built-in components exist; how to share a design system across courses via `$shared`; and how to author new components against the hooks API (`useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`, `useXAPI`). Anything the built-ins do, an agent-authored component can do, with the same scoring, LMS reporting, and persistence.
 
 You review the output, ask for changes, and iterate. The dev server hot-reloads as the agent writes, so you see each change immediately.
 
 ## Troubleshooting
 
-**`command not found: pnpm`**: pnpm isn't installed. Install it via `npm install -g pnpm` or `corepack enable pnpm` (Node 24+ includes corepack). Then close and reopen your terminal.
+**`command not found: pnpm`**: pnpm isn't installed. Install it via `npm install -g pnpm`, then close and reopen your terminal.
 
 **`engine "node" is incompatible` or similar version errors**: your Node version is older than 24. Run `node --version` to check, then install the current version from [nodejs.org/en/download](https://nodejs.org/en/download).
 

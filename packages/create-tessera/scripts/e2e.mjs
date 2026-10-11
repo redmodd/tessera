@@ -27,11 +27,12 @@ const CLI = join(PKG_ROOT, 'dist', 'index.js');
 const SEED_COURSE = 'starter-course';
 // Every export target. Packaged standards (all but web) write a manifest into
 // dist/ and a zip into the project root; web just emits the static dist/.
-const STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5'];
+const STANDARDS = ['web', 'scorm12', 'scorm2004', 'cmi5', 'xapi'];
 const MANIFEST = {
   scorm12: 'imsmanifest.xml',
   scorm2004: 'imsmanifest.xml',
   cmi5: 'cmi5.xml',
+  xapi: 'tincan.xml',
 };
 
 function run(cmd, cwd) {

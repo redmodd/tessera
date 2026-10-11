@@ -24,4 +24,4 @@
 
 ## Changeset
 
-- [ ] I ran `pnpm changeset` and committed the result, OR this PR doesn't need a release entry (docs/CI/internal only).
+- [ ] I ran `pnpm changeset` and committed the result, OR this PR only touches root-level files (root docs, CI, the top-level `tests/` suite).
