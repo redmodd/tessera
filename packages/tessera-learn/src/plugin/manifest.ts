@@ -123,10 +123,9 @@ export function deriveSlug(name: string, isFile = false): string {
   return stripPrefix(name);
 }
 
-interface ReadFailure {
-  ok: false;
-  reason: 'missing' | 'parse-error' | 'no-export' | 'not-data';
-}
+type ReadFailure =
+  | { ok: false; reason: 'missing' | 'parse-error' | 'no-export' }
+  | { ok: false; reason: 'not-data'; source: string };
 
 export const STATIC_LITERAL_RULE =
   'must be a static object literal (no variables, function calls, template literals, or computed values)';
@@ -142,15 +141,17 @@ function readDefaultExport(
   path: string,
 ): { ok: true; value: unknown } | ReadFailure {
   if (!existsSync(path)) return { ok: false, reason: 'missing' };
-  const result = defaultExportObjectLiteral(readSourceFileCached(path));
+  const source = readSourceFileCached(path);
+  const result = defaultExportObjectLiteral(source);
   if (result.kind === 'parse-error')
     return { ok: false, reason: 'parse-error' };
   if (result.kind === 'none') return { ok: false, reason: 'no-export' };
-  if (result.kind === 'invalid') return { ok: false, reason: 'not-data' };
+  if (result.kind === 'invalid')
+    return { ok: false, reason: 'not-data', source };
   try {
     return { ok: true, value: JSON5.parse(result.text) };
   } catch {
-    return { ok: false, reason: 'not-data' };
+    return { ok: false, reason: 'not-data', source };
   }
 }
 
@@ -161,8 +162,8 @@ export type CourseConfigRead =
  * Read and JSON5-parse the `export default { ... }` literal from a project's
  * course.config.js. Shared by the build plugin and the validator so the read,
  * cache, and parse rules live in one place. The discriminated `reason` lets
- * callers that care (export, validation) emit precise errors while callers
- * that just need a value can fall back on `!ok`.
+ * the validator emit precise errors while callers that just need a value can
+ * fall back on `!ok`.
  */
 export function readCourseConfig(projectRoot: string): CourseConfigRead {
   const read = readDefaultExport(resolve(projectRoot, 'course.config.js'));
@@ -186,7 +187,8 @@ export type ResolvedConfigRead = CourseConfigRead & {
  * Resolve a project's effective export standard once: the CLI `--standard`
  * override wins, else `export.standard`, else `DEFAULT_STANDARD`. An unreadable
  * config with no override, or a standard outside the table, fails closed with
- * no `profile` so callers withhold standard-specific output rather than guess.
+ * no `profile` so the validator skips standard-specific checks rather than
+ * guess.
  * The returned `config` drops any non-object section and already has the
  * override applied, so consumers read it back directly.
  */

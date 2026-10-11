@@ -1,7 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
-import { variantDir } from './global-setup.js';
+import { VARIANTS_ROOT, variantDir } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
 
 async function audit(dir: string): Promise<number> {
@@ -78,5 +84,36 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     expect(report.pagesFailedToLoad).toBe(1);
     expect(report.passed).toBe(false);
     expect(code).toBe(1);
+  });
+
+  // tessera.config.js loads after runAudit starts and before its build
+  // validates, so the edit it makes lands between the two. A fixture no other
+  // audit uses: the audit build goes to the fixture's shared node_modules.
+  test('scans with the a11y settings its build validated', async () => {
+    test.setTimeout(120_000);
+    const dir = resolve(VARIANTS_ROOT, 'quiz-timing', 'audit-settings');
+    rmSync(dir, { recursive: true, force: true });
+    cpSync(variantDir('quiz-timing', 'scorm12'), dir, { recursive: true });
+    writeFileSync(
+      resolve(dir, 'tessera.config.js'),
+      `import { readFileSync, writeFileSync } from 'node:fs';
+const config = new URL('./course.config.js', import.meta.url);
+writeFileSync(
+  config,
+  readFileSync(config, 'utf-8').replace(
+    'export default {',
+    "export default { a11y: { standard: 'wcag21aa' },",
+  ),
+);
+export default {};
+`,
+    );
+
+    await audit(dir);
+
+    const report = JSON.parse(
+      readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
+    );
+    expect(report.standard).toBe('wcag21aa');
   });
 });

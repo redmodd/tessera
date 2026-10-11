@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -6,11 +6,27 @@ import {
   rmSync,
   existsSync,
   readdirSync,
+  utimesSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
+
+// svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
+const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
+
+vi.mock('@sveltejs/vite-plugin-svelte', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@sveltejs/vite-plugin-svelte')>();
+  return {
+    ...actual,
+    svelte(options: Parameters<typeof actual.svelte>[0]) {
+      svelteOptions.onwarn = options?.onwarn;
+      return actual.svelte(options);
+    },
+  };
+});
 
 let projectRoot: string;
 
@@ -23,11 +39,28 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
+function validatedBuild(): (name: string) => Plugin {
+  const lesson = resolve(projectRoot, 'pages', '01-section', '01-lesson');
+  mkdirSync(lesson, { recursive: true });
+  writeFileSync(resolve(lesson, 'page.svelte'), '<h1>Page</h1>', 'utf-8');
+  const get = resolvedPlugins(projectRoot, 'build');
+  const validation = get('tessera:validation');
+  (validation.buildStart as any).call(validation);
+  return get;
+}
+
+let configWrites = 0;
+
+function writeConfigSource(source: string) {
+  const configPath = resolve(projectRoot, 'course.config.js');
+  writeFileSync(configPath, source, 'utf-8');
+  configWrites += 1;
+  utimesSync(configPath, configWrites, configWrites);
+}
+
 function writeConfig(standard: string) {
-  writeFileSync(
-    resolve(projectRoot, 'course.config.js'),
+  writeConfigSource(
     `export default { title: "Café 中文 🎓", export: { standard: "${standard}" } };`,
-    'utf-8',
   );
 }
 
@@ -57,18 +90,16 @@ export const pageConfig = { title: "Café 中文 🎓 Évaluation" }
 describe('generated index.html Content-Security-Policy', () => {
   function buildHtml(standard: string): string {
     writeConfig(standard);
-    const plugin = findPlugin('tessera:index-html');
-    (plugin.buildStart as any).call(plugin);
-    return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
+    return renderIndexHtml();
   }
 
   function buildHtmlFromConfig(body: string): string {
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      `export default ${body};`,
-      'utf-8',
-    );
-    const plugin = findPlugin('tessera:index-html');
+    writeConfigSource(`export default ${body};`);
+    return renderIndexHtml();
+  }
+
+  function renderIndexHtml(): string {
+    const plugin = validatedBuild()('tessera:index-html');
     (plugin.buildStart as any).call(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
@@ -86,16 +117,27 @@ describe('generated index.html Content-Security-Policy', () => {
     expect(html).toContain("worker-src 'self' blob:");
   });
 
-  it('fails closed (no CSP) when the config cannot be read', () => {
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      'export default {',
-      'utf-8',
-    );
+  it('refuses to read the config before validation runs', () => {
+    writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
-    (plugin.buildStart as any).call(plugin);
-    const html = readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
-    expect(html).not.toContain('Content-Security-Policy');
+    expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
+      'course.config.js has no validated snapshot',
+    );
+  });
+
+  it('refuses to read the config after a rebuild fails validation', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfig('web');
+    const get = validatedBuild();
+    const validation = get('tessera:validation');
+    const plugin = get('tessera:index-html');
+    writeConfigSource('export default {');
+    expect(() => (validation.buildStart as any).call(validation)).toThrow(
+      'Tessera validation failed',
+    );
+    expect(() => (plugin.buildStart as any).call(plugin)).toThrow(
+      'course.config.js has no validated snapshot',
+    );
   });
 
   it('omits the CSP meta for LMS packages (would break iframe bridges)', () => {
@@ -158,7 +200,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
 describe('export packaging gate', () => {
   function buildPlugins() {
-    const get = resolvedPlugins(projectRoot, 'build');
+    const get = validatedBuild();
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
@@ -166,7 +208,7 @@ describe('export packaging gate', () => {
     (get('tessera:manifest').load as any).handler.call({
       addWatchFile() {},
     });
-    return { entry, exporter, validation };
+    return { entry, exporter, validation, get };
   }
 
   function seedStaleDist() {
@@ -228,11 +270,7 @@ describe('export packaging gate', () => {
     config: string,
     pageConfig?: string,
   ): Promise<string> {
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      `export default ${config};`,
-      'utf-8',
-    );
+    writeConfigSource(`export default ${config};`);
     if (pageConfig) {
       mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
       writeFileSync(
@@ -356,31 +394,51 @@ describe('export packaging gate', () => {
     );
   });
 
-  it.each([
-    [
-      'a syntax error',
-      'export default {',
-      'changed after validation: could not parse, JavaScript syntax error.',
-    ],
-    [
-      'a non-data value',
-      'export default { title: someVariable };',
-      'changed after validation: the default export must be a static object literal',
-    ],
-  ])(
-    'reports a course.config.js that breaks mid-build with %s',
-    async (_case, source, message) => {
-      writeConfig('scorm12');
-      const { entry, exporter } = buildPlugins();
-      writeBundle(exporter);
-      (entry.closeBundle as any).call(entry);
-      writeFileSync(resolve(projectRoot, 'course.config.js'), source, 'utf-8');
+  const editedConfig =
+    'export default { title: "Edited", export: "scorm12", xapi: { endpoint: "https://lrs.example/xapi/" } };';
 
-      await expect(
-        (exporter.closeBundle as any).call(exporter),
-      ).rejects.toThrow(message);
-    },
-  );
+  it('builds and packages the validated config when course.config.js changes mid-build', async () => {
+    writeConfigSource(
+      'export default { title: "Validated", export: { standard: "scorm12" } };',
+    );
+    seedStaleDist();
+    const { entry, exporter, get } = buildPlugins();
+    writeConfigSource(editedConfig);
+    const load = (name: string): string =>
+      (get(name).load as any).handler.call({ addWatchFile() {} });
+    expect(load('tessera:adapter')).toContain('SCORM12Adapter');
+    expect(load('tessera:config')).toContain('"title":"Validated"');
+    expect(load('tessera:config')).toContain('"standard":"scorm12"');
+    expect(load('tessera:xapi-setup')).toContain('return null');
+    writeBundle(exporter);
+    (entry.closeBundle as any).call(entry);
+    await (exporter.closeBundle as any).call(exporter);
+
+    expect(existsSync(resolve(projectRoot, 'dist', 'imsmanifest.xml'))).toBe(
+      true,
+    );
+    expect(
+      readdirSync(projectRoot).filter((f) => f.endsWith('.zip')),
+    ).toHaveLength(1);
+  });
+
+  it('gates compiler a11y warnings at the validated a11y.level when course.config.js changes mid-build', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfigSource(
+      'export default { title: "Validated", language: "en", a11y: { level: "error" } };',
+    );
+    const { get } = buildPlugins();
+    writeConfigSource(editedConfig);
+    svelteOptions.onwarn({
+      code: 'a11y_missing_attribute',
+      filename: resolve(projectRoot, 'pages', 'welcome.svelte'),
+      message: '`<img>` element should have an alt attribute',
+    });
+    const gate = get('tessera:a11y-compiler');
+    expect(() => (gate.buildEnd as any).call(gate)).toThrow(
+      "1 a11y issue(s) with a11y.level: 'error'",
+    );
+  });
 
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
     writeConfig('scorm12');
@@ -397,10 +455,8 @@ describe('export packaging gate', () => {
       rmSync(resolve(projectRoot, zip));
     }
 
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
+    writeConfigSource(
       'export default { title: "Course", export: { standard: "scorm12" }, resume: "sometimes" };',
-      'utf-8',
     );
     expect(() => (validation.buildStart as any).call(validation)).toThrow();
 
@@ -420,12 +476,8 @@ describe('export packaging gate', () => {
 
 describe('xapi setup virtual module', () => {
   function loadSetup(body: string): string {
-    writeFileSync(
-      resolve(projectRoot, 'course.config.js'),
-      `export default ${body};`,
-      'utf-8',
-    );
-    const plugin = findPlugin('tessera:xapi-setup');
+    writeConfigSource(`export default ${body};`);
+    const plugin = validatedBuild()('tessera:xapi-setup');
     return (plugin.load as any).handler.call({});
   }
 
@@ -444,7 +496,7 @@ describe('xapi setup virtual module', () => {
   it('wires the client for an explicit endpoint alongside an inert lms entry', () => {
     expect(
       loadSetup(
-        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { endpoint: "https://lrs.example/xapi/", auth: "Basic x", actor: { mbox: "mailto:a@b.c" } }] }`,
+        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { id: "lrs", endpoint: "https://lrs.example/xapi/", auth: "eDp5", actor: { mbox: "mailto:a@b.c" }, activityId: "https://example.com/course" }] }`,
       ),
     ).toContain(real);
   });

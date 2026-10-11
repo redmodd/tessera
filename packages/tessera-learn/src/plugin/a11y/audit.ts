@@ -2,9 +2,10 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-import type { PreviewServer } from 'vite';
+import type { Plugin, PreviewServer } from 'vite';
+import type { ContextPluginApi } from '../build-context.js';
 import { generateManifest } from '../manifest.js';
-import { readA11ySettings, type A11ySettings } from '../validation/a11y.js';
+import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
 
 export interface AuditOptions {
   /** Minimum violation impact that fails the run (CI gate). Default 'serious'. */
@@ -353,10 +354,6 @@ export async function runAudit(
   }
   const { chromium, AxeBuilder } = deps.deps;
 
-  const settings = readA11ySettings(projectRoot);
-  const tags = axeTags(settings.standard);
-  const disableRules = axeIgnoreRules(settings.ignore);
-
   const manifest = generateManifest(resolve(projectRoot, 'pages'));
 
   const vite = await import('vite');
@@ -379,14 +376,28 @@ export async function runAudit(
   process.env[AUDIT_ENV_FLAG] = '1';
 
   let server: PreviewServer | undefined;
+  let contextApi: ContextPluginApi | undefined;
   try {
     console.log('[tessera a11y] Building course…');
     await vite.build(
       vite.mergeConfig(auditBaseConfig, {
         build: { outDir: auditDist, emptyOutDir: true },
         logLevel: 'warn',
+        plugins: [
+          {
+            name: 'tessera:a11y-settings',
+            configResolved({ plugins }) {
+              contextApi = plugins.find(
+                (plugin) => plugin.name === 'tessera:context',
+              )?.api;
+            },
+          } satisfies Plugin,
+        ],
       }),
     );
+    const settings = a11ySettingsFrom(contextApi!.validatedConfig());
+    const tags = axeTags(settings.standard);
+    const disableRules = axeIgnoreRules(settings.ignore);
 
     server = await vite.preview({
       root: projectRoot,
