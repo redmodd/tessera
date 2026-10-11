@@ -1,4 +1,11 @@
-# Tessera
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/tessera-dark.svg">
+    <img src=".github/assets/tessera-light.svg" alt="Tessera" height="72">
+  </picture>
+</h1>
+
+<div align="center">
 
 [![CI](https://img.shields.io/github/actions/workflow/status/redmodd/tessera/ci.yml?branch=main&label=CI)](https://github.com/redmodd/tessera/actions/workflows/ci.yml)
 [![tessera-learn on npm](https://img.shields.io/npm/v/tessera-learn?label=tessera-learn)](https://www.npmjs.com/package/tessera-learn)
@@ -6,6 +13,8 @@
 [![Node.js >=24](https://img.shields.io/node/v/tessera-learn?label=node)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/github/license/redmodd/tessera)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+</div>
 
 A JavaScript framework for building interactive eLearning courses that run in any learning management system (LMS) that supports SCORM 1.2, SCORM 2004, cmi5, xAPI, or static web. **It's designed for AI-assisted authoring.**
 
