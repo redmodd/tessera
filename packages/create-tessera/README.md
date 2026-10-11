@@ -46,6 +46,8 @@ The authoring guide ships with the framework at `node_modules/tessera-learn/AGEN
 
 Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it ([details](https://code.claude.com/docs/en/memory#agents-md)). On an older version, or with one of those files in place, add a `CLAUDE.md` containing `@AGENTS.md` beside the scaffolded `AGENTS.md`.
 
+An older workspace has a `CLAUDE.md` that duplicates `AGENTS.md`. Project notes live in `AGENTS.md` only: move any notes from `CLAUDE.md` into `AGENTS.md`, then delete `CLAUDE.md`, or replace its contents with `@AGENTS.md` if one of the cases above applies.
+
 The Vite build is owned by the `tessera` CLI: there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js` to the course folder; see the authoring guide.
 
 Every course gets a root `layout.svelte` to customise the course shell and `styles/custom.css` for optional CSS overrides. Add an `assets/` folder to a course for its images, audio, and video.
