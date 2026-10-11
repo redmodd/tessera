@@ -66,7 +66,14 @@ Releases are managed by [changesets](https://github.com/changesets/changesets). 
 pnpm changeset
 ```
 
-Pick the affected packages, choose `patch` / `minor` / `major`, and write a brief summary aimed at end users. Commit the generated file in `.changeset/`. For a change with no user-facing impact (an internal refactor, a test-only change), still add a `patch` — an _empty_ changeset (`changeset add --empty`) does **not** satisfy the gate once package files have changed.
+Pick the affected packages, choose `patch` / `minor` / `major`, and write a brief summary aimed at end users. Commit the generated file in `.changeset/`. For a change with no user-facing impact (an internal refactor, a test-only change), still add a `patch`: an _empty_ changeset (`changeset add --empty`) does **not** satisfy the gate once package files have changed.
+
+Start the entry with a label when the reader may need to act:
+
+- `**Breaking:**` when a working course, script or custom component fails until it is edited, such as a removed export, a rejected CLI flag or a raised peer version. Follow it with the upgrade step.
+- `**Behavior change:**` when nothing fails but a correctly configured course acts differently, most often in what the LMS records. Say what to adjust to keep the old result.
+
+Fixes and additions take no label. In an entry with several paragraphs, label each paragraph that needs one. Both labels ship as a `minor` while the packages are below 1.0.
 
 `create-tessera` and `tessera-learn` are version-locked (changesets `fixed`): a changeset for either one releases **both** at the same new version, so they always share a version number. This is what lets `create-tessera` pin `tessera-learn` to its own version.
 
