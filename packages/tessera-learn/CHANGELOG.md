@@ -1,5 +1,22 @@
 # tessera-learn
 
+## 0.9.1
+
+### Patch Changes
+
+- 0e101f7: - `@types/node` 26.6.3 → 26.6.4
+  - `@vitest/coverage-v8` 5.0.2 → 5.0.3
+  - `scorm-again` 3.4.3 → 3.4.4
+  - `vitest` 5.0.2 → 5.0.3
+- 96b55cb: - `vite` 8.3.1 → 8.3.2
+- 73984e4: `tessera export` now packages the `course.config.js` that passed validation, even if the file changes during the build. `tessera a11y` and `tessera check` scan with the `a11y` settings their build validated.
+- 0014400: Internal test change only; no user-facing change.
+- 5492bd2: On SCORM 1.2, a score below the pass mark now reports `lesson_status` `incomplete` until the course completes, then `failed`. LMSes read `failed` as a finished attempt, so a learner who could still raise their score was shown as completed and could be sent into a new attempt on relaunch. A failing learner who cannot complete, under `completion.mode: 'quiz'` or behind a failed `gatesProgress` quiz, stays `incomplete`.
+- 9e37390: Closing a cmi5 or xAPI course while its saved state is still loading now sends `Terminated` with the session's duration and cancels the load, leaving the saved state and LMS statuses untouched.
+  
+  A resumed session's reported duration now counts from launch, like a new session's, so it includes the time spent connecting to the LMS and loading saved state.
+- 6044306: In SCORM 1.2 and SCORM 2004, a write the LMS rejects with a data-model or session-state error is now logged and dropped without retrying, so later writes (bookmark, suspend data, interactions, scores) still reach the LMS. An interaction whose id the LMS rejects no longer shifts later interactions to an index the LMS refuses. A write that fails while the course exits now logs the LMS error instead of failing silently.
+
 ## 0.9.0
 
 ### Minor Changes
