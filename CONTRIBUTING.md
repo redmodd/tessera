@@ -72,8 +72,9 @@ Start the entry with a label when the reader may need to act:
 
 - `**Breaking:**` when a working course, script or custom component fails until it is edited, such as a removed export, a rejected CLI flag or a raised peer version. Follow it with the upgrade step.
 - `**Behavior change:**` when nothing fails but a correctly configured course acts differently, most often in what the LMS records. Say what to adjust to keep the old result.
+- `**Saved progress reset:**` when learners part-way through a course start over once it is re-exported on the new version. Say which courses are affected. The authoring guide (`packages/tessera-learn/docs/updating.md`) has the assistant warn the author about these entries before it changes a course.
 
-Fixes and additions take no label. In an entry with several paragraphs, label each paragraph that needs one. Both labels ship as a `minor` while the packages are below 1.0.
+Fixes and additions take no label. In an entry with several paragraphs, label each paragraph that needs one. `**Breaking:**` and `**Behavior change:**` ship as a `minor` while the packages are below 1.0.
 
 `create-tessera` and `tessera-learn` are version-locked (changesets `fixed`): a changeset for either one releases **both** at the same new version, so they always share a version number. This is what lets `create-tessera` pin `tessera-learn` to its own version.
 
