@@ -13,6 +13,21 @@ import type { Plugin } from 'vite';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
+// svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
+const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
+
+vi.mock('@sveltejs/vite-plugin-svelte', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@sveltejs/vite-plugin-svelte')>();
+  return {
+    ...actual,
+    svelte(options: Parameters<typeof actual.svelte>[0]) {
+      svelteOptions.onwarn = options?.onwarn;
+      return actual.svelte(options);
+    },
+  };
+});
+
 let projectRoot: string;
 
 beforeEach(() => {
@@ -379,14 +394,22 @@ describe('export packaging gate', () => {
     );
   });
 
-  it('packages the validated config when course.config.js changes mid-build', async () => {
-    writeConfig('scorm12');
+  const editedConfig =
+    'export default { title: "Edited", export: "scorm12", xapi: { endpoint: "https://lrs.example/xapi/" } };';
+
+  it('builds and packages the validated config when course.config.js changes mid-build', async () => {
+    writeConfigSource(
+      'export default { title: "Validated", export: { standard: "scorm12" } };',
+    );
     seedStaleDist();
     const { entry, exporter, get } = buildPlugins();
-    writeConfigSource('export default { export: "scorm12" };');
-    expect((get('tessera:adapter').load as any).handler()).toContain(
-      'SCORM12Adapter',
-    );
+    writeConfigSource(editedConfig);
+    const load = (name: string): string =>
+      (get(name).load as any).handler.call({ addWatchFile() {} });
+    expect(load('tessera:adapter')).toContain('SCORM12Adapter');
+    expect(load('tessera:config')).toContain('"title":"Validated"');
+    expect(load('tessera:config')).toContain('"standard":"scorm12"');
+    expect(load('tessera:xapi-setup')).toContain('return null');
     writeBundle(exporter);
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
@@ -397,6 +420,24 @@ describe('export packaging gate', () => {
     expect(
       readdirSync(projectRoot).filter((f) => f.endsWith('.zip')),
     ).toHaveLength(1);
+  });
+
+  it('gates compiler a11y warnings at the validated a11y.level when course.config.js changes mid-build', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfigSource(
+      'export default { title: "Validated", language: "en", a11y: { level: "error" } };',
+    );
+    const { get } = buildPlugins();
+    writeConfigSource(editedConfig);
+    svelteOptions.onwarn({
+      code: 'a11y_missing_attribute',
+      filename: resolve(projectRoot, 'pages', 'welcome.svelte'),
+      message: '`<img>` element should have an alt attribute',
+    });
+    const gate = get('tessera:a11y-compiler');
+    expect(() => (gate.buildEnd as any).call(gate)).toThrow(
+      "1 a11y issue(s) with a11y.level: 'error'",
+    );
   });
 
   it('leaves the gate closed when a rebuild fails before buildStart', async () => {
