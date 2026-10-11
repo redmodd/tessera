@@ -8,7 +8,11 @@ import {
   type ResolvedConfigRead,
 } from './manifest.js';
 import type { StandardId, StandardProfile } from '../runtime/standards.js';
-import { reportValidationIssues, validateProject } from './validation.js';
+import {
+  readValidatedSources,
+  reportValidationIssues,
+  validateProject,
+} from './validation.js';
 import type { Diagnostics } from './validation/diagnostics.js';
 
 export type ValidatedConfig = ResolvedConfigRead & {
@@ -52,6 +56,7 @@ export class BuildContext {
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
   #validatedConfig: ValidatedConfig | null = null;
+  #validatedSources: Map<string, string | null> | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
 
@@ -68,6 +73,9 @@ export class BuildContext {
 
   validate(): Diagnostics {
     this.#validatedConfig = null;
+    this.#validatedSources = null;
+    // Read ahead of the validation, so a save between the two reads shows as a change.
+    const sources = this.isBuild ? readValidatedSources(this.root) : null;
     const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);
     reportValidationIssues(result);
@@ -85,7 +93,23 @@ export class BuildContext {
       );
     }
     this.#validatedConfig = { ...resolved, profile };
+    this.#validatedSources = sources;
     return result;
+  }
+
+  /** Throws when a source no longer holds what the build's validation read. */
+  assertSourcesUnchanged(): void {
+    const validated = this.#validatedSources;
+    if (!validated) return;
+    const current = readValidatedSources(this.root);
+    const changed = [...new Set([...validated.keys(), ...current.keys()])]
+      .filter((file) => validated.get(file) !== current.get(file))
+      .sort();
+    if (changed.length > 0) {
+      throw new Error(
+        `Tessera: ${changed.length} file(s) changed during the build, after validation: ${changed.join(', ')}. Run the build again.`,
+      );
+    }
   }
 
   validatedConfig(): ValidatedConfig {

@@ -467,6 +467,11 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     buildStart() {
       if (ctx.isBuild) ctx.validate();
     },
+
+    // Every module is loaded by now, and nothing is written yet.
+    buildEnd() {
+      ctx.assertSourcesUnchanged();
+    },
   };
 }
 

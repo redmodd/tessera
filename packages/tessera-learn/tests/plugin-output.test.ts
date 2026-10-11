@@ -398,7 +398,7 @@ describe('export packaging gate', () => {
       'export default { title: "Validated", export: { standard: "scorm12" } };',
     );
     seedStaleDist();
-    const { entry, exporter, get } = buildPlugins();
+    const { entry, exporter, validation, get } = buildPlugins();
     writeConfigSource(editedConfig);
     const load = (name: string): string =>
       (get(name).load as any).handler.call({ addWatchFile() {} });
@@ -406,6 +406,7 @@ describe('export packaging gate', () => {
     expect(load('tessera:config')).toContain('"title":"Validated"');
     expect(load('tessera:config')).toContain('"standard":"scorm12"');
     expect(load('tessera:xapi-setup')).toContain('return null');
+    (validation.buildEnd as any).call(validation);
     writeBundle(exporter);
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
@@ -467,6 +468,76 @@ describe('export packaging gate', () => {
     expect(readdirSync(projectRoot).filter((f) => f.endsWith('.zip'))).toEqual(
       [],
     );
+  });
+});
+
+describe('sources changed after validation', () => {
+  const page = 'pages/01-section/01-lesson/page.svelte';
+
+  function validatedPlugin(): Plugin {
+    writeConfig('web');
+    return validatedBuild()('tessera:validation');
+  }
+
+  function buildEnd(validation: Plugin): void {
+    (validation.buildEnd as any).call(validation);
+  }
+
+  it('lets a build through when no source changed', () => {
+    expect(() => buildEnd(validatedPlugin())).not.toThrow();
+  });
+
+  it.each<[string, string, (path: string) => void]>([
+    ['an edited page', page, (path) => writeFileSync(path, '<h1>Edited</h1>')],
+    ['a deleted page', page, (path) => rmSync(path)],
+    [
+      'an added page',
+      'pages/01-section/01-lesson/extra.svelte',
+      (path) => writeFileSync(path, '<h1>Extra</h1>'),
+    ],
+    [
+      'an added _meta.js',
+      'pages/01-section/_meta.js',
+      (path) => writeFileSync(path, 'export default { title: "Section" };'),
+    ],
+    [
+      'an added layout.svelte',
+      'layout.svelte',
+      (path) => writeFileSync(path, '<main></main>'),
+    ],
+    [
+      'an added course.runtime.js',
+      'course.runtime.js',
+      (path) => writeFileSync(path, 'export const xapi = {};'),
+    ],
+  ])('fails the build on %s', (_change, file, change) => {
+    const validation = validatedPlugin();
+    change(resolve(projectRoot, file));
+    expect(() => buildEnd(validation)).toThrow(
+      `1 file(s) changed during the build, after validation: ${file}.`,
+    );
+  });
+
+  it('names every file that changed', () => {
+    const validation = validatedPlugin();
+    writeFileSync(resolve(projectRoot, page), '<h1>Edited</h1>');
+    writeFileSync(resolve(projectRoot, 'quiz.svelte'), '<main></main>');
+    expect(() => buildEnd(validation)).toThrow(
+      `2 file(s) changed during the build, after validation: ${page}, quiz.svelte.`,
+    );
+  });
+
+  it('compares nothing when a rebuild fails validation', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const validation = validatedPlugin();
+    writeFileSync(
+      resolve(projectRoot, page),
+      '<script module>\nexport const pageConfig = { title: someTitle };\n</script>',
+    );
+    expect(() => (validation.buildStart as any).call(validation)).toThrow(
+      'Tessera validation failed',
+    );
+    expect(() => buildEnd(validation)).not.toThrow();
   });
 });
 

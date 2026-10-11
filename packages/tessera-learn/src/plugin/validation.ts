@@ -1,8 +1,11 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 import { dropUnreadParses } from './ast.js';
 import {
   COURSE_CONFIG_FILE,
   readCourseConfig,
   READ_FAILURE_MESSAGES,
+  walkPages,
   type CourseConfigRead,
 } from './manifest.js';
 import type { StandardId } from '../runtime/standards.js';
@@ -51,6 +54,32 @@ export const VALIDATED_ROOT_FILES = [
   COURSE_RUNTIME_FILE,
   ...SHELL_FILES,
 ];
+
+/**
+ * The content of each file `validateProject` reads and a build then reads
+ * again, by project-relative path, with null for a file that is absent.
+ * course.config.js is left out: a build keeps the read it validated.
+ */
+export function readValidatedSources(
+  projectRoot: string,
+): Map<string, string | null> {
+  const paths = VALIDATED_ROOT_FILES.filter(
+    (file) => file !== COURSE_CONFIG_FILE,
+  ).map((file) => resolve(projectRoot, file));
+  for (const section of walkPages(resolve(projectRoot, 'pages')).sections) {
+    paths.push(section.metaPath);
+    for (const lesson of section.lessons) {
+      paths.push(lesson.metaPath);
+      for (const file of lesson.files) paths.push(resolve(lesson.dir, file));
+    }
+  }
+  return new Map(
+    paths.map((path) => [
+      relative(projectRoot, path),
+      existsSync(path) ? readFileSync(path, 'utf-8') : null,
+    ]),
+  );
+}
 
 /**
  * Validate a Tessera project at the given root.
