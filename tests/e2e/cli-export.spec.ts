@@ -10,12 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  VARIANTS_ROOT,
-  fixtureSource,
-  tesseraCli,
-  viteBin,
-} from './global-setup.js';
+import { VARIANTS_ROOT, fixtureSource, tesseraCli } from './global-setup.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -62,41 +57,36 @@ test.describe('CLI — tessera export', () => {
 test.describe('Export: a source a plugin saves during the build', () => {
   const page = 'pages/03-assessment/02-graded-quiz/quiz.svelte';
   const save = `appendFileSync('${page}', '<p>Saved during the build</p>');`;
+  let projectDir: string;
 
-  // The CLI takes no plugins, so the save comes from one in a vite.config.js.
-  function projectSavingFrom(name: string, hook: string): string {
-    const projectDir = resolve(VARIANTS_ROOT, name);
+  test.afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  function exportSavingFrom(name: string, hook: string) {
+    projectDir = resolve(VARIANTS_ROOT, name);
     copyFreeFixture(projectDir);
     writeFileSync(
-      resolve(projectDir, 'vite.config.js'),
+      resolve(projectDir, 'tessera.config.js'),
       `import { appendFileSync } from 'node:fs';
-import { tesseraPlugin } from 'tessera-learn/plugin';
 
-export default {
-  plugins: [
-    tesseraPlugin({ standardOverride: 'cmi5' }),
-    { name: 'save-during-build', ${hook} },
-  ],
-};
+export default { plugins: [{ name: 'save-during-build', ${hook} }] };
 `,
     );
-    return projectDir;
-  }
-
-  function build(projectDir: string) {
-    return execFileAsync(viteBin('free'), ['build', projectDir], {
-      cwd: projectDir,
-      timeout: 60_000,
-    });
-  }
-
-  test('fails the build and writes no package when the save follows validation', async () => {
-    const projectDir = projectSavingFrom(
-      'saved-mid-build',
-      `transform(_code, id) { if (id.endsWith('${page}')) ${save} }`,
+    return execFileAsync(
+      process.execPath,
+      [tesseraCli('free'), 'export', '--standard', 'cmi5'],
+      { cwd: projectDir, timeout: 60_000 },
     );
+  }
 
-    await expect(build(projectDir)).rejects.toMatchObject({
+  test('fails the export and writes no package when the save follows validation', async () => {
+    await expect(
+      exportSavingFrom(
+        'saved-mid-build',
+        `transform(_code, id) { if (id.endsWith('${page}')) ${save} }`,
+      ),
+    ).rejects.toMatchObject({
       stderr: expect.stringContaining(
         `1 file(s) changed during the build, after validation: ${page}.`,
       ),
@@ -105,19 +95,12 @@ export default {
     expect(readdirSync(projectDir).filter((f) => f.endsWith('.zip'))).toEqual(
       [],
     );
-    rmSync(projectDir, { recursive: true, force: true });
   });
 
   test('validates and packages a save made in buildStart', async () => {
-    const projectDir = projectSavingFrom(
-      'saved-in-build-start',
-      `buildStart() { ${save} }`,
-    );
-
-    await build(projectDir);
+    await exportSavingFrom('saved-in-build-start', `buildStart() { ${save} }`);
 
     expect(existsSync(resolve(projectDir, 'dist', 'index.html'))).toBe(true);
     expect(readdirSync(projectDir).some((f) => f.endsWith('.zip'))).toBe(true);
-    rmSync(projectDir, { recursive: true, force: true });
   });
 });

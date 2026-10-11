@@ -394,7 +394,6 @@ export async function runAudit(
     );
     const settings = a11ySettingsFrom(contextApi!.validatedConfig());
     const manifest = contextApi!.manifest();
-    if (!manifest) throw new Error('the build generated no page manifest.');
     const tags = axeTags(settings.standard);
     const disableRules = axeIgnoreRules(settings.ignore);
 

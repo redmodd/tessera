@@ -85,7 +85,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
       // runAudit reads its a11y settings and its pages here, from what its build validated.
       api: {
         validatedConfig: () => ctx.validatedConfig(),
-        manifest: () => ctx.manifest,
+        manifest: () => ctx.builtManifest(),
       } satisfies ContextPluginApi,
       configResolved(config) {
         ctx.configure(config);
@@ -555,19 +555,13 @@ function tesseraExportPlugin(ctx: BuildContext): Plugin {
 
       if (isAuditBuild()) return;
 
-      if (!ctx.manifest) {
-        throw new Error(
-          '[tessera:export] the page manifest was never generated, so the export cannot tell which pages are graded.',
-        );
-      }
-
       const { config, profile } = ctx.validatedConfig();
       await runExport(
         ctx.root,
         ctx.outDir,
         mergeCourseConfig(config),
         profile,
-        ctx.manifest.pages.some(isRequiredGradedPage),
+        ctx.builtManifest().pages.some(isRequiredGradedPage),
       );
     },
   };

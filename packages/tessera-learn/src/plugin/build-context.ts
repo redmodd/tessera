@@ -22,7 +22,7 @@ export type ValidatedConfig = ResolvedConfigRead & {
 
 export interface ContextPluginApi {
   validatedConfig(): ValidatedConfig;
-  manifest(): Manifest | null;
+  manifest(): Manifest;
 }
 
 export function isInside(parent: string, child: string): boolean {
@@ -101,7 +101,6 @@ export class BuildContext {
   /** Throws when a source no longer holds what the build's validation read. */
   assertSourcesUnchanged(): void {
     const validated = this.#validatedSources;
-    this.#validatedSources = null;
     if (!validated) return;
     const current = readValidatedSources(this.root);
     const changed = [...new Set([...validated.keys(), ...current.keys()])]
@@ -121,6 +120,13 @@ export class BuildContext {
       );
     }
     return this.#validatedConfig;
+  }
+
+  builtManifest(): Manifest {
+    if (!this.manifest) {
+      throw new Error('[tessera] the build generated no page manifest.');
+    }
+    return this.manifest;
   }
 
   readConfig(): ResolvedConfigRead {

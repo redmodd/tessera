@@ -42,11 +42,19 @@ function findPlugin(name: string, command: Command = 'build'): Plugin {
   return resolvedPlugins(projectRoot, command)(name);
 }
 
+function buildStart(plugin: Plugin): void {
+  (plugin.buildStart as any).handler.call(plugin);
+}
+
+function buildEnd(plugin: Plugin): void {
+  (plugin.buildEnd as any).call(plugin);
+}
+
 function validatedBuild(): (name: string) => Plugin {
   writeLessonPage(projectRoot);
   const get = resolvedPlugins(projectRoot, 'build');
   const validation = get('tessera:validation');
-  (validation.buildStart as any).handler.call(validation);
+  buildStart(validation);
   return get;
 }
 
@@ -96,7 +104,7 @@ describe('generated index.html Content-Security-Policy', () => {
 
   function renderIndexHtml(): string {
     const plugin = validatedBuild()('tessera:index-html');
-    (plugin.buildStart as any).handler.call(plugin);
+    buildStart(plugin);
     return readFileSync(resolve(projectRoot, 'index.html'), 'utf-8');
   }
 
@@ -116,7 +124,7 @@ describe('generated index.html Content-Security-Policy', () => {
   it('refuses to read the config before validation runs', () => {
     writeConfig('web');
     const plugin = findPlugin('tessera:index-html');
-    expect(() => (plugin.buildStart as any).handler.call(plugin)).toThrow(
+    expect(() => buildStart(plugin)).toThrow(
       'course.config.js has no validated snapshot',
     );
   });
@@ -128,10 +136,8 @@ describe('generated index.html Content-Security-Policy', () => {
     const validation = get('tessera:validation');
     const plugin = get('tessera:index-html');
     writeConfigSource('export default {');
-    expect(() =>
-      (validation.buildStart as any).handler.call(validation),
-    ).toThrow('Tessera validation failed');
-    expect(() => (plugin.buildStart as any).handler.call(plugin)).toThrow(
+    expect(() => buildStart(validation)).toThrow('Tessera validation failed');
+    expect(() => buildStart(plugin)).toThrow(
       'course.config.js has no validated snapshot',
     );
   });
@@ -200,7 +206,7 @@ describe('export packaging gate', () => {
     const entry = get('tessera:index-html');
     const exporter = get('tessera:export');
     const validation = get('tessera:validation');
-    (entry.buildStart as any).handler.call(entry);
+    buildStart(entry);
     (get('tessera:manifest').load as any).handler.call({
       addWatchFile() {},
     });
@@ -406,7 +412,7 @@ describe('export packaging gate', () => {
     expect(load('tessera:config')).toContain('"title":"Validated"');
     expect(load('tessera:config')).toContain('"standard":"scorm12"');
     expect(load('tessera:xapi-setup')).toContain('return null');
-    (validation.buildEnd as any).call(validation);
+    buildEnd(validation);
     writeBundle(exporter);
     (entry.closeBundle as any).call(entry);
     await (exporter.closeBundle as any).call(exporter);
@@ -432,7 +438,7 @@ describe('export packaging gate', () => {
       message: '`<img>` element should have an alt attribute',
     });
     const gate = get('tessera:a11y-compiler');
-    expect(() => (gate.buildEnd as any).call(gate)).toThrow(
+    expect(() => buildEnd(gate)).toThrow(
       "1 a11y issue(s) with a11y.level: 'error'",
     );
   });
@@ -455,9 +461,7 @@ describe('export packaging gate', () => {
     writeConfigSource(
       'export default { title: "Course", export: { standard: "scorm12" }, resume: "sometimes" };',
     );
-    expect(() =>
-      (validation.buildStart as any).handler.call(validation),
-    ).toThrow();
+    expect(() => buildStart(validation)).toThrow();
 
     for (let i = 0; i < 2; i++) {
       (entry.closeBundle as any).call(entry);
@@ -479,10 +483,6 @@ describe('sources changed after validation', () => {
   function validatedPlugin(): Plugin {
     writeConfig('web');
     return validatedBuild()('tessera:validation');
-  }
-
-  function buildEnd(validation: Plugin): void {
-    (validation.buildEnd as any).call(validation);
   }
 
   it('lets a build through when no source changed', () => {
@@ -547,9 +547,7 @@ describe('sources changed after validation', () => {
       resolve(projectRoot, page),
       '<script module>\nexport const pageConfig = { title: someTitle };\n</script>',
     );
-    expect(() =>
-      (validation.buildStart as any).handler.call(validation),
-    ).toThrow('Tessera validation failed');
+    expect(() => buildStart(validation)).toThrow('Tessera validation failed');
     expect(() => buildEnd(validation)).not.toThrow();
   });
 });
