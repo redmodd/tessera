@@ -245,14 +245,6 @@ export function validatePages(
     const rel = relative(projectRoot, path);
     d.within(rel, () => d.warn(`${rel}: ${message}`));
   };
-  const warnUnresolvedSymlinks = (dir: string, names: string[]) => {
-    for (const name of names) {
-      warnAbout(
-        resolve(dir, name),
-        'symlink does not resolve, so it is left out of the course',
-      );
-    }
-  };
 
   const course = walkPages(pagesDir);
   for (const entry of course.strayFiles) {
@@ -261,16 +253,19 @@ export function validatePages(
       'this file is outside the section/lesson structure and will be ignored',
     );
   }
-  warnUnresolvedSymlinks(pagesDir, course.unresolved);
+  for (const path of course.unresolved) {
+    warnAbout(
+      path,
+      'symlink does not resolve, so it is left out of the course',
+    );
+  }
 
   for (const section of course.sections) {
     const pagesBeforeSection = pages.length;
 
     const sectionMeta = validateMeta(section.metaPath);
-    warnUnresolvedSymlinks(section.dir, section.unresolved);
 
     for (const lesson of section.lessons) {
-      warnUnresolvedSymlinks(lesson.dir, lesson.unresolved);
       // Flat lesson uses the section _meta, already validated above.
       const meta =
         lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);

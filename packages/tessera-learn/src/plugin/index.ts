@@ -410,26 +410,25 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer(server) {
-      let session = devSessions.get(ctx.root);
-      if (session) {
+      const existing = devSessions.get(ctx.root);
+      const session: DevSession = existing ?? {
+        servers: 0,
+        failing: false,
+        reported: new Map(),
+        changes: new ChangeBurst(),
+      };
+      if (existing) {
         // The restart joins a burst still waiting, so the two validate once.
         session.reported.clear();
         session.changes.settle(revalidate);
       } else {
-        session = {
-          servers: 0,
-          failing: false,
-          reported: new Map(),
-          changes: new ChangeBurst(),
-        };
         remember(session, ctx.validate());
       }
-      const opened = session;
       // The hotUpdate hook covers files only, and a folder alone can add or
       // remove an empty section.
       const pagesDir = resolve(ctx.root, 'pages');
       const onFolderChange = (dir: string) => {
-        if (isInside(pagesDir, dir)) opened.changes.settle(revalidate);
+        if (isInside(pagesDir, dir)) session.changes.settle(revalidate);
       };
       server.watcher
         .on('addDir', onFolderChange)
@@ -437,8 +436,8 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       // Counted once every plugin has configured the server: a server that
       // fails before then never starts, so it is never closed either.
       return () => {
-        opened.servers++;
-        devSessions.set(ctx.root, opened);
+        session.servers++;
+        devSessions.set(ctx.root, session);
       };
     },
 

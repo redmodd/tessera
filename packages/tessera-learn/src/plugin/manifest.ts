@@ -296,7 +296,7 @@ interface DirEntries {
   dirs: string[];
   /** Sorted `.svelte` file names. */
   files: string[];
-  /** Symlinks that do not resolve and that the walker would take if they did. */
+  /** Paths of symlinks that do not resolve and that the walker would take if they did. */
   unresolved: string[];
 }
 
@@ -316,7 +316,7 @@ function readEntries(dirPath: string, holdsFolders: boolean): DirEntries {
     if (!isPage && !isFolder) continue;
     const stat = entry.isSymbolicLink() ? entryStat(dirPath, name) : entry;
     if (!stat) {
-      if (!hidden) entries.unresolved.push(name);
+      if (!hidden) entries.unresolved.push(resolve(dirPath, name));
     } else if (stat.isDirectory()) {
       if (isFolder) entries.dirs.push(name);
     } else if (stat.isFile() && isPage) {
@@ -339,8 +339,6 @@ export interface WalkedLesson {
   metaPath: string;
   /** Sorted raw `.svelte` filenames in `dir` (pre-ordering). */
   files: string[];
-  /** Symlinks in `dir` left out because they do not resolve. A flat lesson's are its section's. */
-  unresolved: string[];
 }
 
 export interface WalkedSection {
@@ -348,13 +346,13 @@ export interface WalkedSection {
   dir: string;
   metaPath: string;
   lessons: WalkedLesson[];
-  unresolved: string[];
 }
 
 export interface WalkedCourse {
   sections: WalkedSection[];
   /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
   strayFiles: string[];
+  /** Paths of symlinks left out of the course because they do not resolve. */
   unresolved: string[];
 }
 
@@ -366,43 +364,34 @@ export interface WalkedCourse {
  */
 export function walkPages(pagesDir: string): WalkedCourse {
   const root = readEntries(pagesDir, true);
-  const sections = root.dirs.map((sectionName): WalkedSection => {
+  const { unresolved } = root;
+  const sections: WalkedSection[] = [];
+  for (const sectionName of root.dirs) {
     const dir = resolve(pagesDir, sectionName);
     const metaPath = resolve(dir, '_meta.js');
     const section = readEntries(dir, true);
+    unresolved.push(...section.unresolved);
     const lessons: WalkedLesson[] = [];
 
     if (section.files.length > 0) {
-      lessons.push({
-        name: null,
-        dir,
-        metaPath,
-        files: section.files,
-        unresolved: [],
-      });
+      lessons.push({ name: null, dir, metaPath, files: section.files });
     }
 
     for (const lessonName of section.dirs) {
       const lessonDir = resolve(dir, lessonName);
-      const { files, unresolved } = readEntries(lessonDir, false);
+      const lesson = readEntries(lessonDir, false);
+      unresolved.push(...lesson.unresolved);
       lessons.push({
         name: lessonName,
         dir: lessonDir,
         metaPath: resolve(lessonDir, '_meta.js'),
-        files,
-        unresolved,
+        files: lesson.files,
       });
     }
 
-    return {
-      name: sectionName,
-      dir,
-      metaPath,
-      lessons,
-      unresolved: section.unresolved,
-    };
-  });
-  return { sections, strayFiles: root.files, unresolved: root.unresolved };
+    sections.push({ name: sectionName, dir, metaPath, lessons });
+  }
+  return { sections, strayFiles: root.files, unresolved };
 }
 
 // ---------- Main ----------
