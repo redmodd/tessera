@@ -22,6 +22,7 @@ export type ValidatedConfig = ResolvedConfigRead & {
 
 export interface ContextPluginApi {
   validatedConfig(): ValidatedConfig;
+  manifest(): Manifest | null;
 }
 
 export function isInside(parent: string, child: string): boolean {

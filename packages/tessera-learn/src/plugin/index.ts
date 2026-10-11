@@ -81,9 +81,10 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     {
       name: 'tessera:context',
       enforce: 'pre',
-      // runAudit reads its a11y settings here, from the config its build validated.
+      // runAudit reads its a11y settings and its pages here, from what its build validated.
       api: {
         validatedConfig: () => ctx.validatedConfig(),
+        manifest: () => ctx.manifest,
       } satisfies ContextPluginApi,
       configResolved(config) {
         ctx.configure(config);

@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
-import { generateManifest } from '../manifest.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
 
 export interface AuditOptions {
@@ -354,8 +353,6 @@ export async function runAudit(
   }
   const { chromium, AxeBuilder } = deps.deps;
 
-  const manifest = generateManifest(resolve(projectRoot, 'pages'));
-
   const vite = await import('vite');
   const { resolveTesseraConfig } = await import('../inline-config.js');
   // Carries tesseraPlugin() + the Svelte compiler; without it the plugin-less
@@ -385,7 +382,7 @@ export async function runAudit(
         logLevel: 'warn',
         plugins: [
           {
-            name: 'tessera:a11y-settings',
+            name: 'tessera:a11y-context',
             configResolved({ plugins }) {
               contextApi = plugins.find(
                 (plugin) => plugin.name === 'tessera:context',
@@ -396,6 +393,8 @@ export async function runAudit(
       }),
     );
     const settings = a11ySettingsFrom(contextApi!.validatedConfig());
+    const manifest = contextApi!.manifest();
+    if (!manifest) throw new Error('the build generated no page manifest.');
     const tags = axeTags(settings.standard);
     const disableRules = axeIgnoreRules(settings.ignore);
 
