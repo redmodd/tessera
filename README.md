@@ -13,7 +13,7 @@ A framework for building interactive eLearning courses that run in any learning 
 
 Open your workspace in an AI coding assistant like [Claude Code](https://claude.com/code), [Codex](https://openai.com/codex), or any tool that reads `AGENTS.md`, and describe what you want in plain English. The assistant uses `AGENTS.md` (scaffolded at the root of every workspace, pointing at the guide that ships inside the framework) to write properly-structured pages, build whatever components you need against the hooks API, wire up quizzes, and configure your LMS export. Built-in components (`Callout`, `Image`, `MultipleChoice`, etc.) are included as reference examples; the assistant uses them where they fit and writes new ones where they don't.
 
-**There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, saved state) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte, can be built with Tessera.
+**There's no required look, layout, or component set.** Tessera locks the LMS data contract (tracking, completion, scoring, navigation, saved state) and gets out of the way of the design. Anything that can be built with HTML, CSS, and Svelte can be built with Tessera.
 
 When you're done, one command packages a course as SCORM 1.2, SCORM 2004, cmi5 (an xAPI profile for LMSs), xAPI 1.0.3 ("Tin Can"), or a static web bundle. Completion, scores, and saved progress report back to the LMS automatically. The same source builds for every standard, so you don't maintain five versions.
 
@@ -36,7 +36,7 @@ pnpm install
 pnpm dev starter-course      # live preview at http://localhost:5173
 ```
 
-This scaffolds a workspace with one seed course (`starter-course`). Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+This scaffolds a workspace with one seed course (`starter-course`). Open the printed URL (e.g. `http://localhost:5173`) in your browser. The page hot-reloads as you edit course files. Stop the preview with `Ctrl+C`.
 
 ## Commands
 

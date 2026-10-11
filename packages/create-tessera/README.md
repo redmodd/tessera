@@ -58,11 +58,11 @@ The root scripts forward to whichever course you name: `pnpm dev <course>` runs 
 
 The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing.
 
-Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
+Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the preview with `Ctrl+C`.
 
 ## Updating an existing workspace
 
-Updating is a plain dependency bump: there is no `create-tessera upgrade` verb. From the workspace root:
+Updating is a plain dependency bump: there is no `create-tessera upgrade` verb. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first, or ask your assistant to apply it for you. Then, from the workspace root:
 
 ```bash
 pnpm add tessera-learn@latest
@@ -71,8 +71,6 @@ pnpm add tessera-learn@latest
 To pin a specific release instead of the newest (for reproducible builds, or to avoid an unwanted major), name the version: `pnpm add tessera-learn@<version>` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
 
 The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so none of those need reconciling in your workspace. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically, and your `AGENTS.md` pointer doesn't change.
-
-Your courses are a different matter. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) before you update, or ask your assistant to apply it for you.
 
 ## Documentation
 

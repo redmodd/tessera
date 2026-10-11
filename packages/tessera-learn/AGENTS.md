@@ -100,7 +100,7 @@ Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button u
 
 ### Updating the framework
 
-`pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so a bump needs no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
+Before bumping, read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) (not in `node_modules`) for every version between the installed one and the target. Apply the course changes it lists, and warn the author before installing a release that resets learners' saved progress. Then `pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts and this guide, so those need no reconciling. The root `AGENTS.md` is never overwritten: put workspace standards in its Project notes.
 
 ### Customising the build (optional)
 
