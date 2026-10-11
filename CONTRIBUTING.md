@@ -4,8 +4,8 @@ Thanks for your interest in contributing. This document covers how to get the re
 
 ## Prerequisites
 
-- Node.js >= 24 (CI runs Node 24)
-- [pnpm](https://pnpm.io/) (the repo is a pnpm workspace; corepack will pick the right version automatically)
+- Node.js >= 24 (CI tests Node 24 and 26)
+- [pnpm](https://pnpm.io/) (the repo is a pnpm workspace; `package.json` pins the version in `packageManager`)
 
 ## Getting set up
 
@@ -25,8 +25,8 @@ See [TESTING.md](./TESTING.md) for the test layout, single-file runs, the varian
 
 ```
 packages/
-  tessera-learn/     # Framework runtime + Vite plugin
-  create-tessera/    # Scaffolder (owns the course authoring guide)
+  tessera-learn/     # Framework runtime + Vite plugin + CLI (owns the course authoring guide)
+  create-tessera/    # Scaffolder
 tests/
   e2e/               # Playwright specs
   fixtures/          # Course projects used by e2e (committed)
@@ -79,7 +79,7 @@ Fixes and additions take no label. In an entry with several paragraphs, label ea
 
 Only PRs confined to root-level files (root docs, CI config, the top-level `tests/` suite) can skip the changeset.
 
-A "Version Packages" PR is opened automatically once changesets land on `main`. Merging it triggers the publish workflow.
+A `chore: release` PR is opened automatically once changesets land on `main`. Merging it publishes both packages to npm.
 
 ## Reporting bugs / requesting features
 

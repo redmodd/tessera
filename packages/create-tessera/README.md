@@ -17,7 +17,7 @@ Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window 
 node --version    # should print v24.x.x or higher
 ```
 
-The scaffolded workspace is set up for **pnpm**; install it with `npm install -g pnpm` (or `corepack enable pnpm`).
+The scaffolded workspace is set up for **pnpm**; install it with `npm install -g pnpm`.
 
 ## Usage
 
@@ -44,9 +44,9 @@ A **course** is a self-contained folder under `courses/`. The workspace seeds on
 
 The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version — there's no copy to maintain in the workspace. The scaffolded `CLAUDE.md` imports it (Claude Code reads `CLAUDE.md` and loads the guide automatically); the scaffolded `AGENTS.md` points other agents (Codex, Cursor, …) at the same file. Both live at the workspace root only — open the workspace folder (not an individual course) so the guide stays in scope and `$shared` resolves.
 
-The Vite build is owned by the `tessera` CLI — there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js`; see the authoring guide.
+The Vite build is owned by the `tessera` CLI: there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js` to the course folder; see the authoring guide.
 
-Every course gets `assets/` (drop images, audio, video here), a root `layout.svelte` to customise the course shell, and `styles/custom.css` for optional CSS overrides.
+Every course gets a root `layout.svelte` to customise the course shell and `styles/custom.css` for optional CSS overrides. Add an `assets/` folder to a course for its images, audio, and video.
 
 Then:
 
@@ -65,7 +65,7 @@ The root scripts forward to whichever course you name: `pnpm dev <course>` runs 
 
 The runtime audit drives Playwright; the first run installs the Chromium browser automatically if it's missing.
 
-Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`. The full authoring guide is at `node_modules/tessera-learn/AGENTS.md` (your `CLAUDE.md` / `AGENTS.md` point to it).
+Open the printed URL in your browser. The page hot-reloads as you edit course files. Stop the server with `Ctrl+C`.
 
 ## Updating an existing workspace
 
@@ -75,7 +75,7 @@ Updating is a plain dependency bump — there is no `create-tessera upgrade` ver
 pnpm add tessera-learn@latest
 ```
 
-To pin a specific release instead of the newest — for reproducible builds, or to avoid an unwanted major — name the version: `pnpm add tessera-learn@0.1.0` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
+To pin a specific release instead of the newest (for reproducible builds, or to avoid an unwanted major), name the version: `pnpm add tessera-learn@<version>` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
 
 The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your workspace tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically — your `CLAUDE.md` / `AGENTS.md` pointers don't change.
 

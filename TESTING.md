@@ -4,8 +4,8 @@ This guide covers how Tessera's test suite is organised and how to run it locall
 
 ## Prerequisites
 
-- Node.js >= 24 (CI runs against Node 24)
-- pnpm (the repo is a pnpm workspace; corepack picks the right version)
+- Node.js >= 24 (CI tests Node 24 and 26)
+- pnpm (the repo is a pnpm workspace; `package.json` pins the version in `packageManager`)
 
 A first-time setup script is available:
 
@@ -72,29 +72,33 @@ pnpm exec playwright test --headed --project=free-mode
 pnpm exec playwright test --debug tests/e2e/navigation.spec.ts
 ```
 
-When a run fails, the HTML report lands at `playwright-report/`. Open it with:
+A failed test leaves its artifacts in `test-results/`. The suite writes no HTML report or trace on a local run, so ask for one when you need it:
 
 ```bash
+pnpm exec playwright test --reporter=html   # writes playwright-report/
 pnpm exec playwright show-report
+pnpm exec playwright test --trace on        # a trace.zip per test under test-results/
 ```
 
 ## How the e2e suite is wired
 
-Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Seven projects each target a different fixture / mode on its own port:
+Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Nine projects each target a different fixture / mode:
 
-| Project           | Port | Fixture                         | Specs                        |
-| ----------------- | ---- | ------------------------------- | ---------------------------- |
-| `free-mode`       | 5180 | `tests/fixtures/free`           | most non-mode-specific specs |
-| `sequential-mode` | 5181 | `tests/fixtures/sequential`     | `sequential.spec.ts`         |
-| `custom-layout`   | 5182 | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`    |
-| `custom-quiz`     | 5183 | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`        |
-| `mobile`          | 5180 | `tests/fixtures/free` (375x667) | `mobile.spec.ts`             |
-| `export`          | n/a  | pre-built variants              | `export.spec.ts`             |
-| `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`      |
+| Project           | Port | Fixture                         | Specs                                              |
+| ----------------- | ---- | ------------------------------- | -------------------------------------------------- |
+| `free-mode`       | 5180 | `tests/fixtures/free`           | most non-mode-specific specs                       |
+| `sequential-mode` | 5181 | `tests/fixtures/sequential`     | `sequential.spec.ts`                               |
+| `custom-layout`   | 5182 | `tests/fixtures/custom-layout`  | `layout-override.spec.ts`                          |
+| `custom-quiz`     | 5183 | `tests/fixtures/custom-quiz`    | `custom-quiz.spec.ts`                              |
+| `mobile`          | 5180 | `tests/fixtures/free` (375x667) | `mobile.spec.ts`                                   |
+| `export`          | n/a  | pre-built variants              | `export.spec.ts`                                   |
+| `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`                            |
+| `lms-variants`    | n/a  | pre-built variants              | `lms-variants.spec.ts`, `standalone-retry.spec.ts` |
+| `a11y-audit`      | n/a  | pre-built variants              | `a11y-audit.spec.ts`                               |
 
 ### The variant pre-build
 
-The `export` and `lms` projects don't run a dev server — they read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
+The `export`, `lms`, `lms-variants` and `a11y-audit` projects don't run a dev server. They read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
 
 Building those mid-test would mutate the source fixtures and serialise the suite. Instead, [`tests/e2e/global-setup.ts`](./tests/e2e/global-setup.ts) runs once before any spec:
 
@@ -122,37 +126,30 @@ A fixture entry can also carry `overrides` for a variant that differs by a cours
 },
 ```
 
-Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. The first e2e run after `pnpm install` therefore takes ~30–60s of build time before any spec executes — that's expected.
+Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. Every e2e run rebuilds the variants before any spec executes, so expect a pause at startup.
 
 ### Fixtures are committed
 
-Unlike many monorepos, the four fixture projects under `tests/fixtures/` are tracked in git. Only `tests/.e2e-variants/` (the per-run build output) is gitignored. Don't try to scaffold them with `npm create tessera` — the fixtures contain hand-tailored content (custom quiz components, sequential nav config, etc.) that the scaffolder doesn't produce.
+Unlike many monorepos, the fixture projects under `tests/fixtures/` are tracked in git. Only `tests/.e2e-variants/` (the per-run build output) is gitignored. Don't try to scaffold them with `npm create tessera`: the fixtures contain hand-tailored content (custom quiz components, sequential nav config, etc.) that the scaffolder doesn't produce.
 
 If you change a fixture's content, treat it like any other source change: commit it, note in the PR description what scenario it exercises.
 
 ## Writing tests
 
 - New features ship with tests. Bug fixes ship with a regression test that fails before the fix and passes after.
-- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS.
+- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS. Run the full e2e suite (`pnpm test:e2e`) and note in the PR description which modes you tested and how.
 - Keep e2e specs project-scoped: a spec should only depend on the fixture its project targets. `playwright.config.ts` enforces this with `testMatch` / `testIgnore`.
 - E2E tests get isolated browser contexts automatically, so localStorage and per-test state don't leak across tests. Don't add manual `beforeEach` resets for that.
 
 ## Debugging a failing CI run
 
-CI uploads two artifacts on failure:
+CI uploads these artifacts:
 
-- `coverage-24` — `packages/*/coverage/` from the unit-test job
-- `playwright-report` — HTML report and `test-results/` traces from the e2e job
+- `coverage-24` and `coverage-26`: `packages/*/coverage/` from each unit-test job, on every run
+- `playwright-report`: `test-results/` from the e2e job when it fails, with a trace for each test that failed and was retried
 
 Download from the failed run's Actions page. For Playwright traces:
 
 ```bash
 pnpm exec playwright show-trace path/to/trace.zip
 ```
-
-## Adapter changes
-
-Tessera supports five delivery modes — SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3, and static web. If your change touches the runtime API surface or any adapter:
-
-- Run the full e2e suite: `pnpm test:e2e`
-- Note in the PR description which modes you tested and how.

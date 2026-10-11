@@ -67,14 +67,14 @@ pnpm check <course>       # validate, then the runtime a11y audit (axe) over the
 
 ### Updating the framework
 
-Plain dependency bump — there is no `create-tessera upgrade`: `pnpm add tessera-learn@latest` (or `@0.1.0` to pin). The framework owns the build, reserved scripts, and this guide, so a bump needs no reconciling; your root `CLAUDE.md`/`AGENTS.md` aren't overwritten — add workspace standards to their Project notes freely.
+Plain dependency bump, with no `create-tessera upgrade`: `pnpm add tessera-learn@latest` (or `tessera-learn@<version>` to pin). The framework owns the build, reserved scripts, and this guide, so a bump needs no reconciling; your root `CLAUDE.md`/`AGENTS.md` aren't overwritten, so add workspace standards to their Project notes freely.
 
 ### Customising the build (optional)
 
-You never write `vite.config.js`. To extend the build, add `tessera.config.js` at the project root — a **partial** Vite config merged on top of Tessera's (`tesseraPlugin()` and the Svelte compiler stay wired in). Never scaffolded, never touched by updates.
+You never write `vite.config.js`. To extend the build, add `tessera.config.js` to the course folder, beside `course.config.js`. It is a **partial** Vite config merged on top of Tessera's (`tesseraPlugin()` and the Svelte compiler stay wired in) and applies to that course only; one at the workspace root is ignored. Never scaffolded, never touched by updates.
 
 ```js
-// tessera.config.js
+// courses/<name>/tessera.config.js
 export default {
   server: { port: 4000 },
   resolve: { alias: { $lib: '/src/lib' } },
@@ -90,7 +90,6 @@ export default {
 ```
 my-course/
 ├── course.config.js          # Course configuration
-├── package.json
 └── pages/                     # at least one section dir with .svelte files
     └── intro/
         └── welcome.svelte
@@ -151,12 +150,12 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 
 ## Authoring Surfaces
 
-1. **Built-in components** — `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
-2. **Hooks** — `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`. The stable contract between custom widgets and the runtime.
-3. **Custom layout** — `layout.svelte` at the project root replaces the default chrome.
-4. **Custom quiz shell** — `quiz.svelte` at the project root replaces the quiz UI for every page with `pageConfig.quiz`.
-5. **Custom xAPI** — `useXAPI()` emits your own verbs. See [Custom xAPI](#custom-xapi-statements).
-6. **Runtime hooks**: `course.runtime.js` at the project root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
+1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
+2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime.
+3. **Custom layout**: `layout.svelte` at the course root replaces the default chrome.
+4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`.
+5. **Custom xAPI**: `useXAPI()` emits your own verbs. See [Custom xAPI](#custom-xapi-statements).
+6. **Runtime hooks**: `course.runtime.js` at the course root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
 
 A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`.
 
@@ -415,13 +414,13 @@ A page's own score is the weighted mean of the **graded** standalone questions a
 
 ### Question types
 
-Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
+Every type also accepts `weight` (page-level rollup, default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
-**MultipleChoice** — `question` `string`, `options` `string[]`, `correct` `number` (0-based index). Optional: `correctFeedback` / `incorrectFeedback` `string`, `optionFeedback` `string[]`.
+**MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (0-based index). Optional: `optionFeedback` `string[]`.
 
-**FillInTheBlank** — `question` `string`, `answers` `string[]` (distinct spellings only), `caseSensitive` `boolean` (default `false`, handles case variants).
+**FillInTheBlank**: `question` `string`, `answers` `string[]` (distinct spellings only), `caseSensitive` `boolean` (default `false`, handles case variants).
 
-**Matching** — `question` `string`, `pairs` `{left, right}[]`. Right column auto-shuffled; click left then right to match (tap on mobile), click a pair to unmatch; all pairs must be correct.
+**Matching**: `question` `string`, `pairs` `{left, right}[]`. Right column auto-shuffled; click left then right to match (tap on mobile), click a pair to unmatch; all pairs must be correct.
 
 ```svelte
 <Matching
@@ -433,7 +432,7 @@ Every type also accepts `weight` (page-level rollup, default 1). Syntax is shown
 />
 ```
 
-**Sorting** — `question` `string`, `items` `string[]`, `targets` `string[]` (category labels), `correct` `number[]` (parallel to `items`; each entry an index into `targets`). Drag-and-drop or click-to-place.
+**Sorting**: `question` `string`, `items` `string[]`, `targets` `string[]` (category labels), `correct` `number[]` (parallel to `items`; each entry an index into `targets`). Drag-and-drop or click-to-place.
 
 ```svelte
 <Sorting
@@ -460,8 +459,8 @@ Inside `<Quiz>` the quiz owns grading, so `graded` is ignored there. For a custo
 
 Use `completion.mode: "manual"` when the author owns the completion moment (final page read, "click to acknowledge") rather than a quiz score or visit ratio. Two triggers, both always active; first-to-fire wins, re-marks are idempotent (completion is monotonic — you can't un-complete):
 
-- **Page frontmatter** — `completesOn: "view"` (only v1 value) in a page's `pageConfig`; fires when that page renders.
-- **Runtime hook** — `useCompletion().markComplete()`, composed with any event (modal close, video-ended, timer). Outside manual mode it's a no-op with a one-shot dev warning, so it's safe in shared components.
+- **Page frontmatter**: `completesOn: "view"` (the only value) in a page's `pageConfig`; fires when that page renders.
+- **Runtime hook**: `useCompletion().markComplete()`, composed with any event (modal close, video-ended, timer). Outside manual mode it's a no-op with a one-shot dev warning, so it's safe in shared components.
 
 ```svelte
 <script module>
@@ -684,7 +683,7 @@ Every field except `title` has a default, so `export default { title: "My Course
 
 ### Runtime hooks: `course.runtime.js`
 
-`course.config.js` is data only: a function value in it fails the build. Functions go in an optional `course.runtime.js` at the project root, as named exports:
+`course.config.js` is data only: a function value in it fails the build. Functions go in an optional `course.runtime.js` at the course root, as named exports:
 
 | Export      | Type                                     | Purpose                                                                                                                     |
 | ----------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -713,19 +712,21 @@ export function canAccess(ctx) {
 
 ### Build output
 
-`pnpm export <course>` writes:
+`pnpm export <course>` writes into the course folder:
 
-| `export.standard` | What ships                                  | Where                         |
-| ----------------- | ------------------------------------------- | ----------------------------- |
-| `web`             | Static site (HTML/CSS/JS + `assets/`)       | `dist/` (any static host)     |
-| `scorm12`         | SCORM 1.2 package                           | `dist/<course>-scorm12.zip`   |
-| `scorm2004`       | SCORM 2004 4th Edition package              | `dist/<course>-scorm2004.zip` |
-| `cmi5`            | cmi5 package (AU + manifest)                | `dist/<course>-cmi5.zip`      |
-| `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `dist/<course>-xapi.zip`      |
+| `export.standard` | What ships                                  | Where                     |
+| ----------------- | ------------------------------------------- | ------------------------- |
+| `web`             | Static site (HTML/CSS/JS + `assets/`)       | `dist/` (any static host) |
+| `scorm12`         | SCORM 1.2 package                           | `<title>-<version>.zip`   |
+| `scorm2004`       | SCORM 2004 4th Edition package              | `<title>-<version>.zip`   |
+| `cmi5`            | cmi5 package (AU + manifest)                | `<title>-<version>.zip`   |
+| `xapi`            | xAPI 1.0.3 "Tin Can" package (`tincan.xml`) | `<title>-<version>.zip`   |
 
-Upload the LMS zips via your LMS's import flow; drop `dist/` (web) on any static host.
+`<title>` is the slugified `title` and `<version>` the `version` from `course.config.js` (`my-course-1.0.0.zip`). The name carries no standard, and each export replaces the course's previous zip.
 
-`--standard <web|scorm12|scorm2004|cmi5|xapi>` overrides `export.standard` for one build without editing `course.config.js` — e.g. `pnpm export <course> --standard scorm2004`. Useful for packaging the same course for multiple LMSs from one config. `pnpm validate <course> --standard <value>` takes the same flag to preview validation against the overridden standard. An unknown value fails before the build runs.
+Upload the zip via your LMS's import flow; drop `dist/` (web) on any static host.
+
+`--standard <web|scorm12|scorm2004|cmi5|xapi>` overrides `export.standard` for one build without editing `course.config.js`, e.g. `pnpm export <course> --standard scorm2004`. To package the same course for several LMSs from one config, move or rename each zip before the next export. `pnpm validate <course> --standard <value>` takes the same flag to preview validation against the overridden standard. An unknown value fails before the build runs.
 
 ### Web export Content-Security-Policy
 
@@ -1100,7 +1101,7 @@ Each destination has its own queue, auth resolver, and retry loop. One UUID per 
 - **Actor priority:** an author-supplied actor (`xapi.actor` or a `course.runtime.js` resolver) always wins; else cmi5 launch actor; else SCORM-derived from the LMS data model. If the SCORM LMS supplies no learner id, that destination is skipped with a console warning, so `useXAPI()` is null when it was the only one. Override the SCORM-derived `homePage` via `actorAccountHomePage` (required if `activityId` is a non-URL IRI).
 - **Auth is Basic-only.** Pass the credential value, not the full header (the publisher prepends `Basic `). For OAuth, return a Basic credential from your `auth` resolver or run a proxy.
 - **`course.config.js` and `course.runtime.js` ship in the client bundle.** Every field is public, not just `auth`. Never put a static `auth` string, API key, or any secret in either; export an `auth` resolver that fetches a server-brokered short-lived token. CORS must allow the served origin.
-- **`actor` is required on web export** and resolved once per page-load (no mid-session identity change in v1 — reload to switch).
+- **`actor` is required on web export** and resolved once per page-load (no mid-session identity change; reload to switch).
 - **Page unload rejects sends.** Once unload begins, `sendStatement` rejects (keeps cmi5 Terminated last). Do end-of-session work in a child component's `onDestroy`, not `beforeunload`.
 - **Retry:** 3 attempts, exponential backoff; 5xx/network retry, 4xx short-circuits, 409 treated as success. Opt out per call with `sendStatement(stmt, { retry: false })`.
 
@@ -1113,9 +1114,9 @@ const result = await xapi.sendStatement({ verb, object });
 
 `destinations[]` lets you handle partial failures under fan-out. The publisher validates only: `verb.id` non-empty, `object.id` non-empty when supplied, `result.score.scaled` in `[-1, 1]` when supplied. Everything else passes through; the LRS reports shape errors via `destinations[].error`.
 
-### Not in v1
+### Not supported
 
-OAuth at the publisher level, statement signing/attachment helpers, offline/IndexedDB queue, State API for non-cmi5 modes, voiding, mid-session actor refresh, group actors.
+OAuth at the publisher level, statement signing/attachment helpers, offline/IndexedDB queue, State API under SCORM and web, voiding, mid-session actor refresh, group actors.
 
 ---
 
@@ -1123,7 +1124,7 @@ OAuth at the publisher level, statement signing/attachment helpers, offline/Inde
 
 The runtime translates author intent into adapter calls automatically. The author-relevant differences:
 
-| Concern              | SCORM 1.2                                                                                | SCORM 2004 4th                                                 | cmi5                                 |
+| Concern              | SCORM 1.2                                                                                | SCORM 2004 4th                                                 | cmi5 / xapi                          |
 | -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
 | Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
 | Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
@@ -1140,13 +1141,13 @@ Author-facing consequences:
 
 ### Local testing
 
-| Standard  | How to test                                                                                   |
-| --------- | --------------------------------------------------------------------------------------------- |
-| scorm12   | Upload `dist/*-scorm12.zip` to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player |
-| scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                       |
-| cmi5      | Upload `dist/*-cmi5.zip` to SCORM Cloud and use its generated cmi5 dispatch URL               |
-| xapi      | Upload `dist/*-xapi.zip` to SCORM Cloud (imports `tincan.xml`) and launch the generated URL   |
-| web       | Serve `dist/` from any static host                                                            |
+| Standard  | How to test                                                                                |
+| --------- | ------------------------------------------------------------------------------------------ |
+| scorm12   | Upload the exported zip to [SCORM Cloud](https://cloud.scorm.com) (free) or Reload Player  |
+| scorm2004 | SCORM Cloud (easiest); also Moodle, Cornerstone, SuccessFactors, Canvas                    |
+| cmi5      | Upload the exported zip to SCORM Cloud and use its generated cmi5 dispatch URL             |
+| xapi      | Upload the exported zip to SCORM Cloud (imports `tincan.xml`) and launch the generated URL |
+| web       | Serve `dist/` from any static host                                                         |
 
 Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / interactions look right.
 
@@ -1154,7 +1155,7 @@ Inspect the LMS API call log to confirm `lesson_status` / `completion_status` / 
 
 ## Custom Layouts
 
-Drop `layout.svelte` at the project root to replace the default chrome. The contract: it receives a single `page` snippet prop and renders it where the active page goes; use hooks for everything else.
+Drop `layout.svelte` at the course root to replace the default chrome. The contract: it receives a single `page` snippet prop and renders it where the active page goes; use hooks for everything else.
 
 ```svelte
 <!-- layout.svelte -->
@@ -1238,7 +1239,7 @@ Emits a `matching` interaction (scored like `<Matching>`); persists partial prog
 
 ### Recipe 2: Custom quiz shell via `quiz.svelte`
 
-Drop `quiz.svelte` at the project root. Use only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
+Drop `quiz.svelte` at the course root. Use only the public `useQuiz()` API; no imports from `tessera-learn/runtime/*`.
 
 ```svelte
 <!-- quiz.svelte -->
@@ -1451,4 +1452,4 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
 - **No runtime data fetching in pages.** Page content is static; no `fetch()` or dynamic loaders in page components.
 - **Public API only.** Import from `tessera-learn`. Never from `tessera-learn/runtime/*` — those paths are internal and may change.
 - **`pageConfig` must be a static object literal.** Trailing commas, unquoted keys, single quotes are fine (JSON5); variables, function calls, template literals, and computed values are not.
-- **Third-party libraries** must be project dependencies in `package.json`.
+- **Third-party libraries** must be dependencies in the workspace `package.json`.
