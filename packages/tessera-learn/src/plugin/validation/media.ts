@@ -117,9 +117,7 @@ const ASSET_REF_RE = /\$assets\/([^\s"'`)]+)/g;
 /** Match $assets/... refs in any context (src attrs, import statements, url() etc) and dedupe. */
 function collectAssetRefs(content: string): Set<string> {
   return new Set(
-    Array.from(content.matchAll(ASSET_REF_RE), (m) =>
-      m[1].replace(/[?#].*$/, ''),
-    ),
+    Array.from(content.matchAll(ASSET_REF_RE), (m) => m[1].split(/[?#]/, 1)[0]),
   );
 }
 

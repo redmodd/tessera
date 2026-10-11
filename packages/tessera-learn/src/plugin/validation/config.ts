@@ -98,6 +98,7 @@ export function parseConfig(
   const profile = unreadableExport
     ? undefined
     : resolveConfigRead(read, standardOverride).profile;
+  if (!profile) d.partial = true;
   if (!read.ok) {
     if (read.reason === 'not-data') {
       reportNonDataConfig(read.source, d);

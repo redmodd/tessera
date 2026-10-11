@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath, type HotUpdateOptions, type Plugin } from 'vite';
 import { virtualModule } from '../src/plugin/virtual-module.js';
@@ -224,11 +224,9 @@ describe('config plugin', () => {
     const plugin = tesseraSubPlugin('tessera:config');
 
     writeFileSync(configPath, `export default { title: 'First' };`);
-    utimesSync(configPath, 1, 1);
     expect(load(plugin)).toContain('"title":"First"');
 
     writeFileSync(configPath, `export default { title: 'Second' };`);
-    utimesSync(configPath, 2, 2);
     expect(load(plugin)).toContain('"title":"Second"');
   });
 });
