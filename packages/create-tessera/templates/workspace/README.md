@@ -2,7 +2,7 @@
 
 > Edit this README to describe your course library.
 
-A [Tessera](https://www.npmjs.com/package/tessera-learn) workspace — many courses
+A [Tessera](https://tesseralearn.dev) workspace: many courses
 under `courses/`, with a shared design system in `shared/` (imported as `$shared`).
 
 ## Quick start
@@ -32,7 +32,7 @@ pnpm check <course>      # validate + a11y (run before export)
 pnpm export <course>     # build a SCORM / cmi5 / xAPI / web package
 ```
 
-Authoring with an AI agent? See [`AGENTS.md`](./AGENTS.md): it loads the authoring
+Authoring with an AI assistant? See [`AGENTS.md`](./AGENTS.md): it loads the authoring
 guide and has a **Project notes** section where you add your own context (audience,
 tone, brand). If Claude Code does not pick it up, add a `CLAUDE.md` containing
 `@AGENTS.md` beside it (see

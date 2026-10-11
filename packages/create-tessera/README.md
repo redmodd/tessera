@@ -1,23 +1,12 @@
 # create-tessera
 
-Scaffold a new [Tessera](https://www.npmjs.com/package/tessera-learn) workspace — a single project that holds many courses.
+Scaffold a new [Tessera](https://tesseralearn.dev) workspace: a single project that holds many courses.
 
-Tessera is a toolkit for building interactive online courses that play in any LMS (SCORM 1.2, SCORM 2004, cmi5, xAPI 1.0.3, or static Web), designed for AI-assisted authoring: open the scaffolded workspace in Claude Code, Codex, or any tool that reads `AGENTS.md`, and describe the course you want in plain English. This package is the entry point — it generates the workspace (one `package.json` and one `node_modules` shared by every course), wires up the runtime, seeds a first course, and drops `AGENTS.md` at the root so the agent knows the conventions.
+Tessera is a toolkit for building interactive online courses that play in any LMS (SCORM 1.2, SCORM 2004, cmi5, xAPI 1.0.3, or static Web), designed for AI-assisted authoring: open the scaffolded workspace in Claude Code, Codex, or any tool that reads `AGENTS.md`, and describe the course you want in plain English. This package is the entry point: it generates the workspace (one `package.json` and one `node_modules` shared by every course), wires up the runtime, seeds a first course, and drops `AGENTS.md` at the root so your assistant knows the conventions.
 
 ## Prerequisites
 
-Requires **Node.js 24 or later** (which includes `npm`). If you already have it, jump to [Usage](#usage). Otherwise:
-
-- **macOS:** Download the macOS Installer (`.pkg`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
-- **Windows:** Download the Windows Installer (`.msi`) from [nodejs.org/en/download](https://nodejs.org/en/download) and run it. The default options are fine.
-
-Open a **new** Terminal (macOS) or PowerShell / Command Prompt (Windows) window after installing and confirm:
-
-```bash
-node --version    # should print v24.x.x or higher
-```
-
-The scaffolded workspace is set up for **pnpm**; install it with `npm install -g pnpm`.
+Requires **Node.js 24 or later** (which includes `npm`). The scaffolded workspace is set up for **pnpm**; install it with `npm install -g pnpm`. If you have neither, [Getting started](https://tesseralearn.dev/docs/getting-started/) walks through installing both on macOS, Windows, and Linux.
 
 ## Usage
 
@@ -34,7 +23,7 @@ yarn create tessera my-courses
 
 The scaffolder creates a workspace directory with:
 
-- `package.json`: the one package — owns `tessera-learn`, Svelte, and the reserved scripts
+- `package.json`: the one package, which owns `tessera-learn`, Svelte, and the reserved scripts
 - `courses/starter-course/`: a seed course (`course.config.js`, `pages/`, `styles/`, …)
 - `shared/`: a design system shared across courses, imported as `$shared` (`Button.svelte`, `tokens.css`)
 - `AGENTS.md`: a small pointer to the authoring guide (see below)
@@ -42,7 +31,7 @@ The scaffolder creates a workspace directory with:
 
 A **course** is a self-contained folder under `courses/`. The workspace seeds one (`starter-course`); add more with `pnpm tessera new <name>`, which stamps `courses/<name>/` without re-installing (the workspace already owns the dependencies). Each course exports independently to its own LMS package.
 
-The authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, with reference files beside it in `node_modules/tessera-learn/docs/`, so it's always current for your installed version, with no copy to maintain in the workspace. The scaffolded `AGENTS.md` points your agent (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
+The authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, with reference files beside it in `node_modules/tessera-learn/docs/`, so it's always current for your installed version, with no copy to maintain in the workspace. The scaffolded `AGENTS.md` points your assistant (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
 
 Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it ([details](https://code.claude.com/docs/en/memory#agents-md)). On an older version, or with one of those files in place, add a `CLAUDE.md` containing `@AGENTS.md` beside the scaffolded `AGENTS.md`.
 
@@ -57,7 +46,7 @@ Then:
 ```bash
 cd my-courses
 pnpm install
-pnpm dev starter-course      # local dev server at http://localhost:5173
+pnpm dev starter-course      # live preview at http://localhost:5173
 pnpm export starter-course   # build + package the course for its configured LMS standard
 pnpm validate starter-course # check the course for structural errors, no server or build
 pnpm check starter-course    # validate, then the runtime accessibility audit (axe) over the built course
@@ -73,7 +62,7 @@ Open the printed URL in your browser. The page hot-reloads as you edit course fi
 
 ## Updating an existing workspace
 
-Updating is a plain dependency bump — there is no `create-tessera upgrade` verb. From the workspace root:
+Updating is a plain dependency bump: there is no `create-tessera upgrade` verb. From the workspace root:
 
 ```bash
 pnpm add tessera-learn@latest
@@ -81,7 +70,9 @@ pnpm add tessera-learn@latest
 
 To pin a specific release instead of the newest (for reproducible builds, or to avoid an unwanted major), name the version: `pnpm add tessera-learn@<version>` (or edit the version in `package.json` and run `pnpm install`). The whole workspace shares the one dependency, so every course moves together.
 
-The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so nothing in your workspace tree needs reconciling. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically, and your `AGENTS.md` pointer doesn't change.
+The framework owns the build (`tessera dev`/`export`), the reserved scripts, and the authoring guide, so none of those need reconciling in your workspace. The guide lives in `node_modules/tessera-learn/AGENTS.md`, so bumping the dependency updates it automatically, and your `AGENTS.md` pointer doesn't change.
+
+Your courses are a different matter. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) before you update, or ask your assistant to apply it for you.
 
 ## Documentation
 
