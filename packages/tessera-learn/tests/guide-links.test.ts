@@ -5,13 +5,18 @@ import { dirname, resolve } from 'node:path';
 const PKG_ROOT = resolve(import.meta.dirname, '..');
 const GUIDE_FILES = [
   'AGENTS.md',
-  ...readdirSync(resolve(PKG_ROOT, 'docs')).map((file) => `docs/${file}`),
+  ...readdirSync(resolve(PKG_ROOT, 'docs'))
+    .filter((file) => file.endsWith('.md'))
+    .map((file) => `docs/${file}`),
 ];
 
-function anchors(markdown: string): Set<string> {
-  const prose = markdown.replace(/^```[\s\S]*?^```/gm, '');
+function prose(file: string): string {
+  return readFileSync(file, 'utf-8').replace(/^```[\s\S]*?^```/gm, '');
+}
+
+function anchors(file: string): Set<string> {
   return new Set(
-    Array.from(prose.matchAll(/^#{1,6} (.+)$/gm), ([, heading]) =>
+    Array.from(prose(file).matchAll(/^#{1,6} (.+)$/gm), ([, heading]) =>
       heading
         .toLowerCase()
         .replace(/[^\w\- ]/g, '')
@@ -24,15 +29,12 @@ describe('authoring guide links', () => {
   it.each(GUIDE_FILES)('%s links to files and headings that exist', (file) => {
     const path = resolve(PKG_ROOT, file);
     const broken: string[] = [];
-    for (const [, target, anchor] of readFileSync(path, 'utf-8').matchAll(
+    for (const [, target, anchor] of prose(path).matchAll(
       /\]\((?!https?:)([^)#]*)(?:#([^)]+))?\)/g,
     )) {
       const targetPath = target ? resolve(dirname(path), target) : path;
       if (!existsSync(targetPath)) broken.push(target);
-      else if (
-        anchor &&
-        !anchors(readFileSync(targetPath, 'utf-8')).has(anchor)
-      )
+      else if (anchor && !anchors(targetPath).has(anchor))
         broken.push(`${target}#${anchor}`);
     }
     expect(broken).toEqual([]);

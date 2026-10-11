@@ -5,8 +5,8 @@ owns the dependencies once and holds many courses under `courses/`, with a share
 design system in `shared/` (imported as `$shared`). The authoring guide ships
 with the framework. Run `pnpm install`, then read
 `node_modules/tessera-learn/AGENTS.md` before generating or editing course
-content. It routes hooks, recipes, scoring, xAPI and export tasks to the
-reference files in `node_modules/tessera-learn/docs/`.
+content. It routes specialised tasks to the reference files in
+`node_modules/tessera-learn/docs/`.
 
 @./node_modules/tessera-learn/AGENTS.md
 

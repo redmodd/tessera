@@ -119,9 +119,9 @@ You review the output, ask for changes, and iterate. The dev server hot-reloads 
 
 ## Documentation
 
-- **[tesseralearn.dev/docs](https://tesseralearn.dev/docs/)** — getting started, workspaces, quizzes, validation & accessibility, exporting, how SCORM/xAPI work.
-- **[Authoring guide](./packages/tessera-learn/AGENTS.md)** — the full technical reference (components, hooks, quizzes, layouts, custom xAPI, the `course.config.js` shape). Ships inside `tessera-learn`; every scaffolded workspace points its agent at it.
-- **[tessera-demo-courses](https://github.com/redmodd/tessera-demo-courses)** — a complete example workspace.
+- **[tesseralearn.dev/docs](https://tesseralearn.dev/docs/)**: getting started, workspaces, quizzes, validation & accessibility, exporting, how SCORM/xAPI work.
+- **[Authoring guide](./packages/tessera-learn/AGENTS.md)**: the technical reference. `AGENTS.md` covers components, quizzes and the `course.config.js` shape, and routes hooks, layouts, scoring, custom xAPI and export to the files in [`docs/`](./packages/tessera-learn/docs/). Ships inside `tessera-learn`; every scaffolded workspace points its agent at it.
+- **[tessera-demo-courses](https://github.com/redmodd/tessera-demo-courses)**: a complete example workspace.
 
 ## Contributing
 

@@ -42,7 +42,9 @@ The scaffolder creates a workspace directory with:
 
 A **course** is a self-contained folder under `courses/`. The workspace seeds one (`starter-course`); add more with `pnpm tessera new <name>`, which stamps `courses/<name>/` without re-installing (the workspace already owns the dependencies). Each course exports independently to its own LMS package.
 
-The full authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, so it's always current for your installed version, with no copy to maintain in the workspace. The scaffolded `AGENTS.md` points your agent (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
+The authoring guide ships with the framework at `node_modules/tessera-learn/AGENTS.md`, with reference files beside it in `node_modules/tessera-learn/docs/`, so it's always current for your installed version, with no copy to maintain in the workspace. The scaffolded `AGENTS.md` points your agent (Claude Code, Codex, Cursor, …) at it. It lives at the workspace root only, so open the workspace folder (not an individual course) to keep the guide in scope.
+
+Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it. On an older version, or with one of those files in place, add a `CLAUDE.md` containing `@AGENTS.md` beside the scaffolded `AGENTS.md`.
 
 The Vite build is owned by the `tessera` CLI: there is no `vite.config.js` to manage. If you need to customise the build (an extra plugin, an alias, a dev-server port), add an optional `tessera.config.js` to the course folder; see the authoring guide.
 
