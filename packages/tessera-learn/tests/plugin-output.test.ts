@@ -536,7 +536,7 @@ describe('sources changed after validation', () => {
     writeFileSync(resolve(projectRoot, page), '<h1>Edited</h1>');
     writeFileSync(resolve(projectRoot, 'quiz.svelte'), '<main></main>');
     expect(() => buildEnd(validation)).toThrow(
-      `2 file(s) changed during the build, after validation: ${page}, quiz.svelte.`,
+      `2 file(s) changed during the build, after validation: ${page}, quiz.svelte. Run the build again. If it fails every time, a plugin is saving a source after validation`,
     );
   });
 

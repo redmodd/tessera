@@ -108,7 +108,7 @@ export class BuildContext {
       .sort();
     if (changed.length > 0) {
       throw new Error(
-        `Tessera: ${changed.length} file(s) changed during the build, after validation: ${changed.join(', ')}. Run the build again.`,
+        `Tessera: ${changed.length} file(s) changed during the build, after validation: ${changed.join(', ')}. Run the build again. If it fails every time, a plugin is saving a source after validation: move that save into its buildStart hook.`,
       );
     }
   }
