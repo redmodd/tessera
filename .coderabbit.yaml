@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  sequence_diagrams: false
+  in_progress_fortune: false
+  path_filters:
+    - '!.changeset/**'
+    - '!**/CHANGELOG.md'
+  auto_review:
+    ignore_usernames:
+      - 'dependabot[bot]'
+    ignore_title_keywords:
+      - 'chore: release'
+chat:
+  art: false
