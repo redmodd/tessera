@@ -291,29 +291,46 @@ function entryStat(dirPath: string, name: string) {
   }
 }
 
+/** Sorted names of a directory's entries of one kind. Only a symlink costs a stat, and one that does not resolve is neither kind. */
+function entryNames(
+  dirPath: string,
+  kind: 'isFile' | 'isDirectory',
+  wanted: (name: string) => boolean,
+): string[] {
+  if (!existsSync(dirPath)) return [];
+  return readdirSync(dirPath, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        wanted(entry.name) &&
+        (entry.isSymbolicLink() ? entryStat(dirPath, entry.name) : entry)?.[
+          kind
+        ](),
+    )
+    .map((entry) => entry.name)
+    .sort();
+}
+
 /**
  * Get sorted subdirectories of a given path.
  */
 function getSortedDirs(dirPath: string): string[] {
-  if (!existsSync(dirPath)) return [];
-  return readdirSync(dirPath)
-    .filter(
-      (name) =>
-        !name.startsWith('.') && entryStat(dirPath, name)?.isDirectory(),
-    )
-    .sort();
+  return entryNames(dirPath, 'isDirectory', (name) => !name.startsWith('.'));
 }
 
 /**
  * Get .svelte files in a directory.
  */
 export function getSvelteFiles(dirPath: string): string[] {
-  if (!existsSync(dirPath)) return [];
-  return readdirSync(dirPath)
+  return entryNames(dirPath, 'isFile', (name) => name.endsWith('.svelte'));
+}
+
+/** Names of the symlinks in a directory that do not resolve, which the walker leaves out. */
+export function unresolvedSymlinks(dirPath: string): string[] {
+  return readdirSync(dirPath, { withFileTypes: true })
     .filter(
-      (name) => name.endsWith('.svelte') && entryStat(dirPath, name)?.isFile(),
+      (entry) => entry.isSymbolicLink() && !entryStat(dirPath, entry.name),
     )
-    .sort();
+    .map((entry) => entry.name);
 }
 
 // ---------- Course structure walker ----------

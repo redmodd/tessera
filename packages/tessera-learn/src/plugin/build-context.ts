@@ -8,9 +8,8 @@ import {
   type ResolvedConfigRead,
 } from './manifest.js';
 import type { StandardId, StandardProfile } from '../runtime/standards.js';
-import { ChangeBurst } from './change-burst.js';
 import { reportValidationIssues, validateProject } from './validation.js';
-import type { ValidationResult } from './validation/diagnostics.js';
+import type { Diagnostics } from './validation/diagnostics.js';
 
 export type ValidatedConfig = ResolvedConfigRead & {
   ok: true;
@@ -52,7 +51,6 @@ export class BuildContext {
   // gate plugin. onwarn fires during transform (after the Tier-1b buildStart
   // gate), so a11y warnings are collected here and flushed/gated at buildEnd.
   a11yWarnings: string[] = [];
-  readonly devChanges = new ChangeBurst();
   #validatedConfig: ValidatedConfig | null = null;
 
   constructor(readonly standardOverride?: StandardId) {}
@@ -68,7 +66,7 @@ export class BuildContext {
     }
   }
 
-  validate(): ValidationResult {
+  validate(): Diagnostics {
     this.#validatedConfig = null;
     const read = readCourseConfig(this.root);
     const result = validateProject(this.root, this.standardOverride, read);

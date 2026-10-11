@@ -31,22 +31,25 @@ import {
   standardProfile,
   type LMSStandard,
 } from '../runtime/standards.js';
-import { validateProject, reportValidationIssues } from './validation.js';
+import {
+  validateProject,
+  reportValidationIssues,
+  VALIDATED_ROOT_FILES,
+} from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
 import { isPlausibleLanguageTag } from './validation/config.js';
-import { SHELL_FILES } from './validation/page.js';
 import {
+  Diagnostics,
   formatValue,
   quoteList,
-  type ValidationResult,
 } from './validation/diagnostics.js';
+import { ChangeBurst } from './change-burst.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { resolvePackageRoot } from './package-root.js';
-import { COURSE_RUNTIME_FILE } from './validation/xapi.js';
 import { virtualModule } from './virtual-module.js';
 import {
   BuildContext,
@@ -336,21 +339,25 @@ function tesseraPagesPlugin(): Plugin {
 
 // ---------- Validation Plugin ----------
 
-const VALIDATED_ROOT_FILES = [
-  COURSE_CONFIG_FILE,
-  COURSE_RUNTIME_FILE,
-  ...SHELL_FILES,
-];
-
 interface DevSession {
+  /** Servers open on the root. A restart opens the new one before it closes the old. */
+  servers: number;
   failing: boolean;
-  reported: Set<string>;
+  /** The warnings and notes already printed, each with the source file it is about. */
+  reported: Map<string, string | undefined>;
+  changes: ChangeBurst;
 }
 
-// Kept per project root while its server is open, not per plugin instance:
+// Kept per project root while a server is open on it, not per plugin instance:
 // Vite reloads vite.config.js on a restart and builds a new instance from it,
 // and that restart must not be taken for a first start.
 const devSessions = new Map<string, DevSession>();
+
+function remember(session: DevSession, result: Diagnostics): void {
+  for (const notice of [...result.warnings, ...result.infos]) {
+    session.reported.set(notice, result.sourceOf(notice));
+  }
+}
 
 function isPageSource(projectRoot: string, file: string): boolean {
   return (
@@ -372,18 +379,16 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     const session = devSessions.get(ctx.root);
     if (!session) return;
     const { reported } = session;
-    let result: ValidationResult;
+    let result: Diagnostics;
     try {
       result = validateProject(ctx.root, ctx.standardOverride);
     } catch (error) {
-      result = {
-        errors: [`validation could not run: ${(error as Error).message}`],
-        warnings: [],
-        partial: true,
-      };
+      result = new Diagnostics();
+      result.partial = true;
+      result.error(`validation could not run: ${(error as Error).message}`);
     }
     const unreported = (notice: string) => !reported.has(notice);
-    const infos = (result.infos ?? []).filter(unreported);
+    const infos = result.infos.filter(unreported);
     if (session.failing && result.errors.length === 0) {
       infos.push('validation errors resolved');
     }
@@ -393,12 +398,11 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
       warnings: result.warnings.filter(unreported),
       infos,
     });
-    // A run that cannot read a source or resolve the export standard skips the
-    // checks that depend on it, so a notice it does not repeat may still stand.
-    if (!result.partial) reported.clear();
-    for (const notice of [...result.warnings, ...(result.infos ?? [])]) {
-      reported.add(notice);
+    // A notice that is gone is forgotten, so it prints again if it comes back.
+    for (const [notice, source] of reported) {
+      if (!result.mayStand(source)) reported.delete(notice);
     }
+    remember(session, result);
   }
 
   return {
@@ -406,27 +410,41 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     enforce: 'pre',
 
     configureServer() {
-      const restarted = devSessions.get(ctx.root);
-      if (restarted) {
-        restarted.reported.clear();
-        return revalidate();
+      let session = devSessions.get(ctx.root);
+      if (session) {
+        // The restart joins a burst still waiting, so the two validate once.
+        session.reported.clear();
+        session.changes.settle(revalidate);
+      } else {
+        session = {
+          servers: 0,
+          failing: false,
+          reported: new Map(),
+          changes: new ChangeBurst(),
+        };
+        remember(session, ctx.validate());
       }
-      const { warnings, infos = [] } = ctx.validate();
-      devSessions.set(ctx.root, {
-        failing: false,
-        reported: new Set([...warnings, ...infos]),
-      });
+      const opened = session;
+      // Counted once every plugin has configured the server: a server that
+      // fails before then never starts, so it is never closed either.
+      return () => {
+        opened.servers++;
+        devSessions.set(ctx.root, opened);
+      };
     },
 
-    closeServer({ reason }) {
-      if (reason === 'close') devSessions.delete(ctx.root);
+    closeServer() {
+      const session = devSessions.get(ctx.root);
+      if (session && --session.servers === 0) devSessions.delete(ctx.root);
     },
 
     // Nothing is returned, so Vite does not hold the hot update for the result.
     hotUpdate({ type, file, read: waitForSave }) {
       if (this.environment.name !== 'client') return;
+      const changes = devSessions.get(ctx.root)?.changes;
+      if (!changes) return;
       if (isValidatedSource(ctx.root, file)) {
-        ctx.devChanges.settle(
+        changes.settle(
           revalidate,
           type === 'delete' ? undefined : waitForSave(),
         );
@@ -434,7 +452,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
         type !== 'update' &&
         isInside(resolve(ctx.root, 'assets'), file)
       ) {
-        ctx.devChanges.settle(revalidate);
+        changes.settle(revalidate);
       }
     },
 

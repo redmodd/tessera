@@ -1624,9 +1624,39 @@ describe('structure validation', () => {
       );
       const { errors, warnings } = validateProject(testRoot);
       expect(errors).toEqual([]);
-      expect(warnings).not.toContainEqual(expect.stringContaining('gone'));
+      expect(warnings).toContainEqual(
+        expect.stringContaining(`pages/${entry}: symlink does not resolve`),
+      );
     },
   );
+
+  it('walks a symlink that resolves as the file or folder it points at', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'shared/lesson/linked.svelte',
+      '<script module>export const pageConfig = { extra: 1 };</script>',
+    );
+    symlinkSync(
+      resolve(testRoot, 'shared/lesson'),
+      resolve(testRoot, 'pages/01-section/02-linked'),
+    );
+    symlinkSync(
+      resolve(testRoot, 'shared/lesson/linked.svelte'),
+      resolve(testRoot, 'pages/01-section/01-lesson/linked.svelte'),
+    );
+    const { warnings } = validateProject(testRoot);
+    for (const lesson of ['01-lesson', '02-linked']) {
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          `${lesson}/linked.svelte: unknown field pageConfig.extra`,
+        ),
+      );
+    }
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('symlink does not resolve'),
+    );
+  });
 
   it('skips a symlink that points at itself', () => {
     createValidProject(testRoot);
@@ -1634,7 +1664,9 @@ describe('structure validation', () => {
     symlinkSync(link, link);
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toEqual([]);
-    expect(warnings).not.toContainEqual(expect.stringContaining('loop'));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('loop.svelte: symlink does not resolve'),
+    );
   });
 
   it('treats section-level .svelte files as flat-mode pages', () => {
@@ -3353,6 +3385,19 @@ describe('a11y config block — level and ignore', () => {
     );
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'tessera/image-alt')).toBe(false);
+  });
+
+  it('leaves out the diagnostics a11y.ignore may cover when the config cannot be read', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<h1>Title</h1><h3>Skipped</h3><Image src="$assets/x.png" />`,
+    );
+    writeConfig(testRoot, 'export default {');
+    const { errors, warnings } = validateProject(testRoot);
+    expect(has(errors, 'course.config.js: could not parse')).toBe(true);
+    expect(has(errors, 'tessera/image-alt')).toBe(false);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
   });
 
   it("level: 'error' promotes a promotable warning to an error", () => {

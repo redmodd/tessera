@@ -540,12 +540,17 @@ describe('dev revalidation', () => {
 
   const lessonDir = 'pages/01-section/01-lesson';
 
+  // Vite runs the hook configureServer returns once every plugin has configured the server.
+  function configure(validation: Plugin): void {
+    (validation.configureServer as any).call(validation)();
+  }
+
   function startDev(): Plugin {
     writeLessonPage(projectRoot);
     writeConfig('web');
     const validation = findPlugin('tessera:validation', 'serve');
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    (validation.configureServer as any).call(validation);
+    configure(validation);
     return validation;
   }
 
@@ -689,38 +694,40 @@ describe('dev revalidation', () => {
     );
   });
 
-  it('reports errors on a restart instead of failing it', () => {
+  it('reports errors on a restart instead of failing it', async () => {
     let validation = startDev();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const infos = vi.spyOn(console, 'log').mockImplementation(() => {});
     // Vite builds the restarted server's plugins before it closes the old server.
-    const restart = () => {
+    const restart = async () => {
       const rebuilt = findPlugin('tessera:validation', 'serve');
-      (rebuilt.configureServer as any).call(rebuilt);
+      configure(rebuilt);
       (validation.closeServer as any).call(validation, { reason: 'restart' });
       validation = rebuilt;
+      await vi.runAllTimersAsync();
     };
 
     writeConfigSource('export default {');
-    restart();
+    await restart();
     expect(errors).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining('course.config.js: could not parse'),
     );
 
     writeConfig('web');
-    restart();
+    await restart();
     expect(infos).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining('validation errors resolved'),
     );
   });
 
-  it('reports every standing warning again on a restart', () => {
+  it('reports every standing warning again on a restart', async () => {
     const validation = startDev();
     const warnings = vi.mocked(console.warn);
     const standing = warnings.mock.calls.length;
     expect(standing).toBeGreaterThan(0);
 
-    (validation.configureServer as any).call(validation);
+    configure(validation);
+    await vi.runAllTimersAsync();
     expect(warnings).toHaveBeenCalledTimes(standing * 2);
   });
 
@@ -729,9 +736,7 @@ describe('dev revalidation', () => {
     writeConfigSource('export default {');
     const validation = findPlugin('tessera:validation', 'serve');
 
-    expect(() => (validation.configureServer as any).call(validation)).toThrow(
-      'Tessera validation failed',
-    );
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
   });
 
   it('refuses a project with errors again once its server has closed', () => {
@@ -741,9 +746,45 @@ describe('dev revalidation', () => {
     (validation.closeServer as any).call(validation, { reason: 'close' });
     writeConfigSource('export default {');
 
-    expect(() => (validation.configureServer as any).call(validation)).toThrow(
-      'Tessera validation failed',
-    );
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
+  });
+
+  it('refuses a project with errors after a start that another plugin failed', () => {
+    writeLessonPage(projectRoot);
+    writeConfig('web');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = findPlugin('tessera:validation', 'serve');
+    (failed.configureServer as any).call(failed);
+
+    writeConfigSource('export default {');
+    const validation = findPlugin('tessera:validation', 'serve');
+
+    expect(() => configure(validation)).toThrow('Tessera validation failed');
+  });
+
+  it('keeps revalidating when another server on the same root closes', async () => {
+    const validation = startDev();
+    const other = findPlugin('tessera:validation', 'serve');
+    configure(other);
+    (other.closeServer as any).call(other, { reason: 'close' });
+    writeConfigSource('export default {');
+
+    expect(await hotUpdate(validation, 'course.config.js')).toHaveBeenCalled();
+  });
+
+  it('validates once when a restart lands inside a burst', async () => {
+    const validation = startDev();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeConfigSource('export default {');
+
+    notify(validation, 'course.config.js');
+    const rebuilt = findPlugin('tessera:validation', 'serve');
+    configure(rebuilt);
+    (validation.closeServer as any).call(validation, { reason: 'restart' });
+    await vi.runAllTimersAsync();
+
+    expect(errors).toHaveBeenCalledOnce();
   });
 
   it('says when the errors it reported are resolved', async () => {
@@ -813,6 +854,30 @@ describe('dev revalidation', () => {
     expect(warnings).toHaveBeenCalledWith(unknownField);
   });
 
+  it('reports a warning that comes back on one page while another cannot be parsed', async () => {
+    const validation = startDev();
+    const warnings = vi.mocked(console.warn);
+    const savePage = async (name: string, source: string) => {
+      writeFileSync(resolve(projectRoot, lessonDir, name), source);
+      await hotUpdate(validation, `${lessonDir}/${name}`);
+    };
+    const weighted =
+      '<script module>export const pageConfig = { weight: 2 };</script>';
+
+    await savePage(
+      'broken.svelte',
+      '<script module>export const pageConfig = {</script>',
+    );
+    await savePage('other.svelte', weighted);
+    await savePage('other.svelte', '<h1>Other</h1>');
+    warnings.mockClear();
+
+    await savePage('other.svelte', weighted);
+    expect(warnings).toHaveBeenCalledWith(
+      expect.stringContaining('other.svelte: pageConfig.weight only applies'),
+    );
+  });
+
   const xapiConfig = `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "https://lrs.example/xapi/", activityId: "https://example.com/course", actorAccountHomePage: "https://example.com" } };`;
 
   it.each([
@@ -822,9 +887,24 @@ describe('dev revalidation', () => {
       '<script module>export const pageConfig = {</script>',
     ],
     [
+      `${lessonDir}/page.svelte`,
+      '<script module>export const pageConfig = { weight: 2 };</script>',
+      '<script module>export const pageConfig = { weight: w };</script>',
+    ],
+    [
       `${lessonDir}/_meta.js`,
       `export default { title: "Lesson", pages: ["page", "page"] };`,
       'export default {',
+    ],
+    [
+      `${lessonDir}/_meta.js`,
+      `export default { title: "Lesson", pages: ["page", "page"] };`,
+      `export default { title: "Lesson", pages: "page" };`,
+    ],
+    [
+      'course.config.js',
+      `export default { title: "T", export: { standard: "web" }, completion: { mode: "percentage", trigger: "page" } };`,
+      `export default { title: "T", export: { standard: "web" }, completion: "percentage" };`,
     ],
     [
       'course.config.js',
