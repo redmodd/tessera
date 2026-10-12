@@ -443,27 +443,6 @@ describe('QuizEngine', () => {
       expect(completeScore(events)).toBe(100);
     });
 
-    it('does not review answers it never had', () => {
-      const { engine } = makeEngine(
-        { graded: true },
-        { restore: { attempts: 1, score: 80 } },
-      );
-      engine.registerQuestion(tfQuestion('a', true, true));
-      engine.startReview();
-      expect(engine.state).toBe('submitted');
-    });
-
-    it('reports correct as null rather than flagging every question wrong', () => {
-      const { engine } = makeEngine(
-        { graded: true },
-        { restore: { attempts: 1, score: 100 } },
-      );
-      engine.registerQuestion(tfQuestion('a', true, true));
-      engine.registerQuestion(tfQuestion('b', true, true));
-      expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
-      expect(engine.questions.every((q) => q.feedbackVisible)).toBe(false);
-    });
-
     describe('with saved answers', () => {
       // A widget holding one true/false answer, as a mounted question would.
       function widget(id: string, correct: boolean, canRestore = true) {

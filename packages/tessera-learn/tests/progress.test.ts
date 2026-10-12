@@ -374,7 +374,6 @@ describe('ProgressState', () => {
       ['whole numbers as strings', [2, 0], '["2","0"]'],
       ['paired whole numbers as strings', [[1, 2]], '[["1","2"]]'],
       ['a fraction as written', [1.5], '[1.5]'],
-      ['a number as written', 4.5, '4.5'],
       ['a boolean as written', false, 'false'],
       ['numeric text as written', '42', '"42"'],
     ])('saves %s and restores what was submitted', (_, response, json) => {

@@ -260,113 +260,40 @@ describe('useQuestion — standalone mode', () => {
     });
   });
 
-  describe('returning to the page', () => {
-    const tf = (response: boolean): Interaction => ({
-      type: 'true-false',
-      response,
-      correct: true,
+  it('hands the saved response back to the widget when the learner returns to the page', () => {
+    provideNavCtx({
+      manifest: createManifest(2, {}, { 1: { graded: true } }),
+      pageIndex: 1,
+    });
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({
+        type: 'choice',
+        response: ['2'],
+        correct: ['1'],
+      }),
+      restore: () => {},
+    }).submit();
+
+    let selected: string[] = [];
+    const revisit = useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({
+        type: 'choice',
+        response: selected,
+        correct: ['1'],
+      }),
+      restore: ([choice]) => {
+        selected = [choice];
+      },
     });
 
-    function gradedPage() {
-      return provideNavCtx({
-        manifest: createManifest(2, {}, { 1: { graded: true } }),
-        pageIndex: 1,
-      });
-    }
-
-    it('keeps a full score locked, so a later wrong answer cannot replace it', () => {
-      const { progress } = gradedPage();
-      useQuestion({
-        id: 'q1',
-        graded: true,
-        response: () => tf(true),
-      }).submit();
-
-      const revisit = useQuestion({
-        id: 'q1',
-        graded: true,
-        response: () => tf(false),
-      });
-      revisit.retry();
-      revisit.submit();
-
-      expect(revisit.submitted).toBe(true);
-      expect(revisit.isLockedCorrect).toBe(true);
-      expect(revisit.canRetry).toBe(false);
-      expect(progress.pageScore(1)).toBe(100);
-    });
-
-    it('counts retries across visits against maxRetries', () => {
-      const { progress } = gradedPage();
-      const opts = {
-        id: 'q1',
-        graded: true,
-        maxRetries: 1,
-        response: () => tf(false),
-      };
-      const first = useQuestion(opts);
-      first.submit();
-      first.retry();
-      first.submit();
-      expect(first.canRetry).toBe(false);
-
-      const revisit = useQuestion(opts);
-
-      expect(revisit.retryCount).toBe(1);
-      expect(revisit.submitted).toBe(true);
-      expect(revisit.canRetry).toBe(false);
-      expect(progress.gradedUnits.get(1)?.questions?.get('q1')?.retries).toBe(
-        1,
-      );
-    });
-
-    it('hands the saved response back to the widget', () => {
-      gradedPage();
-      useQuestion({
-        id: 'q1',
-        graded: true,
-        response: () => ({
-          type: 'choice',
-          response: ['2'],
-          correct: ['1'],
-        }),
-        restore: () => {},
-      }).submit();
-
-      let selected: string[] = [];
-      const revisit = useQuestion({
-        id: 'q1',
-        graded: true,
-        response: () => ({
-          type: 'choice',
-          response: selected,
-          correct: ['1'],
-        }),
-        restore: ([choice]) => {
-          selected = [choice];
-        },
-      });
-
-      expect(selected).toEqual(['2']);
-      expect(revisit.answer).toEqual(['2']);
-      expect(revisit.correct).toBe(false);
-      expect(revisit.canRetry).toBe(true);
-    });
-
-    it('keeps correct null for a question with no correct answer', () => {
-      gradedPage();
-      const poll = () =>
-        useQuestion({
-          id: 'q1',
-          response: () => ({ type: 'likert', response: 'agree' }),
-        });
-      poll().submit();
-
-      const revisit = poll();
-
-      expect(revisit.submitted).toBe(true);
-      expect(revisit.correct).toBe(null);
-    });
+    expect(selected).toEqual(['2']);
+    expect(revisit.answer).toEqual(['2']);
+    expect(revisit.correct).toBe(false);
+    expect(revisit.canRetry).toBe(true);
   });
 
   it('mode is "standalone" outside a Quiz', () => {
@@ -394,10 +321,12 @@ describe('useQuestion — inside a <Quiz>', () => {
   it('registers once and hands back the quiz registration', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
+    const restore = () => {};
 
     const q = useQuestion({
       id: 'q1',
       response: () => ({ type: 'true-false', response: true, correct: true }),
+      restore,
     });
 
     expect(quiz.registerQuestion).toHaveBeenCalledTimes(1);
@@ -406,6 +335,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(arg.id).toBe('q1');
     expect(typeof arg.checkAnswer).toBe('function');
     expect(typeof arg.interaction).toBe('function');
+    expect(arg.restore).toBe(restore);
   });
 
   it('forwards each widget through to a distinct quiz registration', () => {

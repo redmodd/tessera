@@ -171,17 +171,12 @@ describe('CourseSession restore gate honours config.resume', () => {
       return saveState.mock.lastCall![0] as SavedState;
     }
 
-    it('are saved whole to an adapter with no limit', async () => {
+    it('are saved whole, unmeasured, to an adapter with no limit', async () => {
+      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+
       expect((await answer()).g).toEqual({
         '1': { q: { q1: [100, 1, 1, 1, essay], q2: [100, 1, 1, 0, [1]] } },
       });
-    });
-
-    it('are not measured for an adapter with no limit', async () => {
-      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
-
-      await answer();
-
       expect(encode).not.toHaveBeenCalled();
     });
 

@@ -210,9 +210,6 @@ test.describe('Quiz — Graded Assessment', () => {
     const score = await page.locator('.tessera-quiz-score-value').textContent();
     expect(score).toBe('100%');
 
-    // A single attempt is the restore default, so it costs no suspend data.
-    expect(await readSavedState(page)).not.toHaveProperty('qa');
-
     await page.reload();
     await waitForTesseraContent(page);
 

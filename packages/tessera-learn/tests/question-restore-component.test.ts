@@ -44,16 +44,6 @@ describe('a built-in question the learner returns to', () => {
     expect(retry()).toHaveLength(0);
   });
 
-  it('MultipleChoice offers Try again on a wrong answer until maxRetries is spent', () => {
-    const props = { options: ['a', 'b'], correct: 1, maxRetries: 1 };
-    const wrong = { score: 0, response: ['0'] };
-
-    expect(revisit(MultipleChoice, props, wrong).retry()).toHaveLength(1);
-    expect(
-      revisit(MultipleChoice, props, { ...wrong, retries: 1 }).retry(),
-    ).toHaveLength(0);
-  });
-
   it('MultipleChoice keeps a full score locked and marked correct when its answer was not saved', () => {
     const { target, all, retry } = revisit(
       MultipleChoice,

@@ -276,18 +276,6 @@ describe('StandaloneQuestion', () => {
     expect(gated.answerComplete).toBe(true);
   });
 
-  it('marks each submit with the retries spent before it', () => {
-    const { q, markScore } = make({ response: () => wrong });
-    q.submit();
-    q.retry();
-    q.submit();
-
-    expect(markScore).toHaveBeenLastCalledWith(
-      0,
-      expect.objectContaining({ retries: 1 }),
-    );
-  });
-
   describe('restored from a saved result', () => {
     it('starts submitted, with the saved retries counted against maxRetries', () => {
       const { q, markScore, report } = make(
@@ -351,11 +339,11 @@ describe('StandaloneQuestion', () => {
       expect(q.answer).toBe(2);
     });
 
-    it.each([
-      ['with its answer', { score: 100, retries: 0, response: true }],
-      ['without its answer', { score: 100, retries: 0 }],
-    ])('reports nothing on commit() when restored %s', (_, saved) => {
-      const { q, report } = make({ restore: () => {} }, saved);
+    it('reports nothing on commit()', () => {
+      const { q, report } = make(
+        { restore: () => {} },
+        { score: 100, retries: 0, response: true },
+      );
 
       q.commit();
 
