@@ -116,4 +116,32 @@ export default {};
     );
     expect(report.standard).toBe('wcag21aa');
   });
+
+  // The same window as above, with a page added in it.
+  test('scans the pages its build bundled', async () => {
+    test.setTimeout(120_000);
+    const dir = resolve(VARIANTS_ROOT, 'standalone-weight', 'audit-pages');
+    rmSync(dir, { recursive: true, force: true });
+    cpSync(variantDir('standalone-weight', 'scorm12'), dir, {
+      recursive: true,
+    });
+    writeFileSync(
+      resolve(dir, 'tessera.config.js'),
+      `import { writeFileSync } from 'node:fs';
+writeFileSync(
+  new URL('./pages/01-assessment/zz-added.svelte', import.meta.url),
+  '<h1>Added</h1>',
+);
+export default {};
+`,
+    );
+
+    await audit(dir);
+
+    const report = JSON.parse(
+      readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
+    );
+    expect(report.totalPages).toBe(3);
+    expect(report.pages.at(-1).title).toBe('Zz Added');
+  });
 });
