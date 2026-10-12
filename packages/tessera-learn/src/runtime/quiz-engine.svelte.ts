@@ -1,10 +1,6 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { normalizeWeight, weightedScore } from './progress.svelte.js';
-import {
-  restoreResponse,
-  type Interaction,
-  type InteractionResponse,
-} from './interaction.js';
+import { restoreResponse, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
   UseQuizHandle,
@@ -56,7 +52,6 @@ interface InternalQuestion {
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
-  restore?: (response: InteractionResponse) => unknown;
   render: unknown;
 }
 
@@ -214,16 +209,15 @@ export class QuizEngine implements UseQuizHandle {
       reset: api.reset,
       complete: api.complete,
       interaction: api.interaction,
-      restore: api.restore,
       render: undefined,
     };
     this.#internalQuestions.push(internal);
     const index = this.#internalQuestions.length - 1;
-    const restored = this.#fromSave
-      ? restoreResponse(internal, this.#deps.restore?.answers?.get(id))
+    const answer = this.#fromSave
+      ? restoreResponse({ ...api, id }, this.#deps.restore?.answers?.get(id))
       : undefined;
-    if (restored) {
-      this.#answers.set(index, restored.answer);
+    if (answer !== undefined) {
+      this.#answers.set(index, answer);
       this.#restoredCount++;
     }
     const handle = this.#makeQuestionHandle(index);

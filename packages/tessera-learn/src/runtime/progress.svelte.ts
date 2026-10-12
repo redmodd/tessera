@@ -11,7 +11,7 @@ import {
   type SuccessConfig,
 } from './types.js';
 import {
-  savedSize,
+  jsonSize,
   type CompletionStatus,
   type GradedUnitState,
   type SavedQuestion,
@@ -92,10 +92,6 @@ function encodeAnswer(response: unknown): string | undefined {
 
 function savedAnswer(answer: string): unknown {
   return swapIds(JSON.parse(answer));
-}
-
-function jsonSize(value: unknown): number {
-  return savedSize(JSON.stringify(value));
 }
 
 function encodeAnswers(
@@ -302,14 +298,13 @@ export class ProgressState {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
-    const answer = encodeAnswer(response);
     questions.set(questionId, {
       score: clampScore(score),
       weight: normalizeWeight(weight),
       graded,
       retries: normalizeRetries(retries),
-      ...(unjudged ? { unjudged } : {}),
-      ...(answer === undefined ? {} : { answer }),
+      unjudged: unjudged || undefined,
+      answer: encodeAnswer(response),
     });
     this.#writeQuestions(pageIndex, questions);
   }
@@ -585,7 +580,7 @@ export class ProgressState {
                 : 1,
             answers: encodeAnswers(
               Object.entries(isRecord(unit.r) ? unit.r : {}).map(
-                ([qid, saved]) => [qid, swapIds(saved)],
+                ([qid, answer]) => [qid, swapIds(answer)],
               ),
             ),
           });

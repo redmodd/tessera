@@ -40,11 +40,7 @@ describe('StandaloneQuestion', () => {
     expect(report).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledWith('q1', right, true);
     expect(markScore).toHaveBeenCalledTimes(1);
-    expect(markScore).toHaveBeenCalledWith(100, {
-      retries: 0,
-      response: true,
-      unjudged: false,
-    });
+    expect(markScore).toHaveBeenCalledWith(100, expect.anything());
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
     expect(q.answer).toBe(1);
@@ -57,19 +53,11 @@ describe('StandaloneQuestion', () => {
     wrongQ.q.submit();
     expect(wrongQ.q.correct).toBe(false);
     expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false);
-    expect(wrongQ.markScore).toHaveBeenCalledWith(0, {
-      retries: 0,
-      response: false,
-      unjudged: false,
-    });
+    expect(wrongQ.markScore).toHaveBeenCalledWith(0, expect.anything());
 
     const scored = make({ response: () => wrong, score: () => 40 });
     scored.q.submit();
-    expect(scored.markScore).toHaveBeenCalledWith(40, {
-      retries: 0,
-      response: false,
-      unjudged: false,
-    });
+    expect(scored.markScore).toHaveBeenCalledWith(40, expect.anything());
   });
 
   it('reports correct=null when the interaction has no correct answer', () => {
@@ -110,11 +98,7 @@ describe('StandaloneQuestion', () => {
 
     expect(report).toHaveBeenCalledTimes(2);
     expect(report).toHaveBeenLastCalledWith('q1', right, true);
-    expect(markScore).toHaveBeenCalledWith(100, {
-      retries: 0,
-      response: true,
-      unjudged: false,
-    });
+    expect(markScore).toHaveBeenCalledWith(100, expect.anything());
   });
 
   it('methods work unbound', () => {

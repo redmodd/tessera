@@ -92,6 +92,7 @@ export interface UseQuestionOptions<I extends Interaction = Interaction> {
   score?: () => number;
   /** Optional reset handler invoked when the learner tries again. */
   reset?: () => void;
+  // Method syntax, so a widget's narrower `restore` fits the options the runtime holds.
   /**
    * Put a saved answer back into the widget. Called inside `useQuestion()`,
    * when the learner returns to a submitted question, with the `response`
@@ -100,7 +101,7 @@ export interface UseQuestionOptions<I extends Interaction = Interaction> {
    * response. Without `restore` the question still comes back submitted and
    * scored, but shows no answer.
    */
-  restore?: (response: I['response']) => unknown;
+  restore?(response: I['response']): unknown;
 }
 
 /**
@@ -141,10 +142,8 @@ export { setQuizContext };
  * submission) and `submitted`/`correct` mirror the quiz's state.
  */
 export function useQuestion<I extends Interaction = Interaction>(
-  options: UseQuestionOptions<I>,
+  opts: UseQuestionOptions<I>,
 ): UseQuestionHandle {
-  // The response handed to `restore` is the one this widget's `response()` saved.
-  const opts = options as unknown as UseQuestionOptions;
   const quizCtx = getQuizContext();
   const navCtx = getNavContext();
   const adapterCtx = getAdapterContext();

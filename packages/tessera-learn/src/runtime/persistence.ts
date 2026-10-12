@@ -17,6 +17,10 @@ export function savedSize(json: string): number {
   return new TextEncoder().encode(json).length;
 }
 
+export function jsonSize(value: unknown): number {
+  return savedSize(JSON.stringify(value));
+}
+
 /** A standalone question's result in `GradedUnitState.q`, written without its trailing defaults. */
 export type SavedQuestion = [
   score: number,

@@ -65,11 +65,10 @@ export function restoreResponse(
     restore?: (response: InteractionResponse) => unknown;
   },
   response: unknown,
-): { answer: unknown } | undefined {
+): unknown {
   if (response === undefined || !question.restore) return undefined;
   try {
-    const answer = question.restore(response as InteractionResponse);
-    return { answer: answer ?? response };
+    return question.restore(response as InteractionResponse) ?? response;
   } catch (err) {
     console.error(
       `[tessera] useQuestion("${question.id}"): restore() threw, so the saved answer is not shown. ` +

@@ -9,7 +9,7 @@ import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { UserStateStore } from './contexts.js';
 import {
-  savedSize,
+  jsonSize,
   type CompletionStatus,
   type SavedState,
   type SuccessStatus,
@@ -284,9 +284,8 @@ export class CourseSession {
     });
     const state = withAnswers(Infinity);
     const limit = this.#adapter.stateLimit;
-    if (limit === Infinity || savedSize(JSON.stringify(state)) <= limit)
-      return state;
-    return withAnswers(limit - savedSize(JSON.stringify(withAnswers(0))));
+    if (limit === Infinity || jsonSize(state) <= limit) return state;
+    return withAnswers(limit - jsonSize(withAnswers(0)));
   }
 
   // Microtask-batched: mutations within one tick collapse to one save and
