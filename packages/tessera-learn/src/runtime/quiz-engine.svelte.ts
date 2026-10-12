@@ -52,6 +52,7 @@ interface InternalQuestion {
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
+  restore?: UseQuizQuestionApi['restore'];
   render: unknown;
 }
 
@@ -209,16 +210,20 @@ export class QuizEngine implements UseQuizHandle {
       reset: api.reset,
       complete: api.complete,
       interaction: api.interaction,
+      restore: api.restore,
       render: undefined,
     };
     this.#internalQuestions.push(internal);
     const index = this.#internalQuestions.length - 1;
     const answer = this.#fromSave
-      ? restoreResponse({ ...api, id }, this.#deps.restore?.answers?.get(id))
+      ? restoreResponse(internal, this.#deps.restore?.answers?.get(id))
       : undefined;
     if (answer !== undefined) {
       this.#answers.set(index, answer);
       this.#restoredCount++;
+    } else if (this.#fromSave) {
+      // `restored` is now true, and a review of it would judge nothing.
+      this.#reviewing = false;
     }
     const handle = this.#makeQuestionHandle(index);
     this.#questionHandles = [...this.#questionHandles, handle];
@@ -285,6 +290,7 @@ export class QuizEngine implements UseQuizHandle {
 
     const responses = new Map<string, unknown>();
     for (const q of this.#internalQuestions) {
+      if (!q.restore) continue;
       const response = q.interaction?.()?.response;
       if (response !== undefined) responses.set(q.id, response);
     }

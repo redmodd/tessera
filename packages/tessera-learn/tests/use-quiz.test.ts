@@ -486,15 +486,33 @@ describe('QuizEngine', () => {
         };
       }
 
-      it('hands each submitted response to progress', () => {
+      it('hands progress the submitted response of each question that can restore it', () => {
         const { engine, responses } = makeEngine();
-        engine.registerQuestion(tfQuestion('a', true, true));
-        engine.registerQuestion(tfQuestion('b', false, true));
+        const restore = () => {};
+        engine.registerQuestion({ ...tfQuestion('a', true, true), restore });
+        engine.registerQuestion({ ...tfQuestion('b', false, true), restore });
+        engine.registerQuestion(tfQuestion('c', true, true));
         engine.setAnswer(0, true);
         engine.setAnswer(1, false);
+        engine.setAnswer(2, true);
         engine.submit();
 
         expect(responses).toEqual([{ a: true, b: false }]);
+      });
+
+      it('leaves a review when a question registers without its answer', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+        );
+        engine.registerQuestion(widget('a', true));
+        engine.startReview();
+        expect(engine.state).toBe('reviewing');
+
+        engine.registerQuestion(widget('b', true));
+
+        expect(engine.restored).toBe(true);
+        expect(engine.state).toBe('submitted');
       });
 
       it('restores every answer, so the result can be reviewed', () => {

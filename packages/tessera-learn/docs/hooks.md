@@ -116,7 +116,7 @@ Register a question widget so the runtime can submit, score, persist, and report
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id (letters, digits, inner underscores)
   graded?: boolean; // standalone only
-  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
+  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit, on each commit(), and whenever `correct` is judged
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap, counted across visits to the page (default Infinity); ignored inside a quiz
@@ -149,6 +149,7 @@ Pass `restore` to show the answer again. Rules:
 
 - It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
 - Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
+- `response()` judges the restored answer each time `q.correct` is read, the first render included. Read state in it, never a `bind:this` element.
 - A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
 - A standalone widget needs a retry control (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
 
@@ -166,7 +167,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()` or its `response()` had no `correct`.
+An answer does not come back when the widget has no `restore`, which also keeps it out of the save, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()` or its `response()` had no `correct`.
 
 ## `useQuiz`
 
@@ -290,7 +291,13 @@ function usePersistence<T>(key: string): {
 };
 ```
 
-Usage in [Recipe 1](recipes.md#recipe-1-custom-draw-a-line-question) (persists partial progress).
+```js
+const store = usePersistence('notes:v1');
+let notes = $state(store.get() ?? '');
+$effect(() => store.set(notes));
+```
+
+Not for a question's answer: `useQuestion({ restore })` brings a submitted answer back.
 
 ## `useCourse`
 

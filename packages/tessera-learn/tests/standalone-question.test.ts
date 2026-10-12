@@ -48,6 +48,24 @@ describe('StandaloneQuestion', () => {
     expect(q.feedbackVisible).toBe(true);
   });
 
+  it('saves the response only for a widget that can restore it', () => {
+    const plain = make();
+    plain.q.submit();
+    expect(plain.markScore).toHaveBeenCalledWith(100, {
+      retries: 0,
+      response: undefined,
+      unjudged: false,
+    });
+
+    const restorable = make({ restore: () => {} });
+    restorable.q.submit();
+    expect(restorable.markScore).toHaveBeenCalledWith(100, {
+      retries: 0,
+      response: true,
+      unjudged: false,
+    });
+  });
+
   it('marks 0 for a wrong answer and honors a score override', () => {
     const wrongQ = make({ response: () => wrong });
     wrongQ.q.submit();
@@ -66,11 +84,10 @@ describe('StandaloneQuestion', () => {
     q.submit();
 
     expect(report).toHaveBeenCalledWith('q1', likert, null);
-    expect(markScore).toHaveBeenCalledWith(0, {
-      retries: 0,
-      response: 'agree',
-      unjudged: true,
-    });
+    expect(markScore).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ unjudged: true }),
+    );
     expect(q.correct).toBe(null);
   });
 
@@ -265,11 +282,10 @@ describe('StandaloneQuestion', () => {
     q.retry();
     q.submit();
 
-    expect(markScore).toHaveBeenLastCalledWith(0, {
-      retries: 1,
-      response: false,
-      unjudged: false,
-    });
+    expect(markScore).toHaveBeenLastCalledWith(
+      0,
+      expect.objectContaining({ retries: 1 }),
+    );
   });
 
   describe('restored from a saved result', () => {
@@ -401,8 +417,25 @@ describe('StandaloneQuestion', () => {
       expect(q.isLockedCorrect).toBe(true);
       expect(q.answer).toBe(undefined);
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('useQuestion("q1"): restore() threw'),
+        expect.stringContaining('declare the state it writes above'),
         expect.any(ReferenceError),
+      );
+    });
+
+    it('does not blame declaration order when restore() rejects a stale answer', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      make(
+        {
+          restore: () => {
+            throw new RangeError('stale');
+          },
+        },
+        { score: 100, retries: 0, answer: true },
+      );
+
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/restore\(\) threw(?!.*declare the state)/),
+        expect.any(RangeError),
       );
     });
   });

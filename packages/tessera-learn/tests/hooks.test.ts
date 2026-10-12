@@ -330,6 +330,7 @@ describe('useQuestion — standalone mode', () => {
           response: ['2'],
           correct: ['1'],
         }),
+        restore: () => {},
       }).submit();
 
       let selected: string[] = [];

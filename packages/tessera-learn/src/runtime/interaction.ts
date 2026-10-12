@@ -71,8 +71,10 @@ export function restoreResponse(
     return question.restore(response as InteractionResponse) ?? response;
   } catch (err) {
     console.error(
-      `[tessera] useQuestion("${question.id}"): restore() threw, so the saved answer is not shown. ` +
-        'It runs inside useQuestion(), so declare the state it writes above that call.',
+      `[tessera] useQuestion("${question.id}"): restore() threw, so the saved answer is not shown.` +
+        (err instanceof ReferenceError
+          ? ' It runs inside useQuestion(), so declare the state it writes above that call.'
+          : ''),
       err,
     );
     return undefined;

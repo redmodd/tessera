@@ -107,7 +107,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
 
     this.#deps.markScore(score, {
       retries: this.#retryCount,
-      response: response.response,
+      response: this.#opts.restore ? response.response : undefined,
       unjudged: correct === null,
     });
     this.#report(response, correct);

@@ -81,7 +81,10 @@ export interface UseQuestionOptions<I extends Interaction = Interaction> {
   weight?: number;
   /** Standalone retry cap, counted across visits to the page. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
-  /** Called on submit. Returns the current learner response, or undefined while unanswered. */
+  /**
+   * Returns the current learner response, or undefined while unanswered.
+   * Called on submit, on each `commit()`, and whenever `correct` is judged.
+   */
   response: () => I | undefined;
   /** Whether the current answer is fully specified. Default: true. */
   complete?: () => boolean;
