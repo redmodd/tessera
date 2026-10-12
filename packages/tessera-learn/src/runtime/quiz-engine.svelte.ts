@@ -2,6 +2,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { normalizeWeight, weightedScore } from './progress.svelte.js';
 import { restoreResponse, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
+import type { QuizPageState } from './contexts.js';
 import type {
   UseQuizHandle,
   UseQuizQuestionApi,
@@ -33,16 +34,12 @@ export interface QuizEngineDeps {
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
-   * Saved attempt count, best score and that attempt's answers for this quiz
-   * page. With attempts > 0 the engine starts in the results phase, and can
-   * review them once every question has taken its answer back: see
+   * Saved attempt count, best score and that attempt's responses for this
+   * quiz page. With attempts > 0 the engine starts in the results phase, and
+   * can review them once every question has taken its answer back: see
    * {@link QuizEngine.restored}.
    */
-  restore?: {
-    attempts: number;
-    score: number;
-    answers?: ReadonlyMap<string, unknown>;
-  };
+  restore?: QuizPageState;
 }
 
 interface InternalQuestion {
@@ -76,7 +73,7 @@ export class QuizEngine implements UseQuizHandle {
   #bestScore = $state(0);
   #attemptCount = $state(0);
   #fromSave = $state(false);
-  #restoredCount = $state(0);
+  #answerMissing = $state(false);
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
@@ -156,10 +153,7 @@ export class QuizEngine implements UseQuizHandle {
 
   get restored(): boolean {
     return (
-      this.#fromSave &&
-      !(
-        this.#totalQuestions > 0 && this.#restoredCount === this.#totalQuestions
-      )
+      this.#fromSave && (this.#totalQuestions === 0 || this.#answerMissing)
     );
   }
 
@@ -216,13 +210,13 @@ export class QuizEngine implements UseQuizHandle {
     this.#internalQuestions.push(internal);
     const index = this.#internalQuestions.length - 1;
     const answer = this.#fromSave
-      ? restoreResponse(internal, this.#deps.restore?.answers?.get(id))
+      ? restoreResponse(internal, this.#deps.restore?.responses?.get(id))
       : undefined;
     if (answer !== undefined) {
       this.#answers.set(index, answer);
-      this.#restoredCount++;
     } else if (this.#fromSave) {
       // `restored` is now true, and a review of it would judge nothing.
+      this.#answerMissing = true;
       this.#reviewing = false;
     }
     const handle = this.#makeQuestionHandle(index);
@@ -332,13 +326,12 @@ export class QuizEngine implements UseQuizHandle {
         if (this.#answers.has(i) && q.checkAnswer()) newLocked.add(i);
       });
     }
-    const preserved = new Map<number, unknown>();
-    for (const i of newLocked) preserved.set(i, this.#answers.get(i));
     this.#lockedCorrect.clear();
     for (const i of newLocked) this.#lockedCorrect.add(i);
-    this.#answers.clear();
+    for (const i of [...this.#answers.keys()]) {
+      if (!newLocked.has(i)) this.#answers.delete(i);
+    }
     this.#reportedAnswers.clear();
-    for (const [i, a] of preserved) this.#answers.set(i, a);
     for (let i = 0; i < this.#internalQuestions.length; i++) {
       if (!newLocked.has(i) && this.#internalQuestions[i].reset)
         this.#internalQuestions[i].reset!();

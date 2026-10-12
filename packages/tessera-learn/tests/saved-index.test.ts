@@ -6,8 +6,20 @@ describe('savedIndex', () => {
     const list = ['a', 'b'];
 
     expect(savedIndex('1', list)).toBe(1);
-    expect(savedIndex(0, list)).toBe(0);
-    for (const value of [null, '', ' ', [], [1], true, '0x1', '2', -1, 0.5]) {
+    for (const value of [
+      null,
+      '',
+      ' ',
+      [],
+      [1],
+      true,
+      '0x1',
+      '2',
+      '01',
+      0,
+      -1,
+      0.5,
+    ]) {
       expect(() => savedIndex(value, list)).toThrow(RangeError);
     }
   });

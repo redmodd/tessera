@@ -8,13 +8,15 @@ export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
+const encoder = new TextEncoder();
+
 /**
  * UTF-8 size of saved JSON, the unit an adapter's `stateLimit` is counted in.
  * The SCORM limits are written in characters, but an LMS may enforce them in
  * bytes, and bytes are never the smaller count.
  */
 export function savedSize(json: string): number {
-  return new TextEncoder().encode(json).length;
+  return encoder.encode(json).length;
 }
 
 export function jsonSize(value: unknown): number {
@@ -28,7 +30,7 @@ export type SavedQuestion = [
   /** 1 when graded, plus 2 when the response had no `correct` to judge it by. */
   flags: number,
   retries?: number,
-  answer?: unknown,
+  response?: unknown,
 ];
 
 /** One page's entry in `SavedState.g`. */
@@ -39,11 +41,11 @@ export interface GradedUnitState {
   a?: number;
   /**
    * Standalone question results: questionId → score 0-100 for a graded,
-   * judged question of weight 1 with no retries or answer saved, else a
+   * judged question of weight 1 with no retries or response saved, else a
    * {@link SavedQuestion}.
    */
   q?: Record<string, number | SavedQuestion>;
-  /** Quiz answers from the best attempt, questionId → response, omitted when they don't fit */
+  /** Quiz responses from the best attempt, questionId → response, omitted when they don't fit */
   r?: Record<string, unknown>;
   /** Graded standalone questions on the page not yet answered, omitted when none */
   w?: string[];

@@ -285,8 +285,9 @@ export class CourseSession {
     });
     const state = withAnswers(Infinity);
     const limit = this.#adapter.stateLimit;
+    if (limit === Infinity) return state;
     const size = jsonSize(state);
-    if (limit === Infinity || size <= limit) return state;
+    if (size <= limit) return state;
     const bareSize = jsonSize(withAnswers(0));
     // No answers to leave out: the adapter warns about the overflow itself.
     if (bareSize === size) return state;

@@ -354,12 +354,12 @@ describe('ProgressState', () => {
       expect(restored.standaloneResult(0, 'answered')).toEqual({
         score: 100,
         retries: 0,
-        answer: ['1'],
+        response: ['1'],
       });
       expect(restored.standaloneResult(0, 'text')).toEqual({
         score: 0,
         retries: 1,
-        answer: 'Paris',
+        response: 'Paris',
       });
       expect(restored.standaloneResult(0, 'missing')).toBeUndefined();
       expect(restored.toSaved()).toEqual(saved);
@@ -384,16 +384,16 @@ describe('ProgressState', () => {
       const { saved, restored } = roundTrip(progress);
 
       expect(JSON.stringify(saved.g[0].q.q[4])).toBe(json);
-      expect(restored.standaloneResult(0, 'q')?.answer).toEqual(response);
+      expect(restored.standaloneResult(0, 'q')?.response).toEqual(response);
     });
 
     it('hands out a copy of the answer, so a widget cannot edit the saved one', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.markStandaloneQuestion(0, 'q', 0, true, 1, { response: ['1'] });
 
-      (progress.standaloneResult(0, 'q')!.answer as string[]).push('2');
+      (progress.standaloneResult(0, 'q')!.response as string[]).push('2');
 
-      expect(progress.standaloneResult(0, 'q')?.answer).toEqual(['1']);
+      expect(progress.standaloneResult(0, 'q')?.response).toEqual(['1']);
     });
 
     it('leaves out an answer that cannot be written as JSON', () => {
@@ -442,11 +442,11 @@ describe('ProgressState', () => {
       const { saved, restored } = roundTrip(progress);
 
       expect(saved.g[2]).toEqual({ s: 100, a: 3, r: { a: [1], b: 'best' } });
-      expect(Object.fromEntries(restored.quizAnswers(2))).toEqual({
+      expect(Object.fromEntries(restored.quizResponses(2))).toEqual({
         a: ['1'],
         b: 'best',
       });
-      expect(restored.quizAnswers(3).size).toBe(0);
+      expect(restored.quizResponses(3).size).toBe(0);
     });
 
     it('drops the saved answers when a better attempt has none', () => {
@@ -477,7 +477,7 @@ describe('ProgressState', () => {
         score: 0,
         retries: 0,
         unjudged: true,
-        answer: 'agree',
+        response: 'agree',
       });
       expect(restored.standaloneResult(0, 'rated')?.unjudged).toBe(true);
       expect(restored.pageScore(0)).toBe(0);
@@ -511,7 +511,7 @@ describe('ProgressState', () => {
           score: 100,
           retries: 1,
         });
-        expect(restored.quizAnswers(2).size).toBe(0);
+        expect(restored.quizResponses(2).size).toBe(0);
       });
 
       it('saves the answers that still fit, and a quiz only whole', () => {

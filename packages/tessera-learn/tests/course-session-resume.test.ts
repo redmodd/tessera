@@ -177,6 +177,14 @@ describe('CourseSession restore gate honours config.resume', () => {
       });
     });
 
+    it('are not measured for an adapter with no limit', async () => {
+      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+
+      await answer();
+
+      expect(encode).not.toHaveBeenCalled();
+    });
+
     it('give way where they would overrun the limit, with one warning', async () => {
       const saved = await answer(180);
 

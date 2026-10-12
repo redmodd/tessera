@@ -6,45 +6,24 @@ import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
-import {
-  setNavContext,
-  setPageContext,
-  setInPage,
-} from '../src/runtime/contexts.js';
 import { createManifest, createConfig } from './helpers.js';
-import { mountInBody } from './helpers/mount.js';
+import { mountOnPage } from './helpers/mount.js';
 
 // Mounts a widget on a page the learner already answered it on.
 function revisit(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved: { score: number; retries?: number; answer?: unknown },
+  saved: { score: number; retries?: number; response?: unknown },
 ) {
   const manifest = createManifest(1);
   const config = createConfig();
   const progress = new ProgressState(manifest, config);
-  progress.markStandaloneQuestion(0, 'q1', saved.score, false, 1, {
-    retries: saved.retries,
-    response: saved.answer,
-  });
-  const { target } = mountInBody(widget, {
-    props: { id: 'q1', question: 'Question', ...props },
-    setup: () => {
-      setNavContext({
-        nav: { currentPageIndex: 0 },
-        manifest,
-        progress,
-        config,
-      } as any);
-      setPageContext({
-        quiz: null,
-        quizState: null,
-        passingScore: 70,
-        index: 0,
-      });
-      setInPage(true);
-    },
-  });
+  progress.markStandaloneQuestion(0, 'q1', saved.score, false, 1, saved);
+  const { target } = mountOnPage(
+    widget,
+    { id: 'q1', question: 'Question', ...props },
+    { manifest, progress, config },
+  );
   const all = <T extends Element>(selector: string) => [
     ...target.querySelectorAll<T>(selector),
   ];
@@ -56,7 +35,7 @@ describe('a built-in question the learner returns to', () => {
     const { all, retry } = revisit(
       MultipleChoice,
       { options: ['a', 'b', 'c'], correct: 1 },
-      { score: 100, answer: ['1'] },
+      { score: 100, response: ['1'] },
     );
     const radios = all<HTMLInputElement>('input[type="radio"]');
 
@@ -67,7 +46,7 @@ describe('a built-in question the learner returns to', () => {
 
   it('MultipleChoice offers Try again on a wrong answer until maxRetries is spent', () => {
     const props = { options: ['a', 'b'], correct: 1, maxRetries: 1 };
-    const wrong = { score: 0, answer: ['0'] };
+    const wrong = { score: 0, response: ['0'] };
 
     expect(revisit(MultipleChoice, props, wrong).retry()).toHaveLength(1);
     expect(
@@ -99,14 +78,14 @@ describe('a built-in question the learner returns to', () => {
     const choice = revisit(
       MultipleChoice,
       { options: ['a', 'b'], correct: 1 },
-      { score: 0, answer: ['2'] },
+      { score: 0, response: ['2'] },
     );
     const sorting = revisit(
       Sorting,
       { items: ['i0', 'i1'], targets: ['t0'], correct: [0, 0] },
       {
         score: 0,
-        answer: [
+        response: [
           ['0', '0'],
           ['1', '1'],
         ],
@@ -117,7 +96,7 @@ describe('a built-in question the learner returns to', () => {
       { pairs: [{ left: 'L0', right: 'R0' }] },
       {
         score: 0,
-        answer: [
+        response: [
           ['0', '1'],
           ['1', '0'],
         ],
@@ -136,7 +115,7 @@ describe('a built-in question the learner returns to', () => {
     const { target, all } = revisit(
       FillInTheBlank,
       { answers: ['blue'] },
-      { score: 100, answer: 'blue' },
+      { score: 100, response: 'blue' },
     );
     const [input] = all<HTMLInputElement>('input[type="text"]');
 
@@ -157,7 +136,7 @@ describe('a built-in question the learner returns to', () => {
       },
       {
         score: 0,
-        answer: [
+        response: [
           ['0', '1'],
           ['1', '0'],
         ],
@@ -176,7 +155,7 @@ describe('a built-in question the learner returns to', () => {
       { items: ['i0', 'i1', 'i2'], targets: ['t0', 't1'], correct: [1, 0, 1] },
       {
         score: 100,
-        answer: [
+        response: [
           ['0', '1'],
           ['1', '0'],
           ['2', '1'],

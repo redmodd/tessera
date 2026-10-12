@@ -35,7 +35,7 @@ function makeEngine(
     restore?: {
       attempts: number;
       score: number;
-      answers?: Record<string, unknown>;
+      responses?: Record<string, unknown>;
     };
   } = {},
 ): EngineProbe {
@@ -57,7 +57,7 @@ function makeEngine(
       : (name, detail) => events.push({ name, detail }),
     restore: opts.restore && {
       ...opts.restore,
-      answers: new Map(Object.entries(opts.restore.answers ?? {})),
+      responses: new Map(Object.entries(opts.restore.responses ?? {})),
     },
   });
   return { engine, events, reports, completed, responses };
@@ -521,7 +521,7 @@ describe('QuizEngine', () => {
       it('leaves a review when a question registers without its answer', () => {
         const { engine } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+          { restore: { attempts: 1, score: 100, responses: { a: true } } },
         );
         engine.registerQuestion(widget('a', true));
         engine.startReview();
@@ -537,7 +537,11 @@ describe('QuizEngine', () => {
         const { engine } = makeEngine(
           { graded: true },
           {
-            restore: { attempts: 1, score: 50, answers: { a: true, b: false } },
+            restore: {
+              attempts: 1,
+              score: 50,
+              responses: { a: true, b: false },
+            },
           },
         );
         engine.registerQuestion(widget('a', true));
@@ -556,7 +560,7 @@ describe('QuizEngine', () => {
       it('counts as submitted, so leaving the page raises no unsubmitted-quiz warning', () => {
         const { engine } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+          { restore: { attempts: 1, score: 100, responses: { a: true } } },
         );
         engine.registerQuestion(widget('a', true));
 
@@ -570,7 +574,7 @@ describe('QuizEngine', () => {
       it('reports nothing when a restored question commits', () => {
         const { engine, reports } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+          { restore: { attempts: 1, score: 100, responses: { a: true } } },
         );
         const q = engine.registerQuestion(widget('a', true));
 
@@ -582,7 +586,7 @@ describe('QuizEngine', () => {
       it('holds what restore() returns as the answer', () => {
         const { engine } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 100, answers: { a: ['2'] } } },
+          { restore: { attempts: 1, score: 100, responses: { a: ['2'] } } },
         );
         const q = engine.registerQuestion({
           ...tfQuestion('a', true, true),
@@ -595,11 +599,11 @@ describe('QuizEngine', () => {
       it.each([
         ['a question has no saved answer', { a: true }, true],
         ['a question has no restore()', { a: true, b: false }, false],
-      ])('stays unreviewable when %s', (_, answers, canRestore) => {
+      ])('stays unreviewable when %s', (_, responses, canRestore) => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { engine } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 50, answers } },
+          { restore: { attempts: 1, score: 50, responses } },
         );
         engine.registerQuestion(widget('a', true));
         engine.registerQuestion(widget('b', true, canRestore));
@@ -626,7 +630,11 @@ describe('QuizEngine', () => {
         const { engine, responses } = makeEngine(
           { graded: true, retryMode: 'incorrect-only' },
           {
-            restore: { attempts: 1, score: 50, answers: { a: true, b: false } },
+            restore: {
+              attempts: 1,
+              score: 50,
+              responses: { a: true, b: false },
+            },
           },
         );
         engine.registerQuestion(widget('a', true));
@@ -667,7 +675,7 @@ describe('QuizEngine', () => {
       it('leaves a question that registers after a retry unanswered', () => {
         const { engine } = makeEngine(
           { graded: true },
-          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+          { restore: { attempts: 1, score: 100, responses: { a: true } } },
         );
         engine.retry();
         const q = engine.registerQuestion(widget('a', true));

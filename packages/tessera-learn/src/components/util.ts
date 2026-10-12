@@ -49,11 +49,9 @@ export function questionId(
  * since and no longer has it, so the answer is left out rather than misplaced.
  */
 export function savedIndex(value: unknown, list: readonly unknown[]): number {
-  const index =
-    typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
-  if (typeof index !== 'number' || !(index in list))
+  if (typeof value !== 'string' || !/^\d+$/.test(value) || !(value in list))
     throw new RangeError('the saved answer points past this question');
-  return index;
+  return Number(value);
 }
 
 /** Fisher-Yates shuffle returning a fresh array. */

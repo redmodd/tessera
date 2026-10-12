@@ -4,42 +4,24 @@ import { flushSync } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { isPageComplete } from '../src/runtime/navigation.svelte.js';
-import {
-  setNavContext,
-  setPageContext,
-  setInPage,
-} from '../src/runtime/contexts.js';
 import { createManifest, createConfig } from './helpers.js';
-import { mountInBody } from './helpers/mount.js';
+import { mountOnPage } from './helpers/mount.js';
 
 function answer(graded: boolean | undefined) {
   const manifest = createManifest(2, {}, { 0: { graded: true } });
   const config = createConfig();
   const progress = new ProgressState(manifest, config);
-  const { target } = mountInBody(MultipleChoice, {
-    props: {
+  const { target } = mountOnPage(
+    MultipleChoice,
+    {
       id: 'q1',
       question: 'Pick one',
       options: ['a', 'b'],
       correct: 0,
       graded,
     },
-    setup: () => {
-      setNavContext({
-        nav: { currentPageIndex: 0 },
-        manifest,
-        progress,
-        config,
-      } as any);
-      setPageContext({
-        quiz: null,
-        quizState: null,
-        passingScore: 70,
-        index: 0,
-      });
-      setInPage(true);
-    },
-  });
+    { manifest, progress, config },
+  );
   const radio = target.querySelector('input[type="radio"]') as HTMLInputElement;
   radio.checked = true;
   radio.dispatchEvent(new Event('change', { bubbles: true }));

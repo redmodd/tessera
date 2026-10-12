@@ -40,7 +40,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
     // Without the answer the score is all there is to judge by, and it says
     // nothing where a custom score() set it or the submit was never judged.
     this.#correct = opts.score || saved.unjudged ? null : saved.score >= 100;
-    this.#answer = restoreResponse(opts, saved.answer);
+    this.#answer = restoreResponse(opts, saved.response);
     this.#answerRestored = this.#answer !== undefined;
   }
 

@@ -334,7 +334,7 @@ describe('StandaloneQuestion', () => {
             current = { ...right, response: response as boolean };
           },
         },
-        { score: 100, retries: 2, answer: true },
+        { score: 100, retries: 2, response: true },
       );
 
       expect(q.answer).toBe(true);
@@ -345,14 +345,14 @@ describe('StandaloneQuestion', () => {
     it('holds what restore() returns as the answer', () => {
       const { q } = make(
         { restore: (response) => Number((response as string[])[0]) },
-        { score: 0, retries: 0, answer: ['2'] },
+        { score: 0, retries: 0, response: ['2'] },
       );
 
       expect(q.answer).toBe(2);
     });
 
     it.each([
-      ['with its answer', { score: 100, retries: 0, answer: true }],
+      ['with its answer', { score: 100, retries: 0, response: true }],
       ['without its answer', { score: 100, retries: 0 }],
     ])('reports nothing on commit() when restored %s', (_, saved) => {
       const { q, report } = make({ restore: () => {} }, saved);
@@ -365,7 +365,7 @@ describe('StandaloneQuestion', () => {
     it('offers a retry on a restored wrong answer and counts on from the saved retries', () => {
       const { q, markScore } = make(
         { maxRetries: 2, response: () => wrong, restore: () => {} },
-        { score: 0, retries: 1, answer: false },
+        { score: 0, retries: 1, response: false },
       );
       expect(q.canRetry).toBe(true);
 
@@ -384,7 +384,7 @@ describe('StandaloneQuestion', () => {
       const response = vi.fn(() => right);
       const { q } = make(
         { response, restore: () => {} },
-        { score: 100, retries: 0, answer: true },
+        { score: 100, retries: 0, response: true },
       );
 
       expect(response).not.toHaveBeenCalled();
@@ -407,7 +407,7 @@ describe('StandaloneQuestion', () => {
     });
 
     it('shows no answer when the widget has no restore()', () => {
-      const { q } = make({}, { score: 40, retries: 0, answer: true });
+      const { q } = make({}, { score: 40, retries: 0, response: true });
 
       expect(q.submitted).toBe(true);
       expect(q.answer).toBe(undefined);
@@ -422,7 +422,7 @@ describe('StandaloneQuestion', () => {
             throw new ReferenceError('state');
           },
         },
-        { score: 100, retries: 0, answer: true },
+        { score: 100, retries: 0, response: true },
       );
 
       expect(q.isLockedCorrect).toBe(true);
@@ -441,7 +441,7 @@ describe('StandaloneQuestion', () => {
             throw new RangeError('stale');
           },
         },
-        { score: 100, retries: 0, answer: true },
+        { score: 100, retries: 0, response: true },
       );
 
       expect(error).toHaveBeenCalledWith(

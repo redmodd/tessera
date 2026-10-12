@@ -161,7 +161,7 @@
         pageContext.quizState = {
           attempts: progress.quizAttempts(index),
           score: progress.quizScore(index) ?? 0,
-          answers: progress.quizAnswers(index),
+          responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
         pageLoading = false;
