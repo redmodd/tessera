@@ -91,7 +91,7 @@ describe('SCORM2004Adapter', () => {
       expect(adapter.stateLimit).toBe(64000);
     });
 
-    it('warns once when serialized state exceeds 64000 chars', async () => {
+    it('warns once when serialized state exceeds 64000 bytes', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       const state: SavedState = {
@@ -104,9 +104,7 @@ describe('SCORM2004Adapter', () => {
       adapter.saveState(state);
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toMatch(
-        /SCORM 2004 cmi\.suspend_data 64000/,
-      );
+      expect(warn.mock.calls[0][0]).toMatch(/SCORM 2004 limit of 64000/);
     });
 
     it('does not warn at the SCORM 1.2 threshold (would warn under 1.2)', async () => {

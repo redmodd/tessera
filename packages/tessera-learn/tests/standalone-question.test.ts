@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { UseQuestionOptions } from '../src/runtime/hooks.svelte.js';
-import { StandaloneQuestion } from '../src/runtime/standalone-question.svelte.js';
+import {
+  StandaloneQuestion,
+  type StandaloneQuestionDeps,
+} from '../src/runtime/standalone-question.svelte.js';
 
 const right: Interaction = {
   type: 'true-false',
@@ -16,18 +19,13 @@ const wrong: Interaction = {
 
 function make(
   opts: Partial<UseQuestionOptions> = {},
-  restore?: {
-    score: number;
-    retries: number;
-    unjudged?: boolean;
-    answer?: unknown;
-  },
+  saved?: StandaloneQuestionDeps['saved'],
 ) {
   const report = vi.fn();
   const markScore = vi.fn();
   const q = new StandaloneQuestion(
     { id: 'q1', response: () => right, ...opts },
-    { report, markScore, restore },
+    { report, markScore, saved },
   );
   return { q, report, markScore };
 }
@@ -42,7 +40,11 @@ describe('StandaloneQuestion', () => {
     expect(report).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledWith('q1', right, true);
     expect(markScore).toHaveBeenCalledTimes(1);
-    expect(markScore).toHaveBeenCalledWith(100, 0, true, false);
+    expect(markScore).toHaveBeenCalledWith(100, {
+      retries: 0,
+      response: true,
+      unjudged: false,
+    });
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
     expect(q.answer).toBe(1);
@@ -55,11 +57,19 @@ describe('StandaloneQuestion', () => {
     wrongQ.q.submit();
     expect(wrongQ.q.correct).toBe(false);
     expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false);
-    expect(wrongQ.markScore).toHaveBeenCalledWith(0, 0, false, false);
+    expect(wrongQ.markScore).toHaveBeenCalledWith(0, {
+      retries: 0,
+      response: false,
+      unjudged: false,
+    });
 
     const scored = make({ response: () => wrong, score: () => 40 });
     scored.q.submit();
-    expect(scored.markScore).toHaveBeenCalledWith(40, 0, false, false);
+    expect(scored.markScore).toHaveBeenCalledWith(40, {
+      retries: 0,
+      response: false,
+      unjudged: false,
+    });
   });
 
   it('reports correct=null when the interaction has no correct answer', () => {
@@ -68,7 +78,11 @@ describe('StandaloneQuestion', () => {
     q.submit();
 
     expect(report).toHaveBeenCalledWith('q1', likert, null);
-    expect(markScore).toHaveBeenCalledWith(0, 0, 'agree', true);
+    expect(markScore).toHaveBeenCalledWith(0, {
+      retries: 0,
+      response: 'agree',
+      unjudged: true,
+    });
     expect(q.correct).toBe(null);
   });
 
@@ -96,7 +110,11 @@ describe('StandaloneQuestion', () => {
 
     expect(report).toHaveBeenCalledTimes(2);
     expect(report).toHaveBeenLastCalledWith('q1', right, true);
-    expect(markScore).toHaveBeenCalledWith(100, 0, true, false);
+    expect(markScore).toHaveBeenCalledWith(100, {
+      retries: 0,
+      response: true,
+      unjudged: false,
+    });
   });
 
   it('methods work unbound', () => {
@@ -263,7 +281,11 @@ describe('StandaloneQuestion', () => {
     q.retry();
     q.submit();
 
-    expect(markScore).toHaveBeenLastCalledWith(0, 1, false, false);
+    expect(markScore).toHaveBeenLastCalledWith(0, {
+      retries: 1,
+      response: false,
+      unjudged: false,
+    });
   });
 
   describe('restored from a saved result', () => {
@@ -339,7 +361,11 @@ describe('StandaloneQuestion', () => {
       q.retry();
       q.submit();
 
-      expect(markScore).toHaveBeenCalledWith(0, 2, false, false);
+      expect(markScore).toHaveBeenCalledWith(0, {
+        retries: 2,
+        response: false,
+        unjudged: false,
+      });
       expect(q.canRetry).toBe(false);
     });
 
@@ -394,7 +420,6 @@ describe('StandaloneQuestion', () => {
         expect.stringContaining('useQuestion("q1"): restore() threw'),
         expect.any(ReferenceError),
       );
-      error.mockRestore();
     });
   });
 });

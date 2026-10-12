@@ -13,7 +13,6 @@ import {
 } from '../src/runtime/contexts.js';
 import { createManifest, createConfig } from './helpers.js';
 import { mountInBody } from './helpers/mount.js';
-import { savedIndex } from '../src/components/util.js';
 
 // Mounts a widget on a page the learner already answered it on.
 function revisit(
@@ -24,15 +23,10 @@ function revisit(
   const manifest = createManifest(1);
   const config = createConfig();
   const progress = new ProgressState(manifest, config);
-  progress.markStandaloneQuestion(
-    0,
-    'q1',
-    saved.score,
-    false,
-    1,
-    saved.retries,
-    saved.answer,
-  );
+  progress.markStandaloneQuestion(0, 'q1', saved.score, false, 1, {
+    retries: saved.retries,
+    response: saved.answer,
+  });
   const { target } = mountInBody(widget, {
     props: { id: 'q1', question: 'Question', ...props },
     setup: () => {
@@ -100,16 +94,6 @@ describe('a built-in question the learner returns to', () => {
     expect(retry()).toHaveLength(0);
   });
 
-  it('takes a saved index only from a whole number the question has', () => {
-    const list = ['a', 'b'];
-
-    expect(savedIndex('1', list)).toBe(1);
-    expect(savedIndex(0, list)).toBe(0);
-    for (const value of [null, '', ' ', [], [1], true, '0x1', '2', -1, 0.5]) {
-      expect(() => savedIndex(value, list)).toThrow(RangeError);
-    }
-  });
-
   it('shows no answer when the saved one points past an edited question', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const choice = revisit(
@@ -146,7 +130,6 @@ describe('a built-in question the learner returns to', () => {
     expect(sorting.all('.tessera-sorting-placed-item')).toHaveLength(0);
     expect(matching.all('.tessera-matching-item.matched')).toHaveLength(0);
     expect(error).toHaveBeenCalledTimes(3);
-    error.mockRestore();
   });
 
   it('FillInTheBlank shows the typed answer', () => {

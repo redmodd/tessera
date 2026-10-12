@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createConfig, createManifest, flush, stubAdapter } from './helpers.js';
 import { startSession } from './helpers/session.svelte.js';
 import type { ProgressState } from '../src/runtime/progress.svelte.js';
-import type { SavedState } from '../src/runtime/persistence.js';
+import { savedSize, type SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const manifest = createManifest(2, {}, { 1: { graded: true } });
@@ -156,8 +156,13 @@ describe('CourseSession restore gate honours config.resume', () => {
 
     async function answer(stateLimit?: number) {
       const { saveState, progress } = await start('auto', { stateLimit });
-      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, 1, essay);
-      progress.markStandaloneQuestion(1, 'q2', 100, true, 1, 0, ['1']);
+      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, {
+        retries: 1,
+        response: essay,
+      });
+      progress.markStandaloneQuestion(1, 'q2', 100, true, 1, {
+        response: ['1'],
+      });
       await flush();
       return saveState.mock.lastCall![0] as SavedState;
     }
@@ -179,19 +184,13 @@ describe('CourseSession restore gate honours config.resume', () => {
 
     it('are measured in UTF-8 bytes, which is what an LMS may count', async () => {
       const { saveState, progress } = await start('auto', { stateLimit: 180 });
-      progress.markStandaloneQuestion(
-        1,
-        'q1',
-        100,
-        true,
-        1,
-        0,
-        '東'.repeat(40),
-      );
+      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, {
+        response: '東'.repeat(40),
+      });
       await flush();
       const saved = saveState.mock.lastCall![0] as SavedState;
 
-      expect(JSON.stringify(saved).length).toBeLessThanOrEqual(180);
+      expect(savedSize(JSON.stringify(saved))).toBeLessThanOrEqual(180);
       expect(saved.g).toEqual({ '1': { q: { q1: 100 } } });
     });
 

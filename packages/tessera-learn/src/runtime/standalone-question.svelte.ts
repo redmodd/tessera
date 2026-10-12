@@ -1,28 +1,15 @@
 import { isCorrect, restoreResponse, type Interaction } from './interaction.js';
 import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
+import type { StandaloneRestore, StandaloneSubmit } from './progress.svelte.js';
 
 export interface StandaloneQuestionDeps extends Pick<QuizEngineDeps, 'report'> {
-  /**
-   * Records a submit: its score, the retries spent before it, the response,
-   * and whether that response had no `correct` to judge it by.
-   */
-  markScore: (
-    score: number,
-    retries: number,
-    response: unknown,
-    unjudged: boolean,
-  ) => void;
+  markScore: (score: number, submit: StandaloneSubmit) => void;
   /**
    * What this question last submitted, on this mount's page. The handle starts
    * submitted with it; a retry clicked but not resubmitted is not part of it.
    */
-  restore?: {
-    score: number;
-    retries: number;
-    unjudged?: boolean;
-    answer?: unknown;
-  };
+  saved?: StandaloneRestore;
 }
 
 export class StandaloneQuestion implements UseQuestionHandle {
@@ -45,7 +32,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   constructor(opts: UseQuestionOptions, deps: StandaloneQuestionDeps) {
     this.#opts = opts;
     this.#deps = deps;
-    const saved = deps.restore;
+    const { saved } = deps;
     if (!saved) return;
     this.#submitted = true;
     this.#score = saved.score;
@@ -120,12 +107,11 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const correct = isCorrect(response);
     const score = this.#opts.score?.() ?? (correct ? 100 : 0);
 
-    this.#deps.markScore(
-      score,
-      this.#retryCount,
-      response.response,
-      correct === null,
-    );
+    this.#deps.markScore(score, {
+      retries: this.#retryCount,
+      response: response.response,
+      unjudged: correct === null,
+    });
     this.#report(response, correct);
 
     this.#correct = correct;

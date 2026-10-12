@@ -177,7 +177,7 @@ export function useQuestion<I extends Interaction = Interaction>(
 
   const pageIndex = isInPage() ? getPageContext()?.index : undefined;
   let markScore: StandaloneQuestionDeps['markScore'] = () => {};
-  let restore: StandaloneQuestionDeps['restore'];
+  let saved: StandaloneQuestionDeps['saved'];
   if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
@@ -191,24 +191,22 @@ export function useQuestion<I extends Interaction = Interaction>(
       !!opts.graded,
       opts.weight,
     );
-    restore = navCtx.progress.standaloneResult(pageIndex, opts.id);
-    markScore = (score, retries, response, unjudged) =>
+    saved = navCtx.progress.standaloneResult(pageIndex, opts.id);
+    markScore = (score, submit) =>
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,
         score,
         !!opts.graded,
         opts.weight,
-        retries,
-        response,
-        unjudged,
+        submit,
       );
   }
 
   return new StandaloneQuestion(opts, {
     report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
     markScore,
-    restore,
+    saved,
   });
 }
 

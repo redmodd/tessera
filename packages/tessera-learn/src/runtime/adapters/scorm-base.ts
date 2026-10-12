@@ -187,15 +187,14 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     if (!this.canWrite()) return;
     this.state = state;
     const json = JSON.stringify(state);
-    const { name, suspendDataLimit } = this.dialect.profile;
-    if (!this.#suspendOverflowWarned && savedSize(json) > suspendDataLimit) {
+    if (!this.#suspendOverflowWarned && savedSize(json) > this.stateLimit) {
       this.#suspendOverflowWarned = true;
       console.warn(
         `Tessera: cmi.suspend_data is ${savedSize(json)} bytes, over the ` +
-          `${name} cmi.suspend_data ${suspendDataLimit} limit. The LMS will likely ` +
+          `${this.dialect.profile.name} limit of ${this.stateLimit}. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +
-          `larger-limit standard (${largerSuspendDataStandards(suspendDataLimit).join('/')}).`,
+          `larger-limit standard (${largerSuspendDataStandards(this.stateLimit).join('/')}).`,
       );
     }
     this.set('cmi.suspend_data', json);

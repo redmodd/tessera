@@ -72,25 +72,8 @@ const MODES: Mode[] = [
     standard: 'cmi5',
     port: 5316,
     async launch(page, base) {
-      const statements = await installCmi5Mock(page);
-      // The shared mock keeps no state; a relaunch needs the document back.
-      const documents = new Map<string | null, string>();
-      await page.route('**/xapi/activities/state**', async (route) => {
-        const req = route.request();
-        const stateId = new URL(req.url()).searchParams.get('stateId');
-        if (req.method() === 'PUT') {
-          documents.set(stateId, req.postData() ?? '');
-          await route.fulfill({ status: 204 });
-        } else if (documents.has(stateId)) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: documents.get(stateId),
-          });
-        } else {
-          await route.fulfill({ status: 404, body: '{}' });
-        }
-      });
+      const documents = new Map<string, string>();
+      const statements = await installCmi5Mock(page, { documents });
       await page.goto(cmi5LaunchURL(base));
       return {
         results: async () =>

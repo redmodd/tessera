@@ -326,9 +326,14 @@ describe('ProgressState', () => {
     it('saves a standalone answer and its retries after the score, weight and graded flag', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.markStandaloneQuestion(0, 'plain', 100, true);
-      progress.markStandaloneQuestion(0, 'retried', 0, true, 1, 2);
-      progress.markStandaloneQuestion(0, 'answered', 100, true, 1, 0, ['1']);
-      progress.markStandaloneQuestion(0, 'text', 0, false, 2, 1, 'Paris');
+      progress.markStandaloneQuestion(0, 'retried', 0, true, 1, { retries: 2 });
+      progress.markStandaloneQuestion(0, 'answered', 100, true, 1, {
+        response: ['1'],
+      });
+      progress.markStandaloneQuestion(0, 'text', 0, false, 2, {
+        retries: 1,
+        response: 'Paris',
+      });
 
       const { saved, restored } = roundTrip(progress);
 
@@ -374,7 +379,7 @@ describe('ProgressState', () => {
       ['numeric text as written', '42', '"42"'],
     ])('saves %s and restores what was submitted', (_, response, json) => {
       const progress = new ProgressState(createManifest(6), createConfig());
-      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, response);
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, { response });
 
       const { saved, restored } = roundTrip(progress);
 
@@ -384,7 +389,7 @@ describe('ProgressState', () => {
 
     it('hands out a copy of the answer, so a widget cannot edit the saved one', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
-      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, ['1']);
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, { response: ['1'] });
 
       (progress.standaloneResult(0, 'q')!.answer as string[]).push('2');
 
@@ -395,7 +400,9 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       const circular: unknown[] = [];
       circular.push(circular);
-      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, circular);
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, {
+        response: circular,
+      });
 
       expect(progress.standaloneResult(0, 'q')).toEqual({
         score: 0,
@@ -452,17 +459,13 @@ describe('ProgressState', () => {
 
     it('saves that a standalone submit had no correct answer to judge by', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
-      progress.markStandaloneQuestion(0, 'poll', 0, false, 1, 0, 'agree', true);
-      progress.markStandaloneQuestion(
-        0,
-        'rated',
-        0,
-        true,
-        1,
-        0,
-        undefined,
-        true,
-      );
+      progress.markStandaloneQuestion(0, 'poll', 0, false, 1, {
+        response: 'agree',
+        unjudged: true,
+      });
+      progress.markStandaloneQuestion(0, 'rated', 0, true, 1, {
+        unjudged: true,
+      });
 
       const { saved, restored } = roundTrip(progress);
 
@@ -483,16 +486,13 @@ describe('ProgressState', () => {
     describe('when the save has no room', () => {
       function answered() {
         const progress = new ProgressState(createManifest(6), createConfig());
-        progress.markStandaloneQuestion(
-          0,
-          'essay',
-          100,
-          true,
-          1,
-          1,
-          'x'.repeat(80),
-        );
-        progress.markStandaloneQuestion(0, 'choice', 100, true, 1, 0, ['1']);
+        progress.markStandaloneQuestion(0, 'essay', 100, true, 1, {
+          retries: 1,
+          response: 'x'.repeat(80),
+        });
+        progress.markStandaloneQuestion(0, 'choice', 100, true, 1, {
+          response: ['1'],
+        });
         progress.quizCompleted(2, 100, [
           ['a', matching],
           ['b', ['1']],
@@ -542,8 +542,7 @@ describe('ProgressState', () => {
           100,
           true,
           1,
-          0,
-          ['1'],
+          { response: ['1'] },
         );
         const quiz = new ProgressState(createManifest(6), createConfig());
         quiz.quizCompleted(2, 100, [

@@ -548,7 +548,7 @@ describe('QuizEngine', () => {
         ['a question has no saved answer', { a: true }, true],
         ['a question has no restore()', { a: true, b: false }, false],
       ])('stays unreviewable when %s', (_, answers, canRestore) => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { engine } = makeEngine(
           { graded: true },
           { restore: { attempts: 1, score: 50, answers } },
@@ -560,7 +560,6 @@ describe('QuizEngine', () => {
         expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
         engine.startReview();
         expect(engine.state).toBe('submitted');
-        warn.mockRestore();
       });
 
       it('stays unreviewable when a widget sets an answer the save did not bring back', () => {

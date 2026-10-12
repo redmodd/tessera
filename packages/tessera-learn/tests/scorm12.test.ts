@@ -198,7 +198,7 @@ describe('SCORM12Adapter', () => {
       expect(adapter.stateLimit).toBe(4096);
     });
 
-    it('warns once when serialized state exceeds 4096 chars', async () => {
+    it('warns once when serialized state exceeds 4096 bytes', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       const big = { padding: 'x'.repeat(4200) };
@@ -207,9 +207,7 @@ describe('SCORM12Adapter', () => {
       adapter.saveState(state);
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toMatch(
-        /SCORM 1\.2 cmi\.suspend_data 4096/,
-      );
+      expect(warn.mock.calls[0][0]).toMatch(/SCORM 1\.2 limit of 4096/);
     });
 
     it('counts the limit in UTF-8 bytes, as the session does', async () => {

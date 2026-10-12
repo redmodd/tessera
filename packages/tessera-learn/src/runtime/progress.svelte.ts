@@ -34,6 +34,23 @@ export interface StandaloneResult {
   answer?: string;
 }
 
+/** What a standalone submit records beside its score. */
+export interface StandaloneSubmit {
+  /** Retries spent before the submit. */
+  retries?: number;
+  response?: unknown;
+  /** The response had no `correct` to judge it by. */
+  unjudged?: boolean;
+}
+
+/** What a standalone question last submitted, for the handle a remount seeds. */
+export interface StandaloneRestore extends Pick<
+  StandaloneResult,
+  'score' | 'retries' | 'unjudged'
+> {
+  answer?: unknown;
+}
+
 const WHOLE_NUMBER = /^(0|[1-9]\d{0,14})$/;
 const isWholeNumber = {
   string: (id: unknown) => typeof id === 'string' && WHOLE_NUMBER.test(id),
@@ -280,9 +297,7 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    retries?: unknown,
-    response?: unknown,
-    unjudged = false,
+    { retries, response, unjudged }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -299,13 +314,10 @@ export class ProgressState {
     this.#writeQuestions(pageIndex, questions);
   }
 
-  /** What a standalone question last submitted, for the handle a remount seeds. */
   standaloneResult(
     pageIndex: number,
     questionId: string,
-  ):
-    | { score: number; retries: number; unjudged?: true; answer?: unknown }
-    | undefined {
+  ): StandaloneRestore | undefined {
     const result = this.gradedUnits.get(pageIndex)?.questions?.get(questionId);
     return (
       result && {
@@ -516,8 +528,7 @@ export class ProgressState {
         const r = Object.fromEntries(
           [...unit.answers].map(([qid, answer]) => [qid, savedAnswer(answer)]),
         );
-        // Answers are only kept with a quiz score, so `r` never opens the entry.
-        const cost = savedSize(`,"r":${JSON.stringify(r)}`);
+        const cost = jsonSize({ ...entry, r }) - jsonSize(entry);
         if (cost <= budget) {
           budget -= cost;
           entry.r = r;
@@ -599,9 +610,11 @@ export class ProgressState {
             score,
             flags === 1 || flags === 3,
             weight,
-            retries,
-            swapIds(answer),
-            flags === 2 || flags === 3,
+            {
+              retries,
+              response: swapIds(answer),
+              unjudged: flags === 2 || flags === 3,
+            },
           );
         }
       }
