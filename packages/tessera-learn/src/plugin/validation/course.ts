@@ -201,7 +201,7 @@ function reportSuspendDataEstimate(
   // only its own fields.
   const quizBytes = totalQuizzes * 14; // g entry: "s":100,"a":2,
   const chunkBytes = totalPages * 12; // c: "NNN":NN,
-  const standaloneBytes = totalPages * 43; // g: "NNN":{"q":{"q1":[100,3,1],"q2":[40,3,1]}},
+  const standaloneBytes = totalPages * 47; // g: "NNN":{"q":{"q1":[100,3,1,2],"q2":[40,3,1,2]}},
   const userStateBuffer = 256; // usePersistence headroom
   const estimatedSize =
     overhead +

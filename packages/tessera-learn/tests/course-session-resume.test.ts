@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { createConfig, createManifest, flush, stubAdapter } from './helpers.js';
 import { startSession } from './helpers/session.svelte.js';
 import type { ProgressState } from '../src/runtime/progress.svelte.js';
@@ -154,6 +154,10 @@ describe('CourseSession restore gate honours config.resume', () => {
   describe('saved answers', () => {
     const essay = 'x'.repeat(120);
 
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
     async function answer(stateLimit?: number) {
       const { saveState, progress } = await start('auto', { stateLimit });
       progress.markStandaloneQuestion(1, 'q1', 100, true, 1, {
@@ -173,8 +177,13 @@ describe('CourseSession restore gate honours config.resume', () => {
       });
     });
 
-    it('give way where they would overrun the limit', async () => {
+    it('give way where they would overrun the limit, with one warning', async () => {
       const saved = await answer(180);
+
+      expect(console.warn).toHaveBeenCalledOnce();
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('180-byte limit'),
+      );
 
       expect(saved.g).toEqual({
         '1': { q: { q1: [100, 1, 1, 1], q2: [100, 1, 1, 0, [1]] } },

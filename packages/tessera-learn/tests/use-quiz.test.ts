@@ -486,19 +486,37 @@ describe('QuizEngine', () => {
         };
       }
 
-      it('hands progress the submitted response of each question that can restore it', () => {
+      it('hands progress the submitted responses', () => {
         const { engine, responses } = makeEngine();
         const restore = () => {};
         engine.registerQuestion({ ...tfQuestion('a', true, true), restore });
         engine.registerQuestion({ ...tfQuestion('b', false, true), restore });
-        engine.registerQuestion(tfQuestion('c', true, true));
         engine.setAnswer(0, true);
         engine.setAnswer(1, false);
-        engine.setAnswer(2, true);
         engine.submit();
 
         expect(responses).toEqual([{ a: true, b: false }]);
       });
+
+      it.each([
+        ['full', {}],
+        ['incorrect-only', { a: true }],
+      ] as const)(
+        'with a question that cannot restore, a %s retry quiz hands progress %o',
+        (retryMode, saved) => {
+          const { engine, responses } = makeEngine({ graded: true, retryMode });
+          engine.registerQuestion({
+            ...tfQuestion('a', true, true),
+            restore: () => {},
+          });
+          engine.registerQuestion(tfQuestion('b', true, true));
+          engine.setAnswer(0, true);
+          engine.setAnswer(1, true);
+          engine.submit();
+
+          expect(responses).toEqual([saved]);
+        },
+      );
 
       it('leaves a review when a question registers without its answer', () => {
         const { engine } = makeEngine(
@@ -615,6 +633,23 @@ describe('QuizEngine', () => {
         engine.submit();
         expect(engine.score).toBe(100);
         expect(responses).toEqual([{ a: true, b: true }]);
+      });
+
+      it('incorrect-only retry resets a correct question whose answer did not come back', () => {
+        const { engine } = makeEngine(
+          { graded: true, retryMode: 'incorrect-only' },
+          { restore: { attempts: 1, score: 100 } },
+        );
+        const reset = vi.fn();
+        const q = engine.registerQuestion({
+          ...tfQuestion('a', true, true),
+          reset,
+        });
+
+        engine.retry();
+
+        expect(q.isLockedCorrect).toBe(false);
+        expect(reset).toHaveBeenCalledOnce();
       });
 
       it('leaves a question that registers after a retry unanswered', () => {

@@ -288,11 +288,18 @@ export class QuizEngine implements UseQuizHandle {
     this.#fromSave = false;
     this.#attemptCount++;
 
+    // A review needs every answer; short of that only an incorrect-only
+    // retry reads them, to lock the correct ones.
     const responses = new Map<string, unknown>();
-    for (const q of this.#internalQuestions) {
-      if (!q.restore) continue;
-      const response = q.interaction?.()?.response;
-      if (response !== undefined) responses.set(q.id, response);
+    if (
+      this.#deps.quizConfig.retryMode === 'incorrect-only' ||
+      this.#internalQuestions.every((q) => q.restore)
+    ) {
+      for (const q of this.#internalQuestions) {
+        if (!q.restore) continue;
+        const response = q.interaction?.()?.response;
+        if (response !== undefined) responses.set(q.id, response);
+      }
     }
     this.#deps.onComplete(score, responses);
     this.#deps.notify?.('tessera-quiz-complete', { score });
@@ -320,13 +327,13 @@ export class QuizEngine implements UseQuizHandle {
     const newLocked = new Set<number>();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
       this.#internalQuestions.forEach((q, i) => {
-        if (q.checkAnswer()) newLocked.add(i);
+        // A question restored without its answer can read as correct, and
+        // locked it could never be answered.
+        if (this.#answers.has(i) && q.checkAnswer()) newLocked.add(i);
       });
     }
     const preserved = new Map<number, unknown>();
-    for (const i of newLocked) {
-      if (this.#answers.has(i)) preserved.set(i, this.#answers.get(i));
-    }
+    for (const i of newLocked) preserved.set(i, this.#answers.get(i));
     this.#lockedCorrect.clear();
     for (const i of newLocked) this.#lockedCorrect.add(i);
     this.#answers.clear();

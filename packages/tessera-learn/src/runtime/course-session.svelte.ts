@@ -56,6 +56,7 @@ export class CourseSession {
   // Each usePersistence call site namespaces under its own key. Saved to SavedState.u.
   #userState = $state<Record<string, unknown>>({});
   #unsavableKeys = new Set<string>();
+  #answersTrimmedWarned = false;
 
   #persistScheduled = false;
   #persistPending = false;
@@ -285,6 +286,14 @@ export class CourseSession {
     const state = withAnswers(Infinity);
     const limit = this.#adapter.stateLimit;
     if (limit === Infinity || jsonSize(state) <= limit) return state;
+    if (!this.#answersTrimmedWarned) {
+      this.#answersTrimmedWarned = true;
+      console.warn(
+        `Tessera: the saved state is over the ${limit}-byte limit, so question ` +
+          `answers are left out of it until it fits. Those questions come back ` +
+          `scored, without the answer shown.`,
+      );
+    }
     return withAnswers(limit - jsonSize(withAnswers(0)));
   }
 
