@@ -16,7 +16,12 @@ const wrong: Interaction = {
 
 function make(
   opts: Partial<UseQuestionOptions> = {},
-  restore?: { score: number; retries: number; answer?: unknown },
+  restore?: {
+    score: number;
+    retries: number;
+    unjudged?: boolean;
+    answer?: unknown;
+  },
 ) {
   const report = vi.fn();
   const markScore = vi.fn();
@@ -37,7 +42,7 @@ describe('StandaloneQuestion', () => {
     expect(report).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledWith('q1', right, true);
     expect(markScore).toHaveBeenCalledTimes(1);
-    expect(markScore).toHaveBeenCalledWith(100, 0, true);
+    expect(markScore).toHaveBeenCalledWith(100, 0, true, false);
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
     expect(q.answer).toBe(1);
@@ -50,19 +55,20 @@ describe('StandaloneQuestion', () => {
     wrongQ.q.submit();
     expect(wrongQ.q.correct).toBe(false);
     expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false);
-    expect(wrongQ.markScore).toHaveBeenCalledWith(0, 0, false);
+    expect(wrongQ.markScore).toHaveBeenCalledWith(0, 0, false, false);
 
     const scored = make({ response: () => wrong, score: () => 40 });
     scored.q.submit();
-    expect(scored.markScore).toHaveBeenCalledWith(40, 0, false);
+    expect(scored.markScore).toHaveBeenCalledWith(40, 0, false, false);
   });
 
   it('reports correct=null when the interaction has no correct answer', () => {
     const likert: Interaction = { type: 'likert', response: 'agree' };
-    const { q, report } = make({ response: () => likert });
+    const { q, report, markScore } = make({ response: () => likert });
     q.submit();
 
     expect(report).toHaveBeenCalledWith('q1', likert, null);
+    expect(markScore).toHaveBeenCalledWith(0, 0, 'agree', true);
     expect(q.correct).toBe(null);
   });
 
@@ -90,7 +96,7 @@ describe('StandaloneQuestion', () => {
 
     expect(report).toHaveBeenCalledTimes(2);
     expect(report).toHaveBeenLastCalledWith('q1', right, true);
-    expect(markScore).toHaveBeenCalledWith(100, 0, true);
+    expect(markScore).toHaveBeenCalledWith(100, 0, true, false);
   });
 
   it('methods work unbound', () => {
@@ -257,7 +263,7 @@ describe('StandaloneQuestion', () => {
     q.retry();
     q.submit();
 
-    expect(markScore).toHaveBeenLastCalledWith(0, 1, false);
+    expect(markScore).toHaveBeenLastCalledWith(0, 1, false, false);
   });
 
   describe('restored from a saved result', () => {
@@ -333,7 +339,7 @@ describe('StandaloneQuestion', () => {
       q.retry();
       q.submit();
 
-      expect(markScore).toHaveBeenCalledWith(0, 2, false);
+      expect(markScore).toHaveBeenCalledWith(0, 2, false, false);
       expect(q.canRetry).toBe(false);
     });
 
@@ -353,6 +359,14 @@ describe('StandaloneQuestion', () => {
 
       expect(q.submitted).toBe(true);
       expect(q.correct).toBe(null);
+    });
+
+    it('cannot tell correct when the submit had no correct answer to judge by', () => {
+      const { q } = make({}, { score: 0, retries: 0, unjudged: true });
+
+      expect(q.submitted).toBe(true);
+      expect(q.correct).toBe(null);
+      expect(q.canRetry).toBe(true);
     });
 
     it('shows no answer when the widget has no restore()', () => {

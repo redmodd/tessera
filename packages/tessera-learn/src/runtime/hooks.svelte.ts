@@ -36,7 +36,8 @@ export interface Question {
    * True/false once submitted or once feedback is visible; null while
    * answering, and null where a restored result cannot tell: a quiz restored
    * without its answers (see `useQuiz().restored`), or a standalone question
-   * with a custom `score()` restored without its answer.
+   * restored without its answer that has a custom `score()` or was submitted
+   * with no `correct` to judge it by.
    */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
@@ -67,7 +68,7 @@ export interface Question {
   commit(): void;
 }
 
-export interface UseQuestionOptions {
+export interface UseQuestionOptions<I extends Interaction = Interaction> {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
   /** Whether this question counts toward its page score. Default false. */
@@ -81,7 +82,7 @@ export interface UseQuestionOptions {
   /** Standalone retry cap, counted across visits to the page. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
   /** Called on submit. Returns the current learner response, or undefined while unanswered. */
-  response: () => Interaction | undefined;
+  response: () => I | undefined;
   /** Whether the current answer is fully specified. Default: true. */
   complete?: () => boolean;
   /**
@@ -99,7 +100,7 @@ export interface UseQuestionOptions {
    * response. Without `restore` the question still comes back submitted and
    * scored, but shows no answer.
    */
-  restore?: (response: InteractionResponse) => unknown;
+  restore?: (response: I['response']) => unknown;
 }
 
 /**
@@ -139,7 +140,11 @@ export { setQuizContext };
  * modes. Inside a quiz, `submit()` is a no-op (the parent quiz drives
  * submission) and `submitted`/`correct` mirror the quiz's state.
  */
-export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
+export function useQuestion<I extends Interaction = Interaction>(
+  options: UseQuestionOptions<I>,
+): UseQuestionHandle {
+  // The response handed to `restore` is the one this widget's `response()` saved.
+  const opts = options as unknown as UseQuestionOptions;
   const quizCtx = getQuizContext();
   const navCtx = getNavContext();
   const adapterCtx = getAdapterContext();
@@ -187,7 +192,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       opts.weight,
     );
     restore = navCtx.progress.standaloneResult(pageIndex, opts.id);
-    markScore = (score, retries, response) =>
+    markScore = (score, retries, response, unjudged) =>
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,
@@ -196,6 +201,7 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
         opts.weight,
         retries,
         response,
+        unjudged,
       );
   }
 

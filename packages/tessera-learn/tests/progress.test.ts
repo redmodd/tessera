@@ -450,6 +450,36 @@ describe('ProgressState', () => {
       expect(progress.toSaved().g).toEqual({ 2: { s: 100, a: 2 } });
     });
 
+    it('saves that a standalone submit had no correct answer to judge by', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'poll', 0, false, 1, 0, 'agree', true);
+      progress.markStandaloneQuestion(
+        0,
+        'rated',
+        0,
+        true,
+        1,
+        0,
+        undefined,
+        true,
+      );
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[0].q).toEqual({
+        poll: [0, 1, 2, 0, 'agree'],
+        rated: [0, 1, 3],
+      });
+      expect(restored.standaloneResult(0, 'poll')).toEqual({
+        score: 0,
+        retries: 0,
+        unjudged: true,
+        answer: 'agree',
+      });
+      expect(restored.standaloneResult(0, 'rated')?.unjudged).toBe(true);
+      expect(restored.pageScore(0)).toBe(0);
+    });
+
     describe('when the save has no room', () => {
       function answered() {
         const progress = new ProgressState(createManifest(6), createConfig());
@@ -502,6 +532,34 @@ describe('ProgressState', () => {
           expect(size - bare).toBeLessThanOrEqual(budget);
         }
         expect(progress.toSaved(200)).toEqual(progress.toSaved());
+      });
+
+      it('charges an answer only the bytes it adds to the save', () => {
+        const standalone = new ProgressState(createManifest(6), createConfig());
+        standalone.markStandaloneQuestion(
+          0,
+          'a-question-with-a-long-id',
+          100,
+          true,
+          1,
+          0,
+          ['1'],
+        );
+        const quiz = new ProgressState(createManifest(6), createConfig());
+        quiz.quizCompleted(2, 100, [
+          ['a-question-with-a-long-id', matching],
+          ['b', ['1']],
+        ]);
+
+        for (const progress of [standalone, quiz]) {
+          const size = (budget?: number) =>
+            JSON.stringify(progress.toSaved(budget)).length;
+          const cost = size() - size(0);
+
+          expect(cost).toBeGreaterThan(0);
+          expect(progress.toSaved(cost)).toEqual(progress.toSaved());
+          expect(progress.toSaved(cost - 1)).toEqual(progress.toSaved(0));
+        }
       });
     });
   });

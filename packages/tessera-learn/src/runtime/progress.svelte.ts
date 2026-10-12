@@ -28,24 +28,17 @@ export interface StandaloneResult {
   graded: boolean;
   /** Retries spent before the submit that scored. */
   retries: number;
-  /** The submitted response, as {@link encodeAnswer} wrote it. */
+  /** The submit's response had no `correct` to judge it by. */
+  unjudged?: true;
+  /** The submitted response, as JSON. */
   answer?: string;
-}
-
-// The most an answer adds around itself: `[`, `,1,1,0,` and `]` on a standalone score.
-const ANSWER_OVERHEAD = 10;
-
-function answerCost(questionId: string, answer: string): number {
-  return (
-    savedSize(answer) + savedSize(JSON.stringify(questionId)) + ANSWER_OVERHEAD
-  );
 }
 
 const WHOLE_NUMBER = /^(0|[1-9]\d{0,14})$/;
 const isWholeNumber = {
   string: (id: unknown) => typeof id === 'string' && WHOLE_NUMBER.test(id),
   number: (id: unknown) =>
-    typeof id === 'number' && WHOLE_NUMBER.test(String(id)),
+    typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < 1e15,
 };
 
 /**
@@ -71,17 +64,21 @@ function swapIds(response: unknown): unknown {
   );
 }
 
-/** A response in its saved form as JSON, or undefined when it has none. */
+/** A response as JSON, or undefined when it has none. */
 function encodeAnswer(response: unknown): string | undefined {
   try {
-    return JSON.stringify(swapIds(response));
+    return JSON.stringify(response);
   } catch {
     return undefined;
   }
 }
 
-function decodeAnswer(answer: string): unknown {
+function savedAnswer(answer: string): unknown {
   return swapIds(JSON.parse(answer));
+}
+
+function jsonSize(value: unknown): number {
+  return savedSize(JSON.stringify(value));
 }
 
 function encodeAnswers(
@@ -231,7 +228,7 @@ export class ProgressState {
     return new Map(
       [...answers].map(([questionId, answer]) => [
         questionId,
-        decodeAnswer(answer),
+        JSON.parse(answer),
       ]),
     );
   }
@@ -285,6 +282,7 @@ export class ProgressState {
     weight?: number,
     retries?: unknown,
     response?: unknown,
+    unjudged = false,
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -295,6 +293,7 @@ export class ProgressState {
       weight: normalizeWeight(weight),
       graded,
       retries: normalizeRetries(retries),
+      ...(unjudged ? { unjudged } : {}),
       ...(answer === undefined ? {} : { answer }),
     });
     this.#writeQuestions(pageIndex, questions);
@@ -304,14 +303,17 @@ export class ProgressState {
   standaloneResult(
     pageIndex: number,
     questionId: string,
-  ): { score: number; retries: number; answer?: unknown } | undefined {
+  ):
+    | { score: number; retries: number; unjudged?: true; answer?: unknown }
+    | undefined {
     const result = this.gradedUnits.get(pageIndex)?.questions?.get(questionId);
     return (
       result && {
         score: result.score,
         retries: result.retries,
+        unjudged: result.unjudged,
         answer:
-          result.answer === undefined ? undefined : decodeAnswer(result.answer),
+          result.answer === undefined ? undefined : JSON.parse(result.answer),
       }
     );
   }
@@ -473,7 +475,7 @@ export class ProgressState {
   #replaying = false;
 
   /**
-   * Answers are saved while `answerBudget` characters last and left out after
+   * Answers are saved while `answerBudget` bytes last and left out after
    * that: a standalone question then restores scored without its answer, and
    * a quiz, which is reviewed whole, without any of its answers.
    */
@@ -487,32 +489,39 @@ export class ProgressState {
       if (unit.questions?.size) {
         entry.q = Object.fromEntries(
           [...unit.questions].map(([qid, result]) => {
-            const { score, weight, graded, retries, answer } = result;
-            const saved: SavedQuestion = [score, weight, graded ? 1 : 0];
-            const cost = answer === undefined ? 0 : answerCost(qid, answer);
-            const fits = answer !== undefined && cost <= budget;
-            if (retries > 0 || fits) saved.push(retries);
-            if (fits) {
-              budget -= cost;
-              saved.push(JSON.parse(answer));
-            }
-            return [
-              qid,
-              saved.length === 3 && graded && weight === 1 ? score : saved,
+            const { score, weight, retries, answer } = result;
+            const flags = (result.graded ? 1 : 0) + (result.unjudged ? 2 : 0);
+            const bare: number | SavedQuestion =
+              retries > 0
+                ? [score, weight, flags, retries]
+                : flags === 1 && weight === 1
+                  ? score
+                  : [score, weight, flags];
+            if (answer === undefined) return [qid, bare];
+            const answered: SavedQuestion = [
+              score,
+              weight,
+              flags,
+              retries,
+              savedAnswer(answer),
             ];
+            const cost = jsonSize(answered) - jsonSize(bare);
+            if (cost > budget) return [qid, bare];
+            budget -= cost;
+            return [qid, answered];
           }),
         );
       }
-      const answers = [...(unit.answers ?? [])];
-      const quizCost = answers.reduce(
-        (sum, [qid, answer]) => sum + answerCost(qid, answer),
-        0,
-      );
-      if (answers.length > 0 && quizCost <= budget) {
-        budget -= quizCost;
-        entry.r = Object.fromEntries(
-          answers.map(([qid, answer]) => [qid, JSON.parse(answer)]),
+      if (unit.answers?.size) {
+        const r = Object.fromEntries(
+          [...unit.answers].map(([qid, answer]) => [qid, savedAnswer(answer)]),
         );
+        // Answers are only kept with a quiz score, so `r` never opens the entry.
+        const cost = savedSize(`,"r":${JSON.stringify(r)}`);
+        if (cost <= budget) {
+          budget -= cost;
+          entry.r = r;
+        }
       }
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
@@ -580,7 +589,7 @@ export class ProgressState {
         for (const [qid, entry] of Object.entries(
           isRecord(unit.q) ? unit.q : {},
         )) {
-          const [score, weight, graded, retries, answer] = Array.isArray(entry)
+          const [score, weight, flags, retries, answer] = Array.isArray(entry)
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
@@ -588,10 +597,11 @@ export class ProgressState {
             pageIndex,
             qid,
             score,
-            graded === 1,
+            flags === 1 || flags === 3,
             weight,
             retries,
             swapIds(answer),
+            flags === 2 || flags === 3,
           );
         }
       }

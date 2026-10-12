@@ -341,8 +341,8 @@ describe('useQuestion — standalone mode', () => {
           response: selected,
           correct: ['1'],
         }),
-        restore: (response) => {
-          selected = response as string[];
+        restore: ([choice]) => {
+          selected = [choice];
         },
       });
 
@@ -350,6 +350,21 @@ describe('useQuestion — standalone mode', () => {
       expect(revisit.answer).toEqual(['2']);
       expect(revisit.correct).toBe(false);
       expect(revisit.canRetry).toBe(true);
+    });
+
+    it('keeps correct null for a question with no correct answer', () => {
+      gradedPage();
+      const poll = () =>
+        useQuestion({
+          id: 'q1',
+          response: () => ({ type: 'likert', response: 'agree' }),
+        });
+      poll().submit();
+
+      const revisit = poll();
+
+      expect(revisit.submitted).toBe(true);
+      expect(revisit.correct).toBe(null);
     });
   });
 

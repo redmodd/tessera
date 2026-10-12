@@ -3,13 +3,26 @@ import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
 
 export interface StandaloneQuestionDeps extends Pick<QuizEngineDeps, 'report'> {
-  /** Records a submit: its score, the retries spent before it, and the response. */
-  markScore: (score: number, retries: number, response: unknown) => void;
+  /**
+   * Records a submit: its score, the retries spent before it, the response,
+   * and whether that response had no `correct` to judge it by.
+   */
+  markScore: (
+    score: number,
+    retries: number,
+    response: unknown,
+    unjudged: boolean,
+  ) => void;
   /**
    * What this question last submitted, on this mount's page. The handle starts
    * submitted with it; a retry clicked but not resubmitted is not part of it.
    */
-  restore?: { score: number; retries: number; answer?: unknown };
+  restore?: {
+    score: number;
+    retries: number;
+    unjudged?: boolean;
+    answer?: unknown;
+  };
 }
 
 export class StandaloneQuestion implements UseQuestionHandle {
@@ -37,9 +50,9 @@ export class StandaloneQuestion implements UseQuestionHandle {
     this.#submitted = true;
     this.#score = saved.score;
     this.#retryCount = saved.retries;
-    // Without the answer the score is all there is to judge by, and a custom
-    // score() need not follow correctness.
-    this.#correct = opts.score ? null : saved.score >= 100;
+    // Without the answer the score is all there is to judge by, and it says
+    // nothing where a custom score() set it or the submit was never judged.
+    this.#correct = opts.score || saved.unjudged ? null : saved.score >= 100;
     const restored = restoreResponse(opts, saved.answer);
     if (!restored) return;
     this.#answer = restored.answer;
@@ -107,7 +120,12 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const correct = isCorrect(response);
     const score = this.#opts.score?.() ?? (correct ? 100 : 0);
 
-    this.#deps.markScore(score, this.#retryCount, response.response);
+    this.#deps.markScore(
+      score,
+      this.#retryCount,
+      response.response,
+      correct === null,
+    );
     this.#report(response, correct);
 
     this.#correct = correct;

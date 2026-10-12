@@ -122,7 +122,7 @@ function useQuestion(opts: {
   maxRetries?: number; // standalone retry cap, counted across visits to the page (default Infinity); ignored inside a quiz
   complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
-  restore?: (response: Interaction['response']) => unknown; // put a saved answer back; see "Returning to a question"
+  restore?: (response: Interaction['response']) => unknown; // put a saved answer back, typed as your response()'s `response`; see "Returning to a question"
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
@@ -166,7 +166,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()`.
+An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()` or its `response()` had no `correct`.
 
 ## `useQuiz`
 

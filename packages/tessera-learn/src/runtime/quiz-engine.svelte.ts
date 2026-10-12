@@ -39,7 +39,7 @@ export interface QuizEngineDeps {
   /**
    * Saved attempt count, best score and that attempt's answers for this quiz
    * page. With attempts > 0 the engine starts in the results phase, and can
-   * review them once every question has taken its answer back — see
+   * review them once every question has taken its answer back: see
    * {@link QuizEngine.restored}.
    */
   restore?: {

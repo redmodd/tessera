@@ -13,6 +13,7 @@ import {
 } from '../src/runtime/contexts.js';
 import { createManifest, createConfig } from './helpers.js';
 import { mountInBody } from './helpers/mount.js';
+import { savedIndex } from '../src/components/util.js';
 
 // Mounts a widget on a page the learner already answered it on.
 function revisit(
@@ -97,6 +98,16 @@ describe('a built-in question the learner returns to', () => {
     expect(target.textContent).toContain('Well done');
     expect(target.textContent).not.toContain('Not quite');
     expect(retry()).toHaveLength(0);
+  });
+
+  it('takes a saved index only from a whole number the question has', () => {
+    const list = ['a', 'b'];
+
+    expect(savedIndex('1', list)).toBe(1);
+    expect(savedIndex(0, list)).toBe(0);
+    for (const value of [null, '', ' ', [], [1], true, '0x1', '2', -1, 0.5]) {
+      expect(() => savedIndex(value, list)).toThrow(RangeError);
+    }
   });
 
   it('shows no answer when the saved one points past an edited question', () => {
