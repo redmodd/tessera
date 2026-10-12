@@ -1,8 +1,9 @@
-import type {
-  CompletionStatus,
-  ExitMode,
-  SavedState,
-  SuccessStatus,
+import {
+  savedSize,
+  type CompletionStatus,
+  type ExitMode,
+  type SavedState,
+  type SuccessStatus,
 } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
@@ -187,11 +188,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.state = state;
     const json = JSON.stringify(state);
     const { name, suspendDataLimit } = this.dialect.profile;
-    if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
+    if (!this.#suspendOverflowWarned && savedSize(json) > suspendDataLimit) {
       this.#suspendOverflowWarned = true;
       console.warn(
-        `Tessera: cmi.suspend_data is ${json.length} chars, over the ` +
-          `${name} cmi.suspend_data ${suspendDataLimit}-char limit. The LMS will likely ` +
+        `Tessera: cmi.suspend_data is ${savedSize(json)} bytes, over the ` +
+          `${name} cmi.suspend_data ${suspendDataLimit} limit. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +
           `larger-limit standard (${largerSuspendDataStandards(suspendDataLimit).join('/')}).`,
