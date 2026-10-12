@@ -8,6 +8,15 @@ export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
+/**
+ * UTF-8 size of saved JSON, the unit an adapter's `stateLimit` is counted in.
+ * The SCORM limits are written in characters, but an LMS may enforce them in
+ * bytes, and bytes are never the smaller count.
+ */
+export function savedSize(json: string): number {
+  return new TextEncoder().encode(json).length;
+}
+
 /** A standalone question's result in `GradedUnitState.q`, written without its trailing defaults. */
 export type SavedQuestion = [
   score: number,

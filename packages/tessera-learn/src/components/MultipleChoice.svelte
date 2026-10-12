@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId } from './util.js';
+  import { QUESTION_ID_PREFIX, questionId, savedIndex } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -53,7 +53,7 @@
       selectedOption = null;
     },
     restore: (response) => {
-      selectedOption = Number(response[0]);
+      selectedOption = savedIndex(response[0], options);
       return selectedOption;
     },
   });

@@ -563,6 +563,18 @@ describe('QuizEngine', () => {
         warn.mockRestore();
       });
 
+      it('stays unreviewable when a widget sets an answer the save did not bring back', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100 } },
+        );
+        const q = engine.registerQuestion(widget('a', true));
+        q.setAnswer(false);
+
+        expect(engine.restored).toBe(true);
+        expect(q.correct).toBe(null);
+      });
+
       it('incorrect-only retry keeps the restored correct answers locked', () => {
         const { engine, responses } = makeEngine(
           { graded: true, retryMode: 'incorrect-only' },

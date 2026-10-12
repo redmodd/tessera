@@ -8,10 +8,11 @@ import type { Manifest } from '../plugin/manifest.js';
 import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { UserStateStore } from './contexts.js';
-import type {
-  CompletionStatus,
-  SavedState,
-  SuccessStatus,
+import {
+  savedSize,
+  type CompletionStatus,
+  type SavedState,
+  type SuccessStatus,
 } from './persistence.js';
 import type { XAPIClient } from './xapi/client.js';
 
@@ -283,9 +284,9 @@ export class CourseSession {
     });
     const state = withAnswers(Infinity);
     const limit = this.#adapter.stateLimit;
-    if (limit === Infinity || JSON.stringify(state).length <= limit)
+    if (limit === Infinity || savedSize(JSON.stringify(state)) <= limit)
       return state;
-    return withAnswers(limit - JSON.stringify(withAnswers(0)).length);
+    return withAnswers(limit - savedSize(JSON.stringify(withAnswers(0))));
   }
 
   // Microtask-batched: mutations within one tick collapse to one save and

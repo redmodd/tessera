@@ -10,12 +10,13 @@ import {
   type CourseConfig,
   type SuccessConfig,
 } from './types.js';
-import type {
-  CompletionStatus,
-  GradedUnitState,
-  SavedQuestion,
-  SavedState,
-  SuccessStatus,
+import {
+  savedSize,
+  type CompletionStatus,
+  type GradedUnitState,
+  type SavedQuestion,
+  type SavedState,
+  type SuccessStatus,
 } from './persistence.js';
 import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
@@ -35,40 +36,52 @@ export interface StandaloneResult {
 const ANSWER_OVERHEAD = 10;
 
 function answerCost(questionId: string, answer: string): number {
-  return answer.length + JSON.stringify(questionId).length + ANSWER_OVERHEAD;
+  return (
+    savedSize(answer) + savedSize(JSON.stringify(questionId)) + ANSWER_OVERHEAD
+  );
 }
 
 const WHOLE_NUMBER = /^(0|[1-9]\d{0,14})$/;
+const isWholeNumber = {
+  string: (id: unknown) => typeof id === 'string' && WHOLE_NUMBER.test(id),
+  number: (id: unknown) =>
+    typeof id === 'number' && WHOLE_NUMBER.test(String(id)),
+};
 
 /**
- * A response as JSON, or undefined when it has none. Ids that are whole
- * numbers, which is all the built-in widgets emit, are written as numbers:
- * `[["0","2"]]` becomes `[[0,2]]`. Only a response made of nothing else is
- * rewritten, so {@link decodeAnswer} can tell which it was given.
+ * A response's saved form, and the response back from it. Ids that are whole
+ * numbers, which is all the built-in widgets emit, are saved as numbers:
+ * `[["0","2"]]` becomes `[[0,2]]`. A response already made of whole numbers
+ * takes the string form in exchange, so the two cannot be mistaken on the way
+ * back; anything else is saved as written.
  */
+function swapIds(response: unknown): unknown {
+  if (!Array.isArray(response)) return response;
+  const ids: unknown[] = response.flat();
+  if (ids.length === 0) return response;
+  const to = ids.every(isWholeNumber.string)
+    ? Number
+    : ids.every(isWholeNumber.number)
+      ? String
+      : undefined;
+  if (!to) return response;
+  const swap = (id: unknown): unknown => to(id);
+  return response.map((entry: unknown) =>
+    Array.isArray(entry) ? entry.map(swap) : swap(entry),
+  );
+}
+
+/** A response in its saved form as JSON, or undefined when it has none. */
 function encodeAnswer(response: unknown): string | undefined {
   try {
-    const ids: unknown[] = Array.isArray(response) ? response.flat() : [];
-    const numeric =
-      ids.length > 0 &&
-      ids.every((id) => typeof id === 'string' && WHOLE_NUMBER.test(id));
-    return JSON.stringify(response, (_, value) =>
-      numeric && typeof value === 'string' ? Number(value) : value,
-    );
+    return JSON.stringify(swapIds(response));
   } catch {
     return undefined;
   }
 }
 
 function decodeAnswer(answer: string): unknown {
-  const response: unknown = JSON.parse(answer);
-  const ids: unknown[] = Array.isArray(response) ? response.flat() : [];
-  const numeric = ids.length > 0 && ids.every((id) => typeof id === 'number');
-  return numeric
-    ? JSON.parse(answer, (_, value) =>
-        typeof value === 'number' ? String(value) : value,
-      )
-    : response;
+  return swapIds(JSON.parse(answer));
 }
 
 function encodeAnswers(
@@ -551,7 +564,9 @@ export class ProgressState {
                 ? Math.max(1, Math.ceil(unit.a))
                 : 1,
             answers: encodeAnswers(
-              Object.entries(isRecord(unit.r) ? unit.r : {}),
+              Object.entries(isRecord(unit.r) ? unit.r : {}).map(
+                ([qid, saved]) => [qid, swapIds(saved)],
+              ),
             ),
           });
         }
@@ -576,7 +591,7 @@ export class ProgressState {
             graded === 1,
             weight,
             retries,
-            answer,
+            swapIds(answer),
           );
         }
       }

@@ -177,6 +177,24 @@ describe('CourseSession restore gate honours config.resume', () => {
       expect(JSON.stringify(saved).length).toBeLessThanOrEqual(180);
     });
 
+    it('are measured in UTF-8 bytes, which is what an LMS may count', async () => {
+      const { saveState, progress } = await start('auto', { stateLimit: 180 });
+      progress.markStandaloneQuestion(
+        1,
+        'q1',
+        100,
+        true,
+        1,
+        0,
+        '東'.repeat(40),
+      );
+      await flush();
+      const saved = saveState.mock.lastCall![0] as SavedState;
+
+      expect(JSON.stringify(saved).length).toBeLessThanOrEqual(180);
+      expect(saved.g).toEqual({ '1': { q: { q1: 100 } } });
+    });
+
     it('are all left out when the scores alone fill the limit', async () => {
       const bare = JSON.stringify(await answer(1)).length;
 

@@ -337,6 +337,24 @@ describe('StandaloneQuestion', () => {
       expect(q.canRetry).toBe(false);
     });
 
+    it('judges a restored answer on read, not inside the constructor', () => {
+      const response = vi.fn(() => right);
+      const { q } = make(
+        { response, restore: () => {} },
+        { score: 100, retries: 0, answer: true },
+      );
+
+      expect(response).not.toHaveBeenCalled();
+      expect(q.correct).toBe(true);
+    });
+
+    it('cannot tell correct from a custom score() when the answer did not come back', () => {
+      const { q } = make({ score: () => 80 }, { score: 80, retries: 0 });
+
+      expect(q.submitted).toBe(true);
+      expect(q.correct).toBe(null);
+    });
+
     it('shows no answer when the widget has no restore()', () => {
       const { q } = make({}, { score: 40, retries: 0, answer: true });
 

@@ -27,7 +27,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null in a quiz restored without its answers (see `useQuiz().restored`)
+  readonly correct: boolean | null; // null while answering, and null where a restored result cannot tell (see "Returning to a question")
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -150,6 +150,7 @@ Pass `restore` to show the answer again. Rules:
 - It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
 - Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
 - A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
+- A standalone widget needs a retry control (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
 
 ```js
 let selected = $state(null);
@@ -165,7 +166,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
+An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()`.
 
 ## `useQuiz`
 

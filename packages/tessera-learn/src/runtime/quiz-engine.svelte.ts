@@ -80,6 +80,7 @@ export class QuizEngine implements UseQuizHandle {
   #bestScore = $state(0);
   #attemptCount = $state(0);
   #fromSave = $state(false);
+  #restoredAnswers = new SvelteSet<number>();
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
@@ -162,7 +163,7 @@ export class QuizEngine implements UseQuizHandle {
       this.#fromSave &&
       !(
         this.#totalQuestions > 0 &&
-        this.#internalQuestions.every((_, i) => this.#answers.has(i))
+        this.#restoredAnswers.size === this.#totalQuestions
       )
     );
   }
@@ -222,7 +223,10 @@ export class QuizEngine implements UseQuizHandle {
     const restored = this.#fromSave
       ? restoreResponse(internal, this.#deps.restore?.answers?.get(id))
       : undefined;
-    if (restored) this.#answers.set(index, restored.answer);
+    if (restored) {
+      this.#answers.set(index, restored.answer);
+      this.#restoredAnswers.add(index);
+    }
     const handle = this.#makeQuestionHandle(index);
     this.#questionHandles = [...this.#questionHandles, handle];
     return handle;

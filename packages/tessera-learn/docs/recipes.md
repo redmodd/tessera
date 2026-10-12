@@ -198,6 +198,8 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
   {@render view()}
   {#if !q.submitted}
     <button disabled={selected === null} onclick={q.submit}>Check</button>
+  {:else if q.canRetry}
+    <button onclick={q.retry}>Try again</button>
   {/if}
 {/if}
 ```
@@ -251,8 +253,11 @@ const q = useQuestion({
   reset: () => {
     answer = '';
   },
+  restore: (saved) => (answer = saved), // shows the saved answer on a return visit
 });
 ```
+
+Render a Try again button while `q.canRetry`: a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

@@ -2,7 +2,12 @@
   import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId, shuffle } from './util.js';
+  import {
+    QUESTION_ID_PREFIX,
+    questionId,
+    savedIndex,
+    shuffle,
+  } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -73,9 +78,11 @@
     }),
     reset: resetState,
     restore: (response) => {
-      for (const [item, target] of response) {
-        placements.set(Number(item), Number(target));
-      }
+      const saved = response.map(([item, target]) => [
+        savedIndex(item, items),
+        savedIndex(target, targets),
+      ]);
+      for (const [item, target] of saved) placements.set(item, target);
       return new Map(placements);
     },
   });

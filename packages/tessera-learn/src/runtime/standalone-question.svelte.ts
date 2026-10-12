@@ -24,6 +24,9 @@ export class StandaloneQuestion implements UseQuestionHandle {
   #score = $state(0);
   #retryCount = $state(0);
   #answer = $state<unknown>(undefined);
+  // While a restored answer is showing, `correct` judges it on read:
+  // `response()` may read what the widget declares below `useQuestion()`.
+  #answerRestored = $state(false);
   #reported: string | null = null;
 
   constructor(opts: UseQuestionOptions, deps: StandaloneQuestionDeps) {
@@ -34,12 +37,13 @@ export class StandaloneQuestion implements UseQuestionHandle {
     this.#submitted = true;
     this.#score = saved.score;
     this.#retryCount = saved.retries;
-    this.#correct = saved.score >= 100;
+    // Without the answer the score is all there is to judge by, and a custom
+    // score() need not follow correctness.
+    this.#correct = opts.score ? null : saved.score >= 100;
     const restored = restoreResponse(opts, saved.answer);
     if (!restored) return;
     this.#answer = restored.answer;
-    const response = opts.response();
-    if (response) this.#correct = isCorrect(response);
+    this.#answerRestored = true;
   }
 
   get id(): string {
@@ -51,7 +55,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get correct(): boolean | null {
-    return this.#correct;
+    const response = this.#answerRestored ? this.#opts.response() : undefined;
+    return response ? isCorrect(response) : this.#correct;
   }
 
   get answer(): unknown {
@@ -135,6 +140,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
     this.#correct = null;
     this.#score = 0;
     this.#answer = undefined;
+    this.#answerRestored = false;
     this.#reported = null;
     this.#opts.reset?.();
   }

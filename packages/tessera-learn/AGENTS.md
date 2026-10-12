@@ -396,13 +396,13 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                                                                                                                     |
-| --------------- | ------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                  |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                     |
-| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                              |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                               |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. A result restored without its answers (see [`restored`](docs/hooks.md#usequiz)) resets everything |
+| Field           | Type                                 | Default    | Description                                                                                                                                                                                                              |
+| --------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                                           |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                                              |
+| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                                                       |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                                                        |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. On a return visit, a question whose answer did not come back (see [`restored`](docs/hooks.md#usequiz)) is reset either way |
 
 ### Per-question weighting
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Component } from 'svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
@@ -97,6 +97,45 @@ describe('a built-in question the learner returns to', () => {
     expect(target.textContent).toContain('Well done');
     expect(target.textContent).not.toContain('Not quite');
     expect(retry()).toHaveLength(0);
+  });
+
+  it('shows no answer when the saved one points past an edited question', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const choice = revisit(
+      MultipleChoice,
+      { options: ['a', 'b'], correct: 1 },
+      { score: 0, answer: ['2'] },
+    );
+    const sorting = revisit(
+      Sorting,
+      { items: ['i0', 'i1'], targets: ['t0'], correct: [0, 0] },
+      {
+        score: 0,
+        answer: [
+          ['0', '0'],
+          ['1', '1'],
+        ],
+      },
+    );
+    const matching = revisit(
+      Matching,
+      { pairs: [{ left: 'L0', right: 'R0' }] },
+      {
+        score: 0,
+        answer: [
+          ['0', '1'],
+          ['1', '0'],
+        ],
+      },
+    );
+
+    expect(
+      choice.all<HTMLInputElement>('input[type="radio"]').map((r) => r.checked),
+    ).toEqual([false, false]);
+    expect(sorting.all('.tessera-sorting-placed-item')).toHaveLength(0);
+    expect(matching.all('.tessera-matching-item.matched')).toHaveLength(0);
+    expect(error).toHaveBeenCalledTimes(3);
+    error.mockRestore();
   });
 
   it('FillInTheBlank shows the typed answer', () => {
