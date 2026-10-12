@@ -28,8 +28,8 @@ export interface StandaloneResult {
   graded: boolean;
   /** Retries spent before the submit that scored. */
   retries: number;
-  /** The submit's response had no `correct` to judge it by. */
-  unjudged?: true;
+  /** The submit's verdict, or null when its response had no `correct` to judge it by. */
+  correct: boolean | null;
   /** The submitted response, as JSON. */
   response?: string;
 }
@@ -39,14 +39,14 @@ export interface StandaloneSubmit {
   /** Retries spent before the submit. */
   retries?: number;
   response?: unknown;
-  /** The response had no `correct` to judge it by. */
-  unjudged?: boolean;
+  /** The verdict, or null when the response had no `correct` to judge it by. Default: what the score gives. */
+  correct?: boolean | null;
 }
 
 /** What a standalone question last submitted, for the handle a remount seeds. */
 export interface StandaloneRestore extends Pick<
   StandaloneResult,
-  'score' | 'retries' | 'unjudged'
+  'score' | 'retries' | 'correct'
 > {
   response?: unknown;
 }
@@ -295,17 +295,18 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    { retries, response, unjudged }: StandaloneSubmit = {},
+    { retries, response, correct }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
+    const clamped = clampScore(score);
     questions.set(questionId, {
-      score: clampScore(score),
+      score: clamped,
       weight: normalizeWeight(weight),
       graded,
       retries: normalizeRetries(retries),
-      unjudged: unjudged || undefined,
+      correct: correct === undefined ? clamped >= 100 : correct,
       response: encodeResponse(response),
     });
     this.#writeQuestions(pageIndex, questions);
@@ -320,7 +321,7 @@ export class ProgressState {
       result && {
         score: result.score,
         retries: result.retries,
-        unjudged: result.unjudged,
+        correct: result.correct,
         response:
           result.response === undefined
             ? undefined
@@ -508,8 +509,10 @@ export class ProgressState {
       if (unit.questions?.size) {
         entry.q = Object.fromEntries(
           [...unit.questions].map(([qid, result]) => {
-            const { score, weight, retries, response } = result;
-            const flags = (result.graded ? 1 : 0) + (result.unjudged ? 2 : 0);
+            const { score, weight, retries, response, correct } = result;
+            const verdict =
+              correct === null ? 2 : correct === score >= 100 ? 0 : 4;
+            const flags = (result.graded ? 1 : 0) + verdict;
             const bare: number | SavedQuestion =
               retries > 0
                 ? [score, weight, flags, retries]
@@ -609,16 +612,17 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
+          const bits = [0, 1, 2, 3, 4, 5].includes(flags) ? flags : 0;
           this.markStandaloneQuestion(
             pageIndex,
             qid,
             score,
-            flags === 1 || flags === 3,
+            !!(bits & 1),
             weight,
             {
               retries,
               response: swapIds(response),
-              unjudged: flags === 2 || flags === 3,
+              correct: bits & 2 ? null : score >= 100 !== !!(bits & 4),
             },
           );
         }

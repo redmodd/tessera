@@ -27,7 +27,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null where a restored result cannot tell (see "Returning to a question")
+  readonly correct: boolean | null; // null while answering, and null on a quiz restored without its answers (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -116,7 +116,7 @@ Register a question widget so the runtime can submit, score, persist, and report
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id (letters, digits, inner underscores)
   graded?: boolean; // standalone only
-  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit, on each commit(), and whenever `correct` is judged
+  response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
   maxRetries?: number; // standalone retry cap, counted across visits to the page (default Infinity); ignored inside a quiz
@@ -140,16 +140,15 @@ See [Recipe 2b](recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-sh
 
 A submitted answer is saved with the page's progress and comes back when the learner returns to the page, in the same session or a later one.
 
-| Mode       | What comes back                                                                                                                                                                         |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Standalone | The question mounts `submitted` with its score and `retryCount`. A score of 100 stays locked (`isLockedCorrect`, no `canRetry`); a lower one offers a retry until `maxRetries` is spent |
-| Quiz       | The results, with the best attempt's answers ready to review                                                                                                                            |
+| Mode       | What comes back                                                                                                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standalone | The question mounts `submitted` with its score, `correct` and `retryCount`. A score of 100 stays locked (`isLockedCorrect`, no `canRetry`); a lower one offers a retry until `maxRetries` is spent |
+| Quiz       | The results, with the best attempt's answers ready to review                                                                                                                                       |
 
 Pass `restore` to show the answer again. Rules:
 
 - It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
 - Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
-- `response()` judges the restored answer each time `q.correct` is read, the first render included. Read state in it, never a `bind:this` element.
 - A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
 - A standalone widget needs a retry control (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
 
@@ -167,7 +166,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, which also keeps it out of the save, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`. The standalone `q.correct` is then read off the score (`true` at 100, else `false`), or is `null` when the question has a custom `score()` or its `response()` had no `correct`.
+An answer does not come back when the widget has no `restore`, which also keeps it out of the save, or when the save had no room for it (see [the suspend data limits](export.md)). The score, `correct`, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
 
 ## `useQuiz`
 

@@ -54,7 +54,7 @@ describe('StandaloneQuestion', () => {
     expect(plain.markScore).toHaveBeenCalledWith(100, {
       retries: 0,
       response: undefined,
-      unjudged: false,
+      correct: true,
     });
 
     const restorable = make({ restore: () => {} });
@@ -62,7 +62,7 @@ describe('StandaloneQuestion', () => {
     expect(restorable.markScore).toHaveBeenCalledWith(100, {
       retries: 0,
       response: true,
-      unjudged: false,
+      correct: true,
     });
   });
 
@@ -86,7 +86,7 @@ describe('StandaloneQuestion', () => {
     expect(report).toHaveBeenCalledWith('q1', likert, null);
     expect(markScore).toHaveBeenCalledWith(
       0,
-      expect.objectContaining({ unjudged: true }),
+      expect.objectContaining({ correct: null }),
     );
     expect(q.correct).toBe(null);
   });
@@ -280,7 +280,7 @@ describe('StandaloneQuestion', () => {
     it('starts submitted, with the saved retries counted against maxRetries', () => {
       const { q, markScore, report } = make(
         { maxRetries: 1, response: () => wrong },
-        { score: 0, retries: 1 },
+        { score: 0, retries: 1, correct: false },
       );
 
       expect(q.submitted).toBe(true);
@@ -299,7 +299,7 @@ describe('StandaloneQuestion', () => {
       const userReset = vi.fn();
       const { q, markScore } = make(
         { reset: userReset, response: () => wrong },
-        { score: 100, retries: 0 },
+        { score: 100, retries: 0, correct: true },
       );
 
       q.retry();
@@ -313,27 +313,22 @@ describe('StandaloneQuestion', () => {
       expect(markScore).not.toHaveBeenCalled();
     });
 
-    it('hands the saved answer to restore() and judges it', () => {
-      let current: Interaction = { ...wrong };
+    it('hands the saved answer to restore()', () => {
+      const restore = vi.fn();
       const { q } = make(
-        {
-          response: () => current,
-          restore: (response) => {
-            current = { ...right, response: response as boolean };
-          },
-        },
-        { score: 100, retries: 2, response: true },
+        { restore },
+        { score: 100, retries: 2, correct: true, response: true },
       );
 
+      expect(restore).toHaveBeenCalledWith(true);
       expect(q.answer).toBe(true);
-      expect(q.correct).toBe(true);
       expect(q.retryCount).toBe(2);
     });
 
     it('holds what restore() returns as the answer', () => {
       const { q } = make(
         { restore: (response) => Number((response as string[])[0]) },
-        { score: 0, retries: 0, response: ['2'] },
+        { score: 0, retries: 0, correct: false, response: ['2'] },
       );
 
       expect(q.answer).toBe(2);
@@ -342,7 +337,7 @@ describe('StandaloneQuestion', () => {
     it('reports nothing on commit()', () => {
       const { q, report } = make(
         { restore: () => {} },
-        { score: 100, retries: 0, response: true },
+        { score: 100, retries: 0, correct: true, response: true },
       );
 
       q.commit();
@@ -353,7 +348,7 @@ describe('StandaloneQuestion', () => {
     it('offers a retry on a restored wrong answer and counts on from the saved retries', () => {
       const { q, markScore } = make(
         { maxRetries: 2, response: () => wrong, restore: () => {} },
-        { score: 0, retries: 1, response: false },
+        { score: 0, retries: 1, correct: false, response: false },
       );
       expect(q.canRetry).toBe(true);
 
@@ -363,31 +358,36 @@ describe('StandaloneQuestion', () => {
       expect(markScore).toHaveBeenCalledWith(0, {
         retries: 2,
         response: false,
-        unjudged: false,
+        correct: false,
       });
       expect(q.canRetry).toBe(false);
     });
 
-    it('judges a restored answer on read, not inside the constructor', () => {
-      const response = vi.fn(() => right);
+    it("keeps the submit's verdict, whatever the widget holds since", () => {
+      const response = vi.fn(() => wrong);
       const { q } = make(
         { response, restore: () => {} },
-        { score: 100, retries: 0, response: true },
+        { score: 100, retries: 0, correct: true, response: true },
       );
 
-      expect(response).not.toHaveBeenCalled();
       expect(q.correct).toBe(true);
+      expect(q.isLockedCorrect).toBe(true);
+      expect(response).not.toHaveBeenCalled();
     });
 
-    it('cannot tell correct from a custom score() when the answer did not come back', () => {
-      const { q } = make({ score: () => 80 }, { score: 80, retries: 0 });
+    it('keeps a verdict that a custom score() does not give', () => {
+      const { q } = make(
+        { score: () => 80 },
+        { score: 80, retries: 0, correct: true },
+      );
 
       expect(q.submitted).toBe(true);
-      expect(q.correct).toBe(null);
+      expect(q.correct).toBe(true);
+      expect(q.canRetry).toBe(true);
     });
 
-    it('cannot tell correct when the submit had no correct answer to judge by', () => {
-      const { q } = make({}, { score: 0, retries: 0, unjudged: true });
+    it('has no verdict when the submit had no correct answer to judge by', () => {
+      const { q } = make({}, { score: 0, retries: 0, correct: null });
 
       expect(q.submitted).toBe(true);
       expect(q.correct).toBe(null);
@@ -395,7 +395,10 @@ describe('StandaloneQuestion', () => {
     });
 
     it('shows no answer when the widget has no restore()', () => {
-      const { q } = make({}, { score: 40, retries: 0, response: true });
+      const { q } = make(
+        {},
+        { score: 40, retries: 0, correct: false, response: true },
+      );
 
       expect(q.submitted).toBe(true);
       expect(q.answer).toBe(undefined);
@@ -410,7 +413,7 @@ describe('StandaloneQuestion', () => {
             throw new ReferenceError('state');
           },
         },
-        { score: 100, retries: 0, response: true },
+        { score: 100, retries: 0, correct: true, response: true },
       );
 
       expect(q.isLockedCorrect).toBe(true);
@@ -429,7 +432,7 @@ describe('StandaloneQuestion', () => {
             throw new RangeError('stale');
           },
         },
-        { score: 100, retries: 0, response: true },
+        { score: 100, retries: 0, correct: true, response: true },
       );
 
       expect(error).toHaveBeenCalledWith(

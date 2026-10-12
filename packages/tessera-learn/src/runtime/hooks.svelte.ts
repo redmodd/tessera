@@ -34,10 +34,8 @@ export interface Question {
   readonly submitted: boolean;
   /**
    * True/false once submitted or once feedback is visible; null while
-   * answering, and null where a restored result cannot tell: a quiz restored
-   * without its answers (see `useQuiz().restored`), or a standalone question
-   * restored without its answer that has a custom `score()` or was submitted
-   * with no `correct` to judge it by.
+   * answering, and null on a quiz restored without its answers (see
+   * `useQuiz().restored`).
    */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
@@ -83,7 +81,7 @@ export interface UseQuestionOptions<I extends Interaction = Interaction> {
   maxRetries?: number;
   /**
    * Returns the current learner response, or undefined while unanswered.
-   * Called on submit, on each `commit()`, and whenever `correct` is judged.
+   * Called on submit and on each `commit()`.
    */
   response: () => I | undefined;
   /** Whether the current answer is fully specified. Default: true. */

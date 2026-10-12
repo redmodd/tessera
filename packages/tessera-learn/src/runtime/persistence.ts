@@ -27,7 +27,11 @@ export function jsonSize(value: unknown): number {
 export type SavedQuestion = [
   score: number,
   weight: number,
-  /** 1 when graded, plus 2 when the response had no `correct` to judge it by. */
+  /**
+   * 1 when graded, plus 2 when the response had no `correct` to judge it by,
+   * or 4 when the verdict is not the one the score gives (correct under 100,
+   * incorrect at 100), which takes a custom `score()`.
+   */
   flags: number,
   retries?: number,
   response?: unknown,
@@ -40,9 +44,9 @@ export interface GradedUnitState {
   /** Submitted quiz attempts, omitted when 1 */
   a?: number;
   /**
-   * Standalone question results: questionId → score 0-100 for a graded,
-   * judged question of weight 1 with no retries or response saved, else a
-   * {@link SavedQuestion}.
+   * Standalone question results: questionId → score 0-100 for a graded
+   * question of weight 1 whose score gives its verdict, with no retries or
+   * response saved, else a {@link SavedQuestion}.
    */
   q?: Record<string, number | SavedQuestion>;
   /** Quiz responses from the best attempt, questionId → response, omitted when they don't fit */

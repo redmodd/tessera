@@ -257,6 +257,7 @@ describe('useQuestion — standalone mode', () => {
       weight: 5,
       graded: true,
       retries: 0,
+      correct: true,
     });
   });
 

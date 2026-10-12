@@ -153,7 +153,7 @@ describe('ProgressState', () => {
       });
     });
 
-    it('restores a question whose graded flag is not 0 or 1 as ungraded', () => {
+    it('restores a question whose flags are not a saved value as ungraded', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({
         g: { 0: { q: { q1: [80, 1, 7] } } },
@@ -346,19 +346,23 @@ describe('ProgressState', () => {
       expect(restored.standaloneResult(0, 'plain')).toEqual({
         score: 100,
         retries: 0,
+        correct: true,
       });
       expect(restored.standaloneResult(0, 'retried')).toEqual({
         score: 0,
         retries: 2,
+        correct: false,
       });
       expect(restored.standaloneResult(0, 'answered')).toEqual({
         score: 100,
         retries: 0,
+        correct: true,
         response: ['1'],
       });
       expect(restored.standaloneResult(0, 'text')).toEqual({
         score: 0,
         retries: 1,
+        correct: false,
         response: 'Paris',
       });
       expect(restored.standaloneResult(0, 'missing')).toBeUndefined();
@@ -406,6 +410,7 @@ describe('ProgressState', () => {
       expect(progress.standaloneResult(0, 'q')).toEqual({
         score: 0,
         retries: 0,
+        correct: false,
       });
       expect(() => JSON.stringify(progress.toSaved())).not.toThrow();
     });
@@ -460,10 +465,10 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.markStandaloneQuestion(0, 'poll', 0, false, 1, {
         response: 'agree',
-        unjudged: true,
+        correct: null,
       });
       progress.markStandaloneQuestion(0, 'rated', 0, true, 1, {
-        unjudged: true,
+        correct: null,
       });
 
       const { saved, restored } = roundTrip(progress);
@@ -475,11 +480,30 @@ describe('ProgressState', () => {
       expect(restored.standaloneResult(0, 'poll')).toEqual({
         score: 0,
         retries: 0,
-        unjudged: true,
+        correct: null,
         response: 'agree',
       });
-      expect(restored.standaloneResult(0, 'rated')?.unjudged).toBe(true);
+      expect(restored.standaloneResult(0, 'rated')?.correct).toBe(null);
       expect(restored.pageScore(0)).toBe(0);
+    });
+
+    it('saves a verdict that the score does not give', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'partial', 80, true, 1, {
+        correct: true,
+      });
+      progress.markStandaloneQuestion(0, 'lenient', 100, true, 1, {
+        correct: false,
+      });
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[0].q).toEqual({
+        partial: [80, 1, 5],
+        lenient: [100, 1, 5],
+      });
+      expect(restored.standaloneResult(0, 'partial')?.correct).toBe(true);
+      expect(restored.standaloneResult(0, 'lenient')?.correct).toBe(false);
     });
 
     describe('when the save has no room', () => {
@@ -509,6 +533,7 @@ describe('ProgressState', () => {
         expect(restored.standaloneResult(0, 'essay')).toEqual({
           score: 100,
           retries: 1,
+          correct: true,
         });
         expect(restored.quizResponses(2).size).toBe(0);
       });
@@ -1094,6 +1119,7 @@ describe('ProgressState', () => {
         weight: 1,
         graded: true,
         retries: 0,
+        correct: true,
       });
       expect(progress.getPageStandaloneAverage(3)).toBe(50);
     });
