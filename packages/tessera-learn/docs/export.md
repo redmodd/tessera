@@ -46,7 +46,7 @@ The runtime translates author intent into adapter calls automatically. The autho
 | -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
 | Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
 | Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| Saved state cap      | ~4 KB (plan for 4096 chars)                                                              | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Saved state cap      | ~4 KB (plan for 4096 bytes)                                                              | 64000 bytes                                                    | LRS-defined (typically unbounded)    |
 | Resume after reload  | From `cmi.suspend_data`                                                                  | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
