@@ -411,7 +411,8 @@ export class QuizEngine implements UseQuizHandle {
         engine.setAnswer(i, a);
       },
       commit() {
-        engine.#commit(i);
+        // A submitted answer is already reported, in this visit or an earlier one.
+        if (!engine.#submitted) engine.#commit(i);
       },
       setRender(r: unknown) {
         engine.setRender(i, r);

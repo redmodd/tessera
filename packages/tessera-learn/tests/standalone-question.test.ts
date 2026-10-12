@@ -351,6 +351,17 @@ describe('StandaloneQuestion', () => {
       expect(q.answer).toBe(2);
     });
 
+    it.each([
+      ['with its answer', { score: 100, retries: 0, answer: true }],
+      ['without its answer', { score: 100, retries: 0 }],
+    ])('reports nothing on commit() when restored %s', (_, saved) => {
+      const { q, report } = make({ restore: () => {} }, saved);
+
+      q.commit();
+
+      expect(report).not.toHaveBeenCalled();
+    });
+
     it('offers a retry on a restored wrong answer and counts on from the saved retries', () => {
       const { q, markScore } = make(
         { maxRetries: 2, response: () => wrong, restore: () => {} },

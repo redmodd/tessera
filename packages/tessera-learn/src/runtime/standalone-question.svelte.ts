@@ -94,6 +94,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
   };
 
   commit = (): void => {
+    // A submitted answer is already reported, in this visit or an earlier one.
+    if (this.#submitted) return;
     const response = this.#opts.response();
     if (response) this.#report(response, isCorrect(response));
   };

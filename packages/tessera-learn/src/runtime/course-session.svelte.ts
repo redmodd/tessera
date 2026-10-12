@@ -285,7 +285,11 @@ export class CourseSession {
     });
     const state = withAnswers(Infinity);
     const limit = this.#adapter.stateLimit;
-    if (limit === Infinity || jsonSize(state) <= limit) return state;
+    const size = jsonSize(state);
+    if (limit === Infinity || size <= limit) return state;
+    const bareSize = jsonSize(withAnswers(0));
+    // No answers to leave out: the adapter warns about the overflow itself.
+    if (bareSize === size) return state;
     if (!this.#answersTrimmedWarned) {
       this.#answersTrimmedWarned = true;
       console.warn(
@@ -294,7 +298,7 @@ export class CourseSession {
           `scored, without the answer shown.`,
       );
     }
-    return withAnswers(limit - jsonSize(withAnswers(0)));
+    return withAnswers(limit - bareSize);
   }
 
   // Microtask-batched: mutations within one tick collapse to one save and

@@ -567,6 +567,18 @@ describe('QuizEngine', () => {
         });
       });
 
+      it('reports nothing when a restored question commits', () => {
+        const { engine, reports } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+        );
+        const q = engine.registerQuestion(widget('a', true));
+
+        q.commit();
+
+        expect(reports).toEqual([]);
+      });
+
       it('holds what restore() returns as the answer', () => {
         const { engine } = makeEngine(
           { graded: true },

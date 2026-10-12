@@ -203,6 +203,17 @@ describe('CourseSession restore gate honours config.resume', () => {
       expect(saved.g).toEqual({ '1': { q: { q1: 100 } } });
     });
 
+    it('raise no warning when a save over the limit holds none', async () => {
+      const { saveState, progress } = await start('auto', { stateLimit: 20 });
+      progress.markStandaloneQuestion(1, 'q1', 100, true);
+      await flush();
+
+      expect(saveState.mock.lastCall![0].g).toEqual({
+        '1': { q: { q1: 100 } },
+      });
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
     it('are all left out when the scores alone fill the limit', async () => {
       const bare = JSON.stringify(await answer(1)).length;
 
