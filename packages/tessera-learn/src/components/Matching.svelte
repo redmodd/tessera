@@ -78,6 +78,13 @@
       correct: pairs.map((_, i) => [String(i), String(i)]),
     }),
     reset: resetState,
+    restore: (response) => {
+      for (const [left, right] of response) {
+        matches.set(Number(left), Number(right));
+        rightToLeft.set(Number(right), Number(left));
+      }
+      return new Map(matches);
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture it once so

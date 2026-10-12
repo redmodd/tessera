@@ -41,14 +41,14 @@
   let cardSelected = $state(false); // current card selected via tap/click
 
   function initQueue() {
-    queue = shuffle(items.map((_, i) => i));
-    placements.clear();
+    queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
     cardSelected = false;
     dragOver = null;
     isDragging = false;
   }
 
   function resetState() {
+    placements.clear();
     initQueue();
   }
 
@@ -72,6 +72,12 @@
       correct: items.map((_, i) => [String(i), String(correct[i])]),
     }),
     reset: resetState,
+    restore: (response) => {
+      for (const [item, target] of response) {
+        placements.set(Number(item), Number(target));
+      }
+      return new Map(placements);
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture it once so

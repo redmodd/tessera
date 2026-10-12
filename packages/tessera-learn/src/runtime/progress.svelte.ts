@@ -13,6 +13,7 @@ import {
 import type {
   CompletionStatus,
   GradedUnitState,
+  SavedQuestion,
   SavedState,
   SuccessStatus,
 } from './persistence.js';
@@ -24,6 +25,67 @@ export interface StandaloneResult {
   score: number;
   weight: number;
   graded: boolean;
+  /** Retries spent before the submit that scored. */
+  retries: number;
+  /** The submitted response, as {@link encodeAnswer} wrote it. */
+  answer?: string;
+}
+
+// The most an answer adds around itself: `[`, `,1,1,0,` and `]` on a standalone score.
+const ANSWER_OVERHEAD = 10;
+
+function answerCost(questionId: string, answer: string): number {
+  return answer.length + JSON.stringify(questionId).length + ANSWER_OVERHEAD;
+}
+
+const WHOLE_NUMBER = /^(0|[1-9]\d{0,14})$/;
+
+/**
+ * A response as JSON, or undefined when it has none. Ids that are whole
+ * numbers, which is all the built-in widgets emit, are written as numbers:
+ * `[["0","2"]]` becomes `[[0,2]]`. Only a response made of nothing else is
+ * rewritten, so {@link decodeAnswer} can tell which it was given.
+ */
+function encodeAnswer(response: unknown): string | undefined {
+  try {
+    const ids: unknown[] = Array.isArray(response) ? response.flat() : [];
+    const numeric =
+      ids.length > 0 &&
+      ids.every((id) => typeof id === 'string' && WHOLE_NUMBER.test(id));
+    return JSON.stringify(response, (_, value) =>
+      numeric && typeof value === 'string' ? Number(value) : value,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function decodeAnswer(answer: string): unknown {
+  const response: unknown = JSON.parse(answer);
+  const ids: unknown[] = Array.isArray(response) ? response.flat() : [];
+  const numeric = ids.length > 0 && ids.every((id) => typeof id === 'number');
+  return numeric
+    ? JSON.parse(answer, (_, value) =>
+        typeof value === 'number' ? String(value) : value,
+      )
+    : response;
+}
+
+function encodeAnswers(
+  responses: Iterable<[string, unknown]>,
+): Map<string, string> | undefined {
+  const answers = new Map<string, string>();
+  for (const [questionId, response] of responses) {
+    const answer = encodeAnswer(response);
+    if (answer !== undefined) answers.set(questionId, answer);
+  }
+  return answers.size > 0 ? answers : undefined;
+}
+
+function normalizeRetries(retries: unknown): number {
+  return typeof retries === 'number' && Number.isInteger(retries) && retries > 0
+    ? retries
+    : 0;
 }
 
 export function normalizeWeight(weight: unknown): number {
@@ -61,6 +123,8 @@ export interface GradedUnit {
   attempts: number;
   /** Standalone question results, questionId → score 0-100 + rollup weight. */
   questions?: Map<string, StandaloneResult>;
+  /** The best quiz attempt's responses, questionId → encoded response. */
+  answers?: ReadonlyMap<string, string>;
 }
 
 export class ProgressState {
@@ -149,13 +213,30 @@ export class ProgressState {
     return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
   }
 
-  /** Records the learner's best score across attempts, not the latest. */
-  quizCompleted(pageIndex: number, score: number) {
+  quizAnswers(pageIndex: number): Map<string, unknown> {
+    const answers = this.gradedUnits.get(pageIndex)?.answers ?? [];
+    return new Map(
+      [...answers].map(([questionId, answer]) => [
+        questionId,
+        decodeAnswer(answer),
+      ]),
+    );
+  }
+
+  /**
+   * Records the learner's best score across attempts, not the latest, and the
+   * responses that earned it.
+   */
+  quizCompleted(
+    pageIndex: number,
+    score: number,
+    responses: Iterable<[string, unknown]> = [],
+  ) {
     const unit = this.gradedUnits.get(pageIndex);
+    const best = unit?.quizScore === undefined || score >= unit.quizScore;
     this.#write(pageIndex, {
-      quizScore:
-        unit?.quizScore === undefined ? score : Math.max(unit.quizScore, score),
       attempts: (unit?.attempts ?? 0) + 1,
+      ...(best ? { quizScore: score, answers: encodeAnswers(responses) } : {}),
     });
   }
 
@@ -189,16 +270,37 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
+    retries?: unknown,
+    response?: unknown,
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
       new Map<string, StandaloneResult>();
+    const answer = encodeAnswer(response);
     questions.set(questionId, {
       score: clampScore(score),
       weight: normalizeWeight(weight),
       graded,
+      retries: normalizeRetries(retries),
+      ...(answer === undefined ? {} : { answer }),
     });
     this.#writeQuestions(pageIndex, questions);
+  }
+
+  /** What a standalone question last submitted, for the handle a remount seeds. */
+  standaloneResult(
+    pageIndex: number,
+    questionId: string,
+  ): { score: number; retries: number; answer?: unknown } | undefined {
+    const result = this.gradedUnits.get(pageIndex)?.questions?.get(questionId);
+    return (
+      result && {
+        score: result.score,
+        retries: result.retries,
+        answer:
+          result.answer === undefined ? undefined : decodeAnswer(result.answer),
+      }
+    );
   }
 
   /**
@@ -357,7 +459,13 @@ export class ProgressState {
 
   #replaying = false;
 
-  toSaved(): SavedProgress {
+  /**
+   * Answers are saved while `answerBudget` characters last and left out after
+   * that: a standalone question then restores scored without its answer, and
+   * a quiz, which is reviewed whole, without any of its answers.
+   */
+  toSaved(answerBudget = Infinity): SavedProgress {
+    let budget = answerBudget;
     const g: Record<string, GradedUnitState> = {};
     for (const [pageIndex, unit] of this.gradedUnits) {
       const entry: GradedUnitState = {};
@@ -365,10 +473,32 @@ export class ProgressState {
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
         entry.q = Object.fromEntries(
-          [...unit.questions].map(([qid, { score, weight, graded }]) => [
-            qid,
-            graded && weight === 1 ? score : [score, weight, graded ? 1 : 0],
-          ]),
+          [...unit.questions].map(([qid, result]) => {
+            const { score, weight, graded, retries, answer } = result;
+            const saved: SavedQuestion = [score, weight, graded ? 1 : 0];
+            const cost = answer === undefined ? 0 : answerCost(qid, answer);
+            const fits = answer !== undefined && cost <= budget;
+            if (retries > 0 || fits) saved.push(retries);
+            if (fits) {
+              budget -= cost;
+              saved.push(JSON.parse(answer));
+            }
+            return [
+              qid,
+              saved.length === 3 && graded && weight === 1 ? score : saved,
+            ];
+          }),
+        );
+      }
+      const answers = [...(unit.answers ?? [])];
+      const quizCost = answers.reduce(
+        (sum, [qid, answer]) => sum + answerCost(qid, answer),
+        0,
+      );
+      if (answers.length > 0 && quizCost <= budget) {
+        budget -= quizCost;
+        entry.r = Object.fromEntries(
+          answers.map(([qid, answer]) => [qid, JSON.parse(answer)]),
         );
       }
       const unanswered = this.#unlistedUnanswered(pageIndex);
@@ -420,6 +550,9 @@ export class ProgressState {
               typeof unit.a === 'number' && Number.isFinite(unit.a)
                 ? Math.max(1, Math.ceil(unit.a))
                 : 1,
+            answers: encodeAnswers(
+              Object.entries(isRecord(unit.r) ? unit.r : {}),
+            ),
           });
         }
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
@@ -432,7 +565,7 @@ export class ProgressState {
         for (const [qid, entry] of Object.entries(
           isRecord(unit.q) ? unit.q : {},
         )) {
-          const [score, weight, graded] = Array.isArray(entry)
+          const [score, weight, graded, retries, answer] = Array.isArray(entry)
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
@@ -442,6 +575,8 @@ export class ProgressState {
             score,
             graded === 1,
             weight,
+            retries,
+            answer,
           );
         }
       }

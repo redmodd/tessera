@@ -23,6 +23,7 @@ async function start(
   options: {
     saved?: Partial<SavedState>;
     seeds?: boolean;
+    stateLimit?: number;
   } = {},
 ) {
   const saved = options.saved ?? savedWith({});
@@ -38,6 +39,7 @@ async function start(
     manifest,
     adapter: stubAdapter({
       getState: () => saved as SavedState,
+      ...(options.stateLimit ? { stateLimit: options.stateLimit } : {}),
       ...spies,
     }),
   });
@@ -146,6 +148,41 @@ describe('CourseSession restore gate honours config.resume', () => {
 
     expect(saveState.mock.lastCall![0]).toMatchObject({
       g: { '1': { q: { q1: [100, 1, 0] } } },
+    });
+  });
+
+  describe('saved answers', () => {
+    const essay = 'x'.repeat(120);
+
+    async function answer(stateLimit?: number) {
+      const { saveState, progress } = await start('auto', { stateLimit });
+      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, 1, essay);
+      progress.markStandaloneQuestion(1, 'q2', 100, true, 1, 0, ['1']);
+      await flush();
+      return saveState.mock.lastCall![0] as SavedState;
+    }
+
+    it('are saved whole to an adapter with no limit', async () => {
+      expect((await answer()).g).toEqual({
+        '1': { q: { q1: [100, 1, 1, 1, essay], q2: [100, 1, 1, 0, [1]] } },
+      });
+    });
+
+    it('give way where they would overrun the limit', async () => {
+      const saved = await answer(180);
+
+      expect(saved.g).toEqual({
+        '1': { q: { q1: [100, 1, 1, 1], q2: [100, 1, 1, 0, [1]] } },
+      });
+      expect(JSON.stringify(saved).length).toBeLessThanOrEqual(180);
+    });
+
+    it('are all left out when the scores alone fill the limit', async () => {
+      const bare = JSON.stringify(await answer(1)).length;
+
+      expect((await answer(bare)).g).toEqual({
+        '1': { q: { q1: [100, 1, 1, 1], q2: 100 } },
+      });
     });
   });
 

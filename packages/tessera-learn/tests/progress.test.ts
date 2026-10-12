@@ -309,6 +309,200 @@ describe('ProgressState', () => {
     });
   });
 
+  describe('saved answers and retries', () => {
+    const matching = [
+      ['0', '2'],
+      ['1', '0'],
+      ['2', '1'],
+    ];
+
+    function roundTrip(progress: ProgressState, answerBudget?: number) {
+      const saved = JSON.parse(JSON.stringify(progress.toSaved(answerBudget)));
+      const restored = new ProgressState(createManifest(6), createConfig());
+      restored.restoreFrom(saved);
+      return { saved, restored };
+    }
+
+    it('saves a standalone answer and its retries after the score, weight and graded flag', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'plain', 100, true);
+      progress.markStandaloneQuestion(0, 'retried', 0, true, 1, 2);
+      progress.markStandaloneQuestion(0, 'answered', 100, true, 1, 0, ['1']);
+      progress.markStandaloneQuestion(0, 'text', 0, false, 2, 1, 'Paris');
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[0].q).toEqual({
+        plain: 100,
+        retried: [0, 1, 1, 2],
+        answered: [100, 1, 1, 0, [1]],
+        text: [0, 2, 0, 1, 'Paris'],
+      });
+      expect(restored.standaloneResult(0, 'plain')).toEqual({
+        score: 100,
+        retries: 0,
+      });
+      expect(restored.standaloneResult(0, 'retried')).toEqual({
+        score: 0,
+        retries: 2,
+      });
+      expect(restored.standaloneResult(0, 'answered')).toEqual({
+        score: 100,
+        retries: 0,
+        answer: ['1'],
+      });
+      expect(restored.standaloneResult(0, 'text')).toEqual({
+        score: 0,
+        retries: 1,
+        answer: 'Paris',
+      });
+      expect(restored.standaloneResult(0, 'missing')).toBeUndefined();
+      expect(restored.toSaved()).toEqual(saved);
+    });
+
+    it.each([
+      ['whole-number ids as numbers', matching, '[[0,2],[1,0],[2,1]]'],
+      ['a choice as numbers', ['3'], '[3]'],
+      ['other ids as written', ['a', '1'], '["a","1"]'],
+      ['a padded id as written', ['01'], '["01"]'],
+      ['a performance step as written', [['step', 4]], '[["step",4]]'],
+      ['a number as written', 4.5, '4.5'],
+      ['a boolean as written', false, 'false'],
+      ['numeric text as written', '42', '"42"'],
+    ])('saves %s and restores what was submitted', (_, response, json) => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, response);
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(JSON.stringify(saved.g[0].q.q[4])).toBe(json);
+      expect(restored.standaloneResult(0, 'q')?.answer).toEqual(response);
+    });
+
+    it('hands out a copy of the answer, so a widget cannot edit the saved one', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, ['1']);
+
+      (progress.standaloneResult(0, 'q')!.answer as string[]).push('2');
+
+      expect(progress.standaloneResult(0, 'q')?.answer).toEqual(['1']);
+    });
+
+    it('leaves out an answer that cannot be written as JSON', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      const circular: unknown[] = [];
+      circular.push(circular);
+      progress.markStandaloneQuestion(0, 'q', 0, true, 1, 0, circular);
+
+      expect(progress.standaloneResult(0, 'q')).toEqual({
+        score: 0,
+        retries: 0,
+      });
+      expect(() => JSON.stringify(progress.toSaved())).not.toThrow();
+    });
+
+    it('ignores saved retries that are not a positive whole number', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.restoreFrom({
+        g: {
+          0: { q: { a: [0, 1, 1, -1], b: [0, 1, 1, 1.5], c: [0, 1, 1, '2'] } },
+        },
+      });
+
+      expect(
+        ['a', 'b', 'c'].map((id) => progress.standaloneResult(0, id)?.retries),
+      ).toEqual([0, 0, 0]);
+    });
+
+    it('saves the answers of the best quiz attempt, not the latest', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(2, 50, [
+        ['a', ['0']],
+        ['b', 'first'],
+      ]);
+      progress.quizCompleted(2, 100, [
+        ['a', ['1']],
+        ['b', 'best'],
+      ]);
+      progress.quizCompleted(2, 0, [
+        ['a', ['2']],
+        ['b', 'worst'],
+      ]);
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[2]).toEqual({ s: 100, a: 3, r: { a: [1], b: 'best' } });
+      expect(Object.fromEntries(restored.quizAnswers(2))).toEqual({
+        a: ['1'],
+        b: 'best',
+      });
+      expect(restored.quizAnswers(3).size).toBe(0);
+    });
+
+    it('drops the saved answers when a better attempt has none', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(2, 50, [['a', ['0']]]);
+      progress.quizCompleted(2, 100);
+
+      expect(progress.toSaved().g).toEqual({ 2: { s: 100, a: 2 } });
+    });
+
+    describe('when the save has no room', () => {
+      function answered() {
+        const progress = new ProgressState(createManifest(6), createConfig());
+        progress.markStandaloneQuestion(
+          0,
+          'essay',
+          100,
+          true,
+          1,
+          1,
+          'x'.repeat(80),
+        );
+        progress.markStandaloneQuestion(0, 'choice', 100, true, 1, 0, ['1']);
+        progress.quizCompleted(2, 100, [
+          ['a', matching],
+          ['b', ['1']],
+        ]);
+        return progress;
+      }
+
+      it('keeps every score and retry count without the answers', () => {
+        const { saved, restored } = roundTrip(answered(), 0);
+
+        expect(saved.g).toEqual({
+          0: { q: { essay: [100, 1, 1, 1], choice: 100 } },
+          2: { s: 100 },
+        });
+        expect(restored.standaloneResult(0, 'essay')).toEqual({
+          score: 100,
+          retries: 1,
+        });
+        expect(restored.quizAnswers(2).size).toBe(0);
+      });
+
+      it('saves the answers that still fit, and a quiz only whole', () => {
+        const { saved } = roundTrip(answered(), 30);
+
+        expect(saved.g).toEqual({
+          0: { q: { essay: [100, 1, 1, 1], choice: [100, 1, 1, 0, [1]] } },
+          2: { s: 100 },
+        });
+      });
+
+      it('never spends more than the budget', () => {
+        const progress = answered();
+        const bare = JSON.stringify(progress.toSaved(0)).length;
+
+        for (let budget = 0; budget <= 200; budget++) {
+          const size = JSON.stringify(progress.toSaved(budget)).length;
+          expect(size - bare).toBeLessThanOrEqual(budget);
+        }
+        expect(progress.toSaved(200)).toEqual(progress.toSaved());
+      });
+    });
+  });
+
   describe('recalculateCompletion — percentage mode with quiz pages', () => {
     const setup = (quizPages: Record<number, { graded?: boolean }>) => {
       const manifest = createManifest(4, quizPages);
@@ -840,6 +1034,7 @@ describe('ProgressState', () => {
         score: 100,
         weight: 1,
         graded: true,
+        retries: 0,
       });
       expect(progress.getPageStandaloneAverage(3)).toBe(50);
     });

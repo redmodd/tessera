@@ -17,6 +17,8 @@ interface EngineProbe {
   events: Array<{ name: string; detail: unknown }>;
   /** Every score handed to progress, in order. */
   completed: number[];
+  /** The responses handed to progress with each score, in order. */
+  responses: Array<Record<string, unknown>>;
   /** Every interaction reported to the (injected) adapter, in order. */
   reports: Array<{
     id: string;
@@ -30,24 +32,35 @@ function makeEngine(
   opts: {
     passingScore?: number;
     noElement?: boolean;
-    restore?: { attempts: number; score: number };
+    restore?: {
+      attempts: number;
+      score: number;
+      answers?: Record<string, unknown>;
+    };
   } = {},
 ): EngineProbe {
   const events: EngineProbe['events'] = [];
   const reports: EngineProbe['reports'] = [];
   const completed: number[] = [];
+  const responses: EngineProbe['responses'] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct) =>
       reports.push({ id, interaction, correct }),
-    onComplete: (score) => completed.push(score),
+    onComplete: (score, answered) => {
+      completed.push(score);
+      responses.push(Object.fromEntries(answered));
+    },
     notify: opts.noElement
       ? undefined
       : (name, detail) => events.push({ name, detail }),
-    restore: opts.restore,
+    restore: opts.restore && {
+      ...opts.restore,
+      answers: new Map(Object.entries(opts.restore.answers ?? {})),
+    },
   });
-  return { engine, events, reports, completed };
+  return { engine, events, reports, completed, responses };
 }
 
 function completeScore(events: EngineProbe['events']): number | undefined {
@@ -449,6 +462,143 @@ describe('QuizEngine', () => {
       engine.registerQuestion(tfQuestion('b', true, true));
       expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
       expect(engine.questions.every((q) => q.feedbackVisible)).toBe(false);
+    });
+
+    describe('with saved answers', () => {
+      // A widget holding one true/false answer, as a mounted question would.
+      function widget(id: string, correct: boolean, canRestore = true) {
+        let response: boolean | undefined;
+        return {
+          id,
+          checkAnswer: () => response === correct,
+          interaction: (): Interaction | undefined =>
+            response === undefined
+              ? undefined
+              : { type: 'true-false', response, correct },
+          reset: () => {
+            response = undefined;
+          },
+          restore: canRestore
+            ? (saved: unknown) => {
+                response = saved as boolean;
+              }
+            : undefined,
+        };
+      }
+
+      it('hands each submitted response to progress', () => {
+        const { engine, responses } = makeEngine();
+        engine.registerQuestion(tfQuestion('a', true, true));
+        engine.registerQuestion(tfQuestion('b', false, true));
+        engine.setAnswer(0, true);
+        engine.setAnswer(1, false);
+        engine.submit();
+
+        expect(responses).toEqual([{ a: true, b: false }]);
+      });
+
+      it('restores every answer, so the result can be reviewed', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          {
+            restore: { attempts: 1, score: 50, answers: { a: true, b: false } },
+          },
+        );
+        engine.registerQuestion(widget('a', true));
+        engine.registerQuestion(widget('b', true));
+
+        expect(engine.state).toBe('submitted');
+        expect(engine.restored).toBe(false);
+        expect(engine.questions.map((q) => q.correct)).toEqual([true, false]);
+        expect(engine.questions.map((q) => q.answer)).toEqual([true, false]);
+
+        engine.startReview();
+        expect(engine.state).toBe('reviewing');
+        expect(engine.questions.every((q) => q.feedbackVisible)).toBe(true);
+      });
+
+      it('counts as submitted, so leaving the page raises no unsubmitted-quiz warning', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+        );
+        engine.registerQuestion(widget('a', true));
+
+        expect(engine.stats).toEqual({
+          questionsCount: 1,
+          answersCount: 1,
+          submitCalled: true,
+        });
+      });
+
+      it('holds what restore() returns as the answer', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100, answers: { a: ['2'] } } },
+        );
+        const q = engine.registerQuestion({
+          ...tfQuestion('a', true, true),
+          restore: (response) => Number((response as string[])[0]),
+        });
+
+        expect(q.answer).toBe(2);
+      });
+
+      it.each([
+        ['a question has no saved answer', { a: true }, true],
+        ['a question has no restore()', { a: true, b: false }, false],
+      ])('stays unreviewable when %s', (_, answers, canRestore) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 50, answers } },
+        );
+        engine.registerQuestion(widget('a', true));
+        engine.registerQuestion(widget('b', true, canRestore));
+
+        expect(engine.restored).toBe(true);
+        expect(engine.questions.map((q) => q.correct)).toEqual([null, null]);
+        engine.startReview();
+        expect(engine.state).toBe('submitted');
+        warn.mockRestore();
+      });
+
+      it('incorrect-only retry keeps the restored correct answers locked', () => {
+        const { engine, responses } = makeEngine(
+          { graded: true, retryMode: 'incorrect-only' },
+          {
+            restore: { attempts: 1, score: 50, answers: { a: true, b: false } },
+          },
+        );
+        engine.registerQuestion(widget('a', true));
+        const b = widget('b', true);
+        engine.registerQuestion(b);
+
+        engine.retry();
+        expect(engine.questions.map((q) => q.isLockedCorrect)).toEqual([
+          true,
+          false,
+        ]);
+        expect(engine.canSubmit).toBe(false);
+
+        b.restore!(true);
+        engine.setAnswer(1, true);
+        engine.submit();
+        expect(engine.score).toBe(100);
+        expect(responses).toEqual([{ a: true, b: true }]);
+      });
+
+      it('leaves a question that registers after a retry unanswered', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          { restore: { attempts: 1, score: 100, answers: { a: true } } },
+        );
+        engine.retry();
+        const q = engine.registerQuestion(widget('a', true));
+
+        expect(q.answer).toBe(undefined);
+        expect(engine.canSubmit).toBe(false);
+      });
     });
 
     it('ignores a zero-attempt restore', () => {

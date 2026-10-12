@@ -273,13 +273,19 @@ export class CourseSession {
 
   #serialize(): SavedState {
     const u = this.#savableUserState();
-    return {
+    const d = this.#duration.totalSeconds;
+    const withAnswers = (budget: number): SavedState => ({
       b: this.#nav.currentPageIndex,
       f: this.#fingerprint,
-      d: this.#duration.totalSeconds,
-      ...this.#progress.toSaved(),
+      d,
+      ...this.#progress.toSaved(budget),
       ...(Object.keys(u).length > 0 ? { u } : {}),
-    };
+    });
+    const state = withAnswers(Infinity);
+    const limit = this.#adapter.stateLimit;
+    if (limit === Infinity || JSON.stringify(state).length <= limit)
+      return state;
+    return withAnswers(limit - JSON.stringify(withAnswers(0)).length);
   }
 
   // Microtask-batched: mutations within one tick collapse to one save and

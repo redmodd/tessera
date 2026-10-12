@@ -1,5 +1,9 @@
 import { onDestroy, onMount, tick } from 'svelte';
-import { isCorrect, type Interaction } from './interaction.js';
+import {
+  isCorrect,
+  type Interaction,
+  type InteractionResponse,
+} from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type { CompletionStatus } from './persistence.js';
 import {
@@ -12,7 +16,10 @@ import {
   requireUserStateStore,
 } from './contexts.js';
 import { QuizEngine } from './quiz-engine.svelte.js';
-import { StandaloneQuestion } from './standalone-question.svelte.js';
+import {
+  StandaloneQuestion,
+  type StandaloneQuestionDeps,
+} from './standalone-question.svelte.js';
 import { resolveAsset } from '../components/util.js';
 
 /**
@@ -25,7 +32,7 @@ export interface Question {
   readonly id: string;
   /** True once the quiz containing this question has been submitted. */
   readonly submitted: boolean;
-  /** True/false once submitted or once feedback is visible; null while answering, and null on a restored result (answers aren't persisted). */
+  /** True/false once submitted or once feedback is visible; null while answering, and null in a quiz restored without its answers (see `useQuiz().restored`). */
   readonly correct: boolean | null;
   /** Current learner answer, or undefined if not yet answered. */
   readonly answer: unknown;
@@ -66,7 +73,7 @@ export interface UseQuestionOptions {
    * non-finite weight rolls up as 1.
    */
   weight?: number;
-  /** Standalone retry cap, counted per mount. Default `Infinity`. Ignored inside a quiz. */
+  /** Standalone retry cap, counted across visits to the page. Default `Infinity`. Ignored inside a quiz. */
   maxRetries?: number;
   /** Called on submit. Returns the current learner response, or undefined while unanswered. */
   response: () => Interaction | undefined;
@@ -79,6 +86,15 @@ export interface UseQuestionOptions {
   score?: () => number;
   /** Optional reset handler invoked when the learner tries again. */
   reset?: () => void;
+  /**
+   * Put a saved answer back into the widget. Called inside `useQuestion()`,
+   * when the learner returns to a submitted question, with the `response`
+   * value that `response()` returned at submit. Return what the widget passes
+   * to `setAnswer()` and it becomes `answer`; otherwise `answer` is the
+   * response. Without `restore` the question still comes back submitted and
+   * scored, but shows no answer.
+   */
+  restore?: (response: InteractionResponse) => unknown;
 }
 
 /**
@@ -93,8 +109,9 @@ export interface UseQuestionHandle extends Question {
   reset(): void;
   /** Standalone retry. No-op unless `canRetry`. Always a no-op inside a quiz. */
   retry(): void;
-  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. A remount starts over. */
+  /** Standalone: true after a submit that scored under 100, until `maxRetries` is hit. */
   readonly canRetry: boolean;
+  /** Standalone: retries spent, counted across visits to the page. */
   readonly retryCount: number;
   readonly mode: 'standalone' | 'quiz';
   /**
@@ -144,11 +161,13 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       reset: opts.reset,
       complete: opts.complete,
       interaction: () => opts.response(),
+      restore: opts.restore,
     });
   }
 
   const pageIndex = isInPage() ? getPageContext()?.index : undefined;
-  let markScore: (score: number) => void = () => {};
+  let markScore: StandaloneQuestionDeps['markScore'] = () => {};
+  let restore: StandaloneQuestionDeps['restore'];
   if (navCtx && pageIndex !== undefined) {
     if (opts.graded) {
       navCtx.progress.assertDeclaredGraded(
@@ -162,19 +181,23 @@ export function useQuestion(opts: UseQuestionOptions): UseQuestionHandle {
       !!opts.graded,
       opts.weight,
     );
-    markScore = (score) =>
+    restore = navCtx.progress.standaloneResult(pageIndex, opts.id);
+    markScore = (score, retries, response) =>
       navCtx.progress.markStandaloneQuestion(
         pageIndex,
         opts.id,
         score,
         !!opts.graded,
         opts.weight,
+        retries,
+        response,
       );
   }
 
   return new StandaloneQuestion(opts, {
     report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
     markScore,
+    restore,
   });
 }
 
@@ -345,6 +368,7 @@ export interface UseQuizQuestionApi {
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
   interaction?: () => Interaction | undefined;
+  restore?: (response: InteractionResponse) => unknown;
 }
 
 export interface UseQuizHandle {
@@ -363,9 +387,10 @@ export interface UseQuizHandle {
   readonly passingScore: number;
   readonly attemptCount: number;
   /**
-   * True while the results shown came from saved progress rather than this
-   * mount. Answers aren't persisted, so per-question results and review are
-   * unavailable until the learner retries.
+   * True while the results shown came from saved progress without every
+   * question's answer: the save had no room for them, or a question has no
+   * `restore`. Per-question results and review are unavailable until the
+   * learner retries.
    */
   readonly restored: boolean;
   /** `pageConfig.quiz.feedbackMode`, defaulting to `'review'`. */
@@ -429,7 +454,8 @@ export function useQuiz(
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
     report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
-    onComplete: (score) => progress.quizCompleted(pageIndex, score),
+    onComplete: (score, responses) =>
+      progress.quizCompleted(pageIndex, score, responses),
     notify: (name, detail) => {
       opts
         .element?.()

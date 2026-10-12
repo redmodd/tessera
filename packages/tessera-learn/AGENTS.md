@@ -396,13 +396,13 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 ### `pageConfig.quiz` fields
 
-| Field           | Type                                 | Default    | Description                                                                                                                                                                                        |
-| --------------- | ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                     |
-| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                        |
-| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                                 |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                                  |
-| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. Answers aren't persisted, so retrying a result restored from saved progress always resets everything |
+| Field           | Type                                 | Default    | Description                                                                                                                                                                                     |
+| --------------- | ------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                  |
+| `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                     |
+| `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions; the recorded score is the best attempt                                              |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                               |
+| `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. A result restored without its answers (see [`restored`](docs/hooks.md#usequiz)) resets everything |
 
 ### Per-question weighting
 
@@ -443,7 +443,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice. `MultipleChoice` and `Matching` check the answer as soon as it is complete; `FillInTheBlank` and `Sorting` show a Check button. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs. The retry count and the full-score lock reset when the learner leaves the page; a revisit can resubmit and replace the saved score:
+All four types work outside `<Quiz>` for inline practice. `MultipleChoice` and `Matching` check the answer as soon as it is complete; `FillInTheBlank` and `Sorting` show a Check button. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />

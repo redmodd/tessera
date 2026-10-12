@@ -203,7 +203,7 @@ test.describe('Quiz — Graded Assessment', () => {
     ).toBeVisible();
   });
 
-  test('a submitted quiz comes back as results, keeping the best score', async ({
+  test('a submitted quiz comes back as results with its answers to review', async ({
     page,
   }) => {
     await completeGradedQuiz(page);
@@ -218,18 +218,48 @@ test.describe('Quiz — Graded Assessment', () => {
 
     await expect(page.locator('.tessera-quiz-results')).toBeVisible();
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
+    await expect(page.locator('.tessera-quiz-results-detail')).toHaveText(
+      'You answered 3 of 3 questions correctly.',
+    );
 
-    // A weaker retry must not lower the recorded score.
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
+    await page.getByRole('button', { name: 'Review Answers' }).click();
+    await expect(active.getByRole('radio', { name: '4' })).toBeChecked();
+    await primaryBtn(page).click();
+    await expect(active.locator('input[type="text"]')).toHaveValue('blue');
+    await primaryBtn(page).click();
+    await expect(
+      active.locator('.tessera-matching-item.left.correct'),
+    ).toHaveCount(3);
+  });
+
+  test('an incorrect-only retry after a reload keeps the correct answers locked', async ({
+    page,
+  }) => {
+    await completeGradedQuiz(page, { mc: 0 });
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText(
+      '66.67%',
+    );
+
+    await page.reload();
+    await waitForTesseraContent(page);
     await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
-    await completeGradedQuiz(page, {
-      mc: 0,
-      fill: 'wrong',
-      matchMap: { '1': 'Three', '2': 'One', '3': 'Two' },
-    });
-    const stored = await readSavedState(page);
-    const units = Object.values<{ s: number; a?: number }>(stored.g);
-    expect(Math.max(...units.map((u) => u.s))).toBe(100);
-    expect(Math.max(...units.map((u) => u.a ?? 1))).toBe(2);
+
+    const progress = page.locator('.tessera-quiz-progress-desktop').first();
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
+    await expect(progress).toContainText('Question 1 of 3');
+    await answerMultipleChoice(page, 1);
+    await checkThenContinue(page, false);
+
+    await expect(progress).toContainText('Question 2 of 3');
+    await expect(active.locator('.tessera-quiz-locked-banner')).toBeVisible();
+    await expect(active.locator('input[type="text"]')).toHaveValue('blue');
+    await primaryBtn(page).click();
+
+    await expect(progress).toContainText('Question 3 of 3');
+    await expect(active.locator('.tessera-quiz-locked-banner')).toBeVisible();
+    await page.locator('.tessera-quiz-btn-submit').click();
+    await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
   });
 });
 
@@ -419,5 +449,15 @@ test.describe('Quiz — Practice', () => {
     await waitForTesseraContent(page);
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
     await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
+
+    // A weaker retry of the restored result must not lower the record either.
+    await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+    await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
+    await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
+    const units = Object.values<{ s: number; a?: number }>(
+      (await readSavedState(page)).g,
+    );
+    expect(Math.max(...units.map((u) => u.s))).toBe(100);
+    expect(Math.max(...units.map((u) => u.a ?? 1))).toBe(3);
   });
 });

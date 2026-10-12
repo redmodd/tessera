@@ -1,6 +1,10 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { normalizeWeight, weightedScore } from './progress.svelte.js';
-import type { Interaction } from './interaction.js';
+import {
+  restoreResponse,
+  type Interaction,
+  type InteractionResponse,
+} from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type {
   UseQuizHandle,
@@ -28,16 +32,21 @@ export interface QuizEngineDeps {
     interaction: Interaction,
     correct: boolean | null,
   ) => void;
-  /** Records the submitted score against the current page's progress. */
-  onComplete: (score: number) => void;
+  /** Records the submitted score and responses against the current page's progress. */
+  onComplete: (score: number, responses: Map<string, unknown>) => void;
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
-   * Saved attempt count and score for this quiz page. With attempts > 0 the
-   * engine starts in the results phase; answers aren't persisted, so it cannot
-   * review them — see {@link QuizEngine.restored}.
+   * Saved attempt count, best score and that attempt's answers for this quiz
+   * page. With attempts > 0 the engine starts in the results phase, and can
+   * review them once every question has taken its answer back — see
+   * {@link QuizEngine.restored}.
    */
-  restore?: { attempts: number; score: number };
+  restore?: {
+    attempts: number;
+    score: number;
+    answers?: ReadonlyMap<string, unknown>;
+  };
 }
 
 interface InternalQuestion {
@@ -47,6 +56,7 @@ interface InternalQuestion {
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
+  restore?: (response: InteractionResponse) => unknown;
   render: unknown;
 }
 
@@ -69,7 +79,7 @@ export class QuizEngine implements UseQuizHandle {
   #score = $state(0);
   #bestScore = $state(0);
   #attemptCount = $state(0);
-  #restored = $state(false);
+  #fromSave = $state(false);
   #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
   #feedbackShown = new SvelteSet<number>();
   #lockedCorrect = new SvelteSet<number>();
@@ -86,7 +96,8 @@ export class QuizEngine implements UseQuizHandle {
       this.#score = deps.restore.score;
       this.#bestScore = deps.restore.score;
       this.#submitted = true;
-      this.#restored = true;
+      this.#fromSave = true;
+      this.#submitCalled = true;
     }
   }
 
@@ -147,7 +158,13 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   get restored(): boolean {
-    return this.#restored;
+    return (
+      this.#fromSave &&
+      !(
+        this.#totalQuestions > 0 &&
+        this.#internalQuestions.every((_, i) => this.#answers.has(i))
+      )
+    );
   }
 
   get feedbackMode(): NonNullable<QuizConfig['feedbackMode']> {
@@ -197,10 +214,16 @@ export class QuizEngine implements UseQuizHandle {
       reset: api.reset,
       complete: api.complete,
       interaction: api.interaction,
+      restore: api.restore,
       render: undefined,
     };
     this.#internalQuestions.push(internal);
-    const handle = this.#makeQuestionHandle(this.#internalQuestions.length - 1);
+    const index = this.#internalQuestions.length - 1;
+    const restored = this.#fromSave
+      ? restoreResponse(internal, this.#deps.restore?.answers?.get(id))
+      : undefined;
+    if (restored) this.#answers.set(index, restored.answer);
+    const handle = this.#makeQuestionHandle(index);
     this.#questionHandles = [...this.#questionHandles, handle];
     return handle;
   }
@@ -260,19 +283,24 @@ export class QuizEngine implements UseQuizHandle {
     this.#score = score;
     this.#bestScore = Math.max(this.#bestScore, score);
     this.#submitted = true;
-    this.#restored = false;
+    this.#fromSave = false;
     this.#attemptCount++;
 
-    this.#deps.onComplete(score);
+    const responses = new Map<string, unknown>();
+    for (const q of this.#internalQuestions) {
+      const response = q.interaction?.()?.response;
+      if (response !== undefined) responses.set(q.id, response);
+    }
+    this.#deps.onComplete(score, responses);
     this.#deps.notify?.('tessera-quiz-complete', { score });
   }
 
   startReview(): void {
     if (!this.#submitted) return;
-    if (this.#restored) {
+    if (this.restored) {
       console.warn(
         '[tessera] useQuiz: startReview() did nothing because these results were ' +
-          'restored from a previous session, which does not persist answers. ' +
+          'restored from saved progress without their answers. ' +
           'Hide your Review control when handle.restored is true.',
       );
       return;
@@ -307,7 +335,7 @@ export class QuizEngine implements UseQuizHandle {
     }
     this.#feedbackShown.clear();
     this.#submitted = false;
-    this.#restored = false;
+    this.#fromSave = false;
     this.#reviewing = false;
     this.#score = 0;
   }
@@ -343,7 +371,7 @@ export class QuizEngine implements UseQuizHandle {
         return engine.#submitted;
       },
       get correct() {
-        if (engine.#restored) return null;
+        if (engine.restored) return null;
         if (!engine.#submitted && !engine.feedbackVisible(i)) return null;
         return engine.#internalQuestions[i].checkAnswer();
       },

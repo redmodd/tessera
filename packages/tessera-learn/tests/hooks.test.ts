@@ -256,6 +256,100 @@ describe('useQuestion — standalone mode', () => {
       score: 100,
       weight: 5,
       graded: true,
+      retries: 0,
+    });
+  });
+
+  describe('returning to the page', () => {
+    const tf = (response: boolean): Interaction => ({
+      type: 'true-false',
+      response,
+      correct: true,
+    });
+
+    function gradedPage() {
+      return provideNavCtx({
+        manifest: createManifest(2, {}, { 1: { graded: true } }),
+        pageIndex: 1,
+      });
+    }
+
+    it('keeps a full score locked, so a later wrong answer cannot replace it', () => {
+      const { progress } = gradedPage();
+      useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => tf(true),
+      }).submit();
+
+      const revisit = useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => tf(false),
+      });
+      revisit.retry();
+      revisit.submit();
+
+      expect(revisit.submitted).toBe(true);
+      expect(revisit.isLockedCorrect).toBe(true);
+      expect(revisit.canRetry).toBe(false);
+      expect(progress.pageScore(1)).toBe(100);
+    });
+
+    it('counts retries across visits against maxRetries', () => {
+      const { progress } = gradedPage();
+      const opts = {
+        id: 'q1',
+        graded: true,
+        maxRetries: 1,
+        response: () => tf(false),
+      };
+      const first = useQuestion(opts);
+      first.submit();
+      first.retry();
+      first.submit();
+      expect(first.canRetry).toBe(false);
+
+      const revisit = useQuestion(opts);
+
+      expect(revisit.retryCount).toBe(1);
+      expect(revisit.submitted).toBe(true);
+      expect(revisit.canRetry).toBe(false);
+      expect(progress.gradedUnits.get(1)?.questions?.get('q1')?.retries).toBe(
+        1,
+      );
+    });
+
+    it('hands the saved response back to the widget', () => {
+      gradedPage();
+      useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => ({
+          type: 'choice',
+          response: ['2'],
+          correct: ['1'],
+        }),
+      }).submit();
+
+      let selected: string[] = [];
+      const revisit = useQuestion({
+        id: 'q1',
+        graded: true,
+        response: () => ({
+          type: 'choice',
+          response: selected,
+          correct: ['1'],
+        }),
+        restore: (response) => {
+          selected = response as string[];
+        },
+      });
+
+      expect(selected).toEqual(['2']);
+      expect(revisit.answer).toEqual(['2']);
+      expect(revisit.correct).toBe(false);
+      expect(revisit.canRetry).toBe(true);
     });
   });
 

@@ -161,6 +161,7 @@
         pageContext.quizState = {
           attempts: progress.quizAttempts(index),
           score: progress.quizScore(index) ?? 0,
+          answers: progress.quizAnswers(index),
         };
         PageComponent = mod.default;
         pageLoading = false;
@@ -185,7 +186,7 @@
   }
 
   // React to page index changes. Held until persistence is restored: a quiz
-  // seeds its attempt count from restored progress at mount.
+  // and a standalone question seed themselves from restored progress at mount.
   $effect(() => {
     const index = nav.currentPageIndex;
     const _retry = retryKey;

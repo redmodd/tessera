@@ -51,6 +51,35 @@ export type Interaction =
     }
   | { type: 'other'; response: string; correct?: string };
 
+export type InteractionResponse = Interaction['response'];
+
+/**
+ * Put a saved response back into its widget and return the answer the handle
+ * then holds: what `restore` returned, else the response. Undefined when there
+ * is no response, the widget takes none, or its `restore` throws; the question
+ * then shows no answer.
+ */
+export function restoreResponse(
+  question: {
+    id: string;
+    restore?: (response: InteractionResponse) => unknown;
+  },
+  response: unknown,
+): { answer: unknown } | undefined {
+  if (response === undefined || !question.restore) return undefined;
+  try {
+    const answer = question.restore(response as InteractionResponse);
+    return { answer: answer ?? response };
+  } catch (err) {
+    console.error(
+      `[tessera] useQuestion("${question.id}"): restore() threw, so the saved answer is not shown. ` +
+        'It runs inside useQuestion(), so declare the state it writes above that call.',
+      err,
+    );
+    return undefined;
+  }
+}
+
 /**
  * Decide whether a learner response is correct. Returns:
  *  - `true`  — response matches the correct pattern

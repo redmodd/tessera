@@ -52,6 +52,10 @@
     reset: () => {
       selectedOption = null;
     },
+    restore: (response) => {
+      selectedOption = Number(response[0]);
+      return selectedOption;
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture once.
@@ -127,9 +131,9 @@
   </div>
 
   {#if q.feedbackVisible}
-    {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
+    {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
       <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-    {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
+    {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
       <div class="tessera-mc-overall-feedback incorrect">
         {incorrectFeedback}
       </div>

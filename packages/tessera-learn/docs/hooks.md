@@ -27,7 +27,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null on a restored result (see `useQuiz().restored`)
+  readonly correct: boolean | null; // null while answering, and null in a quiz restored without its answers (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -119,21 +119,53 @@ function useQuestion(opts: {
   response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
-  maxRetries?: number; // standalone retry cap per mount (default Infinity); ignored inside a quiz
+  maxRetries?: number; // standalone retry cap, counted across visits to the page (default Infinity); ignored inside a quiz
   complete?: () => boolean; // is the answer fully specified? default true
   reset?: () => void;
+  restore?: (response: Interaction['response']) => unknown; // put a saved answer back; see "Returning to a question"
 }): Question & {
   submit(): void; // standalone: own check. quiz: no-op
   reset(): void; // clear the answer; after a standalone submit, same as retry()
   retry(): void; // standalone: no-op unless canRetry. Always a no-op inside a quiz
-  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit. A remount starts over.
-  readonly retryCount: number;
+  readonly canRetry: boolean; // standalone: true after a submit that scored under 100, until maxRetries is hit
+  readonly retryCount: number; // standalone: retries spent, counted across visits to the page
   readonly mode: 'standalone' | 'quiz';
   setRender(render: unknown): void;
 };
 ```
 
 See [Recipe 2b](recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) for a full widget and [Recipe 3](recipes.md#recipe-3-graded-standalone-question) for a graded standalone.
+
+### Returning to a question
+
+A submitted answer is saved with the page's progress and comes back when the learner returns to the page, in the same session or a later one.
+
+| Mode       | What comes back                                                                                                                                                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standalone | The question mounts `submitted` with its score and `retryCount`. A score of 100 stays locked (`isLockedCorrect`, no `canRetry`); a lower one offers a retry until `maxRetries` is spent |
+| Quiz       | The results, with the best attempt's answers ready to review                                                                                                                            |
+
+Pass `restore` to show the answer again. Rules:
+
+- It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
+- Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
+- A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
+
+```js
+let selected = $state(null);
+
+const q = useQuestion({
+  id,
+  response: () => ({
+    type: 'choice',
+    response: selected !== null ? [String(selected)] : [],
+    correct: [String(correct)],
+  }),
+  restore: ([choice]) => (selected = Number(choice)),
+});
+```
+
+An answer does not come back when the widget has no `restore`, or when the save had no room for it (see [the suspend data limits](export.md)). The score, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
 
 ## `useQuiz`
 
@@ -154,7 +186,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly bestScore: number; // highest across attempts; this is what the LMS gets
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  readonly restored: boolean; // results came from saved progress, not this session
+  readonly restored: boolean; // results came from saved progress without their answers
   readonly feedbackMode: 'review' | 'immediate' | 'never'; // pageConfig.quiz value, default 'review'
   readonly maxAttempts: number; // pageConfig.quiz value, default Infinity
   submit(): void;
@@ -166,7 +198,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
 ```
 
 - **Show `bestScore` whenever `bestScore > score`.** `score` is the latest attempt; the LMS and the navigation gate use `bestScore`.
-- **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the score and attempt count, but answers aren't persisted: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
+- **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the best score, the attempt count and that attempt's answers, ready to review. `restored` is `true` when the answers did not come back (see [Returning to a question](#returning-to-a-question)): every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 - **Read `passingScore` from this hook**, not from `course.config.js`: an LMS mastery score overrides the config at launch.
 
 ## `useNavigation`

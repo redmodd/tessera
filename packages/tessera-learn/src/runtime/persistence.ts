@@ -8,6 +8,15 @@ export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
+/** A standalone question's result in `GradedUnitState.q`, written without its trailing defaults. */
+export type SavedQuestion = [
+  score: number,
+  weight: number,
+  graded: 0 | 1,
+  retries?: number,
+  answer?: unknown,
+];
+
 /** One page's entry in `SavedState.g`. */
 export interface GradedUnitState {
   /** Best quiz score across attempts */
@@ -16,9 +25,12 @@ export interface GradedUnitState {
   a?: number;
   /**
    * Standalone question results — questionId → score 0-100 for a graded
-   * question of weight 1, else [score, weight, graded].
+   * question of weight 1 with no retries or answer saved, else a
+   * {@link SavedQuestion}.
    */
-  q?: Record<string, number | [number, number, 0 | 1]>;
+  q?: Record<string, number | SavedQuestion>;
+  /** Quiz answers from the best attempt, questionId → response, omitted when they don't fit */
+  r?: Record<string, unknown>;
   /** Graded standalone questions on the page not yet answered, omitted when none */
   w?: string[];
 }

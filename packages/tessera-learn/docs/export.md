@@ -53,6 +53,7 @@ Author-facing consequences:
 
 - **A failing learner who cannot complete stays `incomplete` on SCORM 1.2**, with the score: under `completion.mode: "quiz"` they never complete, and in any mode a failed `gatesProgress` quiz locks the pages after it. An LMS that rescores against a mastery score on exit records `failed` itself.
 - **Keep persisted state small under SCORM 1.2**: it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
+- **Saved question answers give way first.** When a save would exceed the `suspend_data` limit, answers are left out until it fits. Scores, attempts, retries and locks still restore; the questions come back without the answer shown.
 - **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5.
 - **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel, never a silent degradation.

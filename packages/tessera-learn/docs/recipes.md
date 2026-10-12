@@ -156,6 +156,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     reset: () => {
       selected = null;
     },
+    restore: ([choice]) => (selected = Number(choice)), // shows the saved answer on a return visit
   });
 
   onMount(() => q.setRender(view)); // no-op in standalone mode

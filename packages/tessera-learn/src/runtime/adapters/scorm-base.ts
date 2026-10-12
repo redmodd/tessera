@@ -58,6 +58,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
   protected readonly errorReporter: LMSErrorReporter;
+  override readonly stateLimit: number;
   #terminated = false;
   #suspendOverflowWarned = false;
   #interactionCount = 0;
@@ -66,6 +67,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     super();
     this.api = api;
     this.dialect = dialect;
+    this.stateLimit = dialect.profile.suspendDataLimit;
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),

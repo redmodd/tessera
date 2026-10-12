@@ -55,6 +55,10 @@
     reset: () => {
       inputValue = '';
     },
+    restore: (response) => {
+      inputValue = String(response);
+      return inputValue;
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture once.

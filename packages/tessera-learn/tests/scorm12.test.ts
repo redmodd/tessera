@@ -194,6 +194,10 @@ describe('SCORM12Adapter', () => {
   });
 
   describe('suspend_data size guard', () => {
+    it('tells the session how much suspend_data holds', () => {
+      expect(adapter.stateLimit).toBe(4096);
+    });
+
     it('warns once when serialized state exceeds 4096 chars', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
