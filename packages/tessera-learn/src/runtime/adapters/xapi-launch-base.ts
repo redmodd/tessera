@@ -127,7 +127,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected scaled: number | null = null;
   protected sessionSeconds = 0;
   #totalSeconds = 0;
-  #stateLoad: 'pending' | 'read' | 'failed' = 'pending';
+  #stateRead = false;
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
@@ -234,7 +234,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   saveState(state: SavedState): void {
     // Writing would replace state we never read with a blank-slate session.
     // Grades travel as statements, so this costs the bookmark only.
-    if (this.#stateLoad !== 'read') return;
+    if (!this.#stateRead) return;
     this.state = state;
     if (!this.publisher) return;
     void this.publisher.chainTask(async () => {
@@ -276,7 +276,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * duration, so an LMS that shows the latest one keeps the total it has.
    */
   protected get totalSeconds(): number | null {
-    return this.#stateLoad === 'read' ? this.#totalSeconds : null;
+    return this.#stateRead ? this.#totalSeconds : null;
   }
 
   /**
@@ -550,7 +550,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         } else {
           this.state = null;
         }
-        this.#stateLoad = 'read';
+        this.#stateRead = true;
         return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
@@ -559,7 +559,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         request.abort();
       }
     }
-    this.#stateLoad = 'failed';
     this.state = null;
     if (this.#terminated) return;
     console.warn(
