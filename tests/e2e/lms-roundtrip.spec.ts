@@ -95,14 +95,6 @@ async function expectAnHourOnVerdictAndCompletion(
   }
 }
 
-async function terminatedDuration(
-  page: Page,
-  statements: any[],
-): Promise<string> {
-  await exitCourse(page);
-  return (await waitForStatement(statements, 'terminated')).result.duration;
-}
-
 // ---------------------------------------------------------------------------
 // SCORM 1.2
 // ---------------------------------------------------------------------------
@@ -684,7 +676,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await waitForTesseraContent(resumed);
 
     await expectAnHourOnVerdictAndCompletion(resumed, statements);
-    expect(await terminatedDuration(resumed, statements)).not.toContain('H');
+    await exitCourse(resumed);
+    const terminated = await waitForStatement(statements, 'terminated');
+    expect(terminated.result.duration).not.toContain('H');
   });
 
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
@@ -860,7 +854,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await waitForTesseraContent(resumed);
 
     await expectAnHourOnVerdictAndCompletion(resumed, statements);
-    expect(await terminatedDuration(resumed, statements)).toMatch(/^PT1H/);
+    await exitCourse(resumed);
+    const terminated = await waitForStatement(statements, 'terminated');
+    expect(terminated.result.duration).toMatch(/^PT1H/);
   });
 
   test('a failed resume GET still launches the course and never overwrites state', async ({
