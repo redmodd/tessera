@@ -184,10 +184,10 @@ export class CourseSession {
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
-    this.#reportDuration();
-    adapter.setCompletionStatus(progress.reportedCompletionStatus);
-    adapter.setSuccessStatus(progress.successStatus);
-    adapter.commit();
+    this.#report(() => {
+      adapter.setCompletionStatus(progress.reportedCompletionStatus);
+      adapter.setSuccessStatus(progress.successStatus);
+    });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -337,13 +337,21 @@ export class CourseSession {
     });
   }
 
-  // First in every report: the xAPI adapters build a statement, duration
-  // included, as soon as a status is set.
   #reportDuration(): void {
     this.#adapter.setDuration(
       this.#duration.sessionSeconds,
       this.#duration.totalSeconds,
     );
+  }
+
+  // Duration first: the xAPI adapters build a statement, duration included,
+  // as soon as a status is set.
+  #report(setStatus: () => void): void {
+    untrack(() => {
+      this.#reportDuration();
+      setStatus();
+      this.#adapter.commit();
+    });
   }
 
   #reportStatus(): void {
@@ -358,14 +366,12 @@ export class CourseSession {
       if (score === this.#prevReportedScore) return;
       this.#prevReportedScore = score;
 
-      untrack(() => {
-        this.#reportDuration();
+      this.#report(() => {
         adapter.setScore(score);
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
         this.#prevSuccessStatus = progress.successStatus;
         adapter.setSuccessStatus(this.#prevSuccessStatus);
-        adapter.commit();
       });
     });
 
@@ -374,11 +380,7 @@ export class CourseSession {
       if (!this.#persistenceReady) return;
       if (status === this.#prevCompletionStatus) return;
       this.#prevCompletionStatus = status;
-      untrack(() => {
-        this.#reportDuration();
-        adapter.setCompletionStatus(status);
-        adapter.commit();
-      });
+      this.#report(() => adapter.setCompletionStatus(status));
     });
 
     $effect(() => {
@@ -386,11 +388,7 @@ export class CourseSession {
       if (!this.#persistenceReady) return;
       if (status === this.#prevSuccessStatus) return;
       this.#prevSuccessStatus = status;
-      untrack(() => {
-        this.#reportDuration();
-        adapter.setSuccessStatus(status);
-        adapter.commit();
-      });
+      this.#report(() => adapter.setSuccessStatus(status));
     });
   }
 
