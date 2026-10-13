@@ -35,7 +35,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); persists partial progress so an interrupted session resumes. Check stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. Check stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -44,7 +44,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 </script>
 
 <script>
-  import { useQuestion, usePersistence } from 'tessera-learn';
+  import { useQuestion } from 'tessera-learn';
 
   const CORRECT = [
     ['Hydrogen', 'H'],
@@ -52,9 +52,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
     ['Lithium', 'Li'],
   ];
 
-  const store = usePersistence('draw-pairs:v1');
-  let pairs = $state(store.get() ?? []);
-  $effect(() => store.set(pairs));
+  let pairs = $state([]);
 
   const q = useQuestion({
     id: 'drawPairs1',
@@ -62,6 +60,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
     reset: () => {
       pairs = [];
     },
+    restore: (saved) => (pairs = saved),
   });
 
   function connect(l, r) {
@@ -156,6 +155,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     reset: () => {
       selected = null;
     },
+    restore: ([choice]) => (selected = Number(choice)), // shows the saved answer on a return visit
   });
 
   onMount(() => q.setRender(view)); // no-op in standalone mode
@@ -197,6 +197,8 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
   {@render view()}
   {#if !q.submitted}
     <button disabled={selected === null} onclick={q.submit}>Check</button>
+  {:else if q.canRetry}
+    <button onclick={q.retry}>Try again</button>
   {/if}
 {/if}
 ```
@@ -250,8 +252,11 @@ const q = useQuestion({
   reset: () => {
     answer = '';
   },
+  restore: (saved) => (answer = saved), // shows the saved answer on a return visit
 });
 ```
+
+Render a Try again button while `q.canRetry`: a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

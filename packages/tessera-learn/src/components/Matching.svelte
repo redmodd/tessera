@@ -2,7 +2,12 @@
   import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId, shuffle } from './util.js';
+  import {
+    QUESTION_ID_PREFIX,
+    questionId,
+    savedIndex,
+    shuffle,
+  } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -78,6 +83,16 @@
       correct: pairs.map((_, i) => [String(i), String(i)]),
     }),
     reset: resetState,
+    restore: (response) => {
+      const saved = response.map((pair) =>
+        pair.map((index) => savedIndex(index, pairs)),
+      );
+      for (const [left, right] of saved) {
+        matches.set(left, right);
+        rightToLeft.set(right, left);
+      }
+      return new Map(matches);
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture it once so

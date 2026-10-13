@@ -2,7 +2,12 @@
   import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId, shuffle } from './util.js';
+  import {
+    QUESTION_ID_PREFIX,
+    questionId,
+    savedIndex,
+    shuffle,
+  } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -41,14 +46,14 @@
   let cardSelected = $state(false); // current card selected via tap/click
 
   function initQueue() {
-    queue = shuffle(items.map((_, i) => i));
-    placements.clear();
+    queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
     cardSelected = false;
     dragOver = null;
     isDragging = false;
   }
 
   function resetState() {
+    placements.clear();
     initQueue();
   }
 
@@ -72,6 +77,14 @@
       correct: items.map((_, i) => [String(i), String(correct[i])]),
     }),
     reset: resetState,
+    restore: (response) => {
+      const saved = response.map(([item, target]) => [
+        savedIndex(item, items),
+        savedIndex(target, targets),
+      ]);
+      for (const [item, target] of saved) placements.set(item, target);
+      return new Map(placements);
+    },
   });
 
   // `q.mode` is fixed for the lifetime of the widget; capture it once so

@@ -34,6 +34,7 @@ export interface AdapterContext {
 export interface QuizPageState {
   attempts: number;
   score: number;
+  responses?: ReadonlyMap<string, unknown>;
 }
 
 export interface PageContext {

@@ -120,6 +120,41 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('warns in dev about a widget with no restore, standalone or in a quiz', () => {
+    provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const response = (): Interaction => ({
+      type: 'true-false',
+      response: true,
+    });
+
+    useQuestion({ id: 'kept', response, restore: () => {} });
+    expect(warn).not.toHaveBeenCalled();
+
+    useQuestion({ id: 'bare', response });
+    provideQuizCtx();
+    useQuestion({ id: 'in-quiz', response });
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toContain('useQuestion("bare"): no restore');
+    expect(warn.mock.calls[1][0]).toContain(
+      'useQuestion("in-quiz"): no restore',
+    );
+  });
+
+  it('says nothing in production about a widget with no restore', () => {
+    vi.stubEnv('DEV', false);
+    provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    useQuestion({
+      id: 'bare',
+      response: () => ({ type: 'true-false', response: true }),
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('throws in dev when a graded question registers on an undeclared page', () => {
     provideNavCtx({ manifest: createManifest(2) });
 
@@ -256,7 +291,45 @@ describe('useQuestion — standalone mode', () => {
       score: 100,
       weight: 5,
       graded: true,
+      retries: 0,
+      correct: true,
     });
+  });
+
+  it('hands the saved response back to the widget when the learner returns to the page', () => {
+    provideNavCtx({
+      manifest: createManifest(2, {}, { 1: { graded: true } }),
+      pageIndex: 1,
+    });
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({
+        type: 'choice',
+        response: ['2'],
+        correct: ['1'],
+      }),
+      restore: () => {},
+    }).submit();
+
+    let selected: string[] = [];
+    const revisit = useQuestion({
+      id: 'q1',
+      graded: true,
+      response: () => ({
+        type: 'choice',
+        response: selected,
+        correct: ['1'],
+      }),
+      restore: ([choice]) => {
+        selected = [choice];
+      },
+    });
+
+    expect(selected).toEqual(['2']);
+    expect(revisit.answer).toEqual(['2']);
+    expect(revisit.correct).toBe(false);
+    expect(revisit.canRetry).toBe(true);
   });
 
   it('mode is "standalone" outside a Quiz', () => {
@@ -284,10 +357,12 @@ describe('useQuestion — inside a <Quiz>', () => {
   it('registers once and hands back the quiz registration', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
+    const restore = () => {};
 
     const q = useQuestion({
       id: 'q1',
       response: () => ({ type: 'true-false', response: true, correct: true }),
+      restore,
     });
 
     expect(quiz.registerQuestion).toHaveBeenCalledTimes(1);
@@ -296,6 +371,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(arg.id).toBe('q1');
     expect(typeof arg.checkAnswer).toBe('function');
     expect(typeof arg.interaction).toBe('function');
+    expect(arg.restore).toBe(restore);
   });
 
   it('forwards each widget through to a distinct quiz registration', () => {
@@ -399,6 +475,7 @@ describe('useQuestion — inside a <Quiz>', () => {
       graded: true,
       maxRetries: 3,
       response: () => ({ type: 'true-false', response: true }),
+      restore: () => {},
     });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');

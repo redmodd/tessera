@@ -8,6 +8,37 @@ export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
+/**
+ * The JSON a size-limited adapter stores: ASCII, every other character a `\u`
+ * escape. An LMS can accept non-ASCII text at its limit and store less of it
+ * with no error: SCORM Cloud keeps 3072 bytes of a 4096-character save.
+ */
+export function savedJson(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[\u0080-\uffff]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
+}
+
+/** Length of {@link savedJson}, the unit an adapter's `stateLimit` is counted in. */
+export function jsonSize(value: unknown): number {
+  return savedJson(value).length;
+}
+
+/** A standalone question's result in `GradedUnitState.q`, written without its trailing defaults. */
+export type SavedQuestion = [
+  score: number,
+  weight: number,
+  /**
+   * 1 when graded, plus 2 when the response had no `correct` to judge it by,
+   * or 4 when the verdict is not the one the score gives (correct under 100,
+   * incorrect at 100), which takes a custom `score()`.
+   */
+  flags: number,
+  retries?: number,
+  response?: unknown,
+];
+
 /** One page's entry in `SavedState.g`. */
 export interface GradedUnitState {
   /** Best quiz score across attempts */
@@ -15,10 +46,13 @@ export interface GradedUnitState {
   /** Submitted quiz attempts, omitted when 1 */
   a?: number;
   /**
-   * Standalone question results — questionId → score 0-100 for a graded
-   * question of weight 1, else [score, weight, graded].
+   * Standalone question results: questionId → score 0-100 for a graded
+   * question of weight 1 whose score gives its verdict, with no retries or
+   * response saved, else a {@link SavedQuestion}.
    */
-  q?: Record<string, number | [number, number, 0 | 1]>;
+  q?: Record<string, number | SavedQuestion>;
+  /** Quiz responses from the best attempt, questionId → response, omitted when they don't fit */
+  r?: Record<string, unknown>;
   /** Graded standalone questions on the page not yet answered, omitted when none */
   w?: string[];
 }

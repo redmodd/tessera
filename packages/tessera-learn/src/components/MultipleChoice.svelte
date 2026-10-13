@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId } from './util.js';
+  import { QUESTION_ID_PREFIX, questionId, savedIndex } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -51,6 +51,10 @@
     }),
     reset: () => {
       selectedOption = null;
+    },
+    restore: (response) => {
+      selectedOption = savedIndex(response[0], options);
+      return selectedOption;
     },
   });
 
@@ -127,9 +131,9 @@
   </div>
 
   {#if q.feedbackVisible}
-    {#if selectedOption === correct && correctFeedback && !optionFeedback[selectedOption]}
+    {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
       <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-    {:else if selectedOption !== correct && incorrectFeedback && !optionFeedback[selectedOption]}
+    {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
       <div class="tessera-mc-overall-feedback incorrect">
         {incorrectFeedback}
       </div>

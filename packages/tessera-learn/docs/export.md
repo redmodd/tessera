@@ -46,13 +46,15 @@ The runtime translates author intent into adapter calls automatically. The autho
 | -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
 | Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
 | Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| `usePersistence` cap | ~4 KB (plan for 4096 chars)                                                              | 64000 chars                                                    | LRS-defined (typically unbounded)    |
+| Saved state cap      | ~4 KB (plan for 4096 bytes)                                                              | 64000 bytes                                                    | LRS-defined (typically unbounded)    |
 | Resume after reload  | From `cmi.suspend_data`                                                                  | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
 
 - **A failing learner who cannot complete stays `incomplete` on SCORM 1.2**, with the score: under `completion.mode: "quiz"` they never complete, and in any mode a failed `gatesProgress` quiz locks the pages after it. An LMS that rescores against a mastery score on exit records `failed` itself.
-- **Keep persisted state small under SCORM 1.2**: it shares the ~4 KB `suspend_data` budget with progress and bookmarks.
+- **Keep persisted state small under SCORM 1.2**: it shares the ~4 KB `suspend_data` budget with progress, bookmarks and saved answers. For a long or question-heavy course, export `scorm2004`, `cmi5` or `xapi` instead; validation warns when the page count alone nears the limit.
+- **Under SCORM, a saved character outside ASCII costs 6 bytes** (an emoji 12). Count typed answers and `usePersistence` text in other scripts at that rate.
+- **Saved question answers give way first.** When a save would exceed the `suspend_data` limit, answers are left out until it fits, and the console warns once. Scores, attempts, retries and locks still restore; the questions come back without the answer shown.
 - **`scoring.passingScore` is the mastery score.** An LMS-supplied mastery score overrides it at launch under SCORM 1.2, SCORM 2004 and cmi5.
 - **A package declares a pass mark** (`adlcp:masteryscore`, `minNormalizedMeasure`, cmi5 `masteryScore`) **only under `completion.mode: "quiz"` with a quiz verdict.** Anywhere else a `scoring.passingScore` you set still gates quiz pages that set `gatesProgress`, still decides the verdict, and scores are still reported, but the LMS gets no threshold of its own to judge them against.
 - A failed `adapter.init()` renders a visible "This course can't run here" panel, never a silent degradation.

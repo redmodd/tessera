@@ -8,10 +8,11 @@ import type { Manifest } from '../plugin/manifest.js';
 import type { NavigationState } from './navigation.svelte.js';
 import type { ProgressState } from './progress.svelte.js';
 import type { UserStateStore } from './contexts.js';
-import type {
-  CompletionStatus,
-  SavedState,
-  SuccessStatus,
+import {
+  jsonSize,
+  type CompletionStatus,
+  type SavedState,
+  type SuccessStatus,
 } from './persistence.js';
 import type { XAPIClient } from './xapi/client.js';
 
@@ -55,6 +56,7 @@ export class CourseSession {
   // Each usePersistence call site namespaces under its own key. Saved to SavedState.u.
   #userState = $state<Record<string, unknown>>({});
   #unsavableKeys = new Set<string>();
+  #answersTrimmedWarned = false;
 
   #persistScheduled = false;
   #persistPending = false;
@@ -273,13 +275,31 @@ export class CourseSession {
 
   #serialize(): SavedState {
     const u = this.#savableUserState();
-    return {
+    const d = this.#duration.totalSeconds;
+    const withAnswers = (budget: number): SavedState => ({
       b: this.#nav.currentPageIndex,
       f: this.#fingerprint,
-      d: this.#duration.totalSeconds,
-      ...this.#progress.toSaved(),
+      d,
+      ...this.#progress.toSaved(budget),
       ...(Object.keys(u).length > 0 ? { u } : {}),
-    };
+    });
+    const state = withAnswers(Infinity);
+    const limit = this.#adapter.stateLimit;
+    if (limit === Infinity) return state;
+    const size = jsonSize(state);
+    if (size <= limit) return state;
+    const bareSize = jsonSize(withAnswers(0));
+    // No answers to leave out: the adapter warns about the overflow itself.
+    if (bareSize === size) return state;
+    if (!this.#answersTrimmedWarned) {
+      this.#answersTrimmedWarned = true;
+      console.warn(
+        `Tessera: the saved state is over the ${limit}-byte limit, so question ` +
+          `answers are left out of it until it fits. Those questions come back ` +
+          `scored, without the answer shown.`,
+      );
+    }
+    return withAnswers(limit - bareSize);
   }
 
   // Microtask-batched: mutations within one tick collapse to one save and

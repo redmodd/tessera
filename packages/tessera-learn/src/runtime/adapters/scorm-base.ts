@@ -1,8 +1,9 @@
-import type {
-  CompletionStatus,
-  ExitMode,
-  SavedState,
-  SuccessStatus,
+import {
+  savedJson,
+  type CompletionStatus,
+  type ExitMode,
+  type SavedState,
+  type SuccessStatus,
 } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
 import { buildScormInteractionFields } from '../interaction-format.js';
@@ -58,6 +59,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   protected readonly dialect: ScormDialect<TApi>;
   protected readonly queue = new WriteQueue();
   protected readonly errorReporter: LMSErrorReporter;
+  override readonly stateLimit: number;
   #terminated = false;
   #suspendOverflowWarned = false;
   #interactionCount = 0;
@@ -66,6 +68,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     super();
     this.api = api;
     this.dialect = dialect;
+    this.stateLimit = dialect.profile.suspendDataLimit;
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
       message: (c) => this.dialect.getErrorString(this.api, c),
@@ -183,16 +186,15 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
     this.state = state;
-    const json = JSON.stringify(state);
-    const { name, suspendDataLimit } = this.dialect.profile;
-    if (!this.#suspendOverflowWarned && json.length > suspendDataLimit) {
+    const json = savedJson(state);
+    if (!this.#suspendOverflowWarned && json.length > this.stateLimit) {
       this.#suspendOverflowWarned = true;
       console.warn(
-        `Tessera: cmi.suspend_data is ${json.length} chars, over the ` +
-          `${name} cmi.suspend_data ${suspendDataLimit}-char limit. The LMS will likely ` +
+        `Tessera: cmi.suspend_data is ${json.length} bytes, over the ` +
+          `${this.dialect.profile.name} limit of ${this.stateLimit}. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +
-          `larger-limit standard (${largerSuspendDataStandards(suspendDataLimit).join('/')}).`,
+          `larger-limit standard (${largerSuspendDataStandards(this.stateLimit).join('/')}).`,
       );
     }
     this.set('cmi.suspend_data', json);

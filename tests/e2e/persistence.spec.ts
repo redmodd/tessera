@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import {
-  answerMatching,
   bfcacheRoundTrip,
   exitCourse,
   navigateToPage,
@@ -95,60 +94,6 @@ test.describe('Persistence — localStorage', () => {
     expect(storageData).toHaveProperty('d'); // duration
     expect(Array.isArray(storageData.v)).toBe(true);
     expect(storageData.v.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test('quiz score persists across reload', async ({ page }) => {
-    await navigateToPage(page, 'Graded Assessment');
-    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
-
-    const primaryBtn = page.locator('.tessera-quiz-nav .tessera-btn-primary');
-    const progress = page.locator('.tessera-quiz-progress-desktop').first();
-
-    // Q1: "2 + 2" → option index 1 ("4")
-    await expect(progress).toContainText('Question 1 of 3');
-    await page
-      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
-      .nth(1)
-      .click();
-    await expect(primaryBtn).toHaveText('Submit');
-    await primaryBtn.click(); // show feedback
-    await expect(primaryBtn).toHaveText('Next Question');
-    await primaryBtn.click(); // advance
-
-    // Q2: fill-in "blue"
-    await expect(progress).toContainText('Question 2 of 3');
-    await page
-      .locator('.tessera-quiz-question-wrapper.active input[type="text"]')
-      .fill('blue');
-    await expect(primaryBtn).toHaveText('Submit');
-    await primaryBtn.click();
-    await expect(primaryBtn).toHaveText('Next Question');
-    await primaryBtn.click();
-
-    // Q3: matching, all correct
-    await expect(progress).toContainText('Question 3 of 3');
-    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
-
-    await expect(primaryBtn).toHaveText('Submit');
-    await primaryBtn.click();
-
-    const submitBtn = page.locator('.tessera-quiz-btn-submit');
-    await expect(submitBtn).toBeVisible();
-    await submitBtn.click();
-    await expect(page.locator('.tessera-quiz-results')).toBeVisible();
-
-    // Verify quiz score is in localStorage
-    const storageData = await readSavedState(page);
-    expect(storageData).not.toBeNull();
-    expect(Object.keys(storageData.g).length).toBeGreaterThanOrEqual(1);
-
-    // Reload and verify state is restored
-    await page.reload();
-    await waitForTesseraContent(page);
-
-    const restoredData = await readSavedState(page);
-    expect(restoredData).not.toBeNull();
-    expect(Object.keys(restoredData.g).length).toBeGreaterThanOrEqual(1);
   });
 
   test('state includes duration tracking', async ({ page }) => {

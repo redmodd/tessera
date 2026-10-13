@@ -1,9 +1,15 @@
-import { isCorrect, type Interaction } from './interaction.js';
+import { isCorrect, restoreResponse, type Interaction } from './interaction.js';
 import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
+import type { StandaloneRestore, StandaloneSubmit } from './progress.svelte.js';
 
 export interface StandaloneQuestionDeps extends Pick<QuizEngineDeps, 'report'> {
-  markScore: (score: number) => void;
+  markScore: (score: number, submit: StandaloneSubmit) => void;
+  /**
+   * What this question last submitted, on this mount's page. The handle starts
+   * submitted with it; a retry clicked but not resubmitted is not part of it.
+   */
+  saved?: StandaloneRestore;
 }
 
 export class StandaloneQuestion implements UseQuestionHandle {
@@ -23,6 +29,13 @@ export class StandaloneQuestion implements UseQuestionHandle {
   constructor(opts: UseQuestionOptions, deps: StandaloneQuestionDeps) {
     this.#opts = opts;
     this.#deps = deps;
+    const { saved } = deps;
+    if (!saved) return;
+    this.#submitted = true;
+    this.#score = saved.score;
+    this.#retryCount = saved.retries;
+    this.#correct = saved.correct;
+    this.#answer = restoreResponse(opts, saved.response);
   }
 
   get id(): string {
@@ -74,6 +87,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
   };
 
   commit = (): void => {
+    // A submitted answer is already reported, in this visit or an earlier one.
+    if (this.#submitted) return;
     const response = this.#opts.response();
     if (response) this.#report(response, isCorrect(response));
   };
@@ -85,7 +100,11 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const correct = isCorrect(response);
     const score = this.#opts.score?.() ?? (correct ? 100 : 0);
 
-    this.#deps.markScore(score);
+    this.#deps.markScore(score, {
+      retries: this.#retryCount,
+      response: this.#opts.restore ? response.response : undefined,
+      correct,
+    });
     this.#report(response, correct);
 
     this.#correct = correct;
