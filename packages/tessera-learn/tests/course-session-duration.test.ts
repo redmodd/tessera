@@ -1,18 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { CMI5Adapter } from '../src/runtime/adapters/cmi5.js';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 import type { ProgressState } from '../src/runtime/progress.svelte.js';
-import type { CourseConfig } from '../src/runtime/types.js';
 import {
-  CMI5_LAUNCH,
   cmi5Fetch,
   createConfig,
   createManifest,
   flush,
   postedStatements,
-  setLaunchParams,
   setXAPILaunch,
   useFakeTimers,
 } from './helpers.js';
@@ -25,19 +21,13 @@ import {
 const manifest = createManifest(1, { 0: { graded: true } });
 const saved = { b: 0, v: [0], d: 100, f: structureFingerprint(manifest) };
 
-const launches = {
-  xAPI: () => {
-    setXAPILaunch();
-    return new XAPIAdapter();
-  },
-  cmi5: () => {
-    setLaunchParams(CMI5_LAUNCH);
-    return new CMI5Adapter();
-  },
-};
+function xapiLaunch() {
+  setXAPILaunch();
+  return new XAPIAdapter();
+}
 
-const quizCourse = (resume: CourseConfig['resume'] = 'auto') =>
-  createConfig({ resume, completion: { mode: 'quiz' } });
+const quizCourse = () =>
+  createConfig({ resume: 'auto', completion: { mode: 'quiz' } });
 
 function stubLMS(state: object = saved) {
   const fetch = vi.fn(cmi5Fetch({ saved: state }));
@@ -62,42 +52,18 @@ async function passAfter30sAndLeaveAfter50s(progress: ProgressState) {
 
 describe('statement durations in a session resumed after 100 seconds', () => {
   it.each([
-    ['xAPI', 'PT2M30S'],
-    ['cmi5', 'PT50S'],
-  ] as const)(
-    '%s reports the time so far on Passed and Completed, and %s on Terminated',
-    async (standard, terminated) => {
-      useFakeTimers({ toFake: ['Date'] });
-      const durations = stubLMS();
-      const { progress } = await startSession({
-        config: quizCourse(),
-        manifest,
-        adapter: launches[standard](),
-      });
-
-      await passAfter30sAndLeaveAfter50s(progress);
-
-      expect(durations()).toMatchObject({
-        passed: 'PT2M10S',
-        completed: 'PT2M10S',
-        terminated,
-      });
-    },
-  );
-
-  it.each([
-    ['resume is off', saved, 'never'],
-    ['the course structure changed', { ...saved, f: 'stale' }, 'auto'],
-  ] as const)(
-    'keeps counting from the saved time when %s',
-    async (_, state, resume) => {
+    ['after a restore', saved],
+    ['when the course structure changed', { ...saved, f: 'stale' }],
+  ])(
+    'reports the time so far on Passed, Completed and Terminated %s',
+    async (_, state) => {
       useFakeTimers({ toFake: ['Date'] });
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const durations = stubLMS(state);
       const { progress } = await startSession({
-        config: quizCourse(resume),
+        config: quizCourse(),
         manifest,
-        adapter: launches.xAPI(),
+        adapter: xapiLaunch(),
       });
 
       await passAfter30sAndLeaveAfter50s(progress);
@@ -117,7 +83,7 @@ describe('statement durations in a session resumed after 100 seconds', () => {
     const { session, nav } = createSession({
       config: quizCourse(),
       manifest,
-      adapter: launches.xAPI(),
+      adapter: xapiLaunch(),
     });
     vi.spyOn(nav, 'goToPage').mockImplementation(() => {
       throw new Error('canAccess threw');

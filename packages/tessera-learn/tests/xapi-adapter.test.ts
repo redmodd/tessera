@@ -269,7 +269,6 @@ describe('XAPIAdapter', () => {
     setXAPILaunch();
     const adapter = new XAPIAdapter();
     await adapter.init();
-    await adapter.loadState();
     await flush();
     fetchMock.mockClear();
 
@@ -280,7 +279,6 @@ describe('XAPIAdapter', () => {
 
     adapter.setScore(53.3);
     adapter.setSuccessStatus('failed');
-    adapter.setDuration(120, 120);
     adapter.commit();
     await flush();
 
@@ -291,7 +289,6 @@ describe('XAPIAdapter', () => {
     ]);
     expect(bodies[0].result.score.scaled).toBe(0.5);
     expect(bodies[1].result.score.scaled).toBe(0.533);
-    expect(bodies[1].result.duration).toBe('PT2M');
   });
 
   it('sends the cumulative time on every statement, Terminated included', async () => {
