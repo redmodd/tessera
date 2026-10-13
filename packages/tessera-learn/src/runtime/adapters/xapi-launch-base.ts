@@ -83,8 +83,8 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 const EXIT_STATE_ID = 'tessera-state-exit';
 
 /** `result.duration`, left out when the seconds are unknown. */
-const durationOf = (seconds: number | null): { duration?: string } =>
-  seconds === null ? {} : { duration: formatISO8601Duration(seconds) };
+const durationOf = (seconds: number | null) =>
+  seconds === null ? undefined : { duration: formatISO8601Duration(seconds) };
 
 function linkedController(...signals: AbortSignal[]): AbortController {
   const controller = new AbortController();
@@ -232,10 +232,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   saveState(state: SavedState): void {
-    // The resume GET failed, so writing would replace state we never read with
-    // a blank-slate session. Grades travel as statements, so this costs the
-    // bookmark only.
-    if (this.#stateLoad === 'failed') return;
+    // Writing would replace state we never read with a blank-slate session.
+    // Grades travel as statements, so this costs the bookmark only.
+    if (this.#stateLoad !== 'read') return;
     this.state = state;
     if (!this.publisher) return;
     void this.publisher.chainTask(async () => {
@@ -398,12 +397,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.publisher.markUnloading();
       if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
     }
-    const seconds = this.terminatedSeconds;
     this.#finalSend = this.#report(
       'Terminated',
       this.publisher.sendFinal({
         verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-        result: seconds === null ? undefined : durationOf(seconds),
+        result: durationOf(this.terminatedSeconds),
         context: this.buildContext(),
       }),
     );

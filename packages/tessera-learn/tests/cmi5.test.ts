@@ -221,6 +221,15 @@ describe('CMI5Adapter', () => {
     expect(stateWrites()).toHaveLength(0);
   });
 
+  it('refuses to save before the saved state is read', async () => {
+    const adapter = await initAdapter();
+    mockFetch.mockClear();
+
+    adapter.saveState({ b: 0, v: [0], d: 1 });
+    await flush();
+    expect(stateWrites()).toHaveLength(0);
+  });
+
   it('still saves when the resume GET legitimately 404s', async () => {
     const adapter = await initAdapter();
     await adapter.loadState();
@@ -269,6 +278,7 @@ describe('CMI5Adapter', () => {
 
   it('saves state via PUT to State API', async () => {
     const adapter = await initAdapter();
+    await adapter.loadState();
 
     mockFetch.mockClear();
 
@@ -568,7 +578,7 @@ describe('CMI5Adapter', () => {
     await flush();
     mockFetch.mockClear();
 
-    adapter.setDuration(50, 50);
+    adapter.setDuration(50, 150);
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
     adapter.terminate();
@@ -620,6 +630,7 @@ describe('CMI5Adapter', () => {
 
   it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
     const adapter = await initAdapter();
+    await adapter.loadState();
     await flush();
 
     mockFetch.mockClear();

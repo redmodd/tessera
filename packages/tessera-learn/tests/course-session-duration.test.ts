@@ -54,7 +54,7 @@ function stubLMS(state: object = saved, resumeGet?: ResumeGet) {
     Object.fromEntries(
       postedStatements(fetch).map((s) => [
         s.verb.display['en-US'],
-        s.result?.duration,
+        s.result?.duration ?? null,
       ]),
     );
 }
@@ -147,7 +147,7 @@ describe('statement durations when the saved time was never read', () => {
   };
 
   it.each([
-    ['xAPI', {}],
+    ['xAPI', { passed: null, completed: null, terminated: null }],
     ['cmi5', { passed: 'PT30S', completed: 'PT30S', terminated: 'PT50S' }],
   ] as const)(
     '%s reports no total after a failed resume GET',
@@ -163,12 +163,12 @@ describe('statement durations when the saved time was never read', () => {
 
       await passAfter30sAndLeaveAfter50s(progress);
 
-      expect(durations()).toEqual(expected);
+      expect(durations()).toEqual({ initialized: null, ...expected });
     },
   );
 
   it.each([
-    ['xAPI', {}],
+    ['xAPI', { terminated: null }],
     ['cmi5', { terminated: 'PT5S' }],
   ] as const)(
     '%s reports no total when the learner leaves during the resume GET',
@@ -196,7 +196,7 @@ describe('statement durations when the saved time was never read', () => {
       await started;
       await flush();
 
-      expect(durations()).toEqual(expected);
+      expect(durations()).toEqual({ initialized: null, ...expected });
     },
   );
 });
