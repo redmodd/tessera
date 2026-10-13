@@ -1,5 +1,5 @@
 import {
-  savedSize,
+  savedJson,
   type CompletionStatus,
   type ExitMode,
   type SavedState,
@@ -186,11 +186,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   saveState(state: SavedState): void {
     if (!this.canWrite()) return;
     this.state = state;
-    const json = JSON.stringify(state);
-    if (!this.#suspendOverflowWarned && savedSize(json) > this.stateLimit) {
+    const json = savedJson(state);
+    if (!this.#suspendOverflowWarned && json.length > this.stateLimit) {
       this.#suspendOverflowWarned = true;
       console.warn(
-        `Tessera: cmi.suspend_data is ${savedSize(json)} bytes, over the ` +
+        `Tessera: cmi.suspend_data is ${json.length} bytes, over the ` +
           `${this.dialect.profile.name} limit of ${this.stateLimit}. The LMS will likely ` +
           `truncate it and the next resume will lose state. Reduce ` +
           `usePersistence() payloads or switch export.standard to a ` +

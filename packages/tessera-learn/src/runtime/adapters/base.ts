@@ -12,7 +12,7 @@ import type { XAPIPublisher } from '../xapi/publisher.js';
 export abstract class BaseAdapter {
   /** False only for `WebAdapter`: no LMS or launch LRS is behind it. */
   readonly connected: boolean = true;
-  /** Most `saveState` can store, in {@link savedSize} units; the session trims saved answers to fit. */
+  /** Most `saveState` can store, in {@link jsonSize} units; the session trims saved answers to fit. */
   readonly stateLimit: number = Infinity;
   protected state: SavedState | null = null;
   protected masteryScore: number | null = null;

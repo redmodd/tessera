@@ -3,7 +3,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { createConfig, createManifest, flush, stubAdapter } from './helpers.js';
 import { startSession } from './helpers/session.svelte.js';
 import type { ProgressState } from '../src/runtime/progress.svelte.js';
-import { savedSize, type SavedState } from '../src/runtime/persistence.js';
+import { savedJson, type SavedState } from '../src/runtime/persistence.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 
 const manifest = createManifest(2, {}, { 1: { graded: true } });
@@ -172,12 +172,14 @@ describe('CourseSession restore gate honours config.resume', () => {
     }
 
     it('are saved whole, unmeasured, to an adapter with no limit', async () => {
-      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+      const stringify = vi.spyOn(JSON, 'stringify');
 
       expect((await answer()).g).toEqual({
         '1': { q: { q1: [100, 1, 1, 1, essay], q2: [100, 1, 1, 0, [1]] } },
       });
-      expect(encode).not.toHaveBeenCalled();
+      expect(stringify).not.toHaveBeenCalledWith(
+        expect.objectContaining({ f: expect.any(String) }),
+      );
     });
 
     it('give way where they would overrun the limit, with one warning', async () => {
@@ -194,15 +196,21 @@ describe('CourseSession restore gate honours config.resume', () => {
       expect(JSON.stringify(saved).length).toBeLessThanOrEqual(180);
     });
 
-    it('are measured in UTF-8 bytes, which is what an LMS may count', async () => {
+    it('are measured as the escaped ASCII a limited adapter stores', async () => {
+      const response = '東'.repeat(25);
       const { saveState, progress } = await start('auto', { stateLimit: 180 });
-      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, {
-        response: '東'.repeat(40),
-      });
+      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, { response });
       await flush();
       const saved = saveState.mock.lastCall![0] as SavedState;
 
-      expect(savedSize(JSON.stringify(saved))).toBeLessThanOrEqual(180);
+      const whole = {
+        ...saved,
+        g: { '1': { q: { q1: [100, 1, 1, 0, response] } } },
+      };
+      expect(
+        new TextEncoder().encode(JSON.stringify(whole)).length,
+      ).toBeLessThan(180);
+      expect(savedJson(saved).length).toBeLessThanOrEqual(180);
       expect(saved.g).toEqual({ '1': { q: { q1: 100 } } });
     });
 

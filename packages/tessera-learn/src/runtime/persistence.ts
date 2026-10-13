@@ -8,19 +8,21 @@ export type CompletionStatus = 'incomplete' | 'complete';
 export type SuccessStatus = Verdict | 'unknown';
 export type ExitMode = 'suspend' | 'normal';
 
-const encoder = new TextEncoder();
-
 /**
- * UTF-8 size of saved JSON, the unit an adapter's `stateLimit` is counted in.
- * The SCORM limits are written in characters, but an LMS may enforce them in
- * bytes, and bytes are never the smaller count.
+ * The JSON a size-limited adapter stores: ASCII, every other character a `\u`
+ * escape. An LMS can accept non-ASCII text at its limit and store less of it
+ * with no error: SCORM Cloud keeps 3072 bytes of a 4096-character save.
  */
-export function savedSize(json: string): number {
-  return encoder.encode(json).length;
+export function savedJson(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[\u0080-\uffff]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
 }
 
+/** Length of {@link savedJson}, the unit an adapter's `stateLimit` is counted in. */
 export function jsonSize(value: unknown): number {
-  return savedSize(JSON.stringify(value));
+  return savedJson(value).length;
 }
 
 /** A standalone question's result in `GradedUnitState.q`, written without its trailing defaults. */

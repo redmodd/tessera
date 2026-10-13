@@ -183,6 +183,25 @@ describe('SCORM12Adapter', () => {
     );
   });
 
+  it('saves text outside ASCII as escapes that read back as written', async () => {
+    await adapter.init();
+    const state: SavedState = {
+      b: 0,
+      v: [0],
+      d: 0,
+      u: { t: 'Grün "ß" \\ 日本 مرحبا 😀 \ud83d' },
+    };
+    adapter.saveState(state);
+    await flush();
+    const written = vi
+      .mocked(api.LMSSetValue)
+      .mock.calls.find(([key]) => key === 'cmi.suspend_data')![1];
+
+    expect(written).toMatch(/^[\x20-\x7e]+$/);
+    expect(written).toContain('Gr\\u00fcn');
+    expect(JSON.parse(written)).toEqual(state);
+  });
+
   it('writes cmi.core.lesson_location from SavedState.b on saveState', async () => {
     await adapter.init();
     adapter.saveState({ b: 4, v: [0, 1, 2, 3, 4], d: 50 });
@@ -206,16 +225,18 @@ describe('SCORM12Adapter', () => {
       expect(warn.mock.calls[0][0]).toMatch(/SCORM 1\.2 limit of 4096/);
     });
 
-    it('counts the limit in UTF-8 bytes, as the session does', async () => {
+    it('counts the limit on the escaped save, as the session does', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await adapter.init();
       const state: SavedState = {
         b: 0,
         v: [],
         d: 0,
-        u: { t: '東'.repeat(2000) },
+        u: { t: '東'.repeat(1000) },
       };
-      expect(JSON.stringify(state).length).toBeLessThan(4096);
+      expect(
+        new TextEncoder().encode(JSON.stringify(state)).length,
+      ).toBeLessThan(4096);
       adapter.saveState(state);
       await flush();
       expect(warn).toHaveBeenCalledTimes(1);
