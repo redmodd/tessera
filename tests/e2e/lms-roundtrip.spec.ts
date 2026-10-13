@@ -286,11 +286,12 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     // Assert the adapter's written format from the call log: scorm-again
     // normalizes session_time on storage, so the snapshot is not verbatim.
     const log = await scormLog(page);
-    const sessionTimeWrite = log.find(
+    const sessionTimeWrite = log.findLast(
       (entry) =>
         entry[0] === 'LMSSetValue' && entry[1] === 'cmi.core.session_time',
     );
     expect(sessionTimeWrite?.[2]).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
+    expect(sessionTimeWrite?.[2]).not.toBe('0000:00:00.00');
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
   });
 
@@ -492,6 +493,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
     const data = await scormData(page);
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
+    expect(data['cmi.session_time']).not.toBe('PT0S');
 
     const log = await scormLog(page);
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
