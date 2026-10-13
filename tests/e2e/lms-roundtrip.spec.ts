@@ -26,6 +26,7 @@ import {
   scormLog,
   startPreview,
   waitForServer,
+  waitForStatement,
   waitForTesseraContent,
 } from './helpers.js';
 
@@ -48,11 +49,9 @@ async function expectNoStatementsAfterTerminated(
   page: Page,
   statements: any[],
 ) {
-  await expect
-    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-    .toBeTruthy();
+  const terminated = await waitForStatement(statements, 'terminated');
   await page.waitForTimeout(300);
-  expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+  expect(statements.at(-1)).toBe(terminated);
 }
 
 async function expectPagehideAbortsResumeGet(
@@ -74,9 +73,6 @@ async function expectPagehideAbortsResumeGet(
   await aborted;
 
   await expectNoStatementsAfterTerminated(page, statements);
-  expect(findStatement(statements, 'terminated').result.duration).toMatch(
-    /^PT[1-9]\d*S$/,
-  );
   expect(statePuts).toEqual([]);
 }
 
@@ -104,10 +100,7 @@ async function terminatedDuration(
   statements: any[],
 ): Promise<string> {
   await exitCourse(page);
-  await expect
-    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-    .toBeTruthy();
-  return findStatement(statements, 'terminated').result.duration;
+  return (await waitForStatement(statements, 'terminated')).result.duration;
 }
 
 // ---------------------------------------------------------------------------
@@ -619,9 +612,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await answerGradedQuiz(page);
 
-    await expect
-      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
-      .toBeDefined();
+    await waitForStatement(statements, 'scored');
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
@@ -705,7 +696,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expectNoStatementsAfterTerminated(page, statements);
   });
 
-  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
+  test('pagehide while the resume GET is pending aborts it, sends Terminated with the session time, and writes no state', async ({
     page,
   }) => {
     const statements = await installCmi5Mock(page);
@@ -729,6 +720,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       cmi5LaunchURL(BASE),
       isResumeGet,
       { statements, statePuts },
+    );
+    expect(findStatement(statements, 'terminated').result.duration).toMatch(
+      /^PT[1-9]\d*S$/,
     );
   });
 });
@@ -883,7 +877,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(statePuts).toHaveLength(0);
   });
 
-  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
+  test('pagehide while the resume GET is pending aborts it, sends Terminated without a total, and writes no state', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -896,6 +890,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       statements,
       statePuts,
     });
+    expect(findStatement(statements, 'terminated').result).toBeUndefined();
   });
 
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
@@ -962,9 +957,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
-    await expect
-      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
-      .toBeDefined();
+    await waitForStatement(statements, 'scored');
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = answeredSoFar();
@@ -990,9 +983,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     ).toBeUndefined();
 
     await exitCourse(page);
-    await expect
-      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-      .toBeTruthy();
+    await waitForStatement(statements, 'terminated');
   });
 
   test('a page restored from the back/forward cache ends the session and stops sending', async ({

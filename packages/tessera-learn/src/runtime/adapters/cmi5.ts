@@ -214,6 +214,11 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     super.terminate(unloading);
   }
 
+  /** cmi5 §9.5.4.1 requires a duration on Completed, Passed and Failed, so an unread total falls back to the session's. */
+  protected override get totalSeconds(): number {
+    return super.totalSeconds ?? this.sessionSeconds;
+  }
+
   /** cmi5 §9.5.4.1: Terminated spans Initialized to Terminated, and the LMS sums the sessions. */
   protected override get terminatedSeconds(): number {
     return this.sessionSeconds;

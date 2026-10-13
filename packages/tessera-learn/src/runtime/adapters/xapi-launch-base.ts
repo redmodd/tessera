@@ -82,6 +82,10 @@ const STATE_LOAD_TIMEOUT_MS = 10_000;
 
 const EXIT_STATE_ID = 'tessera-state-exit';
 
+/** `result.duration`, left out when the seconds are unknown. */
+const durationOf = (seconds: number | null): { duration?: string } =>
+  seconds === null ? {} : { duration: formatISO8601Duration(seconds) };
+
 function linkedController(...signals: AbortSignal[]): AbortController {
   const controller = new AbortController();
   for (const source of signals) {
@@ -122,8 +126,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   protected scaled: number | null = null;
   protected sessionSeconds = 0;
-  protected totalSeconds = 0;
-  protected stateLoadFailed = false;
+  #totalSeconds = 0;
+  #stateLoad: 'pending' | 'read' | 'failed' = 'pending';
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
@@ -231,7 +235,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     // The resume GET failed, so writing would replace state we never read with
     // a blank-slate session. Grades travel as statements, so this costs the
     // bookmark only.
-    if (this.stateLoadFailed) return;
+    if (this.#stateLoad === 'failed') return;
     this.state = state;
     if (!this.publisher) return;
     void this.publisher.chainTask(async () => {
@@ -264,7 +268,16 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override setDuration(sessionSeconds: number, totalSeconds: number): void {
     this.sessionSeconds = sessionSeconds;
-    this.totalSeconds = totalSeconds;
+    this.#totalSeconds = totalSeconds;
+  }
+
+  /**
+   * The learner's time across every session, or null when the saved state
+   * holding the earlier sessions was never read. A statement then carries no
+   * duration, so an LMS that shows the latest one keeps the total it has.
+   */
+  protected get totalSeconds(): number | null {
+    return this.#stateLoad === 'read' ? this.#totalSeconds : null;
   }
 
   /**
@@ -272,7 +285,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * `result.duration` of a Tin Can registration as its total time, and
    * Terminated is the last statement of every session.
    */
-  protected get terminatedSeconds(): number {
+  protected get terminatedSeconds(): number | null {
     return this.totalSeconds;
   }
 
@@ -285,7 +298,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
       result: {
         score: { scaled },
-        duration: formatISO8601Duration(this.totalSeconds),
+        ...durationOf(this.totalSeconds),
       },
     });
   }
@@ -313,7 +326,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.completedEmitted = true;
     const result: Record<string, unknown> = {
       completion: true,
-      duration: formatISO8601Duration(this.totalSeconds),
+      ...durationOf(this.totalSeconds),
     };
     this.dispatch('Completed', {
       verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
@@ -332,7 +345,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const verbName = status === 'passed' ? 'passed' : 'failed';
     const result: Record<string, unknown> = {
       success: status === 'passed',
-      duration: formatISO8601Duration(this.totalSeconds),
+      ...durationOf(this.totalSeconds),
     };
     const scaled = this.scoreForSuccess(status);
     if (scaled !== null) {
@@ -385,12 +398,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.publisher.markUnloading();
       if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
     }
-    const duration = formatISO8601Duration(this.terminatedSeconds);
+    const seconds = this.terminatedSeconds;
     this.#finalSend = this.#report(
       'Terminated',
       this.publisher.sendFinal({
         verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-        result: { duration },
+        result: seconds === null ? undefined : durationOf(seconds),
         context: this.buildContext(),
       }),
     );
@@ -505,7 +518,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    * an empty body, or an unparseable one is a definitive answer and returns
    * with saving enabled. Exhausting the attempts or the deadline, or
    * terminating first (which aborts the read in flight), leaves the stored
-   * state unread, so `stateLoadFailed` withholds every later write.
+   * state unread, which withholds every later write.
    */
   override async loadState(): Promise<void> {
     const deadline = AbortSignal.timeout(STATE_LOAD_TIMEOUT_MS);
@@ -539,6 +552,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         } else {
           this.state = null;
         }
+        this.#stateLoad = 'read';
         return;
       } catch (err) {
         lastDetail = err instanceof Error ? err.message : String(err);
@@ -547,7 +561,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         request.abort();
       }
     }
-    this.stateLoadFailed = true;
+    this.#stateLoad = 'failed';
     this.state = null;
     if (this.#terminated) return;
     console.warn(

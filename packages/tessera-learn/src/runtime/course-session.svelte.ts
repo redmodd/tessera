@@ -166,11 +166,12 @@ export class CourseSession {
     // document must cost the resume, not the course.
     try {
       const saved = adapter.getState();
-      if (
-        saved &&
-        shouldRestore(saved, this.#fingerprint, this.#config.resume)
-      ) {
-        this.#restore(saved);
+      if (saved) {
+        // Before the restore, so a launch that starts fresh keeps the time.
+        this.#duration.setPrevious(saved.d);
+        if (shouldRestore(saved, this.#fingerprint, this.#config.resume)) {
+          this.#restore(saved);
+        }
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);
@@ -183,6 +184,7 @@ export class CourseSession {
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
+    this.#reportDuration();
     adapter.setCompletionStatus(progress.reportedCompletionStatus);
     adapter.setSuccessStatus(progress.successStatus);
     adapter.commit();
@@ -235,7 +237,6 @@ export class CourseSession {
     if (isRecord(saved.u)) {
       this.#userState = { ...this.#userState, ...saved.u };
     }
-    this.#duration.setPrevious(saved.d);
     // After progress, so the bookmark's page is unlocked.
     this.#nav.goToPage(saved.b);
 

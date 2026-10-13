@@ -540,7 +540,7 @@ describe('CMI5Adapter', () => {
 
   it('sends the cumulative time on Scored, Completed and Passed, and the session time on Terminated', async () => {
     const adapter = await initAdapter();
-    await flush();
+    await adapter.loadState();
     mockFetch.mockClear();
 
     adapter.setDuration(50, 150);
@@ -559,6 +559,26 @@ describe('CMI5Adapter', () => {
       ['scored', 'PT2M30S'],
       ['completed', 'PT2M30S'],
       ['passed', 'PT2M30S'],
+      ['terminated', 'PT50S'],
+    ]);
+  });
+
+  it('sends the session time on every statement while the saved state is unread', async () => {
+    const adapter = await initAdapter();
+    await flush();
+    mockFetch.mockClear();
+
+    adapter.setDuration(50, 50);
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    expect(
+      sentStatements().map((s) => [s.verb.display['en-US'], s.result.duration]),
+    ).toEqual([
+      ['completed', 'PT50S'],
+      ['passed', 'PT50S'],
       ['terminated', 'PT50S'],
     ]);
   });

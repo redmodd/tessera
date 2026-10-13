@@ -15,8 +15,10 @@ export class DurationTracker {
 
   setPrevious(previousSeconds: number): void {
     this.#accumulated =
-      Number.isFinite(previousSeconds) && previousSeconds > 0
-        ? previousSeconds
+      Number.isFinite(previousSeconds) &&
+      previousSeconds >= 1 &&
+      previousSeconds <= Number.MAX_SAFE_INTEGER
+        ? Math.floor(previousSeconds)
         : 0;
   }
 

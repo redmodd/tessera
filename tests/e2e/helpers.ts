@@ -267,3 +267,13 @@ export function findStatements(statements: any[], verb: string): any[] {
 export function findStatement(statements: any[], verb: string): any {
   return findStatements(statements, verb)[0];
 }
+
+export async function waitForStatement(
+  statements: any[],
+  verb: string,
+): Promise<any> {
+  await expect
+    .poll(() => findStatement(statements, verb), { timeout: 5000 })
+    .toBeTruthy();
+  return findStatement(statements, verb);
+}

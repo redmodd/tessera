@@ -269,6 +269,7 @@ describe('XAPIAdapter', () => {
     setXAPILaunch();
     const adapter = new XAPIAdapter();
     await adapter.init();
+    await adapter.loadState();
     await flush();
     fetchMock.mockClear();
 
@@ -297,6 +298,7 @@ describe('XAPIAdapter', () => {
     setXAPILaunch();
     const adapter = new XAPIAdapter();
     await adapter.init();
+    await adapter.loadState();
     await flush();
     fetchMock.mockClear();
     fetchMock.mockImplementation(async () => respond(200, '[]'));
@@ -316,6 +318,30 @@ describe('XAPIAdapter', () => {
       ['completed', 'PT2M30S'],
       ['passed', 'PT2M30S'],
       ['terminated', 'PT2M30S'],
+    ]);
+  });
+
+  it('sends no duration while the saved state is unread', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+    fetchMock.mockImplementation(async () => respond(200, '[]'));
+
+    adapter.setDuration(50, 50);
+    adapter.setScore(80);
+    adapter.commit();
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    expect(posted().map((s) => [s.verb.display['en-US'], s.result])).toEqual([
+      ['scored', { score: { scaled: 0.8 } }],
+      ['completed', { completion: true }],
+      ['passed', { success: true, score: { scaled: 0.8 } }],
+      ['terminated', undefined],
     ]);
   });
 
