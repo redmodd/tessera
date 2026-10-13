@@ -2,7 +2,7 @@
 'tessera-learn': minor
 ---
 
-Questions keep their state when the learner returns to a page. A standalone question comes back submitted with its answer and retry count. A quiz comes back with the best attempt's answers, so its results can be reviewed. Custom widgets: pass `restore` to `useQuestion()` to show the saved answer.
+Questions keep their state when the learner returns to a page. A standalone question comes back submitted with its answer and retry count. A quiz comes back with the best attempt's answers, so its results can be reviewed. Custom widgets: pass `restore` to `useQuestion()` to show the saved answer. The dev console warns about a widget without it.
 
 **Behavior change:** returning to a page no longer starts a standalone question over. A correct answer stays locked, a wrong one stays submitted, and `maxRetries` counts across visits. A custom widget that renders no retry button needs one, shown on `canRetry` and calling `retry()`, or the learner cannot answer again.
 

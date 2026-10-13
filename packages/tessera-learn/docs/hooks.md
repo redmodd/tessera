@@ -166,7 +166,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, which also keeps it out of the save, or when the save had no room for it (see [the suspend data limits](export.md)). The score, `correct`, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
+An answer does not come back when the widget has no `restore`, which also keeps it out of the save and raises a console warning in dev, or when the save had no room for it (see [the suspend data limits](export.md)). The score, `correct`, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
 
 ## `useQuiz`
 

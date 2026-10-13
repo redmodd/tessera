@@ -149,6 +149,14 @@ export function useQuestion<I extends Interaction = Interaction>(
   const navCtx = getNavContext();
   const adapterCtx = getAdapterContext();
 
+  if (import.meta.env?.DEV && !opts.restore) {
+    console.warn(
+      `[tessera] useQuestion("${opts.id}"): no restore option, so a submitted ` +
+        'answer is not saved. The question comes back scored with no answer ' +
+        'shown, and a quiz holding it cannot be reviewed.',
+    );
+  }
+
   if (quizCtx) {
     if (import.meta.env?.DEV) {
       const ignored = (['graded', 'score', 'maxRetries'] as const).filter(

@@ -120,6 +120,41 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('warns in dev about a widget with no restore, standalone or in a quiz', () => {
+    provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const response = (): Interaction => ({
+      type: 'true-false',
+      response: true,
+    });
+
+    useQuestion({ id: 'kept', response, restore: () => {} });
+    expect(warn).not.toHaveBeenCalled();
+
+    useQuestion({ id: 'bare', response });
+    provideQuizCtx();
+    useQuestion({ id: 'in-quiz', response });
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toContain('useQuestion("bare"): no restore');
+    expect(warn.mock.calls[1][0]).toContain(
+      'useQuestion("in-quiz"): no restore',
+    );
+  });
+
+  it('says nothing in production about a widget with no restore', () => {
+    vi.stubEnv('DEV', false);
+    provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    useQuestion({
+      id: 'bare',
+      response: () => ({ type: 'true-false', response: true }),
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('throws in dev when a graded question registers on an undeclared page', () => {
     provideNavCtx({ manifest: createManifest(2) });
 
@@ -440,6 +475,7 @@ describe('useQuestion — inside a <Quiz>', () => {
       graded: true,
       maxRetries: 3,
       response: () => ({ type: 'true-false', response: true }),
+      restore: () => {},
     });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('graded, maxRetries');
