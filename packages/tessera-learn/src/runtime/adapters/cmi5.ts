@@ -214,6 +214,11 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     super.terminate(unloading);
   }
 
+  /** cmi5 §9.5.4.1: Terminated spans Initialized to Terminated, and the LMS sums the sessions. */
+  protected override get terminatedSeconds(): number {
+    return this.sessionSeconds;
+  }
+
   /** cmi5 §10.2.2 — Browse/Review forbid Completed/Passed/Failed. */
   protected override isDefinedStatementAllowed(): boolean {
     return this.#launchMode === 'Normal';

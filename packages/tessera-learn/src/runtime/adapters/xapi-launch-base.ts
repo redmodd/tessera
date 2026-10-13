@@ -121,7 +121,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
 
   protected scaled: number | null = null;
-  protected durationSeconds = 0;
+  protected sessionSeconds = 0;
+  protected totalSeconds = 0;
   protected stateLoadFailed = false;
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
@@ -261,8 +262,18 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.scaled = Number.isFinite(score) ? toScaled(score) : null;
   }
 
-  override setDuration(seconds: number): void {
-    this.durationSeconds = seconds;
+  override setDuration(sessionSeconds: number, totalSeconds: number): void {
+    this.sessionSeconds = sessionSeconds;
+    this.totalSeconds = totalSeconds;
+  }
+
+  /**
+   * Seconds reported on Terminated. SCORM Cloud shows the latest
+   * `result.duration` of a Tin Can registration as its total time, and
+   * Terminated is the last statement of every session.
+   */
+  protected get terminatedSeconds(): number {
+    return this.totalSeconds;
   }
 
   override commit(): void {
@@ -274,7 +285,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
       result: {
         score: { scaled },
-        duration: formatISO8601Duration(this.durationSeconds),
+        duration: formatISO8601Duration(this.totalSeconds),
       },
     });
   }
@@ -302,7 +313,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.completedEmitted = true;
     const result: Record<string, unknown> = {
       completion: true,
-      duration: formatISO8601Duration(this.durationSeconds),
+      duration: formatISO8601Duration(this.totalSeconds),
     };
     this.dispatch('Completed', {
       verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
@@ -321,7 +332,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const verbName = status === 'passed' ? 'passed' : 'failed';
     const result: Record<string, unknown> = {
       success: status === 'passed',
-      duration: formatISO8601Duration(this.durationSeconds),
+      duration: formatISO8601Duration(this.totalSeconds),
     };
     const scaled = this.scoreForSuccess(status);
     if (scaled !== null) {
@@ -374,7 +385,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.publisher.markUnloading();
       if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
     }
-    const duration = formatISO8601Duration(this.durationSeconds);
+    const duration = formatISO8601Duration(this.terminatedSeconds);
     this.#finalSend = this.#report(
       'Terminated',
       this.publisher.sendFinal({

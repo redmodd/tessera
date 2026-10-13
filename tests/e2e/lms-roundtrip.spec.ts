@@ -80,6 +80,36 @@ async function expectPagehideAbortsResumeGet(
   expect(statePuts).toEqual([]);
 }
 
+const withAnHourSpent = (saved: string): string =>
+  JSON.stringify({ ...JSON.parse(saved), d: 3600 });
+
+async function expectAnHourOnVerdictAndCompletion(
+  page: Page,
+  statements: any[],
+): Promise<void> {
+  await openQuiz(page, 'Graded Assessment');
+  await answerGradedQuiz(page);
+  await finishFreeCourse(page);
+  for (const verb of ['passed', 'completed']) {
+    await expect
+      .poll(() => findStatement(statements, verb)?.result.duration ?? '', {
+        timeout: 5000,
+      })
+      .toMatch(/^PT1H/);
+  }
+}
+
+async function terminatedDuration(
+  page: Page,
+  statements: any[],
+): Promise<string> {
+  await exitCourse(page);
+  await expect
+    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
+    .toBeTruthy();
+  return findStatement(statements, 'terminated').result.duration;
+}
+
 // ---------------------------------------------------------------------------
 // SCORM 1.2
 // ---------------------------------------------------------------------------
@@ -639,6 +669,31 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(terminatedBeforeReturn).toBe(true);
   });
 
+  test('a resumed session reports the time so far on Passed and Completed, and its own length on Terminated', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withAnHourSpent(documents.get('tessera-state')!);
+
+    // On a second page, so the first one's exit save cannot replace `saved`.
+    const resumed = await page.context().newPage();
+    const statements = await installCmi5Mock(resumed, {
+      documents: new Map([['tessera-state', saved]]),
+    });
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await expectAnHourOnVerdictAndCompletion(resumed, statements);
+    expect(await terminatedDuration(resumed, statements)).not.toContain('H');
+  });
+
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
@@ -783,6 +838,33 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Accordion & Carousel',
     );
+  });
+
+  test('a resumed session reports the time so far on every statement, Terminated included', async ({
+    page,
+  }) => {
+    const statePuts: string[] = [];
+    await routeLRS(page, { statePuts });
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withAnHourSpent(statePuts.at(-1)!);
+
+    // On a second page, so the first one's Terminated stays out of `statements`.
+    const resumed = await page.context().newPage();
+    const statements: any[] = [];
+    await routeLRS(resumed, {
+      statements,
+      stateGet: { status: 200, body: saved },
+    });
+    await resumed.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await expectAnHourOnVerdictAndCompletion(resumed, statements);
+    expect(await terminatedDuration(resumed, statements)).toMatch(/^PT1H/);
   });
 
   test('a failed resume GET still launches the course and never overwrites state', async ({

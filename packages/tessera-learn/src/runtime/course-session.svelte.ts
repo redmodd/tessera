@@ -336,6 +336,15 @@ export class CourseSession {
     });
   }
 
+  // First in every report: the xAPI adapters build a statement, duration
+  // included, as soon as a status is set.
+  #reportDuration(): void {
+    this.#adapter.setDuration(
+      this.#duration.sessionSeconds,
+      this.#duration.totalSeconds,
+    );
+  }
+
   #reportStatus(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -349,12 +358,12 @@ export class CourseSession {
       this.#prevReportedScore = score;
 
       untrack(() => {
+        this.#reportDuration();
         adapter.setScore(score);
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
         this.#prevSuccessStatus = progress.successStatus;
         adapter.setSuccessStatus(this.#prevSuccessStatus);
-        adapter.setDuration(this.#duration.sessionSeconds);
         adapter.commit();
       });
     });
@@ -365,8 +374,8 @@ export class CourseSession {
       if (status === this.#prevCompletionStatus) return;
       this.#prevCompletionStatus = status;
       untrack(() => {
+        this.#reportDuration();
         adapter.setCompletionStatus(status);
-        adapter.setDuration(this.#duration.sessionSeconds);
         adapter.commit();
       });
     });
@@ -377,6 +386,7 @@ export class CourseSession {
       if (status === this.#prevSuccessStatus) return;
       this.#prevSuccessStatus = status;
       untrack(() => {
+        this.#reportDuration();
         adapter.setSuccessStatus(status);
         adapter.commit();
       });
@@ -420,7 +430,7 @@ export class CourseSession {
     this.#terminated = true;
     registerXAPIClient(null);
     const adapter = this.#adapter;
-    adapter.setDuration(this.#duration.sessionSeconds);
+    this.#reportDuration();
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.

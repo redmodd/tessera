@@ -289,7 +289,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
 
     adapter.setScore(85);
-    adapter.setDuration(3600);
+    adapter.setDuration(3600, 3600);
     adapter.setCompletionStatus('complete');
 
     await flush();
@@ -320,7 +320,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
 
     adapter.setScore(90);
-    adapter.setDuration(1800);
+    adapter.setDuration(1800, 1800);
     adapter.setSuccessStatus('passed');
 
     await flush();
@@ -523,7 +523,7 @@ describe('CMI5Adapter', () => {
 
     mockFetch.mockClear();
 
-    adapter.setDuration(120);
+    adapter.setDuration(120, 120);
     adapter.terminate();
 
     await flush();
@@ -538,11 +538,36 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).not.toContain('suspended');
   });
 
+  it('sends the cumulative time on Scored, Completed and Passed, and the session time on Terminated', async () => {
+    const adapter = await initAdapter();
+    await flush();
+    mockFetch.mockClear();
+
+    adapter.setDuration(50, 150);
+    adapter.setScore(80);
+    adapter.commit();
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    // cmi5 §9.5.4.1: Terminated spans Initialized to Terminated; Completed
+    // and Passed span the time the learner took to get there.
+    expect(
+      sentStatements().map((s) => [s.verb.display['en-US'], s.result.duration]),
+    ).toEqual([
+      ['scored', 'PT2M30S'],
+      ['completed', 'PT2M30S'],
+      ['passed', 'PT2M30S'],
+      ['terminated', 'PT50S'],
+    ]);
+  });
+
   it('terminate sends Terminated only (no Suspended) after course is completed', async () => {
     const adapter = await initAdapter();
 
     adapter.setScore(85);
-    adapter.setDuration(60);
+    adapter.setDuration(60, 60);
     adapter.setCompletionStatus('complete');
     await flush();
 
@@ -712,7 +737,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
 
       adapter.setScore(85);
-      adapter.setDuration(60);
+      adapter.setDuration(60, 60);
       adapter.setCompletionStatus('complete');
       await flush();
 
