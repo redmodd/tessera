@@ -1,5 +1,30 @@
 # tessera-learn
 
+## 0.10.0
+
+### Minor Changes
+
+- f7a8d57: Questions keep their state when the learner returns to a page. A standalone question comes back submitted with its answer and retry count. A quiz comes back with the best attempt's answers, so its results can be reviewed. Custom widgets: pass `restore` to `useQuestion()` to show the saved answer. The dev console warns about a widget without it.
+  
+  **Behavior change:** returning to a page no longer starts a standalone question over. A correct answer stays locked, a wrong one stays submitted, and `maxRetries` counts across visits. A custom widget that renders no retry button needs one, shown on `canRetry` and calling `retry()`, or the learner cannot answer again.
+  
+  SCORM saves are written in ASCII, with every other character as a `\u` escape, so an LMS that stores non-ASCII text in less room than its limit cannot cut a save short. Such a character takes 6 bytes of the save.
+  
+  **Behavior change:** `useQuiz().restored` is now `true` only when the answers did not come back. A quiz shell that hides Review on `restored` needs no change. One that reads it to tell a saved result from a new one no longer can once the answers restore.
+- 360e095: New workspaces no longer get a `CLAUDE.md`: agents read the root `AGENTS.md`. Claude Code reads it from v2.1.277, and only when no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` sits in the workspace or a folder above it. On an older version, or when scaffolding inside a project that has one of those files, add a `CLAUDE.md` containing `@AGENTS.md` to the workspace.
+  
+  Existing workspaces: Project notes now live in `AGENTS.md` only. Move any notes from `CLAUDE.md` into `AGENTS.md`, then delete `CLAUDE.md`, or replace its contents with `@AGENTS.md` if one of the cases above applies.
+  
+  The authoring guide is split so `AGENTS.md` holds what every task needs and points to reference files in `node_modules/tessera-learn/docs/` for hooks, recipes, scoring, xAPI and export.
+
+### Patch Changes
+
+- ca4ed74: `tessera export` now fails when a page, a `_meta.js`, `layout.svelte`, `quiz.svelte` or `course.runtime.js` is saved, added or removed while it runs. It used to package the changed file without validating it. The error names the files; run the export again. The build behind `tessera a11y` and `tessera check` fails the same way. A source that a `tessera.config.js` plugin writes in its `buildStart` hook is validated and packaged; one it writes from a later hook fails the export, and the error says so.
+  
+  `tessera a11y` and `tessera check` now scan the pages their build bundled. A page added as the audit started could be left out of the scan while the report counted every page as covered.
+- f577dbd: The package READMEs and the scaffolded workspace files use the same wording as tesseralearn.dev. `tessera-learn` now ships its changelog, and the authoring guide tells your assistant to read it and apply what changed when it updates the framework.
+- 324b797: xAPI and cmi5 `completed`, `passed`, `failed` and `scored` statements now carry the learner's total time across sessions, where they carried a stale value, `PT0S` in most courses. Under plain xAPI `terminated` carries the total too. When the saved state cannot be read, plain xAPI statements carry no duration and cmi5 ones carry the session's.
+
 ## 0.9.1
 
 ### Patch Changes
