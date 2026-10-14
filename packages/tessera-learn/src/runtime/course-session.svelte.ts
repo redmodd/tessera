@@ -166,11 +166,12 @@ export class CourseSession {
     // document must cost the resume, not the course.
     try {
       const saved = adapter.getState();
-      if (
-        saved &&
-        shouldRestore(saved, this.#fingerprint, this.#config.resume)
-      ) {
-        this.#restore(saved);
+      if (saved) {
+        // Before the restore, so a launch that starts fresh keeps the time.
+        this.#duration.setPrevious(saved.d);
+        if (shouldRestore(saved, this.#fingerprint, this.#config.resume)) {
+          this.#restore(saved);
+        }
       }
     } catch (err) {
       console.error('Tessera: resume state could not be restored', err);
@@ -183,9 +184,10 @@ export class CourseSession {
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
-    adapter.setCompletionStatus(progress.reportedCompletionStatus);
-    adapter.setSuccessStatus(progress.successStatus);
-    adapter.commit();
+    this.#report(() => {
+      adapter.setCompletionStatus(progress.reportedCompletionStatus);
+      adapter.setSuccessStatus(progress.successStatus);
+    });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -235,7 +237,6 @@ export class CourseSession {
     if (isRecord(saved.u)) {
       this.#userState = { ...this.#userState, ...saved.u };
     }
-    this.#duration.setPrevious(saved.d);
     // After progress, so the bookmark's page is unlocked.
     this.#nav.goToPage(saved.b);
 
@@ -336,6 +337,23 @@ export class CourseSession {
     });
   }
 
+  #reportDuration(): void {
+    this.#adapter.setDuration(
+      this.#duration.sessionSeconds,
+      this.#duration.totalSeconds,
+    );
+  }
+
+  // Duration first: the xAPI adapters build a statement, duration included,
+  // as soon as a status is set.
+  #report(setStatus: () => void): void {
+    untrack(() => {
+      this.#reportDuration();
+      setStatus();
+      this.#adapter.commit();
+    });
+  }
+
   #reportStatus(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -348,14 +366,12 @@ export class CourseSession {
       if (score === this.#prevReportedScore) return;
       this.#prevReportedScore = score;
 
-      untrack(() => {
+      this.#report(() => {
         adapter.setScore(score);
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
         this.#prevSuccessStatus = progress.successStatus;
         adapter.setSuccessStatus(this.#prevSuccessStatus);
-        adapter.setDuration(this.#duration.sessionSeconds);
-        adapter.commit();
       });
     });
 
@@ -364,11 +380,7 @@ export class CourseSession {
       if (!this.#persistenceReady) return;
       if (status === this.#prevCompletionStatus) return;
       this.#prevCompletionStatus = status;
-      untrack(() => {
-        adapter.setCompletionStatus(status);
-        adapter.setDuration(this.#duration.sessionSeconds);
-        adapter.commit();
-      });
+      this.#report(() => adapter.setCompletionStatus(status));
     });
 
     $effect(() => {
@@ -376,10 +388,7 @@ export class CourseSession {
       if (!this.#persistenceReady) return;
       if (status === this.#prevSuccessStatus) return;
       this.#prevSuccessStatus = status;
-      untrack(() => {
-        adapter.setSuccessStatus(status);
-        adapter.commit();
-      });
+      this.#report(() => adapter.setSuccessStatus(status));
     });
   }
 
@@ -420,7 +429,7 @@ export class CourseSession {
     this.#terminated = true;
     registerXAPIClient(null);
     const adapter = this.#adapter;
-    adapter.setDuration(this.#duration.sessionSeconds);
+    this.#reportDuration();
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.

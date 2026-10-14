@@ -39,4 +39,13 @@ describe('DurationTracker', () => {
     expect(tracker.sessionSeconds).toBe(5);
     expect(tracker.totalSeconds).toBe(65);
   });
+
+  it.each([
+    [130.9, 130],
+    [1e25, 0],
+  ])('reads previous seconds of %s as %s whole seconds', (previous, whole) => {
+    const tracker = new DurationTracker();
+    tracker.setPrevious(previous);
+    expect(tracker.totalSeconds).toBe(whole);
+  });
 });

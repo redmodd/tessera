@@ -71,7 +71,8 @@ export abstract class BaseAdapter {
   setScore(_score: number): void {}
   setCompletionStatus(_status: CompletionStatus): void {}
   setSuccessStatus(_status: SuccessStatus): void {}
-  setDuration(_seconds: number): void {}
+  /** `sessionSeconds` covers this launch; `totalSeconds` covers every session so far. */
+  setDuration(_sessionSeconds: number, _totalSeconds: number): void {}
   /** Tell the LMS how the learner is leaving the SCO. */
   setExit(_mode: ExitMode): void {}
   /**

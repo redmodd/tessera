@@ -1,13 +1,12 @@
 /**
  * Tracks course time-on-task. Two readouts:
  *
- *   - `totalSeconds` — cumulative across all sessions (previousSeconds +
- *     this session's elapsed). Persisted into `SavedState.d`.
- *   - `sessionSeconds` — only this session's elapsed. Fed to SCORM
- *     `cmi.(core.)session_time` and to cmi5 statement `result.duration`,
- *     both of which are session-scoped: SCORM sums session_time into
- *     `cmi.total_time` itself, and cmi5 `duration` on Completed/Passed/
- *     Failed/Terminated reflects the AU's launch session.
+ *   - `totalSeconds`: cumulative across all sessions (previousSeconds +
+ *     this session's elapsed). Persisted into `SavedState.d` and sent as
+ *     `result.duration` on xAPI and cmi5 statements.
+ *   - `sessionSeconds`: only this session's elapsed. Fed to SCORM
+ *     `cmi.(core.)session_time` and to the cmi5 Terminated statement. Both
+ *     are session-scoped, and the LMS sums them into its own total.
  */
 export class DurationTracker {
   #startTime = Date.now();
@@ -16,17 +15,19 @@ export class DurationTracker {
 
   setPrevious(previousSeconds: number): void {
     this.#accumulated =
-      Number.isFinite(previousSeconds) && previousSeconds > 0
-        ? previousSeconds
+      Number.isFinite(previousSeconds) &&
+      previousSeconds >= 1 &&
+      previousSeconds <= Number.MAX_SAFE_INTEGER
+        ? Math.floor(previousSeconds)
         : 0;
   }
 
-  /** Cumulative across all sessions. Use for suspend_data persistence. */
+  /** Cumulative across all sessions. */
   get totalSeconds(): number {
     return this.#accumulated + this.sessionSeconds;
   }
 
-  /** This session only. Use for SCORM session_time and cmi5 result.duration. */
+  /** This session only. */
   get sessionSeconds(): number {
     return Math.floor(
       ((this.#pausedAt ?? Date.now()) - this.#startTime) / 1000,

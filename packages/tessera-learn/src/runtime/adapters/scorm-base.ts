@@ -200,8 +200,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.set('cmi.suspend_data', json);
   }
 
-  override setDuration(seconds: number): void {
-    this.set(this.dialect.sessionTimeKey, this.dialect.formatDuration(seconds));
+  override setDuration(sessionSeconds: number): void {
+    this.set(
+      this.dialect.sessionTimeKey,
+      this.dialect.formatDuration(sessionSeconds),
+    );
   }
 
   override reportInteraction(

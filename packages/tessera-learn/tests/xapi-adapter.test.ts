@@ -279,7 +279,6 @@ describe('XAPIAdapter', () => {
 
     adapter.setScore(53.3);
     adapter.setSuccessStatus('failed');
-    adapter.setDuration(120);
     adapter.commit();
     await flush();
 
@@ -290,7 +289,57 @@ describe('XAPIAdapter', () => {
     ]);
     expect(bodies[0].result.score.scaled).toBe(0.5);
     expect(bodies[1].result.score.scaled).toBe(0.533);
-    expect(bodies[1].result.duration).toBe('PT2M');
+  });
+
+  it('sends the cumulative time on every statement, Terminated included', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await adapter.loadState();
+    await flush();
+    fetchMock.mockClear();
+    fetchMock.mockImplementation(async () => respond(200, '[]'));
+
+    adapter.setDuration(50, 150);
+    adapter.setScore(80);
+    adapter.commit();
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    expect(
+      posted().map((s) => [s.verb.display['en-US'], s.result.duration]),
+    ).toEqual([
+      ['scored', 'PT2M30S'],
+      ['completed', 'PT2M30S'],
+      ['passed', 'PT2M30S'],
+      ['terminated', 'PT2M30S'],
+    ]);
+  });
+
+  it('sends no duration while the saved state is unread', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+    fetchMock.mockImplementation(async () => respond(200, '[]'));
+
+    adapter.setDuration(50, 50);
+    adapter.setScore(80);
+    adapter.commit();
+    adapter.setCompletionStatus('complete');
+    adapter.setSuccessStatus('passed');
+    adapter.terminate();
+    await flush();
+
+    expect(posted().map((s) => [s.verb.display['en-US'], s.result])).toEqual([
+      ['scored', { score: { scaled: 0.8 } }],
+      ['completed', { completion: true }],
+      ['passed', { success: true, score: { scaled: 0.8 } }],
+      ['terminated', undefined],
+    ]);
   });
 
   it('does not re-send the resumed score on launch', async () => {

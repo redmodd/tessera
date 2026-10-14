@@ -26,6 +26,7 @@ import {
   scormLog,
   startPreview,
   waitForServer,
+  waitForStatement,
   waitForTesseraContent,
 } from './helpers.js';
 
@@ -48,11 +49,9 @@ async function expectNoStatementsAfterTerminated(
   page: Page,
   statements: any[],
 ) {
-  await expect
-    .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-    .toBeTruthy();
+  const terminated = await waitForStatement(statements, 'terminated');
   await page.waitForTimeout(300);
-  expect(statements.at(-1)).toBe(findStatement(statements, 'terminated'));
+  expect(statements.at(-1)).toBe(terminated);
 }
 
 async function expectPagehideAbortsResumeGet(
@@ -74,10 +73,26 @@ async function expectPagehideAbortsResumeGet(
   await aborted;
 
   await expectNoStatementsAfterTerminated(page, statements);
-  expect(findStatement(statements, 'terminated').result.duration).toMatch(
-    /^PT[1-9]\d*S$/,
-  );
   expect(statePuts).toEqual([]);
+}
+
+const withAnHourSpent = (saved: string): string =>
+  JSON.stringify({ ...JSON.parse(saved), d: 3600 });
+
+async function expectAnHourOnVerdictAndCompletion(
+  page: Page,
+  statements: any[],
+): Promise<void> {
+  await openQuiz(page, 'Graded Assessment');
+  await answerGradedQuiz(page);
+  await finishFreeCourse(page);
+  for (const verb of ['passed', 'completed']) {
+    await expect
+      .poll(() => findStatement(statements, verb)?.result.duration ?? '', {
+        timeout: 5000,
+      })
+      .toMatch(/^PT1H/);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -263,11 +278,12 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     // Assert the adapter's written format from the call log: scorm-again
     // normalizes session_time on storage, so the snapshot is not verbatim.
     const log = await scormLog(page);
-    const sessionTimeWrite = log.find(
+    const sessionTimeWrite = log.findLast(
       (entry) =>
         entry[0] === 'LMSSetValue' && entry[1] === 'cmi.core.session_time',
     );
     expect(sessionTimeWrite?.[2]).toMatch(/^\d{4}:\d{2}:\d{2}\.\d{2}$/);
+    expect(sessionTimeWrite?.[2]).not.toBe('0000:00:00.00');
     expect(log.some((entry) => entry[0] === 'LMSFinish')).toBe(true);
   });
 
@@ -469,6 +485,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
 
     const data = await scormData(page);
     expect(data['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?(\d+S)?$/);
+    expect(data['cmi.session_time']).not.toBe('PT0S');
 
     const log = await scormLog(page);
     expect(log.some((entry) => entry[0] === 'Terminate')).toBe(true);
@@ -589,9 +606,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
 
     await answerGradedQuiz(page);
 
-    await expect
-      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
-      .toBeDefined();
+    await waitForStatement(statements, 'scored');
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     // Per-question xAPI `answered` statements: one per built-in, carrying the
@@ -639,6 +654,33 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(terminatedBeforeReturn).toBe(true);
   });
 
+  test('a resumed session reports the time so far on Passed and Completed, and its own length on Terminated', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withAnHourSpent(documents.get('tessera-state')!);
+
+    // On a second page, so the first one's exit save cannot replace `saved`.
+    const resumed = await page.context().newPage();
+    const statements = await installCmi5Mock(resumed, {
+      documents: new Map([['tessera-state', saved]]),
+    });
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await expectAnHourOnVerdictAndCompletion(resumed, statements);
+    await exitCourse(resumed);
+    const terminated = await waitForStatement(statements, 'terminated');
+    expect(terminated.result.duration).not.toContain('H');
+  });
+
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
@@ -650,7 +692,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expectNoStatementsAfterTerminated(page, statements);
   });
 
-  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
+  test('pagehide while the resume GET is pending aborts it, sends Terminated with the session time, and writes no state', async ({
     page,
   }) => {
     const statements = await installCmi5Mock(page);
@@ -674,6 +716,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       cmi5LaunchURL(BASE),
       isResumeGet,
       { statements, statePuts },
+    );
+    expect(findStatement(statements, 'terminated').result.duration).toMatch(
+      /^PT[1-9]\d*S$/,
     );
   });
 });
@@ -785,6 +830,35 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     );
   });
 
+  test('a resumed session reports the time so far on every statement, Terminated included', async ({
+    page,
+  }) => {
+    const statePuts: string[] = [];
+    await routeLRS(page, { statePuts });
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withAnHourSpent(statePuts.at(-1)!);
+
+    // On a second page, so the first one's Terminated stays out of `statements`.
+    const resumed = await page.context().newPage();
+    const statements: any[] = [];
+    await routeLRS(resumed, {
+      statements,
+      stateGet: { status: 200, body: saved },
+    });
+    await resumed.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await expectAnHourOnVerdictAndCompletion(resumed, statements);
+    await exitCourse(resumed);
+    const terminated = await waitForStatement(statements, 'terminated');
+    expect(terminated.result.duration).toMatch(/^PT1H/);
+  });
+
   test('a failed resume GET still launches the course and never overwrites state', async ({
     page,
   }) => {
@@ -801,7 +875,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(statePuts).toHaveLength(0);
   });
 
-  test('pagehide while the resume GET is pending aborts it, sends Terminated with a duration, and writes no state', async ({
+  test('pagehide while the resume GET is pending aborts it, sends Terminated without a total, and writes no state', async ({
     page,
   }) => {
     const statements: any[] = [];
@@ -814,6 +888,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       statements,
       statePuts,
     });
+    expect(findStatement(statements, 'terminated').result).toBeUndefined();
   });
 
   test('launch sends Initialized with the 1.0.3 version header and verbatim Basic auth', async ({
@@ -880,9 +955,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await submit.click();
     await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
 
-    await expect
-      .poll(() => findStatement(statements, 'scored'), { timeout: 5000 })
-      .toBeDefined();
+    await waitForStatement(statements, 'scored');
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = answeredSoFar();
@@ -908,9 +981,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     ).toBeUndefined();
 
     await exitCourse(page);
-    await expect
-      .poll(() => findStatement(statements, 'terminated'), { timeout: 5000 })
-      .toBeTruthy();
+    await waitForStatement(statements, 'terminated');
   });
 
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
