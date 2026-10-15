@@ -45,10 +45,7 @@ describe('manual completion in App', () => {
       expect(saveState).toHaveBeenCalled();
     });
     expect(progress.completionStatus).toBe('incomplete');
-    expect(setSuccessStatus).not.toHaveBeenCalledWith(
-      'passed',
-      expect.anything(),
-    );
+    expect(setSuccessStatus.mock.calls.map(([s]) => s)).not.toContain('passed');
     expect(saveState.mock.lastCall![0].m).toBeUndefined();
 
     nav.goToPage(1);
