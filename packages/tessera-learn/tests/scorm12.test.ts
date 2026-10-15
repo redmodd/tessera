@@ -392,7 +392,7 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(lastLessonStatus()).toBe('incomplete');
 
-      adapter.setVerdictFinal(true);
+      adapter.setSuccessStatus('failed', true);
       await flush();
       expect(lastLessonStatus()).toBe('failed');
     });

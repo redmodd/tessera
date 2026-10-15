@@ -96,14 +96,10 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.#flushLessonStatus();
   }
 
-  setSuccessStatus(status: SuccessStatus): void {
+  setSuccessStatus(status: SuccessStatus, final = false): void {
     // SCORM 1.2 has no "unknown" lesson_status, so null leaves it to
     // completion status.
     this.#successStatus = status === 'unknown' ? null : status;
-    this.#flushLessonStatus();
-  }
-
-  override setVerdictFinal(final: boolean): void {
     this.#verdictFinal = final;
     this.#flushLessonStatus();
   }

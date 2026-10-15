@@ -67,25 +67,38 @@ describe('a graded submit that decides the verdict', () => {
   });
 
   it('reports the verdict final once the last attempt fails', async () => {
-    const setVerdictFinal = vi.fn();
-    const progress = await start(stubAdapter({ setVerdictFinal }));
+    const setSuccessStatus = vi.fn();
+    const progress = await start(stubAdapter({ setSuccessStatus }));
 
     progress.quizCompleted(0, 40);
     progress.quizCompleted(0, 40);
     await flush();
-    expect(setVerdictFinal).not.toHaveBeenCalledWith(true);
+    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed', true);
 
     progress.quizCompleted(0, 40);
     await flush();
-    expect(setVerdictFinal).toHaveBeenLastCalledWith(true);
+    expect(setSuccessStatus).toHaveBeenLastCalledWith('failed', true);
+  });
+
+  it('never reports a final failure when the last attempt passes', async () => {
+    const setSuccessStatus = vi.fn();
+    const progress = await start(stubAdapter({ setSuccessStatus }));
+
+    progress.quizCompleted(0, 40);
+    progress.quizCompleted(0, 40);
+    progress.quizCompleted(0, 100);
+    await flush();
+
+    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed', true);
+    expect(setSuccessStatus).toHaveBeenLastCalledWith('passed', true);
   });
 
   it('commits a final verdict once when the last attempt also moves the score', async () => {
     const calls: string[] = [];
     const progress = await start(
       stubAdapter({
-        setVerdictFinal: (final) => calls.push(`final:${final}`),
-        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        setSuccessStatus: (status, final) =>
+          calls.push(`success:${status}:${final}`),
         commit: () => calls.push('commit'),
       }),
     );
@@ -97,7 +110,7 @@ describe('a graded submit that decides the verdict', () => {
     progress.quizCompleted(0, 50);
     await flush();
 
-    expect(calls).toEqual(['final:true', 'success:failed', 'commit']);
+    expect(calls).toEqual(['success:failed:true', 'commit']);
   });
 
   it('holds the completion a later optional page would take back', async () => {

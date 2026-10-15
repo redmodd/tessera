@@ -111,7 +111,10 @@ describe('CourseSession restore gate honours config.resume', () => {
 
     expect(saveState.mock.lastCall![0].g['1'].w).toEqual(['q2']);
     expect(seedLifecycle.mock.calls[0]).toEqual(['complete', 'passed', 90]);
-    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
+    expect(setSuccessStatus).not.toHaveBeenCalledWith(
+      'failed',
+      expect.anything(),
+    );
     expect(saveState.mock.lastCall![0]).toMatchObject({ p: 90 });
   });
 

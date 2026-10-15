@@ -355,14 +355,14 @@ export class CourseSession {
     });
   }
 
-  // Finality first, so SCORM 1.2 commits a final failure with the verdict
-  // instead of holding it at incomplete for one more commit.
   #reportSuccess(): void {
     const progress = this.#progress;
-    this.#prevVerdictFinal = progress.verdictFinal;
-    this.#adapter.setVerdictFinal(this.#prevVerdictFinal);
     this.#prevSuccessStatus = progress.successStatus;
-    this.#adapter.setSuccessStatus(this.#prevSuccessStatus);
+    this.#prevVerdictFinal = progress.verdictFinal;
+    this.#adapter.setSuccessStatus(
+      this.#prevSuccessStatus,
+      this.#prevVerdictFinal,
+    );
   }
 
   #reportStatus(): void {
@@ -395,17 +395,14 @@ export class CourseSession {
 
     $effect(() => {
       const status = progress.successStatus;
-      if (!this.#persistenceReady) return;
-      if (status === this.#prevSuccessStatus) return;
-      this.#report(() => this.#reportSuccess());
-    });
-
-    $effect(() => {
       const final = progress.verdictFinal;
       if (!this.#persistenceReady) return;
-      if (final === this.#prevVerdictFinal) return;
-      this.#prevVerdictFinal = final;
-      this.#report(() => adapter.setVerdictFinal(final));
+      if (
+        status === this.#prevSuccessStatus &&
+        final === this.#prevVerdictFinal
+      )
+        return;
+      this.#report(() => this.#reportSuccess());
     });
   }
 
@@ -449,15 +446,8 @@ export class CourseSession {
     this.#reportDuration();
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
-    const progress = this.#progress;
-    const attemptOver =
-      progress.reportedCompletionStatus === 'complete' ||
-      // Quiz completion takes a pass, so a final failure can never complete.
-      (this.#config.completion.mode === 'quiz' &&
-        progress.successStatus === 'failed' &&
-        progress.verdictFinal);
     // Before terminate(), so SCORM commits the exit mode in the same flush.
-    adapter.setExit(attemptOver ? 'normal' : 'suspend');
+    adapter.setExit(this.#progress.attemptOver ? 'normal' : 'suspend');
     adapter.commit();
     return true;
   }

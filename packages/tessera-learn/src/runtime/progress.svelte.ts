@@ -726,6 +726,14 @@ export class ProgressState {
     this.#completionReached ? 'complete' : this.completionStatus,
   );
 
+  /** Completion is reached or out of reach: quiz completion takes a score that a final one can no longer become. */
+  get attemptOver(): boolean {
+    return (
+      this.reportedCompletionStatus === 'complete' ||
+      (this.#config.completion.mode === 'quiz' && this.verdictFinal)
+    );
+  }
+
   completedPages = $derived.by<number>(() => {
     let count = 0;
     for (const i of this.visitedPages) {

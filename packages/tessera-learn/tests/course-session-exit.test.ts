@@ -205,16 +205,20 @@ describe('ending a CourseSession', () => {
   });
 
   it.each([
-    ['quiz', 2, 'suspend'],
-    ['quiz', 3, 'normal'],
-    ['percentage', 3, 'suspend'],
+    ['quiz', 'quiz', 2, 'suspend'],
+    ['quiz', 'quiz', 3, 'normal'],
+    ['quiz', 'none', 3, 'normal'],
+    ['percentage', 'quiz', 3, 'suspend'],
   ] as const)(
-    'under %s completion, exits after %i of 3 failing quiz attempts with %s',
-    async (completion, attempts, mode) => {
+    'under %s completion and success from %s, exits after %i of 3 failing quiz attempts with %s',
+    async (completion, success, attempts, mode) => {
       const { adapter, calls } = recordingAdapter();
       const { session, progress } = await startSession({
         adapter,
-        config: createConfig({ completion: { mode: completion } }),
+        config: createConfig({
+          completion: { mode: completion },
+          success: { from: success },
+        }),
         manifest: createManifest(2, { 0: { graded: true } }),
       });
       for (let i = 0; i < attempts; i++) progress.quizCompleted(0, 40);
