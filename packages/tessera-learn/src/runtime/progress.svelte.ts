@@ -32,7 +32,7 @@ export interface StandaloneResult {
   correct: boolean | null;
   /** The submitted response, as JSON. */
   response?: string;
-  /** No retry is left to change the score. */
+  /** Graded, with no retry left to change the score. */
   final: boolean;
 }
 
@@ -321,7 +321,7 @@ export class ProgressState {
       retries: normalizeRetries(retries),
       correct: correct === undefined ? clamped >= 100 : correct,
       response: encodeResponse(response),
-      final: clamped >= 100 || final === true,
+      final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
   }
@@ -367,7 +367,8 @@ export class ProgressState {
     if (questions && result) {
       const next = normalizeWeight(weight);
       const final =
-        result.score >= 100 || !retriesLeft(result.retries, maxRetries);
+        graded &&
+        (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
       if (
         next !== result.weight ||
         graded !== result.graded ||

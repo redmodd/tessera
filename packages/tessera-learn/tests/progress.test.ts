@@ -1710,9 +1710,16 @@ describe('ProgressState', () => {
       const progress = new ProgressState(manifest, quizMode);
       progress.markStandaloneQuestion(0, 'wrong', 0, true, 1, { final: true });
       progress.markStandaloneQuestion(0, 'right', 100, true);
+      progress.markStandaloneQuestion(0, 'practice', 0, false, 1, {
+        final: true,
+      });
 
       const saved = progress.toSaved();
-      expect(saved.g?.[0].q).toEqual({ wrong: [0, 1, 9], right: 100 });
+      expect(saved.g?.[0].q).toEqual({
+        wrong: [0, 1, 9],
+        right: 100,
+        practice: [0, 1, 0],
+      });
 
       const restored = new ProgressState(manifest, quizMode);
       restored.restoreFrom(JSON.parse(JSON.stringify(saved)));
