@@ -74,8 +74,14 @@ describe('manual completion in a CourseSession', () => {
     await flush();
 
     expect(setCompletionStatus).toHaveBeenCalledWith('complete');
-    expect(setSuccessStatus.mock.calls.map(([s]) => s)).not.toContain('passed');
-    expect(setSuccessStatus.mock.calls.map(([s]) => s)).not.toContain('failed');
+    expect(setSuccessStatus).not.toHaveBeenCalledWith(
+      'passed',
+      expect.anything(),
+    );
+    expect(setSuccessStatus).not.toHaveBeenCalledWith(
+      'failed',
+      expect.anything(),
+    );
   });
 });
 

@@ -364,22 +364,21 @@ export class ProgressState {
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
-    const next = normalizeWeight(weight);
-    const final =
-      !!result &&
-      (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
-    if (
-      questions &&
-      result &&
-      (next !== result.weight ||
+    if (questions && result) {
+      const next = normalizeWeight(weight);
+      const final =
+        result.score >= 100 || !retriesLeft(result.retries, maxRetries);
+      if (
+        next !== result.weight ||
         graded !== result.graded ||
-        final !== result.final)
-    ) {
-      questions.set(questionId, { ...result, weight: next, graded, final });
-      this.#writeQuestions(pageIndex, questions);
-    } else if (expectedChanged) {
-      this.#changed();
+        final !== result.final
+      ) {
+        questions.set(questionId, { ...result, weight: next, graded, final });
+        this.#writeQuestions(pageIndex, questions);
+        return;
+      }
     }
+    if (expectedChanged) this.#changed();
   }
 
   pageMounted(pageIndex: number) {
@@ -511,13 +510,11 @@ export class ProgressState {
    * True once no graded page, optional ones included, can change its score,
    * so the verdict stands.
    */
-  verdictFinal = $derived.by<boolean>(() => {
-    if (this.#declaredGradedIndices.size === 0) return false;
-    for (const pageIndex of this.#declaredGradedIndices) {
-      if (!this.#pageFinal(pageIndex)) return false;
-    }
-    return true;
-  });
+  verdictFinal = $derived.by(
+    () =>
+      this.#declaredGradedIndices.size > 0 &&
+      [...this.#declaredGradedIndices].every((i) => this.#pageFinal(i)),
+  );
 
   #gradedScoreDecided = $state(false);
 
