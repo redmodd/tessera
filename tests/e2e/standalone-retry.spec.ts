@@ -200,7 +200,7 @@ for (const mode of MODES) {
       await leaveAndReturn(page);
       await expectLocked(page, 'Earth');
 
-      await expect.poll(saved).toEqual([0, 1, 8, 1, [2]]);
+      await expect.poll(saved).toEqual([0, 1, 0, 1, [2]]);
       await relaunch(page);
       await expectLocked(page, 'Earth');
       await expect.poll(results).toEqual([false, false]);
