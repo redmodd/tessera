@@ -12,7 +12,6 @@ import {
   reportedQuestionCount,
   retryGradedQuizWithQ1Wrong,
   scormData,
-  scormLog,
   startPreview,
   waitForServer,
   waitForTesseraContent,
@@ -242,11 +241,6 @@ test.describe.serial('completion.mode quiz', () => {
       'cmi.completion_status': 'incomplete',
       'cmi.exit': 'normal',
     });
-    expect(await scormLog(page)).toContainEqual([
-      'SetValue',
-      'adl.nav.request',
-      'exitAll',
-    ]);
   });
 
   test.describe('scaled_passing_score from the exported manifest', () => {

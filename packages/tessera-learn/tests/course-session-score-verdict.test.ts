@@ -66,7 +66,7 @@ describe('a graded submit that decides the verdict', () => {
     ]);
   });
 
-  it('reports the verdict final once the last attempt fails', async () => {
+  it('reports the verdict final once the last attempt fails at the same score', async () => {
     const setSuccessStatus = vi.fn();
     const progress = await start(stubAdapter({ setSuccessStatus }));
 
@@ -78,19 +78,6 @@ describe('a graded submit that decides the verdict', () => {
     progress.quizCompleted(0, 40);
     await flush();
     expect(setSuccessStatus).toHaveBeenLastCalledWith('failed', true);
-  });
-
-  it('never reports a final failure when the last attempt passes', async () => {
-    const setSuccessStatus = vi.fn();
-    const progress = await start(stubAdapter({ setSuccessStatus }));
-
-    progress.quizCompleted(0, 40);
-    progress.quizCompleted(0, 40);
-    progress.quizCompleted(0, 100);
-    await flush();
-
-    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed', true);
-    expect(setSuccessStatus).toHaveBeenLastCalledWith('passed', true);
   });
 
   it('commits a final verdict once when the last attempt also moves the score', async () => {

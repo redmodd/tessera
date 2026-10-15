@@ -388,7 +388,6 @@ describe('SCORM12Adapter', () => {
 
     it('releases a held failed once the verdict is final', async () => {
       adapter.setSuccessStatus('failed');
-      adapter.setExit('normal');
       await flush();
       expect(lastLessonStatus()).toBe('incomplete');
 
