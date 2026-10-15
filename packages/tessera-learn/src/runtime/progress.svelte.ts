@@ -659,7 +659,10 @@ export class ProgressState {
           if (typeof score !== 'number') continue;
           // Flags 1, 2, 4 and 8, never 2 with 4.
           const bits =
-            Number.isInteger(flags) && (flags & ~15) === 0 && (flags & 6) !== 6
+            Number.isInteger(flags) &&
+            flags >= 0 &&
+            flags < 16 &&
+            (flags & 6) !== 6
               ? flags
               : 0;
           this.markStandaloneQuestion(

@@ -153,13 +153,16 @@ describe('ProgressState', () => {
       });
     });
 
-    it('restores a question whose flags are not a saved value as ungraded', () => {
-      const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({
-        g: { 0: { q: { q1: [80, 1, 7] } } },
-      });
-      expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
-    });
+    it.each([7, 16, 2 ** 32 + 9])(
+      'restores a question whose flags %i are not a saved value as ungraded',
+      (flags) => {
+        const progress = new ProgressState(createManifest(3), createConfig());
+        progress.restoreFrom({
+          g: { 0: { q: { q1: [80, 1, flags] } } },
+        });
+        expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
+      },
+    );
 
     it('drops a saved unanswered question id that is not a string', () => {
       const progress = new ProgressState(
