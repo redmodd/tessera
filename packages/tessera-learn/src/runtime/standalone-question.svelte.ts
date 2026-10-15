@@ -36,6 +36,10 @@ export class StandaloneQuestion implements UseQuestionHandle {
     this.#retryCount = saved.retries;
     this.#correct = saved.correct;
     this.#answer = restoreResponse(opts, saved.response);
+    // A republish can change maxRetries under a saved result.
+    const { score, ...submit } = saved;
+    const final = score >= 100 || !this.#retriesLeft;
+    if (final !== submit.final) deps.markScore(score, { ...submit, final });
   }
 
   get id(): string {

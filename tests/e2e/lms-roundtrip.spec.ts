@@ -264,7 +264,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
 
-  test('a failing score out of quiz attempts exits as failed', async ({
+  test('a failing score out of quiz attempts reports failed', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -272,6 +272,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await openQuiz(page, 'Graded Assessment');
 
     await answerGradedQuiz(page, { q1Correct: false });
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({ 'cmi.core.lesson_status': 'incomplete' });
     const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
     const progress = page.locator('.tessera-quiz-progress-desktop').first();
     for (let attempt = 2; attempt <= 3; attempt++) {
@@ -297,15 +300,16 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await expect
       .poll(() => scormData(page))
       .toMatchObject({
-        'cmi.core.lesson_status': 'incomplete',
+        'cmi.core.lesson_status': 'failed',
         'cmi.core.score.raw': '66.67',
       });
 
+    // Pages are left to visit, so the attempt stays open.
     await exitCourse(page);
 
     expect(await scormData(page)).toMatchObject({
       'cmi.core.lesson_status': 'failed',
-      'cmi.core.exit': '',
+      'cmi.core.exit': 'suspend',
     });
   });
 

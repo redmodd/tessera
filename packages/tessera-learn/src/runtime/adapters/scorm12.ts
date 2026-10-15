@@ -63,12 +63,12 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * SCORM 1.2 collapses completion + success into a single `lesson_status`
  * field, so the two setters track their values separately and write the
  * combined result through `#flushLessonStatus`. LMSes read `failed` as a
- * finished attempt, so it waits for completion or a normal exit.
+ * finished attempt, so it waits for completion or a final verdict.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: Verdict | null = null;
-  #attemptEnded = false;
+  #verdictFinal = false;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);
@@ -103,11 +103,16 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.#flushLessonStatus();
   }
 
+  override setVerdictFinal(final: boolean): void {
+    this.#verdictFinal = final;
+    this.#flushLessonStatus();
+  }
+
   #flushLessonStatus(): void {
     const held =
       this.#successStatus === 'failed' &&
       this.#completionStatus === 'incomplete' &&
-      !this.#attemptEnded;
+      !this.#verdictFinal;
     this.set(
       'cmi.core.lesson_status',
       held ? 'incomplete' : (this.#successStatus ?? this.#completionStatus),
@@ -117,9 +122,5 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   setExit(mode: ExitMode): void {
     // SCORM 1.2 §4.2.2 vocabulary: time-out, suspend, logout, "" (normal).
     this.set('cmi.core.exit', mode === 'suspend' ? 'suspend' : '');
-    if (mode === 'normal') {
-      this.#attemptEnded = true;
-      this.#flushLessonStatus();
-    }
   }
 }

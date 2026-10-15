@@ -66,6 +66,20 @@ describe('a graded submit that decides the verdict', () => {
     ]);
   });
 
+  it('reports the verdict final once the last attempt fails', async () => {
+    const setVerdictFinal = vi.fn();
+    const progress = await start(stubAdapter({ setVerdictFinal }));
+
+    progress.quizCompleted(0, 40);
+    progress.quizCompleted(0, 40);
+    await flush();
+    expect(setVerdictFinal).not.toHaveBeenCalledWith(true);
+
+    progress.quizCompleted(0, 40);
+    await flush();
+    expect(setVerdictFinal).toHaveBeenLastCalledWith(true);
+  });
+
   it('holds the completion a later optional page would take back', async () => {
     const setCompletionStatus = vi.fn();
     const setExit = vi.fn();

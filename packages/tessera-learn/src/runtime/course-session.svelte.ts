@@ -63,6 +63,7 @@ export class CourseSession {
 
   #prevReportedScore: number | null = null;
   #prevSuccessStatus: SuccessStatus = 'unknown';
+  #prevVerdictFinal = false;
   #prevCompletionStatus: CompletionStatus = 'incomplete';
 
   readonly userStateStore: UserStateStore = {
@@ -185,6 +186,8 @@ export class CourseSession {
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
     this.#report(() => {
+      this.#prevVerdictFinal = progress.verdictFinal;
+      adapter.setVerdictFinal(this.#prevVerdictFinal);
       adapter.setCompletionStatus(progress.reportedCompletionStatus);
       adapter.setSuccessStatus(progress.successStatus);
     });
@@ -390,6 +393,14 @@ export class CourseSession {
       this.#prevSuccessStatus = status;
       this.#report(() => adapter.setSuccessStatus(status));
     });
+
+    $effect(() => {
+      const final = progress.verdictFinal;
+      if (!this.#persistenceReady) return;
+      if (final === this.#prevVerdictFinal) return;
+      this.#prevVerdictFinal = final;
+      this.#report(() => adapter.setVerdictFinal(final));
+    });
   }
 
   // Dev-only, for `completion.mode: "manual"` without an opt-in trigger check:
@@ -435,7 +446,10 @@ export class CourseSession {
     const progress = this.#progress;
     const attemptOver =
       progress.reportedCompletionStatus === 'complete' ||
-      (progress.successStatus === 'failed' && progress.verdictFinal);
+      // Quiz completion takes a pass, so a final failure can never complete.
+      (this.#config.completion.mode === 'quiz' &&
+        progress.successStatus === 'failed' &&
+        progress.verdictFinal);
     // Before terminate(), so SCORM commits the exit mode in the same flush.
     adapter.setExit(attemptOver ? 'normal' : 'suspend');
     adapter.commit();

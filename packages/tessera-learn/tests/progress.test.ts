@@ -347,22 +347,26 @@ describe('ProgressState', () => {
         score: 100,
         retries: 0,
         correct: true,
+        final: true,
       });
       expect(restored.standaloneResult(0, 'retried')).toEqual({
         score: 0,
         retries: 2,
         correct: false,
+        final: false,
       });
       expect(restored.standaloneResult(0, 'answered')).toEqual({
         score: 100,
         retries: 0,
         correct: true,
+        final: true,
         response: ['1'],
       });
       expect(restored.standaloneResult(0, 'text')).toEqual({
         score: 0,
         retries: 1,
         correct: false,
+        final: false,
         response: 'Paris',
       });
       expect(restored.standaloneResult(0, 'missing')).toBeUndefined();
@@ -411,6 +415,7 @@ describe('ProgressState', () => {
         score: 0,
         retries: 0,
         correct: false,
+        final: false,
       });
       expect(() => JSON.stringify(progress.toSaved())).not.toThrow();
     });
@@ -481,6 +486,7 @@ describe('ProgressState', () => {
         score: 0,
         retries: 0,
         correct: null,
+        final: false,
         response: 'agree',
       });
       expect(restored.standaloneResult(0, 'rated')?.correct).toBe(null);
@@ -534,6 +540,7 @@ describe('ProgressState', () => {
           score: 100,
           retries: 1,
           correct: true,
+          final: true,
         });
         expect(restored.quizResponses(2).size).toBe(0);
       });

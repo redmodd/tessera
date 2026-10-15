@@ -386,13 +386,13 @@ describe('SCORM12Adapter', () => {
       expect(lastLessonStatus()).toBe('failed');
     });
 
-    it('releases a held failed on a normal exit, not a suspend', async () => {
+    it('releases a held failed once the verdict is final', async () => {
       adapter.setSuccessStatus('failed');
-      adapter.setExit('suspend');
+      adapter.setExit('normal');
       await flush();
       expect(lastLessonStatus()).toBe('incomplete');
 
-      adapter.setExit('normal');
+      adapter.setVerdictFinal(true);
       await flush();
       expect(lastLessonStatus()).toBe('failed');
     });

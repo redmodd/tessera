@@ -50,7 +50,7 @@ export interface StandaloneSubmit {
 /** What a standalone question last submitted, for the handle a remount seeds. */
 export interface StandaloneRestore extends Pick<
   StandaloneResult,
-  'score' | 'retries' | 'correct'
+  'score' | 'retries' | 'correct' | 'final'
 > {
   response?: unknown;
 }
@@ -157,7 +157,6 @@ export interface GradedUnit {
 export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
   #requiredGradedIndices: ReadonlySet<number>;
-  #quizGradedIndices: ReadonlySet<number>;
   #quizMaxAttempts: ReadonlyMap<number, number>;
   #config: CourseConfig;
   #success: SuccessConfig;
@@ -175,9 +174,6 @@ export class ProgressState {
     );
     this.#requiredGradedIndices = new Set(
       manifest.pages.filter(isRequiredGradedPage).map((p) => p.index),
-    );
-    this.#quizGradedIndices = new Set(
-      manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
     );
     this.#quizMaxAttempts = new Map(
       manifest.pages.flatMap((p) =>
@@ -335,6 +331,7 @@ export class ProgressState {
         score: result.score,
         retries: result.retries,
         correct: result.correct,
+        final: result.final,
         response:
           result.response === undefined
             ? undefined
@@ -419,14 +416,14 @@ export class ProgressState {
 
   #answeredScore(pageIndex: number): number | undefined {
     if (this.#allAnswered(pageIndex)) return this.pageScore(pageIndex);
-    return this.#quizGradedIndices.has(pageIndex)
+    return this.#quizMaxAttempts.has(pageIndex)
       ? this.quizScore(pageIndex)
       : undefined;
   }
 
   pageScore(pageIndex: number): number | undefined {
     const unit = this.gradedUnits.get(pageIndex);
-    if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
+    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
       return unit.quizScore;
     return this.#gradedResults(pageIndex).length
       ? this.getPageStandaloneAverage(pageIndex)
@@ -492,9 +489,11 @@ export class ProgressState {
         (unit.quizScore >= 100 || unit.attempts >= maxAttempts)
       );
     }
+    const results = this.#gradedResults(pageIndex);
     return (
-      this.#answeredScore(pageIndex) !== undefined &&
-      this.#gradedResults(pageIndex).every((result) => result.final)
+      this.#allAnswered(pageIndex) &&
+      results.length > 0 &&
+      results.every((result) => result.final)
     );
   }
 
@@ -502,12 +501,13 @@ export class ProgressState {
    * True once no graded page, optional ones included, can change its score,
    * so the verdict stands.
    */
-  get verdictFinal(): boolean {
-    return (
-      this.#declaredGradedIndices.size > 0 &&
-      [...this.#declaredGradedIndices].every((i) => this.#pageFinal(i))
-    );
-  }
+  verdictFinal = $derived.by<boolean>(() => {
+    if (this.#declaredGradedIndices.size === 0) return false;
+    for (const pageIndex of this.#declaredGradedIndices) {
+      if (!this.#pageFinal(pageIndex)) return false;
+    }
+    return true;
+  });
 
   #gradedScoreDecided = $state(false);
 
@@ -653,9 +653,11 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
-          const bits = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13].includes(flags)
-            ? flags
-            : 0;
+          // Flags 1, 2, 4 and 8, never 2 with 4.
+          const bits =
+            Number.isInteger(flags) && (flags & ~15) === 0 && (flags & 6) !== 6
+              ? flags
+              : 0;
           this.markStandaloneQuestion(
             pageIndex,
             qid,
