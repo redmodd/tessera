@@ -347,26 +347,22 @@ describe('ProgressState', () => {
         score: 100,
         retries: 0,
         correct: true,
-        final: true,
       });
       expect(restored.standaloneResult(0, 'retried')).toEqual({
         score: 0,
         retries: 2,
         correct: false,
-        final: false,
       });
       expect(restored.standaloneResult(0, 'answered')).toEqual({
         score: 100,
         retries: 0,
         correct: true,
-        final: true,
         response: ['1'],
       });
       expect(restored.standaloneResult(0, 'text')).toEqual({
         score: 0,
         retries: 1,
         correct: false,
-        final: false,
         response: 'Paris',
       });
       expect(restored.standaloneResult(0, 'missing')).toBeUndefined();
@@ -415,7 +411,6 @@ describe('ProgressState', () => {
         score: 0,
         retries: 0,
         correct: false,
-        final: false,
       });
       expect(() => JSON.stringify(progress.toSaved())).not.toThrow();
     });
@@ -486,7 +481,6 @@ describe('ProgressState', () => {
         score: 0,
         retries: 0,
         correct: null,
-        final: false,
         response: 'agree',
       });
       expect(restored.standaloneResult(0, 'rated')?.correct).toBe(null);
@@ -540,7 +534,6 @@ describe('ProgressState', () => {
           score: 100,
           retries: 1,
           correct: true,
-          final: true,
         });
         expect(restored.quizResponses(2).size).toBe(0);
       });
@@ -1151,6 +1144,25 @@ describe('ProgressState', () => {
       );
       expect(progress.pageScore(3)).toBeUndefined();
     });
+
+    it.each([
+      [1, true],
+      [3, false],
+    ])(
+      'resaves a wrong answer final as maxRetries %i now gives',
+      (maxRetries, final) => {
+        const progress = new ProgressState(createManifest(0), createConfig());
+        progress.markStandaloneQuestion(3, 'q1', 0, true, 1, {
+          retries: 1,
+          final: !final,
+        });
+        progress.registerStandaloneQuestion(3, 'q1', true, 1, maxRetries);
+
+        expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.final).toBe(
+          final,
+        );
+      },
+    );
 
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());

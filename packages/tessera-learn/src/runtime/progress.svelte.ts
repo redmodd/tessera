@@ -50,7 +50,7 @@ export interface StandaloneSubmit {
 /** What a standalone question last submitted, for the handle a remount seeds. */
 export interface StandaloneRestore extends Pick<
   StandaloneResult,
-  'score' | 'retries' | 'correct' | 'final'
+  'score' | 'retries' | 'correct'
 > {
   response?: unknown;
 }
@@ -331,7 +331,6 @@ export class ProgressState {
         score: result.score,
         retries: result.retries,
         correct: result.correct,
-        final: result.final,
         response:
           result.response === undefined
             ? undefined
@@ -342,8 +341,8 @@ export class ProgressState {
 
   /**
    * Record a mounted question, so its page counts as answered only once every
-   * graded question on it is, and correct a restored answer's `graded` flag
-   * and weight from it, which outranks what the save was written with. The
+   * graded question on it is, and correct a restored answer's `graded` flag,
+   * weight and finality from it, which outrank what the save was written with. The
    * manifest lists the built-in questions the source fixes, so only a custom
    * or dynamically identified one behind a reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
@@ -354,18 +353,23 @@ export class ProgressState {
     questionId: string,
     graded: boolean,
     weight?: number,
+    maxRetries = Infinity,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
     const next = normalizeWeight(weight);
+    const final =
+      !!result && (result.score >= 100 || result.retries >= maxRetries);
     if (
       questions &&
       result &&
-      (next !== result.weight || graded !== result.graded)
+      (next !== result.weight ||
+        graded !== result.graded ||
+        final !== result.final)
     ) {
-      questions.set(questionId, { ...result, weight: next, graded });
+      questions.set(questionId, { ...result, weight: next, graded, final });
       this.#writeQuestions(pageIndex, questions);
     } else if (expectedChanged) {
       this.#changed();
