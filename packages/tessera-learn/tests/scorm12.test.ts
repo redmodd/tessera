@@ -385,6 +385,17 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(lastLessonStatus()).toBe('failed');
     });
+
+    it('releases a held failed on a normal exit, not a suspend', async () => {
+      adapter.setSuccessStatus('failed');
+      adapter.setExit('suspend');
+      await flush();
+      expect(lastLessonStatus()).toBe('incomplete');
+
+      adapter.setExit('normal');
+      await flush();
+      expect(lastLessonStatus()).toBe('failed');
+    });
   });
 
   // ---- duration / commit / terminate ----

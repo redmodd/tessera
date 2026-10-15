@@ -71,11 +71,11 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get canRetry(): boolean {
-    return (
-      this.#submitted &&
-      !this.isLockedCorrect &&
-      this.#retryCount < (this.#opts.maxRetries ?? Infinity)
-    );
+    return this.#submitted && !this.isLockedCorrect && this.#retriesLeft;
+  }
+
+  get #retriesLeft(): boolean {
+    return this.#retryCount < (this.#opts.maxRetries ?? Infinity);
   }
 
   get retryCount(): number {
@@ -104,6 +104,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
       retries: this.#retryCount,
       response: this.#opts.restore ? response.response : undefined,
       correct,
+      final: !this.#retriesLeft,
     });
     this.#report(response, correct);
 

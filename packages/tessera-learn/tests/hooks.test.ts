@@ -293,6 +293,7 @@ describe('useQuestion — standalone mode', () => {
       graded: true,
       retries: 0,
       correct: true,
+      final: true,
     });
   });
 

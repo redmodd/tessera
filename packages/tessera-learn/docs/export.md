@@ -42,16 +42,16 @@ export: {
 
 The runtime translates author intent into adapter calls automatically. The author-relevant differences:
 
-| Concern              | SCORM 1.2                                                                                | SCORM 2004 4th                                                 | cmi5 / xapi                          |
-| -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
-| Completion + success | One field (`lesson_status`) with no "unknown"; `passed` and `failed` wait for completion | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
-| Score scale to LMS   | `score.raw` (0–100)                                                                      | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
-| Saved state cap      | ~4 KB (plan for 4096 bytes)                                                              | 64000 bytes                                                    | LRS-defined (typically unbounded)    |
-| Resume after reload  | From `cmi.suspend_data`                                                                  | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
+| Concern              | SCORM 1.2                                                                                                              | SCORM 2004 4th                                                 | cmi5 / xapi                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
+| Completion + success | One field (`lesson_status`) with no "unknown"; `passed` waits for completion, `failed` for completion or a final score | Two independent fields (`completion_status`, `success_status`) | Completed + Passed/Failed statements |
+| Score scale to LMS   | `score.raw` (0–100)                                                                                                    | `score.raw` (0–100) **and** `score.scaled` (0–1)               | `result.score.scaled` (0–1)          |
+| Saved state cap      | ~4 KB (plan for 4096 bytes)                                                                                            | 64000 bytes                                                    | LRS-defined (typically unbounded)    |
+| Resume after reload  | From `cmi.suspend_data`                                                                                                | From `cmi.suspend_data`                                        | From `tessera-state` (State API)     |
 
 Author-facing consequences:
 
-- **A failing learner who cannot complete stays `incomplete` on SCORM 1.2**, with the score: under `completion.mode: "quiz"` they never complete, and in any mode a failed `gatesProgress` quiz locks the pages after it. An LMS that rescores against a mastery score on exit records `failed` itself.
+- **A failing learner who cannot complete stays `incomplete` on SCORM 1.2 until the score is final**, then exits as `failed`. The score is final once every graded page, optional ones included, has scored 100 or run out of tries: a quiz its `maxAttempts`, each graded `useQuestion` its `maxRetries`. Without those limits it never is, and neither is it while a failed `gatesProgress` quiz locks a graded page. A final failure exits normally under every standard, ending the attempt.
 - **Keep persisted state small under SCORM 1.2**: it shares the ~4 KB `suspend_data` budget with progress, bookmarks and saved answers. For a long or question-heavy course, export `scorm2004`, `cmi5` or `xapi` instead; validation warns when the page count alone nears the limit.
 - **Under SCORM, a saved character outside ASCII costs 6 bytes** (an emoji 12). Count typed answers and `usePersistence` text in other scripts at that rate.
 - **Saved question answers give way first.** When a save would exceed the `suspend_data` limit, answers are left out until it fits, and the console warns once. Scores, attempts, retries and locks still restore; the questions come back without the answer shown.

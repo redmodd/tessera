@@ -432,12 +432,12 @@ export class CourseSession {
     this.#reportDuration();
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
+    const progress = this.#progress;
+    const attemptOver =
+      progress.reportedCompletionStatus === 'complete' ||
+      (progress.successStatus === 'failed' && progress.verdictFinal);
     // Before terminate(), so SCORM commits the exit mode in the same flush.
-    adapter.setExit(
-      this.#progress.reportedCompletionStatus === 'complete'
-        ? 'normal'
-        : 'suspend',
-    );
+    adapter.setExit(attemptOver ? 'normal' : 'suspend');
     adapter.commit();
     return true;
   }

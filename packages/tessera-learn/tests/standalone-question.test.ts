@@ -55,6 +55,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: undefined,
       correct: true,
+      final: false,
     });
 
     const restorable = make({ restore: () => {} });
@@ -63,6 +64,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: true,
       correct: true,
+      final: false,
     });
   });
 
@@ -359,6 +361,7 @@ describe('StandaloneQuestion', () => {
         retries: 2,
         response: false,
         correct: false,
+        final: true,
       });
       expect(q.canRetry).toBe(false);
     });

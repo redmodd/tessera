@@ -32,6 +32,8 @@ export interface StandaloneResult {
   correct: boolean | null;
   /** The submitted response, as JSON. */
   response?: string;
+  /** No retry is left to change the score. */
+  final: boolean;
 }
 
 /** What a standalone submit records beside its score. */
@@ -41,6 +43,8 @@ export interface StandaloneSubmit {
   response?: unknown;
   /** The verdict, or null when the response had no `correct` to judge it by. Default: what the score gives. */
   correct?: boolean | null;
+  /** No retries are left. A score of 100 is final either way. */
+  final?: boolean;
 }
 
 /** What a standalone question last submitted, for the handle a remount seeds. */
@@ -154,6 +158,7 @@ export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
   #requiredGradedIndices: ReadonlySet<number>;
   #quizGradedIndices: ReadonlySet<number>;
+  #quizMaxAttempts: ReadonlyMap<number, number>;
   #config: CourseConfig;
   #success: SuccessConfig;
   #totalPages: number;
@@ -173,6 +178,13 @@ export class ProgressState {
     );
     this.#quizGradedIndices = new Set(
       manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
+    );
+    this.#quizMaxAttempts = new Map(
+      manifest.pages.flatMap((p) =>
+        p.quiz?.graded
+          ? [[p.index, p.quiz.maxAttempts ?? Infinity] as const]
+          : [],
+      ),
     );
     this.#quizPageIndices = new Set(
       manifest.pages.filter((p) => p.quiz).map((p) => p.index),
@@ -295,7 +307,7 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    { retries, response, correct }: StandaloneSubmit = {},
+    { retries, response, correct, final }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -308,6 +320,7 @@ export class ProgressState {
       retries: normalizeRetries(retries),
       correct: correct === undefined ? clamped >= 100 : correct,
       response: encodeResponse(response),
+      final: clamped >= 100 || final === true,
     });
     this.#writeQuestions(pageIndex, questions);
   }
@@ -469,6 +482,33 @@ export class ProgressState {
     };
   });
 
+  /** No attempt or retry left can change the page's score. */
+  #pageFinal(pageIndex: number): boolean {
+    const maxAttempts = this.#quizMaxAttempts.get(pageIndex);
+    if (maxAttempts !== undefined) {
+      const unit = this.gradedUnits.get(pageIndex);
+      return (
+        unit?.quizScore !== undefined &&
+        (unit.quizScore >= 100 || unit.attempts >= maxAttempts)
+      );
+    }
+    return (
+      this.#answeredScore(pageIndex) !== undefined &&
+      this.#gradedResults(pageIndex).every((result) => result.final)
+    );
+  }
+
+  /**
+   * True once no graded page, optional ones included, can change its score,
+   * so the verdict stands.
+   */
+  get verdictFinal(): boolean {
+    return (
+      this.#declaredGradedIndices.size > 0 &&
+      [...this.#declaredGradedIndices].every((i) => this.#pageFinal(i))
+    );
+  }
+
   #gradedScoreDecided = $state(false);
 
   get gradedScoreFinal(): boolean {
@@ -512,7 +552,8 @@ export class ProgressState {
             const { score, weight, retries, response, correct } = result;
             const verdict =
               correct === null ? 2 : correct === score >= 100 ? 0 : 4;
-            const flags = (result.graded ? 1 : 0) + verdict;
+            const final = result.final && score < 100 ? 8 : 0;
+            const flags = (result.graded ? 1 : 0) + verdict + final;
             const bare: number | SavedQuestion =
               retries > 0
                 ? [score, weight, flags, retries]
@@ -612,7 +653,9 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
-          const bits = [0, 1, 2, 3, 4, 5].includes(flags) ? flags : 0;
+          const bits = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13].includes(flags)
+            ? flags
+            : 0;
           this.markStandaloneQuestion(
             pageIndex,
             qid,
@@ -623,6 +666,7 @@ export class ProgressState {
               retries,
               response: swapIds(response),
               correct: bits & 2 ? null : score >= 100 !== !!(bits & 4),
+              final: !!(bits & 8),
             },
           );
         }

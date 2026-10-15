@@ -264,6 +264,51 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
   });
 
+  test('a failing score out of quiz attempts exits as failed', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+    await openQuiz(page, 'Graded Assessment');
+
+    await answerGradedQuiz(page, { q1Correct: false });
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+    const progress = page.locator('.tessera-quiz-progress-desktop').first();
+    for (let attempt = 2; attempt <= 3; attempt++) {
+      await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+      // An incorrect-only retry locks Q2 and Q3, which were answered right.
+      await page
+        .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+        .first()
+        .click();
+      await primary.click();
+      await expect(primary).toHaveText('Next Question');
+      await primary.click();
+      await expect(progress).toContainText('Question 2 of 3');
+      await primary.click();
+      await expect(progress).toContainText('Question 3 of 3');
+      await page.locator('.tessera-quiz-btn-submit').click();
+      await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+    }
+    await expect(
+      page.locator('.tessera-quiz-attempts-exhausted'),
+    ).toBeVisible();
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.lesson_status': 'incomplete',
+        'cmi.core.score.raw': '66.67',
+      });
+
+    await exitCourse(page);
+
+    expect(await scormData(page)).toMatchObject({
+      'cmi.core.lesson_status': 'failed',
+      'cmi.core.exit': '',
+    });
+  });
+
   test('Exit flushes session_time in HHHH:MM:SS.SS format and calls LMSFinish', async ({
     page,
   }) => {
