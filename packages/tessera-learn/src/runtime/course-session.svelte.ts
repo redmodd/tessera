@@ -186,10 +186,8 @@ export class CourseSession {
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
     this.#report(() => {
-      this.#prevVerdictFinal = progress.verdictFinal;
-      adapter.setVerdictFinal(this.#prevVerdictFinal);
       adapter.setCompletionStatus(progress.reportedCompletionStatus);
-      adapter.setSuccessStatus(progress.successStatus);
+      this.#reportSuccess();
     });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
@@ -357,6 +355,16 @@ export class CourseSession {
     });
   }
 
+  // Finality first, so SCORM 1.2 commits a final failure with the verdict
+  // instead of holding it at incomplete for one more commit.
+  #reportSuccess(): void {
+    const progress = this.#progress;
+    this.#prevVerdictFinal = progress.verdictFinal;
+    this.#adapter.setVerdictFinal(this.#prevVerdictFinal);
+    this.#prevSuccessStatus = progress.successStatus;
+    this.#adapter.setSuccessStatus(this.#prevSuccessStatus);
+  }
+
   #reportStatus(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -373,8 +381,7 @@ export class CourseSession {
         adapter.setScore(score);
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-        this.#prevSuccessStatus = progress.successStatus;
-        adapter.setSuccessStatus(this.#prevSuccessStatus);
+        this.#reportSuccess();
       });
     });
 
@@ -390,8 +397,7 @@ export class CourseSession {
       const status = progress.successStatus;
       if (!this.#persistenceReady) return;
       if (status === this.#prevSuccessStatus) return;
-      this.#prevSuccessStatus = status;
-      this.#report(() => adapter.setSuccessStatus(status));
+      this.#report(() => this.#reportSuccess());
     });
 
     $effect(() => {

@@ -80,6 +80,26 @@ describe('a graded submit that decides the verdict', () => {
     expect(setVerdictFinal).toHaveBeenLastCalledWith(true);
   });
 
+  it('commits a final verdict once when the last attempt also moves the score', async () => {
+    const calls: string[] = [];
+    const progress = await start(
+      stubAdapter({
+        setVerdictFinal: (final) => calls.push(`final:${final}`),
+        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        commit: () => calls.push('commit'),
+      }),
+    );
+    progress.quizCompleted(0, 40);
+    progress.quizCompleted(0, 40);
+    await flush();
+    calls.length = 0;
+
+    progress.quizCompleted(0, 50);
+    await flush();
+
+    expect(calls).toEqual(['final:true', 'success:failed', 'commit']);
+  });
+
   it('holds the completion a later optional page would take back', async () => {
     const setCompletionStatus = vi.fn();
     const setExit = vi.fn();

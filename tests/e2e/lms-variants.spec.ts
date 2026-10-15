@@ -4,12 +4,15 @@ import { installScorm12Mock, installScorm2004Mock, test } from './lms-mocks.js';
 import {
   answerGradedQuiz,
   answerMatching,
+  clickExitCourse,
   interactionField,
   interactionWrites,
   navigateToPage,
   openQuiz,
   reportedQuestionCount,
+  retryGradedQuizWithQ1Wrong,
   scormData,
+  scormLog,
   startPreview,
   waitForServer,
   waitForTesseraContent,
@@ -213,6 +216,37 @@ test.describe.serial('completion.mode quiz', () => {
     const data = await scormData(page);
     const visited = JSON.parse(data['cmi.suspend_data']).v as number[];
     expect(visited.length).toBeLessThan(totalPages);
+  });
+
+  test('failing the graded quiz out of attempts ends the attempt on exit', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+    await openQuiz(page, 'Graded Assessment');
+
+    await answerGradedQuiz(page, { q1Correct: false });
+    await retryGradedQuizWithQ1Wrong(page);
+    await retryGradedQuizWithQ1Wrong(page);
+    await expect(
+      page.locator('.tessera-quiz-attempts-exhausted'),
+    ).toBeVisible();
+
+    await clickExitCourse(page);
+    await expect(page.locator('.tessera-session-ended')).toContainText(
+      'Session ended',
+    );
+
+    expect(await scormData(page)).toMatchObject({
+      'cmi.success_status': 'failed',
+      'cmi.completion_status': 'incomplete',
+      'cmi.exit': 'normal',
+    });
+    expect(await scormLog(page)).toContainEqual([
+      'SetValue',
+      'adl.nav.request',
+      'exitAll',
+    ]);
   });
 
   test.describe('scaled_passing_score from the exported manifest', () => {
