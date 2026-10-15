@@ -266,7 +266,10 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   abstract override setScore(score: number): void;
   abstract override setCompletionStatus(status: CompletionStatus): void;
-  abstract override setSuccessStatus(status: SuccessStatus): void;
+  abstract override setSuccessStatus(
+    status: SuccessStatus,
+    final?: boolean,
+  ): void;
   abstract override setExit(mode: ExitMode): void;
 }
 

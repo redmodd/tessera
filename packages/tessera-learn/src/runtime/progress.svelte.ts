@@ -121,7 +121,7 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
-function clampScore(score: number): number {
+export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
 
