@@ -3,6 +3,7 @@ import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
 import {
   clampScore,
+  retriesLeft,
   type StandaloneRestore,
   type StandaloneSubmit,
 } from './progress.svelte.js';
@@ -79,7 +80,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get #retriesLeft(): boolean {
-    return this.#retryCount < (this.#opts.maxRetries ?? Infinity);
+    return retriesLeft(this.#retryCount, this.#opts.maxRetries);
   }
 
   get retryCount(): number {

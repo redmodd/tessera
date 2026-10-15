@@ -121,6 +121,11 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
+/** A question with `retries` spent can still retry under `maxRetries`. */
+export function retriesLeft(retries: number, maxRetries?: number): boolean {
+  return retries < (maxRetries ?? Infinity);
+}
+
 export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
@@ -353,7 +358,7 @@ export class ProgressState {
     questionId: string,
     graded: boolean,
     weight?: number,
-    maxRetries = Infinity,
+    maxRetries?: number,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
@@ -361,7 +366,8 @@ export class ProgressState {
     const result = questions?.get(questionId);
     const next = normalizeWeight(weight);
     const final =
-      !!result && (result.score >= 100 || result.retries >= maxRetries);
+      !!result &&
+      (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
     if (
       questions &&
       result &&

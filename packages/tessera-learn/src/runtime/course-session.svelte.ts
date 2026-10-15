@@ -242,7 +242,6 @@ export class CourseSession {
     this.#nav.goToPage(saved.b);
 
     this.#prevCompletionStatus = progress.reportedCompletionStatus;
-    this.#prevSuccessStatus = progress.successStatus;
     const seededScore = progress.gradedScoreFinal
       ? progress.reportedScore
       : null;

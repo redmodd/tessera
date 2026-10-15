@@ -1151,8 +1151,9 @@ describe('ProgressState', () => {
     it.each([
       [1, true],
       [3, false],
+      [NaN, true],
     ])(
-      'resaves a wrong answer final as maxRetries %i now gives',
+      'resaves a wrong answer final as maxRetries %d now gives',
       (maxRetries, final) => {
         const progress = new ProgressState(createManifest(0), createConfig());
         progress.markStandaloneQuestion(3, 'q1', 0, true, 1, {
