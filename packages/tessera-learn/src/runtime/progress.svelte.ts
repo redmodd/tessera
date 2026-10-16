@@ -121,11 +121,15 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
-/** A question with `retries` spent can still retry under `maxRetries`. */
+/**
+ * Whether another retry is allowed. `retries` counts retries already spent,
+ * excluding the initial submission; an omitted `maxRetries` means no limit.
+ */
 export function retriesLeft(retries: number, maxRetries?: number): boolean {
   return retries < (maxRetries ?? Infinity);
 }
 
+/** Clamp a score to 0–100, treating any non-finite value as 0. */
 export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
@@ -302,6 +306,11 @@ export class ProgressState {
     console.warn(message);
   }
 
+  /**
+   * Record or replace a standalone result with its score clamped to 0–100;
+   * non-finite scores become 0. A graded result is final when it scores 100
+   * or `final` is true. Responses that cannot be JSON-serialized are omitted.
+   */
   markStandaloneQuestion(
     pageIndex: number,
     questionId: string,
@@ -347,8 +356,10 @@ export class ProgressState {
   /**
    * Record a mounted question, so its page counts as answered only once every
    * graded question on it is, and correct a restored answer's `graded` flag,
-   * weight and finality from it, which outrank what the save was written with. The
-   * manifest lists the built-in questions the source fixes, so only a custom
+   * weight and finality from it, which outrank what the save was written with.
+   * The current `maxRetries` is compared with the saved retries spent; a graded
+   * answer scored 100 is final regardless of the retry limit.
+   * The manifest lists the built-in questions the source fixes, so only a custom
    * or dynamically identified one behind a reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
    * each question's weight at build time, which custom question components hide.
@@ -431,6 +442,11 @@ export class ProgressState {
       : undefined;
   }
 
+  /**
+   * Best submitted graded quiz score, otherwise the weighted mean of submitted
+   * graded standalone answers. Undefined when neither is available; unanswered
+   * standalone questions do not contribute to this mean.
+   */
   pageScore(pageIndex: number): number | undefined {
     const unit = this.gradedUnits.get(pageIndex);
     if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
@@ -737,7 +753,11 @@ export class ProgressState {
     this.#completionReached ? 'complete' : this.completionStatus,
   );
 
-  /** Completion is reached or out of reach: quiz completion takes a score that a final one can no longer become. */
+  /**
+   * Whether exit should end the LMS attempt: the course has completed,
+   * or quiz completion has a final graded verdict, regardless of `success`.
+   * A final verdict alone does not end attempts in other completion modes.
+   */
   get attemptOver(): boolean {
     return (
       this.reportedCompletionStatus === 'complete' ||

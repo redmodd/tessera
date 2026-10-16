@@ -200,6 +200,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     );
   }
 
+  /**
+   * Hold a non-final failure until termination so a later pass can replace it.
+   * With `final: true`, report the failure without waiting for termination.
+   * A pass or unknown status clears any held failure; launch-mode restrictions
+   * and duplicate suppression still apply to reported verdicts.
+   */
   override setSuccessStatus(status: SuccessStatus, final = false): void {
     if (status === 'failed' && !final) {
       this.#heldFailed = true;

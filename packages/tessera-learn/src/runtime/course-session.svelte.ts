@@ -437,6 +437,12 @@ export class CourseSession {
     });
   }
 
+  /**
+   * Mark the session ended and report its duration. Once persistence is ready,
+   * save progress and commit a normal exit if the attempt is over, or suspend
+   * otherwise. Returns false if already ended. Serialization and adapter errors
+   * propagate after the session has been marked ended.
+   */
   #endSession(): boolean {
     if (this.#terminated) return false;
     this.#terminated = true;

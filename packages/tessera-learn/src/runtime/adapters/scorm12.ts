@@ -96,6 +96,11 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.#flushLessonStatus();
   }
 
+  /**
+   * Queue the combined lesson status. A failure stays incomplete until
+   * completion or `final: true`; a pass takes precedence immediately.
+   * An unknown verdict leaves the lesson status to completion alone.
+   */
   setSuccessStatus(status: SuccessStatus, final = false): void {
     // SCORM 1.2 has no "unknown" lesson_status, so null leaves it to
     // completion status.

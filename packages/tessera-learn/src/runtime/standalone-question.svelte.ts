@@ -98,6 +98,14 @@ export class StandaloneQuestion implements UseQuestionHandle {
     if (response) this.#report(response, isCorrect(response));
   };
 
+  /**
+   * Record the score, retries spent and retry exhaustion, then report the
+   * interaction and lock the answer. No-op if already submitted or unanswered.
+   * Scores are clamped to 0–100, with non-finite values treated as 0. A score
+   * of 100 prevents further retries even when the verdict is incorrect.
+   * Callback and reporting errors propagate, leaving the handle unsubmitted;
+   * the score may already have been recorded when reporting fails.
+   */
   submit = (): void => {
     if (this.#submitted) return;
     const response = this.#opts.response();
