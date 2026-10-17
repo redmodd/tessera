@@ -1,8 +1,11 @@
 import JSON5 from 'json5';
 import { staticQuestionId } from '../manifest.js';
-import type { ComponentMatch, PropValue } from '../ast.js';
+import { isLiteralTrue, type ComponentMatch, type PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
-import { SCORM12_MAX_OPTIONS } from '../../runtime/interaction-format.js';
+import {
+  SCORM12_MAX_OPTIONS,
+  formatCorrectPattern,
+} from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
@@ -233,12 +236,24 @@ export function validateQuestionComponents(
       const answers = props.get('answers');
       const value =
         answers?.kind === 'string' ? answers.value : staticValue(answers);
-      const long = [value]
+      const correct = [value]
         .flat()
-        .filter((a) => typeof a === 'string' && a.trim().length > max).length;
+        .filter((a) => typeof a === 'string')
+        .map((a) => a.trim());
+      const caseMatters =
+        format.supportsCasePrefix && isLiteralTrue(props.get('caseSensitive'));
+      const patterns =
+        formatCorrectPattern(
+          { type: 'fill-in', response: '', correct, caseMatters },
+          format,
+        ) ?? [];
+      const long = patterns.filter((p) => p.length > max).length;
       if (long > 0) {
+        const prefix = caseMatters
+          ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
+          : '';
         d.warn(
-          `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${profile.name} records; they are graded but left out of the LMS record`,
+          `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${profile.name} records${prefix}; they are graded but left out of the LMS record`,
         );
       }
     }

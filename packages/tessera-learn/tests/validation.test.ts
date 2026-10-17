@@ -2187,6 +2187,35 @@ let a = {}; let b = {};</script>
     ).toEqual(warning ? [expect.stringContaining(warning)] : []);
   });
 
+  it.each([
+    ['scorm2004', 1],
+    ['scorm12', 0],
+  ])(
+    'counts the case-sensitive prefix toward the fill-in cap under %s',
+    (standard, warnings) => {
+      createValidProject(testRoot);
+      writeConfig(
+        testRoot,
+        `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "${standard}" },
+};`,
+      );
+      writePage(
+        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" caseSensitive answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
+      );
+      expect(
+        validateProject(testRoot).warnings.filter((w) =>
+          w.includes('<FillInTheBlank> has 1 answer(s) over'),
+        ),
+      ).toHaveLength(warnings);
+    },
+  );
+
   it('warns about a single fill-in answer string over 255 characters', () => {
     createValidProject(testRoot);
     writeConfig(
