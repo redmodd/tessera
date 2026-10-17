@@ -2120,16 +2120,17 @@ let a = {}; let b = {};</script>
     ).toHaveLength(0);
   });
 
-  it('warns about more than 36 options only under SCORM 1.2', () => {
-    const options = JSON.stringify(
-      Array.from({ length: 37 }, (_, i) => `o${i}`),
-    );
+  it('warns about more than 36 options, pairs, items or targets only under SCORM 1.2', () => {
+    const list = (f: (i: number) => unknown) =>
+      JSON.stringify(Array.from({ length: 37 }, (_, i) => f(i)));
     createValidProject(testRoot);
     writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice id="q1" question="Q" options={${options}} correct={0} />`,
+      `<script>import { MultipleChoice, Matching, Sorting } from 'tessera-learn';</script>
+<MultipleChoice id="q1" question="Q" options={${list((i) => `o${i}`)}} correct={0} />
+<Matching id="q2" question="Q" pairs={${list((i) => ({ left: `l${i}`, right: `r${i}` }))}} />
+<Sorting id="q3" question="Q" items={${list((i) => `i${i}`)}} targets={${list((i) => `t${i}`)}} correct={${list((i) => i)}} />`,
     );
-    const tooMany = (w: string) => w.includes('has 37 options');
+    const tooMany = (w: string) => w.includes('has 37 ');
     expect(validateProject(testRoot).warnings.filter(tooMany)).toHaveLength(0);
     writeConfig(
       testRoot,
@@ -2141,11 +2142,14 @@ let a = {}; let b = {};</script>
   export: { standard: "scorm12" },
 };`,
     );
-    expect(validateProject(testRoot).warnings).toContainEqual(
+    expect(validateProject(testRoot).warnings.filter(tooMany)).toEqual([
       expect.stringContaining(
         '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36',
       ),
-    );
+      expect.stringContaining('<Matching> has 37 pairs'),
+      expect.stringContaining('<Sorting> has 37 items'),
+      expect.stringContaining('<Sorting> has 37 targets'),
+    ]);
   });
 
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
