@@ -13,6 +13,7 @@
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
       correct: [String(correct)],
+      options: options.map((_, i) => String(i)),
     }),
   });
 </script>

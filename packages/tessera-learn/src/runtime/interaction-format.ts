@@ -116,14 +116,14 @@ function encodeIds(
 }
 
 function encodePairs(
-  pairs: Array<[string, string]>,
+  pairs: Array<[string, string | number]>,
   optionPairs: { left: string[]; right: string[] } | undefined,
   fmt: InteractionFormat,
 ): string {
   return pairs
     .map(
       ([l, r]) =>
-        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`,
+        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(String(r), optionPairs?.right, fmt)}`,
     )
     .join(fmt.itemDelim);
 }
@@ -149,12 +149,7 @@ export function formatResponse(
     case 'numeric':
       return String(i.response);
     case 'performance':
-      return i.response
-        .map(
-          ([s, v]) =>
-            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-        )
-        .join(fmt.itemDelim);
+      return encodePairs(i.response, undefined, fmt);
   }
 }
 
@@ -208,12 +203,11 @@ export function formatCorrectPattern(
       return [i.correct as string];
     case 'performance':
       return [
-        (i.correct as Array<[string, string | number]>)
-          .map(
-            ([s, v]) =>
-              `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-          )
-          .join(fmt.itemDelim),
+        encodePairs(
+          i.correct as Array<[string, string | number]>,
+          undefined,
+          fmt,
+        ),
       ];
   }
 }
