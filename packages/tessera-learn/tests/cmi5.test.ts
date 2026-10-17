@@ -401,6 +401,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
 
     adapter.setSuccessStatus('failed', true);
+    adapter.commit();
     await flush();
     expect(sentVerbs()).toContain('failed');
 
