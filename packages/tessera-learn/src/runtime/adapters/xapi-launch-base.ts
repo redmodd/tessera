@@ -395,7 +395,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override terminate(unloading = true): void {
     if (this.#terminated) return;
-    this.commit();
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {

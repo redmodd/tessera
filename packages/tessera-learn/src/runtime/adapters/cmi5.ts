@@ -211,7 +211,10 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   override terminate(unloading?: boolean): void {
-    if (this.#heldFailed) super.setSuccessStatus('failed');
+    if (this.#heldFailed) {
+      super.setSuccessStatus('failed');
+      this.commit();
+    }
     super.terminate(unloading);
   }
 

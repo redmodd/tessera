@@ -309,6 +309,7 @@ describe('XAPIAdapter', () => {
     adapter.commit();
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
+    adapter.commit();
     adapter.terminate();
     await flush();
 
@@ -360,6 +361,7 @@ describe('XAPIAdapter', () => {
     adapter.commit();
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
+    adapter.commit();
     adapter.terminate();
     await flush();
 

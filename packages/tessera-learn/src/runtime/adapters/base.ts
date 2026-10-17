@@ -85,6 +85,7 @@ export abstract class BaseAdapter {
     _interaction: Interaction,
     _correct: boolean | null,
   ): void {}
+  /** Send what the setters recorded. xAPI and cmi5 send status statements only here. */
   commit(): void {}
   terminate(): void {}
 
