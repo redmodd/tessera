@@ -30,6 +30,8 @@ function staticNumber(prop: PropValue | undefined): number | null {
 
 interface QuestionComponentRule {
   required: string[];
+  /** Props whose entries SCORM 1.2 records as one-character indexes. */
+  indexedLists?: string[];
   check(props: ComponentMatch['props'], fileRel: string, d: Diagnostics): void;
 }
 
@@ -39,6 +41,7 @@ const QUESTION_COMPONENTS: Record<
 > = {
   MultipleChoice: {
     required: ['question', 'options', 'correct'],
+    indexedLists: ['options'],
     check(props, fileRel, d) {
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
@@ -78,6 +81,7 @@ const QUESTION_COMPONENTS: Record<
   },
   Matching: {
     required: ['question', 'pairs'],
+    indexedLists: ['pairs'],
     check(props, fileRel, d) {
       const pairs = staticArray(props.get('pairs'));
       if (pairs) {
@@ -97,6 +101,7 @@ const QUESTION_COMPONENTS: Record<
   },
   Sorting: {
     required: ['question', 'items', 'targets', 'correct'],
+    indexedLists: ['items', 'targets'],
     check(props, fileRel, d) {
       const items = staticArray(props.get('items'));
       const targets = staticArray(props.get('targets'));
@@ -123,12 +128,6 @@ const QUESTION_COMPONENTS: Record<
       }
     },
   },
-};
-
-const INDEXED_LIST_PROPS: Partial<Record<QuestionComponentName, string[]>> = {
-  MultipleChoice: ['options'],
-  Matching: ['pairs'],
-  Sorting: ['items', 'targets'],
 };
 
 export function validateQuestionComponents(
@@ -211,9 +210,8 @@ export function validateQuestionComponents(
       }
     }
 
-    const indexedLists = INDEXED_LIST_PROPS[name as QuestionComponentName];
-    if (profile && format?.encodesOptionIndex && indexedLists) {
-      for (const prop of indexedLists) {
+    if (profile && format?.encodesOptionIndex) {
+      for (const prop of rule.indexedLists ?? []) {
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > SCORM12_MAX_OPTIONS) {
           d.warn(

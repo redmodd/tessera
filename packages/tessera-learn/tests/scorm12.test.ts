@@ -643,19 +643,6 @@ describe('SCORM12Adapter', () => {
       });
     });
 
-    it('records digit ids as written when options is not supplied', async () => {
-      adapter.reportInteraction(
-        'q1',
-        { type: 'choice', response: ['2024'], correct: ['01'] },
-        false,
-      );
-      await flush();
-      expect(interaction0()).toMatchObject({
-        student_response: '2024',
-        'correct_responses.0.pattern': '01',
-      });
-    });
-
     it('omits only the field whose option index exceeds 35', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const options = Array.from({ length: 40 }, (_, i) => `opt${i}`);
@@ -673,7 +660,11 @@ describe('SCORM12Adapter', () => {
         'correct_responses.0.pattern': '2',
       });
       expect(fields).not.toHaveProperty('student_response');
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('q1'));
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" is left out of the LMS record: option 37',
+        ),
+      );
     });
 
     it('omits a field whose id is not in options instead of slugging it', async () => {

@@ -36,6 +36,7 @@
     weight = 1,
   } = $props();
 
+  const pairIds = $derived(indexIds(pairs));
   let shuffledRight = $state([]);
   const matches = new SvelteMap();
   // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
@@ -81,8 +82,8 @@
     response: () => ({
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
-      correct: pairs.map((_, i) => [String(i), String(i)]),
-      optionPairs: { left: indexIds(pairs), right: indexIds(pairs) },
+      correct: pairIds.map((id) => [id, id]),
+      optionPairs: { left: pairIds, right: pairIds },
     }),
     reset: resetState,
     restore: (response) => {

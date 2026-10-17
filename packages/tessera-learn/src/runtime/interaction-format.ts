@@ -107,6 +107,27 @@ function encodeListItem(
   return idx.toString(36);
 }
 
+function encodeIds(
+  values: string[],
+  options: string[] | undefined,
+  fmt: InteractionFormat,
+): string {
+  return values.map((v) => encodeListItem(v, options, fmt)).join(fmt.itemDelim);
+}
+
+function encodePairs(
+  pairs: Array<[string, string]>,
+  optionPairs: { left: string[]; right: string[] } | undefined,
+  fmt: InteractionFormat,
+): string {
+  return pairs
+    .map(
+      ([l, r]) =>
+        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`,
+    )
+    .join(fmt.itemDelim);
+}
+
 /** Throws UnencodableOptionError when SCORM 1.2 cannot encode an option. */
 export function formatResponse(
   i: Interaction,
@@ -115,9 +136,7 @@ export function formatResponse(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response
-        .map((v) => encodeListItem(v, i.options, fmt))
-        .join(fmt.itemDelim);
+      return encodeIds(i.response, i.options, fmt);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -126,12 +145,7 @@ export function formatResponse(
     case 'other':
       return i.response;
     case 'matching':
-      return i.response
-        .map(
-          ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-        )
-        .join(fmt.itemDelim);
+      return encodePairs(i.response, i.optionPairs, fmt);
     case 'numeric':
       return String(i.response);
     case 'performance':
@@ -156,11 +170,7 @@ export function formatCorrectPattern(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return [
-        (i.correct as string[])
-          .map((v) => encodeListItem(v, i.options, fmt))
-          .join(fmt.itemDelim),
-      ];
+      return [encodeIds(i.correct as string[], i.options, fmt)];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
@@ -180,12 +190,7 @@ export function formatCorrectPattern(
     }
     case 'matching':
       return [
-        (i.correct as Array<[string, string]>)
-          .map(
-            ([l, r]) =>
-              `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-          )
-          .join(fmt.itemDelim),
+        encodePairs(i.correct as Array<[string, string]>, i.optionPairs, fmt),
       ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
