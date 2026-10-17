@@ -4,6 +4,7 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
+    indexIds,
     questionId,
     savedIndex,
     shuffle,
@@ -81,6 +82,7 @@
       type: 'matching',
       response: [...matches.entries()].map(([l, r]) => [String(l), String(r)]),
       correct: pairs.map((_, i) => [String(i), String(i)]),
+      optionPairs: { left: indexIds(pairs), right: indexIds(pairs) },
     }),
     reset: resetState,
     restore: (response) => {

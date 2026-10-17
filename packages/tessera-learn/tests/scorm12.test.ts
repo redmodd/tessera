@@ -622,14 +622,17 @@ describe('SCORM12Adapter', () => {
       });
     });
 
-    it('encodes raw index strings as base-36 when options is not supplied', async () => {
-      const pairs = Array.from({ length: 11 }, (_, i): [string, string] => [
-        String(i),
-        String(i),
-      ]);
+    it('encodes matching index ids past 9 as base-36', async () => {
+      const ids = Array.from({ length: 11 }, (_, i) => String(i));
+      const pairs = ids.map((id): [string, string] => [id, id]);
       adapter.reportInteraction(
         'm1',
-        { type: 'matching', response: pairs, correct: pairs },
+        {
+          type: 'matching',
+          response: pairs,
+          correct: pairs,
+          optionPairs: { left: ids, right: ids },
+        },
         true,
       );
       await flush();
@@ -640,11 +643,25 @@ describe('SCORM12Adapter', () => {
       });
     });
 
-    it('omits response and pattern when an option index exceeds 35', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('records digit ids as written when options is not supplied', async () => {
       adapter.reportInteraction(
         'q1',
-        { type: 'choice', response: ['36'], correct: ['0'] },
+        { type: 'choice', response: ['2024'], correct: ['01'] },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({
+        student_response: '2024',
+        'correct_responses.0.pattern': '01',
+      });
+    });
+
+    it('omits only the field whose option index exceeds 35', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const options = Array.from({ length: 40 }, (_, i) => `opt${i}`);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['opt36'], correct: ['opt2'], options },
         false,
       );
       await flush();
@@ -653,9 +670,9 @@ describe('SCORM12Adapter', () => {
         id: 'q1',
         type: 'choice',
         result: 'wrong',
+        'correct_responses.0.pattern': '2',
       });
       expect(fields).not.toHaveProperty('student_response');
-      expect(fields).not.toHaveProperty(['correct_responses.0.pattern']);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('q1'));
       warn.mockRestore();
     });

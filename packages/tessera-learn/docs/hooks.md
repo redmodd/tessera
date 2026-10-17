@@ -85,7 +85,7 @@ type Interaction =
     };
 ```
 
-For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names, SCORM 1.2 maps each to its index in `options` as one character, so up to 36 options (omit `options` and SCORM 1.2 slugs the literal identifier). Past 36, SCORM 1.2 leaves out the response and correct pattern and records only the result.
+For `choice` / `sequencing` / `matching`, name responses with readable ids and pass the full option list via `options` (or `optionPairs` for matching). The encoder adapts per export: cmi5/SCORM 2004 keep the names, SCORM 1.2 maps each to its index in `options` as one character, so up to 36 options (omit `options` and SCORM 1.2 slugs the literal identifier). When an answer points past option 36, SCORM 1.2 leaves that response or correct pattern out of the LMS record and still records the result.
 
 ```ts
 response: () => ({

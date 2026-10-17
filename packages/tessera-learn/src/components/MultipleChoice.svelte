@@ -1,7 +1,12 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId, savedIndex } from './util.js';
+  import {
+    QUESTION_ID_PREFIX,
+    indexIds,
+    questionId,
+    savedIndex,
+  } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import RetryButton from './RetryButton.svelte';
 
@@ -48,6 +53,7 @@
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],
       correct: [String(correct)],
+      options: indexIds(options),
     }),
     reset: () => {
       selectedOption = null;

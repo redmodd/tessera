@@ -80,39 +80,31 @@ export function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
-/** Built-in components send option indexes as digit strings with no `options`. */
-function optionIndex(
-  options: string[] | undefined,
-  value: string,
-): number | null {
-  if (!options) return /^\d+$/.test(value) ? Number(value) : null;
-  const idx = options.indexOf(value);
-  return idx >= 0 ? idx : null;
-}
+const SCORM12_MAX_OPTIONS = 36;
+
+/** An option index too large for SCORM 1.2's one-character ids. */
+export class OptionIndexRangeError extends Error {}
 
 /**
  * SCORM 1.2 CMIFeedback takes one character per choice or matching id
- * (0-9, a-z), so an index encodes as one base-36 digit: 36 options at most.
+ * (0-9, a-z), so an index encodes as one base-36 digit.
  */
 function encodeListItem(
   value: string,
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  if (fmt.encodesOptionIndex) {
-    const idx = optionIndex(options, value);
-    if (idx !== null) {
-      if (idx >= 36) {
-        throw new RangeError(
-          `option ${idx + 1} is past the 36 options SCORM 1.2 can record`,
-        );
-      }
-      return idx.toString(36);
-    }
+  const idx = fmt.encodesOptionIndex ? (options?.indexOf(value) ?? -1) : -1;
+  if (idx < 0) return fmt.identifier(value);
+  if (idx >= SCORM12_MAX_OPTIONS) {
+    throw new OptionIndexRangeError(
+      `option ${idx + 1} is past the ${SCORM12_MAX_OPTIONS} options SCORM 1.2 can record`,
+    );
   }
-  return fmt.identifier(value);
+  return idx.toString(36);
 }
 
+/** Throws OptionIndexRangeError when SCORM 1.2 cannot encode an option. */
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -149,7 +141,10 @@ export function formatResponse(
   }
 }
 
-/** Returns null when no correct pattern was provided. */
+/**
+ * Returns null when no correct pattern was provided. Throws
+ * OptionIndexRangeError when SCORM 1.2 cannot encode an option.
+ */
 export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -242,18 +237,23 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  let patterns: string[] | null;
-  let response: string | null = null;
-  try {
-    patterns = formatCorrectPattern(interaction, spec.format);
-    response = formatResponse(interaction, spec.format);
-  } catch (err) {
-    if (!(err instanceof RangeError)) throw err;
-    patterns = null;
-    console.warn(
-      `Tessera: interaction "${questionId}" has ${err.message}; its response and correct answer are left out of the LMS record.`,
-    );
-  }
+  const recordable = <T>(field: string, format: () => T): T | null => {
+    try {
+      return format();
+    } catch (err) {
+      if (!(err instanceof OptionIndexRangeError)) throw err;
+      console.warn(
+        `Tessera: interaction "${questionId}" has ${err.message}; its ${field} is left out of the LMS record.`,
+      );
+      return null;
+    }
+  };
+  const patterns = recordable('correct answer', () =>
+    formatCorrectPattern(interaction, spec.format),
+  );
+  const response = recordable('response', () =>
+    formatResponse(interaction, spec.format),
+  );
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });
