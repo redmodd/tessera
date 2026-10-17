@@ -290,6 +290,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return this.totalSeconds;
   }
 
+  /**
+   * Queue staged Completed and Passed/Failed statements allowed by the launch
+   * mode, then Scored if the current score was not already reported. Uses the
+   * latest score and duration; does nothing without a launch publisher.
+   * Returns before delivery; asynchronous send failures are handled internally.
+   */
   override commit(): void {
     if (!this.publisher) return;
     if (this.isDefinedStatementAllowed()) {
@@ -324,14 +330,17 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return true;
   }
 
+  /** Stage completion for `commit()`; only `complete` can emit a statement. */
   override setCompletionStatus(status: CompletionStatus): void {
     this.#completion = status;
   }
 
+  /** Stage the latest verdict for `commit()`; `unknown` emits no statement. */
   override setSuccessStatus(status: SuccessStatus): void {
     this.#success = status;
   }
 
+  /** Queue a staged completion with the current duration, unless already emitted or seeded. */
   #sendCompleted(): void {
     if (this.#completion !== 'complete' || this.completedEmitted) return;
     this.completedEmitted = true;
@@ -342,6 +351,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
+  /**
+   * Queue a non-unknown verdict that differs from the last emitted or seeded
+   * verdict, using the current duration and profile-allowed score. An attached
+   * score also suppresses a separate Scored statement for that value.
+   */
   #sendSuccess(): void {
     const status = this.#success;
     if (status === 'unknown' || status === this.lastSuccessEmitted) return;

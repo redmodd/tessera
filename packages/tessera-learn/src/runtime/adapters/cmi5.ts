@@ -200,6 +200,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     );
   }
 
+  /**
+   * Hold a non-final failure until `terminate()`, replacing any staged verdict.
+   * Other statuses clear the held failure and are staged for `commit()`.
+   * `final` means no remaining attempt or retry can change the verdict; a final
+   * failure is eligible for the next commit instead of waiting for termination.
+   */
   override setSuccessStatus(status: SuccessStatus, final = false): void {
     if (status === 'failed' && !final) {
       this.#heldFailed = true;
@@ -210,6 +216,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     super.setSuccessStatus(status);
   }
 
+  /**
+   * Commit a held failure before queuing Terminated, subject to launch-mode
+   * restrictions. Does not wait for delivery.
+   * `unloading` defaults to true, enabling keepalive requests and an exit-state
+   * write when saved state is available.
+   */
   override terminate(unloading?: boolean): void {
     if (this.#heldFailed) {
       super.setSuccessStatus('failed');
