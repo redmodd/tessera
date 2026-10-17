@@ -831,7 +831,7 @@ describe('SCORM12Adapter', () => {
       expect(v['correct_responses.0.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
         expect.stringMatching(
-          /response of interaction "lf2".*at most 255; the LMS gets the first 254\./,
+          /response of interaction "lf2".*at most 255; the LMS gets the first 254 characters\./,
         ),
       );
       expect(warn).toHaveBeenCalledWith(
@@ -841,7 +841,7 @@ describe('SCORM12Adapter', () => {
 
     it('drops over-long correct answers before taking the first 10', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const short = Array.from({ length: 10 }, (_, n) => `a${n}`);
+      const short = Array.from({ length: 11 }, (_, n) => `a${n}`);
       adapter.reportInteraction(
         'f3',
         {
@@ -853,11 +853,18 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       const v = interaction0();
-      short.forEach((answer, n) => {
+      short.slice(0, 10).forEach((answer, n) => {
         expect(v[`correct_responses.${n}.pattern`]).toBe(answer);
       });
       expect(v['correct_responses.10.pattern']).toBeUndefined();
-      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"f3" has 1 correct answer(s) over the 255'),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"f3" has 11 correct answers but this export standard records at most 10',
+        ),
+      );
     });
 
     it('cuts a performance response on a whole step', async () => {

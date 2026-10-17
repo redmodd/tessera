@@ -257,7 +257,7 @@ function fitPatterns(
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
   if (fit.length > limit) {
     console.warn(
-      `Tessera: interaction "${questionId}" has ${patterns.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
+      `Tessera: interaction "${questionId}" has ${fit.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
     );
   }
   return fit.slice(0, limit);
@@ -284,7 +284,7 @@ function fitResponse(
     if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
   }
   console.warn(
-    `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length}` : 'it is left out of the LMS record'}.`,
+    `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
   );
   return cut || null;
 }

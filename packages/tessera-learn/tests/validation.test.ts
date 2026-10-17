@@ -2158,6 +2158,31 @@ let a = {}; let b = {};</script>
     ]);
   });
 
+  it('warns about fill-in answers over 255 characters only under SCORM 1.2', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers={["ok", "${'x'.repeat(256)}"]} />`,
+    );
+    const tooLong = (w: string) => w.includes('over the 255 characters');
+    expect(validateProject(testRoot).warnings.filter(tooLong)).toHaveLength(0);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    expect(validateProject(testRoot).warnings.filter(tooLong)).toEqual([
+      expect.stringContaining(
+        '<FillInTheBlank> has 1 answer(s) over the 255 characters SCORM 1.2 records',
+      ),
+    ]);
+  });
+
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
     createValidProject(testRoot);
     writeConfig(
