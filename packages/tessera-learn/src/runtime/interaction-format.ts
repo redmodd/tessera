@@ -80,10 +80,10 @@ export function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
-const SCORM12_MAX_OPTIONS = 36;
+export const SCORM12_MAX_OPTIONS = 36;
 
-/** An option index too large for SCORM 1.2's one-character ids. */
-export class OptionIndexRangeError extends Error {}
+/** An id SCORM 1.2 cannot record as a one-character option index. */
+class UnencodableOptionError extends Error {}
 
 /**
  * SCORM 1.2 CMIFeedback takes one character per choice or matching id
@@ -94,17 +94,20 @@ function encodeListItem(
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  const idx = fmt.encodesOptionIndex ? (options?.indexOf(value) ?? -1) : -1;
-  if (idx < 0) return fmt.identifier(value);
+  if (!fmt.encodesOptionIndex || !options) return fmt.identifier(value);
+  const idx = options.indexOf(value);
+  if (idx < 0) {
+    throw new UnencodableOptionError(`"${value}" is not in its options`);
+  }
   if (idx >= SCORM12_MAX_OPTIONS) {
-    throw new OptionIndexRangeError(
+    throw new UnencodableOptionError(
       `option ${idx + 1} is past the ${SCORM12_MAX_OPTIONS} options SCORM 1.2 can record`,
     );
   }
   return idx.toString(36);
 }
 
-/** Throws OptionIndexRangeError when SCORM 1.2 cannot encode an option. */
+/** Throws UnencodableOptionError when SCORM 1.2 cannot encode an option. */
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -143,7 +146,7 @@ export function formatResponse(
 
 /**
  * Returns null when no correct pattern was provided. Throws
- * OptionIndexRangeError when SCORM 1.2 cannot encode an option.
+ * UnencodableOptionError when SCORM 1.2 cannot encode an option.
  */
 export function formatCorrectPattern(
   i: Interaction,
@@ -241,9 +244,9 @@ export function buildScormInteractionFields(
     try {
       return format();
     } catch (err) {
-      if (!(err instanceof OptionIndexRangeError)) throw err;
+      if (!(err instanceof UnencodableOptionError)) throw err;
       console.warn(
-        `Tessera: interaction "${questionId}" has ${err.message}; its ${field} is left out of the LMS record.`,
+        `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
       );
       return null;
     }

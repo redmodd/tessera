@@ -674,7 +674,27 @@ describe('SCORM12Adapter', () => {
       });
       expect(fields).not.toHaveProperty('student_response');
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('q1'));
-      warn.mockRestore();
+    });
+
+    it('omits a field whose id is not in options instead of slugging it', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['r'],
+          correct: ['blue'],
+          options: ['red', 'blue'],
+        },
+        false,
+      );
+      await flush();
+      const fields = interaction0();
+      expect(fields).toMatchObject({ 'correct_responses.0.pattern': '1' });
+      expect(fields).not.toHaveProperty('student_response');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"r" is not in its options'),
+      );
     });
 
     it('falls back to slugging when options is not supplied', async () => {

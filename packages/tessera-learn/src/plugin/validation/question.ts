@@ -2,6 +2,7 @@ import JSON5 from 'json5';
 import { staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
+import { SCORM12_MAX_OPTIONS } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
@@ -124,6 +125,12 @@ const QUESTION_COMPONENTS: Record<
   },
 };
 
+const INDEXED_LIST_PROPS: Partial<Record<QuestionComponentName, string[]>> = {
+  MultipleChoice: ['options'],
+  Matching: ['pairs'],
+  Sorting: ['items', 'targets'],
+};
+
 export function validateQuestionComponents(
   components: ComponentMatch[],
   fileRel: string,
@@ -201,6 +208,18 @@ export function validateQuestionComponents(
         d.warn(
           `${fileRel}: <${name}> weight ${weight} is not a positive finite number and is ignored (treated as 1)`,
         );
+      }
+    }
+
+    const indexedLists = INDEXED_LIST_PROPS[name as QuestionComponentName];
+    if (profile && format?.encodesOptionIndex && indexedLists) {
+      for (const prop of indexedLists) {
+        const count = staticArray(props.get(prop))?.length ?? 0;
+        if (count > SCORM12_MAX_OPTIONS) {
+          d.warn(
+            `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; an answer that uses one past the ${SCORM12_MAX_OPTIONS}th is left out of the LMS record`,
+          );
+        }
       }
     }
 

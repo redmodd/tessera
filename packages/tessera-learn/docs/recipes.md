@@ -56,7 +56,15 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 
   const q = useQuestion({
     id: 'drawPairs1',
-    response: () => ({ type: 'matching', response: pairs, correct: CORRECT }),
+    response: () => ({
+      type: 'matching',
+      response: pairs,
+      correct: CORRECT,
+      optionPairs: {
+        left: CORRECT.map(([l]) => l),
+        right: CORRECT.map(([, r]) => r),
+      },
+    }),
     reset: () => {
       pairs = [];
     },
@@ -151,6 +159,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
       correct: [String(correct)],
+      options: options.map((_, i) => String(i)),
     }),
     reset: () => {
       selected = null;

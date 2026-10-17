@@ -2120,6 +2120,34 @@ let a = {}; let b = {};</script>
     ).toHaveLength(0);
   });
 
+  it('warns about more than 36 options only under SCORM 1.2', () => {
+    const options = JSON.stringify(
+      Array.from({ length: 37 }, (_, i) => `o${i}`),
+    );
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="q1" question="Q" options={${options}} correct={0} />`,
+    );
+    const tooMany = (w: string) => w.includes('has 37 options');
+    expect(validateProject(testRoot).warnings.filter(tooMany)).toHaveLength(0);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    expect(validateProject(testRoot).warnings).toContainEqual(
+      expect.stringContaining(
+        '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36',
+      ),
+    );
+  });
+
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
     createValidProject(testRoot);
     writeConfig(
