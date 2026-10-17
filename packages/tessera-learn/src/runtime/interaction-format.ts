@@ -27,6 +27,11 @@ export interface InteractionFormat {
    */
   fillInLimit: number;
   longFillInLimit: number;
+  /**
+   * SCORM 1.2 caps `fill-in` and `performance` CMIFeedback at 255
+   * characters; strict LMSs reject a longer value with 405.
+   */
+  maxValueLength: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -40,6 +45,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
+  maxValueLength: 255,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -57,6 +63,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
+  maxValueLength: Infinity,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
@@ -272,6 +279,16 @@ export function buildScormInteractionFields(
       return null;
     }
   };
+  const fit = (field: string, value: string): string => {
+    const max = spec.format.maxValueLength;
+    if (value.length <= max) return value;
+    console.warn(
+      `Tessera: the ${field} of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; the LMS gets the first ${max}.`,
+    );
+    const cut = value.slice(0, max);
+    // Don't leave half of a surrogate pair (an emoji) at the end.
+    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  };
   const patterns = recordable('correct answer', () =>
     formatCorrectPattern(interaction, spec.format),
   );
@@ -279,9 +296,13 @@ export function buildScormInteractionFields(
     formatResponse(interaction, spec.format),
   );
   patterns?.forEach((pattern, n) => {
-    fields.push([`correct_responses.${n}.pattern`, pattern]);
+    fields.push([
+      `correct_responses.${n}.pattern`,
+      fit('correct answer', pattern),
+    ]);
   });
-  if (response !== null) fields.push([spec.responseField, response]);
+  if (response !== null)
+    fields.push([spec.responseField, fit('response', response)]);
   if (correct !== null) {
     fields.push([
       'result',

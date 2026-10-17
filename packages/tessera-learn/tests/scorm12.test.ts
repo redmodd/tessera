@@ -817,6 +817,38 @@ describe('SCORM12Adapter', () => {
       expect(v.type).toBe('fill-in');
     });
 
+    it('cuts fill-in values past 255 characters and warns', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const long = 'a'.repeat(254) + '😀b';
+      adapter.reportInteraction(
+        'lf2',
+        { type: 'long-fill-in', response: long, correct: [long] },
+        true,
+      );
+      await flush();
+      const v = interaction0();
+      expect(v.student_response).toBe('a'.repeat(254));
+      expect(v['correct_responses.0.pattern']).toBe('a'.repeat(254));
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/response of interaction "lf2".*at most 255/),
+      );
+    });
+
+    it('cuts a performance response past 255 characters', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = Array.from(
+        { length: 40 },
+        (_, k) => [`s${k}`, 'value'],
+      );
+      adapter.reportInteraction(
+        'p1',
+        { type: 'performance', response: steps },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toHaveLength(255);
+    });
+
     it('maps other to fill-in', async () => {
       adapter.reportInteraction(
         'o1',
