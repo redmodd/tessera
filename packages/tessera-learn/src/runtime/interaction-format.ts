@@ -252,12 +252,12 @@ export function buildScormInteractionFields(
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   if (spec.format.encodesOptionIndex) {
-    const long = idsWithoutOptions(interaction).find(
-      (id) => spec.format.identifier(id).length > 1,
+    const invalid = idsWithoutOptions(interaction).find(
+      (id) => !/^[0-9a-z]$/.test(spec.format.identifier(id)),
     );
-    if (long !== undefined) {
+    if (invalid !== undefined) {
       console.warn(
-        `Tessera: interaction "${questionId}" sends the id "${long}" without options; SCORM 1.2 allows one character per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+        `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
       );
     }
   }

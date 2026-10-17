@@ -548,6 +548,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('uses plain . and , delimiters for matching pairs', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'm1',
         {
@@ -732,6 +733,19 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('warns about a one-character id outside 0-9 and a-z sent without options', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['b'], correct: ['A'] },
+        false,
+      );
+      await flush();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"q1" sends the id "A" without options'),
+      );
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
