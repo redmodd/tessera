@@ -12,6 +12,7 @@ import type { XAPIClient } from '../src/runtime/xapi/client.js';
 import type { CourseSession } from '../src/runtime/course-session.svelte.js';
 import { structureFingerprint } from '../src/runtime/fingerprint.js';
 import {
+  createConfig,
   createManifest,
   flush,
   manualConfig,
@@ -202,6 +203,31 @@ describe('ending a CourseSession', () => {
 
     expect(calls).toContain('setExit:normal');
   });
+
+  it.each([
+    ['quiz', 'quiz', 2, 'suspend'],
+    ['quiz', 'quiz', 3, 'normal'],
+    ['quiz', 'none', 3, 'normal'],
+    ['percentage', 'quiz', 3, 'suspend'],
+  ] as const)(
+    'under %s completion and success from %s, exits after %i of 3 failing quiz attempts with %s',
+    async (completion, success, attempts, mode) => {
+      const { adapter, calls } = recordingAdapter();
+      const { session, progress } = await startSession({
+        adapter,
+        config: createConfig({
+          completion: { mode: completion },
+          success: { from: success },
+        }),
+        manifest: createManifest(2, { 0: { graded: true } }),
+      });
+      for (let i = 0; i < attempts; i++) progress.quizCompleted(0, 40);
+
+      await session.exit();
+
+      expect(calls).toContain(`setExit:${mode}`);
+    },
+  );
 
   it('terminates on pagehide while the exit is still saving', async () => {
     const { adapter, calls } = recordingAdapter({

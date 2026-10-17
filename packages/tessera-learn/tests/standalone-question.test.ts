@@ -55,6 +55,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: undefined,
       correct: true,
+      final: false,
     });
 
     const restorable = make({ restore: () => {} });
@@ -63,6 +64,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: true,
       correct: true,
+      final: false,
     });
   });
 
@@ -208,6 +210,14 @@ describe('StandaloneQuestion', () => {
     partial.submit();
     expect(partial.isLockedCorrect).toBe(false);
     expect(partial.canRetry).toBe(true);
+  });
+
+  it('locks on the score progress records, so a non-finite one counts as 0', () => {
+    const { q, markScore } = make({ score: () => Infinity, maxRetries: 1 });
+    q.submit();
+    expect(markScore).toHaveBeenCalledWith(0, expect.anything());
+    expect(q.isLockedCorrect).toBe(false);
+    expect(q.canRetry).toBe(true);
   });
 
   it('stays unsubmitted when recording the score throws', () => {
@@ -359,6 +369,7 @@ describe('StandaloneQuestion', () => {
         retries: 2,
         response: false,
         correct: false,
+        final: true,
       });
       expect(q.canRetry).toBe(false);
     });

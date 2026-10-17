@@ -70,7 +70,8 @@ export abstract class BaseAdapter {
 
   setScore(_score: number): void {}
   setCompletionStatus(_status: CompletionStatus): void {}
-  setSuccessStatus(_status: SuccessStatus): void {}
+  /** `final` when no attempt or retry left can change the status. */
+  setSuccessStatus(_status: SuccessStatus, _final?: boolean): void {}
   /** `sessionSeconds` covers this launch; `totalSeconds` covers every session so far. */
   setDuration(_sessionSeconds: number, _totalSeconds: number): void {}
   /** Tell the LMS how the learner is leaving the SCO. */

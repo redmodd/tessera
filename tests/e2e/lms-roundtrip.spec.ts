@@ -22,6 +22,7 @@ import {
   navigateToPage,
   openQuiz,
   reportedQuestionCount,
+  retryGradedQuizWithQ1Wrong,
   scormData,
   scormLog,
   startPreview,
@@ -262,6 +263,39 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
     for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
+  });
+
+  test('a failing score out of quiz attempts reports failed', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+    await openQuiz(page, 'Graded Assessment');
+
+    await answerGradedQuiz(page, { q1Correct: false });
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({ 'cmi.core.lesson_status': 'incomplete' });
+    await retryGradedQuizWithQ1Wrong(page);
+    await retryGradedQuizWithQ1Wrong(page);
+    await expect(
+      page.locator('.tessera-quiz-attempts-exhausted'),
+    ).toBeVisible();
+
+    await expect
+      .poll(() => scormData(page))
+      .toMatchObject({
+        'cmi.core.lesson_status': 'failed',
+        'cmi.core.score.raw': '66.67',
+      });
+
+    // Pages are left to visit, so the attempt stays open.
+    await exitCourse(page);
+
+    expect(await scormData(page)).toMatchObject({
+      'cmi.core.lesson_status': 'failed',
+      'cmi.core.exit': 'suspend',
+    });
   });
 
   test('Exit flushes session_time in HHHH:MM:SS.SS format and calls LMSFinish', async ({

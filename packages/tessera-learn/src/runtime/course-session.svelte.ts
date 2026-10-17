@@ -63,6 +63,7 @@ export class CourseSession {
 
   #prevReportedScore: number | null = null;
   #prevSuccessStatus: SuccessStatus = 'unknown';
+  #prevVerdictFinal = false;
   #prevCompletionStatus: CompletionStatus = 'incomplete';
 
   readonly userStateStore: UserStateStore = {
@@ -186,7 +187,7 @@ export class CourseSession {
     // Cloud rolls that up to "completed"/"passed" during status rollup.
     this.#report(() => {
       adapter.setCompletionStatus(progress.reportedCompletionStatus);
-      adapter.setSuccessStatus(progress.successStatus);
+      this.#reportSuccess();
     });
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
@@ -241,7 +242,6 @@ export class CourseSession {
     this.#nav.goToPage(saved.b);
 
     this.#prevCompletionStatus = progress.reportedCompletionStatus;
-    this.#prevSuccessStatus = progress.successStatus;
     const seededScore = progress.gradedScoreFinal
       ? progress.reportedScore
       : null;
@@ -352,6 +352,16 @@ export class CourseSession {
     });
   }
 
+  #reportSuccess(): void {
+    const progress = this.#progress;
+    this.#prevSuccessStatus = progress.successStatus;
+    this.#prevVerdictFinal = progress.verdictFinal;
+    this.#adapter.setSuccessStatus(
+      this.#prevSuccessStatus,
+      this.#prevVerdictFinal,
+    );
+  }
+
   #reportStatus(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -368,8 +378,7 @@ export class CourseSession {
         adapter.setScore(score);
         // Before the commit, so a verdict this score decides carries it and
         // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-        this.#prevSuccessStatus = progress.successStatus;
-        adapter.setSuccessStatus(this.#prevSuccessStatus);
+        this.#reportSuccess();
       });
     });
 
@@ -383,10 +392,14 @@ export class CourseSession {
 
     $effect(() => {
       const status = progress.successStatus;
+      const final = progress.verdictFinal;
       if (!this.#persistenceReady) return;
-      if (status === this.#prevSuccessStatus) return;
-      this.#prevSuccessStatus = status;
-      this.#report(() => adapter.setSuccessStatus(status));
+      if (
+        status === this.#prevSuccessStatus &&
+        final === this.#prevVerdictFinal
+      )
+        return;
+      this.#report(() => this.#reportSuccess());
     });
   }
 
@@ -431,11 +444,7 @@ export class CourseSession {
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
-    adapter.setExit(
-      this.#progress.reportedCompletionStatus === 'complete'
-        ? 'normal'
-        : 'suspend',
-    );
+    adapter.setExit(this.#progress.attemptOver ? 'normal' : 'suspend');
     adapter.commit();
     return true;
   }

@@ -63,11 +63,12 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * SCORM 1.2 collapses completion + success into a single `lesson_status`
  * field, so the two setters track their values separately and write the
  * combined result through `#flushLessonStatus`. LMSes read `failed` as a
- * finished attempt, so it waits for completion.
+ * finished attempt, so it waits for completion or a final verdict.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: Verdict | null = null;
+  #verdictFinal = false;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);
@@ -95,17 +96,19 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     this.#flushLessonStatus();
   }
 
-  setSuccessStatus(status: SuccessStatus): void {
+  setSuccessStatus(status: SuccessStatus, final = false): void {
     // SCORM 1.2 has no "unknown" lesson_status, so null leaves it to
     // completion status.
     this.#successStatus = status === 'unknown' ? null : status;
+    this.#verdictFinal = final;
     this.#flushLessonStatus();
   }
 
   #flushLessonStatus(): void {
     const held =
       this.#successStatus === 'failed' &&
-      this.#completionStatus === 'incomplete';
+      this.#completionStatus === 'incomplete' &&
+      !this.#verdictFinal;
     this.set(
       'cmi.core.lesson_status',
       held ? 'incomplete' : (this.#successStatus ?? this.#completionStatus),

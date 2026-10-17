@@ -293,7 +293,25 @@ describe('useQuestion — standalone mode', () => {
       graded: true,
       retries: 0,
       correct: true,
+      final: true,
     });
+  });
+
+  it('marks a restored wrong answer final once its maxRetries are spent', () => {
+    const { progress } = provideNavCtx({
+      manifest: createManifest(2, {}, { 1: { graded: true } }),
+      pageIndex: 1,
+    });
+    progress.markStandaloneQuestion(1, 'q1', 0, true, 1, { retries: 1 });
+
+    useQuestion({
+      id: 'q1',
+      graded: true,
+      maxRetries: 1,
+      response: () => ({ type: 'true-false', response: false, correct: true }),
+    });
+
+    expect(progress.gradedUnits.get(1)?.questions?.get('q1')?.final).toBe(true);
   });
 
   it('hands the saved response back to the widget when the learner returns to the page', () => {

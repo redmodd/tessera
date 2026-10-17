@@ -385,6 +385,16 @@ describe('SCORM12Adapter', () => {
       await flush();
       expect(lastLessonStatus()).toBe('failed');
     });
+
+    it('releases a held failed once the verdict is final', async () => {
+      adapter.setSuccessStatus('failed');
+      await flush();
+      expect(lastLessonStatus()).toBe('incomplete');
+
+      adapter.setSuccessStatus('failed', true);
+      await flush();
+      expect(lastLessonStatus()).toBe('failed');
+    });
   });
 
   // ---- duration / commit / terminate ----

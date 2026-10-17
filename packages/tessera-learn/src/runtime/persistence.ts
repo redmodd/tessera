@@ -32,7 +32,8 @@ export type SavedQuestion = [
   /**
    * 1 when graded, plus 2 when the response had no `correct` to judge it by,
    * or 4 when the verdict is not the one the score gives (correct under 100,
-   * incorrect at 100), which takes a custom `score()`.
+   * incorrect at 100), which takes a custom `score()`, plus 8 when graded
+   * and scored under 100 with no retries left.
    */
   flags: number,
   retries?: number,
