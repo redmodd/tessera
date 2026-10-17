@@ -608,6 +608,58 @@ describe('SCORM12Adapter', () => {
       });
     });
 
+    it('encodes option indexes past 9 as one base-36 character', async () => {
+      const options = Array.from({ length: 12 }, (_, i) => `opt${i}`);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['opt10'], correct: ['opt11'], options },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({
+        student_response: 'a',
+        'correct_responses.0.pattern': 'b',
+      });
+    });
+
+    it('encodes raw index strings as base-36 when options is not supplied', async () => {
+      const pairs = Array.from({ length: 11 }, (_, i): [string, string] => [
+        String(i),
+        String(i),
+      ]);
+      adapter.reportInteraction(
+        'm1',
+        { type: 'matching', response: pairs, correct: pairs },
+        true,
+      );
+      await flush();
+      const expected = '0.0,1.1,2.2,3.3,4.4,5.5,6.6,7.7,8.8,9.9,a.a';
+      expect(interaction0()).toMatchObject({
+        student_response: expected,
+        'correct_responses.0.pattern': expected,
+      });
+    });
+
+    it('omits response and pattern when an option index exceeds 35', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['36'], correct: ['0'] },
+        false,
+      );
+      await flush();
+      const fields = interaction0();
+      expect(fields).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        result: 'wrong',
+      });
+      expect(fields).not.toHaveProperty('student_response');
+      expect(fields).not.toHaveProperty(['correct_responses.0.pattern']);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('q1'));
+      warn.mockRestore();
+    });
+
     it('falls back to slugging when options is not supplied', async () => {
       adapter.reportInteraction(
         'q1',

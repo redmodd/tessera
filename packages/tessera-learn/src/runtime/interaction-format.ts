@@ -80,23 +80,35 @@ export function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
-function indexLookup(
+/** Built-in components send option indexes as digit strings with no `options`. */
+function optionIndex(
   options: string[] | undefined,
   value: string,
-): string | null {
-  if (!options) return null;
+): number | null {
+  if (!options) return /^\d+$/.test(value) ? Number(value) : null;
   const idx = options.indexOf(value);
-  return idx >= 0 ? String(idx) : null;
+  return idx >= 0 ? idx : null;
 }
 
+/**
+ * SCORM 1.2 CMIFeedback takes one character per choice or matching id
+ * (0-9, a-z), so an index encodes as one base-36 digit: 36 options at most.
+ */
 function encodeListItem(
   value: string,
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
   if (fmt.encodesOptionIndex) {
-    const idx = indexLookup(options, value);
-    if (idx !== null) return idx;
+    const idx = optionIndex(options, value);
+    if (idx !== null) {
+      if (idx >= 36) {
+        throw new RangeError(
+          `option ${idx + 1} is past the 36 options SCORM 1.2 can record`,
+        );
+      }
+      return idx.toString(36);
+    }
   }
   return fmt.identifier(value);
 }
@@ -230,13 +242,22 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  const patterns = formatCorrectPattern(interaction, spec.format);
-  if (patterns !== null) {
-    patterns.forEach((pattern, n) => {
-      fields.push([`correct_responses.${n}.pattern`, pattern]);
-    });
+  let patterns: string[] | null;
+  let response: string | null = null;
+  try {
+    patterns = formatCorrectPattern(interaction, spec.format);
+    response = formatResponse(interaction, spec.format);
+  } catch (err) {
+    if (!(err instanceof RangeError)) throw err;
+    patterns = null;
+    console.warn(
+      `Tessera: interaction "${questionId}" has ${err.message}; its response and correct answer are left out of the LMS record.`,
+    );
   }
-  fields.push([spec.responseField, formatResponse(interaction, spec.format)]);
+  patterns?.forEach((pattern, n) => {
+    fields.push([`correct_responses.${n}.pattern`, pattern]);
+  });
+  if (response !== null) fields.push([spec.responseField, response]);
   if (correct !== null) {
     fields.push([
       'result',
