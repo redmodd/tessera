@@ -128,7 +128,7 @@ function encodePairs(
     .join(fmt.itemDelim);
 }
 
-/** Throws UnencodableOptionError when SCORM 1.2 cannot encode an option. */
+/** Throws when SCORM 1.2 cannot encode an option. */
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -154,8 +154,8 @@ export function formatResponse(
 }
 
 /**
- * Returns null when no correct pattern was provided. Throws
- * UnencodableOptionError when SCORM 1.2 cannot encode an option.
+ * Returns null when no correct pattern was provided. Throws when SCORM 1.2
+ * cannot encode an option.
  */
 export function formatCorrectPattern(
   i: Interaction,
