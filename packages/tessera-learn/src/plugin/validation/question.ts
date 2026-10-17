@@ -220,7 +220,7 @@ export function validateQuestionComponents(
           const lost =
             use === 'every'
               ? 'every response and correct answer'
-              : `an answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
+              : `any response or correct answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
           d.warn(
             `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
           );

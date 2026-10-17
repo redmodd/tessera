@@ -2144,7 +2144,7 @@ let a = {}; let b = {};</script>
     );
     expect(validateProject(testRoot).warnings.filter(tooMany)).toEqual([
       expect.stringContaining(
-        '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36; an answer that uses one past the 36th',
+        '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36; any response or correct answer that uses one past the 36th',
       ),
       expect.stringContaining(
         '<Matching> has 37 pairs but SCORM 1.2 records at most 36; every response and correct answer',
@@ -2153,7 +2153,7 @@ let a = {}; let b = {};</script>
         '<Sorting> has 37 items but SCORM 1.2 records at most 36; every response',
       ),
       expect.stringContaining(
-        '<Sorting> has 37 targets but SCORM 1.2 records at most 36; an answer',
+        '<Sorting> has 37 targets but SCORM 1.2 records at most 36; any response',
       ),
     ]);
   });
