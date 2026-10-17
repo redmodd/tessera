@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-xAPI and cmi5 send Completed, Passed and Failed on commit, so each statement carries the latest score and duration whatever order they were set in.
+Internal change to how xAPI and cmi5 build their status statements. The statements sent are unchanged.
