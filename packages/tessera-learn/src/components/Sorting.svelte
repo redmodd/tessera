@@ -4,6 +4,7 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
+    indexIds,
     questionId,
     savedIndex,
     shuffle,
@@ -68,14 +69,18 @@
     weight: untrack(() => weight),
     maxRetries: untrack(() => maxRetries),
     complete: () => placements.size === items.length,
-    response: () => ({
-      type: 'matching',
-      response: [...placements.entries()].map(([i, t]) => [
-        String(i),
-        String(t),
-      ]),
-      correct: items.map((_, i) => [String(i), String(correct[i])]),
-    }),
+    response: () => {
+      const itemIds = indexIds(items);
+      return {
+        type: 'matching',
+        response: [...placements.entries()].map(([i, t]) => [
+          String(i),
+          String(t),
+        ]),
+        correct: itemIds.map((id, i) => [id, String(correct[i])]),
+        optionPairs: { left: itemIds, right: indexIds(targets) },
+      };
+    },
     reset: resetState,
     restore: (response) => {
       const saved = response.map(([item, target]) => [

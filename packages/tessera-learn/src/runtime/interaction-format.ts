@@ -80,27 +80,55 @@ export function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
-function indexLookup(
-  options: string[] | undefined,
-  value: string,
-): string | null {
-  if (!options) return null;
-  const idx = options.indexOf(value);
-  return idx >= 0 ? String(idx) : null;
-}
+export const SCORM12_MAX_OPTIONS = 36;
 
+/** An id SCORM 1.2 cannot record as a one-character option index. */
+class UnencodableOptionError extends Error {}
+
+/**
+ * SCORM 1.2 CMIFeedback takes one character per choice or matching id
+ * (0-9, a-z), so an index encodes as one base-36 digit.
+ */
 function encodeListItem(
   value: string,
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  if (fmt.encodesOptionIndex) {
-    const idx = indexLookup(options, value);
-    if (idx !== null) return idx;
+  if (!fmt.encodesOptionIndex || !options) return fmt.identifier(value);
+  const idx = options.indexOf(value);
+  if (idx < 0) {
+    throw new UnencodableOptionError(`"${value}" is not in its options`);
   }
-  return fmt.identifier(value);
+  if (idx >= SCORM12_MAX_OPTIONS) {
+    throw new UnencodableOptionError(
+      `option ${idx + 1} is past the ${SCORM12_MAX_OPTIONS} options SCORM 1.2 can record`,
+    );
+  }
+  return idx.toString(36);
 }
 
+function encodeIds(
+  values: string[],
+  options: string[] | undefined,
+  fmt: InteractionFormat,
+): string {
+  return values.map((v) => encodeListItem(v, options, fmt)).join(fmt.itemDelim);
+}
+
+function encodePairs(
+  pairs: Array<[string, string | number]>,
+  optionPairs: { left: string[]; right: string[] } | undefined,
+  fmt: InteractionFormat,
+): string {
+  return pairs
+    .map(
+      ([l, r]) =>
+        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(String(r), optionPairs?.right, fmt)}`,
+    )
+    .join(fmt.itemDelim);
+}
+
+/** Throws when SCORM 1.2 cannot encode an option. */
 export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -108,9 +136,7 @@ export function formatResponse(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response
-        .map((v) => encodeListItem(v, i.options, fmt))
-        .join(fmt.itemDelim);
+      return encodeIds(i.response, i.options, fmt);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -119,25 +145,18 @@ export function formatResponse(
     case 'other':
       return i.response;
     case 'matching':
-      return i.response
-        .map(
-          ([l, r]) =>
-            `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-        )
-        .join(fmt.itemDelim);
+      return encodePairs(i.response, i.optionPairs, fmt);
     case 'numeric':
       return String(i.response);
     case 'performance':
-      return i.response
-        .map(
-          ([s, v]) =>
-            `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-        )
-        .join(fmt.itemDelim);
+      return encodePairs(i.response, undefined, fmt);
   }
 }
 
-/** Returns null when no correct pattern was provided. */
+/**
+ * Returns null when no correct pattern was provided. Throws when SCORM 1.2
+ * cannot encode an option.
+ */
 export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
@@ -146,11 +165,7 @@ export function formatCorrectPattern(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return [
-        (i.correct as string[])
-          .map((v) => encodeListItem(v, i.options, fmt))
-          .join(fmt.itemDelim),
-      ];
+      return [encodeIds(i.correct as string[], i.options, fmt)];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
@@ -170,12 +185,7 @@ export function formatCorrectPattern(
     }
     case 'matching':
       return [
-        (i.correct as Array<[string, string]>)
-          .map(
-            ([l, r]) =>
-              `${encodeListItem(l, i.optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, i.optionPairs?.right, fmt)}`,
-          )
-          .join(fmt.itemDelim),
+        encodePairs(i.correct as Array<[string, string]>, i.optionPairs, fmt),
       ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
@@ -193,12 +203,11 @@ export function formatCorrectPattern(
       return [i.correct as string];
     case 'performance':
       return [
-        (i.correct as Array<[string, string | number]>)
-          .map(
-            ([s, v]) =>
-              `${fmt.identifier(s)}${fmt.pairDelim}${fmt.identifier(String(v))}`,
-          )
-          .join(fmt.itemDelim),
+        encodePairs(
+          i.correct as Array<[string, string | number]>,
+          undefined,
+          fmt,
+        ),
       ];
   }
 }
@@ -223,6 +232,18 @@ export interface ScormInteractionSpec {
   format: InteractionFormat;
 }
 
+function idsWithoutOptions(i: Interaction): string[] {
+  switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+      return i.options ? [] : [...i.response, ...(i.correct ?? [])];
+    case 'matching':
+      return i.optionPairs ? [] : [...i.response, ...(i.correct ?? [])].flat();
+    default:
+      return [];
+  }
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -230,13 +251,37 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  const patterns = formatCorrectPattern(interaction, spec.format);
-  if (patterns !== null) {
-    patterns.forEach((pattern, n) => {
-      fields.push([`correct_responses.${n}.pattern`, pattern]);
-    });
+  if (spec.format.encodesOptionIndex) {
+    const invalid = idsWithoutOptions(interaction).find(
+      (id) => !/^[0-9a-z]$/.test(spec.format.identifier(id)),
+    );
+    if (invalid !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+      );
+    }
   }
-  fields.push([spec.responseField, formatResponse(interaction, spec.format)]);
+  const recordable = <T>(field: string, format: () => T): T | null => {
+    try {
+      return format();
+    } catch (err) {
+      if (!(err instanceof UnencodableOptionError)) throw err;
+      console.warn(
+        `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
+      );
+      return null;
+    }
+  };
+  const patterns = recordable('correct answer', () =>
+    formatCorrectPattern(interaction, spec.format),
+  );
+  const response = recordable('response', () =>
+    formatResponse(interaction, spec.format),
+  );
+  patterns?.forEach((pattern, n) => {
+    fields.push([`correct_responses.${n}.pattern`, pattern]);
+  });
+  if (response !== null) fields.push([spec.responseField, response]);
   if (correct !== null) {
     fields.push([
       'result',

@@ -71,6 +71,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       type: 'choice',
       response: [],
       correct: ['1'],
+      options: ['0', '1', '2'],
     });
     expect(reg.id).toMatch(/^mc-/);
   });
@@ -123,6 +124,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ['0', '0'],
         ['1', '1'],
       ],
+      optionPairs: { left: ['0', '1'], right: ['0', '1'] },
     });
     expect(reg.id).toMatch(/^matching-/);
   });
@@ -151,6 +153,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ['0', '0'],
         ['1', '1'],
       ],
+      optionPairs: { left: ['0', '1'], right: ['0', '1'] },
     });
     expect(reg.id).toMatch(/^sorting-/);
   });

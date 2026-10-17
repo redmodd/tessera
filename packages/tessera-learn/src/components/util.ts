@@ -54,6 +54,11 @@ export function savedIndex(value: unknown, list: readonly unknown[]): number {
   return Number(value);
 }
 
+/** Index ids for a built-in's `options`, which SCORM 1.2 encodes one character each. */
+export function indexIds(list: readonly unknown[]): string[] {
+  return list.map((_, i) => String(i));
+}
+
 /** Fisher-Yates shuffle returning a fresh array. */
 export function shuffle<T>(arr: readonly T[]): T[] {
   const result = arr.slice();

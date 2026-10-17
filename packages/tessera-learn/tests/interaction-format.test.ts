@@ -30,4 +30,18 @@ describe('encodesOptionIndex', () => {
   it('encodes identifiers when the flag is off', () => {
     expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
   });
+
+  it('slugs performance steps and values on SCORM 1.2', () => {
+    const performance: Interaction = {
+      type: 'performance',
+      response: [['step 1', 3.5]],
+      correct: [['step 1', 'done!']],
+    };
+    expect(formatResponse(performance, SCORM12_INTERACTION_FORMAT)).toBe(
+      'step_1.3_5',
+    );
+    expect(
+      formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
+    ).toEqual(['step_1.done']);
+  });
 });

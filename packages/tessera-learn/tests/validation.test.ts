@@ -2120,6 +2120,44 @@ let a = {}; let b = {};</script>
     ).toHaveLength(0);
   });
 
+  it('warns about more than 36 options, pairs, items or targets only under SCORM 1.2', () => {
+    const list = (f: (i: number) => unknown) =>
+      JSON.stringify(Array.from({ length: 37 }, (_, i) => f(i)));
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice, Matching, Sorting } from 'tessera-learn';</script>
+<MultipleChoice id="q1" question="Q" options={${list((i) => `o${i}`)}} correct={0} />
+<Matching id="q2" question="Q" pairs={${list((i) => ({ left: `l${i}`, right: `r${i}` }))}} />
+<Sorting id="q3" question="Q" items={${list((i) => `i${i}`)}} targets={${list((i) => `t${i}`)}} correct={${list((i) => i)}} />`,
+    );
+    const tooMany = (w: string) => w.includes('has 37 ');
+    expect(validateProject(testRoot).warnings.filter(tooMany)).toHaveLength(0);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "scorm12" },
+};`,
+    );
+    expect(validateProject(testRoot).warnings.filter(tooMany)).toEqual([
+      expect.stringContaining(
+        '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36; any response or correct answer that uses one past the 36th',
+      ),
+      expect.stringContaining(
+        '<Matching> has 37 pairs but SCORM 1.2 records at most 36; every response and correct answer',
+      ),
+      expect.stringContaining(
+        '<Sorting> has 37 items but SCORM 1.2 records at most 36; every response',
+      ),
+      expect.stringContaining(
+        '<Sorting> has 37 targets but SCORM 1.2 records at most 36; any response',
+      ),
+    ]);
+  });
+
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
     createValidProject(testRoot);
     writeConfig(

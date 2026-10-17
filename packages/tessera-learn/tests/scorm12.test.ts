@@ -517,6 +517,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('slugs non-alphanumeric choice identifiers (SCORM 1.2 CMIIdentifier)', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
         {
@@ -547,6 +548,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('uses plain . and , delimiters for matching pairs', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'm1',
         {
@@ -608,7 +610,88 @@ describe('SCORM12Adapter', () => {
       });
     });
 
-    it('falls back to slugging when options is not supplied', async () => {
+    it('encodes option indexes past 9 as one base-36 character', async () => {
+      const options = Array.from({ length: 12 }, (_, i) => `opt${i}`);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['opt10'], correct: ['opt11'], options },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({
+        student_response: 'a',
+        'correct_responses.0.pattern': 'b',
+      });
+    });
+
+    it('encodes matching index ids past 9 as base-36', async () => {
+      const ids = Array.from({ length: 11 }, (_, i) => String(i));
+      const pairs = ids.map((id): [string, string] => [id, id]);
+      adapter.reportInteraction(
+        'm1',
+        {
+          type: 'matching',
+          response: pairs,
+          correct: pairs,
+          optionPairs: { left: ids, right: ids },
+        },
+        true,
+      );
+      await flush();
+      const expected = '0.0,1.1,2.2,3.3,4.4,5.5,6.6,7.7,8.8,9.9,a.a';
+      expect(interaction0()).toMatchObject({
+        student_response: expected,
+        'correct_responses.0.pattern': expected,
+      });
+    });
+
+    it('omits only the field whose option index exceeds 35', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const options = Array.from({ length: 40 }, (_, i) => `opt${i}`);
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['opt36'], correct: ['opt2'], options },
+        false,
+      );
+      await flush();
+      const fields = interaction0();
+      expect(fields).toMatchObject({
+        id: 'q1',
+        type: 'choice',
+        result: 'wrong',
+        'correct_responses.0.pattern': '2',
+      });
+      expect(fields).not.toHaveProperty('student_response');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" is left out of the LMS record: option 37',
+        ),
+      );
+    });
+
+    it('omits a field whose id is not in options instead of slugging it', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['r'],
+          correct: ['blue'],
+          options: ['red', 'blue'],
+        },
+        false,
+      );
+      await flush();
+      const fields = interaction0();
+      expect(fields).toMatchObject({ 'correct_responses.0.pattern': '1' });
+      expect(fields).not.toHaveProperty('student_response');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"r" is not in its options'),
+      );
+    });
+
+    it('slugs and warns about multi-character ids when options is not supplied', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['speed-limit'], correct: ['speed-limit'] },
@@ -619,6 +702,50 @@ describe('SCORM12Adapter', () => {
         student_response: 'speed_limit',
         'correct_responses.0.pattern': 'speed_limit',
       });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" sends the id "speed-limit" without options',
+        ),
+      );
+    });
+
+    it('warns about a multi-character matching id sent without optionPairs', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'm1',
+        { type: 'matching', response: [['a', '10']], correct: [['a', 'b']] },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ student_response: 'a.10' });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"m1" sends the id "10" without options'),
+      );
+    });
+
+    it('does not warn about one-character ids sent without options', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a', 'b'], correct: ['a'] },
+        false,
+      );
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('warns about a one-character id outside 0-9 and a-z sent without options', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['b'], correct: ['A'] },
+        false,
+      );
+      await flush();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"q1" sends the id "A" without options'),
+      );
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
