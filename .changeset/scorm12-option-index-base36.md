@@ -2,4 +2,6 @@
 'tessera-learn': patch
 ---
 
-SCORM 1.2 now records answers that involve an 11th or later option, up to 36 options (indexes past 9 encode as `a` to `z`). An answer past option 36, or an id missing from a custom widget's `options`, has its response or correct pattern left out with a console warning. Validation warns when a built-in question has more than 36 options under SCORM 1.2. A custom widget that sends a multi-character id without `options` now logs a console warning on SCORM 1.2. The guide's custom question examples now pass `options`.
+SCORM 1.2 now records answers to questions with more than 10 options, up to 36; strict LMSs such as SCORM Cloud rejected them before. Past 36, the answer is left out of the LMS record with a console warning (the result is still recorded), and `tessera validate` flags built-in questions with more than 36 options.
+
+Custom widgets: pass `options` (or `optionPairs` for matching) to `useQuestion()` so SCORM 1.2 can record each id. Without it, an id longer than one character logs a console warning, and an id missing from `options` is left out with one.
