@@ -1,7 +1,6 @@
 import {
   SCORM12_INTERACTION_FORMAT,
   SCORM2004_INTERACTION_FORMAT,
-  XAPI_INTERACTION_FORMAT,
   type InteractionFormat,
 } from './interaction-format.js';
 
@@ -76,7 +75,7 @@ export const STANDARDS = {
     warnLabel: 'cmi5 launch parameters',
     missingDetail:
       'one or more cmi5 launch parameters (fetch / endpoint / activityId / actor) are missing from the URL.',
-    interactionFormat: XAPI_INTERACTION_FORMAT,
+    interactionFormat: SCORM2004_INTERACTION_FORMAT,
   },
   xapi: {
     id: 'xapi',
@@ -87,7 +86,7 @@ export const STANDARDS = {
     warnLabel: 'xAPI launch parameters',
     missingDetail:
       'one or more xAPI launch parameters (endpoint / auth / actor / activity_id) are missing from the URL.',
-    interactionFormat: XAPI_INTERACTION_FORMAT,
+    interactionFormat: SCORM2004_INTERACTION_FORMAT,
   },
 } as const satisfies { [K in StandardId]: ProfileShape & { id: K } };
 

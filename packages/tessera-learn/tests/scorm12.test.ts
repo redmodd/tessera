@@ -817,7 +817,7 @@ describe('SCORM12Adapter', () => {
       expect(v.type).toBe('fill-in');
     });
 
-    it('cuts fill-in values past 255 characters and warns', async () => {
+    it('cuts a long response and drops an over-long correct answer', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const long = 'a'.repeat(254) + '😀b';
       adapter.reportInteraction(

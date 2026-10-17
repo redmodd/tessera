@@ -1,7 +1,6 @@
 /**
  * SCORM 1.2 RTE §3.4.7 vs SCORM 2004 4E RTE §4.2.7 differ in delimiter
- * encoding and identifier rules; cmi5 (xAPI) reuses 2004's delimiters but
- * not its identifier slugging.
+ * encoding and identifier rules; cmi5 and xAPI reuse 2004's encoding.
  */
 
 import type { Interaction } from './interaction.js';
@@ -23,7 +22,8 @@ export interface InteractionFormat {
   encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
-   * `fill-in` and 1 for `long-fill-in`; xAPI has no such limit.
+   * `fill-in` and 1 for `long-fill-in`. These caps and `maxValueLength`
+   * apply only to the SCORM record, not to xAPI statements.
    */
   fillInLimit: number;
   longFillInLimit: number;
@@ -68,10 +68,6 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
-
-// xAPI reuses SCORM 2004's encoding. The RTE caps on `correct_responses`
-// apply only in buildScormInteractionFields.
-export const XAPI_INTERACTION_FORMAT = SCORM2004_INTERACTION_FORMAT;
 
 /**
  * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +
@@ -258,11 +254,7 @@ function fitPatterns(
     );
   }
   const limit =
-    i.type === 'fill-in'
-      ? fmt.fillInLimit
-      : i.type === 'long-fill-in'
-        ? fmt.longFillInLimit
-        : Infinity;
+    i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
   if (fit.length > limit) {
     console.warn(
       `Tessera: interaction "${questionId}" has ${patterns.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
@@ -325,24 +317,22 @@ export function buildScormInteractionFields(
       return null;
     }
   };
-  const patterns = recordable('correct answer', () =>
-    formatCorrectPattern(interaction, spec.format),
-  );
+  const patterns = recordable('correct answer', () => {
+    const all = formatCorrectPattern(interaction, spec.format);
+    return all && fitPatterns(questionId, interaction, all, spec.format);
+  });
   const response = recordable('response', () =>
-    formatResponse(interaction, spec.format),
+    fitResponse(
+      questionId,
+      interaction,
+      formatResponse(interaction, spec.format),
+      spec.format,
+    ),
   );
-  if (patterns) {
-    fitPatterns(questionId, interaction, patterns, spec.format).forEach(
-      (pattern, n) => {
-        fields.push([`correct_responses.${n}.pattern`, pattern]);
-      },
-    );
-  }
-  const recorded =
-    response === null
-      ? null
-      : fitResponse(questionId, interaction, response, spec.format);
-  if (recorded !== null) fields.push([spec.responseField, recorded]);
+  patterns?.forEach((pattern, n) => {
+    fields.push([`correct_responses.${n}.pattern`, pattern]);
+  });
+  if (response !== null) fields.push([spec.responseField, response]);
   if (correct !== null) {
     fields.push([
       'result',
