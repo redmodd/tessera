@@ -131,6 +131,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected completedEmitted = false;
   protected lastSuccessEmitted: SuccessStatus = 'unknown';
   protected lastScoreEmitted: number | null = null;
+  #completion: CompletionStatus = 'incomplete';
+  #success: SuccessStatus = 'unknown';
   protected returnURL: string | undefined;
   #activityId = '';
   #registration: string | undefined;
@@ -289,9 +291,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override commit(): void {
+    if (!this.publisher) return;
+    if (this.isDefinedStatementAllowed()) {
+      this.#sendCompleted();
+      this.#sendSuccess();
+    }
     const { scaled } = this;
-    if (!this.publisher || scaled === null) return;
-    if (scaled === this.lastScoreEmitted) return;
+    if (scaled === null || scaled === this.lastScoreEmitted) return;
     this.lastScoreEmitted = scaled;
     this.dispatch('Scored', {
       verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
@@ -319,29 +325,27 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   override setCompletionStatus(status: CompletionStatus): void {
-    if (status !== 'complete' || this.completedEmitted || !this.publisher)
-      return;
-    if (!this.isDefinedStatementAllowed()) return;
+    this.#completion = status;
+  }
+
+  override setSuccessStatus(status: SuccessStatus): void {
+    this.#success = status;
+  }
+
+  #sendCompleted(): void {
+    if (this.#completion !== 'complete' || this.completedEmitted) return;
     this.completedEmitted = true;
-    const result: Record<string, unknown> = {
-      completion: true,
-      ...durationOf(this.totalSeconds),
-    };
     this.dispatch('Completed', {
       verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
-      result,
+      result: { completion: true, ...durationOf(this.totalSeconds) },
       context: this.buildContext({ moveOn: true }),
     });
   }
 
-  override setSuccessStatus(status: SuccessStatus): void {
-    if (status === 'unknown' || !this.publisher) return;
-    if (status === this.lastSuccessEmitted) return;
-    if (!this.isDefinedStatementAllowed()) return;
+  #sendSuccess(): void {
+    const status = this.#success;
+    if (status === 'unknown' || status === this.lastSuccessEmitted) return;
     this.lastSuccessEmitted = status;
-
-    const verb = status === 'passed' ? VERBS.passed : VERBS.failed;
-    const verbName = status === 'passed' ? 'passed' : 'failed';
     const result: Record<string, unknown> = {
       success: status === 'passed',
       ...durationOf(this.totalSeconds),
@@ -352,7 +356,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.lastScoreEmitted = scaled;
     }
     this.dispatch(status === 'passed' ? 'Passed' : 'Failed', {
-      verb: { id: verb, display: { 'en-US': verbName } },
+      verb: { id: VERBS[status], display: { 'en-US': status } },
       result,
       context: this.buildContext({ moveOn: true, mastery: true }),
     });
@@ -391,6 +395,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override terminate(unloading = true): void {
     if (this.#terminated) return;
+    this.commit();
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {

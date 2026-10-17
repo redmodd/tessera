@@ -23,6 +23,7 @@ async function sentActor(actor: unknown) {
   const adapter = new XAPIAdapter();
   await adapter.init();
   adapter.setCompletionStatus('complete');
+  adapter.commit();
   await flush();
   return posted()[0].actor;
 }
@@ -76,6 +77,7 @@ describe('XAPIAdapter', () => {
     const adapter = new XAPIAdapter();
     await adapter.init();
     adapter.setCompletionStatus('complete');
+    adapter.commit();
     await flush();
     const [send] = calls('/statements');
     expect(send).toBeTruthy();
@@ -96,6 +98,7 @@ describe('XAPIAdapter', () => {
     await adapter.init();
     await adapter.loadState();
     adapter.setCompletionStatus('complete');
+    adapter.commit();
     await flush();
     expect(posted()[0].actor).toEqual({
       name: 'Learner Name',
@@ -218,6 +221,7 @@ describe('XAPIAdapter', () => {
     const adapter = new XAPIAdapter();
     await expect(adapter.init()).rejects.toThrow(/actor/);
     adapter.setCompletionStatus('complete');
+    adapter.commit();
     await flush();
     expect(calls('/statements')).toHaveLength(0);
   });
@@ -315,6 +319,31 @@ describe('XAPIAdapter', () => {
       ['completed', 'PT2M30S'],
       ['passed', 'PT2M30S'],
       ['terminated', 'PT2M30S'],
+    ]);
+  });
+
+  it('builds status statements on commit, whatever order the setters ran in', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await adapter.loadState();
+    await flush();
+    fetchMock.mockClear();
+    fetchMock.mockImplementation(async () => respond(200, '[]'));
+
+    adapter.setSuccessStatus('passed');
+    adapter.setCompletionStatus('complete');
+    adapter.setDuration(30, 90);
+    adapter.setScore(70);
+    adapter.commit();
+    await flush();
+
+    expect(posted().map((s) => [s.verb.display['en-US'], s.result])).toEqual([
+      ['completed', { completion: true, duration: 'PT1M30S' }],
+      [
+        'passed',
+        { success: true, duration: 'PT1M30S', score: { scaled: 0.7 } },
+      ],
     ]);
   });
 

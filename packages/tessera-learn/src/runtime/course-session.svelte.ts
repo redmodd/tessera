@@ -344,8 +344,6 @@ export class CourseSession {
     );
   }
 
-  // Duration first: the xAPI adapters build a statement, duration included,
-  // as soon as a status is set.
   #report(setStatus: () => void): void {
     untrack(() => {
       this.#reportDuration();

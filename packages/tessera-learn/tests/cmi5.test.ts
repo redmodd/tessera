@@ -301,6 +301,7 @@ describe('CMI5Adapter', () => {
     adapter.setScore(85);
     adapter.setDuration(3600, 3600);
     adapter.setCompletionStatus('complete');
+    adapter.commit();
 
     await flush();
 
@@ -318,6 +319,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
 
     adapter.setCompletionStatus('incomplete');
+    adapter.commit();
 
     await flush();
 
@@ -332,6 +334,7 @@ describe('CMI5Adapter', () => {
     adapter.setScore(90);
     adapter.setDuration(1800, 1800);
     adapter.setSuccessStatus('passed');
+    adapter.commit();
 
     await flush();
 
@@ -366,6 +369,7 @@ describe('CMI5Adapter', () => {
 
     adapter.setScore(40);
     adapter.setSuccessStatus('failed');
+    adapter.commit();
     await flush();
     expect(sentVerbs()).not.toContain('failed');
 
@@ -380,6 +384,7 @@ describe('CMI5Adapter', () => {
     mockFetch.mockClear();
 
     adapter.setSuccessStatus('failed');
+    adapter.commit();
     await flush();
     expect(sentVerbs()).not.toContain('failed');
 
@@ -401,6 +406,7 @@ describe('CMI5Adapter', () => {
     adapter.setScore(85);
     adapter.setSuccessStatus('passed');
     adapter.setCompletionStatus('complete');
+    adapter.commit();
 
     await flush();
 
@@ -411,13 +417,14 @@ describe('CMI5Adapter', () => {
   it('seedLifecycle suppresses duplicate Completed and Passed when resuming a completed session', async () => {
     const adapter = await initAdapter();
 
-    adapter.seedLifecycle('complete', 'passed');
+    adapter.seedLifecycle('complete', 'passed', 85);
 
     mockFetch.mockClear();
 
     adapter.setScore(85);
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
+    adapter.commit();
 
     await flush();
 
@@ -599,6 +606,7 @@ describe('CMI5Adapter', () => {
     adapter.setScore(85);
     adapter.setDuration(60, 60);
     adapter.setCompletionStatus('complete');
+    adapter.commit();
     await flush();
 
     mockFetch.mockClear();
@@ -616,6 +624,7 @@ describe('CMI5Adapter', () => {
     const adapter = await initAdapter();
 
     adapter.setCompletionStatus('complete');
+    adapter.commit();
     await flush();
 
     mockFetch.mockClear();
@@ -770,6 +779,7 @@ describe('CMI5Adapter', () => {
       adapter.setScore(85);
       adapter.setDuration(60, 60);
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
 
       const completed = statementFor('completed');
@@ -798,6 +808,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(85);
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
 
       const completed = statementFor('completed');
@@ -826,6 +837,7 @@ describe('CMI5Adapter', () => {
         adapter.setScore(90);
         adapter.setCompletionStatus('complete');
         adapter.setSuccessStatus('passed');
+        adapter.commit();
         await flush();
 
         expect(sentVerbs()).not.toContain(
@@ -859,6 +871,7 @@ describe('CMI5Adapter', () => {
       const adapter = await initAdapter();
       mockFetch.mockClear();
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
       const completed = statementFor('completed');
       expect(categoryIds(completed)).toEqual([CMI5_CAT, MOVEON_CAT]);
@@ -868,6 +881,7 @@ describe('CMI5Adapter', () => {
       const adapter = await initAdapter();
       mockFetch.mockClear();
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       const passed = statementFor('passed');
       expect(categoryIds(passed)).toEqual([CMI5_CAT, MOVEON_CAT]);
@@ -1060,6 +1074,7 @@ describe('CMI5Adapter', () => {
       const sending = Promise.withResolvers<Response>();
       mockFetch.mockReturnValueOnce(sending.promise);
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
 
       let exited = false;
@@ -1088,6 +1103,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(40);
       adapter.setSuccessStatus('failed');
+      adapter.commit();
       await adapter.exit(noDeadline);
 
       const ids = sentVerbs();
@@ -1191,6 +1207,7 @@ describe('CMI5Adapter', () => {
         const adapter = await initAdapter({ launchData: data });
         mockFetch.mockClear();
         adapter.setCompletionStatus('complete');
+        adapter.commit();
         await flush();
         expect(statementFor('completed')).toBeDefined();
       },
@@ -1220,6 +1237,7 @@ describe('CMI5Adapter', () => {
       });
       mockFetch.mockClear();
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
       expect(statementFor('completed')).toBeUndefined();
     });
@@ -1231,6 +1249,7 @@ describe('CMI5Adapter', () => {
       mockFetch.mockClear();
       adapter.setScore(95);
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       expect(statementFor('passed')).toBeUndefined();
       expect(statementFor('failed')).toBeUndefined();
@@ -1320,6 +1339,7 @@ describe('CMI5Adapter', () => {
       });
       mockFetch.mockClear();
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
       const completed = statementFor('completed');
       const ids = completed.context.contextActivities.category.map(
@@ -1340,6 +1360,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(150);
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(1);
@@ -1352,6 +1373,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(50); // scaled = 0.5, below mastery 0.8
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       const passed = statementFor('passed');
       expect(passed).toBeDefined();
@@ -1368,6 +1390,7 @@ describe('CMI5Adapter', () => {
 
       adapter.setScore(53.3);
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       const passed = statementFor('passed');
       expect(passed.result.score.scaled).toBe(0.533);
