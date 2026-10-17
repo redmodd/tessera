@@ -229,10 +229,13 @@ export function validateQuestionComponents(
     }
 
     if (profile && format && name === 'FillInTheBlank') {
-      const max = format.maxValueLength;
-      const long = (staticArray(props.get('answers')) ?? []).filter(
-        (a) => typeof a === 'string' && a.trim().length > max,
-      ).length;
+      const max = format.maxValueLength('fill-in');
+      const answers = props.get('answers');
+      const value =
+        answers?.kind === 'string' ? answers.value : staticValue(answers);
+      const long = [value]
+        .flat()
+        .filter((a) => typeof a === 'string' && a.trim().length > max).length;
       if (long > 0) {
         d.warn(
           `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${profile.name} records; they are graded but left out of the LMS record`,

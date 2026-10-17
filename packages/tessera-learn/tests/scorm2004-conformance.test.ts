@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
@@ -112,6 +112,39 @@ describe('SCORM2004Adapter against scorm-again', () => {
         expect(lms.errors).toEqual([]);
         expect(lms.raw.GetValue('cmi.interactions.0.id')).toBe('q1');
         expect(lms.raw.GetValue('cmi.interactions.0.type')).toBe(label);
+      },
+    );
+
+    it.each([
+      ['fill-in', 250],
+      ['long-fill-in', 4000],
+      ['other', 4000],
+    ] as const)(
+      'a %s response over %i characters is cut to fit',
+      async (type, max) => {
+        await start();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const long = 'a'.repeat(max + 1);
+        const fits = 'b'.repeat(max - '{case_matters=true}'.length);
+        adapter.reportInteraction(
+          'q1',
+          {
+            type,
+            response: long,
+            correct: type === 'other' ? long : [long, fits + 'b', fits],
+            caseMatters: type === 'fill-in',
+          } as never,
+          true,
+        );
+        await flush();
+        warn.mockRestore();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          'a'.repeat(max),
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+        ).toBe(type === 'other' ? '0' : '1');
       },
     );
 

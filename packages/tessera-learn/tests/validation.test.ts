@@ -2158,14 +2158,37 @@ let a = {}; let b = {};</script>
     ]);
   });
 
-  it('warns about fill-in answers over 255 characters only under SCORM 1.2', () => {
+  it.each([
+    ['web', null],
+    ['xapi', null],
+    ['cmi5', null],
+    ['scorm2004', '2 answer(s) over the 250 characters SCORM 2004 records'],
+    ['scorm12', '1 answer(s) over the 255 characters SCORM 1.2 records'],
+  ])('warns about over-long fill-in answers under %s', (standard, warning) => {
     createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "${standard}" },
+};`,
+    );
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank id="q1" question="Q" answers={["ok", "${'x'.repeat(256)}"]} />`,
+<FillInTheBlank id="q1" question="Q" answers={["ok", "${'x'.repeat(251)}", "${'x'.repeat(256)}"]} />`,
     );
-    const tooLong = (w: string) => w.includes('over the 255 characters');
-    expect(validateProject(testRoot).warnings.filter(tooLong)).toHaveLength(0);
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('<FillInTheBlank> has'),
+      ),
+    ).toEqual(warning ? [expect.stringContaining(warning)] : []);
+  });
+
+  it('warns about a single fill-in answer string over 255 characters', () => {
+    createValidProject(testRoot);
     writeConfig(
       testRoot,
       `export default {
@@ -2176,11 +2199,17 @@ let a = {}; let b = {};</script>
   export: { standard: "scorm12" },
 };`,
     );
-    expect(validateProject(testRoot).warnings.filter(tooLong)).toEqual([
-      expect.stringContaining(
-        '<FillInTheBlank> has 1 answer(s) over the 255 characters SCORM 1.2 records',
+    const long = 'x'.repeat(256);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers="${long}" />
+<FillInTheBlank id="q2" question="Q" answers={"${long}"} />`,
+    );
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('has 1 answer(s) over the 255 characters'),
       ),
-    ]);
+    ).toHaveLength(2);
   });
 
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {

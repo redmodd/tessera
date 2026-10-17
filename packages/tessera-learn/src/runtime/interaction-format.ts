@@ -1,6 +1,7 @@
 /**
  * SCORM 1.2 RTE §3.4.7 vs SCORM 2004 4E RTE §4.2.7 differ in delimiter
- * encoding and identifier rules; cmi5 and xAPI reuse 2004's encoding.
+ * encoding and identifier rules; cmi5 and xAPI reuse 2004's encoding
+ * without its caps.
  */
 
 import type { Interaction } from './interaction.js';
@@ -22,17 +23,17 @@ export interface InteractionFormat {
   encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
-   * `fill-in` and 1 for `long-fill-in`. These caps and `maxValueLength`
-   * apply only to the SCORM record, not to xAPI statements.
+   * `fill-in` and 1 for `long-fill-in`.
    */
   fillInLimit: number;
   longFillInLimit: number;
   /**
-   * SCORM 1.2 caps every CMIFeedback value (`student_response` and each
-   * `correct_responses` pattern) at 255 characters; strict LMSs reject a
-   * longer one with 405.
+   * Longest response or correct answer the LMS takes for a type. SCORM 1.2
+   * caps every CMIFeedback value at 255 characters; SCORM 2004 caps each
+   * fill-in answer at 250 and long-fill-in and other at 4000. Strict LMSs
+   * reject a longer value (405 / 406).
    */
-  maxValueLength: number;
+  maxValueLength(type: Interaction['type']): number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -46,7 +47,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
-  maxValueLength: 255,
+  maxValueLength: () => 255,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -64,9 +65,21 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
-  maxValueLength: Infinity,
+  maxValueLength: (type) =>
+    type === 'fill-in'
+      ? 250
+      : type === 'long-fill-in' || type === 'other'
+        ? 4000
+        : Infinity,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
+};
+
+export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
+  ...SCORM2004_INTERACTION_FORMAT,
+  fillInLimit: Infinity,
+  longFillInLimit: Infinity,
+  maxValueLength: () => Infinity,
 };
 
 /**
@@ -246,7 +259,8 @@ function fitPatterns(
   patterns: string[],
   fmt: InteractionFormat,
 ): string[] {
-  const max = fmt.maxValueLength;
+  const max = fmt.maxValueLength(i.type);
+  // Counts a `{case_matters=true}` prefix too, as scorm-again does.
   const fit = patterns.filter((p) => p.length <= max);
   if (fit.length < patterns.length) {
     console.warn(
@@ -273,7 +287,7 @@ function fitResponse(
   value: string,
   fmt: InteractionFormat,
 ): string | null {
-  const max = fmt.maxValueLength;
+  const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
   let cut: string;
   if (Array.isArray(i.response)) {
