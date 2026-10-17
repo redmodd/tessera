@@ -1,5 +1,14 @@
 # create-tessera
 
+## 0.11.0
+
+### Patch Changes
+
+- b1387a6: - `@types/node` 26.6.4 → 26.6.5
+- cf95867: New workspaces ignore exported packages (`*.zip`) in git, so SCORM, cmi5 and xAPI exports no longer get committed with the course.
+  
+  Existing workspaces: add `*.zip` to the workspace `.gitignore`.
+
 ## 0.10.0
 
 ### Minor Changes

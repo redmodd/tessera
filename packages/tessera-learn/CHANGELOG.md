@@ -1,5 +1,24 @@
 # tessera-learn
 
+## 0.11.0
+
+### Minor Changes
+
+- f778e22: A failing learner whose score can no longer change now reports `failed` on SCORM 1.2 instead of staying `incomplete`. Under `completion.mode: "quiz"`, a final failure ends the SCORM 1.2 or 2004 attempt with a normal exit, so the next launch starts a new attempt. cmi5 sends a final `failed` right away instead of holding it for session end. A `useQuestion` `score()` that returns a non-finite value now scores 0 instead of locking the question.
+
+### Patch Changes
+
+- b1387a6: - `@types/node` 26.6.4 → 26.6.5
+  - `jsdom` 30.1.1 → 30.1.2
+  - `scorm-again` 3.4.4 → 3.4.6
+  - `svelte` 5.57.1 → 5.57.2
+- 72ae198: - `vite` 8.3.2 → 8.3.4
+- fef3a94: - `acorn` 8.18.0 → 8.19.0
+- cf95867: New workspaces ignore exported packages (`*.zip`) in git, so SCORM, cmi5 and xAPI exports no longer get committed with the course.
+  
+  Existing workspaces: add `*.zip` to the workspace `.gitignore`.
+- 9ae0ced: Internal change to how xAPI and cmi5 build their status statements. The statements sent are unchanged.
+
 ## 0.10.0
 
 ### Minor Changes
