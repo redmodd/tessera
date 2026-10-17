@@ -5,3 +5,4 @@ a11y-report.json
 *.log
 .env
 .env.local
+*.zip
