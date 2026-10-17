@@ -128,11 +128,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   protected sessionSeconds = 0;
   #totalSeconds = 0;
   #stateRead = false;
-  protected completedEmitted = false;
-  protected lastSuccessEmitted: SuccessStatus = 'unknown';
-  protected lastScoreEmitted: number | null = null;
   #completion: CompletionStatus = 'incomplete';
+  #completedEmitted = false;
   #success: SuccessStatus = 'unknown';
+  #lastSuccessEmitted: SuccessStatus = 'unknown';
+  #lastScoreEmitted: number | null = null;
   protected returnURL: string | undefined;
   #activityId = '';
   #registration: string | undefined;
@@ -303,8 +303,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.#sendSuccess();
     }
     const { scaled } = this;
-    if (scaled === null || scaled === this.lastScoreEmitted) return;
-    this.lastScoreEmitted = scaled;
+    if (scaled === null || scaled === this.#lastScoreEmitted) return;
+    this.#lastScoreEmitted = scaled;
     this.dispatch('Scored', {
       verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
       result: {
@@ -319,13 +319,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     success: SuccessStatus,
     score?: number | null,
   ): boolean {
-    if (completion === 'complete') this.completedEmitted = true;
+    if (completion === 'complete') this.#completedEmitted = true;
     if (success === 'passed' || success === 'failed') {
-      this.lastSuccessEmitted = success;
+      this.#lastSuccessEmitted = success;
     }
     if (typeof score === 'number' && Number.isFinite(score)) {
       this.setScore(score);
-      this.lastScoreEmitted = this.scaled;
+      this.#lastScoreEmitted = this.scaled;
     }
     return true;
   }
@@ -342,8 +342,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   /** Queue a staged completion with the current duration, unless already emitted or seeded. */
   #sendCompleted(): void {
-    if (this.#completion !== 'complete' || this.completedEmitted) return;
-    this.completedEmitted = true;
+    if (this.#completion !== 'complete' || this.#completedEmitted) return;
+    this.#completedEmitted = true;
     this.dispatch('Completed', {
       verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
       result: { completion: true, ...durationOf(this.totalSeconds) },
@@ -358,8 +358,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    */
   #sendSuccess(): void {
     const status = this.#success;
-    if (status === 'unknown' || status === this.lastSuccessEmitted) return;
-    this.lastSuccessEmitted = status;
+    if (status === 'unknown' || status === this.#lastSuccessEmitted) return;
+    this.#lastSuccessEmitted = status;
     const result: Record<string, unknown> = {
       success: status === 'passed',
       ...durationOf(this.totalSeconds),
@@ -367,7 +367,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const scaled = this.scoreForSuccess(status);
     if (scaled !== null) {
       result.score = { scaled };
-      this.lastScoreEmitted = scaled;
+      this.#lastScoreEmitted = scaled;
     }
     this.dispatch(status === 'passed' ? 'Passed' : 'Failed', {
       verb: { id: VERBS[status], display: { 'en-US': status } },
@@ -409,6 +409,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   override terminate(unloading = true): void {
     if (this.#terminated) return;
+    this.commit();
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) {

@@ -389,7 +389,6 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).not.toContain('failed');
 
     adapter.setSuccessStatus('passed');
-    adapter.commit();
     adapter.terminate();
     await flush();
 
@@ -595,7 +594,6 @@ describe('CMI5Adapter', () => {
     adapter.commit();
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
-    adapter.commit();
     adapter.terminate();
     await flush();
 
@@ -619,7 +617,6 @@ describe('CMI5Adapter', () => {
     adapter.setDuration(50, 150);
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
-    adapter.commit();
     adapter.terminate();
     await flush();
 
@@ -679,7 +676,6 @@ describe('CMI5Adapter', () => {
     adapter.saveState({ b: 1 } as never);
     await flush();
     adapter.setCompletionStatus('complete');
-    adapter.commit();
 
     adapter.terminate();
 
