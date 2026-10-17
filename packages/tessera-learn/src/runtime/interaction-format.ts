@@ -232,6 +232,18 @@ export interface ScormInteractionSpec {
   format: InteractionFormat;
 }
 
+function idsWithoutOptions(i: Interaction): string[] {
+  switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+      return i.options ? [] : [...i.response, ...(i.correct ?? [])];
+    case 'matching':
+      return i.optionPairs ? [] : [...i.response, ...(i.correct ?? [])].flat();
+    default:
+      return [];
+  }
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -239,6 +251,16 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
+  if (spec.format.encodesOptionIndex) {
+    const long = idsWithoutOptions(interaction).find(
+      (id) => spec.format.identifier(id).length > 1,
+    );
+    if (long !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" sends the id "${long}" without options; SCORM 1.2 allows one character per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+      );
+    }
+  }
   const recordable = <T>(field: string, format: () => T): T | null => {
     try {
       return format();

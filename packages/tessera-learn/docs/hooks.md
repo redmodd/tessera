@@ -88,7 +88,7 @@ type Interaction =
 For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`. cmi5/SCORM 2004 keep the ids; SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
 
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
-- Without `options`, ids are slugged as written, and strict LMSs reject any id longer than one character.
+- Without `options`, ids are slugged as written, and strict LMSs reject any id longer than one character. Tessera logs a console warning when it sends one.
 
 ```ts
 response: () => ({

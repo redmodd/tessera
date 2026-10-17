@@ -517,6 +517,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('slugs non-alphanumeric choice identifiers (SCORM 1.2 CMIIdentifier)', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
         {
@@ -688,7 +689,8 @@ describe('SCORM12Adapter', () => {
       );
     });
 
-    it('falls back to slugging when options is not supplied', async () => {
+    it('slugs and warns about multi-character ids when options is not supplied', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['speed-limit'], correct: ['speed-limit'] },
@@ -699,6 +701,37 @@ describe('SCORM12Adapter', () => {
         student_response: 'speed_limit',
         'correct_responses.0.pattern': 'speed_limit',
       });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" sends the id "speed-limit" without options',
+        ),
+      );
+    });
+
+    it('warns about a multi-character matching id sent without optionPairs', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'm1',
+        { type: 'matching', response: [['a', '10']], correct: [['a', 'b']] },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ student_response: 'a.10' });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"m1" sends the id "10" without options'),
+      );
+    });
+
+    it('does not warn about one-character ids sent without options', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a', 'b'], correct: ['a'] },
+        false,
+      );
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
