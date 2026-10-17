@@ -828,13 +828,31 @@ describe('SCORM12Adapter', () => {
       await flush();
       const v = interaction0();
       expect(v.student_response).toBe('a'.repeat(254));
-      expect(v['correct_responses.0.pattern']).toBe('a'.repeat(254));
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringMatching(/response of interaction "lf2".*at most 255/),
+        expect.stringMatching(
+          /response of interaction "lf2".*at most 255; the LMS gets the first 254\./,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/"lf2" has 1 correct answer\(s\) over the 255/),
       );
     });
 
-    it('cuts a performance response past 255 characters', async () => {
+    it('keeps the correct answers that fit and numbers them in order', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'f3',
+        { type: 'fill-in', response: 'ok', correct: ['a'.repeat(256), 'ok'] },
+        true,
+      );
+      await flush();
+      const v = interaction0();
+      expect(v['correct_responses.0.pattern']).toBe('ok');
+      expect(v['correct_responses.1.pattern']).toBeUndefined();
+    });
+
+    it('cuts a performance response on a whole step', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const steps: Array<[string, string]> = Array.from(
         { length: 40 },
@@ -846,7 +864,12 @@ describe('SCORM12Adapter', () => {
         null,
       );
       await flush();
-      expect(interaction0().student_response).toHaveLength(255);
+      expect(interaction0().student_response).toBe(
+        steps
+          .slice(0, 26)
+          .map(([s, v]) => `${s}.${v}`)
+          .join(','),
+      );
     });
 
     it('maps other to fill-in', async () => {

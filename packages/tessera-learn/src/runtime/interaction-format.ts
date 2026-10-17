@@ -28,8 +28,9 @@ export interface InteractionFormat {
   fillInLimit: number;
   longFillInLimit: number;
   /**
-   * SCORM 1.2 caps `fill-in` and `performance` CMIFeedback at 255
-   * characters; strict LMSs reject a longer value with 405.
+   * SCORM 1.2 caps every CMIFeedback value (`student_response` and each
+   * `correct_responses` pattern) at 255 characters; strict LMSs reject a
+   * longer one with 405.
    */
   maxValueLength: number;
   formatBoolean(value: boolean): string;
@@ -251,6 +252,39 @@ function idsWithoutOptions(i: Interaction): string[] {
   }
 }
 
+const LIST_TYPES = new Set<Interaction['type']>([
+  'choice',
+  'sequencing',
+  'matching',
+  'performance',
+]);
+
+/**
+ * Cuts a response to the format's length cap. A list keeps only whole items,
+ * since a half-written id or pair is wrong data. Null when nothing fits.
+ */
+function fitResponse(
+  questionId: string,
+  type: Interaction['type'],
+  value: string,
+  fmt: InteractionFormat,
+): string | null {
+  const max = fmt.maxValueLength;
+  if (value.length <= max) return value;
+  let cut: string;
+  if (LIST_TYPES.has(type)) {
+    cut = value.slice(0, Math.max(value.lastIndexOf(fmt.itemDelim, max), 0));
+  } else {
+    cut = value.slice(0, max);
+    // Don't leave half of a surrogate pair (an emoji) at the end.
+    if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
+  }
+  console.warn(
+    `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length}` : 'it is left out of the LMS record'}.`,
+  );
+  return cut || null;
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -279,30 +313,27 @@ export function buildScormInteractionFields(
       return null;
     }
   };
-  const fit = (field: string, value: string): string => {
-    const max = spec.format.maxValueLength;
-    if (value.length <= max) return value;
-    console.warn(
-      `Tessera: the ${field} of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; the LMS gets the first ${max}.`,
-    );
-    const cut = value.slice(0, max);
-    // Don't leave half of a surrogate pair (an emoji) at the end.
-    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
-  };
+  const max = spec.format.maxValueLength;
   const patterns = recordable('correct answer', () =>
     formatCorrectPattern(interaction, spec.format),
   );
   const response = recordable('response', () =>
     formatResponse(interaction, spec.format),
   );
-  patterns?.forEach((pattern, n) => {
-    fields.push([
-      `correct_responses.${n}.pattern`,
-      fit('correct answer', pattern),
-    ]);
+  const keptPatterns = patterns?.filter((p) => p.length <= max) ?? [];
+  if (patterns && keptPatterns.length < patterns.length) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has ${patterns.length - keptPatterns.length} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
+    );
+  }
+  keptPatterns.forEach((pattern, n) => {
+    fields.push([`correct_responses.${n}.pattern`, pattern]);
   });
-  if (response !== null)
-    fields.push([spec.responseField, fit('response', response)]);
+  const recorded =
+    response === null
+      ? null
+      : fitResponse(questionId, interaction.type, response, spec.format);
+  if (recorded !== null) fields.push([spec.responseField, recorded]);
   if (correct !== null) {
     fields.push([
       'result',
