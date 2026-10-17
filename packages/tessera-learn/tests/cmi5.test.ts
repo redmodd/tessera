@@ -396,6 +396,21 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).not.toContain('failed');
   });
 
+  it('holds a Failed set after an uncommitted Passed, and sends no Passed', async () => {
+    const adapter = await initAdapter();
+    mockFetch.mockClear();
+
+    adapter.setSuccessStatus('passed');
+    adapter.setSuccessStatus('failed');
+    adapter.commit();
+    await flush();
+    expect(sentVerbs()).toEqual([]);
+
+    adapter.terminate();
+    await flush();
+    expect(sentVerbs()).toEqual(['failed', 'terminated']);
+  });
+
   it('sends a final Failed without waiting for Terminated', async () => {
     const adapter = await initAdapter();
     mockFetch.mockClear();
