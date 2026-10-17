@@ -839,17 +839,25 @@ describe('SCORM12Adapter', () => {
       );
     });
 
-    it('keeps the correct answers that fit and numbers them in order', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('drops over-long correct answers before taking the first 10', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const short = Array.from({ length: 10 }, (_, n) => `a${n}`);
       adapter.reportInteraction(
         'f3',
-        { type: 'fill-in', response: 'ok', correct: ['a'.repeat(256), 'ok'] },
+        {
+          type: 'fill-in',
+          response: 'a0',
+          correct: ['x'.repeat(256), ...short],
+        },
         true,
       );
       await flush();
       const v = interaction0();
-      expect(v['correct_responses.0.pattern']).toBe('ok');
-      expect(v['correct_responses.1.pattern']).toBeUndefined();
+      short.forEach((answer, n) => {
+        expect(v[`correct_responses.${n}.pattern`]).toBe(answer);
+      });
+      expect(v['correct_responses.10.pattern']).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
     });
 
     it('cuts a performance response on a whole step', async () => {

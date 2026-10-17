@@ -69,13 +69,9 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   identifier: (v) => v,
 };
 
-// xAPI reuses SCORM 2004's delimiters, numeric-range support, and identity
-// identifier, but the RTE caps on `correct_responses` are SCORM-only.
-export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
-  ...SCORM2004_INTERACTION_FORMAT,
-  fillInLimit: Infinity,
-  longFillInLimit: Infinity,
-};
+// xAPI reuses SCORM 2004's encoding. The RTE caps on `correct_responses`
+// apply only in buildScormInteractionFields.
+export const XAPI_INTERACTION_FORMAT = SCORM2004_INTERACTION_FORMAT;
 
 /**
  * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +
@@ -178,15 +174,7 @@ export function formatCorrectPattern(
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
     case 'long-fill-in': {
-      const limit =
-        i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-      const all = i.correct as string[];
-      if (all.length > limit) {
-        console.warn(
-          `Tessera: ${i.type} declares ${all.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
-        );
-      }
-      const alternatives = all.slice(0, limit);
+      const alternatives = i.correct as string[];
       if (!fmt.supportsCasePrefix) return alternatives;
       const prefix = i.caseMatters ? '{case_matters=true}' : '';
       return alternatives.map((a) => prefix + a);
@@ -252,12 +240,36 @@ function idsWithoutOptions(i: Interaction): string[] {
   }
 }
 
-const LIST_TYPES = new Set<Interaction['type']>([
-  'choice',
-  'sequencing',
-  'matching',
-  'performance',
-]);
+/**
+ * Drops correct answers over the format's length cap, since a shortened
+ * pattern matches nothing, then keeps the first ones up to its count cap.
+ */
+function fitPatterns(
+  questionId: string,
+  i: Interaction,
+  patterns: string[],
+  fmt: InteractionFormat,
+): string[] {
+  const max = fmt.maxValueLength;
+  const fit = patterns.filter((p) => p.length <= max);
+  if (fit.length < patterns.length) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has ${patterns.length - fit.length} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
+    );
+  }
+  const limit =
+    i.type === 'fill-in'
+      ? fmt.fillInLimit
+      : i.type === 'long-fill-in'
+        ? fmt.longFillInLimit
+        : Infinity;
+  if (fit.length > limit) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has ${patterns.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
+    );
+  }
+  return fit.slice(0, limit);
+}
 
 /**
  * Cuts a response to the format's length cap. A list keeps only whole items,
@@ -265,14 +277,14 @@ const LIST_TYPES = new Set<Interaction['type']>([
  */
 function fitResponse(
   questionId: string,
-  type: Interaction['type'],
+  i: Interaction,
   value: string,
   fmt: InteractionFormat,
 ): string | null {
   const max = fmt.maxValueLength;
   if (value.length <= max) return value;
   let cut: string;
-  if (LIST_TYPES.has(type)) {
+  if (Array.isArray(i.response)) {
     cut = value.slice(0, Math.max(value.lastIndexOf(fmt.itemDelim, max), 0));
   } else {
     cut = value.slice(0, max);
@@ -313,26 +325,23 @@ export function buildScormInteractionFields(
       return null;
     }
   };
-  const max = spec.format.maxValueLength;
   const patterns = recordable('correct answer', () =>
     formatCorrectPattern(interaction, spec.format),
   );
   const response = recordable('response', () =>
     formatResponse(interaction, spec.format),
   );
-  const keptPatterns = patterns?.filter((p) => p.length <= max) ?? [];
-  if (patterns && keptPatterns.length < patterns.length) {
-    console.warn(
-      `Tessera: interaction "${questionId}" has ${patterns.length - keptPatterns.length} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
+  if (patterns) {
+    fitPatterns(questionId, interaction, patterns, spec.format).forEach(
+      (pattern, n) => {
+        fields.push([`correct_responses.${n}.pattern`, pattern]);
+      },
     );
   }
-  keptPatterns.forEach((pattern, n) => {
-    fields.push([`correct_responses.${n}.pattern`, pattern]);
-  });
   const recorded =
     response === null
       ? null
-      : fitResponse(questionId, interaction.type, response, spec.format);
+      : fitResponse(questionId, interaction, response, spec.format);
   if (recorded !== null) fields.push([spec.responseField, recorded]);
   if (correct !== null) {
     fields.push([

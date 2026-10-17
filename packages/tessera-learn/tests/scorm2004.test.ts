@@ -476,7 +476,9 @@ describe('SCORM2004Adapter', () => {
       expect(v['correct_responses.9.pattern']).toBe('a9');
       expect(v['correct_responses.10.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('declares 12 correct answers'),
+        expect.stringContaining(
+          '"fi4" has 12 correct answers but this export standard records at most 10',
+        ),
       );
     });
 
