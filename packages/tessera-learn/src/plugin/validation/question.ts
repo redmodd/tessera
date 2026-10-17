@@ -30,8 +30,11 @@ function staticNumber(prop: PropValue | undefined): number | null {
 
 interface QuestionComponentRule {
   required: string[];
-  /** Props whose entries SCORM 1.2 records as one-character indexes. */
-  indexedLists?: string[];
+  /**
+   * Props whose entries SCORM 1.2 records as one-character indexes; `every`
+   * when each complete answer and the correct pattern use every entry.
+   */
+  indexedLists?: Record<string, 'some' | 'every'>;
   check(props: ComponentMatch['props'], fileRel: string, d: Diagnostics): void;
 }
 
@@ -41,7 +44,7 @@ const QUESTION_COMPONENTS: Record<
 > = {
   MultipleChoice: {
     required: ['question', 'options', 'correct'],
-    indexedLists: ['options'],
+    indexedLists: { options: 'some' },
     check(props, fileRel, d) {
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
@@ -81,7 +84,7 @@ const QUESTION_COMPONENTS: Record<
   },
   Matching: {
     required: ['question', 'pairs'],
-    indexedLists: ['pairs'],
+    indexedLists: { pairs: 'every' },
     check(props, fileRel, d) {
       const pairs = staticArray(props.get('pairs'));
       if (pairs) {
@@ -101,7 +104,7 @@ const QUESTION_COMPONENTS: Record<
   },
   Sorting: {
     required: ['question', 'items', 'targets', 'correct'],
-    indexedLists: ['items', 'targets'],
+    indexedLists: { items: 'every', targets: 'some' },
     check(props, fileRel, d) {
       const items = staticArray(props.get('items'));
       const targets = staticArray(props.get('targets'));
@@ -211,11 +214,15 @@ export function validateQuestionComponents(
     }
 
     if (profile && format?.encodesOptionIndex) {
-      for (const prop of rule.indexedLists ?? []) {
+      for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > SCORM12_MAX_OPTIONS) {
+          const lost =
+            use === 'every'
+              ? 'every response and correct answer'
+              : `an answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
           d.warn(
-            `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; an answer that uses one past the ${SCORM12_MAX_OPTIONS}th is left out of the LMS record`,
+            `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
           );
         }
       }
