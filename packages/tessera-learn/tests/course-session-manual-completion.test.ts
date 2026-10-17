@@ -62,7 +62,7 @@ describe('manual completion in a CourseSession', () => {
     await flush();
 
     expect(setCompletionStatus).toHaveBeenCalledWith('complete');
-    expect(setSuccessStatus).toHaveBeenCalledWith('passed');
+    expect(setSuccessStatus).toHaveBeenCalledWith('passed', expect.anything());
   });
 
   it('reports no verdict for a manual completion without requireSuccessStatus', async () => {
@@ -74,8 +74,8 @@ describe('manual completion in a CourseSession', () => {
     await flush();
 
     expect(setCompletionStatus).toHaveBeenCalledWith('complete');
-    expect(setSuccessStatus).not.toHaveBeenCalledWith('passed');
-    expect(setSuccessStatus).not.toHaveBeenCalledWith('failed');
+    expect(setSuccessStatus.mock.calls.map(([s]) => s)).not.toContain('passed');
+    expect(setSuccessStatus.mock.calls.map(([s]) => s)).not.toContain('failed');
   });
 });
 

@@ -32,6 +32,8 @@ export interface StandaloneResult {
   correct: boolean | null;
   /** The submitted response, as JSON. */
   response?: string;
+  /** Graded, with no retry left to change the score. */
+  final: boolean;
 }
 
 /** What a standalone submit records beside its score. */
@@ -41,6 +43,8 @@ export interface StandaloneSubmit {
   response?: unknown;
   /** The verdict, or null when the response had no `correct` to judge it by. Default: what the score gives. */
   correct?: boolean | null;
+  /** No retries are left. A score of 100 is final either way. */
+  final?: boolean;
 }
 
 /** What a standalone question last submitted, for the handle a remount seeds. */
@@ -117,7 +121,12 @@ export function normalizeWeight(weight: unknown): number {
     : 1;
 }
 
-function clampScore(score: number): number {
+/** A question with `retries` spent can still retry under `maxRetries`. */
+export function retriesLeft(retries: number, maxRetries?: number): boolean {
+  return retries < (maxRetries ?? Infinity);
+}
+
+export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
 
@@ -153,7 +162,7 @@ export interface GradedUnit {
 export class ProgressState {
   #declaredGradedIndices: ReadonlySet<number>;
   #requiredGradedIndices: ReadonlySet<number>;
-  #quizGradedIndices: ReadonlySet<number>;
+  #quizMaxAttempts: ReadonlyMap<number, number>;
   #config: CourseConfig;
   #success: SuccessConfig;
   #totalPages: number;
@@ -171,8 +180,12 @@ export class ProgressState {
     this.#requiredGradedIndices = new Set(
       manifest.pages.filter(isRequiredGradedPage).map((p) => p.index),
     );
-    this.#quizGradedIndices = new Set(
-      manifest.pages.filter((p) => p.quiz?.graded).map((p) => p.index),
+    this.#quizMaxAttempts = new Map(
+      manifest.pages.flatMap((p) =>
+        p.quiz?.graded
+          ? [[p.index, p.quiz.maxAttempts ?? Infinity] as const]
+          : [],
+      ),
     );
     this.#quizPageIndices = new Set(
       manifest.pages.filter((p) => p.quiz).map((p) => p.index),
@@ -295,7 +308,7 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    { retries, response, correct }: StandaloneSubmit = {},
+    { retries, response, correct, final }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -308,6 +321,7 @@ export class ProgressState {
       retries: normalizeRetries(retries),
       correct: correct === undefined ? clamped >= 100 : correct,
       response: encodeResponse(response),
+      final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
   }
@@ -332,8 +346,8 @@ export class ProgressState {
 
   /**
    * Record a mounted question, so its page counts as answered only once every
-   * graded question on it is, and correct a restored answer's `graded` flag
-   * and weight from it, which outranks what the save was written with. The
+   * graded question on it is, and correct a restored answer's `graded` flag,
+   * weight and finality from it, which outrank what the save was written with. The
    * manifest lists the built-in questions the source fixes, so only a custom
    * or dynamically identified one behind a reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
@@ -344,22 +358,28 @@ export class ProgressState {
     questionId: string,
     graded: boolean,
     weight?: number,
+    maxRetries?: number,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
     const questions = this.gradedUnits.get(pageIndex)?.questions;
     const result = questions?.get(questionId);
-    const next = normalizeWeight(weight);
-    if (
-      questions &&
-      result &&
-      (next !== result.weight || graded !== result.graded)
-    ) {
-      questions.set(questionId, { ...result, weight: next, graded });
-      this.#writeQuestions(pageIndex, questions);
-    } else if (expectedChanged) {
-      this.#changed();
+    if (questions && result) {
+      const next = normalizeWeight(weight);
+      const final =
+        graded &&
+        (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
+      if (
+        next !== result.weight ||
+        graded !== result.graded ||
+        final !== result.final
+      ) {
+        questions.set(questionId, { ...result, weight: next, graded, final });
+        this.#writeQuestions(pageIndex, questions);
+        return;
+      }
     }
+    if (expectedChanged) this.#changed();
   }
 
   pageMounted(pageIndex: number) {
@@ -406,14 +426,14 @@ export class ProgressState {
 
   #answeredScore(pageIndex: number): number | undefined {
     if (this.#allAnswered(pageIndex)) return this.pageScore(pageIndex);
-    return this.#quizGradedIndices.has(pageIndex)
+    return this.#quizMaxAttempts.has(pageIndex)
       ? this.quizScore(pageIndex)
       : undefined;
   }
 
   pageScore(pageIndex: number): number | undefined {
     const unit = this.gradedUnits.get(pageIndex);
-    if (this.#quizGradedIndices.has(pageIndex) && unit?.quizScore !== undefined)
+    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
       return unit.quizScore;
     return this.#gradedResults(pageIndex).length
       ? this.getPageStandaloneAverage(pageIndex)
@@ -469,6 +489,34 @@ export class ProgressState {
     };
   });
 
+  /** No attempt or retry left can change the page's score. */
+  #pageFinal(pageIndex: number): boolean {
+    const maxAttempts = this.#quizMaxAttempts.get(pageIndex);
+    if (maxAttempts !== undefined) {
+      const unit = this.gradedUnits.get(pageIndex);
+      return (
+        unit?.quizScore !== undefined &&
+        (unit.quizScore >= 100 || unit.attempts >= maxAttempts)
+      );
+    }
+    const results = this.#gradedResults(pageIndex);
+    return (
+      this.#allAnswered(pageIndex) &&
+      results.length > 0 &&
+      results.every((result) => result.final)
+    );
+  }
+
+  /**
+   * True once no graded page, optional ones included, can change its score,
+   * so the verdict stands.
+   */
+  verdictFinal = $derived.by(
+    () =>
+      this.#declaredGradedIndices.size > 0 &&
+      [...this.#declaredGradedIndices].every((i) => this.#pageFinal(i)),
+  );
+
   #gradedScoreDecided = $state(false);
 
   get gradedScoreFinal(): boolean {
@@ -512,7 +560,8 @@ export class ProgressState {
             const { score, weight, retries, response, correct } = result;
             const verdict =
               correct === null ? 2 : correct === score >= 100 ? 0 : 4;
-            const flags = (result.graded ? 1 : 0) + verdict;
+            const final = result.final && score < 100 ? 8 : 0;
+            const flags = (result.graded ? 1 : 0) + verdict + final;
             const bare: number | SavedQuestion =
               retries > 0
                 ? [score, weight, flags, retries]
@@ -612,7 +661,14 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
-          const bits = [0, 1, 2, 3, 4, 5].includes(flags) ? flags : 0;
+          // Flags 1, 2, 4 and 8, never 2 with 4.
+          const bits =
+            Number.isInteger(flags) &&
+            flags >= 0 &&
+            flags < 16 &&
+            (flags & 6) !== 6
+              ? flags
+              : 0;
           this.markStandaloneQuestion(
             pageIndex,
             qid,
@@ -623,6 +679,7 @@ export class ProgressState {
               retries,
               response: swapIds(response),
               correct: bits & 2 ? null : score >= 100 !== !!(bits & 4),
+              final: !!(bits & 8),
             },
           );
         }
@@ -679,6 +736,14 @@ export class ProgressState {
   reportedCompletionStatus = $derived<CompletionStatus>(
     this.#completionReached ? 'complete' : this.completionStatus,
   );
+
+  /** Completion is reached or out of reach: quiz completion takes a score that a final one can no longer become. */
+  get attemptOver(): boolean {
+    return (
+      this.reportedCompletionStatus === 'complete' ||
+      (this.#config.completion.mode === 'quiz' && this.verdictFinal)
+    );
+  }
 
   completedPages = $derived.by<number>(() => {
     let count = 0;

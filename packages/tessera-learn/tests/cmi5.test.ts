@@ -391,6 +391,19 @@ describe('CMI5Adapter', () => {
     expect(sentVerbs()).not.toContain('failed');
   });
 
+  it('sends a final Failed without waiting for Terminated', async () => {
+    const adapter = await initAdapter();
+    mockFetch.mockClear();
+
+    adapter.setSuccessStatus('failed', true);
+    await flush();
+    expect(sentVerbs()).toContain('failed');
+
+    adapter.terminate();
+    await flush();
+    expect(sentVerbs().filter((id) => id === 'failed')).toHaveLength(1);
+  });
+
   it('after seedLifecycle("failed"), a transition to passed still emits Passed', async () => {
     const adapter = await initAdapter();
 

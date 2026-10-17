@@ -185,6 +185,27 @@ export async function answerGradedQuiz(
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
 }
 
+/** Retry the `free` graded quiz, answering Q1 wrong again. */
+export async function retryGradedQuizWithQ1Wrong(page: Page): Promise<void> {
+  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+  const progress = page.locator('.tessera-quiz-progress-desktop').first();
+
+  await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
+  // An incorrect-only retry locks Q2 and Q3, which were answered right.
+  await page
+    .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+    .first()
+    .click();
+  await primary.click();
+  await expect(primary).toHaveText('Next Question');
+  await primary.click();
+  await expect(progress).toContainText('Question 2 of 3');
+  await primary.click();
+  await expect(progress).toContainText('Question 3 of 3');
+  await page.locator('.tessera-quiz-btn-submit').click();
+  await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+}
+
 /** Answer Q2 and Q3 of the `free` graded quiz correctly, stopping once the final Submit is visible. */
 export async function answerGradedQuizAfterQ1(page: Page): Promise<void> {
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');

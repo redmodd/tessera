@@ -1,7 +1,12 @@
 import { isCorrect, restoreResponse, type Interaction } from './interaction.js';
 import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
-import type { StandaloneRestore, StandaloneSubmit } from './progress.svelte.js';
+import {
+  clampScore,
+  retriesLeft,
+  type StandaloneRestore,
+  type StandaloneSubmit,
+} from './progress.svelte.js';
 
 export interface StandaloneQuestionDeps extends Pick<QuizEngineDeps, 'report'> {
   markScore: (score: number, submit: StandaloneSubmit) => void;
@@ -71,11 +76,11 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get canRetry(): boolean {
-    return (
-      this.#submitted &&
-      !this.isLockedCorrect &&
-      this.#retryCount < (this.#opts.maxRetries ?? Infinity)
-    );
+    return this.#submitted && !this.isLockedCorrect && this.#retriesLeft;
+  }
+
+  get #retriesLeft(): boolean {
+    return retriesLeft(this.#retryCount, this.#opts.maxRetries);
   }
 
   get retryCount(): number {
@@ -98,12 +103,13 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const response = this.#opts.response();
     if (!response) return;
     const correct = isCorrect(response);
-    const score = this.#opts.score?.() ?? (correct ? 100 : 0);
+    const score = clampScore(this.#opts.score?.() ?? (correct ? 100 : 0));
 
     this.#deps.markScore(score, {
       retries: this.#retryCount,
       response: this.#opts.restore ? response.response : undefined,
       correct,
+      final: !this.#retriesLeft,
     });
     this.#report(response, correct);
 

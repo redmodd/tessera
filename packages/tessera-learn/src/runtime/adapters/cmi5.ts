@@ -200,8 +200,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     );
   }
 
-  override setSuccessStatus(status: SuccessStatus): void {
-    if (status === 'failed') {
+  override setSuccessStatus(status: SuccessStatus, final = false): void {
+    if (status === 'failed' && !final) {
       this.#heldFailed = true;
       return;
     }

@@ -153,13 +153,16 @@ describe('ProgressState', () => {
       });
     });
 
-    it('restores a question whose flags are not a saved value as ungraded', () => {
-      const progress = new ProgressState(createManifest(3), createConfig());
-      progress.restoreFrom({
-        g: { 0: { q: { q1: [80, 1, 7] } } },
-      });
-      expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
-    });
+    it.each([7, 16, 2 ** 32 + 9])(
+      'restores a question whose flags %i are not a saved value as ungraded',
+      (flags) => {
+        const progress = new ProgressState(createManifest(3), createConfig());
+        progress.restoreFrom({
+          g: { 0: { q: { q1: [80, 1, flags] } } },
+        });
+        expect(progress.toSaved().g).toEqual({ 0: { q: { q1: [80, 1, 0] } } });
+      },
+    );
 
     it('drops a saved unanswered question id that is not a string', () => {
       const progress = new ProgressState(
@@ -1120,6 +1123,7 @@ describe('ProgressState', () => {
         graded: true,
         retries: 0,
         correct: true,
+        final: true,
       });
       expect(progress.getPageStandaloneAverage(3)).toBe(50);
     });
@@ -1143,6 +1147,26 @@ describe('ProgressState', () => {
       );
       expect(progress.pageScore(3)).toBeUndefined();
     });
+
+    it.each([
+      [1, true],
+      [3, false],
+      [NaN, true],
+    ])(
+      'resaves a wrong answer final as maxRetries %d now gives',
+      (maxRetries, final) => {
+        const progress = new ProgressState(createManifest(0), createConfig());
+        progress.markStandaloneQuestion(3, 'q1', 0, true, 1, {
+          retries: 1,
+          final: !final,
+        });
+        progress.registerStandaloneQuestion(3, 'q1', true, 1, maxRetries);
+
+        expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.final).toBe(
+          final,
+        );
+      },
+    );
 
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
@@ -1619,6 +1643,87 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(2, 'q1', 80, true);
 
       expect(progress.completionStatus).toBe('complete');
+    });
+  });
+
+  describe('verdictFinal', () => {
+    const quizMode = createConfig({ completion: { mode: 'quiz' } });
+
+    it('waits for a failing quiz to use its last attempt', () => {
+      const progress = new ProgressState(
+        createManifest(2, { 0: { graded: true } }),
+        quizMode,
+      );
+
+      progress.quizCompleted(0, 40);
+      progress.quizCompleted(0, 50);
+      expect(progress.verdictFinal).toBe(false);
+
+      progress.quizCompleted(0, 30);
+      expect(progress.successStatus).toBe('failed');
+      expect(progress.verdictFinal).toBe(true);
+    });
+
+    it('takes a quiz scored 100 as final with attempts left', () => {
+      const progress = new ProgressState(
+        createManifest(2, { 0: { graded: true } }),
+        quizMode,
+      );
+      progress.quizCompleted(0, 100);
+      expect(progress.verdictFinal).toBe(true);
+    });
+
+    it('waits for an unanswered optional graded page', () => {
+      const progress = new ProgressState(
+        createManifest(
+          2,
+          { 0: { graded: true } },
+          { 1: { graded: true, required: false } },
+        ),
+        quizMode,
+      );
+      for (let i = 0; i < 3; i++) progress.quizCompleted(0, 40);
+      expect(progress.verdictFinal).toBe(false);
+
+      progress.markStandaloneQuestion(1, 'q1', 0, true, 1, { final: true });
+      expect(progress.verdictFinal).toBe(true);
+    });
+
+    it('waits for every graded question on a standalone page to run out of retries', () => {
+      const progress = new ProgressState(
+        createManifest(1, {}, { 0: { graded: true, questions: ['q1', 'q2'] } }),
+        quizMode,
+      );
+
+      progress.markStandaloneQuestion(0, 'q1', 0, true, 1, { final: true });
+      expect(progress.verdictFinal).toBe(false);
+
+      progress.markStandaloneQuestion(0, 'q2', 0, true);
+      expect(progress.verdictFinal).toBe(false);
+
+      progress.markStandaloneQuestion(0, 'q2', 0, true, 1, { final: true });
+      expect(progress.verdictFinal).toBe(true);
+    });
+
+    it('saves a question out of retries and restores it final', () => {
+      const manifest = createManifest(1, {}, { 0: { graded: true } });
+      const progress = new ProgressState(manifest, quizMode);
+      progress.markStandaloneQuestion(0, 'wrong', 0, true, 1, { final: true });
+      progress.markStandaloneQuestion(0, 'right', 100, true);
+      progress.markStandaloneQuestion(0, 'practice', 0, false, 1, {
+        final: true,
+      });
+
+      const saved = progress.toSaved();
+      expect(saved.g?.[0].q).toEqual({
+        wrong: [0, 1, 9],
+        right: 100,
+        practice: [0, 1, 0],
+      });
+
+      const restored = new ProgressState(manifest, quizMode);
+      restored.restoreFrom(JSON.parse(JSON.stringify(saved)));
+      expect(restored.verdictFinal).toBe(true);
     });
   });
 });
