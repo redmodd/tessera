@@ -57,6 +57,13 @@ type RecordingStandard = Extract<
   { interactionFormat: unknown }
 >;
 
+interface RuleContext {
+  fileRel: string;
+  d: Diagnostics;
+  standard: RecordingStandard | undefined;
+  id: string | null;
+}
+
 interface QuestionComponentRule {
   required: string[];
   /**
@@ -64,14 +71,7 @@ interface QuestionComponentRule {
    * when each complete answer and the correct pattern use every entry.
    */
   indexedLists?: Record<string, 'some' | 'every'>;
-  check(
-    props: ComponentMatch['props'],
-    fileRel: string,
-    d: Diagnostics,
-    standard: RecordingStandard | undefined,
-    id: string | null,
-    hasSpread: boolean,
-  ): void;
+  check(match: ComponentMatch, ctx: RuleContext): void;
 }
 
 const QUESTION_COMPONENTS: Record<
@@ -81,7 +81,7 @@ const QUESTION_COMPONENTS: Record<
   MultipleChoice: {
     required: ['question', 'options', 'correct'],
     indexedLists: { options: 'some' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
       if (options && correct !== null) {
@@ -105,7 +105,7 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check(props, fileRel, d, standard, id, hasSpread) {
+    check({ props, hasSpread }, { fileRel, d, standard, id }) {
       const answers = staticList(props.get('answers'));
       if (answers) {
         if (!isStringArray(answers)) {
@@ -144,7 +144,7 @@ const QUESTION_COMPONENTS: Record<
   Matching: {
     required: ['question', 'pairs'],
     indexedLists: { pairs: 'every' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const pairs = staticArray(props.get('pairs'));
       if (pairs) {
         const bad = pairs.some(
@@ -164,7 +164,7 @@ const QUESTION_COMPONENTS: Record<
   Sorting: {
     required: ['question', 'items', 'targets', 'correct'],
     indexedLists: { items: 'every', targets: 'some' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const items = staticArray(props.get('items'));
       const targets = staticArray(props.get('targets'));
       const correct = staticArray(props.get('correct'));
@@ -283,6 +283,6 @@ export function validateQuestionComponents(
       }
     }
 
-    rule.check(props, fileRel, d, standard, resolvedId, hasSpread);
+    rule.check(match, { fileRel, d, standard, id: resolvedId });
   }
 }

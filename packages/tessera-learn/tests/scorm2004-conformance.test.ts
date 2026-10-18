@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
+import type { Interaction } from '../src/runtime/interaction.js';
 import {
   createReal2004Lms,
   relaunch2004,
@@ -126,16 +127,16 @@ describe('SCORM2004Adapter against scorm-again', () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const long = 'a'.repeat(max + 1);
         const fits = 'b'.repeat(max - '{case_matters=true}'.length);
-        adapter.reportInteraction(
-          'q1',
-          {
-            type,
-            response: long,
-            correct: type === 'other' ? long : [long, fits + 'b', fits],
-            caseMatters: type === 'fill-in',
-          } as never,
-          true,
-        );
+        const interaction: Interaction =
+          type === 'other'
+            ? { type, response: long, correct: long }
+            : {
+                type,
+                response: long,
+                correct: [long, fits + 'b', fits],
+                caseMatters: type === 'fill-in',
+              };
+        adapter.reportInteraction('q1', interaction, true);
         await flush();
         expect(lms.errors).toEqual([]);
         expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(

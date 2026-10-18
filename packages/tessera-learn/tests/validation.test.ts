@@ -11,6 +11,19 @@ function writeConfig(root: string, content: string): void {
   writeFileSync(resolve(root, 'course.config.js'), content, 'utf-8');
 }
 
+function writeStandardConfig(standard: string): void {
+  writeConfig(
+    testRoot,
+    `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "${standard}" },
+};`,
+  );
+}
+
 function mkdirp(...parts: string[]): void {
   mkdirSync(join(...parts), { recursive: true });
 }
@@ -1794,19 +1807,6 @@ describe('question component validation', () => {
     writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', content);
   }
 
-  function writeStandardConfig(standard: string): void {
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "${standard}" },
-};`,
-    );
-  }
-
   it('errors when MultipleChoice is missing a required prop', () => {
     createValidProject(testRoot);
     writePage(
@@ -2959,16 +2959,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
     ['scorm2004', 64000],
   ])('warns on %s with high page count', (standard, limit) => {
     // Create a project with many pages
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "${standard}" },
-};`,
-    );
+    writeStandardConfig(standard);
     mkdirp(testRoot, 'assets');
     mkdirp(testRoot, 'pages', '01-section', '01-lesson');
     writeFile(
@@ -2999,16 +2990,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
 
   it('no SCORM 1.2 warning for small course', () => {
     createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
-};`,
-    );
+    writeStandardConfig('scorm12');
     const { warnings } = validateProject(testRoot);
     expect(warnings.filter((w) => w.includes('SCORM 1.2'))).toHaveLength(0);
   });

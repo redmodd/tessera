@@ -271,37 +271,38 @@ export function fitPatterns(
   i: Interaction,
   fmt: InteractionFormat,
   recorder = 'this export standard',
-): { kept: string[] | null; warnings: string[] } {
-  const patterns = formatCorrectPattern(i, fmt);
-  if (!patterns) return { kept: null, warnings: [] };
+): { kept: string[]; warnings: string[] } {
+  const lost = 'graded but left out of the LMS record';
+  if (
+    i.type === 'performance' &&
+    i.correct &&
+    hasLongStep(i.correct, fmt.maxStepAnswerLength)
+  ) {
+    return {
+      kept: [],
+      warnings: [
+        `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
+      ],
+    };
+  }
+  const patterns = formatCorrectPattern(i, fmt) ?? [];
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  const lost = 'graded but left out of the LMS record';
   const warnings: string[] = [];
   // Counts a `{case_matters=true}` prefix too, as scorm-again does.
-  let fit = patterns.filter((p) => p.length <= max);
+  const fit = patterns.filter((p) => p.length <= max);
   if (fit.length < patterns.length) {
-    const prefixed =
-      'caseMatters' in i && i.caseMatters && fmt.supportsCasePrefix;
-    const prefix =
-      prefixed &&
-      patterns.some(
-        (p) => p.length > max && p.length - CASE_PREFIX.length <= max,
-      )
-        ? `, counting the ${CASE_PREFIX} prefix of a case-sensitive answer`
-        : '';
+    const prefix = patterns.some(
+      (p) =>
+        p.length > max &&
+        p.startsWith(CASE_PREFIX) &&
+        p.length - CASE_PREFIX.length <= max,
+    )
+      ? `, counting the ${CASE_PREFIX} prefix of a case-sensitive answer`
+      : '';
     warnings.push(
       `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records${prefix}; they are ${lost}`,
-    );
-  }
-  if (
-    i.type === 'performance' &&
-    i.correct?.some(([, a]) => String(a).length > fmt.maxStepAnswerLength)
-  ) {
-    fit = [];
-    warnings.push(
-      `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
     );
   }
   if (fit.length > limit) {
@@ -312,6 +313,13 @@ export function fitPatterns(
     );
   }
   return { kept: fit.slice(0, limit), warnings };
+}
+
+function hasLongStep(
+  steps: Array<[string, string | number]>,
+  max: number,
+): boolean {
+  return steps.some(([, a]) => String(a).length > max);
 }
 
 function cutText(value: string, max: number): string {
@@ -332,10 +340,7 @@ function fitResponse(
   fmt: InteractionFormat,
 ): string | null {
   const stepMax = fmt.maxStepAnswerLength;
-  if (
-    i.type === 'performance' &&
-    i.response.some(([, a]) => typeof a === 'string' && a.length > stepMax)
-  ) {
+  if (i.type === 'performance' && hasLongStep(i.response, stepMax)) {
     console.warn(
       `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
     );
