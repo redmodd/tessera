@@ -36,6 +36,14 @@ export interface InteractionFormat {
   maxValueLength(type: Interaction['type']): number;
   /** SCORM 2004 caps each performance step answer at 250 characters. */
   maxStepAnswerLength: number;
+  /** SCORM 2004 records an unnamed step as `[.]answer`; SCORM 1.2 records `_`. */
+  keepsUnnamedStep: boolean;
+  /**
+   * SCORM 2004 parses `[,]`, `[.]` and `[:]` inside a step answer as
+   * delimiters, so it rejects an answer holding one (a correct `min[:]max`
+   * range aside).
+   */
+  rejectsDelimInStepAnswer: boolean;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
   /** Ids inside a response: list items, matching ids, step names, likert. */
@@ -53,6 +61,8 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: 10,
   maxValueLength: () => 255,
   maxStepAnswerLength: Infinity,
+  keepsUnnamedStep: false,
+  rejectsDelimInStepAnswer: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
   responseId: shortIdentifier,
@@ -83,6 +93,8 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
     }
   },
   maxStepAnswerLength: 250,
+  keepsUnnamedStep: true,
+  rejectsDelimInStepAnswer: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
   responseId: uriIdentifier,
@@ -94,6 +106,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
+  rejectsDelimInStepAnswer: false,
   responseId: (v) => v,
 };
 
@@ -139,8 +152,8 @@ export const SCORM12_MAX_OPTIONS = 36;
 
 const CASE_PREFIX = '{case_matters=true}';
 
-/** An id SCORM 1.2 cannot record as a one-character option index. */
-class UnencodableOptionError extends Error {}
+/** A value the format cannot record, so its field is left out of the LMS record. */
+class UnrecordableError extends Error {}
 
 /**
  * SCORM 1.2 CMIFeedback takes one character per choice or matching id
@@ -154,10 +167,10 @@ function encodeListItem(
   if (!fmt.encodesOptionIndex || !options) return fmt.responseId(value);
   const idx = options.indexOf(value);
   if (idx < 0) {
-    throw new UnencodableOptionError(`"${value}" is not in its options`);
+    throw new UnrecordableError(`"${value}" is not in its options`);
   }
   if (idx >= SCORM12_MAX_OPTIONS) {
-    throw new UnencodableOptionError(
+    throw new UnrecordableError(
       `option ${idx + 1} is past the ${SCORM12_MAX_OPTIONS} options SCORM 1.2 can record`,
     );
   }
@@ -172,17 +185,30 @@ function encodePair(
   return `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`;
 }
 
-/** SCORM 2004 allows an unnamed step (`[.]answer`); SCORM 1.2 records it as `_`. */
 function stepName(step: string, fmt: InteractionFormat): string {
-  return step === '' && !fmt.encodesOptionIndex ? '' : fmt.responseId(step);
+  return step === '' && fmt.keepsUnnamedStep ? '' : fmt.responseId(step);
 }
+
+const STEP_DELIM = /\[[,.:]\]/;
+const NUMERIC_RANGE = /^(-?\d+(\.\d+)?)?\[:\](-?\d+(\.\d+)?)?$/;
 
 /** Step names are identifiers; step answers are free text, kept as written. */
 function encodeStep(
   [step, a]: [string, string | number],
+  field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string {
-  return `${stepName(step, fmt)}${fmt.pairDelim}${a}`;
+  const answer = String(a);
+  if (
+    fmt.rejectsDelimInStepAnswer &&
+    STEP_DELIM.test(answer) &&
+    !(field === 'correct' && NUMERIC_RANGE.test(answer))
+  ) {
+    throw new UnrecordableError(
+      `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
+    );
+  }
+  return `${stepName(step, fmt)}${fmt.pairDelim}${answer}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -204,16 +230,22 @@ function encodeItems(
 ): string[] {
   switch (i.type) {
     case 'choice':
+      // A choice response is a set; SCORM 2004 rejects one that repeats an id.
+      return [
+        ...new Set(
+          (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt)),
+        ),
+      ];
     case 'sequencing':
       return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
     case 'matching':
       return (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt));
     case 'performance':
-      return (i[field] ?? []).map((s) => encodeStep(s, fmt));
+      return (i[field] ?? []).map((s) => encodeStep(s, field, fmt));
   }
 }
 
-/** Throws when SCORM 1.2 cannot encode an option. */
+/** Throws when the format cannot record a value. */
 export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
   if (isList(i)) return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
   switch (i.type) {
@@ -231,8 +263,8 @@ export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
 }
 
 /**
- * Returns null when no correct pattern was provided. Throws when SCORM 1.2
- * cannot encode an option.
+ * Returns null when no correct pattern was provided. Throws when the format
+ * cannot record a value.
  */
 export function formatCorrectPattern(
   i: Interaction,
@@ -334,7 +366,7 @@ function mergedIds(
  * Formats the correct patterns, drops those over the format's length cap,
  * since a shortened pattern matches nothing, then keeps the first ones up to
  * its count cap. Each warning completes a sentence whose subject is the
- * question. Throws when SCORM 1.2 cannot encode an option.
+ * question. Throws when the format cannot record a value.
  */
 export function fitPatterns(
   i: Interaction,
@@ -489,7 +521,7 @@ export function buildScormInteractionFields(
     try {
       return format();
     } catch (err) {
-      if (!(err instanceof UnencodableOptionError)) throw err;
+      if (!(err instanceof UnrecordableError)) throw err;
       console.warn(
         `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
       );

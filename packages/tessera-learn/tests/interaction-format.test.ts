@@ -132,6 +132,27 @@ describe('SCORM 2004 ids inside a response', () => {
     ).toBe('_.go');
   });
 
+  it('records a choice id once', () => {
+    expect(
+      formatResponse({ type: 'choice', response: ['', '_', 'a', 'a'] }, fmt),
+    ).toBe('_[,]a');
+  });
+
+  it('refuses a step answer holding a delimiter, except a correct range', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 'a [,] b']],
+      correct: [['s', '-1.5[:]2']],
+    };
+    expect(() => formatResponse(i, fmt)).toThrow('holds [,], [.] or [:]');
+    expect(formatCorrectPattern(i, fmt)).toEqual(['s[.]-1.5[:]2']);
+    expect(() =>
+      formatCorrectPattern({ ...i, correct: [['s', 'a[:]b']] }, fmt),
+    ).toThrow('holds [,], [.] or [:]');
+    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
+    expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
+  });
+
   it('cuts an id to 250 characters without splitting an escape', () => {
     const recorded = formatResponse(
       { type: 'likert', response: 'a'.repeat(248) + ' b' },

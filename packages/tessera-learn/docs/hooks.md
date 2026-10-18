@@ -90,12 +90,12 @@ For `choice` / `sequencing` / `matching`, always pass the full option list via `
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
-Ids inside a response (list items, matching ids, `performance` step ids and the `likert` value) must be identifiers in SCORM. Send short ids (`strongly_agree`), not display text, and show the label in the widget. On SCORM, Tessera rewrites any other id; cmi5 and xAPI send ids as written. Step values are sent as written.
+Ids inside a response (list items, matching ids, `performance` step ids and the `likert` value) must be identifiers in SCORM. Send short ids (`strongly_agree`), not display text, and show the label in the widget. On SCORM, Tessera rewrites any other id; cmi5 and xAPI send ids as written. Step values are sent as written; on SCORM 2004, a step value holding `[,]`, `[.]` or `[:]` (other than a correct `min[:]max` range) leaves that response or correct answer out of the LMS record with a console warning.
 
-- **SCORM 2004** percent-encodes `%` and each character an id cannot hold (`Strongly agree` → `Strongly%20agree`), keeps URI punctuation such as `:` and `/` (`urn:course:agree`), and cuts ids at 250 characters.
+- **SCORM 2004** percent-encodes `%` and each character an id cannot hold (`Strongly agree` → `Strongly%20agree`), keeps URI punctuation such as `:` and `/` (`urn:course:agree`), and cuts the recorded id at 250 characters. An id with no letter, digit or underscore escapes every character (`-` → `%2D`), so at most 83 of its characters fit.
 - **SCORM 1.2** slugs ids to letters, digits and underscores (`Step 1` → `Step_1`).
 
-When two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), Tessera logs a console warning naming both. Give ids that differ in letters or digits, not only in punctuation.
+When two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), Tessera logs a console warning naming both; on SCORM 1.2, ids sent without `options` get the one-character warning instead. Give ids that differ in letters or digits, not only in punctuation.
 
 ```ts
 response: () => ({

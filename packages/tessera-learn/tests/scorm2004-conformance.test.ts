@@ -240,6 +240,11 @@ describe('SCORM2004Adapter against scorm-again', () => {
         { type: 'likert', response: '-', correct: '-' },
         '%2D',
       ],
+      [
+        'merged choice',
+        { type: 'choice', response: ['', '_'], correct: ['', '_'] },
+        '_',
+      ],
     ] as const)(
       'records %s ids so the data model accepts them',
       async (_label, interaction, recorded) => {
@@ -255,6 +260,31 @@ describe('SCORM2004Adapter against scorm-again', () => {
         ).toBe(recorded);
       },
     );
+
+    it('leaves out a step answer holding a delimiter but keeps a correct range', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'performance',
+          response: [['s', 'turn [.] left']],
+          correct: [['s', '1[:]5']],
+        },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe('');
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+      ).toBe('s[.]1[:]5');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'the response of interaction "q1" is left out of the LMS record: the step answer "turn [.] left" holds [,], [.] or [:]',
+        ),
+      );
+    });
 
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
