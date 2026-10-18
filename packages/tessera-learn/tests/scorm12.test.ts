@@ -902,7 +902,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('cuts the answer of a performance step too long to fit whole', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'p2',
         {
@@ -916,6 +916,9 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       expect(interaction0().student_response).toBe(`step_1.${'a'.repeat(248)}`);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"p2" is 319 characters'),
+      );
     });
 
     it('maps other to fill-in', async () => {

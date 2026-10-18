@@ -141,15 +141,25 @@ function encodeIds(
 }
 
 function encodePairs(
-  pairs: Array<[string, string | number]>,
+  pairs: Array<[string, string]>,
   optionPairs: { left: string[]; right: string[] } | undefined,
   fmt: InteractionFormat,
 ): string {
   return pairs
     .map(
       ([l, r]) =>
-        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(String(r), optionPairs?.right, fmt)}`,
+        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`,
     )
+    .join(fmt.itemDelim);
+}
+
+/** Step names are identifiers; step answers are free text, kept as written. */
+function encodeSteps(
+  steps: Array<[string, string | number]>,
+  fmt: InteractionFormat,
+): string {
+  return steps
+    .map(([step, a]) => `${fmt.identifier(step)}${fmt.pairDelim}${a}`)
     .join(fmt.itemDelim);
 }
 
@@ -174,7 +184,7 @@ export function formatResponse(
     case 'numeric':
       return String(i.response);
     case 'performance':
-      return encodePairs(i.response, undefined, fmt);
+      return encodeSteps(i.response, fmt);
   }
 }
 
@@ -219,13 +229,7 @@ export function formatCorrectPattern(
     case 'other':
       return [i.correct as string];
     case 'performance':
-      return [
-        encodePairs(
-          i.correct as Array<[string, string | number]>,
-          undefined,
-          fmt,
-        ),
-      ];
+      return [encodeSteps(i.correct as Array<[string, string | number]>, fmt)];
   }
 }
 
