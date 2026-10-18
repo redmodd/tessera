@@ -148,18 +148,15 @@ function encodeStep(
   return `${fmt.identifier(step)}${fmt.pairDelim}${a}`;
 }
 
+const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
+
 type ListInteraction = Extract<
   Interaction,
-  { type: 'choice' | 'sequencing' | 'matching' | 'performance' }
+  { type: (typeof LIST_TYPES)[number] }
 >;
 
 function isList(i: Interaction): i is ListInteraction {
-  return (
-    i.type === 'choice' ||
-    i.type === 'sequencing' ||
-    i.type === 'matching' ||
-    i.type === 'performance'
-  );
+  return (LIST_TYPES as readonly string[]).includes(i.type);
 }
 
 /** The response's or correct answer's encoded items, not yet joined. */
@@ -184,12 +181,8 @@ export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string {
+  if (isList(i)) return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
   switch (i.type) {
-    case 'choice':
-    case 'sequencing':
-    case 'matching':
-    case 'performance':
-      return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -211,12 +204,8 @@ export function formatCorrectPattern(
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string[] | null {
   if (i.correct === undefined) return null;
+  if (isList(i)) return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
   switch (i.type) {
-    case 'choice':
-    case 'sequencing':
-    case 'matching':
-    case 'performance':
-      return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':

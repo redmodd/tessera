@@ -90,6 +90,8 @@ For `choice` / `sequencing` / `matching`, always pass the full option list via `
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
+For `performance`, SCORM 1.2 slugs each step id to letters, digits and underscores (`Step 1` → `Step_1`) and sends each value as written. Give steps ids that differ in letters or digits, not only in punctuation.
+
 ```ts
 response: () => ({
   type: 'choice',
