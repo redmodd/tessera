@@ -326,6 +326,26 @@ function hasLongStep(
   return steps.some(([, a]) => String(a).length > max);
 }
 
+/**
+ * Length of the whole steps that fit in `max`, or -1 when none do. A step
+ * answer can hold the item delimiter, so this can't search the joined value.
+ */
+function wholeStepsEnd(
+  steps: Array<[string, string | number]>,
+  fmt: InteractionFormat,
+  max: number,
+): number {
+  let end = -1;
+  let next = 0;
+  for (const step of steps) {
+    next += encodeSteps([step], fmt).length;
+    if (next > max) break;
+    end = next;
+    next += fmt.itemDelim.length;
+  }
+  return end;
+}
+
 /** Cuts on a character boundary, so an emoji or accented letter stays whole. */
 function cutText(value: string, max: number): string {
   // Firefox before 125 has no Intl.Segmenter; there, only keep surrogate pairs whole.
@@ -368,7 +388,10 @@ function fitResponse(
   const value = formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  const whole = value.lastIndexOf(fmt.itemDelim, max);
+  const whole =
+    i.type === 'performance'
+      ? wholeStepsEnd(i.response, fmt, max)
+      : value.lastIndexOf(fmt.itemDelim, max);
   const cut =
     !Array.isArray(i.response) || (whole < 0 && i.type === 'performance')
       ? cutText(value, max)

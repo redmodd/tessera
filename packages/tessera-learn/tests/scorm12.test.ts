@@ -921,6 +921,39 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it('cuts on a whole step when step answers hold commas', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = Array.from(
+        { length: 40 },
+        (_, k) => [`s${k}`, 'v, lu'],
+      );
+      adapter.reportInteraction(
+        'p3',
+        { type: 'performance', response: steps },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(
+        steps
+          .slice(0, 26)
+          .map(([s, v]) => `${s}.${v}`)
+          .join(','),
+      );
+    });
+
+    it('cuts the answer of a first step that holds a comma', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'p4',
+        { type: 'performance', response: [['s1', `left, ${'x'.repeat(300)}`]] },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(
+        `s1.left, ${'x'.repeat(246)}`,
+      );
+    });
+
     it('maps other to fill-in', async () => {
       adapter.reportInteraction(
         'o1',
