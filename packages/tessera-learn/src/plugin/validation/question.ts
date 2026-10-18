@@ -5,6 +5,7 @@ import type { StandardProfile } from '../../runtime/standards.js';
 import {
   SCORM12_MAX_OPTIONS,
   formatCorrectPattern,
+  type InteractionFormat,
 } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
@@ -31,6 +32,12 @@ function staticNumber(prop: PropValue | undefined): number | null {
   return typeof value === 'number' ? value : null;
 }
 
+/** An export standard that records interactions in the LMS. */
+interface RecordingStandard {
+  name: string;
+  format: InteractionFormat;
+}
+
 interface QuestionComponentRule {
   required: string[];
   /**
@@ -38,7 +45,12 @@ interface QuestionComponentRule {
    * when each complete answer and the correct pattern use every entry.
    */
   indexedLists?: Record<string, 'some' | 'every'>;
-  check(props: ComponentMatch['props'], fileRel: string, d: Diagnostics): void;
+  check(
+    props: ComponentMatch['props'],
+    fileRel: string,
+    d: Diagnostics,
+    standard: RecordingStandard | undefined,
+  ): void;
 }
 
 const QUESTION_COMPONENTS: Record<
@@ -72,8 +84,9 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check(props, fileRel, d) {
-      const answers = staticArray(props.get('answers'));
+    check(props, fileRel, d, standard) {
+      const answersProp = props.get('answers');
+      const answers = staticArray(answersProp);
       if (answers) {
         if (answers.length === 0) {
           d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
@@ -82,6 +95,33 @@ const QUESTION_COMPONENTS: Record<
             `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
           );
         }
+      }
+      if (!standard) return;
+      const { format } = standard;
+      const max = format.maxValueLength('fill-in');
+      const value =
+        answersProp?.kind === 'string'
+          ? answersProp.value
+          : staticValue(answersProp);
+      const correct = [value]
+        .flat()
+        .filter((a) => typeof a === 'string')
+        .map((a) => a.trim());
+      const caseMatters =
+        format.supportsCasePrefix && isLiteralTrue(props.get('caseSensitive'));
+      const patterns =
+        formatCorrectPattern(
+          { type: 'fill-in', response: '', correct, caseMatters },
+          format,
+        ) ?? [];
+      const long = patterns.filter((p) => p.length > max).length;
+      if (long > 0) {
+        const prefix = caseMatters
+          ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
+          : '';
+        d.warn(
+          `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${standard.name} records${prefix}; they are graded but left out of the LMS record`,
+        );
       }
     },
   },
@@ -142,9 +182,9 @@ export function validateQuestionComponents(
   d: Diagnostics,
   profile: StandardProfile | undefined,
 ): void {
-  const format =
+  const standard =
     profile && 'interactionFormat' in profile
-      ? profile.interactionFormat
+      ? { name: profile.name, format: profile.interactionFormat }
       : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
@@ -182,19 +222,19 @@ export function validateQuestionComponents(
             ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
             : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
-      } else if (profile && format) {
+      } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids
         // can collide after sanitization. Skip raw duplicates (already flagged
         // above) to avoid double-reporting the same id.
-        const sane = format.identifier(resolvedId);
+        const sane = standard.format.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${profile.name} — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name} — use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${profile.name} sanitization ("${sane}")`,
+            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${standard.name} sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);
@@ -216,7 +256,7 @@ export function validateQuestionComponents(
       }
     }
 
-    if (profile && format?.encodesOptionIndex) {
+    if (standard?.format.encodesOptionIndex) {
       for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > SCORM12_MAX_OPTIONS) {
@@ -225,39 +265,12 @@ export function validateQuestionComponents(
               ? 'every response and correct answer'
               : `any response or correct answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
           d.warn(
-            `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
+            `${fileRel}: <${name}> has ${count} ${prop} but ${standard.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
           );
         }
       }
     }
 
-    if (profile && format && name === 'FillInTheBlank') {
-      const max = format.maxValueLength('fill-in');
-      const answers = props.get('answers');
-      const value =
-        answers?.kind === 'string' ? answers.value : staticValue(answers);
-      const correct = [value]
-        .flat()
-        .filter((a) => typeof a === 'string')
-        .map((a) => a.trim());
-      const caseMatters =
-        format.supportsCasePrefix && isLiteralTrue(props.get('caseSensitive'));
-      const patterns =
-        formatCorrectPattern(
-          { type: 'fill-in', response: '', correct, caseMatters },
-          format,
-        ) ?? [];
-      const long = patterns.filter((p) => p.length > max).length;
-      if (long > 0) {
-        const prefix = caseMatters
-          ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
-          : '';
-        d.warn(
-          `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${profile.name} records${prefix}; they are graded but left out of the LMS record`,
-        );
-      }
-    }
-
-    rule.check(props, fileRel, d);
+    rule.check(props, fileRel, d, standard);
   }
 }

@@ -65,12 +65,17 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
-  maxValueLength: (type) =>
-    type === 'fill-in'
-      ? 250
-      : type === 'long-fill-in' || type === 'other'
-        ? 4000
-        : Infinity,
+  maxValueLength: (type) => {
+    switch (type) {
+      case 'fill-in':
+        return 250;
+      case 'long-fill-in':
+      case 'other':
+        return 4000;
+      default:
+        return Infinity;
+    }
+  },
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };

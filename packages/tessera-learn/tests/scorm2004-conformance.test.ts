@@ -123,7 +123,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       'a %s response over %i characters is cut to fit',
       async (type, max) => {
         await start();
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
         const long = 'a'.repeat(max + 1);
         const fits = 'b'.repeat(max - '{case_matters=true}'.length);
         adapter.reportInteraction(
@@ -137,7 +137,6 @@ describe('SCORM2004Adapter against scorm-again', () => {
           true,
         );
         await flush();
-        warn.mockRestore();
         expect(lms.errors).toEqual([]);
         expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
           'a'.repeat(max),
