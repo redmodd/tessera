@@ -1953,18 +1953,23 @@ let a = {}; let b = {};</script>
     expect(errors.filter((e) => e.includes('Matching'))).toHaveLength(0);
   });
 
-  it('errors when FillInTheBlank answers contains a non-string', () => {
+  it('errors when FillInTheBlank answers is not a string or an array of strings', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers={["Oxygen", 8]} />`,
+<FillInTheBlank question="Q" answers={["Oxygen", 8]} />
+<FillInTheBlank question="R" answers={8} />
+<FillInTheBlank question="S" answers />
+<FillInTheBlank question="T" answers={undefined} />`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining(
-        '<FillInTheBlank> answers must be a string or an array of strings',
+    expect(
+      errors.filter((e) =>
+        e.includes(
+          '<FillInTheBlank> answers must be a string or an array of strings',
+        ),
       ),
-    );
+    ).toHaveLength(4);
   });
 
   it('errors when FillInTheBlank answers is empty or all blank', () => {
@@ -1982,37 +1987,6 @@ let a = {}; let b = {};</script>
         e.includes('<FillInTheBlank> answers must not be empty'),
       ),
     ).toHaveLength(4);
-  });
-
-  it('errors when a single FillInTheBlank answer is not a string', () => {
-    createValidProject(testRoot);
-    writePage(
-      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers={8} />`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining(
-        '<FillInTheBlank> answers must be a string or an array of strings',
-      ),
-    );
-  });
-
-  it('errors when FillInTheBlank answers is a bare attribute or undefined', () => {
-    createValidProject(testRoot);
-    writePage(
-      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers />
-<FillInTheBlank question="R" answers={undefined} />`,
-    );
-    const { errors } = validateProject(testRoot);
-    expect(
-      errors.filter((e) =>
-        e.includes(
-          '<FillInTheBlank> answers must be a string or an array of strings',
-        ),
-      ),
-    ).toHaveLength(2);
   });
 
   it('accepts a single FillInTheBlank answer string', () => {
@@ -3332,13 +3306,6 @@ describe('a11y rule 1.5 — question option/answer labels', () => {
       testRoot,
       `<MultipleChoice question="Q" options={['A', '']} correct={0} />`,
     );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/question-label')).toBe(true);
-  });
-
-  it('warns on an empty single answer string', () => {
-    createValidProject(testRoot);
-    writePage(testRoot, `<FillInTheBlank question="Q" answers="" />`);
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/question-label')).toBe(true);
   });

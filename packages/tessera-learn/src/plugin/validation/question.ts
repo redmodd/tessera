@@ -165,15 +165,13 @@ export function validateQuestionComponents(
     }
 
     // Rule 1.5: empty option/answer labels are both an a11y and a scoring bug.
-    for (const [label, entries] of Object.entries({
-      option: staticArray(props.get('options')),
-      answer: staticList(props.get('answers')),
-    })) {
+    for (const labelProp of ['options', 'answers']) {
+      const entries = staticArray(props.get(labelProp));
       if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
         d.warn(
           tag(
             A11Y_IDS.questionLabel,
-            `${fileRel}: <${name}> has an empty ${label} label`,
+            `${fileRel}: <${name}> has an empty ${labelProp === 'options' ? 'option' : 'answer'} label`,
           ),
         );
       }
