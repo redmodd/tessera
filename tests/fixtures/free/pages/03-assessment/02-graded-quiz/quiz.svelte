@@ -34,7 +34,7 @@
 
 <FillInTheBlank
   question="What color is the sky on a clear day?"
-  answers={['blue', 'Blue']}
+  answers="blue"
   correctFeedback="That's right! The sky is blue."
   incorrectFeedback="The correct answer is blue."
 />

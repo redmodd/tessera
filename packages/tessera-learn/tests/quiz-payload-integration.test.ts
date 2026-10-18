@@ -211,23 +211,31 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
 });
 
 describe('FillInTheBlank normalizes the response at the boundary', () => {
-  it('a trailing space scores correct and reports the trimmed response', async () => {
+  async function answerAndSubmit(answers: string | string[], typed: string) {
     const reports: Array<[string, Interaction, boolean | null]> = [];
     const adapter = {
       reportInteraction: (id: string, i: Interaction, c: boolean | null) =>
         reports.push([id, i, c]),
     };
     const { target } = mountInBody(FillInTheBlank, {
-      props: { question: 'Sky colour', answers: ['blue', 'Blue'] },
+      props: { question: 'Q', answers },
       setup: () => setAdapterContext({ adapter } as any),
     });
 
     const input = target.querySelector('input') as HTMLInputElement;
-    input.value = 'blue ';
+    input.value = typed;
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await flush();
     (target.querySelector('button') as HTMLButtonElement).click();
     await flush();
+    return { target, reports };
+  }
+
+  it('a trailing space scores correct and reports the trimmed response', async () => {
+    const { target, reports } = await answerAndSubmit(
+      ['blue', 'Blue'],
+      'blue ',
+    );
 
     expect(reports).toHaveLength(1);
     const [, interaction, correct] = reports[0];
@@ -236,5 +244,26 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     expect(target.querySelector('.tessera-fitb-result')?.className).toContain(
       'correct',
     );
+  });
+
+  it('shows and reports a single answer string as one answer', async () => {
+    const { target, reports } = await answerAndSubmit('Paris', 'Lyon');
+
+    expect(
+      target.querySelector('.tessera-fitb-correct-answer')?.textContent,
+    ).toBe('Correct answer: Paris');
+    expect(reports[0][1]).toMatchObject({ correct: ['Paris'] });
+  });
+
+  it('shows and reports the trimmed, non-blank answers it grades against', async () => {
+    const { target, reports } = await answerAndSubmit(
+      [' Paris ', ' ', 'Lutetia'],
+      'Lyon',
+    );
+
+    expect(
+      target.querySelector('.tessera-fitb-correct-answer')?.textContent,
+    ).toBe('Correct answers: Paris, Lutetia');
+    expect(reports[0][1]).toMatchObject({ correct: ['Paris', 'Lutetia'] });
   });
 });
