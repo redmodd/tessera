@@ -128,6 +128,59 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
   });
 
+  it('records a matching pair once', () => {
+    expect(
+      formatResponse(
+        {
+          type: 'matching',
+          response: [
+            ['a', 'b'],
+            ['a', 'b'],
+          ],
+        },
+        fmt,
+      ),
+    ).toBe('a[.]b');
+  });
+
+  it('refuses a correct sequence or step list that repeats an item', () => {
+    const seq: Interaction = {
+      type: 'sequencing',
+      response: ['a', 'b', 'a'],
+      correct: ['a', 'b', 'a'],
+    };
+    expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
+    expect(() => formatCorrectPattern(seq, fmt)).toThrow('lists "a" twice');
+    expect(() =>
+      formatCorrectPattern(
+        {
+          type: 'performance',
+          response: [],
+          correct: [
+            ['s', 'x'],
+            ['s', 'x'],
+          ],
+        },
+        fmt,
+      ),
+    ).toThrow('lists "s[.]x" twice');
+    expect(formatCorrectPattern(seq, XAPI_INTERACTION_FORMAT)).toEqual([
+      'a[,]b[,]a',
+    ]);
+  });
+
+  it('refuses an empty list and a step with neither name nor answer', () => {
+    const empty: Interaction = { type: 'choice', response: [], correct: [] };
+    expect(() => formatResponse(empty, fmt)).toThrow('has no items');
+    expect(() => formatCorrectPattern(empty, fmt)).toThrow('has no items');
+    expect(formatResponse(empty, XAPI_INTERACTION_FORMAT)).toBe('');
+    const blank: Interaction = { type: 'performance', response: [['', '']] };
+    expect(() => formatResponse(blank, fmt)).toThrow(
+      'neither a name nor an answer',
+    );
+    expect(formatResponse(blank, SCORM12_INTERACTION_FORMAT)).toBe('_.');
+  });
+
   it.each([
     ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
     ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
@@ -156,6 +209,52 @@ describe('fitPatterns', () => {
       expect(warnings[0].includes('counting the')).toBe(credited);
     },
   );
+
+  it.each<[string, Interaction, string[], number]>([
+    [
+      'fill-in',
+      { type: 'fill-in', response: '', correct: ['Paris ', ' Rome', 'Oslo'] },
+      ['Oslo'],
+      2,
+    ],
+    [
+      'performance',
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'done '],
+          ['t', 'x'],
+        ],
+      },
+      [],
+      1,
+    ],
+  ])(
+    'drops a SCORM 2004 %s answer starting or ending in whitespace',
+    (_, i, kept, dropped) => {
+      const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
+      expect(fit.kept).toEqual(kept);
+      expect(fit.warnings).toEqual([
+        expect.stringContaining(
+          `${dropped} correct answer(s) starting or ending in whitespace`,
+        ),
+      ]);
+      expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
+    },
+  );
+
+  it('keeps a case-sensitive SCORM 2004 answer whose space follows the prefix', () => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: [' Paris'],
+      caseMatters: true,
+    };
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT).kept).toEqual([
+      '{case_matters=true} Paris',
+    ]);
+  });
 
   it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {
     const i: Interaction = {

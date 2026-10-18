@@ -90,7 +90,12 @@ For `choice` / `sequencing` / `matching`, always pass the full option list via `
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
-Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2). Step values are sent as written, but on SCORM 2004 a step value holding `[,]`, `[.]` or `[:]` (other than a correct `min[:]max` range) leaves that response or correct answer out of the LMS record with a console warning.
+Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2). Step values are sent as written. Choice and matching answers record each item once. SCORM 2004 leaves a response or correct answer out of the LMS record, with a console warning, when it:
+
+- is an empty list, or has a step with neither an id nor a value
+- has a step value holding `[,]`, `[.]` or `[:]` (other than a correct `min[:]max` range)
+- is a correct `sequencing` or `performance` answer that repeats an item
+- is a correct answer (or a `fill-in` alternative) starting or ending in whitespace
 
 ```ts
 response: () => ({

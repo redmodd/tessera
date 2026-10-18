@@ -286,6 +286,115 @@ describe('SCORM2004Adapter against scorm-again', () => {
       );
     });
 
+    it.each([
+      [
+        'a correct step answer ending in a space',
+        {
+          type: 'performance',
+          response: [['s', 'done ']],
+          correct: [['s', 'done ']],
+        },
+        's[.]done ',
+        '',
+        'starting or ending in whitespace',
+      ],
+      [
+        'a case-sensitive answer with a space after the prefix',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: [' Paris'],
+          caseMatters: true,
+        },
+        'Paris',
+        '{case_matters=true} Paris',
+        undefined,
+      ],
+      [
+        'a repeated sequence item',
+        {
+          type: 'sequencing',
+          response: ['a', 'b', 'a'],
+          correct: ['a', 'b', 'a'],
+        },
+        'a[,]b[,]a',
+        '',
+        'lists "a" twice',
+      ],
+      [
+        'a repeated matching pair',
+        {
+          type: 'matching',
+          response: [
+            ['a', 'b'],
+            ['a', 'b'],
+          ],
+          correct: [
+            ['a', 'b'],
+            ['a', 'b'],
+          ],
+        },
+        'a[.]b',
+        'a[.]b',
+        undefined,
+      ],
+      [
+        'a step with neither name nor answer',
+        { type: 'performance', response: [['', '']], correct: [['', '']] },
+        '',
+        '',
+        'neither a name nor an answer',
+      ],
+      [
+        'an empty choice',
+        { type: 'choice', response: [], correct: [] },
+        '',
+        '',
+        'has no items',
+      ],
+    ] as const)(
+      'records what the data model takes from %s',
+      async (_label, interaction, response, pattern, warning) => {
+        await start();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        adapter.reportInteraction('q1', interaction as never, true);
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          response,
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+        ).toBe(pattern);
+        if (warning) {
+          expect(warn).toHaveBeenCalledWith(expect.stringContaining(warning));
+        } else {
+          expect(warn).not.toHaveBeenCalled();
+        }
+        warn.mockRestore();
+      },
+    );
+
+    it('warns only that a long step answer holding a delimiter is left out', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'performance',
+          response: [['s', 'a [,] b' + 'x'.repeat(300)]],
+        },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('is left out of the LMS record'),
+      );
+      warn.mockRestore();
+    });
+
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
         [

@@ -39,11 +39,12 @@ export interface InteractionFormat {
   /** SCORM 2004 records an unnamed step as `[.]answer`; SCORM 1.2 records `_`. */
   keepsUnnamedStep: boolean;
   /**
-   * SCORM 2004 parses `[,]`, `[.]` and `[:]` inside a step answer as
-   * delimiters, so it rejects an answer holding one (a correct `min[:]max`
-   * range aside).
+   * SCORM 2004 rejects a list with no items, a step with neither name nor
+   * answer, a step answer holding `[,]`, `[.]` or `[:]` (a correct `min[:]max`
+   * range aside), and a correct pattern that repeats an item or has an item
+   * starting or ending in whitespace.
    */
-  rejectsDelimInStepAnswer: boolean;
+  strictGrammar: boolean;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
   /** Ids inside a response: list items, matching ids, step names, likert. */
@@ -62,7 +63,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   maxValueLength: () => 255,
   maxStepAnswerLength: Infinity,
   keepsUnnamedStep: false,
-  rejectsDelimInStepAnswer: false,
+  strictGrammar: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
   responseId: shortIdentifier,
@@ -94,7 +95,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   },
   maxStepAnswerLength: 250,
   keepsUnnamedStep: true,
-  rejectsDelimInStepAnswer: true,
+  strictGrammar: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
   responseId: uriIdentifier,
@@ -106,7 +107,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
-  rejectsDelimInStepAnswer: false,
+  strictGrammar: false,
   responseId: (v) => v,
 };
 
@@ -155,6 +156,14 @@ const CASE_PREFIX = '{case_matters=true}';
 /** A value the format cannot record, so its field is left out of the LMS record. */
 class UnrecordableError extends Error {}
 
+/** SCORM 1.2 records a list id as its position in the options passed. */
+function recordsIndex(
+  options: object | undefined,
+  fmt: InteractionFormat,
+): boolean {
+  return fmt.encodesOptionIndex && options !== undefined;
+}
+
 /**
  * SCORM 1.2 CMIFeedback takes one character per choice or matching id
  * (0-9, a-z), so an index encodes as one base-36 digit.
@@ -199,8 +208,14 @@ function encodeStep(
   fmt: InteractionFormat,
 ): string {
   const answer = String(a);
+  const name = stepName(step, fmt);
+  if (fmt.strictGrammar && name === '' && answer === '') {
+    throw new UnrecordableError(
+      'a step has neither a name nor an answer, which this export standard rejects',
+    );
+  }
   if (
-    fmt.rejectsDelimInStepAnswer &&
+    fmt.strictGrammar &&
     STEP_DELIM.test(answer) &&
     !(field === 'correct' && NUMERIC_RANGE.test(answer))
   ) {
@@ -208,7 +223,7 @@ function encodeStep(
       `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
     );
   }
-  return `${stepName(step, fmt)}${fmt.pairDelim}${answer}`;
+  return `${name}${fmt.pairDelim}${answer}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -228,18 +243,43 @@ function encodeItems(
   field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string[] {
+  const items = encodeEach(i, field, fmt);
+  if (!fmt.strictGrammar) return items;
+  if (items.length === 0) {
+    throw new UnrecordableError(
+      'it has no items, which this export standard rejects',
+    );
+  }
+  const repeat = items.find((item, k) => items.indexOf(item) !== k);
+  if (field === 'correct' && repeat !== undefined) {
+    throw new UnrecordableError(
+      `it lists "${repeat}" twice, which this export standard rejects`,
+    );
+  }
+  return items;
+}
+
+function encodeEach(
+  i: ListInteraction,
+  field: 'response' | 'correct',
+  fmt: InteractionFormat,
+): string[] {
   switch (i.type) {
+    // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
     case 'choice':
-      // A choice response is a set; SCORM 2004 rejects one that repeats an id.
       return [
         ...new Set(
           (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt)),
         ),
       ];
+    case 'matching':
+      return [
+        ...new Set(
+          (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt)),
+        ),
+      ];
     case 'sequencing':
       return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
-    case 'matching':
-      return (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt));
     case 'performance':
       return (i[field] ?? []).map((s) => encodeStep(s, field, fmt));
   }
@@ -325,11 +365,11 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return fmt.encodesOptionIndex && i.options
+      return recordsIndex(i.options, fmt)
         ? []
         : [[...i.response, ...(i.correct ?? [])]];
     case 'matching': {
-      if (fmt.encodesOptionIndex && i.optionPairs) return [];
+      if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
       return [pairs.map(([l]) => l), pairs.map(([, r]) => r)];
     }
@@ -386,11 +426,19 @@ export function fitPatterns(
       ],
     };
   }
-  const patterns = formatCorrectPattern(i, fmt) ?? [];
+  const formatted = formatCorrectPattern(i, fmt) ?? [];
+  const warnings: string[] = [];
+  const patterns = fmt.strictGrammar
+    ? formatted.filter((p) => !hasEdgeSpace(p, i.type, fmt))
+    : formatted;
+  if (patterns.length < formatted.length) {
+    warnings.push(
+      `has ${formatted.length - patterns.length} correct answer(s) starting or ending in whitespace, which ${recorder} rejects; they are ${lost}`,
+    );
+  }
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  const warnings: string[] = [];
   // Counts a `{case_matters=true}` prefix too, as scorm-again does.
   const fit = patterns.filter((p) => p.length <= max);
   if (fit.length < patterns.length) {
@@ -414,6 +462,19 @@ export function fitPatterns(
     );
   }
   return { kept: fit.slice(0, limit), warnings };
+}
+
+/** scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole. */
+function hasEdgeSpace(
+  pattern: string,
+  type: Interaction['type'],
+  fmt: InteractionFormat,
+): boolean {
+  const items =
+    type === 'long-fill-in' || type === 'other'
+      ? [pattern]
+      : pattern.split(fmt.itemDelim);
+  return items.some((item) => item.trim() !== item);
 }
 
 function hasLongStep(
@@ -464,10 +525,9 @@ function fitResponse(
   fmt: InteractionFormat,
 ): string | null {
   const stepMax = fmt.maxStepAnswerLength;
+  let longStep = false;
   if (i.type === 'performance' && hasLongStep(i.response, stepMax)) {
-    console.warn(
-      `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
-    );
+    longStep = true;
     i = {
       ...i,
       response: i.response.map(([step, a]): [string, string | number] => [
@@ -477,6 +537,11 @@ function fitResponse(
     };
   }
   const items = isList(i) ? encodeItems(i, 'response', fmt) : null;
+  if (longStep) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
+    );
+  }
   const value = items ? items.join(fmt.itemDelim) : formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
