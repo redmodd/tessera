@@ -88,6 +88,13 @@ const QUESTION_COMPONENTS: Record<
         } else if (answers.every((a) => a.trim() === '')) {
           // A learner can't submit blank input, so no response could match.
           d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
+        } else if (answers.some((a) => a.trim() === '')) {
+          d.warn(
+            tag(
+              A11Y_IDS.questionLabel,
+              `${fileRel}: <FillInTheBlank> has an empty answer label`,
+            ),
+          );
         }
       }
     },
@@ -164,17 +171,15 @@ export function validateQuestionComponents(
       }
     }
 
-    // Rule 1.5: empty option/answer labels are both an a11y and a scoring bug.
-    for (const labelProp of ['options', 'answers']) {
-      const entries = staticArray(props.get(labelProp));
-      if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
-        d.warn(
-          tag(
-            A11Y_IDS.questionLabel,
-            `${fileRel}: <${name}> has an empty ${labelProp === 'options' ? 'option' : 'answer'} label`,
-          ),
-        );
-      }
+    // Rule 1.5: empty option labels are both an a11y and a scoring bug.
+    const options = staticArray(props.get('options'));
+    if (options?.some((e) => typeof e === 'string' && e.trim() === '')) {
+      d.warn(
+        tag(
+          A11Y_IDS.questionLabel,
+          `${fileRel}: <${name}> has an empty option label`,
+        ),
+      );
     }
 
     const resolvedId = staticQuestionId(match);

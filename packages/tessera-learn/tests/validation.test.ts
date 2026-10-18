@@ -1981,12 +1981,15 @@ let a = {}; let b = {};</script>
 <FillInTheBlank question="S" answers=" " />
 <FillInTheBlank question="T" answers={['', ' ']} />`,
     );
-    const { errors } = validateProject(testRoot);
+    const { errors, warnings } = validateProject(testRoot);
     expect(
       errors.filter((e) =>
         e.includes('<FillInTheBlank> answers must not be empty'),
       ),
     ).toHaveLength(4);
+    expect(warnings.filter((w) => w.includes('FillInTheBlank'))).toHaveLength(
+      0,
+    );
   });
 
   it('accepts a single FillInTheBlank answer string', () => {
@@ -3305,6 +3308,16 @@ describe('a11y rule 1.5 — question option/answer labels', () => {
     writePage(
       testRoot,
       `<MultipleChoice question="Q" options={['A', '']} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/question-label')).toBe(true);
+  });
+
+  it('warns on an empty FillInTheBlank answer next to a valid one', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<FillInTheBlank question="Q" answers={['Paris', ' ']} />`,
     );
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/question-label')).toBe(true);
