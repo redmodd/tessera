@@ -9,6 +9,7 @@ import {
   xapiLaunchURL,
 } from './lms-mocks.js';
 import {
+  exitCourse,
   findStatement,
   findStatements,
   interactionField,
@@ -136,16 +137,6 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
       .check();
     await page.locator('[data-testid="custom-quiz-submit"]').click();
 
-    await expect
-      .poll(() => scormData(page))
-      .toMatchObject({
-        'cmi.core.score.raw': '50',
-        'cmi.core.lesson_status': 'failed',
-      });
-
-    await page.reload();
-    await waitForCustomQuiz(page);
-
     const lessonStatusWrites = async () =>
       (await scormLog(page))
         .filter(
@@ -153,7 +144,16 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
             fn === 'LMSSetValue' && key === 'cmi.core.lesson_status',
         )
         .map(([, , value]) => value);
-    await expect.poll(lessonStatusWrites).toEqual(['failed']);
+    await expect.poll(lessonStatusWrites).toEqual(['incomplete', 'failed']);
+    expect(await scormData(page)).toMatchObject({
+      'cmi.core.score.raw': '50',
+    });
+
+    await page.reload();
+    await waitForCustomQuiz(page);
+    await exitCourse(page);
+
+    expect(await lessonStatusWrites()).toEqual(['failed']);
   });
 });
 
