@@ -218,6 +218,24 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'step%20one[.]all done',
       ],
       [
+        'URN likert',
+        {
+          type: 'likert',
+          response: 'urn:course:agree',
+          correct: 'urn:course:agree',
+        },
+        'urn:course:agree',
+      ],
+      [
+        'unnamed performance step',
+        {
+          type: 'performance',
+          response: [['', 'all done']],
+          correct: [['', 'all done']],
+        },
+        '[.]all done',
+      ],
+      [
         'punctuation-only likert',
         { type: 'likert', response: '-', correct: '-' },
         '%2D',

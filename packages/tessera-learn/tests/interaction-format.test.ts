@@ -82,7 +82,11 @@ describe('SCORM 2004 ids inside a response', () => {
     ['step-one_(a)', 'step-one_(a)'],
     ['a[,]b~c', 'a%5B%2C%5Db%7Ec'],
     ['café', 'caf%C3%A9'],
+    ['urn:course:likert/agree#1', 'urn:course:likert/agree#1'],
+    ['a%20b', 'a%2520b'],
+    ['a?b&c', 'a%3Fb%26c'],
     ['-', '%2D'],
+    ['::', '%3A%3A'],
     ['(*)', '%28%2A%29'],
     ['', '_'],
     ['a\uD800', 'a%EF%BF%BD'],
@@ -114,6 +118,18 @@ describe('SCORM 2004 ids inside a response', () => {
         fmt,
       ),
     ).toEqual(['Strongly%20agree']);
+  });
+
+  it('keeps an unnamed performance step unnamed', () => {
+    expect(
+      formatResponse({ type: 'performance', response: [['', 'go']] }, fmt),
+    ).toBe('[.]go');
+    expect(
+      formatResponse(
+        { type: 'performance', response: [['', 'go']] },
+        SCORM12_INTERACTION_FORMAT,
+      ),
+    ).toBe('_.go');
   });
 
   it('cuts an id to 250 characters without splitting an escape', () => {

@@ -797,6 +797,20 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it('warns once when ids sent without options also record as one id', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a b'], correct: ['a-b'] },
+        false,
+      );
+      await flush();
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"q1" sends the id "a b" without options'),
+      );
+    });
+
     it('does not warn when a matching left id and right id record the same', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(

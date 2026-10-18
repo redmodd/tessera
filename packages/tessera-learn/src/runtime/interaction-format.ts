@@ -108,16 +108,22 @@ export function shortIdentifier(value: string): string {
   return trimmed || '_';
 }
 
+/** The characters scorm-again's SCORM 2004 `CMIShortIdentifier` takes, less `%`. */
+const URI_ID_CHAR = /[\w\-()+.:=@;$!*'/#]/;
+
 /**
- * SCORM 2004 `short_identifier_type` is URI text, so percent-encoding keeps
- * distinct ids distinct. scorm-again also refuses `~`, and an id with no
- * letter, digit or underscore, so such an id escapes every character. The
- * 250-character cut keeps each character's escapes whole.
+ * SCORM 2004 `short_identifier_type`. Characters outside that set, and `%`,
+ * are percent-encoded. scorm-again refuses an id with no letter, digit or
+ * underscore, so such an id escapes every character. The 250-character cut
+ * keeps each character's escapes whole. The cut, the `_` for an empty id and
+ * the U+FFFD for a lone surrogate can record distinct ids as one.
  */
 function uriIdentifier(value: string): string {
   let id = '';
   for (const c of value.replace(/\p{Cs}/gu, '\uFFFD')) {
-    const encoded = encodeURIComponent(c).replace('~', '%7E');
+    const encoded = URI_ID_CHAR.test(c)
+      ? c
+      : encodeURIComponent(c).replace('~', '%7E');
     if (id.length + encoded.length > 250) break;
     id += encoded;
   }
@@ -166,12 +172,17 @@ function encodePair(
   return `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`;
 }
 
+/** SCORM 2004 allows an unnamed step (`[.]answer`); SCORM 1.2 records it as `_`. */
+function stepName(step: string, fmt: InteractionFormat): string {
+  return step === '' && !fmt.encodesOptionIndex ? '' : fmt.responseId(step);
+}
+
 /** Step names are identifiers; step answers are free text, kept as written. */
 function encodeStep(
   [step, a]: [string, string | number],
   fmt: InteractionFormat,
 ): string {
-  return `${fmt.responseId(step)}${fmt.pairDelim}${a}`;
+  return `${stepName(step, fmt)}${fmt.pairDelim}${a}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -291,7 +302,11 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
       return [pairs.map(([l]) => l), pairs.map(([, r]) => r)];
     }
     case 'performance':
-      return [[...i.response, ...(i.correct ?? [])].map(([step]) => step)];
+      return [
+        [...i.response, ...(i.correct ?? [])]
+          .map(([step]) => step)
+          .filter((step) => stepName(step, fmt) !== ''),
+      ];
     case 'likert':
       return [[i.response, i.correct ?? i.response]];
     default:
@@ -452,21 +467,19 @@ export function buildScormInteractionFields(
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   const { type } = interaction;
-  if (
+  const invalid =
     spec.format.encodesOptionIndex &&
     (type === 'choice' || type === 'sequencing' || type === 'matching')
-  ) {
-    const invalid = responseIdGroups(interaction, spec.format)
-      .flat()
-      .find((id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)));
-    if (invalid !== undefined) {
-      console.warn(
-        `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
-      );
-    }
-  }
+      ? responseIdGroups(interaction, spec.format)
+          .flat()
+          .find((id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)))
+      : undefined;
   const merged = mergedIds(interaction, spec.format);
-  if (merged) {
+  if (invalid !== undefined) {
+    console.warn(
+      `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+    );
+  } else if (merged) {
     const [a, b, recorded] = merged;
     console.warn(
       `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
