@@ -382,7 +382,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 <FillInTheBlank
   id="symbol"
   question="What element has the symbol 'O'?"
-  answers={['Oxygen']}
+  answers="Oxygen"
 />
 ```
 

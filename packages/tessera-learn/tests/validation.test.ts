@@ -1993,6 +1993,23 @@ let a = {}; let b = {};</script>
     );
   });
 
+  it('errors when FillInTheBlank answers is a bare attribute or undefined', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank question="Q" answers />
+<FillInTheBlank question="R" answers={undefined} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(
+      errors.filter((e) =>
+        e.includes(
+          '<FillInTheBlank> answers must be a string or an array of strings',
+        ),
+      ),
+    ).toHaveLength(2);
+  });
+
   it('accepts a single FillInTheBlank answer string', () => {
     createValidProject(testRoot);
     writePage(

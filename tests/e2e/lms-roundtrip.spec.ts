@@ -259,6 +259,9 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       'fill-in',
       'matching',
     ]);
+    expect(
+      await interactionField(page, String.raw`correct_responses\.0\.pattern`),
+    ).toContain('blue');
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
@@ -500,6 +503,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'fill-in',
       'matching',
     ]);
+    expect(
+      await interactionField(page, String.raw`correct_responses\.0\.pattern`),
+    ).toContain('blue');
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);

@@ -25,6 +25,8 @@ function staticArray(prop: PropValue | undefined): unknown[] | null {
 
 function staticList(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind === 'string') return [prop.value];
+  if (prop?.kind === 'bool') return [true];
+  if (prop?.kind === 'expr' && prop.raw === 'undefined') return [undefined];
   const value = staticValue(prop);
   if (value === undefined) return null;
   return Array.isArray(value) ? value : [value];
@@ -162,10 +164,10 @@ export function validateQuestionComponents(
     }
 
     // Rule 1.5: empty option/answer labels are both an a11y and a scoring bug.
-    for (const [label, entries] of [
-      ['option', staticArray(props.get('options'))],
-      ['answer', staticList(props.get('answers'))],
-    ] as const) {
+    for (const [label, entries] of Object.entries({
+      option: staticArray(props.get('options')),
+      answer: staticList(props.get('answers')),
+    })) {
       if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
         d.warn(
           tag(
