@@ -797,7 +797,7 @@ describe('SCORM12Adapter', () => {
       );
     });
 
-    it('warns once when ids sent without options also record as one id', async () => {
+    it('warns when ids sent without options also record as one id', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
@@ -805,10 +805,38 @@ describe('SCORM12Adapter', () => {
         false,
       );
       await flush();
+      expect(warn.mock.calls).toEqual([
+        [expect.stringContaining('"q1" sends the id "a b" without options')],
+        [
+          expect.stringContaining(
+            'records the ids "a b" and "a-b" both as "a_b"',
+          ),
+        ],
+      ]);
+    });
+
+    it('warns when it changes a likert value', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction('l1', { type: 'likert', response: '-1' }, null);
+      await flush();
+      expect(interaction0()).toMatchObject({ student_response: '1' });
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('"q1" sends the id "a b" without options'),
+        expect.stringContaining(
+          'interaction "l1" records the likert value "-1" as "1" on SCORM 1.2',
+        ),
       );
+    });
+
+    it('does not warn about a likert value it sends as written', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'l1',
+        { type: 'likert', response: 'strongly_agree', correct: 'agree' },
+        false,
+      );
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('does not warn when a matching left id and right id record the same', async () => {

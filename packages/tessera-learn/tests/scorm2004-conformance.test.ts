@@ -10,6 +10,8 @@ import {
 } from './helpers/real-lms.js';
 import { flush } from './helpers.js';
 
+const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
+
 describe('SCORM2004Adapter against scorm-again', () => {
   let lms: RealLms2004;
   let adapter: SCORM2004Adapter;
@@ -343,7 +345,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         { type: 'fill-in', response: 'a', correct: ['a[,]a'] },
         'a',
         '',
-        'repeating an item',
+        'repeating a [,]-separated part',
       ],
       [
         'a step with neither name nor answer',
@@ -358,6 +360,38 @@ describe('SCORM2004Adapter against scorm-again', () => {
         '',
         '',
         'has no items',
+      ],
+      [
+        '36 sequence items',
+        { type: 'sequencing', response: ids(36), correct: ids(36) },
+        ids(36).join('[,]'),
+        ids(36).join('[,]'),
+        undefined,
+      ],
+      [
+        '37 sequence items',
+        { type: 'sequencing', response: ids(37), correct: ids(37) },
+        '',
+        '',
+        'has 37 items, more than the 36',
+      ],
+      [
+        '37 choice ids',
+        { type: 'choice', response: ids(37), correct: ids(37) },
+        '',
+        '',
+        'has 37 items, more than the 36',
+      ],
+      [
+        '251 steps',
+        {
+          type: 'performance',
+          response: ids(251).map((s) => [s, 'x']),
+          correct: ids(251).map((s) => [s, 'x']),
+        },
+        '',
+        '',
+        'has 251 items, more than the 250',
       ],
     ] as const)(
       'records what the data model takes from %s',

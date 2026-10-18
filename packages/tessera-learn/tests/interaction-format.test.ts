@@ -171,6 +171,18 @@ describe('SCORM 2004 ids inside a response', () => {
     ]);
   });
 
+  it('refuses a list over its item cap', () => {
+    const ids = Array.from({ length: 37 }, (_, k) => `s${k}`);
+    const i: Interaction = { type: 'sequencing', response: ids };
+    expect(() => formatResponse(i, fmt)).toThrow(
+      'it has 37 items, more than the 36',
+    );
+    expect(() =>
+      formatResponse({ ...i, response: ids.slice(1) }, fmt),
+    ).not.toThrow();
+    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
+  });
+
   it('refuses an empty list and a step with neither name nor answer', () => {
     const empty: Interaction = { type: 'choice', response: [], correct: [] };
     expect(() => formatResponse(empty, fmt)).toThrow('has no items');
@@ -212,12 +224,16 @@ describe('fitPatterns', () => {
     },
   );
 
-  it.each<[string, Interaction, string[], number]>([
+  it.each<[string, Interaction, string[], string]>([
     [
       'fill-in',
-      { type: 'fill-in', response: '', correct: ['Paris ', ' Rome', 'Oslo'] },
+      {
+        type: 'fill-in',
+        response: '',
+        correct: ['Paris ', ' Rome', 'a[,] b', 'Oslo'],
+      },
       ['Oslo'],
-      2,
+      '3 correct answer(s) starting or ending in whitespace, or with whitespace beside [,]',
     ],
     [
       'performance',
@@ -230,18 +246,14 @@ describe('fitPatterns', () => {
         ],
       },
       [],
-      1,
+      '1 correct answer(s) with an item starting or ending in whitespace',
     ],
   ])(
     'drops a SCORM 2004 %s answer starting or ending in whitespace',
-    (_, i, kept, dropped) => {
+    (_, i, kept, warning) => {
       const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
       expect(fit.kept).toEqual(kept);
-      expect(fit.warnings).toEqual([
-        expect.stringContaining(
-          `${dropped} correct answer(s) starting or ending in whitespace`,
-        ),
-      ]);
+      expect(fit.warnings).toEqual([expect.stringContaining(warning)]);
       expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
     },
   );
@@ -255,7 +267,9 @@ describe('fitPatterns', () => {
     const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
     expect(fit.kept).toEqual(['a[,]b']);
     expect(fit.warnings).toEqual([
-      expect.stringContaining('1 correct answer(s) repeating an item'),
+      expect.stringContaining(
+        '1 correct answer(s) repeating a [,]-separated part',
+      ),
     ]);
     expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
   });

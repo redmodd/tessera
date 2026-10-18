@@ -140,20 +140,17 @@ export function isCorrect(i: Interaction): boolean | null {
   }
 }
 
+/** A repeated item counts once, as the LMS records it. */
 function setEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const seen = new Set(b);
-  for (const x of a) if (!seen.has(x)) return false;
-  return true;
+  const as = new Set(a);
+  const bs = new Set(b);
+  return as.size === bs.size && [...as].every((x) => bs.has(x));
 }
 
 function pairSetEqual(
   a: Array<[string, string]>,
   b: Array<[string, string]>,
 ): boolean {
-  if (a.length !== b.length) return false;
   const key = ([l, r]: [string, string]) => `${l}\u241F${r}`;
-  const bset = new Set(b.map(key));
-  for (const p of a) if (!bset.has(key(p))) return false;
-  return true;
+  return setEqual(a.map(key), b.map(key));
 }

@@ -26,6 +26,19 @@ describe('isCorrect', () => {
       ).toBe(false);
     });
 
+    it('counts a repeated id once', () => {
+      expect(
+        isCorrect({ type: 'choice', response: ['a', 'a'], correct: ['a'] }),
+      ).toBe(true);
+      expect(
+        isCorrect({
+          type: 'choice',
+          response: ['a', 'a'],
+          correct: ['a', 'b'],
+        }),
+      ).toBe(false);
+    });
+
     it('returns null when correct is undefined', () => {
       expect(isCorrect({ type: 'choice', response: ['a'] })).toBeNull();
     });
@@ -132,6 +145,19 @@ describe('isCorrect', () => {
           correct: [['A', '2']],
         }),
       ).toBe(false);
+    });
+
+    it('counts a repeated pair once', () => {
+      expect(
+        isCorrect({
+          type: 'matching',
+          response: [
+            ['A', '1'],
+            ['A', '1'],
+          ],
+          correct: [['A', '1']],
+        }),
+      ).toBe(true);
     });
 
     it('returns null when correct is undefined', () => {

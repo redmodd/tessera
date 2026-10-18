@@ -36,6 +36,11 @@ export interface InteractionFormat {
   maxValueLength(type: Interaction['type']): number;
   /** SCORM 2004 caps each performance step answer at 250 characters. */
   maxStepAnswerLength: number;
+  /**
+   * SCORM 2004 caps a choice, sequencing or matching list at 36 items and a
+   * performance list at 250 steps.
+   */
+  maxItems(type: ListInteraction['type']): number;
   /** SCORM 2004 records an unnamed step as `[.]answer`; SCORM 1.2 records `_`. */
   keepsUnnamedStep: boolean;
   /**
@@ -62,6 +67,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: 10,
   maxValueLength: () => 255,
   maxStepAnswerLength: Infinity,
+  maxItems: () => Infinity,
   keepsUnnamedStep: false,
   strictGrammar: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
@@ -94,6 +100,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
     }
   },
   maxStepAnswerLength: 250,
+  maxItems: (type) => (type === 'performance' ? 250 : 36),
   keepsUnnamedStep: true,
   strictGrammar: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
@@ -107,6 +114,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
+  maxItems: () => Infinity,
   strictGrammar: false,
   responseId: (v) => v,
 };
@@ -257,6 +265,12 @@ function encodeItems(
       'it has no items, which this export standard rejects',
     );
   }
+  const max = fmt.maxItems(i.type);
+  if (items.length > max) {
+    throw new UnrecordableError(
+      `it has ${items.length} items, more than the ${max} this export standard records`,
+    );
+  }
   return items;
 }
 
@@ -379,10 +393,10 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
 
 /** Two distinct ids that record as the same id, and that id. */
 function mergedIds(
-  i: Interaction,
+  groups: string[][],
   fmt: InteractionFormat,
 ): [string, string, string] | undefined {
-  for (const ids of responseIdGroups(i, fmt)) {
+  for (const ids of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
       const recorded = fmt.responseId(id);
@@ -420,9 +434,12 @@ export function fitPatterns(
   const warnings: string[] = [];
   // scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole.
   const items = (p: string) =>
-    i.type === 'long-fill-in' || i.type === 'other'
-      ? [p]
-      : p.split(fmt.itemDelim);
+    isList(i) || i.type === 'fill-in' ? p.split(fmt.itemDelim) : [p];
+  const edgeSpace = isList(i)
+    ? 'with an item starting or ending in whitespace'
+    : i.type === 'fill-in'
+      ? 'starting or ending in whitespace, or with whitespace beside [,]'
+      : 'starting or ending in whitespace';
   const drop = (
     list: string[],
     rejects: (items: string[]) => boolean,
@@ -441,12 +458,12 @@ export function fitPatterns(
     patterns = drop(
       patterns,
       (it) => it.some((item) => item.trim() !== item),
-      'starting or ending in whitespace',
+      edgeSpace,
     );
     patterns = drop(
       patterns,
       (it) => new Set(it).size < it.length,
-      'repeating an item',
+      `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`,
     );
   }
   const max = fmt.maxValueLength(i.type);
@@ -556,6 +573,39 @@ function fitResponse(
   return cut || null;
 }
 
+function warnResponseIds(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): void {
+  const groups = responseIdGroups(i, fmt);
+  const ids = groups.flat();
+  // Only SCORM 1.2 encodes option indexes.
+  if (fmt.encodesOptionIndex && i.type === 'likert') {
+    // Values from different learners can merge, which the check below cannot see.
+    const changed = ids.find((v) => fmt.responseId(v) !== v);
+    if (changed !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}" on SCORM 1.2, so values that differ only in punctuation record the same. Send values of letters, digits and underscores.`,
+      );
+    }
+  } else if (fmt.encodesOptionIndex && i.type !== 'performance') {
+    const invalid = ids.find((id) => !/^[0-9a-z]$/.test(fmt.responseId(id)));
+    if (invalid !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+      );
+    }
+  }
+  const merged = mergedIds(groups, fmt);
+  if (merged) {
+    const [a, b, recorded] = merged;
+    console.warn(
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
+    );
+  }
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -563,25 +613,7 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  const { type } = interaction;
-  const invalid =
-    spec.format.encodesOptionIndex &&
-    (type === 'choice' || type === 'sequencing' || type === 'matching')
-      ? responseIdGroups(interaction, spec.format)
-          .flat()
-          .find((id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)))
-      : undefined;
-  const merged = mergedIds(interaction, spec.format);
-  if (invalid !== undefined) {
-    console.warn(
-      `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
-    );
-  } else if (merged) {
-    const [a, b, recorded] = merged;
-    console.warn(
-      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
-    );
-  }
+  warnResponseIds(questionId, interaction, spec.format);
   const recordable = <T>(field: string, format: () => T): T | null => {
     try {
       return format();
