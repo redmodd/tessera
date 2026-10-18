@@ -430,12 +430,21 @@ export function fitPatterns(
   }
   const formatted = formatCorrectPattern(i, fmt) ?? [];
   const warnings: string[] = [];
-  const patterns = fmt.strictGrammar
-    ? formatted.filter((p) => !hasEdgeSpace(p, i.type, fmt))
+  const items = (p: string) => patternItems(p, i.type, fmt);
+  const unspaced = fmt.strictGrammar
+    ? formatted.filter((p) => items(p).every((item) => item.trim() === item))
     : formatted;
-  if (patterns.length < formatted.length) {
+  if (unspaced.length < formatted.length) {
     warnings.push(
-      `has ${formatted.length - patterns.length} correct answer(s) starting or ending in whitespace, which ${recorder} rejects; they are ${lost}`,
+      `has ${formatted.length - unspaced.length} correct answer(s) starting or ending in whitespace, which ${recorder} rejects; they are ${lost}`,
+    );
+  }
+  const patterns = fmt.strictGrammar
+    ? unspaced.filter((p) => new Set(items(p)).size === items(p).length)
+    : unspaced;
+  if (patterns.length < unspaced.length) {
+    warnings.push(
+      `has ${unspaced.length - patterns.length} correct answer(s) repeating an item, which ${recorder} rejects; they are ${lost}`,
     );
   }
   const max = fmt.maxValueLength(i.type);
@@ -467,16 +476,14 @@ export function fitPatterns(
 }
 
 /** scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole. */
-function hasEdgeSpace(
+function patternItems(
   pattern: string,
   type: Interaction['type'],
   fmt: InteractionFormat,
-): boolean {
-  const items =
-    type === 'long-fill-in' || type === 'other'
-      ? [pattern]
-      : pattern.split(fmt.itemDelim);
-  return items.some((item) => item.trim() !== item);
+): string[] {
+  return type === 'long-fill-in' || type === 'other'
+    ? [pattern]
+    : pattern.split(fmt.itemDelim);
 }
 
 function hasLongStep(

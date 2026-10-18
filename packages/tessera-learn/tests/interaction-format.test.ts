@@ -244,6 +244,20 @@ describe('fitPatterns', () => {
     },
   );
 
+  it('drops a SCORM 2004 fill-in answer that repeats an item', () => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: ['a[,]b[,]a', 'a[,]b'],
+    };
+    const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
+    expect(fit.kept).toEqual(['a[,]b']);
+    expect(fit.warnings).toEqual([
+      expect.stringContaining('1 correct answer(s) repeating an item'),
+    ]);
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
+  });
+
   it('keeps a case-sensitive SCORM 2004 answer whose space follows the prefix', () => {
     const i: Interaction = {
       type: 'fill-in',

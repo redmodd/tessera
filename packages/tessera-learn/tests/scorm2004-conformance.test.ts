@@ -339,6 +339,13 @@ describe('SCORM2004Adapter against scorm-again', () => {
         undefined,
       ],
       [
+        'a fill-in answer that repeats an item',
+        { type: 'fill-in', response: 'a', correct: ['a[,]a'] },
+        'a',
+        '',
+        'repeating an item',
+      ],
+      [
         'a step with neither name nor answer',
         { type: 'performance', response: [['', '']], correct: [['', '']] },
         '',

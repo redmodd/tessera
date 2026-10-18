@@ -94,7 +94,7 @@ Ids inside a response (list items, matching ids, `performance` step ids, the `li
 
 - is an empty list, or has a step with neither an id nor a value
 - has a step value holding `[,]`, `[.]` or `[:]` (other than a correct `min[:]max` range)
-- is a correct `sequencing` or `performance` answer that repeats an item
+- is a correct answer (or a `fill-in` alternative) that repeats an item
 - is a correct answer (or a `fill-in` alternative) starting or ending in whitespace
 
 ```ts
