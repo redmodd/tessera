@@ -2148,8 +2148,14 @@ let a = {}; let b = {};</script>
     ['web', null],
     ['xapi', null],
     ['cmi5', null],
-    ['scorm2004', '2 answer(s) over the 250 characters SCORM 2004 records'],
-    ['scorm12', '1 answer(s) over the 255 characters SCORM 1.2 records'],
+    [
+      'scorm2004',
+      '"q1" has 2 correct answer(s) over the 250 characters SCORM 2004 records',
+    ],
+    [
+      'scorm12',
+      '"q1" has 1 correct answer(s) over the 255 characters SCORM 1.2 records',
+    ],
   ])('warns about over-long fill-in answers under %s', (standard, warning) => {
     createValidProject(testRoot);
     writeStandardConfig(standard);
@@ -2159,7 +2165,7 @@ let a = {}; let b = {};</script>
     );
     expect(
       validateProject(testRoot).warnings.filter((w) =>
-        w.includes('<FillInTheBlank> has'),
+        w.includes('<FillInTheBlank> "q1" has'),
       ),
     ).toEqual(warning ? [expect.stringContaining(warning)] : []);
   });
@@ -2180,7 +2186,7 @@ let a = {}; let b = {};</script>
       );
       expect(
         validateProject(testRoot).warnings.filter((w) =>
-          w.includes('<FillInTheBlank> has 1 answer(s) over'),
+          w.includes('<FillInTheBlank> "q1" has 1 correct answer(s) over'),
         ),
       ).toHaveLength(warnings);
     },
@@ -2190,8 +2196,11 @@ let a = {}; let b = {};</script>
     ['web', null],
     ['xapi', null],
     ['cmi5', null],
-    ['scorm2004', '11 answers but SCORM 2004 records at most 10'],
-    ['scorm12', '11 answers but SCORM 1.2 records at most 10'],
+    [
+      'scorm2004',
+      '"q1" has 11 correct answers but SCORM 2004 records at most 10',
+    ],
+    ['scorm12', '"q1" has 11 correct answers but SCORM 1.2 records at most 10'],
   ])(
     'warns about fill-in answers past the count cap under %s',
     (standard, warning) => {
@@ -2222,7 +2231,7 @@ let a = {}; let b = {};</script>
     );
     expect(
       validateProject(testRoot).warnings.filter((w) =>
-        w.includes('has 1 answer(s) over the 255 characters'),
+        w.includes('has 1 correct answer(s) over the 255 characters'),
       ),
     ).toHaveLength(2);
   });

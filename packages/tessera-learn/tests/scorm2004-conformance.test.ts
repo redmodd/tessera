@@ -147,6 +147,38 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
+    it('a performance step answer over 250 characters is cut to fit', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = [
+        ['s1', 'a'.repeat(251)],
+        ['s2', 'done'],
+      ];
+      adapter.reportInteraction(
+        'q1',
+        { type: 'performance', response: steps, correct: steps },
+        true,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+        `s1[.]${'a'.repeat(250)}[,]s2[.]done`,
+      );
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('0');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets its first 250 characters',
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" has a correct step answer over the 250 characters',
+        ),
+      );
+    });
+
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
         [

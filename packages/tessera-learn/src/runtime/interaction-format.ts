@@ -34,6 +34,8 @@ export interface InteractionFormat {
    * reject a longer value (405 / 406).
    */
   maxValueLength(type: Interaction['type']): number;
+  /** SCORM 2004 caps each performance step answer at 250 characters. */
+  maxStepAnswerLength: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -48,6 +50,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   fillInLimit: 10,
   longFillInLimit: 10,
   maxValueLength: () => 255,
+  maxStepAnswerLength: Infinity,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -76,6 +79,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
         return Infinity;
     }
   },
+  maxStepAnswerLength: 250,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
@@ -85,6 +89,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
+  maxStepAnswerLength: Infinity,
 };
 
 /**
@@ -257,52 +262,84 @@ function idsWithoutOptions(i: Interaction): string[] {
 /**
  * Drops correct answers over the format's length cap, since a shortened
  * pattern matches nothing, then keeps the first ones up to its count cap.
+ * Each warning completes a sentence whose subject is the question.
  */
 export function fitPatterns(
   i: Interaction,
   patterns: string[],
   fmt: InteractionFormat,
-): {
-  kept: string[];
-  tooLong: number;
-  fitting: number;
-  max: number;
-  limit: number;
-} {
+  recorder = 'this export standard',
+): { kept: string[]; warnings: string[] } {
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
+  const lost = 'graded but left out of the LMS record';
+  const warnings: string[] = [];
   // Counts a `{case_matters=true}` prefix too, as scorm-again does.
-  const fit = patterns.filter((p) => p.length <= max);
-  return {
-    kept: fit.slice(0, limit),
-    tooLong: patterns.length - fit.length,
-    fitting: fit.length,
-    max,
-    limit,
-  };
+  let fit = patterns.filter((p) => p.length <= max);
+  if (fit.length < patterns.length) {
+    const prefix =
+      'caseMatters' in i && i.caseMatters && fmt.supportsCasePrefix
+        ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
+        : '';
+    warnings.push(
+      `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records${prefix}; they are ${lost}`,
+    );
+  }
+  if (
+    i.type === 'performance' &&
+    i.correct?.some(([, a]) => String(a).length > fmt.maxStepAnswerLength)
+  ) {
+    fit = [];
+    warnings.push(
+      `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
+    );
+  }
+  if (fit.length > limit) {
+    warnings.push(
+      `has ${fit.length} correct answers but ${recorder} records at most ${limit}; the rest are ${lost}`,
+    );
+  }
+  return { kept: fit.slice(0, limit), warnings };
+}
+
+function cutText(value: string, max: number): string {
+  const cut = value.slice(0, max);
+  // Don't leave half of a surrogate pair (an emoji) at the end.
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 }
 
 /**
- * Cuts a response to the format's length cap. A list keeps only whole items,
+ * Cuts a response to the format's length caps. A list keeps only whole items,
  * since a half-written id or pair is wrong data. Null when nothing fits.
  */
 function fitResponse(
   questionId: string,
   i: Interaction,
-  value: string,
   fmt: InteractionFormat,
 ): string | null {
+  const stepMax = fmt.maxStepAnswerLength;
+  if (
+    i.type === 'performance' &&
+    i.response.some(([, a]) => typeof a === 'string' && a.length > stepMax)
+  ) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
+    );
+    i = {
+      ...i,
+      response: i.response.map(([step, a]): [string, string | number] => [
+        step,
+        typeof a === 'string' ? cutText(a, stepMax) : a,
+      ]),
+    };
+  }
+  const value = formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  let cut: string;
-  if (Array.isArray(i.response)) {
-    cut = value.slice(0, Math.max(value.lastIndexOf(fmt.itemDelim, max), 0));
-  } else {
-    cut = value.slice(0, max);
-    // Don't leave half of a surrogate pair (an emoji) at the end.
-    if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
-  }
+  const cut = Array.isArray(i.response)
+    ? value.slice(0, Math.max(value.lastIndexOf(fmt.itemDelim, max), 0))
+    : cutText(value, max);
   console.warn(
     `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
   );
@@ -340,30 +377,14 @@ export function buildScormInteractionFields(
   const patterns = recordable('correct answer', () => {
     const all = formatCorrectPattern(interaction, spec.format);
     if (!all) return null;
-    const { kept, tooLong, fitting, max, limit } = fitPatterns(
-      interaction,
-      all,
-      spec.format,
-    );
-    if (tooLong > 0) {
-      console.warn(
-        `Tessera: interaction "${questionId}" has ${tooLong} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
-      );
-    }
-    if (fitting > limit) {
-      console.warn(
-        `Tessera: interaction "${questionId}" has ${fitting} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
-      );
+    const { kept, warnings } = fitPatterns(interaction, all, spec.format);
+    for (const warning of warnings) {
+      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
     }
     return kept;
   });
   const response = recordable('response', () =>
-    fitResponse(
-      questionId,
-      interaction,
-      formatResponse(interaction, spec.format),
-      spec.format,
-    ),
+    fitResponse(questionId, interaction, spec.format),
   );
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);

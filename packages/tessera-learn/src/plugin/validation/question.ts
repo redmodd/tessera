@@ -58,6 +58,7 @@ interface QuestionComponentRule {
     fileRel: string,
     d: Diagnostics,
     standard: RecordingStandard | undefined,
+    id: string | null,
   ): void;
 }
 
@@ -92,7 +93,7 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check(props, fileRel, d, standard) {
+    check(props, fileRel, d, standard, id) {
       const answersProp = props.get('answers');
       const answers = staticArray(answersProp);
       if (answers) {
@@ -114,31 +115,21 @@ const QUESTION_COMPONENTS: Record<
         .flat()
         .filter((a) => typeof a === 'string')
         .map((a) => a.trim());
-      const caseMatters =
-        format.supportsCasePrefix && staticTruthy(props.get('caseSensitive'));
       const interaction = {
         type: 'fill-in' as const,
         response: '',
         correct,
-        caseMatters,
+        caseMatters: staticTruthy(props.get('caseSensitive')),
       };
-      const { tooLong, fitting, max, limit } = fitPatterns(
+      const { warnings } = fitPatterns(
         interaction,
         formatCorrectPattern(interaction, format) ?? [],
         format,
+        standard.name,
       );
-      if (tooLong > 0) {
-        const prefix = caseMatters
-          ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
-          : '';
-        d.warn(
-          `${fileRel}: <FillInTheBlank> has ${tooLong} answer(s) over the ${max} characters ${standard.name} records${prefix}; they are graded but left out of the LMS record`,
-        );
-      }
-      if (fitting > limit) {
-        d.warn(
-          `${fileRel}: <FillInTheBlank> has ${fitting} answers but ${standard.name} records at most ${limit}; the rest are graded but left out of the LMS record`,
-        );
+      const subject = id === null ? '' : ` "${id}"`;
+      for (const warning of warnings) {
+        d.warn(`${fileRel}: <FillInTheBlank>${subject} ${warning}`);
       }
     },
   },
@@ -288,6 +279,6 @@ export function validateQuestionComponents(
       }
     }
 
-    rule.check(props, fileRel, d, standard);
+    rule.check(props, fileRel, d, standard, resolvedId);
   }
 }
