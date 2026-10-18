@@ -413,10 +413,14 @@ describe('SCORM12Adapter', () => {
       expect(lessonStatusWrites()).toEqual(['failed']);
     });
 
-    it('terminate writes a status set without a commit', () => {
-      adapter.setCompletionStatus('complete');
-      adapter.terminate();
-      expect(lessonStatusWrites()).toEqual(['completed']);
+    it('skips a lesson_status equal to the last one written', async () => {
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      adapter.setScore(95);
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      await flush();
+      expect(lessonStatusWrites()).toEqual(['passed']);
     });
   });
 

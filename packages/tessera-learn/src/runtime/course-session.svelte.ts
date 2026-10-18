@@ -366,40 +366,34 @@ export class CourseSession {
     const adapter = this.#adapter;
     const progress = this.#progress;
 
+    // One effect, so what changes in one tick reaches the LMS in one commit:
+    // SCORM 1.2 would otherwise show `completed` before `failed`.
     $effect(() => {
-      if (!this.#persistenceReady) return;
-      if (!progress.gradedScoreFinal) return;
-
-      const score = progress.reportedScore;
-      if (score === this.#prevReportedScore) return;
-      this.#prevReportedScore = score;
-
-      this.#report(() => {
-        adapter.setScore(score);
-        // Before the commit, so a verdict this score decides carries it and
-        // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-        this.#reportSuccess();
-      });
-    });
-
-    $effect(() => {
-      const status = progress.reportedCompletionStatus;
-      if (!this.#persistenceReady) return;
-      if (status === this.#prevCompletionStatus) return;
-      this.#prevCompletionStatus = status;
-      this.#report(() => adapter.setCompletionStatus(status));
-    });
-
-    $effect(() => {
-      const status = progress.successStatus;
+      const score = progress.gradedScoreFinal ? progress.reportedScore : null;
+      const completion = progress.reportedCompletionStatus;
+      const success = progress.successStatus;
       const final = progress.verdictFinal;
       if (!this.#persistenceReady) return;
-      if (
-        status === this.#prevSuccessStatus &&
-        final === this.#prevVerdictFinal
-      )
-        return;
-      this.#report(() => this.#reportSuccess());
+
+      const scoreChanged = score !== null && score !== this.#prevReportedScore;
+      const completionChanged = completion !== this.#prevCompletionStatus;
+      const successChanged =
+        success !== this.#prevSuccessStatus || final !== this.#prevVerdictFinal;
+      if (!scoreChanged && !completionChanged && !successChanged) return;
+
+      this.#report(() => {
+        if (scoreChanged) {
+          this.#prevReportedScore = score;
+          adapter.setScore(score);
+        }
+        if (completionChanged) {
+          this.#prevCompletionStatus = completion;
+          adapter.setCompletionStatus(completion);
+        }
+        // With every score, so a verdict the score decides carries it and
+        // xAPI/cmi5 send one statement rather than a Scored and a Passed.
+        if (scoreChanged || successChanged) this.#reportSuccess();
+      });
     });
   }
 
