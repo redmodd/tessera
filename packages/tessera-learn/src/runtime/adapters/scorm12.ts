@@ -61,14 +61,16 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * since async retries cannot complete during page unload.
  *
  * SCORM 1.2 collapses completion + success into a single `lesson_status`
- * field, so the two setters track their values separately and write the
- * combined result through `#flushLessonStatus`. LMSes read `failed` as a
- * finished attempt, so it waits for completion or a final verdict.
+ * field, so the two setters only record their values and `commit()` writes
+ * the combined result if it changed, so one commit never shows `completed`
+ * before `failed`. LMSes read `failed` as a finished attempt, so it waits for
+ * completion or a final verdict.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: Verdict | null = null;
   #verdictFinal = false;
+  #writtenStatus: Verdict | 'completed' | 'incomplete' | null = null;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);
@@ -93,7 +95,6 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   setCompletionStatus(status: CompletionStatus): void {
     this.#completionStatus = status === 'complete' ? 'completed' : 'incomplete';
-    this.#flushLessonStatus();
   }
 
   setSuccessStatus(status: SuccessStatus, final = false): void {
@@ -101,7 +102,11 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     // completion status.
     this.#successStatus = status === 'unknown' ? null : status;
     this.#verdictFinal = final;
+  }
+
+  override commit(): void {
     this.#flushLessonStatus();
+    super.commit();
   }
 
   #flushLessonStatus(): void {
@@ -109,10 +114,12 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
       this.#successStatus === 'failed' &&
       this.#completionStatus === 'incomplete' &&
       !this.#verdictFinal;
-    this.set(
-      'cmi.core.lesson_status',
-      held ? 'incomplete' : (this.#successStatus ?? this.#completionStatus),
-    );
+    const status = held
+      ? 'incomplete'
+      : (this.#successStatus ?? this.#completionStatus);
+    if (status === this.#writtenStatus) return;
+    this.#writtenStatus = status;
+    this.set('cmi.core.lesson_status', status);
   }
 
   setExit(mode: ExitMode): void {

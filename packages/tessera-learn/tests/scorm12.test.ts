@@ -345,13 +345,15 @@ describe('SCORM12Adapter', () => {
   // ---- lesson_status ----
 
   describe('lesson_status reconciliation', () => {
-    const lastLessonStatus = () =>
+    const lessonStatusWrites = () =>
       api.LMSSetValue.mock.calls
         .filter(([k]) => k === 'cmi.core.lesson_status')
-        .at(-1)?.[1];
+        .map(([, v]) => v);
+    const lastLessonStatus = () => lessonStatusWrites().at(-1);
 
     it('sets incomplete when completion is incomplete', async () => {
       adapter.setCompletionStatus('incomplete');
+      adapter.commit();
       await flush();
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.core.lesson_status',
@@ -361,6 +363,7 @@ describe('SCORM12Adapter', () => {
 
     it('sets completed when completion is complete', async () => {
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
       expect(api.LMSSetValue).toHaveBeenCalledWith(
         'cmi.core.lesson_status',
@@ -371,6 +374,7 @@ describe('SCORM12Adapter', () => {
     it('success status takes priority over completion', async () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('passed');
+      adapter.commit();
       await flush();
       expect(lastLessonStatus()).toBe('passed');
     });
@@ -378,22 +382,44 @@ describe('SCORM12Adapter', () => {
     it('holds failed at incomplete until the course completes', async () => {
       adapter.setSuccessStatus('failed');
       adapter.setCompletionStatus('incomplete');
+      adapter.commit();
       await flush();
       expect(lastLessonStatus()).toBe('incomplete');
 
       adapter.setCompletionStatus('complete');
+      adapter.commit();
       await flush();
       expect(lastLessonStatus()).toBe('failed');
     });
 
     it('releases a held failed once the verdict is final', async () => {
       adapter.setSuccessStatus('failed');
+      adapter.commit();
       await flush();
       expect(lastLessonStatus()).toBe('incomplete');
 
       adapter.setSuccessStatus('failed', true);
+      adapter.commit();
       await flush();
       expect(lastLessonStatus()).toBe('failed');
+    });
+
+    it('writes one combined lesson_status per commit', async () => {
+      adapter.setCompletionStatus('complete');
+      adapter.setSuccessStatus('failed');
+      adapter.commit();
+      await flush();
+      expect(lessonStatusWrites()).toEqual(['failed']);
+    });
+
+    it('skips a lesson_status equal to the last one written', async () => {
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      adapter.setScore(95);
+      adapter.setSuccessStatus('passed');
+      adapter.commit();
+      await flush();
+      expect(lessonStatusWrites()).toEqual(['passed']);
     });
   });
 

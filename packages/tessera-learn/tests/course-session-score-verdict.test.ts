@@ -53,7 +53,7 @@ describe('a graded submit that decides the verdict', () => {
     expect(verbs()).not.toContain('scored');
   });
 
-  it('sends the verdict once, not again from the success effect', async () => {
+  it('sends the verdict once when the score decides it', async () => {
     const setSuccessStatus = vi.fn();
     const progress = await start(stubAdapter({ setSuccessStatus }));
 
@@ -129,5 +129,48 @@ describe('a graded submit that decides the verdict', () => {
 
     expect(setExit).toHaveBeenCalledWith('normal');
     expect(saveState.mock.lastCall![0]).toMatchObject({ k: 1 });
+  });
+});
+
+describe('completion and a verdict that change in one tick', () => {
+  it('reach the LMS in one commit', async () => {
+    const calls: string[] = [];
+    const { progress } = await startSession({
+      config: createConfig({ success: { from: 'fixed', status: 'failed' } }),
+      manifest: createManifest(2),
+      adapter: stubAdapter({
+        setCompletionStatus: (status) => calls.push(`completion:${status}`),
+        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        commit: () => calls.push('commit'),
+      }),
+    });
+    progress.markVisited(0);
+    await flush();
+    calls.length = 0;
+
+    progress.markVisited(1);
+    await flush();
+
+    expect(calls).toEqual(['completion:complete', 'success:failed', 'commit']);
+  });
+});
+
+describe('a launch that is already complete', () => {
+  it('reports its status in one commit', async () => {
+    const calls: string[] = [];
+    await startSession({
+      config: createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 0 },
+      }),
+      manifest: createManifest(2),
+      adapter: stubAdapter({
+        setCompletionStatus: (status) => calls.push(`completion:${status}`),
+        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        commit: () => calls.push('commit'),
+      }),
+    });
+    await flush();
+
+    expect(calls).toEqual(['completion:complete', 'success:unknown', 'commit']);
   });
 });
