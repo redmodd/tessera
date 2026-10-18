@@ -664,6 +664,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       'fill-in',
       'matching',
     ]);
+    expect(answered[1].object?.definition?.correctResponsesPattern).toEqual([
+      'blue',
+    ]);
     for (const s of answered) {
       expect(String(s.object?.id)).toMatch(
         /^http:\/\/tessera\.test\/activity\/course-1#/,
@@ -1010,6 +1013,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'choice',
       'fill-in',
       'matching',
+    ]);
+    expect(answered[1].object?.definition?.correctResponsesPattern).toEqual([
+      'blue',
     ]);
 
     await finishFreeCourse(page);
