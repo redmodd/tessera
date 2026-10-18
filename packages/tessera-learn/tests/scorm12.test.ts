@@ -817,6 +817,76 @@ describe('SCORM12Adapter', () => {
       expect(v.type).toBe('fill-in');
     });
 
+    it('cuts a long response and drops an over-long correct answer', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const long = 'a'.repeat(254) + '😀b';
+      adapter.reportInteraction(
+        'lf2',
+        { type: 'long-fill-in', response: long, correct: [long] },
+        true,
+      );
+      await flush();
+      const v = interaction0();
+      expect(v.student_response).toBe('a'.repeat(254));
+      expect(v['correct_responses.0.pattern']).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /response of interaction "lf2".*at most 255; the LMS gets the first 254 characters\./,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/"lf2" has 1 correct answer\(s\) over the 255/),
+      );
+    });
+
+    it('drops over-long correct answers before taking the first 10', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const short = Array.from({ length: 11 }, (_, n) => `a${n}`);
+      adapter.reportInteraction(
+        'f3',
+        {
+          type: 'fill-in',
+          response: 'a0',
+          correct: ['x'.repeat(256), ...short],
+        },
+        true,
+      );
+      await flush();
+      const v = interaction0();
+      short.slice(0, 10).forEach((answer, n) => {
+        expect(v[`correct_responses.${n}.pattern`]).toBe(answer);
+      });
+      expect(v['correct_responses.10.pattern']).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"f3" has 1 correct answer(s) over the 255'),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"f3" has 11 correct answers but this export standard records at most 10',
+        ),
+      );
+    });
+
+    it('cuts a performance response on a whole step', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = Array.from(
+        { length: 40 },
+        (_, k) => [`s${k}`, 'value'],
+      );
+      adapter.reportInteraction(
+        'p1',
+        { type: 'performance', response: steps },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(
+        steps
+          .slice(0, 26)
+          .map(([s, v]) => `${s}.${v}`)
+          .join(','),
+      );
+    });
+
     it('maps other to fill-in', async () => {
       adapter.reportInteraction(
         'o1',

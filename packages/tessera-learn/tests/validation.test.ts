@@ -1794,6 +1794,19 @@ describe('question component validation', () => {
     writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', content);
   }
 
+  function writeStandardConfig(standard: string): void {
+    writeConfig(
+      testRoot,
+      `export default {
+  title: "Test",
+  navigation: { mode: "free" },
+  completion: { mode: "percentage" },
+  scoring: { passingScore: 70 },
+  export: { standard: "${standard}" },
+};`,
+    );
+  }
+
   it('errors when MultipleChoice is missing a required prop', () => {
     createValidProject(testRoot);
     writePage(
@@ -2061,16 +2074,7 @@ let a = {}; let b = {};</script>
 
   it('warns when a question id will be rewritten under SCORM 1.2', () => {
     createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
-};`,
-    );
+    writeStandardConfig('scorm12');
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
@@ -2085,16 +2089,7 @@ let a = {}; let b = {};</script>
 
   it('errors on a SCORM 1.2 sanitized id collision', () => {
     createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
-};`,
-    );
+    writeStandardConfig('scorm12');
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="q-1" question="A" options={["a", "b"]} correct={0} />
@@ -2132,16 +2127,7 @@ let a = {}; let b = {};</script>
     );
     const tooMany = (w: string) => w.includes('has 37 ');
     expect(validateProject(testRoot).warnings.filter(tooMany)).toHaveLength(0);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
-};`,
-    );
+    writeStandardConfig('scorm12');
     expect(validateProject(testRoot).warnings.filter(tooMany)).toEqual([
       expect.stringContaining(
         '<MultipleChoice> has 37 options but SCORM 1.2 records at most 36; any response or correct answer that uses one past the 36th',
@@ -2158,18 +2144,101 @@ let a = {}; let b = {};</script>
     ]);
   });
 
+  it.each([
+    ['web', null],
+    ['xapi', null],
+    ['cmi5', null],
+    [
+      'scorm2004',
+      '"q1" has 2 correct answer(s) over the 250 characters SCORM 2004 records',
+    ],
+    [
+      'scorm12',
+      '"q1" has 1 correct answer(s) over the 255 characters SCORM 1.2 records',
+    ],
+  ])('warns about over-long fill-in answers under %s', (standard, warning) => {
+    createValidProject(testRoot);
+    writeStandardConfig(standard);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers={["ok", "${'x'.repeat(251)}", "${'x'.repeat(256)}"]} />`,
+    );
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('<FillInTheBlank> "q1" has'),
+      ),
+    ).toEqual(warning ? [expect.stringContaining(warning)] : []);
+  });
+
+  it.each([
+    ['scorm2004', 'caseSensitive', 1],
+    ['scorm2004', 'caseSensitive="true"', 1],
+    ['scorm2004', 'caseSensitive={false}', 0],
+    ['scorm12', 'caseSensitive', 0],
+  ])(
+    'counts the case-sensitive prefix toward the fill-in cap under %s with %s',
+    (standard, attr, warnings) => {
+      createValidProject(testRoot);
+      writeStandardConfig(standard);
+      writePage(
+        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" ${attr} answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
+      );
+      expect(
+        validateProject(testRoot).warnings.filter((w) =>
+          w.includes('<FillInTheBlank> "q1" has 1 correct answer(s) over'),
+        ),
+      ).toHaveLength(warnings);
+    },
+  );
+
+  it.each([
+    ['web', null],
+    ['xapi', null],
+    ['cmi5', null],
+    [
+      'scorm2004',
+      '"q1" has 11 correct answers but SCORM 2004 records at most 10',
+    ],
+    ['scorm12', '"q1" has 11 correct answers but SCORM 1.2 records at most 10'],
+  ])(
+    'warns about fill-in answers past the count cap under %s',
+    (standard, warning) => {
+      createValidProject(testRoot);
+      writeStandardConfig(standard);
+      const answers = Array.from({ length: 11 }, (_, n) => `"a${n}"`);
+      writePage(
+        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers={[${answers}]} />
+<FillInTheBlank id="q2" question="Q" answers={[${answers.slice(1)}, "${'x'.repeat(256)}"]} />`,
+      );
+      expect(
+        validateProject(testRoot).warnings.filter((w) =>
+          w.includes('answers but'),
+        ),
+      ).toEqual(warning ? [expect.stringContaining(warning)] : []);
+    },
+  );
+
+  it('warns about a single fill-in answer string over 255 characters', () => {
+    createValidProject(testRoot);
+    writeStandardConfig('scorm12');
+    const long = 'x'.repeat(256);
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers="${long}" />
+<FillInTheBlank id="q2" question="Q" answers={"${long}"} />`,
+    );
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('has 1 correct answer(s) over the 255 characters'),
+      ),
+    ).toHaveLength(2);
+  });
+
   it('does not double-report a raw duplicate as a SCORM 1.2 collision', () => {
     createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "scorm12" },
-};`,
-    );
+    writeStandardConfig('scorm12');
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="q1" question="A" options={["a", "b"]} correct={0} />

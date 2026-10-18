@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SCORM2004Adapter } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
@@ -114,6 +114,70 @@ describe('SCORM2004Adapter against scorm-again', () => {
         expect(lms.raw.GetValue('cmi.interactions.0.type')).toBe(label);
       },
     );
+
+    it.each([
+      ['fill-in', 250],
+      ['long-fill-in', 4000],
+      ['other', 4000],
+    ] as const)(
+      'a %s response over %i characters is cut to fit',
+      async (type, max) => {
+        await start();
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const long = 'a'.repeat(max + 1);
+        const fits = 'b'.repeat(max - '{case_matters=true}'.length);
+        adapter.reportInteraction(
+          'q1',
+          {
+            type,
+            response: long,
+            correct: type === 'other' ? long : [long, fits + 'b', fits],
+            caseMatters: type === 'fill-in',
+          } as never,
+          true,
+        );
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          'a'.repeat(max),
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+        ).toBe(type === 'other' ? '0' : '1');
+      },
+    );
+
+    it('a performance step answer over 250 characters is cut to fit', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = [
+        ['s1', 'a'.repeat(251)],
+        ['s2', 'done'],
+      ];
+      adapter.reportInteraction(
+        'q1',
+        { type: 'performance', response: steps, correct: steps },
+        true,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+        `s1[.]${'a'.repeat(250)}[,]s2[.]done`,
+      );
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('0');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets its first 250 characters',
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"q1" has a correct step answer over the 250 characters',
+        ),
+      );
+    });
 
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
