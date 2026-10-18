@@ -23,6 +23,15 @@ function staticArray(prop: PropValue | undefined): unknown[] | null {
   return Array.isArray(value) ? value : null;
 }
 
+function staticList(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind === 'string') return [prop.value];
+  if (prop?.kind === 'bool') return [true];
+  if (prop?.kind === 'expr' && prop.raw === 'undefined') return [undefined];
+  const value = staticValue(prop);
+  if (value === undefined) return null;
+  return Array.isArray(value) ? value : [value];
+}
+
 function staticNumber(prop: PropValue | undefined): number | null {
   const value = staticValue(prop);
   return typeof value === 'number' ? value : null;
@@ -70,14 +79,15 @@ const QUESTION_COMPONENTS: Record<
   FillInTheBlank: {
     required: ['question', 'answers'],
     check(props, fileRel, d) {
-      const answers = staticArray(props.get('answers'));
+      const answers = staticList(props.get('answers'));
       if (answers) {
-        if (answers.length === 0) {
-          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
-        } else if (!isStringArray(answers)) {
+        if (!isStringArray(answers)) {
           d.error(
-            `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
+            `${fileRel}: <FillInTheBlank> answers must be a string or an array of strings`,
           );
+        } else if (answers.every((a) => a.trim() === '')) {
+          // A learner can't submit blank input, so no response could match.
+          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
         }
       }
     },
