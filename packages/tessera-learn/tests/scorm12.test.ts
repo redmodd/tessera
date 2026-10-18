@@ -839,6 +839,20 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it.each([
+      ['an emoji sequence', 252, '\u{1F469}\u200D\u{1F4BB}'],
+      ['a combining accent', 254, 'e\u0301'],
+    ])('keeps %s whole when cutting a response', async (_, n, tail) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'f4',
+        { type: 'fill-in', response: 'a'.repeat(n) + tail },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe('a'.repeat(n));
+    });
+
     it('drops over-long correct answers before taking the first 10', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const short = Array.from({ length: 11 }, (_, n) => `a${n}`);

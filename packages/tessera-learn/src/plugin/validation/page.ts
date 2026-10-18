@@ -39,7 +39,7 @@ import {
   type Diagnostics,
 } from './diagnostics.js';
 import { validateAssetRefs, validateMediaComponents } from './media.js';
-import { validateQuestionComponents } from './question.js';
+import { propMayBeTruthy, validateQuestionComponents } from './question.js';
 
 export interface PageInfo {
   fileRel: string;
@@ -188,7 +188,7 @@ function validatePageFile(
     declaresGraded &&
     !isQuiz &&
     !hasCustomWidget &&
-    !questionComponents.some(isGradedQuestion) &&
+    !questionComponents.some((q) => propMayBeTruthy(q, 'graded')) &&
     (useQuestions === 'absent' || useQuestions === 'none')
   ) {
     d.warn(
@@ -408,12 +408,6 @@ function hasLocalModuleImport(content: string): boolean {
     const file = from.slice(from.lastIndexOf('/') + 1);
     return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
   });
-}
-
-function isGradedQuestion({ props, hasSpread }: ComponentMatch): boolean {
-  if (hasSpread) return true;
-  const graded = props.get('graded');
-  return !!graded && !(graded.kind === 'expr' && graded.raw === 'false');
 }
 
 function splitsAcrossBranches(questions: ComponentMatch[]): boolean {

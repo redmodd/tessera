@@ -23,10 +23,15 @@ function staticValue(prop: PropValue | undefined): unknown {
   }
 }
 
-/** False only when the prop is absent or statically falsy. */
-function mayBeTruthy(prop: PropValue | undefined): boolean {
-  if (prop?.kind === 'string') return prop.value !== '';
-  if (prop?.kind !== 'expr') return prop !== undefined;
+/** False only when the prop is statically falsy, or absent with no spread to set it. */
+export function propMayBeTruthy(
+  { props, hasSpread }: ComponentMatch,
+  name: string,
+): boolean {
+  const prop = props.get(name);
+  if (prop === undefined) return hasSpread;
+  if (prop.kind === 'string') return prop.value !== '';
+  if (prop.kind !== 'expr') return true;
   if (prop.raw === 'undefined') return false;
   const value = staticValue(prop);
   return value === undefined || Boolean(value);
@@ -105,8 +110,8 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check({ props, hasSpread }, { fileRel, d, standard, id }) {
-      const answers = staticList(props.get('answers'));
+    check(match, { fileRel, d, standard, id }) {
+      const answers = staticList(match.props.get('answers'));
       if (answers) {
         if (!isStringArray(answers)) {
           d.error(
@@ -130,7 +135,7 @@ const QUESTION_COMPONENTS: Record<
           type: 'fill-in',
           response: '',
           correct: fillInAnswers(answers),
-          caseMatters: hasSpread || mayBeTruthy(props.get('caseSensitive')),
+          caseMatters: propMayBeTruthy(match, 'caseSensitive'),
         },
         standard.interactionFormat,
         standard.name,

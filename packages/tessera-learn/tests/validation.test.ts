@@ -2196,6 +2196,20 @@ let a = {}; let b = {};</script>
     ).toEqual(warning ? [expect.stringContaining(warning)] : []);
   });
 
+  it('skips the fill-in cap check for answers a later spread may replace', () => {
+    createValidProject(testRoot);
+    writeStandardConfig('scorm12');
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank answers={["${'x'.repeat(256)}"]} {...cfg} id="q1" question="Q" />`,
+    );
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('<FillInTheBlank> "q1" has'),
+      ),
+    ).toEqual([]);
+  });
+
   it.each([
     ['scorm2004', 'caseSensitive', 1],
     ['scorm2004', 'caseSensitive="true"', 1],
@@ -2205,6 +2219,7 @@ let a = {}; let b = {};</script>
     ['scorm2004', 'caseSensitive={strict}', 1],
     ['scorm2004', '{...cfg}', 1],
     ['scorm2004', 'caseSensitive={false} {...cfg}', 1],
+    ['scorm2004', '{...cfg} caseSensitive={false}', 0],
     ['scorm12', 'caseSensitive', 0],
   ])(
     'counts the case-sensitive prefix toward the fill-in cap under %s with %s',
@@ -2213,7 +2228,7 @@ let a = {}; let b = {};</script>
       writeStandardConfig(standard);
       writePage(
         `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank id="q1" question="Q" ${attr} answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
+<FillInTheBlank ${attr} id="q1" question="Q" answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
       );
       expect(
         validateProject(testRoot).warnings.filter((w) =>
@@ -2448,6 +2463,28 @@ export const pageConfig = { title: "Exam", graded: true };
   const settings = { graded: true };
 </script>
 <h1>Exam</h1>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('no question on the page is graded'),
+    );
+  });
+
+  it.each([
+    'graded=""',
+    'graded={0}',
+    'graded={undefined}',
+    '{...q} graded={false}',
+  ])('warns when the only question component has %s', (attr) => {
+    createValidProject(testRoot);
+    writePage(
+      `<script module>
+export const pageConfig = { title: "Exam", graded: true };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+</script>
+<MultipleChoice question="Q" options={["a", "b"]} correct={0} ${attr} />`,
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(

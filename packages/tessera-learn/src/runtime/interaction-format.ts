@@ -322,10 +322,19 @@ function hasLongStep(
   return steps.some(([, a]) => String(a).length > max);
 }
 
+/** Cuts on a character boundary, so an emoji or accented letter stays whole. */
 function cutText(value: string, max: number): string {
-  const cut = value.slice(0, max);
-  // Don't leave half of a surrogate pair (an emoji) at the end.
-  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  // Firefox before 125 has no Intl.Segmenter; there, only keep surrogate pairs whole.
+  if (typeof Intl.Segmenter !== 'function') {
+    const cut = value.slice(0, max);
+    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  }
+  let end = 0;
+  for (const { index, segment } of new Intl.Segmenter().segment(value)) {
+    if (index + segment.length > max) break;
+    end = index + segment.length;
+  }
+  return value.slice(0, end);
 }
 
 /**
