@@ -881,6 +881,17 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it('cuts a choice response on a whole id', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'c1',
+        { type: 'choice', response: ['a'.repeat(200), 'b'.repeat(200)] },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe('a'.repeat(200));
+    });
+
     it('cuts a performance response on a whole step', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const steps: Array<[string, string]> = Array.from(
@@ -902,7 +913,7 @@ describe('SCORM12Adapter', () => {
     });
 
     it('cuts the answer of a performance step too long to fit whole', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'p2',
         {
@@ -916,6 +927,42 @@ describe('SCORM12Adapter', () => {
       );
       await flush();
       expect(interaction0().student_response).toBe(`step_1.${'a'.repeat(248)}`);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"p2" is 319 characters'),
+      );
+    });
+
+    it('cuts on a whole step when step answers hold commas', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const steps: Array<[string, string]> = Array.from(
+        { length: 40 },
+        (_, k) => [`s${k}`, 'v, lu'],
+      );
+      adapter.reportInteraction(
+        'p3',
+        { type: 'performance', response: steps },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(
+        steps
+          .slice(0, 26)
+          .map(([s, v]) => `${s}.${v}`)
+          .join(','),
+      );
+    });
+
+    it('cuts the answer of a first step that holds a comma', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'p4',
+        { type: 'performance', response: [['s1', `left, ${'x'.repeat(300)}`]] },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(
+        `s1.left, ${'x'.repeat(246)}`,
+      );
     });
 
     it('maps other to fill-in', async () => {

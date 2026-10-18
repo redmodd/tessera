@@ -6,6 +6,7 @@ import {
   fitPatterns,
   SCORM12_INTERACTION_FORMAT,
   SCORM2004_INTERACTION_FORMAT,
+  XAPI_INTERACTION_FORMAT,
 } from '../src/runtime/interaction-format.js';
 
 const choice: Interaction = {
@@ -32,18 +33,37 @@ describe('encodesOptionIndex', () => {
     expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
   });
 
-  it('slugs performance steps and values on SCORM 1.2', () => {
+  it('slugs performance step names but keeps answers as written on SCORM 1.2', () => {
     const performance: Interaction = {
       type: 'performance',
-      response: [['step 1', 3.5]],
-      correct: [['step 1', 'done!']],
+      response: [
+        ['Step 1', 'turn left'],
+        ['angle', -3.5],
+      ],
+      correct: [['Step 1', 'done!']],
     };
     expect(formatResponse(performance, SCORM12_INTERACTION_FORMAT)).toBe(
-      'step_1.3_5',
+      'Step_1.turn left,angle.-3.5',
     );
     expect(
       formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
-    ).toEqual(['step_1.done']);
+    ).toEqual(['Step_1.done!']);
+  });
+
+  it.each([
+    ['SCORM 2004', SCORM2004_INTERACTION_FORMAT],
+    ['xAPI', XAPI_INTERACTION_FORMAT],
+  ])('keeps performance step names and answers as written on %s', (_, fmt) => {
+    const performance: Interaction = {
+      type: 'performance',
+      response: [
+        ['Step 1', 'turn left'],
+        ['angle', -3.5],
+      ],
+    };
+    expect(formatResponse(performance, fmt)).toBe(
+      'Step 1[.]turn left[,]angle[.]-3.5',
+    );
   });
 });
 
@@ -65,4 +85,17 @@ describe('fitPatterns', () => {
       expect(warnings[0].includes('counting the')).toBe(credited);
     },
   );
+
+  it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [],
+      correct: [['s', 'x'.repeat(260)]],
+    };
+    const { kept, warnings } = fitPatterns(i, SCORM12_INTERACTION_FORMAT);
+    expect(kept).toEqual([]);
+    expect(warnings).toEqual([
+      expect.stringContaining('1 correct answer(s) over the 255 characters'),
+    ]);
+  });
 });
