@@ -68,4 +68,17 @@ describe('fitPatterns', () => {
       expect(warnings[0].includes('counting the')).toBe(credited);
     },
   );
+
+  it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [],
+      correct: [['s', 'x'.repeat(260)]],
+    };
+    const { kept, warnings } = fitPatterns(i, SCORM12_INTERACTION_FORMAT);
+    expect(kept).toEqual([]);
+    expect(warnings).toEqual([
+      expect.stringContaining('1 correct answer(s) over the 255 characters'),
+    ]);
+  });
 });

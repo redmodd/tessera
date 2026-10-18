@@ -132,46 +132,31 @@ function encodeListItem(
   return idx.toString(36);
 }
 
-function encodeIds(
-  values: string[],
-  options: string[] | undefined,
-  fmt: InteractionFormat,
-): string {
-  return values.map((v) => encodeListItem(v, options, fmt)).join(fmt.itemDelim);
-}
-
-function encodePairs(
-  pairs: Array<[string, string]>,
+function encodePair(
+  [l, r]: [string, string],
   optionPairs: { left: string[]; right: string[] } | undefined,
   fmt: InteractionFormat,
 ): string {
-  return pairs
-    .map(
-      ([l, r]) =>
-        `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`,
-    )
-    .join(fmt.itemDelim);
+  return `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`;
 }
 
 /** Step names are identifiers; step answers are free text, kept as written. */
-function encodeSteps(
-  steps: Array<[string, string | number]>,
+function encodeStep(
+  [step, a]: [string, string | number],
   fmt: InteractionFormat,
 ): string {
-  return steps
-    .map(([step, a]) => `${fmt.identifier(step)}${fmt.pairDelim}${a}`)
-    .join(fmt.itemDelim);
+  return `${fmt.identifier(step)}${fmt.pairDelim}${a}`;
 }
 
-/** Throws when SCORM 1.2 cannot encode an option. */
-export function formatResponse(
+/** A list response comes back as its encoded items, not yet joined. */
+function encodeResponse(
   i: Interaction,
-  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
-): string {
+  fmt: InteractionFormat,
+): string | string[] {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return encodeIds(i.response, i.options, fmt);
+      return i.response.map((v) => encodeListItem(v, i.options, fmt));
     case 'true-false':
       return fmt.formatBoolean(i.response);
     case 'fill-in':
@@ -180,12 +165,21 @@ export function formatResponse(
     case 'other':
       return i.response;
     case 'matching':
-      return encodePairs(i.response, i.optionPairs, fmt);
+      return i.response.map((p) => encodePair(p, i.optionPairs, fmt));
     case 'numeric':
       return String(i.response);
     case 'performance':
-      return encodeSteps(i.response, fmt);
+      return i.response.map((s) => encodeStep(s, fmt));
   }
+}
+
+/** Throws when SCORM 1.2 cannot encode an option. */
+export function formatResponse(
+  i: Interaction,
+  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
+): string {
+  const encoded = encodeResponse(i, fmt);
+  return typeof encoded === 'string' ? encoded : encoded.join(fmt.itemDelim);
 }
 
 /**
@@ -200,7 +194,11 @@ export function formatCorrectPattern(
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return [encodeIds(i.correct as string[], i.options, fmt)];
+      return [
+        (i.correct as string[])
+          .map((v) => encodeListItem(v, i.options, fmt))
+          .join(fmt.itemDelim),
+      ];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
@@ -212,7 +210,9 @@ export function formatCorrectPattern(
     }
     case 'matching':
       return [
-        encodePairs(i.correct as Array<[string, string]>, i.optionPairs, fmt),
+        (i.correct as Array<[string, string]>)
+          .map((p) => encodePair(p, i.optionPairs, fmt))
+          .join(fmt.itemDelim),
       ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
@@ -229,7 +229,11 @@ export function formatCorrectPattern(
     case 'other':
       return [i.correct as string];
     case 'performance':
-      return [encodeSteps(i.correct as Array<[string, string | number]>, fmt)];
+      return [
+        (i.correct as Array<[string, string | number]>)
+          .map((s) => encodeStep(s, fmt))
+          .join(fmt.itemDelim),
+      ];
   }
 }
 
@@ -327,23 +331,17 @@ function hasLongStep(
 }
 
 /**
- * Length of the whole steps that fit in `max`, or -1 when none do. A step
- * answer can hold the item delimiter, so this can't search the joined value.
+ * The leading items that fit whole in `max`, joined. Walks the items rather
+ * than searching the joined value, since an item can hold the delimiter.
  */
-function wholeStepsEnd(
-  steps: Array<[string, string | number]>,
-  fmt: InteractionFormat,
-  max: number,
-): number {
-  let end = -1;
-  let next = 0;
-  for (const step of steps) {
-    next += encodeSteps([step], fmt).length;
-    if (next > max) break;
-    end = next;
-    next += fmt.itemDelim.length;
+function wholeItems(items: string[], delim: string, max: number): string {
+  let kept = '';
+  for (const [k, item] of items.entries()) {
+    const next = k ? `${kept}${delim}${item}` : item;
+    if (next.length > max) break;
+    kept = next;
   }
-  return end;
+  return kept;
 }
 
 /** Cuts on a character boundary, so an emoji or accented letter stays whole. */
@@ -385,17 +383,17 @@ function fitResponse(
       ]),
     };
   }
-  const value = formatResponse(i, fmt);
+  const encoded = encodeResponse(i, fmt);
+  const value =
+    typeof encoded === 'string' ? encoded : encoded.join(fmt.itemDelim);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
   const whole =
-    i.type === 'performance'
-      ? wholeStepsEnd(i.response, fmt, max)
-      : value.lastIndexOf(fmt.itemDelim, max);
+    typeof encoded === 'string' ? '' : wholeItems(encoded, fmt.itemDelim, max);
   const cut =
-    !Array.isArray(i.response) || (whole < 0 && i.type === 'performance')
+    typeof encoded === 'string' || (!whole && i.type === 'performance')
       ? cutText(value, max)
-      : value.slice(0, Math.max(whole, 0));
+      : whole;
   console.warn(
     `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
   );

@@ -881,6 +881,17 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it('cuts a choice response on a whole id', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'c1',
+        { type: 'choice', response: ['a'.repeat(200), 'b'.repeat(200)] },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe('a'.repeat(200));
+    });
+
     it('cuts a performance response on a whole step', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const steps: Array<[string, string]> = Array.from(
