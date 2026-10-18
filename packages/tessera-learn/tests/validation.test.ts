@@ -2200,6 +2200,7 @@ let a = {}; let b = {};</script>
     ['scorm2004', 'caseSensitive', 1],
     ['scorm2004', 'caseSensitive="true"', 1],
     ['scorm2004', 'caseSensitive={false}', 0],
+    ['scorm2004', 'caseSensitive={strict}', 1],
     ['scorm12', 'caseSensitive', 0],
   ])(
     'counts the case-sensitive prefix toward the fill-in cap under %s with %s',
@@ -2236,7 +2237,8 @@ let a = {}; let b = {};</script>
       writePage(
         `<script>import { FillInTheBlank } from 'tessera-learn';</script>
 <FillInTheBlank id="q1" question="Q" answers={[${answers}]} />
-<FillInTheBlank id="q2" question="Q" answers={[${answers.slice(1)}, "${'x'.repeat(256)}"]} />`,
+<FillInTheBlank id="q2" question="Q" answers={[${answers.slice(1)}, "${'x'.repeat(256)}"]} />
+<FillInTheBlank id="q3" question="Q" answers={[${answers.slice(1)}, ""]} />`,
       );
       expect(
         validateProject(testRoot).warnings.filter((w) =>

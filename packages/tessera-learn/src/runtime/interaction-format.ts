@@ -105,6 +105,8 @@ export function shortIdentifier(value: string): string {
 
 export const SCORM12_MAX_OPTIONS = 36;
 
+const CASE_PREFIX = '{case_matters=true}';
+
 /** An id SCORM 1.2 cannot record as a one-character option index. */
 class UnencodableOptionError extends Error {}
 
@@ -195,7 +197,7 @@ export function formatCorrectPattern(
     case 'long-fill-in': {
       const alternatives = i.correct as string[];
       if (!fmt.supportsCasePrefix) return alternatives;
-      const prefix = i.caseMatters ? '{case_matters=true}' : '';
+      const prefix = i.caseMatters ? CASE_PREFIX : '';
       return alternatives.map((a) => prefix + a);
     }
     case 'matching':
@@ -278,9 +280,14 @@ export function fitPatterns(
   // Counts a `{case_matters=true}` prefix too, as scorm-again does.
   let fit = patterns.filter((p) => p.length <= max);
   if (fit.length < patterns.length) {
+    const prefixed =
+      'caseMatters' in i && i.caseMatters && fmt.supportsCasePrefix;
     const prefix =
-      'caseMatters' in i && i.caseMatters && fmt.supportsCasePrefix
-        ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
+      prefixed &&
+      patterns.some(
+        (p) => p.length > max && p.length - CASE_PREFIX.length <= max,
+      )
+        ? `, counting the ${CASE_PREFIX} prefix of a case-sensitive answer`
         : '';
     warnings.push(
       `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records${prefix}; they are ${lost}`,

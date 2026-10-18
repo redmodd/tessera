@@ -6,7 +6,6 @@ import {
   SCORM12_MAX_OPTIONS,
   fitPatterns,
   formatCorrectPattern,
-  type InteractionFormat,
 } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
 import type { QuestionComponentName } from '../../components/util.js';
@@ -22,11 +21,12 @@ function staticValue(prop: PropValue | undefined): unknown {
   }
 }
 
-/** The prop's truthiness at runtime, or false when it is not static. */
-function staticTruthy(prop: PropValue | undefined): boolean {
-  if (prop?.kind === 'bool') return true;
+/** False only when the prop is absent or statically falsy. */
+function mayBeTruthy(prop: PropValue | undefined): boolean {
   if (prop?.kind === 'string') return prop.value !== '';
-  return Boolean(staticValue(prop));
+  if (prop?.kind !== 'expr') return prop !== undefined;
+  const value = staticValue(prop);
+  return value === undefined || Boolean(value);
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
@@ -50,10 +50,10 @@ function staticNumber(prop: PropValue | undefined): number | null {
 }
 
 /** An export standard that records interactions in the LMS. */
-interface RecordingStandard {
-  name: string;
-  format: InteractionFormat;
-}
+type RecordingStandard = Extract<
+  StandardProfile,
+  { interactionFormat: unknown }
+>;
 
 interface QuestionComponentRule {
   required: string[];
@@ -122,15 +122,16 @@ const QUESTION_COMPONENTS: Record<
         }
       }
       if (!standard) return;
-      const { format } = standard;
+      const format = standard.interactionFormat;
       const correct = (answers ?? [])
         .filter((a) => typeof a === 'string')
-        .map((a) => a.trim());
+        .map((a) => a.trim())
+        .filter((a) => a !== '');
       const interaction = {
         type: 'fill-in' as const,
         response: '',
         correct,
-        caseMatters: staticTruthy(props.get('caseSensitive')),
+        caseMatters: mayBeTruthy(props.get('caseSensitive')),
       };
       const { warnings } = fitPatterns(
         interaction,
@@ -202,9 +203,7 @@ export function validateQuestionComponents(
   profile: StandardProfile | undefined,
 ): void {
   const standard =
-    profile && 'interactionFormat' in profile
-      ? { name: profile.name, format: profile.interactionFormat }
-      : undefined;
+    profile && 'interactionFormat' in profile ? profile : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
   for (const match of components) {
@@ -243,7 +242,7 @@ export function validateQuestionComponents(
         // The standard's identifier rules can rewrite ids, so distinct raw ids
         // can collide after sanitization. Skip raw duplicates (already flagged
         // above) to avoid double-reporting the same id.
-        const sane = standard.format.identifier(resolvedId);
+        const sane = standard.interactionFormat.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
             `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only letters and digits (underscores only between them)`,
@@ -273,7 +272,7 @@ export function validateQuestionComponents(
       }
     }
 
-    if (standard?.format.encodesOptionIndex) {
+    if (standard?.interactionFormat.encodesOptionIndex) {
       for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > SCORM12_MAX_OPTIONS) {
