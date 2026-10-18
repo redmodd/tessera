@@ -348,16 +348,6 @@ export class CourseSession {
     });
   }
 
-  #reportSuccess(): void {
-    const progress = this.#progress;
-    this.#prevSuccessStatus = progress.successStatus;
-    this.#prevVerdictFinal = progress.verdictFinal;
-    this.#adapter.setSuccessStatus(
-      this.#prevSuccessStatus,
-      this.#prevVerdictFinal,
-    );
-  }
-
   #reportChanges(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
@@ -383,7 +373,11 @@ export class CourseSession {
       }
       // With every score, so a verdict the score decides carries it and
       // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-      if (scoreChanged || successChanged) this.#reportSuccess();
+      if (scoreChanged || successChanged) {
+        this.#prevSuccessStatus = success;
+        this.#prevVerdictFinal = final;
+        adapter.setSuccessStatus(success, final);
+      }
     });
   }
 
