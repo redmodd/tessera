@@ -38,6 +38,8 @@ export interface InteractionFormat {
   maxStepAnswerLength: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
+  /** Ids inside a response: list items, matching ids, step names, likert. */
+  responseId(value: string): string;
 }
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
@@ -53,6 +55,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   maxStepAnswerLength: Infinity,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
+  responseId: shortIdentifier,
 };
 
 /**
@@ -82,6 +85,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   maxStepAnswerLength: 250,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
+  responseId: uriIdentifier,
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
@@ -90,6 +94,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
+  responseId: (v) => v,
 };
 
 /**
@@ -101,6 +106,16 @@ export function shortIdentifier(value: string): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const trimmed = cleaned.slice(0, 250);
   return trimmed || '_';
+}
+
+/**
+ * SCORM 2004 `short_identifier_type` is URI text, so percent-encoding keeps
+ * distinct ids distinct. scorm-again also refuses `~`. The 250-character cut
+ * never splits an escape.
+ */
+function uriIdentifier(value: string): string {
+  const encoded = encodeURIComponent(value).replace(/~/g, '%7E');
+  return encoded.slice(0, 250).replace(/%.?$/, '');
 }
 
 export const SCORM12_MAX_OPTIONS = 36;
@@ -119,7 +134,7 @@ function encodeListItem(
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  if (!fmt.encodesOptionIndex || !options) return fmt.identifier(value);
+  if (!fmt.encodesOptionIndex || !options) return fmt.responseId(value);
   const idx = options.indexOf(value);
   if (idx < 0) {
     throw new UnencodableOptionError(`"${value}" is not in its options`);
@@ -145,7 +160,7 @@ function encodeStep(
   [step, a]: [string, string | number],
   fmt: InteractionFormat,
 ): string {
-  return `${fmt.identifier(step)}${fmt.pairDelim}${a}`;
+  return `${fmt.responseId(step)}${fmt.pairDelim}${a}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -187,9 +202,10 @@ export function formatResponse(
       return fmt.formatBoolean(i.response);
     case 'fill-in':
     case 'long-fill-in':
-    case 'likert':
     case 'other':
       return i.response;
+    case 'likert':
+      return fmt.responseId(i.response);
     case 'numeric':
       return String(i.response);
   }
@@ -227,6 +243,7 @@ export function formatCorrectPattern(
       return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
     case 'likert':
+      return [fmt.responseId(i.correct as string)];
     case 'other':
       return [i.correct as string];
   }
@@ -261,6 +278,44 @@ function idsWithoutOptions(i: Interaction): string[] {
       return i.optionPairs ? [] : [...i.response, ...(i.correct ?? [])].flat();
     default:
       return [];
+  }
+}
+
+/** Ids recorded through `responseId`, grouped so ids in one group must stay distinct. */
+function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
+  switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+      return fmt.encodesOptionIndex && i.options
+        ? []
+        : [[...i.response, ...(i.correct ?? [])]];
+    case 'matching': {
+      if (fmt.encodesOptionIndex && i.optionPairs) return [];
+      const pairs = [...i.response, ...(i.correct ?? [])];
+      return [pairs.map(([l]) => l), pairs.map(([, r]) => r)];
+    }
+    case 'performance':
+      return [[...i.response, ...(i.correct ?? [])].map(([step]) => step)];
+    case 'likert':
+      return [[i.response, i.correct ?? i.response]];
+    default:
+      return [];
+  }
+}
+
+/** Two distinct ids that record as the same id, and that id. */
+function mergedIds(
+  i: Interaction,
+  fmt: InteractionFormat,
+): [string, string, string] | undefined {
+  for (const ids of responseIdGroups(i, fmt)) {
+    const seen = new Map<string, string>();
+    for (const id of ids) {
+      const recorded = fmt.responseId(id);
+      const first = seen.get(recorded) ?? id;
+      if (first !== id) return [first, id, recorded];
+      seen.set(recorded, id);
+    }
   }
 }
 
@@ -402,13 +457,20 @@ export function buildScormInteractionFields(
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   if (spec.format.encodesOptionIndex) {
     const invalid = idsWithoutOptions(interaction).find(
-      (id) => !/^[0-9a-z]$/.test(spec.format.identifier(id)),
+      (id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)),
     );
     if (invalid !== undefined) {
       console.warn(
         `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
       );
     }
+  }
+  const merged = mergedIds(interaction, spec.format);
+  if (merged) {
+    const [a, b, recorded] = merged;
+    console.warn(
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
+    );
   }
   const recordable = <T>(field: string, format: () => T): T | null => {
     try {

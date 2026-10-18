@@ -50,10 +50,7 @@ describe('encodesOptionIndex', () => {
     ).toEqual(['Step_1.done!']);
   });
 
-  it.each([
-    ['SCORM 2004', SCORM2004_INTERACTION_FORMAT],
-    ['xAPI', XAPI_INTERACTION_FORMAT],
-  ])('keeps performance step names and answers as written on %s', (_, fmt) => {
+  it('percent-encodes performance step names but keeps answers as written on SCORM 2004', () => {
     const performance: Interaction = {
       type: 'performance',
       response: [
@@ -61,9 +58,66 @@ describe('encodesOptionIndex', () => {
         ['angle', -3.5],
       ],
     };
-    expect(formatResponse(performance, fmt)).toBe(
-      'Step 1[.]turn left[,]angle[.]-3.5',
+    expect(formatResponse(performance, SCORM2004_INTERACTION_FORMAT)).toBe(
+      'Step%201[.]turn left[,]angle[.]-3.5',
     );
+  });
+
+  it('keeps performance step names and answers as written on xAPI', () => {
+    const performance: Interaction = {
+      type: 'performance',
+      response: [['Step 1', 'turn left']],
+    };
+    expect(formatResponse(performance, XAPI_INTERACTION_FORMAT)).toBe(
+      'Step 1[.]turn left',
+    );
+  });
+});
+
+describe('SCORM 2004 ids inside a response', () => {
+  const fmt = SCORM2004_INTERACTION_FORMAT;
+
+  it.each([
+    ['Strongly agree', 'Strongly%20agree'],
+    ['step-one_(a)', 'step-one_(a)'],
+    ['a[,]b~c', 'a%5B%2C%5Db%7Ec'],
+    ['café', 'caf%C3%A9'],
+  ])('records %s as %s', (id, recorded) => {
+    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+      recorded,
+    );
+  });
+
+  it('encodes every list type and the likert correct answer', () => {
+    expect(
+      formatResponse({ type: 'choice', response: ['New York', 'Paris'] }, fmt),
+    ).toBe('New%20York[,]Paris');
+    expect(
+      formatResponse(
+        { type: 'matching', response: [['New York', 'USA']] },
+        fmt,
+      ),
+    ).toBe('New%20York[.]USA');
+    expect(
+      formatResponse(
+        { type: 'sequencing', response: ['step one', 'step two'] },
+        fmt,
+      ),
+    ).toBe('step%20one[,]step%20two');
+    expect(
+      formatCorrectPattern(
+        { type: 'likert', response: 'x', correct: 'Strongly agree' },
+        fmt,
+      ),
+    ).toEqual(['Strongly%20agree']);
+  });
+
+  it('cuts an id to 250 characters without splitting an escape', () => {
+    const recorded = formatResponse(
+      { type: 'likert', response: 'a'.repeat(248) + ' b' },
+      fmt,
+    );
+    expect(recorded).toBe('a'.repeat(248));
   });
 });
 

@@ -774,6 +774,42 @@ describe('SCORM12Adapter', () => {
       );
     });
 
+    it('warns when two step names record as one id', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'route',
+        {
+          type: 'performance',
+          response: [
+            ['a b', 'x'],
+            ['a-b', 'y'],
+          ],
+        },
+        null,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ student_response: 'a_b.x,a_b.y' });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'interaction "route" records the ids "a b" and "a-b" both as "a_b"',
+        ),
+      );
+    });
+
+    it('does not warn when a matching left id and right id record the same', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'm1',
+        { type: 'matching', response: [['a b', 'a-b']] },
+        null,
+      );
+      await flush();
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('records the ids'),
+      );
+    });
+
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {
       adapter.reportInteraction(
         'n1',

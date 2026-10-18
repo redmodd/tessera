@@ -180,6 +180,59 @@ describe('SCORM2004Adapter against scorm-again', () => {
       );
     });
 
+    it.each([
+      [
+        'likert',
+        {
+          type: 'likert',
+          response: 'Strongly agree',
+          correct: 'Strongly agree',
+        },
+        'Strongly%20agree',
+      ],
+      [
+        'matching',
+        {
+          type: 'matching',
+          response: [['New York', 'USA']],
+          correct: [['New York', 'USA']],
+        },
+        'New%20York[.]USA',
+      ],
+      [
+        'sequencing',
+        {
+          type: 'sequencing',
+          response: ['step one', 'step two'],
+          correct: ['step one', 'step two'],
+        },
+        'step%20one[,]step%20two',
+      ],
+      [
+        'performance',
+        {
+          type: 'performance',
+          response: [['step one', 'all done']],
+          correct: [['step one', 'all done']],
+        },
+        'step%20one[.]all done',
+      ],
+    ] as const)(
+      'records %s ids with spaces so the data model accepts them',
+      async (_label, interaction, recorded) => {
+        await start();
+        adapter.reportInteraction('q1', interaction as never, true);
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          recorded,
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+        ).toBe(recorded);
+      },
+    );
+
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {
       it.each([
         [
