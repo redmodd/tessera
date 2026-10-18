@@ -45,10 +45,10 @@ export interface InteractionFormat {
   keepsUnnamedStep: boolean;
   /**
    * SCORM 2004 rejects a list with no items (an empty correct choice aside),
-   * a fill-in response of more than 10 `[,]`-separated parts, a step with neither name nor
-   * answer, a step answer holding `[,]`, `[.]` or `[:]` (a correct `min[:]max`
-   * range aside), and a correct pattern that repeats an item or has an item
-   * starting or ending in whitespace.
+   * a fill-in value of more than 10 `[,]`-separated parts, a step with neither
+   * name nor answer, a step answer holding `[,]`, `[.]` or `[:]` (a correct
+   * `min[:]max` range aside), and a correct pattern that repeats an item or has
+   * an item starting or ending in whitespace.
    */
   strictGrammar: boolean;
   formatBoolean(value: boolean): string;
@@ -210,6 +210,7 @@ function stepName(step: string, fmt: InteractionFormat): string {
 }
 
 const STEP_DELIM = /\[[,.:]\]/;
+const MAX_FILL_IN_PARTS = 10;
 const NUMERIC_RANGE = /^(-?\d+(\.\d+)?)?\[:\](-?\d+(\.\d+)?)?$/;
 
 /** Step names are identifiers; step answers are free text, kept as written. */
@@ -301,9 +302,9 @@ export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
       return fmt.formatBoolean(i.response);
     case 'fill-in': {
       const parts = i.response.split(fmt.itemDelim).length;
-      if (fmt.strictGrammar && parts > fmt.fillInLimit) {
+      if (fmt.strictGrammar && parts > MAX_FILL_IN_PARTS) {
         throw new UnrecordableError(
-          `it has ${parts} [,]-separated parts, more than the ${fmt.fillInLimit} this export standard records`,
+          `it has ${parts} [,]-separated parts, more than the ${MAX_FILL_IN_PARTS} this export standard records`,
         );
       }
       return i.response;
@@ -476,6 +477,13 @@ export function fitPatterns(
       (it) => new Set(it).size < it.length,
       `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`,
     );
+    if (i.type === 'fill-in') {
+      patterns = drop(
+        patterns,
+        (it) => it.length > MAX_FILL_IN_PARTS,
+        `with more than ${MAX_FILL_IN_PARTS} [,]-separated parts`,
+      );
+    }
   }
   const max = fmt.maxValueLength(i.type);
   const limit =

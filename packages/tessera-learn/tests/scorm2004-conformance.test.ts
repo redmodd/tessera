@@ -380,6 +380,13 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'has 11 [,]-separated parts, more than the 10',
       ],
       [
+        'a fill-in answer of 11 parts',
+        { type: 'fill-in', response: 'a', correct: [ids(11).join('[,]')] },
+        'a',
+        '',
+        'more than 10 [,]-separated parts',
+      ],
+      [
         '36 sequence items',
         { type: 'sequencing', response: ids(36), correct: ids(36) },
         ids(36).join('[,]'),

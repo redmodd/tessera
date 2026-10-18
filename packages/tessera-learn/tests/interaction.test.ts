@@ -286,6 +286,29 @@ describe('isCorrect', () => {
         }),
       ).toBe(false);
     });
+
+    it('matches a repeated unnamed step', () => {
+      const steps: Array<[string, string]> = [
+        ['', 'x'],
+        ['', 'x'],
+      ];
+      expect(
+        isCorrect({ type: 'performance', response: steps, correct: steps }),
+      ).toBe(true);
+    });
+
+    it('fails when the response skips a repeat of a correct step', () => {
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [['step-a', 2]],
+          correct: [
+            ['step-a', 1],
+            ['step-a', 2],
+          ],
+        }),
+      ).toBe(false);
+    });
   });
 
   describe('other', () => {
