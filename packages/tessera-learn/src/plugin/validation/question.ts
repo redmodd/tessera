@@ -1,9 +1,10 @@
 import JSON5 from 'json5';
 import { staticQuestionId } from '../manifest.js';
-import { isLiteralTrue, type ComponentMatch, type PropValue } from '../ast.js';
+import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
   SCORM12_MAX_OPTIONS,
+  fitPatterns,
   formatCorrectPattern,
   type InteractionFormat,
 } from '../../runtime/interaction-format.js';
@@ -19,6 +20,13 @@ function staticValue(prop: PropValue | undefined): unknown {
   } catch {
     return undefined;
   }
+}
+
+/** The prop's truthiness at runtime, or false when it is not static. */
+function staticTruthy(prop: PropValue | undefined): boolean {
+  if (prop?.kind === 'bool') return true;
+  if (prop?.kind === 'string') return prop.value !== '';
+  return Boolean(staticValue(prop));
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
@@ -98,7 +106,6 @@ const QUESTION_COMPONENTS: Record<
       }
       if (!standard) return;
       const { format } = standard;
-      const max = format.maxValueLength('fill-in');
       const value =
         answersProp?.kind === 'string'
           ? answersProp.value
@@ -108,19 +115,29 @@ const QUESTION_COMPONENTS: Record<
         .filter((a) => typeof a === 'string')
         .map((a) => a.trim());
       const caseMatters =
-        format.supportsCasePrefix && isLiteralTrue(props.get('caseSensitive'));
-      const patterns =
-        formatCorrectPattern(
-          { type: 'fill-in', response: '', correct, caseMatters },
-          format,
-        ) ?? [];
-      const long = patterns.filter((p) => p.length > max).length;
-      if (long > 0) {
+        format.supportsCasePrefix && staticTruthy(props.get('caseSensitive'));
+      const interaction = {
+        type: 'fill-in' as const,
+        response: '',
+        correct,
+        caseMatters,
+      };
+      const { tooLong, fitting, max, limit } = fitPatterns(
+        interaction,
+        formatCorrectPattern(interaction, format) ?? [],
+        format,
+      );
+      if (tooLong > 0) {
         const prefix = caseMatters
           ? ', counting the {case_matters=true} prefix of a case-sensitive answer'
           : '';
         d.warn(
-          `${fileRel}: <FillInTheBlank> has ${long} answer(s) over the ${max} characters ${standard.name} records${prefix}; they are graded but left out of the LMS record`,
+          `${fileRel}: <FillInTheBlank> has ${tooLong} answer(s) over the ${max} characters ${standard.name} records${prefix}; they are graded but left out of the LMS record`,
+        );
+      }
+      if (fitting > limit) {
+        d.warn(
+          `${fileRel}: <FillInTheBlank> has ${fitting} answers but ${standard.name} records at most ${limit}; the rest are graded but left out of the LMS record`,
         );
       }
     },
@@ -229,7 +246,7 @@ export function validateQuestionComponents(
         const sane = standard.format.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name} — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {

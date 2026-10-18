@@ -2165,22 +2165,49 @@ let a = {}; let b = {};</script>
   });
 
   it.each([
-    ['scorm2004', 1],
-    ['scorm12', 0],
+    ['scorm2004', 'caseSensitive', 1],
+    ['scorm2004', 'caseSensitive="true"', 1],
+    ['scorm2004', 'caseSensitive={false}', 0],
+    ['scorm12', 'caseSensitive', 0],
   ])(
-    'counts the case-sensitive prefix toward the fill-in cap under %s',
-    (standard, warnings) => {
+    'counts the case-sensitive prefix toward the fill-in cap under %s with %s',
+    (standard, attr, warnings) => {
       createValidProject(testRoot);
       writeStandardConfig(standard);
       writePage(
         `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank id="q1" question="Q" caseSensitive answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
+<FillInTheBlank id="q1" question="Q" ${attr} answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
       );
       expect(
         validateProject(testRoot).warnings.filter((w) =>
           w.includes('<FillInTheBlank> has 1 answer(s) over'),
         ),
       ).toHaveLength(warnings);
+    },
+  );
+
+  it.each([
+    ['web', null],
+    ['xapi', null],
+    ['cmi5', null],
+    ['scorm2004', '11 answers but SCORM 2004 records at most 10'],
+    ['scorm12', '11 answers but SCORM 1.2 records at most 10'],
+  ])(
+    'warns about fill-in answers past the count cap under %s',
+    (standard, warning) => {
+      createValidProject(testRoot);
+      writeStandardConfig(standard);
+      const answers = Array.from({ length: 11 }, (_, n) => `"a${n}"`);
+      writePage(
+        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers={[${answers}]} />
+<FillInTheBlank id="q2" question="Q" answers={[${answers.slice(1)}, "${'x'.repeat(256)}"]} />`,
+      );
+      expect(
+        validateProject(testRoot).warnings.filter((w) =>
+          w.includes('answers but'),
+        ),
+      ).toEqual(warning ? [expect.stringContaining(warning)] : []);
     },
   );
 

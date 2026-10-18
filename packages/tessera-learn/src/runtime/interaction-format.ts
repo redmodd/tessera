@@ -258,28 +258,29 @@ function idsWithoutOptions(i: Interaction): string[] {
  * Drops correct answers over the format's length cap, since a shortened
  * pattern matches nothing, then keeps the first ones up to its count cap.
  */
-function fitPatterns(
-  questionId: string,
+export function fitPatterns(
   i: Interaction,
   patterns: string[],
   fmt: InteractionFormat,
-): string[] {
+): {
+  kept: string[];
+  tooLong: number;
+  fitting: number;
+  max: number;
+  limit: number;
+} {
   const max = fmt.maxValueLength(i.type);
-  // Counts a `{case_matters=true}` prefix too, as scorm-again does.
-  const fit = patterns.filter((p) => p.length <= max);
-  if (fit.length < patterns.length) {
-    console.warn(
-      `Tessera: interaction "${questionId}" has ${patterns.length - fit.length} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
-    );
-  }
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  if (fit.length > limit) {
-    console.warn(
-      `Tessera: interaction "${questionId}" has ${fit.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
-    );
-  }
-  return fit.slice(0, limit);
+  // Counts a `{case_matters=true}` prefix too, as scorm-again does.
+  const fit = patterns.filter((p) => p.length <= max);
+  return {
+    kept: fit.slice(0, limit),
+    tooLong: patterns.length - fit.length,
+    fitting: fit.length,
+    max,
+    limit,
+  };
 }
 
 /**
@@ -338,7 +339,23 @@ export function buildScormInteractionFields(
   };
   const patterns = recordable('correct answer', () => {
     const all = formatCorrectPattern(interaction, spec.format);
-    return all && fitPatterns(questionId, interaction, all, spec.format);
+    if (!all) return null;
+    const { kept, tooLong, fitting, max, limit } = fitPatterns(
+      interaction,
+      all,
+      spec.format,
+    );
+    if (tooLong > 0) {
+      console.warn(
+        `Tessera: interaction "${questionId}" has ${tooLong} correct answer(s) over the ${max} characters this export standard records; they are graded locally but absent from the LMS record.`,
+      );
+    }
+    if (fitting > limit) {
+      console.warn(
+        `Tessera: interaction "${questionId}" has ${fitting} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
+      );
+    }
+    return kept;
   });
   const response = recordable('response', () =>
     fitResponse(
