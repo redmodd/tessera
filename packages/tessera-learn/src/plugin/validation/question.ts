@@ -81,12 +81,13 @@ const QUESTION_COMPONENTS: Record<
     check(props, fileRel, d) {
       const answers = staticList(props.get('answers'));
       if (answers) {
-        if (answers.length === 0) {
-          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
-        } else if (!isStringArray(answers)) {
+        if (!isStringArray(answers)) {
           d.error(
             `${fileRel}: <FillInTheBlank> answers must be a string or an array of strings`,
           );
+        } else if (answers.every((a) => a.trim() === '')) {
+          // A learner can't submit blank input, so no response could match.
+          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
         }
       }
     },
