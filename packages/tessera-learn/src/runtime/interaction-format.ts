@@ -148,26 +148,34 @@ function encodeStep(
   return `${fmt.identifier(step)}${fmt.pairDelim}${a}`;
 }
 
-/** A list value's encoded items, not yet joined; null for a scalar type. */
+type ListInteraction = Extract<
+  Interaction,
+  { type: 'choice' | 'sequencing' | 'matching' | 'performance' }
+>;
+
+function isList(i: Interaction): i is ListInteraction {
+  return (
+    i.type === 'choice' ||
+    i.type === 'sequencing' ||
+    i.type === 'matching' ||
+    i.type === 'performance'
+  );
+}
+
+/** The response's or correct answer's encoded items, not yet joined. */
 function encodeItems(
-  i: Interaction,
-  value: unknown,
+  i: ListInteraction,
+  field: 'response' | 'correct',
   fmt: InteractionFormat,
-): string[] | null {
+): string[] {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return (value as string[]).map((v) => encodeListItem(v, i.options, fmt));
+      return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
     case 'matching':
-      return (value as Array<[string, string]>).map((p) =>
-        encodePair(p, i.optionPairs, fmt),
-      );
+      return (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt));
     case 'performance':
-      return (value as Array<[string, string | number]>).map((s) =>
-        encodeStep(s, fmt),
-      );
-    default:
-      return null;
+      return (i[field] ?? []).map((s) => encodeStep(s, fmt));
   }
 }
 
@@ -176,15 +184,21 @@ export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string {
-  const items = encodeItems(i, i.response, fmt);
-  if (items) return items.join(fmt.itemDelim);
   switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+    case 'matching':
+    case 'performance':
+      return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
     case 'true-false':
       return fmt.formatBoolean(i.response);
+    case 'fill-in':
+    case 'long-fill-in':
+    case 'likert':
+    case 'other':
+      return i.response;
     case 'numeric':
       return String(i.response);
-    default:
-      return i.response as string;
   }
 }
 
@@ -197,9 +211,12 @@ export function formatCorrectPattern(
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string[] | null {
   if (i.correct === undefined) return null;
-  const items = encodeItems(i, i.correct, fmt);
-  if (items) return [items.join(fmt.itemDelim)];
   switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+    case 'matching':
+    case 'performance':
+      return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
@@ -220,7 +237,8 @@ export function formatCorrectPattern(
       if (!fmt.supportsNumericRange) return null;
       return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
-    default:
+    case 'likert':
+    case 'other':
       return [i.correct as string];
   }
 }
@@ -371,10 +389,10 @@ function fitResponse(
       ]),
     };
   }
-  const value = formatResponse(i, fmt);
+  const items = isList(i) ? encodeItems(i, 'response', fmt) : null;
+  const value = items ? items.join(fmt.itemDelim) : formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  const items = encodeItems(i, i.response, fmt);
   const whole = items ? wholeItems(items, fmt.itemDelim, max) : '';
   const cut =
     !items || (!whole && i.type === 'performance')

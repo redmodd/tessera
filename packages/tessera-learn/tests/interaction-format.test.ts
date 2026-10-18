@@ -6,6 +6,7 @@ import {
   fitPatterns,
   SCORM12_INTERACTION_FORMAT,
   SCORM2004_INTERACTION_FORMAT,
+  XAPI_INTERACTION_FORMAT,
 } from '../src/runtime/interaction-format.js';
 
 const choice: Interaction = {
@@ -47,6 +48,22 @@ describe('encodesOptionIndex', () => {
     expect(
       formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
     ).toEqual(['Step_1.done!']);
+  });
+
+  it.each([
+    ['SCORM 2004', SCORM2004_INTERACTION_FORMAT],
+    ['xAPI', XAPI_INTERACTION_FORMAT],
+  ])('keeps performance step names and answers as written on %s', (_, fmt) => {
+    const performance: Interaction = {
+      type: 'performance',
+      response: [
+        ['Step 1', 'turn left'],
+        ['angle', -3.5],
+      ],
+    };
+    expect(formatResponse(performance, fmt)).toBe(
+      'Step 1[.]turn left[,]angle[.]-3.5',
+    );
   });
 });
 
