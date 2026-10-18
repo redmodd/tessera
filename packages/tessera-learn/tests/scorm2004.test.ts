@@ -447,6 +447,19 @@ describe('SCORM2004Adapter', () => {
       expect(v['correct_responses.1.pattern']).toBeUndefined();
     });
 
+    it('writes a long-fill-in response past 255 characters in full', async () => {
+      const long = 'a'.repeat(300);
+      adapter.reportInteraction(
+        'lf2',
+        { type: 'long-fill-in', response: long, correct: [long] },
+        true,
+      );
+      await flush();
+      const v = interaction0();
+      expect(v.learner_response).toBe(long);
+      expect(v['correct_responses.0.pattern']).toBe(long);
+    });
+
     it('caps fill-in patterns at the 10 allowed by the RTE', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
@@ -463,7 +476,9 @@ describe('SCORM2004Adapter', () => {
       expect(v['correct_responses.9.pattern']).toBe('a9');
       expect(v['correct_responses.10.pattern']).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('declares 12 correct answers'),
+        expect.stringContaining(
+          '"fi4" has 12 correct answers but this export standard records at most 10',
+        ),
       );
     });
 

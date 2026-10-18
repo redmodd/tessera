@@ -160,6 +160,8 @@ function readProps(
   const attributes = (node.attributes as Node[]) ?? [];
   for (const attr of attributes) {
     if (attr.type === 'SpreadAttribute') {
+      // A later attribute wins, so the spread may override every prop before it.
+      props.clear();
       hasSpread = true;
       continue;
     }
@@ -197,7 +199,6 @@ function readProps(
         kind: 'expr',
         raw: source.slice(expr.start, expr.end).trim(),
       });
-      if (source[attr.start] === '{') hasSpread = true;
     }
   }
   return { name: node.name as string, props, hasSpread, branches };

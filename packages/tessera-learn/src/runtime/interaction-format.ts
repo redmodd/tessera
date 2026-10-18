@@ -1,7 +1,7 @@
 /**
  * SCORM 1.2 RTE §3.4.7 vs SCORM 2004 4E RTE §4.2.7 differ in delimiter
- * encoding and identifier rules; cmi5 (xAPI) reuses 2004's delimiters but
- * not its identifier slugging.
+ * encoding and identifier rules; cmi5 and xAPI reuse 2004's encoding
+ * without its caps.
  */
 
 import type { Interaction } from './interaction.js';
@@ -23,10 +23,19 @@ export interface InteractionFormat {
   encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
-   * `fill-in` and 1 for `long-fill-in`; xAPI has no such limit.
+   * `fill-in` and 1 for `long-fill-in`.
    */
   fillInLimit: number;
   longFillInLimit: number;
+  /**
+   * Longest response or correct answer the LMS takes for a type. SCORM 1.2
+   * caps every CMIFeedback value at 255 characters; SCORM 2004 caps each
+   * fill-in answer at 250 and long-fill-in and other at 4000. Strict LMSs
+   * reject a longer value (405 / 406).
+   */
+  maxValueLength(type: Interaction['type']): number;
+  /** SCORM 2004 caps each performance step answer at 250 characters. */
+  maxStepAnswerLength: number;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
 }
@@ -40,6 +49,8 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
+  maxValueLength: () => 255,
+  maxStepAnswerLength: Infinity,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
 };
@@ -57,16 +68,28 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
+  maxValueLength: (type) => {
+    switch (type) {
+      case 'fill-in':
+        return 250;
+      case 'long-fill-in':
+      case 'other':
+        return 4000;
+      default:
+        return Infinity;
+    }
+  },
+  maxStepAnswerLength: 250,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
 };
 
-// xAPI reuses SCORM 2004's delimiters, numeric-range support, and identity
-// identifier, but the RTE caps on `correct_responses` are SCORM-only.
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   ...SCORM2004_INTERACTION_FORMAT,
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
+  maxValueLength: () => Infinity,
+  maxStepAnswerLength: Infinity,
 };
 
 /**
@@ -81,6 +104,8 @@ export function shortIdentifier(value: string): string {
 }
 
 export const SCORM12_MAX_OPTIONS = 36;
+
+const CASE_PREFIX = '{case_matters=true}';
 
 /** An id SCORM 1.2 cannot record as a one-character option index. */
 class UnencodableOptionError extends Error {}
@@ -170,17 +195,9 @@ export function formatCorrectPattern(
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
     case 'long-fill-in': {
-      const limit =
-        i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-      const all = i.correct as string[];
-      if (all.length > limit) {
-        console.warn(
-          `Tessera: ${i.type} declares ${all.length} correct answers but this export standard records at most ${limit}; the rest are graded locally but absent from the LMS record.`,
-        );
-      }
-      const alternatives = all.slice(0, limit);
+      const alternatives = i.correct as string[];
       if (!fmt.supportsCasePrefix) return alternatives;
-      const prefix = i.caseMatters ? '{case_matters=true}' : '';
+      const prefix = i.caseMatters ? CASE_PREFIX : '';
       return alternatives.map((a) => prefix + a);
     }
     case 'matching':
@@ -244,6 +261,120 @@ function idsWithoutOptions(i: Interaction): string[] {
   }
 }
 
+/**
+ * Formats the correct patterns, drops those over the format's length cap,
+ * since a shortened pattern matches nothing, then keeps the first ones up to
+ * its count cap. Each warning completes a sentence whose subject is the
+ * question. Throws when SCORM 1.2 cannot encode an option.
+ */
+export function fitPatterns(
+  i: Interaction,
+  fmt: InteractionFormat,
+  recorder = 'this export standard',
+): { kept: string[]; warnings: string[] } {
+  const lost = 'graded but left out of the LMS record';
+  if (
+    i.type === 'performance' &&
+    i.correct &&
+    hasLongStep(i.correct, fmt.maxStepAnswerLength)
+  ) {
+    return {
+      kept: [],
+      warnings: [
+        `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
+      ],
+    };
+  }
+  const patterns = formatCorrectPattern(i, fmt) ?? [];
+  const max = fmt.maxValueLength(i.type);
+  const limit =
+    i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
+  const warnings: string[] = [];
+  // Counts a `{case_matters=true}` prefix too, as scorm-again does.
+  const fit = patterns.filter((p) => p.length <= max);
+  if (fit.length < patterns.length) {
+    const prefix = patterns.some(
+      (p) =>
+        p.length > max &&
+        p.startsWith(CASE_PREFIX) &&
+        p.length - CASE_PREFIX.length <= max,
+    )
+      ? `, counting the ${CASE_PREFIX} prefix of a case-sensitive answer`
+      : '';
+    warnings.push(
+      `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records${prefix}; they are ${lost}`,
+    );
+  }
+  if (fit.length > limit) {
+    const counted =
+      fit.length < patterns.length ? ' short enough to record,' : '';
+    warnings.push(
+      `has ${fit.length} correct answers${counted} but ${recorder} records at most ${limit}; the rest are ${lost}`,
+    );
+  }
+  return { kept: fit.slice(0, limit), warnings };
+}
+
+function hasLongStep(
+  steps: Array<[string, string | number]>,
+  max: number,
+): boolean {
+  return steps.some(([, a]) => String(a).length > max);
+}
+
+/** Cuts on a character boundary, so an emoji or accented letter stays whole. */
+function cutText(value: string, max: number): string {
+  // Firefox before 125 has no Intl.Segmenter; there, only keep surrogate pairs whole.
+  if (typeof Intl.Segmenter !== 'function') {
+    const cut = value.slice(0, max);
+    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  }
+  let end = 0;
+  for (const { index, segment } of new Intl.Segmenter().segment(value)) {
+    if (index + segment.length > max) break;
+    end = index + segment.length;
+  }
+  return value.slice(0, end);
+}
+
+/**
+ * Cuts a response to the format's length caps. A list keeps only whole items,
+ * since a half-written id or pair is wrong data, but a performance response
+ * whose first step doesn't fit keeps that step with its answer cut. Null when
+ * nothing fits.
+ */
+function fitResponse(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string | null {
+  const stepMax = fmt.maxStepAnswerLength;
+  if (i.type === 'performance' && hasLongStep(i.response, stepMax)) {
+    console.warn(
+      `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
+    );
+    i = {
+      ...i,
+      response: i.response.map(([step, a]): [string, string | number] => [
+        step,
+        typeof a === 'string' ? cutText(a, stepMax) : a,
+      ]),
+    };
+  }
+  const value = formatResponse(i, fmt);
+  const max = fmt.maxValueLength(i.type);
+  if (value.length <= max) return value;
+  const whole = value.lastIndexOf(fmt.itemDelim, max);
+  const cut =
+    !Array.isArray(i.response) || (whole < 0 && i.type === 'performance')
+      ? cutText(value, max)
+      : value.slice(0, Math.max(whole, 0));
+  console.warn(
+    `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
+  );
+  return cut || null;
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -272,11 +403,15 @@ export function buildScormInteractionFields(
       return null;
     }
   };
-  const patterns = recordable('correct answer', () =>
-    formatCorrectPattern(interaction, spec.format),
-  );
+  const patterns = recordable('correct answer', () => {
+    const { kept, warnings } = fitPatterns(interaction, spec.format);
+    for (const warning of warnings) {
+      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
+    }
+    return kept;
+  });
   const response = recordable('response', () =>
-    formatResponse(interaction, spec.format),
+    fitResponse(questionId, interaction, spec.format),
   );
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);

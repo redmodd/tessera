@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, questionId } from './util.js';
+  import { QUESTION_ID_PREFIX, fillInAnswers, questionId } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
   import RetryButton from './RetryButton.svelte';
@@ -31,11 +31,7 @@
     weight = 1,
   } = $props();
 
-  const answerList = $derived(
-    (Array.isArray(answers) ? answers : [answers])
-      .map((a) => a.trim())
-      .filter((a) => a !== ''),
-  );
+  const answerList = $derived(fillInAnswers(answers));
   let inputValue = $state('');
 
   const componentId = $props.id();

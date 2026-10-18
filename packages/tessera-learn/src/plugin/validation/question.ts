@@ -2,9 +2,15 @@ import JSON5 from 'json5';
 import { staticQuestionId } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
-import { SCORM12_MAX_OPTIONS } from '../../runtime/interaction-format.js';
+import {
+  SCORM12_MAX_OPTIONS,
+  fitPatterns,
+} from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
-import type { QuestionComponentName } from '../../components/util.js';
+import {
+  fillInAnswers,
+  type QuestionComponentName,
+} from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
 
@@ -15,6 +21,20 @@ function staticValue(prop: PropValue | undefined): unknown {
   } catch {
     return undefined;
   }
+}
+
+/** False only when the prop is statically falsy, or absent with no spread to set it. */
+export function propMayBeTruthy(
+  { props, hasSpread }: ComponentMatch,
+  name: string,
+): boolean {
+  const prop = props.get(name);
+  if (prop === undefined) return hasSpread;
+  if (prop.kind === 'string') return prop.value !== '';
+  if (prop.kind !== 'expr') return true;
+  if (prop.raw === 'undefined') return false;
+  const value = staticValue(prop);
+  return value === undefined || Boolean(value);
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
@@ -37,6 +57,18 @@ function staticNumber(prop: PropValue | undefined): number | null {
   return typeof value === 'number' ? value : null;
 }
 
+type RecordingStandard = Extract<
+  StandardProfile,
+  { interactionFormat: unknown }
+>;
+
+interface RuleContext {
+  fileRel: string;
+  d: Diagnostics;
+  standard: RecordingStandard | undefined;
+  id: string | null;
+}
+
 interface QuestionComponentRule {
   required: string[];
   /**
@@ -44,7 +76,7 @@ interface QuestionComponentRule {
    * when each complete answer and the correct pattern use every entry.
    */
   indexedLists?: Record<string, 'some' | 'every'>;
-  check(props: ComponentMatch['props'], fileRel: string, d: Diagnostics): void;
+  check(match: ComponentMatch, ctx: RuleContext): void;
 }
 
 const QUESTION_COMPONENTS: Record<
@@ -54,7 +86,7 @@ const QUESTION_COMPONENTS: Record<
   MultipleChoice: {
     required: ['question', 'options', 'correct'],
     indexedLists: { options: 'some' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
       if (options && correct !== null) {
@@ -78,8 +110,8 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check(props, fileRel, d) {
-      const answers = staticList(props.get('answers'));
+    check(match, { fileRel, d, standard, id }) {
+      const answers = staticList(match.props.get('answers'));
       if (answers) {
         if (!isStringArray(answers)) {
           d.error(
@@ -97,12 +129,27 @@ const QUESTION_COMPONENTS: Record<
           );
         }
       }
+      if (!standard || !isStringArray(answers)) return;
+      const { warnings } = fitPatterns(
+        {
+          type: 'fill-in',
+          response: '',
+          correct: fillInAnswers(answers),
+          caseMatters: propMayBeTruthy(match, 'caseSensitive'),
+        },
+        standard.interactionFormat,
+        standard.name,
+      );
+      const subject = id === null ? '' : ` "${id}"`;
+      for (const warning of warnings) {
+        d.warn(`${fileRel}: <FillInTheBlank>${subject} ${warning}`);
+      }
     },
   },
   Matching: {
     required: ['question', 'pairs'],
     indexedLists: { pairs: 'every' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const pairs = staticArray(props.get('pairs'));
       if (pairs) {
         const bad = pairs.some(
@@ -122,7 +169,7 @@ const QUESTION_COMPONENTS: Record<
   Sorting: {
     required: ['question', 'items', 'targets', 'correct'],
     indexedLists: { items: 'every', targets: 'some' },
-    check(props, fileRel, d) {
+    check({ props }, { fileRel, d }) {
       const items = staticArray(props.get('items'));
       const targets = staticArray(props.get('targets'));
       const correct = staticArray(props.get('correct'));
@@ -156,10 +203,8 @@ export function validateQuestionComponents(
   d: Diagnostics,
   profile: StandardProfile | undefined,
 ): void {
-  const format =
-    profile && 'interactionFormat' in profile
-      ? profile.interactionFormat
-      : undefined;
+  const standard =
+    profile && 'interactionFormat' in profile ? profile : undefined;
   const seenIds = new Set<string>();
   const seenSanitized = new Set<string>();
   for (const match of components) {
@@ -194,19 +239,19 @@ export function validateQuestionComponents(
             ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
             : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
-      } else if (profile && format) {
+      } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids
         // can collide after sanitization. Skip raw duplicates (already flagged
         // above) to avoid double-reporting the same id.
-        const sane = format.identifier(resolvedId);
+        const sane = standard.interactionFormat.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${profile.name} — use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only letters and digits (underscores only between them)`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${profile.name} sanitization ("${sane}")`,
+            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${standard.name} sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);
@@ -228,7 +273,7 @@ export function validateQuestionComponents(
       }
     }
 
-    if (profile && format?.encodesOptionIndex) {
+    if (standard?.interactionFormat.encodesOptionIndex) {
       for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > SCORM12_MAX_OPTIONS) {
@@ -237,12 +282,12 @@ export function validateQuestionComponents(
               ? 'every response and correct answer'
               : `any response or correct answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
           d.warn(
-            `${fileRel}: <${name}> has ${count} ${prop} but ${profile.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
+            `${fileRel}: <${name}> has ${count} ${prop} but ${standard.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
           );
         }
       }
     }
 
-    rule.check(props, fileRel, d);
+    rule.check(match, { fileRel, d, standard, id: resolvedId });
   }
 }

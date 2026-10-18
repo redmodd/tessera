@@ -3,6 +3,7 @@ import type { Interaction } from '../src/runtime/interaction.js';
 import {
   formatResponse,
   formatCorrectPattern,
+  fitPatterns,
   SCORM12_INTERACTION_FORMAT,
   SCORM2004_INTERACTION_FORMAT,
 } from '../src/runtime/interaction-format.js';
@@ -44,4 +45,24 @@ describe('encodesOptionIndex', () => {
       formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
     ).toEqual(['step_1.done']);
   });
+});
+
+describe('fitPatterns', () => {
+  it.each([
+    [232, true],
+    [251, false],
+  ])(
+    'credits the case prefix only when it pushes a %i-character answer over the cap',
+    (length, credited) => {
+      const i: Interaction = {
+        type: 'fill-in',
+        response: '',
+        correct: ['x'.repeat(length)],
+        caseMatters: true,
+      };
+      const { warnings } = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].includes('counting the')).toBe(credited);
+    },
+  );
 });
