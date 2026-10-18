@@ -110,12 +110,23 @@ export function shortIdentifier(value: string): string {
 
 /**
  * SCORM 2004 `short_identifier_type` is URI text, so percent-encoding keeps
- * distinct ids distinct. scorm-again also refuses `~`. The 250-character cut
- * never splits an escape.
+ * distinct ids distinct. scorm-again also refuses `~`, and an id with no
+ * letter, digit or underscore, so such an id escapes every character. The
+ * 250-character cut keeps each character's escapes whole.
  */
 function uriIdentifier(value: string): string {
-  const encoded = encodeURIComponent(value).replace(/~/g, '%7E');
-  return encoded.slice(0, 250).replace(/%.?$/, '');
+  let id = '';
+  for (const c of value.replace(/\p{Cs}/gu, '\uFFFD')) {
+    const encoded = encodeURIComponent(c).replace('~', '%7E');
+    if (id.length + encoded.length > 250) break;
+    id += encoded;
+  }
+  if (/\w/.test(id)) return id;
+  const escaped = id.replace(
+    /./g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return escaped.slice(0, 249) || '_';
 }
 
 export const SCORM12_MAX_OPTIONS = 36;
@@ -192,10 +203,7 @@ function encodeItems(
 }
 
 /** Throws when SCORM 1.2 cannot encode an option. */
-export function formatResponse(
-  i: Interaction,
-  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
-): string {
+export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
   if (isList(i)) return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
   switch (i.type) {
     case 'true-false':
@@ -217,7 +225,7 @@ export function formatResponse(
  */
 export function formatCorrectPattern(
   i: Interaction,
-  fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
+  fmt: InteractionFormat,
 ): string[] | null {
   if (i.correct === undefined) return null;
   if (isList(i)) return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
@@ -267,18 +275,6 @@ export interface ScormInteractionSpec {
   typeValue: string;
   resultLabels: { correct: string; incorrect: string };
   format: InteractionFormat;
-}
-
-function idsWithoutOptions(i: Interaction): string[] {
-  switch (i.type) {
-    case 'choice':
-    case 'sequencing':
-      return i.options ? [] : [...i.response, ...(i.correct ?? [])];
-    case 'matching':
-      return i.optionPairs ? [] : [...i.response, ...(i.correct ?? [])].flat();
-    default:
-      return [];
-  }
 }
 
 /** Ids recorded through `responseId`, grouped so ids in one group must stay distinct. */
@@ -455,10 +451,14 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  if (spec.format.encodesOptionIndex) {
-    const invalid = idsWithoutOptions(interaction).find(
-      (id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)),
-    );
+  const { type } = interaction;
+  if (
+    spec.format.encodesOptionIndex &&
+    (type === 'choice' || type === 'sequencing' || type === 'matching')
+  ) {
+    const invalid = responseIdGroups(interaction, spec.format)
+      .flat()
+      .find((id) => !/^[0-9a-z]$/.test(spec.format.responseId(id)));
     if (invalid !== undefined) {
       console.warn(
         `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,

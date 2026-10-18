@@ -82,6 +82,10 @@ describe('SCORM 2004 ids inside a response', () => {
     ['step-one_(a)', 'step-one_(a)'],
     ['a[,]b~c', 'a%5B%2C%5Db%7Ec'],
     ['café', 'caf%C3%A9'],
+    ['-', '%2D'],
+    ['(*)', '%28%2A%29'],
+    ['', '_'],
+    ['a\uD800', 'a%EF%BF%BD'],
   ])('records %s as %s', (id, recorded) => {
     expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
       recorded,
@@ -118,6 +122,14 @@ describe('SCORM 2004 ids inside a response', () => {
       fmt,
     );
     expect(recorded).toBe('a'.repeat(248));
+  });
+
+  it('cuts an id to 250 characters without splitting a character', () => {
+    const recorded = formatResponse(
+      { type: 'likert', response: 'é'.repeat(42) },
+      fmt,
+    );
+    expect(recorded).toBe('%C3%A9'.repeat(41));
   });
 });
 

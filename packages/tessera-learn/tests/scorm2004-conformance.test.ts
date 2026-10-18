@@ -217,8 +217,13 @@ describe('SCORM2004Adapter against scorm-again', () => {
         },
         'step%20one[.]all done',
       ],
+      [
+        'punctuation-only likert',
+        { type: 'likert', response: '-', correct: '-' },
+        '%2D',
+      ],
     ] as const)(
-      'records %s ids with spaces so the data model accepts them',
+      'records %s ids so the data model accepts them',
       async (_label, interaction, recorded) => {
         await start();
         adapter.reportInteraction('q1', interaction as never, true);
