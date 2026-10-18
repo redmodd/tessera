@@ -137,7 +137,9 @@ function uriIdentifier(value: string): string {
   for (const c of value.replace(/\p{Cs}/gu, '\uFFFD')) {
     const encoded = URI_ID_CHAR.test(c)
       ? c
-      : encodeURIComponent(c).replace('~', '%7E');
+      : c === '~'
+        ? '%7E'
+        : encodeURIComponent(c);
     if (id.length + encoded.length > 250) break;
     id += encoded;
   }
