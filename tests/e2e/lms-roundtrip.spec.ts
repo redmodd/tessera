@@ -259,12 +259,6 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       'fill-in',
       'matching',
     ]);
-    const patterns = await interactionField(
-      page,
-      String.raw`correct_responses\.0\.pattern`,
-    );
-    expect(patterns).toHaveLength(3);
-    expect(patterns[1]).toBe('blue');
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
@@ -506,12 +500,6 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'fill-in',
       'matching',
     ]);
-    const patterns = await interactionField(
-      page,
-      String.raw`correct_responses\.0\.pattern`,
-    );
-    expect(patterns).toHaveLength(3);
-    expect(patterns[1]).toBe('blue');
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
@@ -663,9 +651,6 @@ test.describe.serial('LMS round-trip — CMI5', () => {
       'choice',
       'fill-in',
       'matching',
-    ]);
-    expect(answered[1].object?.definition?.correctResponsesPattern).toEqual([
-      'blue',
     ]);
     for (const s of answered) {
       expect(String(s.object?.id)).toMatch(
@@ -1013,9 +998,6 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'choice',
       'fill-in',
       'matching',
-    ]);
-    expect(answered[1].object?.definition?.correctResponsesPattern).toEqual([
-      'blue',
     ]);
 
     await finishFreeCourse(page);

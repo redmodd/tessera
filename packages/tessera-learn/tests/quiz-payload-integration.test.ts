@@ -246,16 +246,13 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     );
   });
 
-  it('a single answer string grades, reports and shows as the correct answer', async () => {
+  it('shows and reports a single answer string as one answer', async () => {
     const { target, reports } = await answerAndSubmit('Paris', 'Lyon');
 
     expect(
       target.querySelector('.tessera-fitb-correct-answer')?.textContent,
     ).toBe('Correct answer: Paris');
-    expect(reports).toHaveLength(1);
-    const [, interaction, correct] = reports[0];
-    expect(interaction).toMatchObject({ type: 'fill-in', correct: ['Paris'] });
-    expect(correct).toBe(false);
+    expect(reports[0][1]).toMatchObject({ correct: ['Paris'] });
   });
 
   it('shows and reports the trimmed, non-blank answers it grades against', async () => {

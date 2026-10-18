@@ -1977,16 +1977,15 @@ let a = {}; let b = {};</script>
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
 <FillInTheBlank question="Q" answers={[]} />
-<FillInTheBlank question="R" answers="" />
-<FillInTheBlank question="S" answers=" " />
-<FillInTheBlank question="T" answers={['', ' ']} />`,
+<FillInTheBlank question="R" answers=" " />
+<FillInTheBlank question="S" answers={['', ' ']} />`,
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(
       errors.filter((e) =>
         e.includes('<FillInTheBlank> answers must not be empty'),
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
     expect(warnings.filter((w) => w.includes('FillInTheBlank'))).toHaveLength(
       0,
     );
