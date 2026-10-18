@@ -32,7 +32,9 @@
   } = $props();
 
   const answerList = $derived(
-    (Array.isArray(answers) ? answers : [answers]).map((a) => a.trim()),
+    (Array.isArray(answers) ? answers : [answers])
+      .map((a) => a.trim())
+      .filter((a) => a !== ''),
   );
   let inputValue = $state('');
 

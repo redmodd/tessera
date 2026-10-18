@@ -258,11 +258,15 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     expect(correct).toBe(false);
   });
 
-  it('shows the trimmed answers it grades against', async () => {
-    const { target } = await answerAndSubmit([' Paris ', 'Lutetia'], 'Lyon');
+  it('shows and reports the trimmed, non-blank answers it grades against', async () => {
+    const { target, reports } = await answerAndSubmit(
+      [' Paris ', ' ', 'Lutetia'],
+      'Lyon',
+    );
 
     expect(
       target.querySelector('.tessera-fitb-correct-answer')?.textContent,
     ).toBe('Correct answers: Paris, Lutetia');
+    expect(reports[0][1]).toMatchObject({ correct: ['Paris', 'Lutetia'] });
   });
 });
