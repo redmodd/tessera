@@ -2201,6 +2201,8 @@ let a = {}; let b = {};</script>
     ['scorm2004', 'caseSensitive="true"', 1],
     ['scorm2004', 'caseSensitive={false}', 0],
     ['scorm2004', 'caseSensitive={strict}', 1],
+    ['scorm2004', '{...cfg}', 1],
+    ['scorm2004', 'caseSensitive={false} {...cfg}', 1],
     ['scorm12', 'caseSensitive', 0],
   ])(
     'counts the case-sensitive prefix toward the fill-in cap under %s with %s',

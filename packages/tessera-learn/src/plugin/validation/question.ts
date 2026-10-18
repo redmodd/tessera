@@ -5,10 +5,12 @@ import type { StandardProfile } from '../../runtime/standards.js';
 import {
   SCORM12_MAX_OPTIONS,
   fitPatterns,
-  formatCorrectPattern,
 } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
-import type { QuestionComponentName } from '../../components/util.js';
+import {
+  fillInAnswers,
+  type QuestionComponentName,
+} from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
 
@@ -49,7 +51,6 @@ function staticNumber(prop: PropValue | undefined): number | null {
   return typeof value === 'number' ? value : null;
 }
 
-/** An export standard that records interactions in the LMS. */
 type RecordingStandard = Extract<
   StandardProfile,
   { interactionFormat: unknown }
@@ -68,6 +69,7 @@ interface QuestionComponentRule {
     d: Diagnostics,
     standard: RecordingStandard | undefined,
     id: string | null,
+    hasSpread: boolean,
   ): void;
 }
 
@@ -102,7 +104,7 @@ const QUESTION_COMPONENTS: Record<
   },
   FillInTheBlank: {
     required: ['question', 'answers'],
-    check(props, fileRel, d, standard, id) {
+    check(props, fileRel, d, standard, id, hasSpread) {
       const answers = staticList(props.get('answers'));
       if (answers) {
         if (!isStringArray(answers)) {
@@ -121,22 +123,15 @@ const QUESTION_COMPONENTS: Record<
           );
         }
       }
-      if (!standard) return;
-      const format = standard.interactionFormat;
-      const correct = (answers ?? [])
-        .filter((a) => typeof a === 'string')
-        .map((a) => a.trim())
-        .filter((a) => a !== '');
-      const interaction = {
-        type: 'fill-in' as const,
-        response: '',
-        correct,
-        caseMatters: mayBeTruthy(props.get('caseSensitive')),
-      };
+      if (!standard || !isStringArray(answers)) return;
       const { warnings } = fitPatterns(
-        interaction,
-        formatCorrectPattern(interaction, format) ?? [],
-        format,
+        {
+          type: 'fill-in',
+          response: '',
+          correct: fillInAnswers(answers),
+          caseMatters: hasSpread || mayBeTruthy(props.get('caseSensitive')),
+        },
+        standard.interactionFormat,
         standard.name,
       );
       const subject = id === null ? '' : ` "${id}"`;
@@ -287,6 +282,6 @@ export function validateQuestionComponents(
       }
     }
 
-    rule.check(props, fileRel, d, standard, resolvedId);
+    rule.check(props, fileRel, d, standard, resolvedId, hasSpread);
   }
 }

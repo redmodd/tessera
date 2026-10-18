@@ -54,6 +54,13 @@ export function savedIndex(value: unknown, list: readonly unknown[]): number {
   return Number(value);
 }
 
+/** FillInTheBlank's accepted answers: trimmed, blanks dropped. */
+export function fillInAnswers(answers: string | string[]): string[] {
+  return (Array.isArray(answers) ? answers : [answers])
+    .map((a) => a.trim())
+    .filter((a) => a !== '');
+}
+
 /** Index ids for a built-in's `options`, which SCORM 1.2 encodes one character each. */
 export function indexIds(list: readonly unknown[]): string[] {
   return list.map((_, i) => String(i));

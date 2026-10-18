@@ -60,8 +60,7 @@ describe('fitPatterns', () => {
         correct: ['x'.repeat(length)],
         caseMatters: true,
       };
-      const fmt = SCORM2004_INTERACTION_FORMAT;
-      const { warnings } = fitPatterns(i, formatCorrectPattern(i, fmt)!, fmt);
+      const { warnings } = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
       expect(warnings).toHaveLength(1);
       expect(warnings[0].includes('counting the')).toBe(credited);
     },

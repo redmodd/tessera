@@ -262,16 +262,18 @@ function idsWithoutOptions(i: Interaction): string[] {
 }
 
 /**
- * Drops correct answers over the format's length cap, since a shortened
- * pattern matches nothing, then keeps the first ones up to its count cap.
- * Each warning completes a sentence whose subject is the question.
+ * Formats the correct patterns, drops those over the format's length cap,
+ * since a shortened pattern matches nothing, then keeps the first ones up to
+ * its count cap. Each warning completes a sentence whose subject is the
+ * question. Throws when SCORM 1.2 cannot encode an option.
  */
 export function fitPatterns(
   i: Interaction,
-  patterns: string[],
   fmt: InteractionFormat,
   recorder = 'this export standard',
-): { kept: string[]; warnings: string[] } {
+): { kept: string[] | null; warnings: string[] } {
+  const patterns = formatCorrectPattern(i, fmt);
+  if (!patterns) return { kept: null, warnings: [] };
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
@@ -382,9 +384,7 @@ export function buildScormInteractionFields(
     }
   };
   const patterns = recordable('correct answer', () => {
-    const all = formatCorrectPattern(interaction, spec.format);
-    if (!all) return null;
-    const { kept, warnings } = fitPatterns(interaction, all, spec.format);
+    const { kept, warnings } = fitPatterns(interaction, spec.format);
     for (const warning of warnings) {
       console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
     }
