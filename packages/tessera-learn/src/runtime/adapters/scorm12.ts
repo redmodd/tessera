@@ -62,8 +62,8 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  *
  * SCORM 1.2 collapses completion + success into a single `lesson_status`
  * field, so the two setters only record their values and `commit()` writes
- * the combined result if it changed: the LMS never sees `completed` before
- * `failed`. LMSes read `failed` as a finished attempt, so it waits for
+ * the combined result if it changed, so one commit never shows `completed`
+ * before `failed`. LMSes read `failed` as a finished attempt, so it waits for
  * completion or a final verdict.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {

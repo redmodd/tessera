@@ -86,8 +86,9 @@ export abstract class BaseAdapter {
     _correct: boolean | null,
   ): void {}
   /**
-   * Send what the setters recorded. SCORM's terminate() does not call it, so
-   * call commit() first or SCORM 1.2 drops `lesson_status`.
+   * Send what the setters recorded: SCORM 1.2 writes `lesson_status` and
+   * xAPI/cmi5 send status statements only here. SCORM's terminate() skips it,
+   * so commit first.
    */
   commit(): void {}
   terminate(): void {}
