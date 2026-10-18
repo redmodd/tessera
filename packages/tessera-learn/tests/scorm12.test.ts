@@ -815,13 +815,11 @@ describe('SCORM12Adapter', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'm1',
-        { type: 'matching', response: [['a b', 'a-b']] },
+        { type: 'matching', response: [['!a', 'a']] },
         null,
       );
       await flush();
-      expect(warn).not.toHaveBeenCalledWith(
-        expect.stringContaining('records the ids'),
-      );
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('drops correct_responses for numeric ranges (SCORM 1.2 has no range pattern)', async () => {

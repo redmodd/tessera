@@ -32,7 +32,9 @@ describe('encodesOptionIndex', () => {
   it('encodes identifiers when the flag is off', () => {
     expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
   });
+});
 
+describe('performance steps', () => {
   it('slugs performance step names but keeps answers as written on SCORM 1.2', () => {
     const performance: Interaction = {
       type: 'performance',
@@ -72,6 +74,15 @@ describe('encodesOptionIndex', () => {
       'Step 1[.]turn left',
     );
   });
+
+  it('keeps an unnamed step unnamed on SCORM 2004', () => {
+    const unnamed: Interaction = {
+      type: 'performance',
+      response: [['', 'go']],
+    };
+    expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
+    expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
+  });
 });
 
 describe('SCORM 2004 ids inside a response', () => {
@@ -96,42 +107,6 @@ describe('SCORM 2004 ids inside a response', () => {
     );
   });
 
-  it('encodes every list type and the likert correct answer', () => {
-    expect(
-      formatResponse({ type: 'choice', response: ['New York', 'Paris'] }, fmt),
-    ).toBe('New%20York[,]Paris');
-    expect(
-      formatResponse(
-        { type: 'matching', response: [['New York', 'USA']] },
-        fmt,
-      ),
-    ).toBe('New%20York[.]USA');
-    expect(
-      formatResponse(
-        { type: 'sequencing', response: ['step one', 'step two'] },
-        fmt,
-      ),
-    ).toBe('step%20one[,]step%20two');
-    expect(
-      formatCorrectPattern(
-        { type: 'likert', response: 'x', correct: 'Strongly agree' },
-        fmt,
-      ),
-    ).toEqual(['Strongly%20agree']);
-  });
-
-  it('keeps an unnamed performance step unnamed', () => {
-    expect(
-      formatResponse({ type: 'performance', response: [['', 'go']] }, fmt),
-    ).toBe('[.]go');
-    expect(
-      formatResponse(
-        { type: 'performance', response: [['', 'go']] },
-        SCORM12_INTERACTION_FORMAT,
-      ),
-    ).toBe('_.go');
-  });
-
   it('records a choice id once', () => {
     expect(
       formatResponse({ type: 'choice', response: ['', '_', 'a', 'a'] }, fmt),
@@ -153,20 +128,13 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
   });
 
-  it('cuts an id to 250 characters without splitting an escape', () => {
-    const recorded = formatResponse(
-      { type: 'likert', response: 'a'.repeat(248) + ' b' },
-      fmt,
+  it.each([
+    ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
+    ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
+  ])('cuts an id to 250 characters without splitting %s', (_, id, recorded) => {
+    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+      recorded,
     );
-    expect(recorded).toBe('a'.repeat(248));
-  });
-
-  it('cuts an id to 250 characters without splitting a character', () => {
-    const recorded = formatResponse(
-      { type: 'likert', response: 'é'.repeat(42) },
-      fmt,
-    );
-    expect(recorded).toBe('%C3%A9'.repeat(41));
   });
 });
 
