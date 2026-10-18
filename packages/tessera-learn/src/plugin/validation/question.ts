@@ -27,6 +27,7 @@ function staticValue(prop: PropValue | undefined): unknown {
 function mayBeTruthy(prop: PropValue | undefined): boolean {
   if (prop?.kind === 'string') return prop.value !== '';
   if (prop?.kind !== 'expr') return prop !== undefined;
+  if (prop.raw === 'undefined') return false;
   const value = staticValue(prop);
   return value === undefined || Boolean(value);
 }

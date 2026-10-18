@@ -862,7 +862,7 @@ describe('SCORM12Adapter', () => {
       );
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"f3" has 11 correct answers but this export standard records at most 10',
+          '"f3" has 11 correct answers short enough to record, but this export standard records at most 10',
         ),
       );
     });
@@ -885,6 +885,23 @@ describe('SCORM12Adapter', () => {
           .map(([s, v]) => `${s}.${v}`)
           .join(','),
       );
+    });
+
+    it('cuts the answer of a performance step too long to fit whole', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'p2',
+        {
+          type: 'performance',
+          response: [
+            ['step_1', 'a'.repeat(300)],
+            ['step_2', 'done'],
+          ],
+        },
+        null,
+      );
+      await flush();
+      expect(interaction0().student_response).toBe(`step_1.${'a'.repeat(248)}`);
     });
 
     it('maps other to fill-in', async () => {

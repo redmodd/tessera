@@ -197,7 +197,6 @@ function readProps(
         kind: 'expr',
         raw: source.slice(expr.start, expr.end).trim(),
       });
-      if (source[attr.start] === '{') hasSpread = true;
     }
   }
   return { name: node.name as string, props, hasSpread, branches };

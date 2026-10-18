@@ -305,8 +305,10 @@ export function fitPatterns(
     );
   }
   if (fit.length > limit) {
+    const counted =
+      fit.length < patterns.length ? ' short enough to record,' : '';
     warnings.push(
-      `has ${fit.length} correct answers but ${recorder} records at most ${limit}; the rest are ${lost}`,
+      `has ${fit.length} correct answers${counted} but ${recorder} records at most ${limit}; the rest are ${lost}`,
     );
   }
   return { kept: fit.slice(0, limit), warnings };
@@ -320,7 +322,9 @@ function cutText(value: string, max: number): string {
 
 /**
  * Cuts a response to the format's length caps. A list keeps only whole items,
- * since a half-written id or pair is wrong data. Null when nothing fits.
+ * since a half-written id or pair is wrong data, but a performance response
+ * whose first step doesn't fit keeps that step with its answer cut. Null when
+ * nothing fits.
  */
 function fitResponse(
   questionId: string,
@@ -346,9 +350,11 @@ function fitResponse(
   const value = formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  const cut = Array.isArray(i.response)
-    ? value.slice(0, Math.max(value.lastIndexOf(fmt.itemDelim, max), 0))
-    : cutText(value, max);
+  const whole = value.lastIndexOf(fmt.itemDelim, max);
+  const cut =
+    !Array.isArray(i.response) || (whole < 0 && i.type === 'performance')
+      ? cutText(value, max)
+      : value.slice(0, Math.max(whole, 0));
   console.warn(
     `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
   );

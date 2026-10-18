@@ -2200,6 +2200,8 @@ let a = {}; let b = {};</script>
     ['scorm2004', 'caseSensitive', 1],
     ['scorm2004', 'caseSensitive="true"', 1],
     ['scorm2004', 'caseSensitive={false}', 0],
+    ['scorm2004', 'caseSensitive={undefined}', 0],
+    ['scorm2004', '{weight}', 0],
     ['scorm2004', 'caseSensitive={strict}', 1],
     ['scorm2004', '{...cfg}', 1],
     ['scorm2004', 'caseSensitive={false} {...cfg}', 1],
@@ -3151,6 +3153,13 @@ describe('a11y — spread props suppress false positives', () => {
   it('still errors on an explicit missing alt alongside other props', () => {
     createValidProject(testRoot);
     writePage(testRoot, `<Image src="$assets/x.png" />`);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'tessera/image-alt')).toBe(true);
+  });
+
+  it('still errors on a missing alt when another prop is shorthand', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<Image {src} />`);
     const { errors } = validateProject(testRoot);
     expect(has(errors, 'tessera/image-alt')).toBe(true);
   });
