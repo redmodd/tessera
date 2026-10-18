@@ -255,6 +255,29 @@ describe('CourseSession restore gate honours config.resume', () => {
     expect(setScore).toHaveBeenCalledWith(33.33);
   });
 
+  it('re-reports a complete, failed resume to an adapter that does not seed in one commit', async () => {
+    const calls: string[] = [];
+    await startSession({
+      config: createConfig({ resume: 'auto', scoring: { passingScore: 80 } }),
+      manifest,
+      adapter: stubAdapter({
+        getState: () => scoredSave as SavedState,
+        setScore: (score) => calls.push(`score:${score}`),
+        setCompletionStatus: (status) => calls.push(`completion:${status}`),
+        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        commit: () => calls.push('commit'),
+      }),
+    });
+    await flush();
+
+    expect(calls).toEqual([
+      'score:33.33',
+      'completion:complete',
+      'success:failed',
+      'commit',
+    ]);
+  });
+
   it('ignores saved state when resume is "never"', async () => {
     const { seedLifecycle, setCompletionStatus } = await start('never');
     expect(setCompletionStatus).toHaveBeenCalled();

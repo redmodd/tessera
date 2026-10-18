@@ -13,6 +13,7 @@ import {
   findStatements,
   interactionField,
   scormData,
+  scormLog,
   startPreview,
   waitForServer,
 } from './helpers.js';
@@ -111,7 +112,7 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
     expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
   });
 
-  test('a failing score holds lesson_status at incomplete until the course completes, then reports failed', async ({
+  test('a failing score holds lesson_status at incomplete until the course completes, then reports failed once per launch', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -141,6 +142,18 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
         'cmi.core.score.raw': '50',
         'cmi.core.lesson_status': 'failed',
       });
+
+    await page.reload();
+    await waitForCustomQuiz(page);
+
+    const lessonStatusWrites = async () =>
+      (await scormLog(page))
+        .filter(
+          ([fn, key]) =>
+            fn === 'LMSSetValue' && key === 'cmi.core.lesson_status',
+        )
+        .map(([, , value]) => value);
+    await expect.poll(lessonStatusWrites).toEqual(['failed']);
   });
 });
 

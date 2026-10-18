@@ -62,9 +62,10 @@ export class CourseSession {
   #persistPending = false;
 
   #prevReportedScore: number | null = null;
-  #prevSuccessStatus: SuccessStatus = 'unknown';
-  #prevVerdictFinal = false;
-  #prevCompletionStatus: CompletionStatus = 'incomplete';
+  // Undefined until the launch report, so it sends every status.
+  #prevSuccessStatus: SuccessStatus | undefined;
+  #prevVerdictFinal: boolean | undefined;
+  #prevCompletionStatus: CompletionStatus | undefined;
 
   readonly userStateStore: UserStateStore = {
     get: (key) =>
@@ -122,7 +123,6 @@ export class CourseSession {
    */
   async start(): Promise<Error | null> {
     const adapter = this.#adapter;
-    const progress = this.#progress;
     let initDeadline: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
@@ -185,11 +185,7 @@ export class CourseSession {
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
-    this.#report(() => {
-      this.#prevCompletionStatus = progress.reportedCompletionStatus;
-      adapter.setCompletionStatus(this.#prevCompletionStatus);
-      this.#reportSuccess();
-    });
+    this.#reportChanges();
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is
     // documented to return when nothing is wired.
@@ -362,38 +358,40 @@ export class CourseSession {
     );
   }
 
-  #reportStatus(): void {
+  #reportChanges(): void {
     const adapter = this.#adapter;
     const progress = this.#progress;
+    const score = progress.gradedScoreFinal ? progress.reportedScore : null;
+    const completion = progress.reportedCompletionStatus;
+    const success = progress.successStatus;
+    const final = progress.verdictFinal;
 
+    const scoreChanged = score !== null && score !== this.#prevReportedScore;
+    const completionChanged = completion !== this.#prevCompletionStatus;
+    const successChanged =
+      success !== this.#prevSuccessStatus || final !== this.#prevVerdictFinal;
+    if (!scoreChanged && !completionChanged && !successChanged) return;
+
+    this.#report(() => {
+      if (scoreChanged) {
+        this.#prevReportedScore = score;
+        adapter.setScore(score);
+      }
+      if (completionChanged) {
+        this.#prevCompletionStatus = completion;
+        adapter.setCompletionStatus(completion);
+      }
+      // With every score, so a verdict the score decides carries it and
+      // xAPI/cmi5 send one statement rather than a Scored and a Passed.
+      if (scoreChanged || successChanged) this.#reportSuccess();
+    });
+  }
+
+  #reportStatus(): void {
     // One effect, so what changes in one tick reaches the LMS in one commit:
     // SCORM 1.2 would otherwise show `completed` before `failed`.
     $effect(() => {
-      const score = progress.gradedScoreFinal ? progress.reportedScore : null;
-      const completion = progress.reportedCompletionStatus;
-      const success = progress.successStatus;
-      const final = progress.verdictFinal;
-      if (!this.#persistenceReady) return;
-
-      const scoreChanged = score !== null && score !== this.#prevReportedScore;
-      const completionChanged = completion !== this.#prevCompletionStatus;
-      const successChanged =
-        success !== this.#prevSuccessStatus || final !== this.#prevVerdictFinal;
-      if (!scoreChanged && !completionChanged && !successChanged) return;
-
-      this.#report(() => {
-        if (scoreChanged) {
-          this.#prevReportedScore = score;
-          adapter.setScore(score);
-        }
-        if (completionChanged) {
-          this.#prevCompletionStatus = completion;
-          adapter.setCompletionStatus(completion);
-        }
-        // With every score, so a verdict the score decides carries it and
-        // xAPI/cmi5 send one statement rather than a Scored and a Passed.
-        if (scoreChanged || successChanged) this.#reportSuccess();
-      });
+      if (this.#persistenceReady) this.#reportChanges();
     });
   }
 
