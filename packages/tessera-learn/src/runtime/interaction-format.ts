@@ -148,28 +148,26 @@ function encodeStep(
   return `${fmt.identifier(step)}${fmt.pairDelim}${a}`;
 }
 
-/** A list response comes back as its encoded items, not yet joined. */
-function encodeResponse(
+/** A list value's encoded items, not yet joined; null for a scalar type. */
+function encodeItems(
   i: Interaction,
+  value: unknown,
   fmt: InteractionFormat,
-): string | string[] {
+): string[] | null {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
-      return i.response.map((v) => encodeListItem(v, i.options, fmt));
-    case 'true-false':
-      return fmt.formatBoolean(i.response);
-    case 'fill-in':
-    case 'long-fill-in':
-    case 'likert':
-    case 'other':
-      return i.response;
+      return (value as string[]).map((v) => encodeListItem(v, i.options, fmt));
     case 'matching':
-      return i.response.map((p) => encodePair(p, i.optionPairs, fmt));
-    case 'numeric':
-      return String(i.response);
+      return (value as Array<[string, string]>).map((p) =>
+        encodePair(p, i.optionPairs, fmt),
+      );
     case 'performance':
-      return i.response.map((s) => encodeStep(s, fmt));
+      return (value as Array<[string, string | number]>).map((s) =>
+        encodeStep(s, fmt),
+      );
+    default:
+      return null;
   }
 }
 
@@ -178,8 +176,16 @@ export function formatResponse(
   i: Interaction,
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string {
-  const encoded = encodeResponse(i, fmt);
-  return typeof encoded === 'string' ? encoded : encoded.join(fmt.itemDelim);
+  const items = encodeItems(i, i.response, fmt);
+  if (items) return items.join(fmt.itemDelim);
+  switch (i.type) {
+    case 'true-false':
+      return fmt.formatBoolean(i.response);
+    case 'numeric':
+      return String(i.response);
+    default:
+      return i.response as string;
+  }
 }
 
 /**
@@ -191,14 +197,9 @@ export function formatCorrectPattern(
   fmt: InteractionFormat = SCORM2004_INTERACTION_FORMAT,
 ): string[] | null {
   if (i.correct === undefined) return null;
+  const items = encodeItems(i, i.correct, fmt);
+  if (items) return [items.join(fmt.itemDelim)];
   switch (i.type) {
-    case 'choice':
-    case 'sequencing':
-      return [
-        (i.correct as string[])
-          .map((v) => encodeListItem(v, i.options, fmt))
-          .join(fmt.itemDelim),
-      ];
     case 'true-false':
       return [fmt.formatBoolean(i.correct as boolean)];
     case 'fill-in':
@@ -208,12 +209,6 @@ export function formatCorrectPattern(
       const prefix = i.caseMatters ? CASE_PREFIX : '';
       return alternatives.map((a) => prefix + a);
     }
-    case 'matching':
-      return [
-        (i.correct as Array<[string, string]>)
-          .map((p) => encodePair(p, i.optionPairs, fmt))
-          .join(fmt.itemDelim),
-      ];
     case 'numeric': {
       const c = i.correct as { min?: number; max?: number };
       if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
@@ -225,15 +220,8 @@ export function formatCorrectPattern(
       if (!fmt.supportsNumericRange) return null;
       return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
-    case 'likert':
-    case 'other':
+    default:
       return [i.correct as string];
-    case 'performance':
-      return [
-        (i.correct as Array<[string, string | number]>)
-          .map((s) => encodeStep(s, fmt))
-          .join(fmt.itemDelim),
-      ];
   }
 }
 
@@ -383,15 +371,13 @@ function fitResponse(
       ]),
     };
   }
-  const encoded = encodeResponse(i, fmt);
-  const value =
-    typeof encoded === 'string' ? encoded : encoded.join(fmt.itemDelim);
+  const value = formatResponse(i, fmt);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  const whole =
-    typeof encoded === 'string' ? '' : wholeItems(encoded, fmt.itemDelim, max);
+  const items = encodeItems(i, i.response, fmt);
+  const whole = items ? wholeItems(items, fmt.itemDelim, max) : '';
   const cut =
-    typeof encoded === 'string' || (!whole && i.type === 'performance')
+    !items || (!whole && i.type === 'performance')
       ? cutText(value, max)
       : whole;
   console.warn(
