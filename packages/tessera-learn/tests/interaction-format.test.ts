@@ -143,28 +143,30 @@ describe('SCORM 2004 ids inside a response', () => {
     ).toBe('a[.]b');
   });
 
-  it('refuses a correct sequence or step list that repeats an item', () => {
+  it('drops a correct sequence or step list that repeats an item', () => {
     const seq: Interaction = {
       type: 'sequencing',
       response: ['a', 'b', 'a'],
       correct: ['a', 'b', 'a'],
     };
+    const steps: Interaction = {
+      type: 'performance',
+      response: [],
+      correct: [
+        ['s', 'x'],
+        ['s', 'x'],
+      ],
+    };
     expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
-    expect(() => formatCorrectPattern(seq, fmt)).toThrow('lists "a" twice');
-    expect(() =>
-      formatCorrectPattern(
-        {
-          type: 'performance',
-          response: [],
-          correct: [
-            ['s', 'x'],
-            ['s', 'x'],
-          ],
-        },
-        fmt,
-      ),
-    ).toThrow('lists "s[.]x" twice');
-    expect(formatCorrectPattern(seq, XAPI_INTERACTION_FORMAT)).toEqual([
+    for (const i of [seq, steps]) {
+      expect(fitPatterns(i, fmt)).toEqual({
+        kept: [],
+        warnings: [
+          expect.stringContaining('1 correct answer(s) repeating an item'),
+        ],
+      });
+    }
+    expect(fitPatterns(seq, XAPI_INTERACTION_FORMAT).kept).toEqual([
       'a[,]b[,]a',
     ]);
   });

@@ -319,7 +319,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         },
         'a[,]b[,]a',
         '',
-        'lists "a" twice',
+        'repeating an item',
       ],
       [
         'a repeated matching pair',

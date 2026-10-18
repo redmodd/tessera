@@ -211,19 +211,20 @@ function encodeStep(
 ): string {
   const answer = String(a);
   const name = stepName(step, fmt);
-  if (fmt.strictGrammar && name === '' && answer === '') {
-    throw new UnrecordableError(
-      'a step has neither a name nor an answer, which this export standard rejects',
-    );
-  }
-  if (
-    fmt.strictGrammar &&
-    STEP_DELIM.test(answer) &&
-    !(field === 'correct' && NUMERIC_RANGE.test(answer))
-  ) {
-    throw new UnrecordableError(
-      `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
-    );
+  if (fmt.strictGrammar) {
+    if (name === '' && answer === '') {
+      throw new UnrecordableError(
+        'a step has neither a name nor an answer, which this export standard rejects',
+      );
+    }
+    if (
+      STEP_DELIM.test(answer) &&
+      !(field === 'correct' && NUMERIC_RANGE.test(answer))
+    ) {
+      throw new UnrecordableError(
+        `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
+      );
+    }
   }
   return `${name}${fmt.pairDelim}${answer}`;
 }
@@ -251,16 +252,9 @@ function encodeItems(
     i.type === 'choice' || i.type === 'matching'
       ? [...new Set(encoded)]
       : encoded;
-  if (!fmt.strictGrammar) return items;
-  if (items.length === 0) {
+  if (fmt.strictGrammar && items.length === 0) {
     throw new UnrecordableError(
       'it has no items, which this export standard rejects',
-    );
-  }
-  const repeat = items.find((item, k) => items.indexOf(item) !== k);
-  if (field === 'correct' && repeat !== undefined) {
-    throw new UnrecordableError(
-      `it lists "${repeat}" twice, which this export standard rejects`,
     );
   }
   return items;
@@ -423,23 +417,36 @@ export function fitPatterns(
       ],
     };
   }
-  const formatted = formatCorrectPattern(i, fmt) ?? [];
   const warnings: string[] = [];
-  const items = (p: string) => patternItems(p, i.type, fmt);
-  const unspaced = fmt.strictGrammar
-    ? formatted.filter((p) => items(p).every((item) => item.trim() === item))
-    : formatted;
-  if (unspaced.length < formatted.length) {
-    warnings.push(
-      `has ${formatted.length - unspaced.length} correct answer(s) starting or ending in whitespace, which ${recorder} rejects; they are ${lost}`,
+  // scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole.
+  const items = (p: string) =>
+    i.type === 'long-fill-in' || i.type === 'other'
+      ? [p]
+      : p.split(fmt.itemDelim);
+  const drop = (
+    list: string[],
+    rejects: (items: string[]) => boolean,
+    reason: string,
+  ) => {
+    const kept = list.filter((p) => !rejects(items(p)));
+    if (kept.length < list.length) {
+      warnings.push(
+        `has ${list.length - kept.length} correct answer(s) ${reason}, which ${recorder} rejects; they are ${lost}`,
+      );
+    }
+    return kept;
+  };
+  let patterns = formatCorrectPattern(i, fmt) ?? [];
+  if (fmt.strictGrammar) {
+    patterns = drop(
+      patterns,
+      (it) => it.some((item) => item.trim() !== item),
+      'starting or ending in whitespace',
     );
-  }
-  const patterns = fmt.strictGrammar
-    ? unspaced.filter((p) => new Set(items(p)).size === items(p).length)
-    : unspaced;
-  if (patterns.length < unspaced.length) {
-    warnings.push(
-      `has ${unspaced.length - patterns.length} correct answer(s) repeating an item, which ${recorder} rejects; they are ${lost}`,
+    patterns = drop(
+      patterns,
+      (it) => new Set(it).size < it.length,
+      'repeating an item',
     );
   }
   const max = fmt.maxValueLength(i.type);
@@ -468,17 +475,6 @@ export function fitPatterns(
     );
   }
   return { kept: fit.slice(0, limit), warnings };
-}
-
-/** scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole. */
-function patternItems(
-  pattern: string,
-  type: Interaction['type'],
-  fmt: InteractionFormat,
-): string[] {
-  return type === 'long-fill-in' || type === 'other'
-    ? [pattern]
-    : pattern.split(fmt.itemDelim);
 }
 
 function hasLongStep(
