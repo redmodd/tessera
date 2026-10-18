@@ -70,7 +70,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: Verdict | null = null;
   #verdictFinal = false;
-  #writtenStatus: string | null = null;
+  #writtenStatus: Verdict | 'completed' | 'incomplete' | null = null;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);

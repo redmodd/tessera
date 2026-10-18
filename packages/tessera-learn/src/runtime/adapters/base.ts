@@ -87,8 +87,8 @@ export abstract class BaseAdapter {
   ): void {}
   /**
    * Send what the setters recorded. SCORM 1.2 writes `lesson_status` and
-   * xAPI/cmi5 send status statements only here. xAPI/cmi5 also commit in
-   * terminate(); SCORM does not.
+   * xAPI/cmi5 send status statements only here. xAPI/cmi5 terminate() calls
+   * commit(); SCORM's does not, so commit() before terminate().
    */
   commit(): void {}
   terminate(): void {}

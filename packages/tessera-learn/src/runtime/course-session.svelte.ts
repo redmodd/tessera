@@ -186,7 +186,8 @@ export class CourseSession {
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
     // Cloud rolls that up to "completed"/"passed" during status rollup.
     this.#report(() => {
-      adapter.setCompletionStatus(progress.reportedCompletionStatus);
+      this.#prevCompletionStatus = progress.reportedCompletionStatus;
+      adapter.setCompletionStatus(this.#prevCompletionStatus);
       this.#reportSuccess();
     });
 
@@ -241,7 +242,6 @@ export class CourseSession {
     // After progress, so the bookmark's page is unlocked.
     this.#nav.goToPage(saved.b);
 
-    this.#prevCompletionStatus = progress.reportedCompletionStatus;
     const seededScore = progress.gradedScoreFinal
       ? progress.reportedScore
       : null;

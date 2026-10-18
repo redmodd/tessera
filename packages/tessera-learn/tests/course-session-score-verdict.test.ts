@@ -154,3 +154,23 @@ describe('completion and a verdict that change in one tick', () => {
     expect(calls).toEqual(['completion:complete', 'success:failed', 'commit']);
   });
 });
+
+describe('a launch that is already complete', () => {
+  it('reports its status in one commit', async () => {
+    const calls: string[] = [];
+    await startSession({
+      config: createConfig({
+        completion: { mode: 'percentage', percentageThreshold: 0 },
+      }),
+      manifest: createManifest(2),
+      adapter: stubAdapter({
+        setCompletionStatus: (status) => calls.push(`completion:${status}`),
+        setSuccessStatus: (status) => calls.push(`success:${status}`),
+        commit: () => calls.push('commit'),
+      }),
+    });
+    await flush();
+
+    expect(calls).toEqual(['completion:complete', 'success:unknown', 'commit']);
+  });
+});
