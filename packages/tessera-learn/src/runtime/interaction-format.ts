@@ -159,10 +159,10 @@ const CASE_PREFIX = '{case_matters=true}';
 class UnrecordableError extends Error {}
 
 /** SCORM 1.2 records a list id as its position in the options passed. */
-function recordsIndex(
-  options: object | undefined,
+function recordsIndex<T extends object>(
+  options: T | undefined,
   fmt: InteractionFormat,
-): boolean {
+): options is T {
   return fmt.encodesOptionIndex && options !== undefined;
 }
 
@@ -175,7 +175,7 @@ function encodeListItem(
   options: string[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  if (!fmt.encodesOptionIndex || !options) return fmt.responseId(value);
+  if (!recordsIndex(options, fmt)) return fmt.responseId(value);
   const idx = options.indexOf(value);
   if (idx < 0) {
     throw new UnrecordableError(`"${value}" is not in its options`);
@@ -245,7 +245,12 @@ function encodeItems(
   field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string[] {
-  const items = encodeEach(i, field, fmt);
+  const encoded = encodeEach(i, field, fmt);
+  // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
+  const items =
+    i.type === 'choice' || i.type === 'matching'
+      ? [...new Set(encoded)]
+      : encoded;
   if (!fmt.strictGrammar) return items;
   if (items.length === 0) {
     throw new UnrecordableError(
@@ -267,21 +272,11 @@ function encodeEach(
   fmt: InteractionFormat,
 ): string[] {
   switch (i.type) {
-    // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
     case 'choice':
-      return [
-        ...new Set(
-          (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt)),
-        ),
-      ];
-    case 'matching':
-      return [
-        ...new Set(
-          (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt)),
-        ),
-      ];
     case 'sequencing':
       return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
+    case 'matching':
+      return (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt));
     case 'performance':
       return (i[field] ?? []).map((s) => encodeStep(s, field, fmt));
   }
