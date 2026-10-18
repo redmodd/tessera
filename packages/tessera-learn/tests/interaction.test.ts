@@ -270,6 +270,22 @@ describe('isCorrect', () => {
         }),
       ).toBe(false);
     });
+
+    it('fails when a repeated step stands in for a missing one', () => {
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['step-a', 1],
+            ['step-a', 1],
+          ],
+          correct: [
+            ['step-a', 1],
+            ['step-b', 'x'],
+          ],
+        }),
+      ).toBe(false);
+    });
   });
 
   describe('other', () => {

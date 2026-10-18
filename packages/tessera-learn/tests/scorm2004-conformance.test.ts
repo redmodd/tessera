@@ -355,11 +355,29 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'neither a name nor an answer',
       ],
       [
-        'an empty choice',
-        { type: 'choice', response: [], correct: [] },
+        'an empty choice response',
+        { type: 'choice', response: [], correct: ['a'] },
+        '',
+        'a',
+        'has no items',
+      ],
+      [
+        'an empty sequence',
+        { type: 'sequencing', response: [], correct: [] },
         '',
         '',
         'has no items',
+      ],
+      [
+        'a fill-in response of 11 parts',
+        {
+          type: 'fill-in',
+          response: ids(11).join('[,]'),
+          correct: ['a'],
+        },
+        '',
+        'a',
+        'has 11 [,]-separated parts, more than the 10',
       ],
       [
         '36 sequence items',
@@ -415,6 +433,21 @@ describe('SCORM2004Adapter against scorm-again', () => {
         warn.mockRestore();
       },
     );
+
+    // scorm-again 3.4.6 rejects it, though SCORM 2004 reads it as no choice correct.
+    it.skip('records an empty choice pattern', async () => {
+      await start();
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: [] },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('1');
+    });
 
     it('warns only that a long step answer holding a delimiter is left out', async () => {
       await start();

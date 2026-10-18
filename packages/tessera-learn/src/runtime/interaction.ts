@@ -126,9 +126,12 @@ export function isCorrect(i: Interaction): boolean | null {
       return i.response === i.correct;
     case 'performance': {
       if (i.correct === undefined) return null;
-      if (i.response.length !== i.correct.length) return false;
       const cmap = new Map<string, string | number>(i.correct);
-      for (const [stepId, value] of i.response) {
+      const rmap = new Map<string, string | number>(i.response);
+      if (rmap.size !== i.response.length || rmap.size !== cmap.size) {
+        return false;
+      }
+      for (const [stepId, value] of rmap) {
         if (!cmap.has(stepId)) return false;
         if (cmap.get(stepId) !== value) return false;
       }

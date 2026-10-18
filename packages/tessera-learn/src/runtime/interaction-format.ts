@@ -44,7 +44,8 @@ export interface InteractionFormat {
   /** SCORM 2004 records an unnamed step as `[.]answer`; SCORM 1.2 records `_`. */
   keepsUnnamedStep: boolean;
   /**
-   * SCORM 2004 rejects a list with no items, a step with neither name nor
+   * SCORM 2004 rejects a list with no items (an empty correct choice aside),
+   * a fill-in response of more than 10 `[,]`-separated parts, a step with neither name nor
    * answer, a step answer holding `[,]`, `[.]` or `[:]` (a correct `min[:]max`
    * range aside), and a correct pattern that repeats an item or has an item
    * starting or ending in whitespace.
@@ -260,7 +261,9 @@ function encodeItems(
     i.type === 'choice' || i.type === 'matching'
       ? [...new Set(encoded)]
       : encoded;
-  if (fmt.strictGrammar && items.length === 0) {
+  // SCORM 2004 reads an empty choice pattern as "no choice is correct".
+  const mayBeEmpty = field === 'correct' && i.type === 'choice';
+  if (fmt.strictGrammar && items.length === 0 && !mayBeEmpty) {
     throw new UnrecordableError(
       'it has no items, which this export standard rejects',
     );
@@ -296,7 +299,15 @@ export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
   switch (i.type) {
     case 'true-false':
       return fmt.formatBoolean(i.response);
-    case 'fill-in':
+    case 'fill-in': {
+      const parts = i.response.split(fmt.itemDelim).length;
+      if (fmt.strictGrammar && parts > fmt.fillInLimit) {
+        throw new UnrecordableError(
+          `it has ${parts} [,]-separated parts, more than the ${fmt.fillInLimit} this export standard records`,
+        );
+      }
+      return i.response;
+    }
     case 'long-fill-in':
     case 'other':
       return i.response;
@@ -580,7 +591,6 @@ function warnResponseIds(
 ): void {
   const groups = responseIdGroups(i, fmt);
   const ids = groups.flat();
-  // Only SCORM 1.2 encodes option indexes.
   if (fmt.encodesOptionIndex && i.type === 'likert') {
     // Values from different learners can merge, which the check below cannot see.
     const changed = ids.find((v) => fmt.responseId(v) !== v);
