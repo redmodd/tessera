@@ -61,14 +61,16 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
  * since async retries cannot complete during page unload.
  *
  * SCORM 1.2 collapses completion + success into a single `lesson_status`
- * field, so the two setters track their values separately and write the
- * combined result through `#flushLessonStatus`. LMSes read `failed` as a
+ * field, so the two setters only record their values and `commit()` writes
+ * the combined result once. Writing from each setter would show the LMS a
+ * transient value (`completed` before `failed`). LMSes read `failed` as a
  * finished attempt, so it waits for completion or a final verdict.
  */
 export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
   #completionStatus: 'completed' | 'incomplete' = 'incomplete';
   #successStatus: Verdict | null = null;
   #verdictFinal = false;
+  #statusChanged = false;
 
   static connect(): SCORM12Adapter | null {
     const api = findLMSAPI(SCORM12_DIALECT);
@@ -93,7 +95,7 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
 
   setCompletionStatus(status: CompletionStatus): void {
     this.#completionStatus = status === 'complete' ? 'completed' : 'incomplete';
-    this.#flushLessonStatus();
+    this.#statusChanged = true;
   }
 
   setSuccessStatus(status: SuccessStatus, final = false): void {
@@ -101,10 +103,22 @@ export class SCORM12Adapter extends BaseScormAdapter<SCORM12API> {
     // completion status.
     this.#successStatus = status === 'unknown' ? null : status;
     this.#verdictFinal = final;
+    this.#statusChanged = true;
+  }
+
+  override commit(): void {
     this.#flushLessonStatus();
+    super.commit();
+  }
+
+  override terminate(): void {
+    this.#flushLessonStatus();
+    super.terminate();
   }
 
   #flushLessonStatus(): void {
+    if (!this.#statusChanged) return;
+    this.#statusChanged = false;
     const held =
       this.#successStatus === 'failed' &&
       this.#completionStatus === 'incomplete' &&

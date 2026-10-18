@@ -59,6 +59,7 @@ describe('SCORM12Adapter against scorm-again', () => {
     await start();
     adapter.setCompletionStatus('complete');
     adapter.setSuccessStatus('passed');
+    adapter.commit();
     await flush();
     expect(lms.errors).toEqual([]);
     // success takes priority over completion in lesson_status
