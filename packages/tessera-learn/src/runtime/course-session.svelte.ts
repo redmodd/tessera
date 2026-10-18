@@ -184,7 +184,8 @@ export class CourseSession {
     }
 
     // LMSes must never see the SCORM default ("unknown") on Terminate: SCORM
-    // Cloud rolls that up to "completed"/"passed" during status rollup.
+    // Cloud rolls that up to "completed"/"passed" during status rollup. Sent
+    // here rather than left to the effect, so a failure rejects start().
     this.#reportChanges();
 
     // Courses with no `xapi:` config get null, which is what `useXAPI()` is

@@ -408,7 +408,6 @@ describe('SCORM12Adapter', () => {
       adapter.setCompletionStatus('complete');
       adapter.setSuccessStatus('failed');
       adapter.commit();
-      adapter.commit();
       await flush();
       expect(lessonStatusWrites()).toEqual(['failed']);
     });

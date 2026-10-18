@@ -53,7 +53,7 @@ describe('a graded submit that decides the verdict', () => {
     expect(verbs()).not.toContain('scored');
   });
 
-  it('sends the verdict once, not again from the success effect', async () => {
+  it('sends the verdict once when the score decides it', async () => {
     const setSuccessStatus = vi.fn();
     const progress = await start(stubAdapter({ setSuccessStatus }));
 
