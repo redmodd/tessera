@@ -23,6 +23,13 @@ function staticArray(prop: PropValue | undefined): unknown[] | null {
   return Array.isArray(value) ? value : null;
 }
 
+function staticList(prop: PropValue | undefined): unknown[] | null {
+  if (prop?.kind === 'string') return [prop.value];
+  const value = staticValue(prop);
+  if (value === undefined) return null;
+  return Array.isArray(value) ? value : [value];
+}
+
 function staticNumber(prop: PropValue | undefined): number | null {
   const value = staticValue(prop);
   return typeof value === 'number' ? value : null;
@@ -70,13 +77,13 @@ const QUESTION_COMPONENTS: Record<
   FillInTheBlank: {
     required: ['question', 'answers'],
     check(props, fileRel, d) {
-      const answers = staticArray(props.get('answers'));
+      const answers = staticList(props.get('answers'));
       if (answers) {
         if (answers.length === 0) {
           d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
         } else if (!isStringArray(answers)) {
           d.error(
-            `${fileRel}: <FillInTheBlank> answers must be an array of strings`,
+            `${fileRel}: <FillInTheBlank> answers must be a string or an array of strings`,
           );
         }
       }
@@ -155,13 +162,15 @@ export function validateQuestionComponents(
     }
 
     // Rule 1.5: empty option/answer labels are both an a11y and a scoring bug.
-    for (const labelProp of ['options', 'answers']) {
-      const entries = staticArray(props.get(labelProp));
+    for (const [label, entries] of [
+      ['option', staticArray(props.get('options'))],
+      ['answer', staticList(props.get('answers'))],
+    ] as const) {
       if (entries?.some((e) => typeof e === 'string' && e.trim() === '')) {
         d.warn(
           tag(
             A11Y_IDS.questionLabel,
-            `${fileRel}: <${name}> has an empty ${labelProp === 'options' ? 'option' : 'answer'} label`,
+            `${fileRel}: <${name}> has an empty ${label} label`,
           ),
         );
       }

@@ -238,9 +238,15 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     );
   });
 
-  it('a single answer string shows as the correct answer after a miss', async () => {
+  it('a single answer string grades, reports and shows as the correct answer', async () => {
+    const reports: Array<[string, Interaction, boolean | null]> = [];
+    const adapter = {
+      reportInteraction: (id: string, i: Interaction, c: boolean | null) =>
+        reports.push([id, i, c]),
+    };
     const { target } = mountInBody(FillInTheBlank, {
       props: { question: 'Capital', answers: 'Paris' },
+      setup: () => setAdapterContext({ adapter } as any),
     });
 
     const input = target.querySelector('input') as HTMLInputElement;
@@ -253,5 +259,26 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     expect(
       target.querySelector('.tessera-fitb-correct-answer')?.textContent,
     ).toBe('Correct answer: Paris');
+    expect(reports).toHaveLength(1);
+    const [, interaction, correct] = reports[0];
+    expect(interaction).toMatchObject({ type: 'fill-in', correct: ['Paris'] });
+    expect(correct).toBe(false);
+  });
+
+  it('shows the trimmed answers it grades against', async () => {
+    const { target } = mountInBody(FillInTheBlank, {
+      props: { question: 'Capital', answers: [' Paris ', 'Lutetia'] },
+    });
+
+    const input = target.querySelector('input') as HTMLInputElement;
+    input.value = 'Lyon';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush();
+    (target.querySelector('button') as HTMLButtonElement).click();
+    await flush();
+
+    expect(
+      target.querySelector('.tessera-fitb-correct-answer')?.textContent,
+    ).toBe('Correct answers: Paris, Lutetia');
   });
 });

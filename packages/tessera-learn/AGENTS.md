@@ -416,7 +416,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 **MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`.
 
-**FillInTheBlank**: `question` `string`, `answers` `string[]` (distinct spellings only). Optional: `caseSensitive` `boolean` (default `false`, so don't list case variants).
+**FillInTheBlank**: `question` `string`, `answers` `string | string[]` (distinct spellings only). Optional: `caseSensitive` `boolean` (default `false`, so don't list case variants).
 
 **Matching**: `question` `string`, `pairs` `{left, right}[]`. Right column auto-shuffled; click left then right to match (tap on mobile), click a pair to unmatch; all pairs must be correct.
 

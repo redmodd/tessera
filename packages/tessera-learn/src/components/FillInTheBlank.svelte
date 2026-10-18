@@ -31,7 +31,9 @@
     weight = 1,
   } = $props();
 
-  const answerList = $derived(Array.isArray(answers) ? answers : [answers]);
+  const answerList = $derived(
+    (Array.isArray(answers) ? answers : [answers]).map((a) => a.trim()),
+  );
   let inputValue = $state('');
 
   const componentId = $props.id();
@@ -48,7 +50,7 @@
     response: () => ({
       type: 'fill-in',
       response: inputValue.trim(),
-      correct: answerList.map((a) => a.trim()),
+      correct: answerList,
       caseMatters: !!caseSensitive,
     }),
     reset: () => {
