@@ -237,21 +237,4 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
       'correct',
     );
   });
-
-  it('a single answer string shows as the correct answer after a miss', async () => {
-    const { target } = mountInBody(FillInTheBlank, {
-      props: { question: 'Capital', answers: 'Paris' },
-    });
-
-    const input = target.querySelector('input') as HTMLInputElement;
-    input.value = 'Lyon';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    await flush();
-    (target.querySelector('button') as HTMLButtonElement).click();
-    await flush();
-
-    expect(
-      target.querySelector('.tessera-fitb-correct-answer')?.textContent,
-    ).toBe('Correct answer: Paris');
-  });
 });

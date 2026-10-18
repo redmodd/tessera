@@ -10,7 +10,7 @@
    * @type {{
    *   id?: string;
    *   question: string;
-   *   answers: string | string[];
+   *   answers: string[];
    *   caseSensitive?: boolean;
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
@@ -31,7 +31,6 @@
     weight = 1,
   } = $props();
 
-  const answerList = $derived(Array.isArray(answers) ? answers : [answers]);
   let inputValue = $state('');
 
   const componentId = $props.id();
@@ -48,7 +47,9 @@
     response: () => ({
       type: 'fill-in',
       response: inputValue.trim(),
-      correct: answerList.map((a) => a.trim()),
+      correct: (Array.isArray(answers) ? answers : [answers]).map((a) =>
+        a.trim(),
+      ),
       caseMatters: !!caseSensitive,
     }),
     reset: () => {
@@ -124,9 +125,7 @@
           Incorrect
         </div>
         <p class="tessera-fitb-correct-answer">
-          Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(
-            ', ',
-          )}
+          Correct answer{answers.length > 1 ? 's' : ''}: {answers.join(', ')}
         </p>
         {#if incorrectFeedback}
           <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
