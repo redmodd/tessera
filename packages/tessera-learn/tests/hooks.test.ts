@@ -142,6 +142,39 @@ describe('useQuestion — standalone mode', () => {
     );
   });
 
+  it('warns in dev, not in production, about a correct range no answer can match', () => {
+    const { adapter } = provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const interaction: Interaction = {
+      type: 'numeric',
+      response: 3,
+      correct: { min: 5, max: 1 },
+    };
+
+    useQuestion({
+      id: 'q1',
+      response: () => interaction,
+      restore: () => {},
+    }).submit();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(
+      'useQuestion("q1"): a correct range runs from 5 down to 1',
+    );
+    expect(adapter.reportInteraction).toHaveBeenCalledWith(
+      'q1',
+      interaction,
+      false,
+    );
+
+    vi.stubEnv('DEV', false);
+    useQuestion({
+      id: 'q2',
+      response: () => interaction,
+      restore: () => {},
+    }).submit();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
   it('says nothing in production about a widget with no restore', () => {
     vi.stubEnv('DEV', false);
     provideNavCtx();

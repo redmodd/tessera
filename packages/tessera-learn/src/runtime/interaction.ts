@@ -170,6 +170,24 @@ export function stepRange(
   };
 }
 
+/** A correct range whose min is above its max, so no answer can match it. */
+export function reversedRange(
+  i: Interaction,
+): { min: number; max: number } | null {
+  const ranges =
+    i.type === 'numeric'
+      ? [i.correct]
+      : i.type === 'performance'
+        ? (i.correct ?? []).map(([, answer]) => stepRange(answer))
+        : [];
+  for (const r of ranges) {
+    if (r?.min !== undefined && r.max !== undefined && r.min > r.max) {
+      return { min: r.min, max: r.max };
+    }
+  }
+  return null;
+}
+
 /**
  * Grades a step value as recorded, by its text: a range takes any decimal
  * inside it, ends included, as an LMS grades it (`1e-7` is not a decimal).

@@ -1,6 +1,7 @@
 import { onDestroy, onMount, tick } from 'svelte';
 import {
   isCorrect,
+  reversedRange,
   type Interaction,
   type InteractionResponse,
 } from './interaction.js';
@@ -136,6 +137,22 @@ interface QuizContext {
 const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
 export { setQuizContext };
 
+function reporter(
+  adapterCtx: ReturnType<typeof getAdapterContext>,
+): StandaloneQuestionDeps['report'] {
+  return (id, interaction, correct) => {
+    const range = import.meta.env?.DEV ? reversedRange(interaction) : null;
+    if (range) {
+      console.warn(
+        `[tessera] useQuestion("${id}"): a correct range runs from ` +
+          `${range.min} down to ${range.max}, so no answer can match it. ` +
+          'Put the smaller number first.',
+      );
+    }
+    adapterCtx?.adapter.reportInteraction(id, interaction, correct);
+  };
+}
+
 /**
  * Register a question widget with the Tessera runtime. Works outside a quiz
  * for inline practice, and inside a quiz host — the same hook drives both
@@ -213,7 +230,7 @@ export function useQuestion<I extends Interaction = Interaction>(
   }
 
   return new StandaloneQuestion(opts, {
-    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    report: reporter(adapterCtx),
     markScore,
     saved,
   });
@@ -471,7 +488,7 @@ export function useQuiz(
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
-    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    report: reporter(adapterCtx),
     onComplete: (score, responses) =>
       progress.quizCompleted(pageIndex, score, responses),
     notify: (name, detail) => {

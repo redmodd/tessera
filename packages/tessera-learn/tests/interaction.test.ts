@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isCorrect } from '../src/runtime/interaction.js';
+import type { Interaction } from '../src/runtime/interaction.js';
+import { isCorrect, reversedRange } from '../src/runtime/interaction.js';
 
 describe('isCorrect', () => {
   describe('choice', () => {
@@ -405,4 +406,44 @@ describe('isCorrect', () => {
       expect(isCorrect({ type: 'other', response: 'foo' })).toBeNull();
     });
   });
+});
+
+describe('reversedRange', () => {
+  it.each([
+    [
+      { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
+      { min: 5, max: 1 },
+    ],
+    [{ type: 'numeric', response: 3, correct: { min: 1, max: 5 } }, null],
+    [{ type: 'numeric', response: 3, correct: { min: 5 } }, null],
+    [{ type: 'numeric', response: 3 }, null],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'x'],
+          ['t', '5[:]-1'],
+        ],
+      },
+      { min: 5, max: -1 },
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', '1[:]5'],
+          ['t', '5[:]'],
+        ],
+      },
+      null,
+    ],
+    [{ type: 'other', response: '5[:]1', correct: '5[:]1' }, null],
+  ] as Array<[Interaction, ReturnType<typeof reversedRange>]>)(
+    'finds the reversed range in %j',
+    (i, range) => {
+      expect(reversedRange(i)).toEqual(range);
+    },
+  );
 });
