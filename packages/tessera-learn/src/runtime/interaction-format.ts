@@ -434,6 +434,14 @@ export function fitPatterns(
       ],
     };
   }
+  if (fmt.supportsRange && reversedRange(i)) {
+    return {
+      kept: [],
+      warnings: [
+        `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
+      ],
+    };
+  }
   const warnings: string[] = [];
   // scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole.
   const items = (p: string) =>
@@ -457,14 +465,6 @@ export function fitPatterns(
     return kept;
   };
   let patterns = formatCorrectPattern(i, fmt) ?? [];
-  if (patterns.length > 0 && reversedRange(i)) {
-    return {
-      kept: [],
-      warnings: [
-        `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
-      ],
-    };
-  }
   if (fmt.strictGrammar) {
     patterns = drop(
       patterns,

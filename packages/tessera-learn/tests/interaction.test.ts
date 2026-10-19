@@ -430,7 +430,7 @@ describe('isCorrect', () => {
 });
 
 describe('reversedRange', () => {
-  it.each([
+  it.each<[Interaction, ReturnType<typeof reversedRange>]>([
     [
       { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
       { min: 5, max: 1 },
@@ -461,10 +461,7 @@ describe('reversedRange', () => {
       null,
     ],
     [{ type: 'other', response: '5[:]1', correct: '5[:]1' }, null],
-  ] as Array<[Interaction, ReturnType<typeof reversedRange>]>)(
-    'finds the reversed range in %j',
-    (i, range) => {
-      expect(reversedRange(i)).toEqual(range);
-    },
-  );
+  ])('finds the reversed range in %j', (i, range) => {
+    expect(reversedRange(i)).toEqual(range);
+  });
 });

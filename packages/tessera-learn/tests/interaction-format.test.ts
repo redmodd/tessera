@@ -106,6 +106,23 @@ describe('performance steps', () => {
   });
 });
 
+describe('numeric ranges', () => {
+  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
+    [{ min: 5 }, ['5[:]'], null],
+    [{ max: 5 }, ['[:]5'], null],
+    [{ min: 1, max: 5 }, ['1[:]5'], null],
+    [{ min: 5, max: 5 }, ['5'], ['5']],
+  ])('records the correct range %j', (correct, scorm2004, scorm12) => {
+    const i: Interaction = { type: 'numeric', response: 7, correct };
+    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
+      scorm2004,
+    );
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
+      scorm12,
+    );
+  });
+});
+
 describe('SCORM 2004 ids inside a response', () => {
   const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
   const fmt = SCORM2004_INTERACTION_FORMAT;
@@ -272,21 +289,6 @@ describe('fitPatterns', () => {
       kept: [],
       warnings: [expect.stringContaining('minimum above its maximum')],
     });
-  });
-
-  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
-    [{ min: 5 }, ['5[:]'], null],
-    [{ max: 5 }, ['[:]5'], null],
-    [{ min: 1, max: 5 }, ['1[:]5'], null],
-    [{ min: 5, max: 5 }, ['5'], ['5']],
-  ])('records the numeric correct range %j', (correct, scorm2004, scorm12) => {
-    const i: Interaction = { type: 'numeric', response: 7, correct };
-    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
-      scorm2004,
-    );
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
-      scorm12,
-    );
   });
 
   it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
