@@ -2,4 +2,6 @@
 'tessera-learn': patch
 ---
 
-SCORM 2004 percent-encodes ids inside a response (`Strongly agree` → `Strongly%20agree`) so strict LMSs accept them, and SCORM 1.2 slugs likert values like other ids, with a warning when that changes one. Tessera warns when two ids in one response record as the same id. Choice and matching answers record and grade each item once, and a performance answer must match each correct step, repeats included. SCORM 2004 leaves out, with a console warning, values its data model rejects, and validation warns about Matching and Sorting lists over 36 items on SCORM 2004 too.
+Custom `useQuestion` widgets that send labels as ids (`Strongly agree`) now record on strict SCORM LMSs. SCORM 2004 percent-encodes them (`Strongly%20agree`), and SCORM 1.2 converts likert values to letters, digits and underscores, as it already does for other ids. Built-in widgets are unaffected. A console warning names any two ids that would record as one.
+
+Grading counts a repeated choice or matching item once, and a repeated performance step no longer stands in for a missing one. On SCORM 2004, a value the LMS would reject is left out with a console warning instead of being refused, and validation flags Matching and Sorting lists over 36 items.
