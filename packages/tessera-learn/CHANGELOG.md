@@ -1,5 +1,22 @@
 # tessera-learn
 
+## 0.11.1
+
+### Patch Changes
+
+- 47bdeaa: `<FillInTheBlank>` given a single answer string no longer throws when it shows the correct answer.
+  `tessera validate` checks a single answer string the same way as an answer list. It errors on a bare `answers` attribute, on `answers={undefined}`, and on answers that are all blank.
+  The correct answer shown after a miss and reported to the LMS is trimmed and leaves out blank answers, matching the answers it grades against.
+- 92c11f6: Custom `useQuestion` widgets that send labels as ids (`Strongly agree`) now record on strict SCORM LMSs. SCORM 2004 percent-encodes them (`Strongly%20agree`), and SCORM 1.2 converts likert values to letters, digits and underscores, as it already does for other ids. Built-in widgets are unaffected. A console warning names any two ids that would record as one, and any id cut to fit the 250-character limit.
+  
+  Grading counts a repeated choice or matching item once, and a repeated performance step no longer stands in for a missing one. On SCORM 2004, a value the LMS would reject is left out with a console warning instead of being refused, and validation flags Matching and Sorting lists over 36 items.
+- a46ee53: SCORM 1.2 and 2004 now record the first part of an over-long interaction response instead of losing it when a strict LMS rejects it (under SCORM 2004: fill-in, long-fill-in, other and performance step answers). `tessera validate` warns about `<FillInTheBlank>` answers the LMS record leaves out: those over the length cap, and those past the 10th. A shorthand prop like `{src}` no longer hides a missing alt text, title or other required prop from `tessera validate`, and a prop written before a `{...spread}` counts as one the spread may replace.
+- 3059e84: SCORM 1.2 now records answers to questions with more than 10 options, up to 36; strict LMSs such as SCORM Cloud rejected them before. Past 36, the answer is left out of the LMS record with a console warning (the result is still recorded), and `tessera validate` flags built-in questions with more than 36 options.
+  
+  Custom widgets: pass `options` (or `optionPairs` for matching) to `useQuestion()` so SCORM 1.2 can record each id. Without it, an id that is not one character from 0-9 or a-z logs a console warning, and an id missing from `options` is left out with one.
+- 4ef1ad3: SCORM 1.2 records performance step answers as written, so a numeric answer keeps its sign and decimal point.
+- a482370: SCORM 1.2 writes `lesson_status` once per commit, so the LMS no longer sees a brief `completed` before `failed`, on relaunch or when completion and a verdict arrive together.
+
 ## 0.11.0
 
 ### Minor Changes
