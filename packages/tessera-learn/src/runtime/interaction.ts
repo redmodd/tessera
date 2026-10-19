@@ -152,6 +152,6 @@ function pairSetEqual(
   a: Array<[string, string]>,
   b: Array<[string, string]>,
 ): boolean {
-  const key = ([l, r]: [string, string]) => `${l}\u241F${r}`;
+  const key = (pair: [string, string]) => JSON.stringify(pair);
   return setEqual(a.map(key), b.map(key));
 }

@@ -160,6 +160,19 @@ describe('isCorrect', () => {
       ).toBe(true);
     });
 
+    it('keeps pairs apart whatever characters their ids hold', () => {
+      expect(
+        isCorrect({
+          type: 'matching',
+          response: [['a␟b', 'c']],
+          correct: [
+            ['a␟b', 'c'],
+            ['a', 'b␟c'],
+          ],
+        }),
+      ).toBe(false);
+    });
+
     it('returns null when correct is undefined', () => {
       expect(
         isCorrect({ type: 'matching', response: [['A', '1']] }),
