@@ -158,7 +158,7 @@ function pairSetEqual(
 }
 
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
-const DECIMAL = new RegExp(`^${NUMBER}$`);
+const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)$/;
 const STEP_RANGE = new RegExp(String.raw`^(${NUMBER})?\[:\](${NUMBER})?$`);
 
 /** A performance step answer written `min[:]max`, either end optional. */
@@ -193,7 +193,8 @@ export function reversedRange(
 
 /**
  * Grades a step value as recorded, by its text: a range takes any decimal
- * inside it, ends included, as an LMS grades it (`1e-7` is not a decimal).
+ * inside it, ends included, as an LMS grades it (`.5` and `+3` are decimals,
+ * `1e-7` is not).
  */
 function stepFits(value: string | number, answer: string | number): boolean {
   const text = String(value);

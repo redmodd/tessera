@@ -110,6 +110,20 @@ describe('SCORM12Adapter against scorm-again', () => {
         { type: 'numeric', response: 22, correct: { min: 19, max: 25 } },
         true,
       ],
+      [
+        'numeric',
+        { type: 'numeric', response: 22, correct: { min: 19 } },
+        true,
+      ],
+      [
+        'performance',
+        {
+          type: 'performance',
+          response: [['s', '3']],
+          correct: [['s', '1[:]5']],
+        },
+        true,
+      ],
       ['likert', { type: 'likert', response: 'agree' }, null],
     ] as const)(
       'a %s interaction is accepted by the data model',

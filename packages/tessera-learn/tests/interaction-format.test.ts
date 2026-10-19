@@ -264,6 +264,31 @@ describe('fitPatterns', () => {
     },
   );
 
+  it.each<[Interaction]>([
+    [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],
+    [{ type: 'performance', response: [], correct: [['s', '5[:]1']] }],
+  ])('drops a reversed correct range on SCORM 2004: %j', (i) => {
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: [],
+      warnings: [expect.stringContaining('minimum above its maximum')],
+    });
+  });
+
+  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
+    [{ min: 5 }, ['5[:]'], null],
+    [{ max: 5 }, ['[:]5'], null],
+    [{ min: 1, max: 5 }, ['1[:]5'], null],
+    [{ min: 5, max: 5 }, ['5'], ['5']],
+  ])('records the numeric correct range %j', (correct, scorm2004, scorm12) => {
+    const i: Interaction = { type: 'numeric', response: 7, correct };
+    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
+      scorm2004,
+    );
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
+      scorm12,
+    );
+  });
+
   it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
     const i: Interaction = { type: 'choice', response: ['a'], correct: [] };
     expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(['']);

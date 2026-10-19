@@ -4,7 +4,7 @@
  * without its caps.
  */
 
-import { stepRange, type Interaction } from './interaction.js';
+import { reversedRange, stepRange, type Interaction } from './interaction.js';
 
 export interface InteractionFormat {
   itemDelim: string;
@@ -336,14 +336,10 @@ export function formatCorrectPattern(
       return alternatives.map((a) => prefix + a);
     }
     case 'numeric': {
-      const c = i.correct as { min?: number; max?: number };
-      if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
-        return [String(c.min)];
-      }
-      if (c.min !== undefined && c.max === undefined) return [String(c.min)];
-      if (c.min === undefined && c.max !== undefined) return [String(c.max)];
+      const { min, max } = i.correct as { min?: number; max?: number };
+      if (min !== undefined && min === max) return [String(min)];
       if (!fmt.supportsRange) return null;
-      return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
+      return [`${min ?? ''}${fmt.rangeDelim}${max ?? ''}`];
     }
     case 'likert':
       return [fmt.responseId(i.correct as string)];
@@ -461,6 +457,14 @@ export function fitPatterns(
     return kept;
   };
   let patterns = formatCorrectPattern(i, fmt) ?? [];
+  if (patterns.length > 0 && reversedRange(i)) {
+    return {
+      kept: [],
+      warnings: [
+        `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
+      ],
+    };
+  }
   if (fmt.strictGrammar) {
     patterns = drop(
       patterns,

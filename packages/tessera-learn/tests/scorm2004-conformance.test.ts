@@ -106,6 +106,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'numeric',
         { type: 'numeric', response: 7, correct: { min: 7, max: 7 } },
       ],
+      ['numeric', { type: 'numeric', response: 7, correct: { min: 5 } }],
     ] as const)(
       'a %s interaction is accepted by the data model',
       async (label, interaction) => {
@@ -307,6 +308,26 @@ describe('SCORM2004Adapter against scorm-again', () => {
         expect.stringContaining(
           'the response of interaction "q1" is left out of the LMS record: the step answer "turn [.] left" holds [,], [.] or [:]',
         ),
+      );
+    });
+
+    it('leaves out a reversed numeric range the data model rejects', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions._count')).toBe('1');
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('0');
+      expect(lms.raw.GetValue('cmi.interactions.0.result')).toBe('incorrect');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('minimum above its maximum'),
       );
     });
 
