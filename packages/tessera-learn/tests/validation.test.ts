@@ -2141,7 +2141,7 @@ let a = {}; let b = {};</script>
     ).toHaveLength(0);
   });
 
-  it('warns about more than 36 options, pairs, items or targets only under SCORM 1.2', () => {
+  it('warns about more than 36 options, pairs, items or targets under SCORM 1.2, and 36 pairs or items under SCORM 2004', () => {
     const list = (f: (i: number) => unknown) =>
       JSON.stringify(Array.from({ length: 37 }, (_, i) => f(i)));
     createValidProject(testRoot);
@@ -2166,6 +2166,15 @@ let a = {}; let b = {};</script>
       ),
       expect.stringContaining(
         '<Sorting> has 37 targets but SCORM 1.2 records at most 36; any response',
+      ),
+    ]);
+    writeStandardConfig('scorm2004');
+    expect(validateProject(testRoot).warnings.filter(tooMany)).toEqual([
+      expect.stringContaining(
+        '<Matching> has 37 pairs but SCORM 2004 records at most 36; every response and correct answer',
+      ),
+      expect.stringContaining(
+        '<Sorting> has 37 items but SCORM 2004 records at most 36; every response',
       ),
     ]);
   });

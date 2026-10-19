@@ -26,6 +26,19 @@ describe('isCorrect', () => {
       ).toBe(false);
     });
 
+    it('counts a repeated id once', () => {
+      expect(
+        isCorrect({ type: 'choice', response: ['a', 'a'], correct: ['a'] }),
+      ).toBe(true);
+      expect(
+        isCorrect({
+          type: 'choice',
+          response: ['a', 'a'],
+          correct: ['a', 'b'],
+        }),
+      ).toBe(false);
+    });
+
     it('returns null when correct is undefined', () => {
       expect(isCorrect({ type: 'choice', response: ['a'] })).toBeNull();
     });
@@ -130,6 +143,32 @@ describe('isCorrect', () => {
           type: 'matching',
           response: [['A', '1']],
           correct: [['A', '2']],
+        }),
+      ).toBe(false);
+    });
+
+    it('counts a repeated pair once', () => {
+      expect(
+        isCorrect({
+          type: 'matching',
+          response: [
+            ['A', '1'],
+            ['A', '1'],
+          ],
+          correct: [['A', '1']],
+        }),
+      ).toBe(true);
+    });
+
+    it('keeps pairs apart whatever characters their ids hold', () => {
+      expect(
+        isCorrect({
+          type: 'matching',
+          response: [['a␟b', 'c']],
+          correct: [
+            ['a␟b', 'c'],
+            ['a', 'b␟c'],
+          ],
         }),
       ).toBe(false);
     });
@@ -241,6 +280,45 @@ describe('isCorrect', () => {
           type: 'performance',
           response: [['step-a', 2]],
           correct: [['step-a', 1]],
+        }),
+      ).toBe(false);
+    });
+
+    it('fails when a repeated step stands in for a missing one', () => {
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['step-a', 1],
+            ['step-a', 1],
+          ],
+          correct: [
+            ['step-a', 1],
+            ['step-b', 'x'],
+          ],
+        }),
+      ).toBe(false);
+    });
+
+    it('matches a repeated unnamed step', () => {
+      const steps: Array<[string, string]> = [
+        ['', 'x'],
+        ['', 'x'],
+      ];
+      expect(
+        isCorrect({ type: 'performance', response: steps, correct: steps }),
+      ).toBe(true);
+    });
+
+    it('fails when the response skips a repeat of a correct step', () => {
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [['step-a', 2]],
+          correct: [
+            ['step-a', 1],
+            ['step-a', 2],
+          ],
         }),
       ).toBe(false);
     });

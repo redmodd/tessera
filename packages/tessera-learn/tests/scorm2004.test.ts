@@ -523,7 +523,7 @@ describe('SCORM2004Adapter', () => {
       });
     });
 
-    it('passes response and correct identifiers through unchanged', async () => {
+    it('percent-encodes response and correct identifiers', async () => {
       adapter.reportInteraction(
         's2',
         {
@@ -534,10 +534,11 @@ describe('SCORM2004Adapter', () => {
         true,
       );
       await flush();
+      const recorded =
+        "Sputnik%201%20launched[,]Apollo%208's%20%22Earthrise%22%20photo";
       expect(interaction0()).toMatchObject({
-        learner_response: 'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
-        'correct_responses.0.pattern':
-          'Sputnik 1 launched[,]Apollo 8\'s "Earthrise" photo',
+        learner_response: recorded,
+        'correct_responses.0.pattern': recorded,
       });
     });
 

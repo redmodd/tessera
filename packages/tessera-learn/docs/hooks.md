@@ -85,12 +85,14 @@ type Interaction =
     };
 ```
 
-For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`. cmi5/SCORM 2004 keep the ids; SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
+For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`. cmi5, xAPI and SCORM 2004 record the ids (see below); SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
 
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
-For `performance`, SCORM 1.2 slugs each step id to letters, digits and underscores (`Step 1` → `Step_1`) and sends each value as written. Give steps ids that differ in letters or digits, not only in punctuation.
+Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), and when SCORM 1.2 changes a `likert` value (`-1` and `+1` both become `1`). Step values are sent as written. Choice and matching answers record and grade each item once.
+
+SCORM 2004 records at most 36 list items (250 `performance` steps) and rejects a correct answer that repeats an item or starts or ends in whitespace. Tessera leaves any value SCORM 2004 rejects out of the LMS record, with a console warning naming the cause. The result is still recorded.
 
 ```ts
 response: () => ({

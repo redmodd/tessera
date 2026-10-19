@@ -10,6 +10,8 @@ import {
 } from './helpers/real-lms.js';
 import { flush } from './helpers.js';
 
+const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
+
 describe('SCORM2004Adapter against scorm-again', () => {
   let lms: RealLms2004;
   let adapter: SCORM2004Adapter;
@@ -148,6 +150,28 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
+    it.each([
+      ['an id', 'a'.repeat(300), 'a'.repeat(250)],
+      ['an id with no letter or digit', '-'.repeat(100), '%2D'.repeat(83)],
+    ])('warns once when it cuts %s to 250 characters', async (_, id, cut) => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: [id], correct: [id] },
+        true,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(cut);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `interaction "q1" records the id "${id}" cut to the 250 characters`,
+        ),
+      );
+    });
+
     it('a performance step answer over 250 characters is cut to fit', async () => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -177,6 +201,309 @@ describe('SCORM2004Adapter against scorm-again', () => {
         expect.stringContaining(
           '"q1" has a correct step answer over the 250 characters',
         ),
+      );
+    });
+
+    it.each([
+      [
+        'likert',
+        {
+          type: 'likert',
+          response: 'Strongly agree',
+          correct: 'Strongly agree',
+        },
+        'Strongly%20agree',
+      ],
+      [
+        'matching',
+        {
+          type: 'matching',
+          response: [['New York', 'USA']],
+          correct: [['New York', 'USA']],
+        },
+        'New%20York[.]USA',
+      ],
+      [
+        'sequencing',
+        {
+          type: 'sequencing',
+          response: ['step one', 'step two'],
+          correct: ['step one', 'step two'],
+        },
+        'step%20one[,]step%20two',
+      ],
+      [
+        'performance',
+        {
+          type: 'performance',
+          response: [['step one', 'all done']],
+          correct: [['step one', 'all done']],
+        },
+        'step%20one[.]all done',
+      ],
+      [
+        'URN likert',
+        {
+          type: 'likert',
+          response: 'urn:course:agree',
+          correct: 'urn:course:agree',
+        },
+        'urn:course:agree',
+      ],
+      [
+        'unnamed performance step',
+        {
+          type: 'performance',
+          response: [['', 'all done']],
+          correct: [['', 'all done']],
+        },
+        '[.]all done',
+      ],
+      [
+        'punctuation-only likert',
+        { type: 'likert', response: '-', correct: '-' },
+        '%2D',
+      ],
+      [
+        'merged choice',
+        { type: 'choice', response: ['', '_'], correct: ['', '_'] },
+        '_',
+      ],
+    ] as const)(
+      'records %s ids so the data model accepts them',
+      async (_label, interaction, recorded) => {
+        await start();
+        adapter.reportInteraction('q1', interaction as never, true);
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          recorded,
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+        ).toBe(recorded);
+      },
+    );
+
+    it('leaves out a step answer holding a delimiter but keeps a correct range', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'performance',
+          response: [['s', 'turn [.] left']],
+          correct: [['s', '1[:]5']],
+        },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe('');
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+      ).toBe('s[.]1[:]5');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'the response of interaction "q1" is left out of the LMS record: the step answer "turn [.] left" holds [,], [.] or [:]',
+        ),
+      );
+    });
+
+    it.each([
+      [
+        'a correct step answer ending in a space',
+        {
+          type: 'performance',
+          response: [['s', 'done ']],
+          correct: [['s', 'done ']],
+        },
+        's[.]done ',
+        '',
+        'starting or ending in whitespace',
+      ],
+      [
+        'a case-sensitive answer with a space after the prefix',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: [' Paris'],
+          caseMatters: true,
+        },
+        'Paris',
+        '{case_matters=true} Paris',
+        undefined,
+      ],
+      [
+        'a repeated sequence item',
+        {
+          type: 'sequencing',
+          response: ['a', 'b', 'a'],
+          correct: ['a', 'b', 'a'],
+        },
+        'a[,]b[,]a',
+        '',
+        'repeating an item',
+      ],
+      [
+        'a repeated matching pair',
+        {
+          type: 'matching',
+          response: [
+            ['a', 'b'],
+            ['a', 'b'],
+          ],
+          correct: [
+            ['a', 'b'],
+            ['a', 'b'],
+          ],
+        },
+        'a[.]b',
+        'a[.]b',
+        undefined,
+      ],
+      [
+        'a fill-in answer that repeats an item',
+        { type: 'fill-in', response: 'a', correct: ['a[,]a'] },
+        'a',
+        '',
+        'repeating a [,]-separated part',
+      ],
+      [
+        'a step with neither name nor answer',
+        { type: 'performance', response: [['', '']], correct: [['', '']] },
+        '',
+        '',
+        'neither a name nor an answer',
+      ],
+      [
+        'an empty choice response',
+        { type: 'choice', response: [], correct: ['a'] },
+        '',
+        'a',
+        'has no items',
+      ],
+      [
+        'an empty sequence',
+        { type: 'sequencing', response: [], correct: [] },
+        '',
+        '',
+        'has no items',
+      ],
+      [
+        'a fill-in response of 10 parts',
+        {
+          type: 'fill-in',
+          response: ids(10).join('[,]'),
+          correct: ['a'],
+        },
+        ids(10).join('[,]'),
+        'a',
+        undefined,
+      ],
+      [
+        'a fill-in response of 11 parts',
+        {
+          type: 'fill-in',
+          response: ids(11).join('[,]'),
+          correct: ['a'],
+        },
+        '',
+        'a',
+        'has 11 [,]-separated parts, more than the 10',
+      ],
+      [
+        'a fill-in answer of 11 parts',
+        { type: 'fill-in', response: 'a', correct: [ids(11).join('[,]')] },
+        'a',
+        '',
+        'more than 10 [,]-separated parts',
+      ],
+      [
+        '36 sequence items',
+        { type: 'sequencing', response: ids(36), correct: ids(36) },
+        ids(36).join('[,]'),
+        ids(36).join('[,]'),
+        undefined,
+      ],
+      [
+        '37 sequence items',
+        { type: 'sequencing', response: ids(37), correct: ids(37) },
+        '',
+        '',
+        'has 37 items, more than the 36',
+      ],
+      [
+        '37 choice ids',
+        { type: 'choice', response: ids(37), correct: ids(37) },
+        '',
+        '',
+        'has 37 items, more than the 36',
+      ],
+      [
+        '251 steps',
+        {
+          type: 'performance',
+          response: ids(251).map((s) => [s, 'x']),
+          correct: ids(251).map((s) => [s, 'x']),
+        },
+        '',
+        '',
+        'has 251 items, more than the 250',
+      ],
+    ] as const)(
+      'records what the data model takes from %s',
+      async (_label, interaction, response, pattern, warning) => {
+        await start();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        adapter.reportInteraction('q1', interaction as never, true);
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+          response,
+        );
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+        ).toBe(pattern);
+        if (warning) {
+          expect(warn).toHaveBeenCalledWith(expect.stringContaining(warning));
+        } else {
+          expect(warn).not.toHaveBeenCalled();
+        }
+      },
+    );
+
+    // scorm-again 3.4.6 rejects it, though SCORM 2004 reads it as no choice correct.
+    it.skip('records an empty choice pattern', async () => {
+      await start();
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: [] },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('1');
+    });
+
+    it('warns only that a long step answer holding a delimiter is left out', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'performance',
+          response: [['s', 'a [,] b' + 'x'.repeat(300)]],
+        },
+        false,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('is left out of the LMS record'),
       );
     });
 

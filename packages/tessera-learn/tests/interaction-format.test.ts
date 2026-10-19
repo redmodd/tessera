@@ -32,7 +32,9 @@ describe('encodesOptionIndex', () => {
   it('encodes identifiers when the flag is off', () => {
     expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
   });
+});
 
+describe('performance steps', () => {
   it('slugs performance step names but keeps answers as written on SCORM 1.2', () => {
     const performance: Interaction = {
       type: 'performance',
@@ -50,10 +52,7 @@ describe('encodesOptionIndex', () => {
     ).toEqual(['Step_1.done!']);
   });
 
-  it.each([
-    ['SCORM 2004', SCORM2004_INTERACTION_FORMAT],
-    ['xAPI', XAPI_INTERACTION_FORMAT],
-  ])('keeps performance step names and answers as written on %s', (_, fmt) => {
+  it('percent-encodes performance step names but keeps answers as written on SCORM 2004', () => {
     const performance: Interaction = {
       type: 'performance',
       response: [
@@ -61,8 +60,132 @@ describe('encodesOptionIndex', () => {
         ['angle', -3.5],
       ],
     };
-    expect(formatResponse(performance, fmt)).toBe(
-      'Step 1[.]turn left[,]angle[.]-3.5',
+    expect(formatResponse(performance, SCORM2004_INTERACTION_FORMAT)).toBe(
+      'Step%201[.]turn left[,]angle[.]-3.5',
+    );
+  });
+
+  it('keeps performance step names and answers as written on xAPI', () => {
+    const performance: Interaction = {
+      type: 'performance',
+      response: [['Step 1', 'turn left']],
+    };
+    expect(formatResponse(performance, XAPI_INTERACTION_FORMAT)).toBe(
+      'Step 1[.]turn left',
+    );
+  });
+
+  it('keeps an unnamed step unnamed on SCORM 2004', () => {
+    const unnamed: Interaction = {
+      type: 'performance',
+      response: [['', 'go']],
+    };
+    expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
+    expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
+  });
+});
+
+describe('SCORM 2004 ids inside a response', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
+  const fmt = SCORM2004_INTERACTION_FORMAT;
+
+  it.each([
+    ['Strongly agree', 'Strongly%20agree'],
+    ['step-one_(a)', 'step-one_(a)'],
+    ['a[,]b~c', 'a%5B%2C%5Db%7Ec'],
+    ['café', 'caf%C3%A9'],
+    ['urn:course:likert/agree#1', 'urn:course:likert/agree#1'],
+    ['a%20b', 'a%2520b'],
+    ['a?b&c', 'a%3Fb%26c'],
+    ['-', '%2D'],
+    ['::', '%3A%3A'],
+    ['(*)', '%28%2A%29'],
+    ['', '_'],
+    ['a\uD800', 'a%EF%BF%BD'],
+  ])('records %s as %s', (id, recorded) => {
+    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+      recorded,
+    );
+  });
+
+  it('records a choice id once', () => {
+    expect(
+      formatResponse({ type: 'choice', response: ['', '_', 'a', 'a'] }, fmt),
+    ).toBe('_[,]a');
+  });
+
+  it('refuses a step answer holding a delimiter, except a correct range', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 'a [,] b']],
+      correct: [['s', '-1.5[:]2']],
+    };
+    expect(() => formatResponse(i, fmt)).toThrow('holds [,], [.] or [:]');
+    expect(formatCorrectPattern(i, fmt)).toEqual(['s[.]-1.5[:]2']);
+    expect(() =>
+      formatCorrectPattern({ ...i, correct: [['s', 'a[:]b']] }, fmt),
+    ).toThrow('holds [,], [.] or [:]');
+    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
+    expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
+  });
+
+  it('drops a correct sequence or step list that repeats an item', () => {
+    const seq: Interaction = {
+      type: 'sequencing',
+      response: ['a', 'b', 'a'],
+      correct: ['a', 'b', 'a'],
+    };
+    const steps: Interaction = {
+      type: 'performance',
+      response: [],
+      correct: [
+        ['s', 'x'],
+        ['s', 'x'],
+      ],
+    };
+    expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
+    for (const i of [seq, steps]) {
+      expect(fitPatterns(i, fmt)).toEqual({
+        kept: [],
+        warnings: [
+          expect.stringContaining('1 correct answer(s) repeating an item'),
+        ],
+      });
+    }
+    expect(fitPatterns(seq, XAPI_INTERACTION_FORMAT).kept).toEqual([
+      'a[,]b[,]a',
+    ]);
+  });
+
+  it.each<[string, Interaction, string]>([
+    [
+      '37 sequence items',
+      { type: 'sequencing', response: ids(37) },
+      'it has 37 items, more than the 36',
+    ],
+    ['an empty choice', { type: 'choice', response: [] }, 'has no items'],
+    [
+      'a step with neither name nor answer',
+      { type: 'performance', response: [['', '']] },
+      'neither a name nor an answer',
+    ],
+    [
+      'an 11-part fill-in',
+      { type: 'fill-in', response: ids(11).join('[,]') },
+      'it has 11 [,]-separated parts, more than the 10',
+    ],
+  ])('refuses %s on SCORM 2004 only', (_, i, error) => {
+    expect(() => formatResponse(i, fmt)).toThrow(error);
+    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
+    expect(() => formatResponse(i, SCORM12_INTERACTION_FORMAT)).not.toThrow();
+  });
+
+  it.each([
+    ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
+    ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
+  ])('cuts an id to 250 characters without splitting %s', (_, id, recorded) => {
+    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+      recorded,
     );
   });
 });
@@ -85,6 +208,45 @@ describe('fitPatterns', () => {
       expect(warnings[0].includes('counting the')).toBe(credited);
     },
   );
+
+  it.each<[string, Interaction, string[], string]>([
+    [
+      'fill-in',
+      {
+        type: 'fill-in',
+        response: '',
+        correct: ['Paris ', ' Rome', 'a[,] b', 'Oslo'],
+      },
+      ['Oslo'],
+      '3 correct answer(s) starting or ending in whitespace, or with whitespace beside [,]',
+    ],
+    [
+      'performance',
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'done '],
+          ['t', 'x'],
+        ],
+      },
+      [],
+      '1 correct answer(s) with an item starting or ending in whitespace',
+    ],
+  ])(
+    'drops a SCORM 2004 %s answer starting or ending in whitespace',
+    (_, i, kept, warning) => {
+      const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
+      expect(fit.kept).toEqual(kept);
+      expect(fit.warnings).toEqual([expect.stringContaining(warning)]);
+      expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
+    },
+  );
+
+  it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
+    const i: Interaction = { type: 'choice', response: ['a'], correct: [] };
+    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(['']);
+  });
 
   it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {
     const i: Interaction = {

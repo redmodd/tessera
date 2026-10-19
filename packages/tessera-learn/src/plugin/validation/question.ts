@@ -73,7 +73,8 @@ interface QuestionComponentRule {
   required: string[];
   /**
    * Props whose entries SCORM 1.2 records as one-character indexes; `every`
-   * when each complete answer and the correct pattern use every entry.
+   * when each complete answer and the correct pattern use every entry, as one
+   * matching pair each, so SCORM 2004's item cap applies too.
    */
   indexedLists?: Record<string, 'some' | 'every'>;
   check(match: ComponentMatch, ctx: RuleContext): void;
@@ -273,16 +274,22 @@ export function validateQuestionComponents(
       }
     }
 
-    if (standard?.interactionFormat.encodesOptionIndex) {
+    if (standard) {
+      const format = standard.interactionFormat;
       for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
+        const max = format.encodesOptionIndex
+          ? SCORM12_MAX_OPTIONS
+          : use === 'every'
+            ? format.maxItems('matching')
+            : Infinity;
         const count = staticArray(props.get(prop))?.length ?? 0;
-        if (count > SCORM12_MAX_OPTIONS) {
+        if (count > max) {
           const lost =
             use === 'every'
               ? 'every response and correct answer'
-              : `any response or correct answer that uses one past the ${SCORM12_MAX_OPTIONS}th`;
+              : `any response or correct answer that uses one past the ${max}th`;
           d.warn(
-            `${fileRel}: <${name}> has ${count} ${prop} but ${standard.name} records at most ${SCORM12_MAX_OPTIONS}; ${lost} is left out of the LMS record`,
+            `${fileRel}: <${name}> has ${count} ${prop} but ${standard.name} records at most ${max}; ${lost} is left out of the LMS record`,
           );
         }
       }
