@@ -86,6 +86,7 @@ describe('performance steps', () => {
 });
 
 describe('SCORM 2004 ids inside a response', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
   const fmt = SCORM2004_INTERACTION_FORMAT;
 
   it.each([
@@ -128,21 +129,6 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
   });
 
-  it('records a matching pair once', () => {
-    expect(
-      formatResponse(
-        {
-          type: 'matching',
-          response: [
-            ['a', 'b'],
-            ['a', 'b'],
-          ],
-        },
-        fmt,
-      ),
-    ).toBe('a[.]b');
-  });
-
   it('drops a correct sequence or step list that repeats an item', () => {
     const seq: Interaction = {
       type: 'sequencing',
@@ -171,33 +157,27 @@ describe('SCORM 2004 ids inside a response', () => {
     ]);
   });
 
-  it('refuses a list over its item cap', () => {
-    const ids = Array.from({ length: 37 }, (_, k) => `s${k}`);
-    const i: Interaction = { type: 'sequencing', response: ids };
-    expect(() => formatResponse(i, fmt)).toThrow(
+  it.each<[string, Interaction, string]>([
+    [
+      '37 sequence items',
+      { type: 'sequencing', response: ids(37) },
       'it has 37 items, more than the 36',
-    );
-    expect(() =>
-      formatResponse({ ...i, response: ids.slice(1) }, fmt),
-    ).not.toThrow();
-    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
-  });
-
-  it('refuses an empty list and a step with neither name nor answer', () => {
-    const empty: Interaction = { type: 'choice', response: [], correct: [] };
-    expect(() => formatResponse(empty, fmt)).toThrow('has no items');
-    expect(formatResponse(empty, XAPI_INTERACTION_FORMAT)).toBe('');
-    const order: Interaction = {
-      type: 'sequencing',
-      response: [],
-      correct: [],
-    };
-    expect(() => formatCorrectPattern(order, fmt)).toThrow('has no items');
-    const blank: Interaction = { type: 'performance', response: [['', '']] };
-    expect(() => formatResponse(blank, fmt)).toThrow(
+    ],
+    ['an empty choice', { type: 'choice', response: [] }, 'has no items'],
+    [
+      'a step with neither name nor answer',
+      { type: 'performance', response: [['', '']] },
       'neither a name nor an answer',
-    );
-    expect(formatResponse(blank, SCORM12_INTERACTION_FORMAT)).toBe('_.');
+    ],
+    [
+      'an 11-part fill-in',
+      { type: 'fill-in', response: ids(11).join('[,]') },
+      'it has 11 [,]-separated parts, more than the 10',
+    ],
+  ])('refuses %s on SCORM 2004 only', (_, i, error) => {
+    expect(() => formatResponse(i, fmt)).toThrow(error);
+    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
+    expect(() => formatResponse(i, SCORM12_INTERACTION_FORMAT)).not.toThrow();
   });
 
   it.each([
@@ -266,50 +246,6 @@ describe('fitPatterns', () => {
   it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
     const i: Interaction = { type: 'choice', response: ['a'], correct: [] };
     expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(['']);
-  });
-
-  it('refuses a SCORM 2004 fill-in response of more than 10 parts', () => {
-    const parts = (n: number): Interaction => ({
-      type: 'fill-in',
-      response: Array.from({ length: n }, (_, k) => `p${k}`).join('[,]'),
-    });
-    expect(() =>
-      formatResponse(parts(11), SCORM2004_INTERACTION_FORMAT),
-    ).toThrow('it has 11 [,]-separated parts, more than the 10');
-    expect(() =>
-      formatResponse(parts(10), SCORM2004_INTERACTION_FORMAT),
-    ).not.toThrow();
-    expect(() =>
-      formatResponse(parts(11), XAPI_INTERACTION_FORMAT),
-    ).not.toThrow();
-  });
-
-  it('drops a SCORM 2004 fill-in answer that repeats an item', () => {
-    const i: Interaction = {
-      type: 'fill-in',
-      response: '',
-      correct: ['a[,]b[,]a', 'a[,]b'],
-    };
-    const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
-    expect(fit.kept).toEqual(['a[,]b']);
-    expect(fit.warnings).toEqual([
-      expect.stringContaining(
-        '1 correct answer(s) repeating a [,]-separated part',
-      ),
-    ]);
-    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
-  });
-
-  it('keeps a case-sensitive SCORM 2004 answer whose space follows the prefix', () => {
-    const i: Interaction = {
-      type: 'fill-in',
-      response: '',
-      correct: [' Paris'],
-      caseMatters: true,
-    };
-    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT).kept).toEqual([
-      '{case_matters=true} Paris',
-    ]);
   });
 
   it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {

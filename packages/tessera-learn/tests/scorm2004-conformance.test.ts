@@ -369,6 +369,17 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'has no items',
       ],
       [
+        'a fill-in response of 10 parts',
+        {
+          type: 'fill-in',
+          response: ids(10).join('[,]'),
+          correct: ['a'],
+        },
+        ids(10).join('[,]'),
+        'a',
+        undefined,
+      ],
+      [
         'a fill-in response of 11 parts',
         {
           type: 'fill-in',
@@ -437,7 +448,6 @@ describe('SCORM2004Adapter against scorm-again', () => {
         } else {
           expect(warn).not.toHaveBeenCalled();
         }
-        warn.mockRestore();
       },
     );
 
@@ -473,7 +483,6 @@ describe('SCORM2004Adapter against scorm-again', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('is left out of the LMS record'),
       );
-      warn.mockRestore();
     });
 
     describe('matching + numeric range (scorm-again 3.0.5 fix)', () => {

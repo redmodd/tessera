@@ -41,14 +41,9 @@ export interface InteractionFormat {
    * performance list at 250 steps.
    */
   maxItems(type: ListInteraction['type']): number;
-  /** SCORM 2004 records an unnamed step as `[.]answer`; SCORM 1.2 records `_`. */
-  keepsUnnamedStep: boolean;
   /**
-   * SCORM 2004 rejects a list with no items (an empty correct choice aside),
-   * a fill-in value of more than 10 `[,]`-separated parts, a step with neither
-   * name nor answer, a step answer holding `[,]`, `[.]` or `[:]` (a correct
-   * `min[:]max` range aside), and a correct pattern that repeats an item or has
-   * an item starting or ending in whitespace.
+   * SCORM 2004 keeps an unnamed step as `[.]answer` and rejects values its
+   * data model grammar disallows.
    */
   strictGrammar: boolean;
   formatBoolean(value: boolean): string;
@@ -69,7 +64,6 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   maxValueLength: () => 255,
   maxStepAnswerLength: Infinity,
   maxItems: () => Infinity,
-  keepsUnnamedStep: false,
   strictGrammar: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
@@ -102,7 +96,6 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   },
   maxStepAnswerLength: 250,
   maxItems: (type) => (type === 'performance' ? 250 : 36),
-  keepsUnnamedStep: true,
   strictGrammar: true,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
@@ -206,7 +199,7 @@ function encodePair(
 }
 
 function stepName(step: string, fmt: InteractionFormat): string {
-  return step === '' && fmt.keepsUnnamedStep ? '' : fmt.responseId(step);
+  return step === '' && fmt.strictGrammar ? '' : fmt.responseId(step);
 }
 
 const STEP_DELIM = /\[[,.:]\]/;
@@ -600,14 +593,17 @@ function warnResponseIds(
   const groups = responseIdGroups(i, fmt);
   const ids = groups.flat();
   if (fmt.encodesOptionIndex && i.type === 'likert') {
-    // Values from different learners can merge, which the check below cannot see.
+    // Values from different learners can merge too, so this warns on any change
+    // and stands in for the merge warning.
     const changed = ids.find((v) => fmt.responseId(v) !== v);
     if (changed !== undefined) {
       console.warn(
         `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}" on SCORM 1.2, so values that differ only in punctuation record the same. Send values of letters, digits and underscores.`,
       );
     }
-  } else if (fmt.encodesOptionIndex && i.type !== 'performance') {
+    return;
+  }
+  if (fmt.encodesOptionIndex && i.type !== 'performance') {
     const invalid = ids.find((id) => !/^[0-9a-z]$/.test(fmt.responseId(id)));
     if (invalid !== undefined) {
       console.warn(

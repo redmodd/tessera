@@ -815,9 +815,13 @@ describe('SCORM12Adapter', () => {
       ]);
     });
 
-    it('warns when it changes a likert value', async () => {
+    it('warns once when it changes a likert value', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      adapter.reportInteraction('l1', { type: 'likert', response: '-1' }, null);
+      adapter.reportInteraction(
+        'l1',
+        { type: 'likert', response: '-1', correct: '+1' },
+        false,
+      );
       await flush();
       expect(interaction0()).toMatchObject({ student_response: '1' });
       expect(warn).toHaveBeenCalledOnce();
