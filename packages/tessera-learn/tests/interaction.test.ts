@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { Interaction } from '../src/runtime/interaction.js';
-import { isCorrect, reversedRange } from '../src/runtime/interaction.js';
+import {
+  isCorrect,
+  reversedRange,
+  type Interaction,
+} from '../src/runtime/interaction.js';
 
 describe('isCorrect', () => {
   describe('choice', () => {

@@ -90,7 +90,14 @@ For `choice` / `sequencing` / `matching`, always pass the full option list via `
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
-Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), and when SCORM 1.2 changes a `likert` value (`-1` and `+1` both become `1`). Step values are sent as written and graded by that text, so `3` and `'3'` match. A correct step value written `min[:]max` (either end optional, as in `1[:]5` or `[:]10`) grades any decimal step value inside the range, ends included. Put the smaller end first, here and in a `numeric` `correct`: Tessera warns in dev when a range's minimum is above its maximum, since no answer can match it. SCORM 1.2 has no range syntax, so it leaves that correct answer out of the LMS record; the result is still recorded. Choice and matching answers record and grade each item once.
+Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), and when SCORM 1.2 changes a `likert` value (`-1` and `+1` both become `1`). Choice and matching answers record and grade each item once.
+
+`performance` step values:
+
+- Sent as written and graded by that text, so `3` and `'3'` match.
+- A correct step value written `min[:]max` (either end optional, as in `1[:]5` or `[:]10`) matches any decimal step value inside the range, ends included.
+- Put the smaller end first, here and in a `numeric` `correct`. Tessera warns in dev when a range's minimum is above its maximum.
+- SCORM 1.2 has no range syntax, so it leaves a correct answer holding a range out of the LMS record. The result is still recorded.
 
 SCORM 2004 records at most 36 list items (250 `performance` steps) and rejects a correct answer that repeats an item or starts or ends in whitespace. Tessera leaves any value SCORM 2004 rejects out of the LMS record, with a console warning naming the cause. The result is still recorded.
 

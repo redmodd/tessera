@@ -137,9 +137,8 @@ interface QuizContext {
 const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
 export { setQuizContext };
 
-function reporter(
-  adapterCtx: ReturnType<typeof getAdapterContext>,
-): StandaloneQuestionDeps['report'] {
+function reporter(): StandaloneQuestionDeps['report'] {
+  const adapterCtx = getAdapterContext();
   return (id, interaction, correct) => {
     const range = import.meta.env?.DEV ? reversedRange(interaction) : null;
     if (range) {
@@ -164,7 +163,6 @@ export function useQuestion<I extends Interaction = Interaction>(
 ): UseQuestionHandle {
   const quizCtx = getQuizContext();
   const navCtx = getNavContext();
-  const adapterCtx = getAdapterContext();
 
   if (import.meta.env?.DEV && !opts.restore) {
     console.warn(
@@ -230,7 +228,7 @@ export function useQuestion<I extends Interaction = Interaction>(
   }
 
   return new StandaloneQuestion(opts, {
-    report: reporter(adapterCtx),
+    report: reporter(),
     markScore,
     saved,
   });
@@ -467,7 +465,6 @@ export function useQuiz(
   opts: { element?: () => HTMLElement | null } = {},
 ): UseQuizHandle {
   const pageCtx = getPageContext();
-  const adapterCtx = getAdapterContext();
   const { progress } = requireNavContext('useQuiz()');
   if (!pageCtx?.quiz || pageCtx.index === undefined) {
     throw new Error(
@@ -488,7 +485,7 @@ export function useQuiz(
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
-    report: reporter(adapterCtx),
+    report: reporter(),
     onComplete: (score, responses) =>
       progress.quizCompleted(pageIndex, score, responses),
     notify: (name, detail) => {

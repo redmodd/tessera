@@ -11,10 +11,10 @@ export interface InteractionFormat {
   pairDelim: string;
   rangeDelim: string;
   /**
-   * SCORM 1.2 has no numeric range syntax — `correct_responses.n.pattern`
-   * is a single CMIDecimal. SCORM 2004 supports `min[:]max`.
+   * SCORM 2004 writes a `numeric` or `performance` step range as `min[:]max`;
+   * SCORM 1.2 has no range syntax, so it leaves a correct range out.
    */
-  supportsNumericRange: boolean;
+  supportsRange: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
@@ -56,7 +56,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: ',',
   pairDelim: '.',
   rangeDelim: ':',
-  supportsNumericRange: false,
+  supportsRange: false,
   supportsCasePrefix: false,
   encodesOptionIndex: true,
   fillInLimit: 10,
@@ -78,7 +78,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: '[,]',
   pairDelim: '[.]',
   rangeDelim: '[:]',
-  supportsNumericRange: true,
+  supportsRange: true,
   supportsCasePrefix: true,
   encodesOptionIndex: false,
   fillInLimit: 10,
@@ -317,10 +317,9 @@ export function formatCorrectPattern(
   fmt: InteractionFormat,
 ): string[] | null {
   if (i.correct === undefined) return null;
-  // SCORM 1.2 has no range syntax; rely on `result`, as for a numeric range.
   if (
     i.type === 'performance' &&
-    !fmt.supportsNumericRange &&
+    !fmt.supportsRange &&
     i.correct.some(([, a]) => stepRange(a))
   ) {
     return null;
@@ -343,8 +342,7 @@ export function formatCorrectPattern(
       }
       if (c.min !== undefined && c.max === undefined) return [String(c.min)];
       if (c.min === undefined && c.max !== undefined) return [String(c.max)];
-      // True range — drop the pattern in 1.2 (rely on `result` for pass/fail).
-      if (!fmt.supportsNumericRange) return null;
+      if (!fmt.supportsRange) return null;
       return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
     }
     case 'likert':
