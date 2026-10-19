@@ -83,6 +83,27 @@ describe('performance steps', () => {
     expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
     expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
   });
+
+  it('leaves out a correct step range on SCORM 1.2 only', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 3]],
+      correct: [
+        ['s', '1[:]5'],
+        ['t', 'x'],
+      ],
+    };
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
+    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
+      's[.]1[:]5[,]t[.]x',
+    ]);
+    expect(
+      formatCorrectPattern(
+        { ...i, correct: [['s', 'a[:]b']] },
+        SCORM12_INTERACTION_FORMAT,
+      ),
+    ).toEqual(['s.a[:]b']);
+  });
 });
 
 describe('SCORM 2004 ids inside a response', () => {
@@ -127,27 +148,6 @@ describe('SCORM 2004 ids inside a response', () => {
     ).toThrow('holds [,], [.] or [:]');
     expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
-  });
-
-  it('leaves out a correct step range on SCORM 1.2 only', () => {
-    const i: Interaction = {
-      type: 'performance',
-      response: [['s', 3]],
-      correct: [
-        ['s', '1[:]5'],
-        ['t', 'x'],
-      ],
-    };
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
-    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
-      's[.]1[:]5[,]t[.]x',
-    ]);
-    expect(
-      formatCorrectPattern(
-        { ...i, correct: [['s', 'a[:]b']] },
-        SCORM12_INTERACTION_FORMAT,
-      ),
-    ).toEqual(['s.a[:]b']);
   });
 
   it('drops a correct sequence or step list that repeats an item', () => {

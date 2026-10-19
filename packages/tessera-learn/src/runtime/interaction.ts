@@ -129,8 +129,8 @@ export function isCorrect(i: Interaction): boolean | null {
       if (i.response.length !== i.correct.length) return false;
       return matchesAll(
         i.response,
-        i.correct,
-        ([s, value], [t, answer]) => s === t && stepFits(value, answer),
+        i.correct.map(([t, answer]) => [t, stepMatcher(answer)] as const),
+        ([s, value], [t, fits]) => s === t && fits(value),
       );
     }
     case 'other':
@@ -154,8 +154,9 @@ function pairSetEqual(
   return setEqual(a.map(key), b.map(key));
 }
 
-const DECIMAL = /^-?\d+(\.\d+)?$/;
-const STEP_RANGE = /^(-?\d+(?:\.\d+)?)?\[:\](-?\d+(?:\.\d+)?)?$/;
+const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
+const DECIMAL = new RegExp(`^${NUMBER}$`);
+const STEP_RANGE = new RegExp(String.raw`^(${NUMBER})?\[:\](${NUMBER})?$`);
 
 /** A performance step answer written `min[:]max`, either end optional. */
 export function stepRange(
@@ -169,17 +170,24 @@ export function stepRange(
   };
 }
 
-/** A range takes any decimal inside it, ends included, as an LMS grades it. */
-function stepFits(value: string | number, answer: string | number): boolean {
+/**
+ * Grades a step value as recorded, by its text: a range takes any decimal
+ * inside it, ends included, as an LMS grades it (`1e-7` is not a decimal).
+ */
+function stepMatcher(
+  answer: string | number,
+): (value: string | number) => boolean {
   const range = stepRange(answer);
-  if (!range) return value === answer;
-  const n =
-    typeof value === 'number' ? value : DECIMAL.test(value) ? +value : NaN;
-  return (
-    Number.isFinite(n) &&
-    (range.min === undefined || n >= range.min) &&
-    (range.max === undefined || n <= range.max)
-  );
+  if (!range) return (value) => String(value) === String(answer);
+  return (value) => {
+    const text = String(value);
+    const n = Number(text);
+    return (
+      DECIMAL.test(text) &&
+      (range.min === undefined || n >= range.min) &&
+      (range.max === undefined || n <= range.max)
+    );
+  };
 }
 
 /**

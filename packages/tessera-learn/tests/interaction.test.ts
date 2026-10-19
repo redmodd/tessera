@@ -324,7 +324,26 @@ describe('isCorrect', () => {
     });
 
     it.each([
+      [3, '3', true],
+      [-3.5, '-3.5', true],
+      ['3', 3, true],
+      [3, '3.0', false],
+    ] as const)(
+      'grades %j against %j as recorded text: %s',
+      (value, answer, ok) => {
+        expect(
+          isCorrect({
+            type: 'performance',
+            response: [['s', value]],
+            correct: [['s', answer]],
+          }),
+        ).toBe(ok);
+      },
+    );
+
+    it.each([
       [3, '1[:]5', true],
+      [3, '3[:]3', true],
       ['3', '1[:]5', true],
       [1, '1[:]5', true],
       [5, '1[:]5', true],
@@ -339,6 +358,8 @@ describe('isCorrect', () => {
       ['3 ', '1[:]5', false],
       ['1[:]5', '1[:]5', false],
       [Number.NaN, '[:]', false],
+      [1e-7, '[:]1', false],
+      [1e21, '0[:]', false],
       [3, 'a[:]b', false],
     ] as const)(
       'grades %j against the step range %j as %s',
