@@ -262,20 +262,21 @@ describe('isCorrect', () => {
   });
 
   describe('performance', () => {
-    it('matches on step-set equality regardless of order', () => {
+    it('requires the steps in order', () => {
+      const correct: Array<[string, string | number]> = [
+        ['step-a', 1],
+        ['step-b', 'x'],
+      ];
+      expect(
+        isCorrect({ type: 'performance', response: correct, correct }),
+      ).toBe(true);
       expect(
         isCorrect({
           type: 'performance',
-          response: [
-            ['step-a', 1],
-            ['step-b', 'x'],
-          ],
-          correct: [
-            ['step-b', 'x'],
-            ['step-a', 1],
-          ],
+          response: [...correct].reverse(),
+          correct,
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it('fails on wrong step value', () => {
@@ -378,7 +379,21 @@ describe('isCorrect', () => {
       },
     );
 
-    it('matches repeated steps to overlapping ranges in any order', () => {
+    it('grades each step against the correct step in its place', () => {
+      const correct: Array<[string, string]> = [
+        ['s', '1[:]5'],
+        ['s', '3[:]10'],
+      ];
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['s', 2],
+            ['s', 4],
+          ],
+          correct,
+        }),
+      ).toBe(true);
       expect(
         isCorrect({
           type: 'performance',
@@ -386,12 +401,9 @@ describe('isCorrect', () => {
             ['s', 4],
             ['s', 2],
           ],
-          correct: [
-            ['s', '1[:]5'],
-            ['s', '3[:]10'],
-          ],
+          correct,
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 

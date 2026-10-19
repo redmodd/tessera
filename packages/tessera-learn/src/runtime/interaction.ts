@@ -125,12 +125,15 @@ export function isCorrect(i: Interaction): boolean | null {
       if (i.correct === undefined) return null;
       return i.response === i.correct;
     case 'performance': {
-      if (i.correct === undefined) return null;
-      if (i.response.length !== i.correct.length) return false;
-      return matchesAll(
-        i.response,
-        i.correct.map(([t, answer]) => [t, stepMatcher(answer)] as const),
-        ([s, value], [t, fits]) => s === t && fits(value),
+      const correct = i.correct;
+      if (correct === undefined) return null;
+      // Steps grade in order, as `order_matters` defaults to true.
+      return (
+        i.response.length === correct.length &&
+        i.response.every(
+          ([step, value], k) =>
+            step === correct[k][0] && stepFits(value, correct[k][1]),
+        )
       );
     }
     case 'other':
@@ -192,39 +195,14 @@ export function reversedRange(
  * Grades a step value as recorded, by its text: a range takes any decimal
  * inside it, ends included, as an LMS grades it (`1e-7` is not a decimal).
  */
-function stepMatcher(
-  answer: string | number,
-): (value: string | number) => boolean {
+function stepFits(value: string | number, answer: string | number): boolean {
+  const text = String(value);
   const range = stepRange(answer);
-  if (!range) return (value) => String(value) === String(answer);
-  return (value) => {
-    const text = String(value);
-    const n = Number(text);
-    return (
-      DECIMAL.test(text) &&
-      (range.min === undefined || n >= range.min) &&
-      (range.max === undefined || n <= range.max)
-    );
-  };
-}
-
-/**
- * Whether each item pairs with its own target. Augmenting paths, since a
- * value can fit more than one range and a greedy pick can block a later one.
- */
-function matchesAll<T, U>(
-  items: T[],
-  targets: U[],
-  fits: (item: T, target: U) => boolean,
-): boolean {
-  const owner: number[] = targets.map(() => -1);
-  const place = (k: number, seen: Set<number>): boolean =>
-    targets.some((target, t) => {
-      if (seen.has(t) || !fits(items[k], target)) return false;
-      seen.add(t);
-      if (owner[t] >= 0 && !place(owner[t], seen)) return false;
-      owner[t] = k;
-      return true;
-    });
-  return items.every((_, k) => place(k, new Set()));
+  if (!range) return text === String(answer);
+  const n = Number(text);
+  return (
+    DECIMAL.test(text) &&
+    (range.min === undefined || n >= range.min) &&
+    (range.max === undefined || n <= range.max)
+  );
 }
