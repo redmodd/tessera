@@ -150,6 +150,28 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
+    it.each([
+      ['an id', 'a'.repeat(300), 'a'.repeat(250)],
+      ['an id with no letter or digit', '-'.repeat(100), '%2D'.repeat(83)],
+    ])('warns once when it cuts %s to 250 characters', async (_, id, cut) => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: [id], correct: [id] },
+        true,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(cut);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `interaction "q1" records the id "${id}" cut to the 250 characters`,
+        ),
+      );
+    });
+
     it('a performance step answer over 250 characters is cut to fit', async () => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

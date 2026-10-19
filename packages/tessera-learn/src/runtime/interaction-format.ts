@@ -49,7 +49,7 @@ export interface InteractionFormat {
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
   /** Ids inside a response: list items, matching ids, step names, likert. */
-  responseId(value: string): string;
+  responseId(value: string, max?: number): string;
 }
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
@@ -118,9 +118,9 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
  * underscore, max 250 chars. Strict validators (SCORM Cloud) reject raw
  * option labels with spaces or punctuation with error 405/406.
  */
-export function shortIdentifier(value: string): string {
+export function shortIdentifier(value: string, max = 250): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const trimmed = cleaned.slice(0, 250);
+  const trimmed = cleaned.slice(0, max);
   return trimmed || '_';
 }
 
@@ -134,7 +134,7 @@ const URI_ID_CHAR = /[\w\-()+.:=@;$!*'/#]/;
  * keeps each character's escapes whole. The cut, the `_` for an empty id and
  * the U+FFFD for a lone surrogate can record distinct ids as one.
  */
-function uriIdentifier(value: string): string {
+function uriIdentifier(value: string, max = 250): string {
   let id = '';
   for (const c of value.replace(/\p{Cs}/gu, '\uFFFD')) {
     const encoded = URI_ID_CHAR.test(c)
@@ -142,7 +142,7 @@ function uriIdentifier(value: string): string {
       : c === '~'
         ? '%7E'
         : encodeURIComponent(c);
-    if (id.length + encoded.length > 250) break;
+    if (id.length + encoded.length > max) break;
     id += encoded;
   }
   if (/\w/.test(id)) return id;
@@ -150,7 +150,7 @@ function uriIdentifier(value: string): string {
     /./g,
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
   );
-  return escaped.slice(0, 249) || '_';
+  return escaped.slice(0, Math.floor(max / 3) * 3) || '_';
 }
 
 export const SCORM12_MAX_OPTIONS = 36;
@@ -608,6 +608,15 @@ function warnResponseIds(
     if (invalid !== undefined) {
       console.warn(
         `Tessera: interaction "${questionId}" sends the id "${invalid}" without options; SCORM 1.2 allows one character (0-9, a-z) per id, so strict LMSs reject it. Pass options to record each id as its position.`,
+      );
+    }
+  } else {
+    const long = ids.find(
+      (id) => fmt.responseId(id, Infinity) !== fmt.responseId(id),
+    );
+    if (long !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" records the id "${long}" cut to the 250 characters this export standard allows, so the LMS record loses its end. Give it a shorter id.`,
       );
     }
   }
