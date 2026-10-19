@@ -158,7 +158,7 @@ function pairSetEqual(
 }
 
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
-const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)$/;
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const STEP_RANGE = new RegExp(String.raw`^(${NUMBER})?\[:\](${NUMBER})?$`);
 
 /** A performance step answer written `min[:]max`, either end optional. */
