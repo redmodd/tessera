@@ -4,7 +4,7 @@
  * without its caps.
  */
 
-import type { Interaction } from './interaction.js';
+import { stepRange, type Interaction } from './interaction.js';
 
 export interface InteractionFormat {
   itemDelim: string;
@@ -204,7 +204,6 @@ function stepName(step: string, fmt: InteractionFormat): string {
 
 const STEP_DELIM = /\[[,.:]\]/;
 const MAX_FILL_IN_PARTS = 10;
-const NUMERIC_RANGE = /^(-?\d+(\.\d+)?)?\[:\](-?\d+(\.\d+)?)?$/;
 
 /** Step names are identifiers; step answers are free text, kept as written. */
 function encodeStep(
@@ -220,10 +219,7 @@ function encodeStep(
         'a step has neither a name nor an answer, which this export standard rejects',
       );
     }
-    if (
-      STEP_DELIM.test(answer) &&
-      !(field === 'correct' && NUMERIC_RANGE.test(answer))
-    ) {
+    if (STEP_DELIM.test(answer) && !(field === 'correct' && stepRange(a))) {
       throw new UnrecordableError(
         `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
       );
@@ -321,6 +317,14 @@ export function formatCorrectPattern(
   fmt: InteractionFormat,
 ): string[] | null {
   if (i.correct === undefined) return null;
+  // SCORM 1.2 has no range syntax; rely on `result`, as for a numeric range.
+  if (
+    i.type === 'performance' &&
+    !fmt.supportsNumericRange &&
+    i.correct.some(([, a]) => stepRange(a))
+  ) {
+    return null;
+  }
   if (isList(i)) return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
   switch (i.type) {
     case 'true-false':

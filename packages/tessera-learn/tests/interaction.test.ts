@@ -322,6 +322,52 @@ describe('isCorrect', () => {
         }),
       ).toBe(false);
     });
+
+    it.each([
+      [3, '1[:]5', true],
+      ['3', '1[:]5', true],
+      [1, '1[:]5', true],
+      [5, '1[:]5', true],
+      [-1.5, '-2[:]-1', true],
+      [99, '1[:]', true],
+      [-99, '[:]5', true],
+      [0, '[:]', true],
+      [6, '1[:]5', false],
+      [0.5, '1[:]5', false],
+      ['', '[:]', false],
+      ['three', '1[:]5', false],
+      ['3 ', '1[:]5', false],
+      ['1[:]5', '1[:]5', false],
+      [Number.NaN, '[:]', false],
+      [3, 'a[:]b', false],
+    ] as const)(
+      'grades %j against the step range %j as %s',
+      (value, range, ok) => {
+        expect(
+          isCorrect({
+            type: 'performance',
+            response: [['s', value]],
+            correct: [['s', range]],
+          }),
+        ).toBe(ok);
+      },
+    );
+
+    it('matches repeated steps to overlapping ranges in any order', () => {
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['s', 4],
+            ['s', 2],
+          ],
+          correct: [
+            ['s', '1[:]5'],
+            ['s', '3[:]10'],
+          ],
+        }),
+      ).toBe(true);
+    });
   });
 
   describe('other', () => {

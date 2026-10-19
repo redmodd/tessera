@@ -127,13 +127,11 @@ export function isCorrect(i: Interaction): boolean | null {
     case 'performance': {
       if (i.correct === undefined) return null;
       if (i.response.length !== i.correct.length) return false;
-      const unmatched = [...i.correct];
-      for (const [stepId, value] of i.response) {
-        const k = unmatched.findIndex(([s, v]) => s === stepId && v === value);
-        if (k < 0) return false;
-        unmatched.splice(k, 1);
-      }
-      return true;
+      return matchesAll(
+        i.response,
+        i.correct,
+        ([s, value], [t, answer]) => s === t && stepFits(value, answer),
+      );
     }
     case 'other':
       if (i.correct === undefined) return null;
@@ -154,4 +152,53 @@ function pairSetEqual(
 ): boolean {
   const key = (pair: [string, string]) => JSON.stringify(pair);
   return setEqual(a.map(key), b.map(key));
+}
+
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+const STEP_RANGE = /^(-?\d+(?:\.\d+)?)?\[:\](-?\d+(?:\.\d+)?)?$/;
+
+/** A performance step answer written `min[:]max`, either end optional. */
+export function stepRange(
+  answer: string | number,
+): { min?: number; max?: number } | null {
+  const m = typeof answer === 'string' ? STEP_RANGE.exec(answer) : null;
+  if (!m) return null;
+  return {
+    min: m[1] === undefined ? undefined : Number(m[1]),
+    max: m[2] === undefined ? undefined : Number(m[2]),
+  };
+}
+
+/** A range takes any decimal inside it, ends included, as an LMS grades it. */
+function stepFits(value: string | number, answer: string | number): boolean {
+  const range = stepRange(answer);
+  if (!range) return value === answer;
+  const n =
+    typeof value === 'number' ? value : DECIMAL.test(value) ? +value : NaN;
+  return (
+    Number.isFinite(n) &&
+    (range.min === undefined || n >= range.min) &&
+    (range.max === undefined || n <= range.max)
+  );
+}
+
+/**
+ * Whether each item pairs with its own target. Augmenting paths, since a
+ * value can fit more than one range and a greedy pick can block a later one.
+ */
+function matchesAll<T, U>(
+  items: T[],
+  targets: U[],
+  fits: (item: T, target: U) => boolean,
+): boolean {
+  const owner: number[] = targets.map(() => -1);
+  const place = (k: number, seen: Set<number>): boolean =>
+    targets.some((target, t) => {
+      if (seen.has(t) || !fits(items[k], target)) return false;
+      seen.add(t);
+      if (owner[t] >= 0 && !place(owner[t], seen)) return false;
+      owner[t] = k;
+      return true;
+    });
+  return items.every((_, k) => place(k, new Set()));
 }

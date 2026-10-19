@@ -129,6 +129,27 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
   });
 
+  it('leaves out a correct step range on SCORM 1.2 only', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 3]],
+      correct: [
+        ['s', '1[:]5'],
+        ['t', 'x'],
+      ],
+    };
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
+    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
+      's[.]1[:]5[,]t[.]x',
+    ]);
+    expect(
+      formatCorrectPattern(
+        { ...i, correct: [['s', 'a[:]b']] },
+        SCORM12_INTERACTION_FORMAT,
+      ),
+    ).toEqual(['s.a[:]b']);
+  });
+
   it('drops a correct sequence or step list that repeats an item', () => {
     const seq: Interaction = {
       type: 'sequencing',
