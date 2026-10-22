@@ -2,6 +2,8 @@
  * Time / number formatters for SCORM & cmi5 data-model writes.
  */
 
+import { DECIMAL_PATTERN } from '../interaction.js';
+
 /**
  * Format integer seconds as SCORM 1.2 `CMITimespan` (HHHH:MM:SS.SS).
  *
@@ -70,7 +72,6 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
-export const DECIMAL_PATTERN = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
 const DECIMAL = new RegExp(String.raw`^${DECIMAL_PATTERN}(?:e[-+]?\d+)?$`, 'i');
 
 export function parseMastery(

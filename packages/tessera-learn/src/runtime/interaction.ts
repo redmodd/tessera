@@ -1,5 +1,3 @@
-import { DECIMAL_PATTERN } from './adapters/format.js';
-
 /**
  * Learner interaction data — the payload `useQuestion` returns to the runtime
  * and that adapters translate into SCORM `cmi.interactions.n.*` or xAPI
@@ -43,7 +41,7 @@ export type Interaction =
   | {
       type: 'numeric';
       response: number;
-      correct?: { min?: number; max?: number };
+      correct?: NumericRange;
     }
   | { type: 'likert'; response: string; correct?: string }
   | {
@@ -54,6 +52,8 @@ export type Interaction =
   | { type: 'other'; response: string; correct?: string };
 
 export type InteractionResponse = Interaction['response'];
+
+type NumericRange = { min?: number; max?: number };
 
 /**
  * Put a saved response back into its widget and return the answer the handle
@@ -116,13 +116,9 @@ export function isCorrect(i: Interaction): boolean | null {
       }
       return true;
     }
-    case 'numeric': {
+    case 'numeric':
       if (i.correct === undefined) return null;
-      const { min, max } = i.correct;
-      if (min !== undefined && i.response < min) return false;
-      if (max !== undefined && i.response > max) return false;
-      return true;
-    }
+      return inRange(i.response, i.correct);
     case 'likert':
       if (i.correct === undefined) return null;
       return i.response === i.correct;
@@ -159,19 +155,20 @@ function pairSetEqual(
   return setEqual(a.map(key), b.map(key));
 }
 
-const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
+export const DECIMAL_PATTERN = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
 const DECIMAL = new RegExp(`^${DECIMAL_PATTERN}$`);
-const STEP_RANGE = new RegExp(String.raw`^(${NUMBER})?\[:\](${NUMBER})?$`);
+const RANGE_END = String.raw`-?\d+(?:\.\d+)?`;
+const STEP_RANGE = new RegExp(
+  String.raw`^(${RANGE_END})?\[:\](${RANGE_END})?$`,
+);
 
 /** A performance step answer written `min[:]max`, either end optional. */
-export function stepRange(
-  answer: string | number,
-): { min?: number; max?: number } | null {
-  const m = typeof answer === 'string' ? STEP_RANGE.exec(answer) : null;
+export function stepRange(answer: string | number): NumericRange | null {
+  const m = STEP_RANGE.exec(String(answer));
   if (!m) return null;
   return {
-    min: m[1] === undefined ? undefined : Number(m[1]),
-    max: m[2] === undefined ? undefined : Number(m[2]),
+    min: m[1] ? Number(m[1]) : undefined,
+    max: m[2] ? Number(m[2]) : undefined,
   };
 }
 
@@ -211,10 +208,9 @@ function stepFits(value: string | number, answer: string | number): boolean {
   const text = String(value);
   const range = stepRange(answer);
   if (!range) return text === String(answer);
-  const n = Number(text);
-  return (
-    DECIMAL.test(text) &&
-    (range.min === undefined || n >= range.min) &&
-    (range.max === undefined || n <= range.max)
-  );
+  return DECIMAL.test(text) && inRange(Number(text), range);
+}
+
+function inRange(n: number, { min, max }: NumericRange): boolean {
+  return (min === undefined || n >= min) && (max === undefined || n <= max);
 }

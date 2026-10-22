@@ -336,7 +336,7 @@ export function formatCorrectPattern(
       return alternatives.map((a) => prefix + a);
     }
     case 'numeric': {
-      const { min, max } = i.correct as { min?: number; max?: number };
+      const { min, max } = i.correct;
       if (min !== undefined && min === max) return [String(min)];
       if (!fmt.supportsRange) return null;
       return [`${min ?? ''}${fmt.rangeDelim}${max ?? ''}`];
