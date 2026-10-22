@@ -70,7 +70,8 @@ export function formatISO8601Duration(totalSeconds: number): string {
   return result;
 }
 
-const DECIMAL = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i;
+export const DECIMAL_PATTERN = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
+const DECIMAL = new RegExp(String.raw`^${DECIMAL_PATTERN}(?:e[-+]?\d+)?$`, 'i');
 
 export function parseMastery(
   raw: unknown,

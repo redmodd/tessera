@@ -1,3 +1,5 @@
+import { DECIMAL_PATTERN } from './adapters/format.js';
+
 /**
  * Learner interaction data — the payload `useQuestion` returns to the runtime
  * and that adapters translate into SCORM `cmi.interactions.n.*` or xAPI
@@ -158,7 +160,7 @@ function pairSetEqual(
 }
 
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
-const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const DECIMAL = new RegExp(`^${DECIMAL_PATTERN}$`);
 const STEP_RANGE = new RegExp(String.raw`^(${NUMBER})?\[:\](${NUMBER})?$`);
 
 /** A performance step answer written `min[:]max`, either end optional. */
