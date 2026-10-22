@@ -11,6 +11,7 @@ import type { UserStateStore } from './contexts.js';
 import {
   jsonSize,
   type CompletionStatus,
+  type ExitMode,
   type SavedState,
   type SuccessStatus,
 } from './persistence.js';
@@ -66,6 +67,7 @@ export class CourseSession {
   #prevSuccessStatus: SuccessStatus | undefined;
   #prevVerdictFinal: boolean | undefined;
   #prevCompletionStatus: CompletionStatus | undefined;
+  #prevExitMode: ExitMode | undefined;
 
   readonly userStateStore: UserStateStore = {
     get: (key) =>
@@ -356,12 +358,21 @@ export class CourseSession {
     const completion = progress.reportedCompletionStatus;
     const success = progress.successStatus;
     const final = progress.verdictFinal;
+    const exitMode = this.#exitMode();
 
     const scoreChanged = score !== null && score !== this.#prevReportedScore;
     const completionChanged = completion !== this.#prevCompletionStatus;
     const successChanged =
       success !== this.#prevSuccessStatus || final !== this.#prevVerdictFinal;
-    if (!scoreChanged && !completionChanged && !successChanged) return;
+    const exitModeChanged = exitMode !== this.#prevExitMode;
+    if (
+      !scoreChanged &&
+      !completionChanged &&
+      !successChanged &&
+      !exitModeChanged
+    ) {
+      return;
+    }
 
     this.#report(() => {
       if (scoreChanged) {
@@ -378,6 +389,12 @@ export class CourseSession {
         this.#prevSuccessStatus = success;
         this.#prevVerdictFinal = final;
         adapter.setSuccessStatus(success, final);
+      }
+      // Before the session ends too: a page killed without pagehide never
+      // reaches #endSession, and the LMS would treat the default as normal.
+      if (exitModeChanged) {
+        this.#prevExitMode = exitMode;
+        adapter.setExit(exitMode);
       }
     });
   }
@@ -431,9 +448,13 @@ export class CourseSession {
     if (!this.#persistenceReady) return true;
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
-    adapter.setExit(this.#progress.attemptOver ? 'normal' : 'suspend');
+    adapter.setExit(this.#exitMode());
     adapter.commit();
     return true;
+  }
+
+  #exitMode(): ExitMode {
+    return this.#progress.attemptOver ? 'normal' : 'suspend';
   }
 
   #onPagehide = (): void => {

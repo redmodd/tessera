@@ -147,6 +147,25 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     ]);
   });
 
+  test('launch commits a suspend exit before the session ends', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    // Committed with the launch status, so a page killed without pagehide
+    // still leaves the attempt open for resume.
+    await expect
+      .poll(async () => {
+        const verbs = (await scormLog(page)).map((entry) => entry.join(' '));
+        const exitWrite = verbs.indexOf('LMSSetValue cmi.core.exit suspend');
+        return exitWrite >= 0 && verbs.slice(exitWrite).includes('LMSCommit ');
+      })
+      .toBe(true);
+    const verbs = (await scormLog(page)).map((entry) => entry[0]);
+    expect(verbs).not.toContain('LMSFinish');
+  });
+
   test('Navigation writes suspend_data containing bookmark and visited pages', async ({
     page,
   }) => {
@@ -452,6 +471,25 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       .filter((entry) => entry[0] === 'GetValue')
       .map((entry) => entry[1]);
     expect(gets).toContain('cmi.suspend_data');
+  });
+
+  test('launch commits a suspend exit before the session ends', async ({
+    page,
+  }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    // Committed with the launch status, so a page killed without pagehide
+    // still leaves the attempt open for resume.
+    await expect
+      .poll(async () => {
+        const verbs = (await scormLog(page)).map((entry) => entry.join(' '));
+        const exitWrite = verbs.indexOf('SetValue cmi.exit suspend');
+        return exitWrite >= 0 && verbs.slice(exitWrite).includes('Commit ');
+      })
+      .toBe(true);
+    const verbs = (await scormLog(page)).map((entry) => entry[0]);
+    expect(verbs).not.toContain('Terminate');
   });
 
   test('Re-launch via reload restores bookmark from suspend_data', async ({
