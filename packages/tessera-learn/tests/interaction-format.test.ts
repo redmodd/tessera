@@ -83,6 +83,44 @@ describe('performance steps', () => {
     expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
     expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
   });
+
+  it('leaves out a correct step range on SCORM 1.2 only', () => {
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 3]],
+      correct: [
+        ['s', '1[:]5'],
+        ['t', 'x'],
+      ],
+    };
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
+    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
+      's[.]1[:]5[,]t[.]x',
+    ]);
+    expect(
+      formatCorrectPattern(
+        { ...i, correct: [['s', 'a[:]b']] },
+        SCORM12_INTERACTION_FORMAT,
+      ),
+    ).toEqual(['s.a[:]b']);
+  });
+});
+
+describe('numeric ranges', () => {
+  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
+    [{ min: 5 }, ['5[:]'], null],
+    [{ max: 5 }, ['[:]5'], null],
+    [{ min: 1, max: 5 }, ['1[:]5'], null],
+    [{ min: 5, max: 5 }, ['5'], ['5']],
+  ])('records the correct range %j', (correct, scorm2004, scorm12) => {
+    const i: Interaction = { type: 'numeric', response: 7, correct };
+    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
+      scorm2004,
+    );
+    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
+      scorm12,
+    );
+  });
 });
 
 describe('SCORM 2004 ids inside a response', () => {
@@ -242,6 +280,16 @@ describe('fitPatterns', () => {
       expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
     },
   );
+
+  it.each<[Interaction]>([
+    [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],
+    [{ type: 'performance', response: [], correct: [['s', '5[:]1']] }],
+  ])('drops a reversed correct range on SCORM 2004: %j', (i) => {
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: [],
+      warnings: [expect.stringContaining('minimum above its maximum')],
+    });
+  });
 
   it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
     const i: Interaction = { type: 'choice', response: ['a'], correct: [] };

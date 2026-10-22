@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isCorrect } from '../src/runtime/interaction.js';
+import {
+  isCorrect,
+  reversedRange,
+  textRange,
+  type Interaction,
+} from '../src/runtime/interaction.js';
 
 describe('isCorrect', () => {
   describe('choice', () => {
@@ -258,20 +263,21 @@ describe('isCorrect', () => {
   });
 
   describe('performance', () => {
-    it('matches on step-set equality regardless of order', () => {
+    it('requires the steps in order', () => {
+      const correct: Array<[string, string | number]> = [
+        ['step-a', 1],
+        ['step-b', 'x'],
+      ];
+      expect(
+        isCorrect({ type: 'performance', response: correct, correct }),
+      ).toBe(true);
       expect(
         isCorrect({
           type: 'performance',
-          response: [
-            ['step-a', 1],
-            ['step-b', 'x'],
-          ],
-          correct: [
-            ['step-b', 'x'],
-            ['step-a', 1],
-          ],
+          response: [...correct].reverse(),
+          correct,
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it('fails on wrong step value', () => {
@@ -322,6 +328,90 @@ describe('isCorrect', () => {
         }),
       ).toBe(false);
     });
+
+    it.each([
+      [3, '3', true],
+      [-3.5, '-3.5', true],
+      ['3', 3, true],
+      [3, '3.0', false],
+    ] as const)(
+      'grades %j against %j as recorded text: %s',
+      (value, answer, ok) => {
+        expect(
+          isCorrect({
+            type: 'performance',
+            response: [['s', value]],
+            correct: [['s', answer]],
+          }),
+        ).toBe(ok);
+      },
+    );
+
+    it.each([
+      [3, '1[:]5', true],
+      [3, '3[:]3', true],
+      ['3', '1[:]5', true],
+      [1, '1[:]5', true],
+      [5, '1[:]5', true],
+      [-1.5, '-2[:]-1', true],
+      [99, '1[:]', true],
+      [-99, '[:]5', true],
+      [0, '[:]', true],
+      ['.5', '0[:]1', true],
+      ['-.5', '-1[:]0', true],
+      ['+3', '1[:]5', true],
+      ['3.', '1[:]5', true],
+      [6, '1[:]5', false],
+      [0.5, '1[:]5', false],
+      ['', '[:]', false],
+      ['.', '[:]', false],
+      ['+', '[:]', false],
+      ['three', '1[:]5', false],
+      ['3 ', '1[:]5', false],
+      ['1[:]5', '1[:]5', false],
+      [Number.NaN, '[:]', false],
+      [1e-7, '[:]1', false],
+      [1e21, '0[:]', false],
+      [3, 'a[:]b', false],
+    ] as const)(
+      'grades %j against the step range %j as %s',
+      (value, range, ok) => {
+        expect(
+          isCorrect({
+            type: 'performance',
+            response: [['s', value]],
+            correct: [['s', range]],
+          }),
+        ).toBe(ok);
+      },
+    );
+
+    it('grades each step against the correct step in its place', () => {
+      const correct: Array<[string, string]> = [
+        ['s', '1[:]5'],
+        ['s', '3[:]10'],
+      ];
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['s', 2],
+            ['s', 4],
+          ],
+          correct,
+        }),
+      ).toBe(true);
+      expect(
+        isCorrect({
+          type: 'performance',
+          response: [
+            ['s', 4],
+            ['s', 2],
+          ],
+          correct,
+        }),
+      ).toBe(false);
+    });
   });
 
   describe('other', () => {
@@ -337,5 +427,82 @@ describe('isCorrect', () => {
     it('returns null when correct is undefined', () => {
       expect(isCorrect({ type: 'other', response: 'foo' })).toBeNull();
     });
+  });
+});
+
+describe('reversedRange', () => {
+  it.each<[Interaction, ReturnType<typeof reversedRange>]>([
+    [
+      { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
+      { min: 5, max: 1 },
+    ],
+    [{ type: 'numeric', response: 3, correct: { min: 1, max: 5 } }, null],
+    [{ type: 'numeric', response: 3, correct: { min: 5 } }, null],
+    [{ type: 'numeric', response: 3 }, null],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'x'],
+          ['t', '5[:]-1'],
+        ],
+      },
+      { min: 5, max: -1 },
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', '1[:]5'],
+          ['t', '5[:]'],
+        ],
+      },
+      null,
+    ],
+    [{ type: 'other', response: '5[:]1', correct: '5[:]1' }, null],
+  ])('finds the reversed range in %j', (i, range) => {
+    expect(reversedRange(i)).toEqual(range);
+  });
+});
+
+describe('textRange', () => {
+  it.each<[Interaction, string | null]>([
+    [
+      { type: 'performance', response: [], correct: [['s', '.5[:]1']] },
+      '.5[:]1',
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'x'],
+          ['t', '1 [:] 5'],
+        ],
+      },
+      '1 [:] 5',
+    ],
+    [
+      { type: 'performance', response: [], correct: [['s', '+1[:]5']] },
+      '+1[:]5',
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', '1[:]5'],
+          ['t', '[:]'],
+          ['u', 3],
+        ],
+      },
+      null,
+    ],
+    [{ type: 'performance', response: [] }, null],
+    [{ type: 'other', response: '.5[:]1', correct: '.5[:]1' }, null],
+  ])('finds the step answer that is not a range in %j', (i, text) => {
+    expect(textRange(i)).toBe(text);
   });
 });

@@ -41,7 +41,7 @@ export type Interaction =
   | {
       type: 'numeric';
       response: number;
-      correct?: { min?: number; max?: number };
+      correct?: NumericRange;
     }
   | { type: 'likert'; response: string; correct?: string }
   | {
@@ -52,6 +52,8 @@ export type Interaction =
   | { type: 'other'; response: string; correct?: string };
 
 export type InteractionResponse = Interaction['response'];
+
+type NumericRange = { min?: number; max?: number };
 
 /**
  * Put a saved response back into its widget and return the answer the handle
@@ -114,26 +116,23 @@ export function isCorrect(i: Interaction): boolean | null {
       }
       return true;
     }
-    case 'numeric': {
+    case 'numeric':
       if (i.correct === undefined) return null;
-      const { min, max } = i.correct;
-      if (min !== undefined && i.response < min) return false;
-      if (max !== undefined && i.response > max) return false;
-      return true;
-    }
+      return inRange(i.response, i.correct);
     case 'likert':
       if (i.correct === undefined) return null;
       return i.response === i.correct;
     case 'performance': {
-      if (i.correct === undefined) return null;
-      if (i.response.length !== i.correct.length) return false;
-      const unmatched = [...i.correct];
-      for (const [stepId, value] of i.response) {
-        const k = unmatched.findIndex(([s, v]) => s === stepId && v === value);
-        if (k < 0) return false;
-        unmatched.splice(k, 1);
-      }
-      return true;
+      const correct = i.correct;
+      if (correct === undefined) return null;
+      // Steps grade in order, as `order_matters` defaults to true.
+      return (
+        i.response.length === correct.length &&
+        i.response.every(
+          ([step, value], k) =>
+            step === correct[k][0] && stepFits(value, correct[k][1]),
+        )
+      );
     }
     case 'other':
       if (i.correct === undefined) return null;
@@ -154,4 +153,64 @@ function pairSetEqual(
 ): boolean {
   const key = (pair: [string, string]) => JSON.stringify(pair);
   return setEqual(a.map(key), b.map(key));
+}
+
+export const DECIMAL_PATTERN = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
+const DECIMAL = new RegExp(`^${DECIMAL_PATTERN}$`);
+const RANGE_END = String.raw`-?\d+(?:\.\d+)?`;
+const STEP_RANGE = new RegExp(
+  String.raw`^(${RANGE_END})?\[:\](${RANGE_END})?$`,
+);
+
+/** A performance step answer written `min[:]max`, either end optional. */
+export function stepRange(answer: string | number): NumericRange | null {
+  const m = STEP_RANGE.exec(String(answer));
+  if (!m) return null;
+  return {
+    min: m[1] ? Number(m[1]) : undefined,
+    max: m[2] ? Number(m[2]) : undefined,
+  };
+}
+
+/** A correct range whose min is above its max, so no answer can match it. */
+export function reversedRange(
+  i: Interaction,
+): { min: number; max: number } | null {
+  const ranges =
+    i.type === 'numeric'
+      ? [i.correct]
+      : i.type === 'performance'
+        ? (i.correct ?? []).map(([, answer]) => stepRange(answer))
+        : [];
+  for (const r of ranges) {
+    if (r?.min !== undefined && r.max !== undefined && r.min > r.max) {
+      return { min: r.min, max: r.max };
+    }
+  }
+  return null;
+}
+
+/** A correct step answer holding `[:]` that is not a range, so it grades as text. */
+export function textRange(i: Interaction): string | null {
+  if (i.type !== 'performance') return null;
+  const answer = (i.correct ?? []).find(
+    ([, a]) => typeof a === 'string' && a.includes('[:]') && !stepRange(a),
+  );
+  return answer ? String(answer[1]) : null;
+}
+
+/**
+ * Grades a step value as recorded, by its text: a range takes any decimal
+ * inside it, ends included, as an LMS grades it (`.5` and `+3` are decimals,
+ * `1e-7` is not).
+ */
+function stepFits(value: string | number, answer: string | number): boolean {
+  const text = String(value);
+  const range = stepRange(answer);
+  if (!range) return text === String(answer);
+  return DECIMAL.test(text) && inRange(Number(text), range);
+}
+
+function inRange(n: number, { min, max }: NumericRange): boolean {
+  return (min === undefined || n >= min) && (max === undefined || n <= max);
 }

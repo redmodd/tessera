@@ -1,6 +1,8 @@
 import { onDestroy, onMount, tick } from 'svelte';
 import {
   isCorrect,
+  reversedRange,
+  textRange,
   type Interaction,
   type InteractionResponse,
 } from './interaction.js';
@@ -136,6 +138,33 @@ interface QuizContext {
 const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
 export { setQuizContext };
 
+function warnRange(id: string, interaction: Interaction): void {
+  const range = reversedRange(interaction);
+  if (range) {
+    console.warn(
+      `[tessera] useQuestion("${id}"): a correct range runs from ` +
+        `${range.min} down to ${range.max}, so no answer can match it. ` +
+        'Put the smaller number first.',
+    );
+  }
+  const text = textRange(interaction);
+  if (text !== null) {
+    console.warn(
+      `[tessera] useQuestion("${id}"): the correct step answer "${text}" ` +
+        'is not a min[:]max range, so it matches only that exact text. ' +
+        'Write each end as digits with an optional fraction, such as 0.5[:]1.',
+    );
+  }
+}
+
+function reporter(): StandaloneQuestionDeps['report'] {
+  const adapterCtx = getAdapterContext();
+  return (id, interaction, correct) => {
+    if (import.meta.env?.DEV) warnRange(id, interaction);
+    adapterCtx?.adapter.reportInteraction(id, interaction, correct);
+  };
+}
+
 /**
  * Register a question widget with the Tessera runtime. Works outside a quiz
  * for inline practice, and inside a quiz host — the same hook drives both
@@ -147,7 +176,6 @@ export function useQuestion<I extends Interaction = Interaction>(
 ): UseQuestionHandle {
   const quizCtx = getQuizContext();
   const navCtx = getNavContext();
-  const adapterCtx = getAdapterContext();
 
   if (import.meta.env?.DEV && !opts.restore) {
     console.warn(
@@ -213,7 +241,7 @@ export function useQuestion<I extends Interaction = Interaction>(
   }
 
   return new StandaloneQuestion(opts, {
-    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    report: reporter(),
     markScore,
     saved,
   });
@@ -450,7 +478,6 @@ export function useQuiz(
   opts: { element?: () => HTMLElement | null } = {},
 ): UseQuizHandle {
   const pageCtx = getPageContext();
-  const adapterCtx = getAdapterContext();
   const { progress } = requireNavContext('useQuiz()');
   if (!pageCtx?.quiz || pageCtx.index === undefined) {
     throw new Error(
@@ -471,7 +498,7 @@ export function useQuiz(
   const engine = new QuizEngine({
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
-    report: (...args) => adapterCtx?.adapter.reportInteraction(...args),
+    report: reporter(),
     onComplete: (score, responses) =>
       progress.quizCompleted(pageIndex, score, responses),
     notify: (name, detail) => {

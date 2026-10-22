@@ -4,17 +4,17 @@
  * without its caps.
  */
 
-import type { Interaction } from './interaction.js';
+import { reversedRange, stepRange, type Interaction } from './interaction.js';
 
 export interface InteractionFormat {
   itemDelim: string;
   pairDelim: string;
   rangeDelim: string;
   /**
-   * SCORM 1.2 has no numeric range syntax — `correct_responses.n.pattern`
-   * is a single CMIDecimal. SCORM 2004 supports `min[:]max`.
+   * SCORM 2004 writes a `numeric` or `performance` step range as `min[:]max`;
+   * SCORM 1.2 has no range syntax, so it leaves a correct range out.
    */
-  supportsNumericRange: boolean;
+  supportsRange: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
@@ -56,7 +56,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: ',',
   pairDelim: '.',
   rangeDelim: ':',
-  supportsNumericRange: false,
+  supportsRange: false,
   supportsCasePrefix: false,
   encodesOptionIndex: true,
   fillInLimit: 10,
@@ -78,7 +78,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: '[,]',
   pairDelim: '[.]',
   rangeDelim: '[:]',
-  supportsNumericRange: true,
+  supportsRange: true,
   supportsCasePrefix: true,
   encodesOptionIndex: false,
   fillInLimit: 10,
@@ -204,7 +204,6 @@ function stepName(step: string, fmt: InteractionFormat): string {
 
 const STEP_DELIM = /\[[,.:]\]/;
 const MAX_FILL_IN_PARTS = 10;
-const NUMERIC_RANGE = /^(-?\d+(\.\d+)?)?\[:\](-?\d+(\.\d+)?)?$/;
 
 /** Step names are identifiers; step answers are free text, kept as written. */
 function encodeStep(
@@ -220,10 +219,7 @@ function encodeStep(
         'a step has neither a name nor an answer, which this export standard rejects',
       );
     }
-    if (
-      STEP_DELIM.test(answer) &&
-      !(field === 'correct' && NUMERIC_RANGE.test(answer))
-    ) {
+    if (STEP_DELIM.test(answer) && !(field === 'correct' && stepRange(a))) {
       throw new UnrecordableError(
         `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
       );
@@ -321,6 +317,13 @@ export function formatCorrectPattern(
   fmt: InteractionFormat,
 ): string[] | null {
   if (i.correct === undefined) return null;
+  if (
+    i.type === 'performance' &&
+    !fmt.supportsRange &&
+    i.correct.some(([, a]) => stepRange(a))
+  ) {
+    return null;
+  }
   if (isList(i)) return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
   switch (i.type) {
     case 'true-false':
@@ -333,15 +336,10 @@ export function formatCorrectPattern(
       return alternatives.map((a) => prefix + a);
     }
     case 'numeric': {
-      const c = i.correct as { min?: number; max?: number };
-      if (c.min !== undefined && c.max !== undefined && c.min === c.max) {
-        return [String(c.min)];
-      }
-      if (c.min !== undefined && c.max === undefined) return [String(c.min)];
-      if (c.min === undefined && c.max !== undefined) return [String(c.max)];
-      // True range — drop the pattern in 1.2 (rely on `result` for pass/fail).
-      if (!fmt.supportsNumericRange) return null;
-      return [`${c.min ?? ''}${fmt.rangeDelim}${c.max ?? ''}`];
+      const { min, max } = i.correct;
+      if (min !== undefined && min === max) return [String(min)];
+      if (!fmt.supportsRange) return null;
+      return [`${min ?? ''}${fmt.rangeDelim}${max ?? ''}`];
     }
     case 'likert':
       return [fmt.responseId(i.correct as string)];
@@ -433,6 +431,14 @@ export function fitPatterns(
       kept: [],
       warnings: [
         `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
+      ],
+    };
+  }
+  if (fmt.supportsRange && reversedRange(i)) {
+    return {
+      kept: [],
+      warnings: [
+        `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
       ],
     };
   }
