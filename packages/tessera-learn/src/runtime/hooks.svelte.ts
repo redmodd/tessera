@@ -2,6 +2,7 @@ import { onDestroy, onMount, tick } from 'svelte';
 import {
   isCorrect,
   reversedRange,
+  textRange,
   type Interaction,
   type InteractionResponse,
 } from './interaction.js';
@@ -137,17 +138,29 @@ interface QuizContext {
 const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
 export { setQuizContext };
 
+function warnRange(id: string, interaction: Interaction): void {
+  const range = reversedRange(interaction);
+  if (range) {
+    console.warn(
+      `[tessera] useQuestion("${id}"): a correct range runs from ` +
+        `${range.min} down to ${range.max}, so no answer can match it. ` +
+        'Put the smaller number first.',
+    );
+  }
+  const text = textRange(interaction);
+  if (text !== null) {
+    console.warn(
+      `[tessera] useQuestion("${id}"): the correct step answer "${text}" ` +
+        'is not a min[:]max range, so it matches only that exact text. ' +
+        'Write each end as digits with an optional fraction, such as 0.5[:]1.',
+    );
+  }
+}
+
 function reporter(): StandaloneQuestionDeps['report'] {
   const adapterCtx = getAdapterContext();
   return (id, interaction, correct) => {
-    const range = import.meta.env?.DEV ? reversedRange(interaction) : null;
-    if (range) {
-      console.warn(
-        `[tessera] useQuestion("${id}"): a correct range runs from ` +
-          `${range.min} down to ${range.max}, so no answer can match it. ` +
-          'Put the smaller number first.',
-      );
-    }
+    if (import.meta.env?.DEV) warnRange(id, interaction);
     adapterCtx?.adapter.reportInteraction(id, interaction, correct);
   };
 }

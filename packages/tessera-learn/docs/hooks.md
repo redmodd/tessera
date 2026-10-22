@@ -97,6 +97,7 @@ Ids inside a response (list items, matching ids, `performance` step ids, the `li
 - Graded in order: response step N against correct step N, as SCORM 2004 and xAPI read the correct pattern.
 - Sent as written and graded by that text, so `3` and `'3'` match.
 - A correct step value written `min[:]max` (either end optional, as in `1[:]5` or `[:]10`) matches any decimal step value inside the range, ends included.
+- Write each range end as digits with an optional `-` and fraction (`0.5[:]1`, not `.5[:]1` or `1 [:] 5`). Any other text holding `[:]` matches only that exact text: Tessera warns in dev.
 - Put the smaller end first, here and in a `numeric` `correct`. A range with its minimum above its maximum matches no answer: Tessera warns in dev and leaves it out of the SCORM record.
 - SCORM 1.2 has no range syntax, so it leaves a correct answer holding a range out of the LMS record. The result is still recorded.
 

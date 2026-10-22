@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isCorrect,
   reversedRange,
+  textRange,
   type Interaction,
 } from '../src/runtime/interaction.js';
 
@@ -463,5 +464,45 @@ describe('reversedRange', () => {
     [{ type: 'other', response: '5[:]1', correct: '5[:]1' }, null],
   ])('finds the reversed range in %j', (i, range) => {
     expect(reversedRange(i)).toEqual(range);
+  });
+});
+
+describe('textRange', () => {
+  it.each<[Interaction, string | null]>([
+    [
+      { type: 'performance', response: [], correct: [['s', '.5[:]1']] },
+      '.5[:]1',
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', 'x'],
+          ['t', '1 [:] 5'],
+        ],
+      },
+      '1 [:] 5',
+    ],
+    [
+      { type: 'performance', response: [], correct: [['s', '+1[:]5']] },
+      '+1[:]5',
+    ],
+    [
+      {
+        type: 'performance',
+        response: [],
+        correct: [
+          ['s', '1[:]5'],
+          ['t', '[:]'],
+          ['u', 3],
+        ],
+      },
+      null,
+    ],
+    [{ type: 'performance', response: [] }, null],
+    [{ type: 'other', response: '.5[:]1', correct: '.5[:]1' }, null],
+  ])('finds the step answer that is not a range in %j', (i, text) => {
+    expect(textRange(i)).toBe(text);
   });
 });

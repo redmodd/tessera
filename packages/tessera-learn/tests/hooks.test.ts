@@ -175,6 +175,25 @@ describe('useQuestion — standalone mode', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('warns in dev about a correct step answer that is not a range', () => {
+    provideNavCtx();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    useQuestion({
+      id: 'q1',
+      response: () => ({
+        type: 'performance',
+        response: [['s', '0.7']],
+        correct: [['s', '.5[:]1']],
+      }),
+      restore: () => {},
+    }).submit();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(
+      'useQuestion("q1"): the correct step answer ".5[:]1" is not a min[:]max range',
+    );
+  });
+
   it('says nothing in production about a widget with no restore', () => {
     vi.stubEnv('DEV', false);
     provideNavCtx();

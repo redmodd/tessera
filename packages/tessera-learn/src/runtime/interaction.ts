@@ -193,6 +193,15 @@ export function reversedRange(
   return null;
 }
 
+/** A correct step answer holding `[:]` that is not a range, so it grades as text. */
+export function textRange(i: Interaction): string | null {
+  if (i.type !== 'performance') return null;
+  const answer = (i.correct ?? []).find(
+    ([, a]) => typeof a === 'string' && a.includes('[:]') && !stepRange(a),
+  );
+  return answer ? String(answer[1]) : null;
+}
+
 /**
  * Grades a step value as recorded, by its text: a range takes any decimal
  * inside it, ends included, as an LMS grades it (`.5` and `+3` are decimals,
