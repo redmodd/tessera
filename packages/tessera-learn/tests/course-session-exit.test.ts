@@ -205,18 +205,28 @@ describe('ending a CourseSession', () => {
   });
 
   it('commits the exit mode with the status, before the session ends', async () => {
-    const { adapter, calls } = recordingAdapter();
+    const { adapter, calls } = recordingAdapter({
+      setCompletionStatus: (status) => calls.push(`completion:${status}`),
+    });
     const { progress } = await startSession({
       adapter,
       config: manualConfig(),
     });
-    expect(calls).toEqual(['setDuration:0', 'setExit:suspend', 'commit']);
+    expect(calls).toEqual([
+      'setDuration:0',
+      'completion:incomplete',
+      'setExit:suspend',
+      'commit',
+    ]);
+    const launched = calls.length;
 
     progress.markCompleteManually();
     await flush();
 
-    expect(calls.slice(3, 6)).toEqual([
+    const committed = calls.indexOf('commit', launched) + 1;
+    expect(calls.slice(launched, committed)).toEqual([
       'setDuration:0',
+      'completion:complete',
       'setExit:normal',
       'commit',
     ]);

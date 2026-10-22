@@ -67,7 +67,6 @@ export class CourseSession {
   #prevSuccessStatus: SuccessStatus | undefined;
   #prevVerdictFinal: boolean | undefined;
   #prevCompletionStatus: CompletionStatus | undefined;
-  #prevExitMode: ExitMode | undefined;
 
   readonly userStateStore: UserStateStore = {
     get: (key) =>
@@ -358,21 +357,12 @@ export class CourseSession {
     const completion = progress.reportedCompletionStatus;
     const success = progress.successStatus;
     const final = progress.verdictFinal;
-    const exitMode = this.#exitMode();
 
     const scoreChanged = score !== null && score !== this.#prevReportedScore;
     const completionChanged = completion !== this.#prevCompletionStatus;
     const successChanged =
       success !== this.#prevSuccessStatus || final !== this.#prevVerdictFinal;
-    const exitModeChanged = exitMode !== this.#prevExitMode;
-    if (
-      !scoreChanged &&
-      !completionChanged &&
-      !successChanged &&
-      !exitModeChanged
-    ) {
-      return;
-    }
+    if (!scoreChanged && !completionChanged && !successChanged) return;
 
     this.#report(() => {
       if (scoreChanged) {
@@ -392,10 +382,7 @@ export class CourseSession {
       }
       // Before the session ends too: a page killed without pagehide never
       // reaches #endSession, and the LMS would treat the default as normal.
-      if (exitModeChanged) {
-        this.#prevExitMode = exitMode;
-        adapter.setExit(exitMode);
-      }
+      adapter.setExit(this.#exitMode());
     });
   }
 

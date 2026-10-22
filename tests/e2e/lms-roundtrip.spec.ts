@@ -39,6 +39,23 @@ async function expectRestoreToEndSession(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+// A page killed without pagehide keeps only what was committed.
+async function expectExitCommitted(
+  page: Page,
+  write: string[],
+  commit: string,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const log = await scormLog(page);
+      const at = log.findLastIndex((entry) =>
+        write.every((part, i) => entry[i] === part),
+      );
+      return at >= 0 && log.slice(at).some(([fn]) => fn === commit);
+    })
+    .toBe(true);
+}
+
 async function expectNoScormCallsAfter(page: Page, finish: string) {
   const log = await scormLog(page);
   const end = log.findIndex(([fn]) => fn === finish);
@@ -147,23 +164,25 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     ]);
   });
 
-  test('launch commits a suspend exit before the session ends', async ({
+  test('commits suspend at launch and normal on completion, before the session ends', async ({
     page,
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
+    await expectExitCommitted(
+      page,
+      ['LMSSetValue', 'cmi.core.exit', 'suspend'],
+      'LMSCommit',
+    );
 
-    // Committed with the launch status, so a page killed without pagehide
-    // still leaves the attempt open for resume.
-    await expect
-      .poll(async () => {
-        const verbs = (await scormLog(page)).map((entry) => entry.join(' '));
-        const exitWrite = verbs.indexOf('LMSSetValue cmi.core.exit suspend');
-        return exitWrite >= 0 && verbs.slice(exitWrite).includes('LMSCommit ');
-      })
-      .toBe(true);
-    const verbs = (await scormLog(page)).map((entry) => entry[0]);
-    expect(verbs).not.toContain('LMSFinish');
+    await openQuiz(page, 'Graded Assessment');
+    await answerGradedQuiz(page);
+    await finishFreeCourse(page);
+    await expectExitCommitted(
+      page,
+      ['LMSSetValue', 'cmi.core.exit', ''],
+      'LMSCommit',
+    );
   });
 
   test('Navigation writes suspend_data containing bookmark and visited pages', async ({
@@ -473,23 +492,25 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
     expect(gets).toContain('cmi.suspend_data');
   });
 
-  test('launch commits a suspend exit before the session ends', async ({
+  test('commits suspend at launch and normal on completion, before the session ends', async ({
     page,
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
+    await expectExitCommitted(
+      page,
+      ['SetValue', 'cmi.exit', 'suspend'],
+      'Commit',
+    );
 
-    // Committed with the launch status, so a page killed without pagehide
-    // still leaves the attempt open for resume.
-    await expect
-      .poll(async () => {
-        const verbs = (await scormLog(page)).map((entry) => entry.join(' '));
-        const exitWrite = verbs.indexOf('SetValue cmi.exit suspend');
-        return exitWrite >= 0 && verbs.slice(exitWrite).includes('Commit ');
-      })
-      .toBe(true);
-    const verbs = (await scormLog(page)).map((entry) => entry[0]);
-    expect(verbs).not.toContain('Terminate');
+    await openQuiz(page, 'Graded Assessment');
+    await answerGradedQuiz(page);
+    await finishFreeCourse(page);
+    await expectExitCommitted(
+      page,
+      ['SetValue', 'cmi.exit', 'normal'],
+      'Commit',
+    );
   });
 
   test('Re-launch via reload restores bookmark from suspend_data', async ({
