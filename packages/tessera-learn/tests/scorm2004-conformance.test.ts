@@ -120,6 +120,37 @@ describe('SCORM2004Adapter against scorm-again', () => {
     );
 
     it.each([
+      [{ type: 'numeric', response: 3, correct: { max: 5 } }, '[:]5'],
+      [
+        {
+          type: 'performance',
+          response: [['s', '3']],
+          correct: [['s', '1[:]5']],
+        },
+        's[.]1[:]5',
+      ],
+      [
+        {
+          type: 'performance',
+          response: [['s', '3']],
+          correct: [['s', '[:]5']],
+        },
+        's[.][:]5',
+      ],
+    ] as const)(
+      'the data model accepts the range pattern $1',
+      async (interaction, pattern) => {
+        await start();
+        adapter.reportInteraction('q1', interaction as never, true);
+        await flush();
+        expect(lms.errors).toEqual([]);
+        expect(
+          lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+        ).toBe(pattern);
+      },
+    );
+
+    it.each([
       ['fill-in', 250],
       ['long-fill-in', 4000],
       ['other', 4000],
