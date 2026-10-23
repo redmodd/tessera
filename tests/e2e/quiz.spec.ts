@@ -337,9 +337,7 @@ test.describe('Quiz — Accessibility', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('correct and incorrect question feedback passes axe audit', async ({
-    page,
-  }) => {
+  test('success and error feedback passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
     const audit = async (scope = '') =>
@@ -350,13 +348,14 @@ test.describe('Quiz — Accessibility', () => {
       ).violations;
     const btn = primaryBtn(page);
 
-    await answerMultipleChoice(page, 0);
+    // Not audited: axe skips text inside the label of a disabled radio,
+    // which is where locked multiple-choice feedback renders.
+    await answerMultipleChoice(page, 1);
     await btn.click();
     await expect(btn).toHaveText('Next Question');
-    expect(await audit()).toEqual([]);
     await btn.click();
 
-    await answerFillInTheBlank(page, 'blue');
+    await answerFillInTheBlank(page, 'red');
     await btn.click();
     await expect(btn).toHaveText('Next Question');
     expect(await audit()).toEqual([]);

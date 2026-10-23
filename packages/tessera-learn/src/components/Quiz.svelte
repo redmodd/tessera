@@ -414,13 +414,13 @@
   }
 
   .tessera-quiz-score-label.passed {
-    color: color-mix(in srgb, var(--tessera-success) 55%, black);
-    background: color-mix(in srgb, var(--tessera-success) 12%, white);
+    color: var(--tessera-success);
+    background: var(--tessera-success-bg);
   }
 
   .tessera-quiz-score-label.failed {
-    color: color-mix(in srgb, var(--tessera-error) 55%, black);
-    background: color-mix(in srgb, var(--tessera-error) 12%, white);
+    color: var(--tessera-error);
+    background: var(--tessera-error-bg);
   }
 
   .tessera-quiz-results-detail {
