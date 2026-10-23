@@ -150,9 +150,6 @@ export class CourseSession {
     const { signal } = this.#lifetime;
     window.addEventListener('pagehide', this.#onPagehide, { signal });
     window.addEventListener('pageshow', this.#onPageshow, { signal });
-    document.addEventListener('visibilitychange', this.#onVisibilityChange, {
-      signal,
-    });
 
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
@@ -187,6 +184,9 @@ export class CourseSession {
       console.error('Tessera: resume state could not be restored', err);
     }
     this.#persistenceReady = true;
+    document.addEventListener('visibilitychange', this.#onVisibilityChange, {
+      signal,
+    });
     if (this.#persistPending) {
       this.#persistPending = false;
       this.#requestPersist();
@@ -345,12 +345,7 @@ export class CourseSession {
   }
 
   #commitProgress = (): void => {
-    if (
-      !this.#persistenceReady ||
-      this.#terminated ||
-      this.#exitPhase ||
-      this.#lifetime.signal.aborted
-    ) {
+    if (this.#terminated || this.#exitPhase) {
       this.#clearCommitTimer();
       return;
     }
