@@ -333,11 +333,12 @@ export class CourseSession {
   }
 
   // A SCORM LMS may keep only committed values, and a page killed without
-  // pagehide never reaches the end-of-session commit.
+  // pagehide never reaches the end-of-session commit. A hidden page can be
+  // killed at any moment, so its saves skip the wait.
   #scheduleCommit(): void {
     if (this.#commitTimer !== undefined) return;
     const wait = this.#lastCommitAt + COMMIT_INTERVAL_MS - performance.now();
-    if (wait > 0) {
+    if (wait > 0 && document.visibilityState !== 'hidden') {
       this.#commitTimer = setTimeout(this.#commitProgress, wait);
     } else {
       this.#commitProgress();

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { useFakeTimers } from './helpers.js';
 import {
   createSession,
@@ -90,6 +90,30 @@ describe('committing progress saves', () => {
     await tick(10_000);
 
     expect(calls).toEqual(['setDuration:12', 'commit']);
+  });
+
+  it('commits a save made by a hide listener that runs after the hidden-page commit', async () => {
+    const { session, calls } = await launch();
+    const saveOnHide = () => {
+      if (document.visibilityState === 'hidden') {
+        session.userStateStore.set('notes', 'saved on hide');
+      }
+    };
+    document.addEventListener('visibilitychange', saveOnHide);
+    onTestFinished(() =>
+      document.removeEventListener('visibilitychange', saveOnHide),
+    );
+
+    hidePage();
+    await tick();
+
+    expect(calls).toEqual([
+      'setDuration:10',
+      'commit',
+      'saveState',
+      'setDuration:10',
+      'commit',
+    ]);
   });
 
   it('commits nothing when the page is hidden before the saved state loads', async () => {
