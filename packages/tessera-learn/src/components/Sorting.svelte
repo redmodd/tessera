@@ -183,13 +183,6 @@
     if (q.locked || !cardSelected) return;
     placeCard(targetIdx);
   }
-
-  function onTargetKeydown(e, targetIdx) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onTargetClick(targetIdx);
-    }
-  }
 </script>
 
 <QuestionShell {q} class="tessera-sorting" aria-label={question}>
@@ -207,16 +200,18 @@
             draggable={true}
             role="button"
             tabindex="0"
-            aria-label="{cardSelected
-              ? 'Selected — click a target to place: '
-              : 'Drag or click to sort: '}{items[currentItemIdx]}"
-            aria-grabbed={isDragging}
+            aria-pressed={cardSelected}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
             onclick={onCardClick}
             onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
+            {#if !cardSelected}
+              <span class="tessera-sr-only"
+                >(activate, then choose a target)</span
+              >
+            {/if}
           </div>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
@@ -246,19 +241,24 @@
         class="tessera-sorting-target"
         class:drag-over={dragOver === targetIdx}
         class:clickable={cardSelected && !q.locked}
-        role="button"
-        tabindex="0"
-        aria-disabled={!(cardSelected && !q.locked)}
-        aria-label="Target: {targetLabel}{cardSelected && !q.locked
-          ? ` (activate to place ${items[currentItemIdx]})`
-          : ''}"
+        role="group"
+        aria-label={targetLabel}
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
-        onclick={() => onTargetClick(targetIdx)}
-        onkeydown={(e) => onTargetKeydown(e, targetIdx)}
       >
-        <div class="tessera-sorting-target-label">{targetLabel}</div>
+        <button
+          class="tessera-sorting-target-label"
+          aria-disabled={!(cardSelected && !q.locked)}
+          onclick={() => onTargetClick(targetIdx)}
+        >
+          {targetLabel}
+          {#if cardSelected && !q.locked}
+            <span class="tessera-sr-only"
+              >(activate to place {items[currentItemIdx]})</span
+            >
+          {/if}
+        </button>
         {#if targetItems.length > 0}
           <div class="tessera-sorting-target-items">
             {#each targetItems as itemIdx (itemIdx)}
@@ -455,6 +455,11 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    position: relative;
+  }
+
+  .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible) {
+    box-shadow: var(--tessera-focus-ring);
   }
 
   .tessera-sorting-target.drag-over {
@@ -475,6 +480,10 @@
   }
 
   .tessera-sorting-target-label {
+    background: none;
+    border: none;
+    font-family: inherit;
+    cursor: inherit;
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
     font-size: 0.8125rem;
     font-weight: 700;
@@ -482,7 +491,17 @@
     letter-spacing: 0.05em;
     color: var(--tessera-text-light);
     text-align: center;
-    pointer-events: none;
+  }
+
+  /* Stretch the button over the whole target so a click anywhere places the card. */
+  .tessera-sorting-target-label::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .tessera-sorting-target-label:focus-visible {
+    box-shadow: none;
   }
 
   .tessera-sorting-target-items {
@@ -508,6 +527,7 @@
       border-color 0.15s,
       background 0.15s;
     pointer-events: all;
+    position: relative;
   }
 
   .tessera-sorting-placed-item.correct {

@@ -362,12 +362,21 @@ test.describe('Quiz — Accessibility', () => {
         name: '1 1 (matched, activate to unmatch)',
       }),
     ).toBeVisible();
+    const rightOne = matching.getByRole('button', {
+      name: '1 One (matched)',
+      exact: true,
+    });
+    await expect(rightOne).toBeVisible();
     expect((await audit()).violations).toEqual([]);
 
     await primaryBtn(page).click();
     await expect(
-      matching.getByRole('button', { name: '1 1 (matched)', exact: true }),
+      matching.getByRole('button', {
+        name: '1 1 (matched, correct)',
+        exact: true,
+      }),
     ).toBeDisabled();
+    await expect(rightOne).toBeDisabled();
     expect((await audit()).violations).toEqual([]);
   });
 

@@ -200,6 +200,7 @@
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
           disabled={q.locked}
+          aria-pressed={matched ? undefined : isSelected}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -208,12 +209,14 @@
           {/if}
           <span>{pair.left}</span>
           {#if matched && !q.locked}
-            <span class="tessera-matching-sr"
-              >(matched, activate to unmatch)</span
-            >
+            <span class="tessera-sr-only">(matched, activate to unmatch)</span>
             <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
+          {:else if correctMatch}
+            <span class="tessera-sr-only">(matched, correct)</span>
+          {:else if wrongMatch}
+            <span class="tessera-sr-only">(matched, incorrect)</span>
           {:else if matched}
-            <span class="tessera-matching-sr">(matched)</span>
+            <span class="tessera-sr-only">(matched)</span>
           {/if}
         </button>
       {/each}
@@ -233,6 +236,7 @@
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() => handleRightClick(item.originalIndex)}
           disabled={q.locked}
+          aria-pressed={isSelected}
         >
           {#if matched}
             {@const leftIdx = getLeftForRight(item.originalIndex)}
@@ -242,7 +246,7 @@
           {/if}
           <span>{item.text}</span>
           {#if matched}
-            <span class="tessera-matching-sr">(matched)</span>
+            <span class="tessera-sr-only">(matched)</span>
           {/if}
         </button>
       {/each}
@@ -285,15 +289,6 @@
 </QuestionShell>
 
 <style>
-  .tessera-matching-sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .tessera-matching-question {
     font-size: 1.125rem;
     font-weight: 600;
