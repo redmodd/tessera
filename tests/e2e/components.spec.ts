@@ -159,6 +159,11 @@ test.describe('Component — Sorting', () => {
     await fruit.getByRole('button', { name: /^Fruit/ }).click();
     await expect(counter).toHaveText('2 of 3 to sort');
 
+    // With no card selected, the target button no longer covers placed items.
+    await fruit
+      .locator('.tessera-sorting-item-text')
+      .click({ trial: true, timeout: 2000 });
+
     // force skips Playwright's own hit check: the real pointer must land on
     // the target button stretched over the placed item.
     await card.click();

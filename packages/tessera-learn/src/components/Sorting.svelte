@@ -491,7 +491,7 @@
   }
 
   /* Stretch the button over the whole target so a click anywhere places the card. */
-  .tessera-sorting-target-label::after {
+  .tessera-sorting-target.clickable .tessera-sorting-target-label::after {
     content: '';
     position: absolute;
     inset: 0;
