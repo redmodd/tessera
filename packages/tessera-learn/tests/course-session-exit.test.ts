@@ -204,6 +204,34 @@ describe('ending a CourseSession', () => {
     expect(calls).toContain('setExit:normal');
   });
 
+  it('commits the exit mode with the status, before the session ends', async () => {
+    const { adapter, calls } = recordingAdapter({
+      setCompletionStatus: (status) => calls.push(`completion:${status}`),
+    });
+    const { progress } = await startSession({
+      adapter,
+      config: manualConfig(),
+    });
+    expect(calls).toEqual([
+      'setDuration:0',
+      'completion:incomplete',
+      'setExit:suspend',
+      'commit',
+    ]);
+    const launched = calls.length;
+
+    progress.markCompleteManually();
+    await flush();
+
+    const committed = calls.indexOf('commit', launched) + 1;
+    expect(calls.slice(launched, committed)).toEqual([
+      'setDuration:0',
+      'completion:complete',
+      'setExit:normal',
+      'commit',
+    ]);
+  });
+
   it.each([
     ['quiz', 'quiz', 2, 'suspend'],
     ['quiz', 'quiz', 3, 'normal'],

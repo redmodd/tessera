@@ -127,7 +127,7 @@ describe('a graded submit that decides the verdict', () => {
 
     pagehide();
 
-    expect(setExit).toHaveBeenCalledWith('normal');
+    expect(setExit.mock.lastCall).toEqual(['normal']);
     expect(saveState.mock.lastCall![0]).toMatchObject({ k: 1 });
   });
 });
