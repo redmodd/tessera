@@ -180,8 +180,7 @@
   }
 
   function onTargetClick(targetIdx) {
-    if (q.locked || !cardSelected) return;
-    placeCard(targetIdx);
+    if (cardSelected) placeCard(targetIdx);
   }
 </script>
 
@@ -271,10 +270,7 @@
                   <button
                     class="tessera-sorting-remove"
                     aria-label="Return '{items[itemIdx]}' to deck"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      returnCard(itemIdx);
-                    }}>×</button
+                    onclick={() => returnCard(itemIdx)}>×</button
                   >
                 {:else if q.feedbackVisible}
                   <span class="tessera-sorting-item-icon" aria-hidden="true">
@@ -483,6 +479,7 @@
   .tessera-sorting-target-label {
     background: none;
     border: none;
+    box-shadow: none;
     cursor: inherit;
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
     font-size: 0.8125rem;
@@ -498,11 +495,6 @@
     content: '';
     position: absolute;
     inset: 0;
-  }
-
-  .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible)
-    .tessera-sorting-target-label {
-    box-shadow: none;
   }
 
   .tessera-sorting-target-items {
@@ -573,6 +565,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 3px;
+    /* Lifts the button above the target's stretched click area. */
     position: relative;
   }
 

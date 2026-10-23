@@ -69,11 +69,13 @@ export function mountOnPage(
   });
 }
 
+export type SavedAnswer = StandaloneSubmit & { score: number };
+
 /** Mounts question `q1` on page 0, already answered when `saved` is given. */
 export function mountQuestion(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved?: StandaloneSubmit & { score: number },
+  saved?: SavedAnswer,
 ) {
   const manifest = createManifest(1);
   const config = createConfig();

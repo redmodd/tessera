@@ -46,9 +46,9 @@ describe('Sorting accessible names', () => {
     expect(name(button('Fruit'))).toBe('Fruit (activate to place Apple)');
 
     click(button('Fruit'));
-    const remove = button("Return 'Apple' to deck");
-    expect(remove.parentElement?.closest('button, [role="button"]')).toBe(null);
-    expect(target.querySelector('[role="button"] button')).toBe(null);
+    expect(button("Return 'Apple' to deck")).toBeTruthy();
+    const control = ':is(button, [role="button"])';
+    expect(target.querySelector(`${control} ${control}`)).toBe(null);
   });
 
   it('disables targets and states each placement result once locked', () => {

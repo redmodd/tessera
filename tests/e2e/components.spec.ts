@@ -1,16 +1,20 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
+async function openFresh(page: Page, title: string, ready: string) {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.goto('/');
+  await waitForTesseraContent(page);
+  await navigateToPage(page, title);
+  await page.waitForSelector(ready);
+}
+
 test.describe('Component — Accordion', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Accordion & Carousel');
-    await page.waitForSelector('.tessera-accordion');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Accordion & Carousel', '.tessera-accordion'),
+  );
 
   test('accordion items toggle with click', async ({ page }) => {
     const firstTrigger = page.locator('.tessera-accordion-trigger').first();
@@ -53,14 +57,9 @@ test.describe('Component — Accordion', () => {
 });
 
 test.describe('Component — Carousel', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Accordion & Carousel');
-    await page.waitForSelector('.tessera-carousel');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Accordion & Carousel', '.tessera-carousel'),
+  );
 
   test('carousel shows first slide and navigation dots', async ({ page }) => {
     const dots = page.locator('.tessera-carousel-dot');
@@ -100,14 +99,9 @@ test.describe('Component — Carousel', () => {
 });
 
 test.describe('Component — RevealModal', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Modal, Video & Audio');
-    await page.waitForSelector('.tessera-reveal-trigger');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Modal, Video & Audio', '.tessera-reveal-trigger'),
+  );
 
   test('clicking trigger opens modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
@@ -149,14 +143,9 @@ test.describe('Component — RevealModal', () => {
 });
 
 test.describe('Component — Sorting', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Modal, Video & Audio');
-    await page.waitForSelector('.tessera-sorting-card');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Modal, Video & Audio', '.tessera-sorting-card'),
+  );
 
   test('a click anywhere on a target places the card, and placed cards return to the deck', async ({
     page,

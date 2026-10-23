@@ -5,13 +5,13 @@ import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
-import { mountQuestion } from './helpers/mount.js';
+import { mountQuestion, type SavedAnswer } from './helpers/mount.js';
 
 // Mounts a widget on a page the learner already answered it on.
 function revisit(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved: { score: number; retries?: number; response?: unknown },
+  saved: SavedAnswer,
 ) {
   const { target } = mountQuestion(widget, props, saved);
   const all = <T extends Element>(selector: string) => [
