@@ -36,21 +36,70 @@ export interface InteractionFormat {
   maxValueLength(type: Interaction['type']): number;
   /** SCORM 2004 caps each performance step answer at 250 characters. */
   maxStepAnswerLength: number;
+  /** SCORM 2004 keeps an unnamed step as `[.]answer`; SCORM 1.2 names it `_`. */
+  namelessSteps: boolean;
   /**
-   * SCORM 2004 caps a choice, sequencing or matching list at 36 items and a
-   * performance list at 250 steps.
+   * What the LMS rejects in a value's encoded items, by type. SCORM 1.2 has
+   * none; its option ids are checked while encoding.
    */
-  maxItems(type: ListInteraction['type']): number;
-  /**
-   * SCORM 2004 keeps an unnamed step as `[.]answer` and rejects values its
-   * data model grammar disallows.
-   */
-  strictGrammar: boolean;
+  rules?: ValueRules;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
   /** Ids inside a response: list items, matching ids, step names, likert. */
   responseId(value: string, max?: number): string;
 }
+
+/**
+ * Rules for a value's items: list items, steps (`name[.]answer`), or the
+ * `[,]`-separated parts of a fill-in.
+ */
+interface ItemRule {
+  maxItems?: number;
+  maxParts?: number;
+  nonEmpty?: boolean;
+  /**
+   * Items are steps. Each needs a name or an answer, and an answer can't hold
+   * `[,]`, `[.]` or `[:]` unless `range` lets it be a `min[:]max` range.
+   */
+  steps?: 'text' | 'range';
+}
+
+/**
+ * In a correct answer, breaking `maxParts`, `trimmed` or `unique` drops only
+ * that answer; breaking any other rule leaves out the whole field.
+ */
+interface AnswerRule extends ItemRule {
+  trimmed?: boolean;
+  unique?: boolean;
+}
+
+type ValueRules = Partial<
+  Record<Interaction['type'], { response?: ItemRule; correct?: AnswerRule }>
+>;
+
+const LIST: ItemRule = { maxItems: 36, nonEmpty: true };
+const STEPS: ItemRule = { maxItems: 250, nonEmpty: true, steps: 'text' };
+
+/**
+ * scorm-again's SCORM 2004 grammar. Encoded ids hold no whitespace, and choice
+ * and matching items are already deduplicated.
+ */
+const SCORM2004_RULES: ValueRules = {
+  // An empty choice pattern means "no choice is correct".
+  choice: { response: LIST, correct: { ...LIST, nonEmpty: false } },
+  sequencing: { response: LIST, correct: { ...LIST, unique: true } },
+  matching: { response: LIST, correct: LIST },
+  performance: {
+    response: STEPS,
+    correct: { ...STEPS, steps: 'range', trimmed: true, unique: true },
+  },
+  'fill-in': {
+    response: { maxParts: 10 },
+    correct: { maxParts: 10, trimmed: true, unique: true },
+  },
+  'long-fill-in': { correct: { trimmed: true } },
+  other: { correct: { trimmed: true } },
+};
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   itemDelim: ',',
@@ -63,8 +112,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: 10,
   maxValueLength: () => 255,
   maxStepAnswerLength: Infinity,
-  maxItems: () => Infinity,
-  strictGrammar: false,
+  namelessSteps: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
   responseId: shortIdentifier,
@@ -95,8 +143,8 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
     }
   },
   maxStepAnswerLength: 250,
-  maxItems: (type) => (type === 'performance' ? 250 : 36),
-  strictGrammar: true,
+  namelessSteps: true,
+  rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
   responseId: uriIdentifier,
@@ -108,8 +156,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
-  maxItems: () => Infinity,
-  strictGrammar: false,
+  rules: undefined,
   responseId: (v) => v,
 };
 
@@ -199,33 +246,15 @@ function encodePair(
 }
 
 function stepName(step: string, fmt: InteractionFormat): string {
-  return step === '' && fmt.strictGrammar ? '' : fmt.responseId(step);
+  return step === '' && fmt.namelessSteps ? '' : fmt.responseId(step);
 }
-
-const STEP_DELIM = /\[[,.:]\]/;
-const MAX_FILL_IN_PARTS = 10;
 
 /** Step names are identifiers; step answers are free text, kept as written. */
 function encodeStep(
-  [step, a]: [string, string | number],
-  field: 'response' | 'correct',
+  [step, answer]: [string, string | number],
   fmt: InteractionFormat,
 ): string {
-  const answer = String(a);
-  const name = stepName(step, fmt);
-  if (fmt.strictGrammar) {
-    if (name === '' && answer === '') {
-      throw new UnrecordableError(
-        'a step has neither a name nor an answer, which this export standard rejects',
-      );
-    }
-    if (STEP_DELIM.test(answer) && !(field === 'correct' && stepRange(a))) {
-      throw new UnrecordableError(
-        `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
-      );
-    }
-  }
-  return `${name}${fmt.pairDelim}${answer}`;
+  return `${stepName(step, fmt)}${fmt.pairDelim}${answer}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -239,83 +268,44 @@ function isList(i: Interaction): i is ListInteraction {
   return (LIST_TYPES as readonly string[]).includes(i.type);
 }
 
-/** The response's or correct answer's encoded items, not yet joined. */
 function encodeItems(
   i: ListInteraction,
   field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string[] {
-  const encoded = encodeEach(i, field, fmt);
-  // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
+  if (i.type === 'performance') {
+    return (i[field] ?? []).map((s) => encodeStep(s, fmt));
+  }
   const items =
-    i.type === 'choice' || i.type === 'matching'
-      ? [...new Set(encoded)]
-      : encoded;
-  // SCORM 2004 reads an empty choice pattern as "no choice is correct".
-  const mayBeEmpty = field === 'correct' && i.type === 'choice';
-  if (fmt.strictGrammar && items.length === 0 && !mayBeEmpty) {
-    throw new UnrecordableError(
-      'it has no items, which this export standard rejects',
-    );
-  }
-  const max = fmt.maxItems(i.type);
-  if (items.length > max) {
-    throw new UnrecordableError(
-      `it has ${items.length} items, more than the ${max} this export standard records`,
-    );
-  }
-  return items;
+    i.type === 'matching'
+      ? (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt))
+      : (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
+  // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
+  return i.type === 'sequencing' ? items : [...new Set(items)];
 }
 
-function encodeEach(
-  i: ListInteraction,
-  field: 'response' | 'correct',
-  fmt: InteractionFormat,
-): string[] {
-  switch (i.type) {
-    case 'choice':
-    case 'sequencing':
-      return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
-    case 'matching':
-      return (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt));
-    case 'performance':
-      return (i[field] ?? []).map((s) => encodeStep(s, field, fmt));
-  }
-}
-
-/** Throws when the format cannot record a value. */
-export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
-  if (isList(i)) return encodeItems(i, 'response', fmt).join(fmt.itemDelim);
+function responseItems(i: Interaction, fmt: InteractionFormat): string[] {
+  if (isList(i)) return encodeItems(i, 'response', fmt);
   switch (i.type) {
     case 'true-false':
-      return fmt.formatBoolean(i.response);
-    case 'fill-in': {
-      const parts = i.response.split(fmt.itemDelim).length;
-      if (fmt.strictGrammar && parts > MAX_FILL_IN_PARTS) {
-        throw new UnrecordableError(
-          `it has ${parts} [,]-separated parts, more than the ${MAX_FILL_IN_PARTS} this export standard records`,
-        );
-      }
-      return i.response;
-    }
+      return [fmt.formatBoolean(i.response)];
+    case 'fill-in':
+      return i.response.split(fmt.itemDelim);
     case 'long-fill-in':
     case 'other':
-      return i.response;
+      return [i.response];
     case 'likert':
-      return fmt.responseId(i.response);
+      return [fmt.responseId(i.response)];
     case 'numeric':
-      return String(i.response);
+      return [String(i.response)];
   }
 }
 
-/**
- * Returns null when no correct pattern was provided. Throws when the format
- * cannot record a value.
- */
-export function formatCorrectPattern(
+/** Null when none was provided or the format can't write its range. */
+function correctItems(
   i: Interaction,
   fmt: InteractionFormat,
-): string[] | null {
+): string[][] | null {
   if (i.correct === undefined) return null;
   if (
     i.type === 'performance' &&
@@ -324,27 +314,111 @@ export function formatCorrectPattern(
   ) {
     return null;
   }
-  if (isList(i)) return [encodeItems(i, 'correct', fmt).join(fmt.itemDelim)];
+  if (isList(i)) return [encodeItems(i, 'correct', fmt)];
   switch (i.type) {
     case 'true-false':
-      return [fmt.formatBoolean(i.correct as boolean)];
+      return [[fmt.formatBoolean(i.correct as boolean)]];
     case 'fill-in':
     case 'long-fill-in': {
-      const alternatives = i.correct as string[];
-      if (!fmt.supportsCasePrefix) return alternatives;
-      const prefix = i.caseMatters ? CASE_PREFIX : '';
-      return alternatives.map((a) => prefix + a);
+      const prefix = fmt.supportsCasePrefix && i.caseMatters ? CASE_PREFIX : '';
+      const answers = (i.correct as string[]).map((a) => prefix + a);
+      return i.type === 'fill-in'
+        ? answers.map((a) => a.split(fmt.itemDelim))
+        : answers.map((a) => [a]);
     }
     case 'numeric': {
       const { min, max } = i.correct;
-      if (min !== undefined && min === max) return [String(min)];
+      if (min !== undefined && min === max) return [[String(min)]];
       if (!fmt.supportsRange) return null;
-      return [`${min ?? ''}${fmt.rangeDelim}${max ?? ''}`];
+      return [[`${min ?? ''}${fmt.rangeDelim}${max ?? ''}`]];
     }
     case 'likert':
-      return [fmt.responseId(i.correct as string)];
+      return [[fmt.responseId(i.correct as string)]];
     case 'other':
-      return [i.correct as string];
+      return [[i.correct as string]];
+  }
+}
+
+/** Throws when the format cannot encode a value. */
+export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
+  return responseItems(i, fmt).join(fmt.itemDelim);
+}
+
+/**
+ * Returns null when no correct pattern was provided. Throws when the format
+ * cannot encode a value.
+ */
+export function formatCorrectPattern(
+  i: Interaction,
+  fmt: InteractionFormat,
+): string[] | null {
+  return (
+    correctItems(i, fmt)?.map((items) => items.join(fmt.itemDelim)) ?? null
+  );
+}
+
+const STEP_DELIM = /\[[,.:]\]/;
+
+function checkSteps(
+  steps: Array<[string, string | number]>,
+  mode: NonNullable<ItemRule['steps']>,
+  fmt: InteractionFormat,
+): void {
+  for (const [step, a] of steps) {
+    const answer = String(a);
+    if (stepName(step, fmt) === '' && answer === '') {
+      throw new UnrecordableError(
+        'a step has neither a name nor an answer, which this export standard rejects',
+      );
+    }
+    if (STEP_DELIM.test(answer) && !(mode === 'range' && stepRange(answer))) {
+      throw new UnrecordableError(
+        `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
+      );
+    }
+  }
+}
+
+const DROPS = ['trimmed', 'unique', 'maxParts'] as const;
+type DroppedBy = (typeof DROPS)[number];
+
+/**
+ * Checks a value against the format's rules for its type: steps as written,
+ * everything else on the encoded items. Throws when the field cannot be
+ * recorded; returns the rule a correct answer breaks when only that answer is
+ * dropped.
+ */
+function checkValue(
+  i: Interaction,
+  field: 'response' | 'correct',
+  items: string[],
+  fmt: InteractionFormat,
+): DroppedBy | undefined {
+  const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
+  if (!rule) return;
+  if (rule.steps && i.type === 'performance') {
+    checkSteps(i[field] ?? [], rule.steps, fmt);
+  }
+  if (rule.nonEmpty && items.length === 0) {
+    throw new UnrecordableError(
+      'it has no items, which this export standard rejects',
+    );
+  }
+  const { maxItems = Infinity, maxParts = Infinity } = rule;
+  if (items.length > maxItems) {
+    throw new UnrecordableError(
+      `it has ${items.length} items, more than the ${maxItems} this export standard records`,
+    );
+  }
+  if (rule.trimmed && items.some((item) => item.trim() !== item)) {
+    return 'trimmed';
+  }
+  if (rule.unique && new Set(items).size < items.length) return 'unique';
+  if (items.length > maxParts) {
+    if (field === 'correct') return 'maxParts';
+    throw new UnrecordableError(
+      `it has ${items.length} [,]-separated parts, more than the ${maxParts} this export standard records`,
+    );
   }
 }
 
@@ -442,48 +516,34 @@ export function fitPatterns(
       ],
     };
   }
-  const warnings: string[] = [];
-  // scorm-again checks each `[,]` item, but a long-fill-in or other pattern whole.
-  const items = (p: string) =>
-    isList(i) || i.type === 'fill-in' ? p.split(fmt.itemDelim) : [p];
-  const edgeSpace = isList(i)
-    ? 'with an item starting or ending in whitespace'
-    : i.type === 'fill-in'
-      ? 'starting or ending in whitespace, or with whitespace beside [,]'
-      : 'starting or ending in whitespace';
-  const drop = (
-    list: string[],
-    rejects: (items: string[]) => boolean,
-    reason: string,
-  ) => {
-    const kept = list.filter((p) => !rejects(items(p)));
-    if (kept.length < list.length) {
-      warnings.push(
-        `has ${list.length - kept.length} correct answer(s) ${reason}, which ${recorder} rejects; they are ${lost}`,
-      );
+  const answers = correctItems(i, fmt) ?? [];
+  const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
+  const reason = (rule: DroppedBy): string => {
+    switch (rule) {
+      case 'trimmed':
+        return isList(i)
+          ? 'with an item starting or ending in whitespace'
+          : i.type === 'fill-in'
+            ? 'starting or ending in whitespace, or with whitespace beside [,]'
+            : 'starting or ending in whitespace';
+      case 'unique':
+        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`;
+      case 'maxParts':
+        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts`;
     }
-    return kept;
   };
-  let patterns = formatCorrectPattern(i, fmt) ?? [];
-  if (fmt.strictGrammar) {
-    patterns = drop(
-      patterns,
-      (it) => it.some((item) => item.trim() !== item),
-      edgeSpace,
-    );
-    patterns = drop(
-      patterns,
-      (it) => new Set(it).size < it.length,
-      `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`,
-    );
-    if (i.type === 'fill-in') {
-      patterns = drop(
-        patterns,
-        (it) => it.length > MAX_FILL_IN_PARTS,
-        `with more than ${MAX_FILL_IN_PARTS} [,]-separated parts`,
+  const warnings: string[] = [];
+  for (const rule of DROPS) {
+    const dropped = broken.filter((b) => b === rule).length;
+    if (dropped) {
+      warnings.push(
+        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} rejects; they are ${lost}`,
       );
     }
   }
+  const patterns = answers
+    .filter((_, k) => !broken[k])
+    .map((it) => it.join(fmt.itemDelim));
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
@@ -571,20 +631,20 @@ function fitResponse(
       ]),
     };
   }
-  const items = isList(i) ? encodeItems(i, 'response', fmt) : null;
+  const items = responseItems(i, fmt);
+  checkValue(i, 'response', items, fmt);
   if (longStep) {
     console.warn(
       `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
     );
   }
-  const value = items ? items.join(fmt.itemDelim) : formatResponse(i, fmt);
+  const value = items.join(fmt.itemDelim);
   const max = fmt.maxValueLength(i.type);
   if (value.length <= max) return value;
-  const whole = items ? wholeItems(items, fmt.itemDelim, max) : '';
+  const list = isList(i);
+  const whole = list ? wholeItems(items, fmt.itemDelim, max) : '';
   const cut =
-    !items || (!whole && i.type === 'performance')
-      ? cutText(value, max)
-      : whole;
+    !list || (!whole && i.type === 'performance') ? cutText(value, max) : whole;
   console.warn(
     `Tessera: the response of interaction "${questionId}" is ${value.length} characters but this export standard records at most ${max}; ${cut ? `the LMS gets the first ${cut.length} characters` : 'it is left out of the LMS record'}.`,
   );

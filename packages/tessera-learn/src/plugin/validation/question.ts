@@ -280,7 +280,7 @@ export function validateQuestionComponents(
         const max = format.encodesOptionIndex
           ? SCORM12_MAX_OPTIONS
           : use === 'every'
-            ? format.maxItems('matching')
+            ? (format.rules?.matching?.response?.maxItems ?? Infinity)
             : Infinity;
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > max) {
