@@ -511,8 +511,8 @@ Add `.css` files to `styles/`; they load after framework styles and override the
 | `--tessera-bg`                                 | `#ffffff`                             |
 | `--tessera-bg-secondary`                       | `#f9fafb`                             |
 | `--tessera-border`                             | `#e5e7eb`                             |
-| `--tessera-success`                            | `#16a34a`                             |
-| `--tessera-error`                              | `#dc2626`                             |
+| `--tessera-success`                            | `#147638`                             |
+| `--tessera-error`                              | `#b91c1c`                             |
 | `--tessera-warning`                            | `#d97706`                             |
 | `--tessera-font-family`                        | `'Inter', system-ui, sans-serif`      |
 | `--tessera-font-size-base`                     | `1rem`                                |
