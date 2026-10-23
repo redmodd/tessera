@@ -343,7 +343,7 @@ export async function expectAAText(elements: Locator): Promise<void> {
       const [hi, lo] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
       return {
         text: node.textContent?.trim(),
-        ratio: +((hi + 0.05) / (lo + 0.05)).toFixed(2),
+        ratio: (hi + 0.05) / (lo + 0.05),
         opacity,
       };
     });

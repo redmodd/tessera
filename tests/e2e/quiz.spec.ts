@@ -360,6 +360,9 @@ test.describe('Quiz — Accessibility', () => {
     await answerFillInTheBlank(page, 'red');
     await btn.click();
     await expect(btn).toHaveText('Next Question');
+    await expect(
+      activeQ.locator('.tessera-fitb-feedback.incorrect'),
+    ).toBeVisible();
     expect(await audit()).toEqual([]);
     await btn.click();
 
