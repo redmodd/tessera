@@ -5,6 +5,7 @@ import {
   answerMatching,
   answerMultipleChoice,
   completePracticeQuiz,
+  expectAAText,
   navigateToPage,
   primaryBtn,
   readSavedState,
@@ -337,7 +338,7 @@ test.describe('Quiz — Accessibility', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('success and error feedback passes axe audit', async ({ page }) => {
+  test('success and error feedback meets AA contrast', async ({ page }) => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
     const audit = async (scope = '') =>
@@ -347,12 +348,13 @@ test.describe('Quiz — Accessibility', () => {
           .analyze()
       ).violations;
     const btn = primaryBtn(page);
+    const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
 
-    // Not audited: axe skips text inside the label of a disabled radio,
-    // which is where locked multiple-choice feedback renders.
-    await answerMultipleChoice(page, 1);
+    // A wrong answer shows its error feedback and reveals the correct option's.
+    await answerMultipleChoice(page, 0);
     await btn.click();
     await expect(btn).toHaveText('Next Question');
+    await expectAAText(activeQ.locator('.tessera-mc-feedback'));
     await btn.click();
 
     await answerFillInTheBlank(page, 'red');
@@ -365,6 +367,7 @@ test.describe('Quiz — Accessibility', () => {
     await btn.click();
     await expect(page.locator('.tessera-matching-review')).toBeVisible();
     expect(await audit('.tessera-matching-review')).toEqual([]);
+    await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 
   test('quiz results panel passes axe audit', async ({ page }) => {

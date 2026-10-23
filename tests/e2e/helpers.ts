@@ -1,5 +1,5 @@
 // Shared page-driving helpers for the preview-server specs.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { execFile, type ChildProcess } from 'node:child_process';
 import {
   variantDir,
@@ -297,4 +297,57 @@ export async function waitForStatement(
     .poll(() => findStatement(statements, verb), { timeout: 5000 })
     .toBeTruthy();
   return findStatement(statements, verb);
+}
+
+/**
+ * Asserts each element's text has 4.5:1 contrast against the backgrounds
+ * stacked under it, at full opacity. axe skips text inside disabled controls,
+ * which is where locked quiz answers and their feedback render.
+ */
+export async function expectAAText(elements: Locator): Promise<void> {
+  const results = await elements.evaluateAll(async (nodes) => {
+    // Feedback states fade their backgrounds in; read the settled colors.
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => {})),
+    );
+    // color-mix() computes to color(srgb …) with 0–1 channels; the rest to rgb().
+    const parse = (css: string) => {
+      const [r, g, b, a = 1] = css.match(/[\d.]+/g)!.map(Number);
+      const k = css.startsWith('color(') ? 255 : 1;
+      return { rgb: [r * k, g * k, b * k], a };
+    };
+    const over = (base: number[], { rgb, a }: ReturnType<typeof parse>) =>
+      base.map((v, i) => v + (rgb[i] - v) * a);
+    const luminance = (rgb: number[]) => {
+      const [r, g, b] = rgb.map((v) => {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    return nodes.map((node) => {
+      const chain: Element[] = [];
+      for (let e: Element | null = node; e; e = e.parentElement)
+        chain.unshift(e);
+      let bg = [255, 255, 255];
+      let opacity = 1;
+      for (const e of chain) {
+        const style = getComputedStyle(e);
+        opacity *= Number(style.opacity);
+        bg = over(bg, parse(style.backgroundColor));
+      }
+      const fg = over(bg, parse(getComputedStyle(node).color));
+      const [hi, lo] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
+      return {
+        text: node.textContent?.trim(),
+        ratio: +((hi + 0.05) / (lo + 0.05)).toFixed(2),
+        opacity,
+      };
+    });
+  });
+  expect(results.length).toBeGreaterThan(0);
+  expect(results.filter((r) => r.ratio < 4.5 || r.opacity < 1)).toEqual([]);
 }
