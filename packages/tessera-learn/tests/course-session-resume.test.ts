@@ -270,7 +270,7 @@ describe('CourseSession restore gate honours config.resume', () => {
     });
     await flush();
 
-    expect(calls.slice(0, calls.indexOf('commit') + 1)).toEqual([
+    expect(calls).toEqual([
       'score:33.33',
       'completion:complete',
       'success:failed',

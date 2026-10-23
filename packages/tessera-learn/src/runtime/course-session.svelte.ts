@@ -234,6 +234,7 @@ export class CourseSession {
 
   dispose(): void {
     this.#lifetime.abort();
+    this.#clearCommitTimer();
     this.#destroyEffects();
     // A stale client from this session must not leak into a fresh one.
     registerXAPIClient(null);
@@ -318,18 +319,24 @@ export class CourseSession {
     if (this.#persistScheduled) return;
     this.#persistScheduled = true;
     queueMicrotask(() => {
-      this.#persistScheduled = false;
-      if (this.#exitPhase || this.#lifetime.signal.aborted) return;
-      this.#adapter.saveState(this.#serialize());
-      this.#scheduleCommit();
+      if (this.#flushSave()) this.#scheduleCommit();
     });
+  }
+
+  // A status report runs this first, so one commit carries the save too.
+  #flushSave(): boolean {
+    if (!this.#persistScheduled) return false;
+    this.#persistScheduled = false;
+    if (this.#exitPhase || this.#lifetime.signal.aborted) return false;
+    this.#adapter.saveState(this.#serialize());
+    return true;
   }
 
   // A SCORM LMS may keep only committed values, and a page killed without
   // pagehide never reaches the end-of-session commit.
   #scheduleCommit(): void {
     if (this.#commitTimer !== undefined) return;
-    const wait = this.#lastCommitAt + COMMIT_INTERVAL_MS - Date.now();
+    const wait = this.#lastCommitAt + COMMIT_INTERVAL_MS - performance.now();
     if (wait > 0) {
       this.#commitTimer = setTimeout(this.#commitProgress, wait);
     } else {
@@ -338,15 +345,29 @@ export class CourseSession {
   }
 
   #commitProgress = (): void => {
-    clearTimeout(this.#commitTimer);
-    this.#commitTimer = undefined;
-    if (this.#terminated || this.#exitPhase || this.#lifetime.signal.aborted) {
+    if (
+      !this.#persistenceReady ||
+      this.#terminated ||
+      this.#exitPhase ||
+      this.#lifetime.signal.aborted
+    ) {
+      this.#clearCommitTimer();
       return;
     }
-    this.#lastCommitAt = Date.now();
     this.#reportDuration();
-    this.#adapter.commit();
+    this.#commit();
   };
+
+  #commit(): void {
+    this.#clearCommitTimer();
+    this.#lastCommitAt = performance.now();
+    this.#adapter.commit();
+  }
+
+  #clearCommitTimer(): void {
+    clearTimeout(this.#commitTimer);
+    this.#commitTimer = undefined;
+  }
 
   #trackChanges(): void {
     const nav = this.#nav;
@@ -376,8 +397,9 @@ export class CourseSession {
   #report(setStatus: () => void): void {
     untrack(() => {
       this.#reportDuration();
+      this.#flushSave();
       setStatus();
-      this.#adapter.commit();
+      this.#commit();
     });
   }
 
@@ -467,7 +489,7 @@ export class CourseSession {
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
     adapter.setExit(this.#exitMode());
-    adapter.commit();
+    this.#commit();
     return true;
   }
 

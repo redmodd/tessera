@@ -44,19 +44,15 @@ async function expectCommitted(
   page: Page,
   write: string[],
   commit: string,
-  timeout?: number,
 ): Promise<void> {
   await expect
-    .poll(
-      async () => {
-        const log = await scormLog(page);
-        const at = log.findLastIndex((entry) =>
-          write.every((part, i) => entry[i] === part),
-        );
-        return at >= 0 && log.slice(at).some(([fn]) => fn === commit);
-      },
-      { timeout },
-    )
+    .poll(async () => {
+      const log = await scormLog(page);
+      const at = log.findLastIndex((entry) =>
+        write.every((part, i) => entry[i] === part),
+      );
+      return at >= 0 && log.slice(at).some(([fn]) => fn === commit);
+    })
     .toBe(true);
 }
 
@@ -190,17 +186,18 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   });
 
   test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.clock.install();
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await navigateToPage(page, 'Objectives');
+    // Past the ten seconds the launch commit holds the next one back.
+    await page.clock.fastForward(10_000);
 
-    // Up to the ten seconds a launch commit holds the next one back.
     await expectCommitted(
       page,
-      ['LMSSetValue', 'cmi.core.lesson_location'],
+      ['LMSSetValue', 'cmi.core.lesson_location', '1'],
       'LMSCommit',
-      15_000,
     );
   });
 
@@ -525,13 +522,15 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   });
 
   test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.clock.install();
     await page.goto(BASE);
     await waitForTesseraContent(page);
 
     await navigateToPage(page, 'Objectives');
+    // Past the ten seconds the launch commit holds the next one back.
+    await page.clock.fastForward(10_000);
 
-    // Up to the ten seconds a launch commit holds the next one back.
-    await expectCommitted(page, ['SetValue', 'cmi.location'], 'Commit', 15_000);
+    await expectCommitted(page, ['SetValue', 'cmi.location', '1'], 'Commit');
   });
 
   test('Re-launch via reload restores bookmark from suspend_data', async ({
