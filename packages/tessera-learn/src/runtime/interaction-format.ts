@@ -86,7 +86,7 @@ const STEPS: ItemRule = { maxItems: 250, nonEmpty: true, steps: 'text' };
  */
 const SCORM2004_RULES: ValueRules = {
   // An empty choice pattern means "no choice is correct".
-  choice: { response: LIST, correct: { maxItems: 36 } },
+  choice: { response: LIST, correct: { ...LIST, nonEmpty: false } },
   sequencing: { response: LIST, correct: { ...LIST, unique: true } },
   matching: { response: LIST, correct: LIST },
   performance: {
@@ -522,7 +522,7 @@ export function fitPatterns(
   }
   const answers = correctItems(i, fmt) ?? [];
   const broken = answers.map((it) => checkItems(i.type, 'correct', it, fmt));
-  const reasons = {
+  const reasons: Record<NonNullable<(typeof broken)[number]>, string> = {
     trimmed: isList(i)
       ? 'with an item starting or ending in whitespace'
       : i.type === 'fill-in'
