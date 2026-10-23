@@ -40,19 +40,23 @@ async function expectRestoreToEndSession(page: Page): Promise<void> {
 }
 
 // A page killed without pagehide keeps only what was committed.
-async function expectExitCommitted(
+async function expectCommitted(
   page: Page,
   write: string[],
   commit: string,
+  timeout?: number,
 ): Promise<void> {
   await expect
-    .poll(async () => {
-      const log = await scormLog(page);
-      const at = log.findLastIndex((entry) =>
-        write.every((part, i) => entry[i] === part),
-      );
-      return at >= 0 && log.slice(at).some(([fn]) => fn === commit);
-    })
+    .poll(
+      async () => {
+        const log = await scormLog(page);
+        const at = log.findLastIndex((entry) =>
+          write.every((part, i) => entry[i] === part),
+        );
+        return at >= 0 && log.slice(at).some(([fn]) => fn === commit);
+      },
+      { timeout },
+    )
     .toBe(true);
 }
 
@@ -169,7 +173,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
-    await expectExitCommitted(
+    await expectCommitted(
       page,
       ['LMSSetValue', 'cmi.core.exit', 'suspend'],
       'LMSCommit',
@@ -178,10 +182,25 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await openQuiz(page, 'Graded Assessment');
     await answerGradedQuiz(page);
     await finishFreeCourse(page);
-    await expectExitCommitted(
+    await expectCommitted(
       page,
       ['LMSSetValue', 'cmi.core.exit', ''],
       'LMSCommit',
+    );
+  });
+
+  test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await navigateToPage(page, 'Objectives');
+
+    // Up to the ten seconds a launch commit holds the next one back.
+    await expectCommitted(
+      page,
+      ['LMSSetValue', 'cmi.core.lesson_location'],
+      'LMSCommit',
+      15_000,
     );
   });
 
@@ -497,20 +516,22 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
-    await expectExitCommitted(
-      page,
-      ['SetValue', 'cmi.exit', 'suspend'],
-      'Commit',
-    );
+    await expectCommitted(page, ['SetValue', 'cmi.exit', 'suspend'], 'Commit');
 
     await openQuiz(page, 'Graded Assessment');
     await answerGradedQuiz(page);
     await finishFreeCourse(page);
-    await expectExitCommitted(
-      page,
-      ['SetValue', 'cmi.exit', 'normal'],
-      'Commit',
-    );
+    await expectCommitted(page, ['SetValue', 'cmi.exit', 'normal'], 'Commit');
+  });
+
+  test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await navigateToPage(page, 'Objectives');
+
+    // Up to the ten seconds a launch commit holds the next one back.
+    await expectCommitted(page, ['SetValue', 'cmi.location'], 'Commit', 15_000);
   });
 
   test('Re-launch via reload restores bookmark from suspend_data', async ({

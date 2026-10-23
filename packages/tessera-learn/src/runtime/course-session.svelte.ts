@@ -21,6 +21,9 @@ import type { XAPIClient } from './xapi/client.js';
 // have no deadline of their own, and the first page waits on all three.
 const INIT_TIMEOUT_MS = 15_000;
 const EXIT_TIMEOUT_MS = 10_000;
+// usePersistence can save on every keystroke, and a commit is often a server
+// round trip.
+const COMMIT_INTERVAL_MS = 10_000;
 
 type ExitPhase = 'ending' | 'ended';
 
@@ -61,6 +64,8 @@ export class CourseSession {
 
   #persistScheduled = false;
   #persistPending = false;
+  #commitTimer: ReturnType<typeof setTimeout> | undefined;
+  #lastCommitAt = -Infinity;
 
   #prevReportedScore: number | null = null;
   // Undefined until the launch report, so it sends every status.
@@ -145,6 +150,9 @@ export class CourseSession {
     const { signal } = this.#lifetime;
     window.addEventListener('pagehide', this.#onPagehide, { signal });
     window.addEventListener('pageshow', this.#onPageshow, { signal });
+    document.addEventListener('visibilitychange', this.#onVisibilityChange, {
+      signal,
+    });
 
     // Separate from init(): the adapter bounds this itself, so a stalled State
     // API costs the bookmark rather than the launch.
@@ -301,8 +309,7 @@ export class CourseSession {
     return withAnswers(limit - bareSize);
   }
 
-  // Microtask-batched: mutations within one tick collapse to one save and
-  // one LMS commit.
+  // Microtask-batched: mutations within one tick collapse to one save.
   #requestPersist(): void {
     if (!this.#persistenceReady) {
       this.#persistPending = true;
@@ -314,8 +321,32 @@ export class CourseSession {
       this.#persistScheduled = false;
       if (this.#exitPhase || this.#lifetime.signal.aborted) return;
       this.#adapter.saveState(this.#serialize());
+      this.#scheduleCommit();
     });
   }
+
+  // A SCORM LMS may keep only committed values, and a page killed without
+  // pagehide never reaches the end-of-session commit.
+  #scheduleCommit(): void {
+    if (this.#commitTimer !== undefined) return;
+    const wait = this.#lastCommitAt + COMMIT_INTERVAL_MS - Date.now();
+    if (wait > 0) {
+      this.#commitTimer = setTimeout(this.#commitProgress, wait);
+    } else {
+      this.#commitProgress();
+    }
+  }
+
+  #commitProgress = (): void => {
+    clearTimeout(this.#commitTimer);
+    this.#commitTimer = undefined;
+    if (this.#terminated || this.#exitPhase || this.#lifetime.signal.aborted) {
+      return;
+    }
+    this.#lastCommitAt = Date.now();
+    this.#reportDuration();
+    this.#adapter.commit();
+  };
 
   #trackChanges(): void {
     const nav = this.#nav;
@@ -450,6 +481,11 @@ export class CourseSession {
     this.#duration.pause();
     this.#xapiClient?.markUnloading();
     this.#adapter.terminate();
+  };
+
+  // iOS Safari can kill a backgrounded page without firing pagehide.
+  #onVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') this.#commitProgress();
   };
 
   #onPageshow = (event: PageTransitionEvent): void => {
