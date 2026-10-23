@@ -511,8 +511,8 @@ Add `.css` files to `styles/`; they load after framework styles and override the
 | `--tessera-bg`                                 | `#ffffff`                             |
 | `--tessera-bg-secondary`                       | `#f9fafb`                             |
 | `--tessera-border`                             | `#e5e7eb`                             |
-| `--tessera-success`                            | `#16a34a`                             |
-| `--tessera-error`                              | `#dc2626`                             |
+| `--tessera-success`                            | `#147638`                             |
+| `--tessera-error`                              | `#b91c1c`                             |
 | `--tessera-warning`                            | `#d97706`                             |
 | `--tessera-font-family`                        | `'Inter', system-ui, sans-serif`      |
 | `--tessera-font-size-base`                     | `1rem`                                |
@@ -520,6 +520,8 @@ Add `.css` files to `styles/`; they load after framework styles and override the
 | `--tessera-spacing-sm` / `-md` / `-lg` / `-xl` | `0.5rem` / `1rem` / `1.5rem` / `2rem` |
 | `--tessera-sidebar-width`                      | `280px`                               |
 | `--tessera-content-max-width`                  | `800px`                               |
+
+Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {

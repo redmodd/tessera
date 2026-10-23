@@ -5,6 +5,7 @@ import {
   answerMatching,
   answerMultipleChoice,
   completePracticeQuiz,
+  expectAAText,
   navigateToPage,
   primaryBtn,
   readSavedState,
@@ -368,6 +369,41 @@ test.describe('Quiz — Accessibility', () => {
       matching.getByRole('button', { name: '1 1 (matched)', exact: true }),
     ).toBeDisabled();
     expect((await audit()).violations).toEqual([]);
+  });
+
+  test('success and error feedback meets AA contrast', async ({ page }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    const audit = async (scope = '') =>
+      (
+        await new AxeBuilder({ page })
+          .include(`.tessera-quiz-question-wrapper.active ${scope}`)
+          .analyze()
+      ).violations;
+    const btn = primaryBtn(page);
+    const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
+
+    // A wrong answer shows its error feedback and reveals the correct option's.
+    await answerMultipleChoice(page, 0);
+    await btn.click();
+    await expect(btn).toHaveText('Next Question');
+    await expectAAText(activeQ.locator('.tessera-mc-feedback'));
+    await btn.click();
+
+    await answerFillInTheBlank(page, 'red');
+    await btn.click();
+    await expect(btn).toHaveText('Next Question');
+    await expect(
+      activeQ.locator('.tessera-fitb-feedback.incorrect'),
+    ).toBeVisible();
+    expect(await audit()).toEqual([]);
+    await btn.click();
+
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+    await btn.click();
+    await expect(page.locator('.tessera-matching-review')).toBeVisible();
+    expect(await audit('.tessera-matching-review')).toEqual([]);
+    await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 
   test('quiz results panel passes axe audit', async ({ page }) => {
