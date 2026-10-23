@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import {
   formatResponse,
   formatCorrectPattern,
   fitPatterns,
+  buildScormInteractionFields,
+  type InteractionFormat,
   SCORM12_INTERACTION_FORMAT,
   SCORM2004_INTERACTION_FORMAT,
   XAPI_INTERACTION_FORMAT,
@@ -15,6 +17,19 @@ const choice: Interaction = {
   response: ['Blue'],
   correct: ['Green'],
 };
+
+/** The response the format records; undefined when it leaves it out. */
+function recordedResponse(i: Interaction, format: InteractionFormat) {
+  const { fields } = buildScormInteractionFields('q', i, null, {
+    responseField: 'learner_response',
+    timestampField: 'timestamp',
+    timestamp: '',
+    typeValue: i.type,
+    resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+    format,
+  });
+  return fields.find(([key]) => key === 'learner_response')?.[1];
+}
 
 describe('encodesOptionIndex', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
@@ -158,11 +173,15 @@ describe('SCORM 2004 ids inside a response', () => {
       response: [['s', 'a [,] b']],
       correct: [['s', '-1.5[:]2']],
     };
-    expect(() => formatResponse(i, fmt)).toThrow('holds [,], [.] or [:]');
-    expect(formatCorrectPattern(i, fmt)).toEqual(['s[.]-1.5[:]2']);
-    expect(() =>
-      formatCorrectPattern({ ...i, correct: [['s', 'a[:]b']] }, fmt),
-    ).toThrow('holds [,], [.] or [:]');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(recordedResponse(i, fmt)).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('holds [,], [.] or [:]'),
+    );
+    expect(fitPatterns(i, fmt).kept).toEqual(['s[.]-1.5[:]2']);
+    expect(() => fitPatterns({ ...i, correct: [['s', 'a[:]b']] }, fmt)).toThrow(
+      'holds [,], [.] or [:]',
+    );
     expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
     expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
   });
@@ -213,9 +232,11 @@ describe('SCORM 2004 ids inside a response', () => {
       'it has 11 [,]-separated parts, more than the 10',
     ],
   ])('refuses %s on SCORM 2004 only', (_, i, error) => {
-    expect(() => formatResponse(i, fmt)).toThrow(error);
-    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
-    expect(() => formatResponse(i, SCORM12_INTERACTION_FORMAT)).not.toThrow();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(recordedResponse(i, fmt)).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(error));
+    expect(recordedResponse(i, XAPI_INTERACTION_FORMAT)).toBeDefined();
+    expect(recordedResponse(i, SCORM12_INTERACTION_FORMAT)).toBeDefined();
   });
 
   it.each([
