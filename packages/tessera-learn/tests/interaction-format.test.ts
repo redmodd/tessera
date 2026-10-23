@@ -314,7 +314,10 @@ describe('fitPatterns', () => {
 
   it('records an empty SCORM 2004 choice pattern as no choice correct', () => {
     const i: Interaction = { type: 'choice', response: ['a'], correct: [] };
-    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(['']);
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: [''],
+      warnings: [],
+    });
   });
 
   it('drops a SCORM 1.2 performance pattern whose step answer runs past the cap', () => {

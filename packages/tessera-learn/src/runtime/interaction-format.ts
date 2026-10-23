@@ -38,7 +38,10 @@ export interface InteractionFormat {
   maxStepAnswerLength: number;
   /** SCORM 2004 keeps an unnamed step as `[.]answer`; SCORM 1.2 names it `_`. */
   namelessSteps: boolean;
-  /** What the LMS rejects in a value, by type. Unset when it rejects nothing. */
+  /**
+   * What the LMS rejects in a value's encoded items, by type. SCORM 1.2 has
+   * none; its option ids are checked while encoding.
+   */
   rules?: ValueRules;
   formatBoolean(value: boolean): string;
   identifier(value: string): string;
@@ -53,7 +56,6 @@ export interface InteractionFormat {
 interface ItemRule {
   maxItems?: number;
   maxParts?: number;
-  /** Rejects a list with no items. */
   nonEmpty?: boolean;
   /**
    * Items are steps. Each needs a name or an answer, and an answer can't hold
@@ -67,9 +69,7 @@ interface ItemRule {
  * that answer; breaking any other rule leaves out the whole field.
  */
 interface AnswerRule extends ItemRule {
-  /** Rejects an item starting or ending in whitespace. */
   trimmed?: boolean;
-  /** Rejects a repeated item. */
   unique?: boolean;
 }
 
@@ -273,25 +273,15 @@ function encodeItems(
   field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string[] {
-  switch (i.type) {
-    case 'choice':
-      // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
-      return [
-        ...new Set(
-          (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt)),
-        ),
-      ];
-    case 'matching':
-      return [
-        ...new Set(
-          (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt)),
-        ),
-      ];
-    case 'sequencing':
-      return (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
-    case 'performance':
-      return (i[field] ?? []).map((s) => encodeStep(s, fmt));
+  if (i.type === 'performance') {
+    return (i[field] ?? []).map((s) => encodeStep(s, fmt));
   }
+  const items =
+    i.type === 'matching'
+      ? (i[field] ?? []).map((p) => encodePair(p, i.optionPairs, fmt))
+      : (i[field] ?? []).map((v) => encodeListItem(v, i.options, fmt));
+  // Choice and matching answers are sets; SCORM 2004 rejects a repeated item.
+  return i.type === 'sequencing' ? items : [...new Set(items)];
 }
 
 /** The response's items, not yet joined. */
