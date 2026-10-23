@@ -521,7 +521,7 @@ Add `.css` files to `styles/`; they load after framework styles and override the
 | `--tessera-sidebar-width`                      | `280px`                               |
 | `--tessera-content-max-width`                  | `800px`                               |
 
-Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color. An override must keep 4.5:1 contrast against that tint.
+Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {

@@ -371,7 +371,6 @@
 
   .tessera-matching-item:disabled {
     cursor: default;
-    opacity: 0.9;
   }
 
   .tessera-matching-badge {
