@@ -284,7 +284,6 @@ function encodeItems(
   return i.type === 'sequencing' ? items : [...new Set(items)];
 }
 
-/** The response's items, not yet joined. */
 function responseItems(i: Interaction, fmt: InteractionFormat): string[] {
   if (isList(i)) return encodeItems(i, 'response', fmt);
   switch (i.type) {
@@ -302,7 +301,7 @@ function responseItems(i: Interaction, fmt: InteractionFormat): string[] {
   }
 }
 
-/** Each correct answer's items, not yet joined. Null when none was provided. */
+/** Null when none was provided or the format can't write its range. */
 function correctItems(
   i: Interaction,
   fmt: InteractionFormat,
@@ -360,15 +359,12 @@ export function formatCorrectPattern(
 
 const STEP_DELIM = /\[[,.:]\]/;
 
-/** Throws when a step breaks the format's step rule. */
 function checkSteps(
-  i: Interaction,
-  field: 'response' | 'correct',
+  steps: Array<[string, string | number]>,
+  mode: NonNullable<ItemRule['steps']>,
   fmt: InteractionFormat,
 ): void {
-  const mode = fmt.rules?.[i.type]?.[field]?.steps;
-  if (!mode || i.type !== 'performance') return;
-  for (const [step, a] of i[field] ?? []) {
+  for (const [step, a] of steps) {
     const answer = String(a);
     if (stepName(step, fmt) === '' && answer === '') {
       throw new UnrecordableError(
@@ -387,18 +383,22 @@ const DROPS = ['trimmed', 'unique', 'maxParts'] as const;
 type DroppedBy = (typeof DROPS)[number];
 
 /**
- * Checks a value's encoded items against the format's rules for its type.
- * Throws when the field cannot be recorded; returns the rule a correct answer
- * breaks when only that answer is dropped.
+ * Checks a value against the format's rules for its type: steps as written,
+ * everything else on the encoded items. Throws when the field cannot be
+ * recorded; returns the rule a correct answer breaks when only that answer is
+ * dropped.
  */
-function checkItems(
-  type: Interaction['type'],
+function checkValue(
+  i: Interaction,
   field: 'response' | 'correct',
   items: string[],
   fmt: InteractionFormat,
 ): DroppedBy | undefined {
-  const rule: AnswerRule | undefined = fmt.rules?.[type]?.[field];
+  const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
+  if (rule.steps && i.type === 'performance') {
+    checkSteps(i[field] ?? [], rule.steps, fmt);
+  }
   if (rule.nonEmpty && items.length === 0) {
     throw new UnrecordableError(
       'it has no items, which this export standard rejects',
@@ -516,9 +516,8 @@ export function fitPatterns(
       ],
     };
   }
-  checkSteps(i, 'correct', fmt);
   const answers = correctItems(i, fmt) ?? [];
-  const broken = answers.map((it) => checkItems(i.type, 'correct', it, fmt));
+  const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
       case 'trimmed':
@@ -632,9 +631,8 @@ function fitResponse(
       ]),
     };
   }
-  checkSteps(i, 'response', fmt);
   const items = responseItems(i, fmt);
-  checkItems(i.type, 'response', items, fmt);
+  checkValue(i, 'response', items, fmt);
   if (longStep) {
     console.warn(
       `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,

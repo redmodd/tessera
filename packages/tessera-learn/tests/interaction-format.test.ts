@@ -119,6 +119,19 @@ describe('performance steps', () => {
       ),
     ).toEqual(['s.a[:]b']);
   });
+
+  it('leaves out a correct step range before checking its other steps', () => {
+    const fmt = { ...SCORM2004_INTERACTION_FORMAT, supportsRange: false };
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 3]],
+      correct: [
+        ['s', '1[:]5'],
+        ['t', 'a[,]b'],
+      ],
+    };
+    expect(fitPatterns(i, fmt)).toEqual({ kept: [], warnings: [] });
+  });
 });
 
 describe('numeric ranges', () => {
