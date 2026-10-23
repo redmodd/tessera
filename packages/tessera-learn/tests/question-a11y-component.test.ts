@@ -19,9 +19,14 @@ function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
-  const name = (el: HTMLElement) =>
-    el.getAttribute('aria-label') ??
-    (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const name = (el: HTMLElement) => {
+    const visible = el.cloneNode(true) as HTMLElement;
+    visible.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+    return (
+      el.getAttribute('aria-label') ??
+      (visible.textContent ?? '').replace(/\s+/g, ' ').trim()
+    );
+  };
   const button = (start: string) => {
     const found = buttons().find((b) => name(b).startsWith(start));
     if (!found) throw new Error(`no button named "${start}…"`);
@@ -53,6 +58,25 @@ describe('Sorting accessible names', () => {
     const remove = button("Return 'Apple' to deck");
     expect(remove.parentElement?.closest('button, [role="button"]')).toBe(null);
     expect(target.querySelector('[role="button"] button')).toBe(null);
+  });
+
+  it('disables targets and states each placement result once locked', () => {
+    const { target, button, name, click } = mountWidget(Sorting, {
+      items: ['Apple', 'Carrot'],
+      targets: ['Fruit', 'Vegetable'],
+      correct: [0, 1],
+    });
+    for (let i = 0; i < 2; i++) {
+      click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
+      click(button('Fruit'));
+    }
+    click(button('Check Answer'));
+
+    expect((button('Fruit') as HTMLButtonElement).disabled).toBe(true);
+    const placed = [
+      ...target.querySelectorAll<HTMLElement>('.tessera-sorting-placed-item'),
+    ].map(name);
+    expect(placed.sort()).toEqual(['Apple (correct)', 'Carrot (incorrect)']);
   });
 });
 

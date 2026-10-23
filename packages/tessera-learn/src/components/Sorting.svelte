@@ -207,11 +207,8 @@
             onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
-            {#if !cardSelected}
-              <span class="tessera-sr-only"
-                >(activate, then choose a target)</span
-              >
-            {/if}
+            <span class="tessera-sr-only">(activate, then choose a target)</span
+            >
           </div>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
@@ -249,7 +246,8 @@
       >
         <button
           class="tessera-sorting-target-label"
-          aria-disabled={!(cardSelected && !q.locked)}
+          disabled={q.locked}
+          aria-disabled={!cardSelected}
           onclick={() => onTargetClick(targetIdx)}
         >
           {targetLabel}
@@ -282,6 +280,11 @@
                   <span class="tessera-sorting-item-icon" aria-hidden="true">
                     {isCorrectPlacement(itemIdx) ? '✓' : '✗'}
                   </span>
+                  <span class="tessera-sr-only"
+                    >({isCorrectPlacement(itemIdx)
+                      ? 'correct'
+                      : 'incorrect'})</span
+                  >
                 {/if}
               </div>
             {/each}
@@ -482,7 +485,6 @@
   .tessera-sorting-target-label {
     background: none;
     border: none;
-    font-family: inherit;
     cursor: inherit;
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
     font-size: 0.8125rem;
@@ -500,7 +502,8 @@
     inset: 0;
   }
 
-  .tessera-sorting-target-label:focus-visible {
+  .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible)
+    .tessera-sorting-target-label {
     box-shadow: none;
   }
 
@@ -527,7 +530,6 @@
       border-color 0.15s,
       background 0.15s;
     pointer-events: all;
-    position: relative;
   }
 
   .tessera-sorting-placed-item.correct {
@@ -576,6 +578,7 @@
     justify-content: center;
     border-radius: 3px;
     pointer-events: all;
+    position: relative;
   }
 
   .tessera-sorting-remove:hover {
