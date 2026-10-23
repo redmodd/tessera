@@ -360,6 +360,32 @@ export function formatCorrectPattern(
 
 const STEP_DELIM = /\[[,.:]\]/;
 
+/** Throws when a step breaks the format's step rule. */
+function checkSteps(
+  i: Interaction,
+  field: 'response' | 'correct',
+  fmt: InteractionFormat,
+): void {
+  const mode = fmt.rules?.[i.type]?.[field]?.steps;
+  if (!mode || i.type !== 'performance') return;
+  for (const [step, a] of i[field] ?? []) {
+    const answer = String(a);
+    if (stepName(step, fmt) === '' && answer === '') {
+      throw new UnrecordableError(
+        'a step has neither a name nor an answer, which this export standard rejects',
+      );
+    }
+    if (STEP_DELIM.test(answer) && !(mode === 'range' && stepRange(answer))) {
+      throw new UnrecordableError(
+        `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
+      );
+    }
+  }
+}
+
+const DROPS = ['trimmed', 'unique', 'maxParts'] as const;
+type DroppedBy = (typeof DROPS)[number];
+
 /**
  * Checks a value's encoded items against the format's rules for its type.
  * Throws when the field cannot be recorded; returns the rule a correct answer
@@ -370,29 +396,9 @@ function checkItems(
   field: 'response' | 'correct',
   items: string[],
   fmt: InteractionFormat,
-): 'maxParts' | 'trimmed' | 'unique' | undefined {
+): DroppedBy | undefined {
   const rule: AnswerRule | undefined = fmt.rules?.[type]?.[field];
   if (!rule) return;
-  if (rule.steps) {
-    for (const step of items) {
-      if (step === fmt.pairDelim) {
-        throw new UnrecordableError(
-          'a step has neither a name nor an answer, which this export standard rejects',
-        );
-      }
-      const answer = step.slice(
-        step.indexOf(fmt.pairDelim) + fmt.pairDelim.length,
-      );
-      if (
-        STEP_DELIM.test(answer) &&
-        !(rule.steps === 'range' && stepRange(answer))
-      ) {
-        throw new UnrecordableError(
-          `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
-        );
-      }
-    }
-  }
   if (rule.nonEmpty && items.length === 0) {
     throw new UnrecordableError(
       'it has no items, which this export standard rejects',
@@ -510,23 +516,29 @@ export function fitPatterns(
       ],
     };
   }
+  checkSteps(i, 'correct', fmt);
   const answers = correctItems(i, fmt) ?? [];
   const broken = answers.map((it) => checkItems(i.type, 'correct', it, fmt));
-  const reasons: Record<NonNullable<(typeof broken)[number]>, string> = {
-    trimmed: isList(i)
-      ? 'with an item starting or ending in whitespace'
-      : i.type === 'fill-in'
-        ? 'starting or ending in whitespace, or with whitespace beside [,]'
-        : 'starting or ending in whitespace',
-    unique: `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`,
-    maxParts: `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts`,
+  const reason = (rule: DroppedBy): string => {
+    switch (rule) {
+      case 'trimmed':
+        return isList(i)
+          ? 'with an item starting or ending in whitespace'
+          : i.type === 'fill-in'
+            ? 'starting or ending in whitespace, or with whitespace beside [,]'
+            : 'starting or ending in whitespace';
+      case 'unique':
+        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`;
+      case 'maxParts':
+        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts`;
+    }
   };
   const warnings: string[] = [];
-  for (const [rule, reason] of Object.entries(reasons)) {
+  for (const rule of DROPS) {
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason}, which ${recorder} rejects; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} rejects; they are ${lost}`,
       );
     }
   }
@@ -620,6 +632,7 @@ function fitResponse(
       ]),
     };
   }
+  checkSteps(i, 'response', fmt);
   const items = responseItems(i, fmt);
   checkItems(i.type, 'response', items, fmt);
   if (longStep) {

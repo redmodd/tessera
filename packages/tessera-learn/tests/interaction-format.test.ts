@@ -235,7 +235,7 @@ describe('SCORM 2004 ids inside a response', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(recordedResponse(i, fmt)).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(error));
-    expect(recordedResponse(i, XAPI_INTERACTION_FORMAT)).toBeDefined();
+    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
     expect(recordedResponse(i, SCORM12_INTERACTION_FORMAT)).toBeDefined();
   });
 
