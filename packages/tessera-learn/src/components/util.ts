@@ -35,6 +35,20 @@ export const QUESTION_ID_PREFIX = {
 
 export type QuestionComponentName = keyof typeof QUESTION_ID_PREFIX;
 
+/** Matching pair badge colors, cycled by pair index. Each carries a white number. */
+export const MATCH_PAIR_COLORS = [
+  '#2563eb',
+  '#9333ea',
+  '#0e7490',
+  '#c2410c',
+  '#4f46e5',
+  '#0f766e',
+  '#be185d',
+  '#7c3aed',
+  '#0369a1',
+  '#a16207',
+] as const;
+
 /** Author-supplied `id`, or a `prefix-<slug>` fallback derived from the prompt. */
 export function questionId(
   id: string | undefined,

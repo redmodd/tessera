@@ -3,6 +3,7 @@ import {
   relativeLuminance,
   contrastRatio,
 } from '../src/plugin/a11y/contrast.js';
+import { MATCH_PAIR_COLORS } from '../src/components/util.js';
 
 describe('relativeLuminance', () => {
   it('is 0 for black and 1 for white', () => {
@@ -49,5 +50,14 @@ describe('contrastRatio', () => {
   it('returns null when either color is not hex', () => {
     expect(contrastRatio('blue', '#ffffff')).toBeNull();
     expect(contrastRatio('#ffffff', 'rgb(0,0,0)')).toBeNull();
+  });
+});
+
+describe('Matching pair colors', () => {
+  it('give the white badge number AA contrast', () => {
+    const failing = MATCH_PAIR_COLORS.filter(
+      (c) => (contrastRatio(c, '#ffffff') as number) < 4.5,
+    );
+    expect(failing).toEqual([]);
   });
 });

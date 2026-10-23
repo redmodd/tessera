@@ -3,6 +3,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
+    MATCH_PAIR_COLORS,
     QUESTION_ID_PREFIX,
     indexIds,
     questionId,
@@ -42,19 +43,6 @@
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
-
-  const pairColors = [
-    '#2563eb',
-    '#9333ea',
-    '#0891b2',
-    '#c2410c',
-    '#4f46e5',
-    '#0d9488',
-    '#b91c1c',
-    '#7c3aed',
-    '#0369a1',
-    '#a16207',
-  ];
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -165,12 +153,14 @@
 
   function getMatchColor(leftIndex) {
     if (!matches.has(leftIndex)) return null;
-    return pairColors[leftIndex % pairColors.length];
+    return MATCH_PAIR_COLORS[leftIndex % MATCH_PAIR_COLORS.length];
   }
 
   function getRightMatchColor(rightOriginalIndex) {
     const l = rightToLeft.get(rightOriginalIndex);
-    return l === undefined ? null : pairColors[l % pairColors.length];
+    return l === undefined
+      ? null
+      : MATCH_PAIR_COLORS[l % MATCH_PAIR_COLORS.length];
   }
 
   function isRightMatched(rightOriginalIndex) {
@@ -371,7 +361,6 @@
 
   .tessera-matching-item:disabled {
     cursor: default;
-    opacity: 0.9;
   }
 
   .tessera-matching-badge {
