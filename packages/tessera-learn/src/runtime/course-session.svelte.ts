@@ -21,6 +21,9 @@ import type { XAPIClient } from './xapi/client.js';
 // have no deadline of their own, and the first page waits on all three.
 const INIT_TIMEOUT_MS = 15_000;
 const EXIT_TIMEOUT_MS = 10_000;
+// usePersistence can save on every keystroke, and a commit is often a server
+// round trip.
+const COMMIT_INTERVAL_MS = 10_000;
 
 type ExitPhase = 'ending' | 'ended';
 
@@ -61,6 +64,8 @@ export class CourseSession {
 
   #persistScheduled = false;
   #persistPending = false;
+  #commitTimer: ReturnType<typeof setTimeout> | undefined;
+  #lastCommitAt = -Infinity;
 
   #prevReportedScore: number | null = null;
   // Undefined until the launch report, so it sends every status.
@@ -179,6 +184,9 @@ export class CourseSession {
       console.error('Tessera: resume state could not be restored', err);
     }
     this.#persistenceReady = true;
+    document.addEventListener('visibilitychange', this.#onVisibilityChange, {
+      signal,
+    });
     if (this.#persistPending) {
       this.#persistPending = false;
       this.#requestPersist();
@@ -226,6 +234,7 @@ export class CourseSession {
 
   dispose(): void {
     this.#lifetime.abort();
+    this.#clearCommitTimer();
     this.#destroyEffects();
     // A stale client from this session must not leak into a fresh one.
     registerXAPIClient(null);
@@ -301,8 +310,7 @@ export class CourseSession {
     return withAnswers(limit - bareSize);
   }
 
-  // Microtask-batched: mutations within one tick collapse to one save and
-  // one LMS commit.
+  // Microtask-batched: mutations within one tick collapse to one save.
   #requestPersist(): void {
     if (!this.#persistenceReady) {
       this.#persistPending = true;
@@ -311,10 +319,50 @@ export class CourseSession {
     if (this.#persistScheduled) return;
     this.#persistScheduled = true;
     queueMicrotask(() => {
-      this.#persistScheduled = false;
-      if (this.#exitPhase || this.#lifetime.signal.aborted) return;
-      this.#adapter.saveState(this.#serialize());
+      if (this.#flushSave()) this.#scheduleCommit();
     });
+  }
+
+  // A status report runs this first, so one commit carries the save too.
+  #flushSave(): boolean {
+    if (!this.#persistScheduled) return false;
+    this.#persistScheduled = false;
+    if (this.#exitPhase || this.#lifetime.signal.aborted) return false;
+    this.#adapter.saveState(this.#serialize());
+    return true;
+  }
+
+  // A SCORM LMS may keep only committed values, and a page killed without
+  // pagehide never reaches the end-of-session commit. A hidden page can be
+  // killed at any moment, so its saves skip the wait.
+  #scheduleCommit(): void {
+    if (this.#commitTimer !== undefined) return;
+    const wait = this.#lastCommitAt + COMMIT_INTERVAL_MS - performance.now();
+    if (wait > 0 && document.visibilityState !== 'hidden') {
+      this.#commitTimer = setTimeout(this.#commitProgress, wait);
+    } else {
+      this.#commitProgress();
+    }
+  }
+
+  #commitProgress = (): void => {
+    if (this.#terminated || this.#exitPhase) {
+      this.#clearCommitTimer();
+      return;
+    }
+    this.#reportDuration();
+    this.#commit();
+  };
+
+  #commit(): void {
+    this.#clearCommitTimer();
+    this.#lastCommitAt = performance.now();
+    this.#adapter.commit();
+  }
+
+  #clearCommitTimer(): void {
+    clearTimeout(this.#commitTimer);
+    this.#commitTimer = undefined;
   }
 
   #trackChanges(): void {
@@ -345,8 +393,9 @@ export class CourseSession {
   #report(setStatus: () => void): void {
     untrack(() => {
       this.#reportDuration();
+      this.#flushSave();
       setStatus();
-      this.#adapter.commit();
+      this.#commit();
     });
   }
 
@@ -436,7 +485,7 @@ export class CourseSession {
     adapter.saveState(this.#serialize());
     // Before terminate(), so SCORM commits the exit mode in the same flush.
     adapter.setExit(this.#exitMode());
-    adapter.commit();
+    this.#commit();
     return true;
   }
 
@@ -450,6 +499,11 @@ export class CourseSession {
     this.#duration.pause();
     this.#xapiClient?.markUnloading();
     this.#adapter.terminate();
+  };
+
+  // iOS Safari can kill a backgrounded page without firing pagehide.
+  #onVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') this.#commitProgress();
   };
 
   #onPageshow = (event: PageTransitionEvent): void => {

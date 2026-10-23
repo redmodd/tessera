@@ -223,9 +223,9 @@ describe('ending a CourseSession', () => {
     progress.markCompleteManually();
     await flush();
 
-    const committed = calls.indexOf('commit', launched) + 1;
-    expect(calls.slice(launched, committed)).toEqual([
+    expect(calls.slice(launched)).toEqual([
       'setDuration:0',
+      'saveState',
       'completion:complete',
       'setExit:normal',
       'commit',

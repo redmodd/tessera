@@ -40,7 +40,7 @@ async function expectRestoreToEndSession(page: Page): Promise<void> {
 }
 
 // A page killed without pagehide keeps only what was committed.
-async function expectExitCommitted(
+async function expectCommitted(
   page: Page,
   write: string[],
   commit: string,
@@ -169,7 +169,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
-    await expectExitCommitted(
+    await expectCommitted(
       page,
       ['LMSSetValue', 'cmi.core.exit', 'suspend'],
       'LMSCommit',
@@ -178,9 +178,25 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     await openQuiz(page, 'Graded Assessment');
     await answerGradedQuiz(page);
     await finishFreeCourse(page);
-    await expectExitCommitted(
+    await expectCommitted(
       page,
       ['LMSSetValue', 'cmi.core.exit', ''],
+      'LMSCommit',
+    );
+  });
+
+  test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.clock.install();
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await navigateToPage(page, 'Objectives');
+    // Past the ten seconds the launch commit holds the next one back.
+    await page.clock.fastForward(10_000);
+
+    await expectCommitted(
+      page,
+      ['LMSSetValue', 'cmi.core.lesson_location', '1'],
       'LMSCommit',
     );
   });
@@ -497,20 +513,24 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
   }) => {
     await page.goto(BASE);
     await waitForTesseraContent(page);
-    await expectExitCommitted(
-      page,
-      ['SetValue', 'cmi.exit', 'suspend'],
-      'Commit',
-    );
+    await expectCommitted(page, ['SetValue', 'cmi.exit', 'suspend'], 'Commit');
 
     await openQuiz(page, 'Graded Assessment');
     await answerGradedQuiz(page);
     await finishFreeCourse(page);
-    await expectExitCommitted(
-      page,
-      ['SetValue', 'cmi.exit', 'normal'],
-      'Commit',
-    );
+    await expectCommitted(page, ['SetValue', 'cmi.exit', 'normal'], 'Commit');
+  });
+
+  test('commits the bookmark when the page changes', async ({ page }) => {
+    await page.clock.install();
+    await page.goto(BASE);
+    await waitForTesseraContent(page);
+
+    await navigateToPage(page, 'Objectives');
+    // Past the ten seconds the launch commit holds the next one back.
+    await page.clock.fastForward(10_000);
+
+    await expectCommitted(page, ['SetValue', 'cmi.location', '1'], 'Commit');
   });
 
   test('Re-launch via reload restores bookmark from suspend_data', async ({
