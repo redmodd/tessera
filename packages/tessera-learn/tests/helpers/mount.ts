@@ -1,7 +1,10 @@
 import { onTestFinished } from 'vitest';
 import { mount, unmount, type Component, type MountOptions } from 'svelte';
 import type { QuizEngine } from '../../src/runtime/quiz-engine.svelte.js';
-import type { ProgressState } from '../../src/runtime/progress.svelte.js';
+import {
+  ProgressState,
+  type StandaloneSubmit,
+} from '../../src/runtime/progress.svelte.js';
 import type { CourseConfig } from '../../src/runtime/types.js';
 import type { Manifest } from '../../src/plugin/manifest.js';
 import {
@@ -10,6 +13,7 @@ import {
   setPageContext,
 } from '../../src/runtime/contexts.js';
 import HarnessSvelte from '../fixtures/use-quiz-harness.svelte';
+import { createConfig, createManifest } from '../helpers.js';
 
 export function mountInBody<Props extends Record<string, any>>(
   component: Component<Props>,
@@ -63,6 +67,25 @@ export function mountOnPage(
       setInPage(true);
     },
   });
+}
+
+/** Mounts question `q1` on page 0, already answered when `saved` is given. */
+export function mountQuestion(
+  widget: Component<any>,
+  props: Record<string, unknown>,
+  saved?: StandaloneSubmit & { score: number },
+) {
+  const manifest = createManifest(1);
+  const config = createConfig();
+  const progress = new ProgressState(manifest, config);
+  if (saved) {
+    progress.markStandaloneQuestion(0, 'q1', saved.score, false, 1, saved);
+  }
+  return mountOnPage(
+    widget,
+    { id: 'q1', question: 'Question', ...props },
+    { manifest, progress, config },
+  );
 }
 
 export interface HarnessRef {

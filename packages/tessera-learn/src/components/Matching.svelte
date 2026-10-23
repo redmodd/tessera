@@ -190,6 +190,16 @@
         {@const correctMatch =
           q.feedbackVisible && matched && isMatchCorrect(i)}
         {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
+        {@const status =
+          matched && !q.locked
+            ? 'matched, activate to unmatch'
+            : correctMatch
+              ? 'matched, correct'
+              : wrongMatch
+                ? 'matched, incorrect'
+                : matched
+                  ? 'matched'
+                  : ''}
         <button
           class="tessera-matching-item left"
           class:selected={isSelected}
@@ -208,15 +218,11 @@
             </span>
           {/if}
           <span>{pair.left}</span>
+          {#if status}
+            <span class="tessera-sr-only">({status})</span>
+          {/if}
           {#if matched && !q.locked}
-            <span class="tessera-sr-only">(matched, activate to unmatch)</span>
             <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
-          {:else if correctMatch}
-            <span class="tessera-sr-only">(matched, correct)</span>
-          {:else if wrongMatch}
-            <span class="tessera-sr-only">(matched, incorrect)</span>
-          {:else if matched}
-            <span class="tessera-sr-only">(matched)</span>
           {/if}
         </button>
       {/each}

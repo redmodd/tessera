@@ -148,6 +148,49 @@ test.describe('Component — RevealModal', () => {
   });
 });
 
+test.describe('Component — Sorting', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/');
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Modal, Video & Audio');
+    await page.waitForSelector('.tessera-sorting-card');
+  });
+
+  test('a click anywhere on a target places the card, and placed cards return to the deck', async ({
+    page,
+  }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const card = sorting.locator('.tessera-sorting-card');
+    const counter = sorting.locator('.tessera-sorting-counter');
+    const fruit = sorting.locator('.tessera-sorting-target').first();
+
+    await card.click();
+    await fruit.getByRole('button', { name: /^Fruit/ }).click();
+    await expect(counter).toHaveText('2 of 3 to sort');
+
+    // force skips Playwright's own hit check: the real pointer must land on
+    // the target button stretched over the placed item.
+    await card.click();
+    await fruit.locator('.tessera-sorting-placed-item').click({ force: true });
+    await expect(counter).toHaveText('1 of 3 to sort');
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(2);
+
+    expect(
+      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
+        .violations,
+    ).toEqual([]);
+
+    await fruit
+      .getByRole('button', { name: /^Return/ })
+      .first()
+      .click();
+    await expect(counter).toHaveText('2 of 3 to sort');
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+  });
+});
+
 test.describe('Component Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');

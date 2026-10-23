@@ -260,11 +260,11 @@
         {#if targetItems.length > 0}
           <div class="tessera-sorting-target-items">
             {#each targetItems as itemIdx (itemIdx)}
+              {@const ok = isCorrectPlacement(itemIdx)}
               <div
                 class="tessera-sorting-placed-item"
-                class:correct={q.feedbackVisible && isCorrectPlacement(itemIdx)}
-                class:incorrect={q.feedbackVisible &&
-                  !isCorrectPlacement(itemIdx)}
+                class:correct={q.feedbackVisible && ok}
+                class:incorrect={q.feedbackVisible && !ok}
               >
                 <span class="tessera-sorting-item-text">{items[itemIdx]}</span>
                 {#if !q.locked}
@@ -278,12 +278,10 @@
                   >
                 {:else if q.feedbackVisible}
                   <span class="tessera-sorting-item-icon" aria-hidden="true">
-                    {isCorrectPlacement(itemIdx) ? '✓' : '✗'}
+                    {ok ? '✓' : '✗'}
                   </span>
                   <span class="tessera-sr-only"
-                    >({isCorrectPlacement(itemIdx)
-                      ? 'correct'
-                      : 'incorrect'})</span
+                    >({ok ? 'correct' : 'incorrect'})</span
                   >
                 {/if}
               </div>
@@ -512,7 +510,6 @@
     flex-direction: column;
     gap: var(--tessera-spacing-xs, 4px);
     padding: var(--tessera-spacing-sm);
-    pointer-events: none;
   }
 
   .tessera-sorting-placed-item {
@@ -529,7 +526,6 @@
     transition:
       border-color 0.15s,
       background 0.15s;
-    pointer-events: all;
   }
 
   .tessera-sorting-placed-item.correct {
@@ -577,7 +573,6 @@
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    pointer-events: all;
     position: relative;
   }
 

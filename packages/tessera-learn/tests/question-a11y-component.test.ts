@@ -3,19 +3,10 @@ import { describe, it, expect } from 'vitest';
 import { flushSync, type Component } from 'svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
-import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig } from './helpers.js';
-import { mountOnPage } from './helpers/mount.js';
+import { mountQuestion } from './helpers/mount.js';
 
 function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
-  const manifest = createManifest(1);
-  const config = createConfig();
-  const progress = new ProgressState(manifest, config);
-  const { target } = mountOnPage(
-    widget,
-    { id: 'q1', question: 'Question', ...props },
-    { manifest, progress, config },
-  );
+  const { target } = mountQuestion(widget, props);
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];

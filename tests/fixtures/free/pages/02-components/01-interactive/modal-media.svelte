@@ -3,7 +3,7 @@
 </script>
 
 <script>
-  import { RevealModal, Audio } from 'tessera-learn';
+  import { RevealModal, Audio, Sorting } from 'tessera-learn';
 </script>
 
 <h1>Modal, Video & Audio</h1>
@@ -29,4 +29,14 @@
   src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
   title="Sample Audio"
   transcript="An instrumental sample track used to demonstrate the audio player."
+/>
+
+<h2>Sorting</h2>
+
+<Sorting
+  id="sort-produce"
+  question="Sort each item"
+  items={['Apple', 'Carrot', 'Pear']}
+  targets={['Fruit', 'Vegetable']}
+  correct={[0, 1, 0]}
 />
