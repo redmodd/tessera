@@ -125,15 +125,19 @@ describe('Matching accessible names', () => {
 
   it('hints the next step and names each partner', () => {
     const { target, button, name, click } = mountWidget(Matching, { pairs });
+    const hint = (el: HTMLElement) => {
+      const id = el.getAttribute('aria-describedby');
+      return id && target.querySelector(`[id="${id}"]`)?.textContent;
+    };
     const a = button('A');
+    expect(hint(a)).toBe('Activate, then choose a match.');
+    expect(hint(button('Beta'))).toBe('Activate, then choose a match.');
     click(a);
     expect(a.getAttribute('aria-pressed')).toBe('true');
-    const hint = target.querySelector(
-      `[id="${a.getAttribute('aria-describedby')}"]`,
-    );
-    expect(hint?.textContent).toBe('Choose a match.');
+    expect(hint(a)).toBe('Choose a match.');
     expect(name(a)).toBe('A');
     expect(name(button('Beta'))).toBe('Beta (activate to match with A)');
+    expect(hint(button('Beta'))).toBeNull();
 
     click(button('Beta'));
     expect(name(button('B'))).toBe('B');
@@ -144,8 +148,11 @@ describe('Matching accessible names', () => {
       '1 A (matched with Beta, activate to unmatch)',
     );
     expect(name(button('1 Beta'))).toBe('1 Beta (matched with A)');
+    expect(hint(button('1 A'))).toBeNull();
+    expect(hint(button('1 Beta'))).toBe('Activate, then choose a match.');
 
     click(button('Submit'));
+    expect(hint(button('1 A'))).toBeNull();
     expect(name(button('1 A'))).toBe('1 A (matched with Beta, incorrect)');
     expect(name(button('2 B'))).toBe('2 B (matched with Alpha, incorrect)');
     expect(name(button('1 Beta'))).toBe('1 Beta (matched with A, incorrect)');
@@ -169,11 +176,16 @@ describe('Matching accessible names', () => {
     const tabStops = () => items.filter((b) => b.tabIndex === 0);
     expect(tabStops()).toEqual([items[0]]);
 
-    const press = (key: string) => {
-      document.activeElement!.dispatchEvent(
-        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
-      );
+    const press = (key: string, init: KeyboardEventInit = {}) => {
+      const e = new KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      });
+      document.activeElement!.dispatchEvent(e);
       flushSync();
+      return e;
     };
     items[0].focus();
     press('ArrowDown');
@@ -187,6 +199,10 @@ describe('Matching accessible names', () => {
     expect(document.activeElement).toBe(items[2]);
     press('Home');
     expect(document.activeElement).toBe(items[0]);
+    for (const mod of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      expect(press('ArrowDown', { [mod]: true }).defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(items[0]);
+    }
   });
 
   it('announces when every pair is matched', () => {

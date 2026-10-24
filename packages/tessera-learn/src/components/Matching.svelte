@@ -49,6 +49,7 @@
   const leftHeadingId = `matching-${componentId}-from`;
   const rightHeadingId = `matching-${componentId}-to`;
   const hintId = `matching-${componentId}-hint`;
+  const startHintId = `matching-${componentId}-start-hint`;
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -177,6 +178,7 @@
   const NEXT = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
 
   function onItemKeydown(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     const items = [...e.currentTarget.parentElement.querySelectorAll('button')];
     const i = items.indexOf(e.currentTarget);
     let next;
@@ -206,25 +208,30 @@
         {@const color = getMatchColor(i)}
         {@const isSelected = selectedLeft === i}
         {@const matched = matches.has(i)}
-        {@const correctMatch =
-          q.feedbackVisible && matched && isMatchCorrect(i)}
-        {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
-        {@const detail = matched
-          ? srDetail([
-              `matched with ${pairs[matches.get(i)].right}`,
-              q.locked ? resultText(i) : 'activate to unmatch',
-            ])
-          : selectedRight !== null && !q.locked
-            ? srDetail([`activate to match with ${pairs[selectedRight].right}`])
-            : ''}
+        {@const result = matched ? resultText(i) : ''}
+        {@const detail = srDetail([
+          matched && `matched with ${pairs[matches.get(i)].right}`,
+          matched && (q.locked ? result : 'activate to unmatch'),
+          !matched &&
+            selectedRight !== null &&
+            !q.locked &&
+            `activate to match with ${pairs[selectedRight].right}`,
+        ])}
+        {@const hint = q.locked
+          ? undefined
+          : isSelected
+            ? hintId
+            : !matched && selectedRight === null
+              ? startHintId
+              : undefined}
         <button
           bind:this={leftItems[i]}
           type="button"
           class="tessera-matching-item left"
           class:selected={isSelected}
           class:matched
-          class:correct={correctMatch}
-          class:incorrect={wrongMatch}
+          class:correct={result === 'correct'}
+          class:incorrect={result === 'incorrect'}
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
@@ -233,7 +240,7 @@
           tabindex={leftFocus === i ? 0 : -1}
           disabled={q.locked}
           aria-pressed={matched ? undefined : isSelected}
-          aria-describedby={isSelected ? hintId : undefined}
+          aria-describedby={hint}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -267,11 +274,18 @@
         {@const isSelected = selectedRight === item.originalIndex}
         {@const detail = srDetail([
           matched && `matched with ${pairs[leftIdx].left}`,
-          matched && q.locked && resultText(leftIdx),
+          matched && resultText(leftIdx),
           selectedLeft !== null &&
             !q.locked &&
             `activate to match with ${pairs[selectedLeft].left}`,
         ])}
+        {@const hint = q.locked
+          ? undefined
+          : isSelected
+            ? hintId
+            : selectedLeft === null
+              ? startHintId
+              : undefined}
         <button
           type="button"
           class="tessera-matching-item right"
@@ -284,7 +298,7 @@
           tabindex={rightFocus === pos ? 0 : -1}
           disabled={q.locked}
           aria-pressed={isSelected}
-          aria-describedby={isSelected ? hintId : undefined}
+          aria-describedby={hint}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -303,13 +317,14 @@
   <!-- A description, not part of the name: a toggle keeps its name when
        pressed. -->
   <span id={hintId} hidden>Choose a match.</span>
-  {#if !inQuiz}
-    <p class="tessera-sr-only" aria-live="polite">
-      {matches.size === pairs.length && !q.locked
-        ? 'All pairs matched. Submit your answer below.'
-        : ''}
-    </p>
-  {/if}
+  <span id={startHintId} hidden>Activate, then choose a match.</span>
+  <p class="tessera-sr-only" aria-live="polite">
+    {matches.size === pairs.length && !q.locked
+      ? inQuiz
+        ? 'All pairs matched.'
+        : 'All pairs matched. Submit your answer below.'
+      : ''}
+  </p>
 
   <QuestionReview
     {q}

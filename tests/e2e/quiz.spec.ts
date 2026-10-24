@@ -366,6 +366,9 @@ test.describe('Quiz — Accessibility', () => {
         .include('.tessera-quiz-question-wrapper.active .tessera-matching-grid')
         .analyze();
 
+    await expect(matching.locator('[aria-live="polite"]')).toHaveText(
+      'All pairs matched.',
+    );
     await expect(
       matching.getByRole('button', {
         name: '1 1 (matched with One, activate to unmatch)',
