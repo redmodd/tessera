@@ -31,26 +31,28 @@
   // Arrow keys change page only while no control has focus: the page itself,
   // or a heading or result that focus was moved to. WebKit gives media
   // players and editable text a tabIndex of -1, so they are named here.
+  const DIALOG = 'dialog, [role="dialog"]';
+
   function controlHasFocus(el) {
     return (
       el.tabIndex >= 0 ||
       el.isContentEditable ||
-      !!el.closest('video, audio, dialog, [role="dialog"], .tessera-quiz')
+      !!el.closest(`video, audio, ${DIALOG}, .tessera-quiz`)
     );
   }
 
   function handleKeyNav(e) {
-    if (e.defaultPrevented) return;
+    if (e.defaultPrevented || !(e.target instanceof Element)) return;
 
     if (e.key === 'Escape') {
-      if (sidebarOpen && !e.target?.closest?.('dialog, [role="dialog"]')) {
+      if (sidebarOpen && !e.target.closest(DIALOG)) {
         closeSidebar();
         e.preventDefault();
       }
       return;
     }
 
-    if (e.target instanceof Element && controlHasFocus(e.target)) return;
+    if (controlHasFocus(e.target)) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
 
     if (e.key === 'ArrowLeft') {

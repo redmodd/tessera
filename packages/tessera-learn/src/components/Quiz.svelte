@@ -10,7 +10,7 @@
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
-  let quizEl = $state();
+  let quizEl;
 
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it.
@@ -105,6 +105,28 @@
   }
 </script>
 
+{#snippet progressHeading(prefix, index)}
+  <h2 class="tessera-quiz-progress-text" tabindex="-1">
+    <span class="tessera-quiz-progress-desktop"
+      >{prefix}Question {index + 1} of {totalQuestions}</span
+    >
+    <span class="tessera-quiz-progress-mobile" aria-hidden="true"
+      >{prefix}{index + 1}/{totalQuestions}</span
+    >
+  </h2>
+{/snippet}
+
+{#snippet backButton(disabled, onclick)}
+  <button
+    type="button"
+    class="tessera-quiz-btn tessera-quiz-btn-secondary"
+    {disabled}
+    {onclick}
+  >
+    Back
+  </button>
+{/snippet}
+
 {#snippet questionList(activeIndex)}
   <div class="tessera-quiz-questions">
     {#each handle.questions as q, i (q.id)}
@@ -129,14 +151,7 @@
   {#if handle.state === 'answering'}
     <!-- Question phase -->
     <div class="tessera-quiz-progress">
-      <h2 class="tessera-quiz-progress-text" tabindex="-1">
-        <span class="tessera-quiz-progress-desktop"
-          >Question {currentQuestionIndex + 1} of {totalQuestions}</span
-        >
-        <span class="tessera-quiz-progress-mobile" aria-hidden="true"
-          >{currentQuestionIndex + 1}/{totalQuestions}</span
-        >
-      </h2>
+      {@render progressHeading('', currentQuestionIndex)}
       <div class="tessera-progress-track">
         <div
           class="tessera-progress-fill"
@@ -186,26 +201,12 @@
             : 'Submit'}
         </button>
       {/if}
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={currentQuestionIndex === 0}
-        onclick={goPrevQuestion}
-      >
-        Back
-      </button>
+      {@render backButton(currentQuestionIndex === 0, goPrevQuestion)}
     </div>
   {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
     <div class="tessera-quiz-progress">
-      <h2 class="tessera-quiz-progress-text" tabindex="-1">
-        <span class="tessera-quiz-progress-desktop"
-          >Review: Question {reviewIndex + 1} of {totalQuestions}</span
-        >
-        <span class="tessera-quiz-progress-mobile" aria-hidden="true"
-          >Review: {reviewIndex + 1}/{totalQuestions}</span
-        >
-      </h2>
+      {@render progressHeading('Review: ', reviewIndex)}
     </div>
 
     {@render questionList(reviewIndex)}
@@ -228,14 +229,7 @@
           Done
         </button>
       {/if}
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={reviewIndex === 0}
-        onclick={goPrevReview}
-      >
-        Back
-      </button>
+      {@render backButton(reviewIndex === 0, goPrevReview)}
     </div>
   {:else}
     <!-- Results phase -->
