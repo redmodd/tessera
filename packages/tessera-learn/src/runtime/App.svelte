@@ -134,32 +134,39 @@
   // ---- Page loading ----
   let loadGeneration = 0;
   let pageEl;
-  let firstRender = true;
 
   $effect(() => {
-    const title = [manifest.pages[renderedPageIndex]?.title, config.title];
-    document.title = title.filter(Boolean).join(' – ');
+    const title = [manifest.pages[renderedPageIndex]?.title, config.title]
+      .filter(Boolean)
+      .join(' – ');
+    if (title) document.title = title;
   });
 
-  // Focus goes to the new page's heading so a screen reader announces it. The
-  // first page keeps the browser's initial focus.
+  const isAnnounced = (el) =>
+    el.getClientRects().length > 0 &&
+    getComputedStyle(el).visibility === 'visible' &&
+    !el.closest('[aria-hidden="true"], [inert]');
+
+  // Focus goes to the new page's heading so a screen reader announces it,
+  // unless the page already moved focus into itself.
   function focusPageHeading() {
-    if (firstRender) {
-      firstRender = false;
-      return;
-    }
-    const heading =
-      pageEl?.querySelector('h1') ??
-      pageEl?.querySelector('h2, h3, h4, h5, h6');
+    if (!pageEl || pageEl.contains(document.activeElement)) return;
+    const headings = [
+      ...pageEl.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+    ].filter(isAnnounced);
+    const heading = headings.find((h) => h.localName === 'h1') ?? headings[0];
     if (!heading) return;
     if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
     heading.focus();
   }
 
+  // The first page keeps the browser's initial focus, and ErrorPage announces
+  // itself as an alert.
   function showPage(index) {
+    const firstPage = renderedPageIndex < 0;
     pageLoading = false;
     renderedPageIndex = index;
-    tick().then(focusPageHeading);
+    if (!firstPage && !pageError) tick().then(focusPageHeading);
   }
 
   function loadPage(index) {
