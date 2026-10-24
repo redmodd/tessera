@@ -239,7 +239,7 @@
     </div>
   {:else}
     <!-- Results phase -->
-    <div class="tessera-quiz-results" role="status" aria-live="polite">
+    <div class="tessera-quiz-results">
       <h2 class="tessera-quiz-results-title" tabindex="-1">Quiz Results</h2>
       {#if bestBeaten}
         <div class="tessera-quiz-score paired" data-testid="quiz-attempt-score">

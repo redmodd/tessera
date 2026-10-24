@@ -3,7 +3,6 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { QUESTION_ID_PREFIX, fillInAnswers, questionId } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
@@ -109,18 +108,10 @@
   <QuestionReview {q} class="tessera-fitb-review" firstControl={() => inputEl}>
     {@const isCorrect = q.correct}
     {#if isCorrect}
-      <div class="tessera-fitb-result correct">
-        <ResultIcon kind="correct" />
-        Correct
-      </div>
       {#if correctFeedback}
         <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
       {/if}
     {:else}
-      <div class="tessera-fitb-result incorrect">
-        <ResultIcon kind="incorrect" />
-        Incorrect
-      </div>
       <p class="tessera-fitb-correct-answer">
         Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(
           ', ',
@@ -180,23 +171,6 @@
 
   :global(.tessera-fitb-review) {
     margin-top: var(--tessera-spacing-md);
-  }
-
-  .tessera-fitb-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-result.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-fitb-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-fitb-correct-answer {

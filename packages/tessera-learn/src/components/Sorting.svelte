@@ -10,7 +10,6 @@
     shuffle,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
@@ -304,22 +303,16 @@
   <QuestionReview
     {q}
     class="tessera-sorting-review"
+    correctLabel="All items sorted correctly!"
+    incorrectLabel="Some items are in the wrong category."
     firstControl={() => cardEl}
   >
     {@const isCorrect = q.correct}
     {#if isCorrect}
-      <div class="tessera-sorting-result correct">
-        <ResultIcon kind="correct" />
-        All items sorted correctly!
-      </div>
       {#if correctFeedback}
         <p class="tessera-sorting-feedback correct">{correctFeedback}</p>
       {/if}
     {:else}
-      <div class="tessera-sorting-result incorrect">
-        <ResultIcon kind="incorrect" />
-        Some items are in the wrong category.
-      </div>
       <div class="tessera-sorting-correct-list">
         <p class="tessera-sorting-correct-title">Correct arrangement:</p>
         {#each items as item, i (i)}
@@ -592,22 +585,6 @@
 
   :global(.tessera-sorting-review) {
     margin-top: var(--tessera-spacing-lg);
-  }
-
-  .tessera-sorting-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-result.correct {
-    color: var(--tessera-success);
-  }
-  .tessera-sorting-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-sorting-correct-list {

@@ -9,7 +9,6 @@
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
-  import ResultIcon from './ResultIcon.svelte';
 
   /**
    * @type {{
@@ -39,7 +38,7 @@
   } = $props();
 
   let selectedOption = $state(null);
-  const radios = $state([]);
+  const radios = [];
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -155,14 +154,6 @@
   <QuestionReview {q} class="tessera-mc-review" firstControl={() => radios[0]}>
     {@const chosen = optionFeedback[selectedOption]}
     {@const overall = q.correct ? correctFeedback : incorrectFeedback}
-    <div
-      class="tessera-mc-result"
-      class:correct={q.correct}
-      class:incorrect={!q.correct}
-    >
-      <ResultIcon kind={q.correct ? 'correct' : 'incorrect'} />
-      {q.correct ? 'Correct' : 'Incorrect'}
-    </div>
     {#if chosen}
       <span class="tessera-sr-only">{chosen}</span>
     {:else if overall}
@@ -308,23 +299,6 @@
 
   :global(.tessera-mc-review) {
     margin-top: var(--tessera-spacing-md);
-  }
-
-  .tessera-mc-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-mc-result.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-mc-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-mc-overall-feedback {

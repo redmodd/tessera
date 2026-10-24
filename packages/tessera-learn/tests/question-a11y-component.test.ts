@@ -239,7 +239,7 @@ describe('standalone feedback', () => {
     expect(enter.defaultPrevented).toBe(true);
     expect(radios[0].checked).toBe(true);
     expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
-    expect(target.querySelector('.tessera-mc-result')).toBe(null);
+    expect(target.querySelector('.tessera-question-result')).toBe(null);
   });
 
   it('states the MultipleChoice result once and moves focus to it', async () => {
@@ -268,7 +268,7 @@ describe('standalone feedback', () => {
 
     await expect.poll(focusedText).toBe('Correct');
     expect(
-      document.activeElement!.querySelector('.tessera-mc-result'),
+      document.activeElement!.querySelector('.tessera-question-result'),
     ).not.toBe(null);
   });
 
@@ -284,9 +284,9 @@ describe('standalone feedback', () => {
     click(button('Check'));
 
     expect(group.contains(button('Try again'))).toBe(false);
-    expect(group.contains(target.querySelector('.tessera-mc-result'))).toBe(
-      false,
-    );
+    expect(
+      group.contains(target.querySelector('.tessera-question-result')),
+    ).toBe(false);
   });
 
   it('shows MultipleChoice correctFeedback once', () => {

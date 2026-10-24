@@ -11,7 +11,6 @@
     shuffle,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
@@ -42,8 +41,8 @@
   // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
-  const leftItems = $state([]);
   let selectedRight = $state(null);
+  const leftItems = [];
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -252,22 +251,16 @@
   <QuestionReview
     {q}
     class="tessera-matching-review"
+    correctLabel="All pairs matched correctly!"
+    incorrectLabel="Some pairs are incorrect"
     firstControl={() => leftItems[0]}
   >
     {@const isCorrect = q.correct}
     {#if isCorrect}
-      <div class="tessera-matching-result correct">
-        <ResultIcon kind="correct" />
-        All pairs matched correctly!
-      </div>
       {#if correctFeedback}
         <p class="tessera-matching-feedback correct">{correctFeedback}</p>
       {/if}
     {:else}
-      <div class="tessera-matching-result incorrect">
-        <ResultIcon kind="incorrect" />
-        Some pairs are incorrect
-      </div>
       <div class="tessera-matching-correct-pairs">
         <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
         {#each pairs as pair, i (i)}
@@ -404,23 +397,6 @@
 
   :global(.tessera-matching-review) {
     margin-top: var(--tessera-spacing-lg);
-  }
-
-  .tessera-matching-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-matching-result.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-matching-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-matching-correct-pairs {

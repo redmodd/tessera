@@ -169,7 +169,9 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page.locator('[data-testid="custom-quiz-review"]').click();
 
     const list = page.locator('.custom-quiz-list');
-    await expect(list.locator('.tessera-mc-result')).toContainText('Incorrect');
+    await expect(
+      list.locator('.tessera-mc .tessera-question-result'),
+    ).toContainText('Incorrect');
     const focusInList = await page.evaluate(
       () => !!document.activeElement?.closest('.custom-quiz-list'),
     );
