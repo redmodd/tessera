@@ -32,7 +32,8 @@
   // or a heading or result that focus was moved to. Form fields, media and
   // editable text are named here because their tabIndex can be -1 (set by
   // code, or by WebKit for media and editable text). What the runtime focused
-  // on a page change is never a control, even inside a quiz.
+  // on a page change is never a control, even inside a quiz, until the quiz
+  // moves focus itself.
   const DIALOG = 'dialog, [role="dialog"]';
 
   function controlHasFocus(el) {

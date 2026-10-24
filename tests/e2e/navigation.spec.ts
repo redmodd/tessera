@@ -78,6 +78,25 @@ test.describe('Navigation — Free Mode', () => {
     await expect(other).toBeFocused();
   });
 
+  test('a page chosen while the first page loads gets focus', async ({
+    page,
+  }) => {
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/welcome\.svelte/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto('/');
+
+    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
+    release();
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
+  });
+
   test('can click any page in free mode — no locking', async ({ page }) => {
     // Should be able to jump directly to a later page
     await navigateToPage(page, 'Accordion & Carousel');
@@ -251,6 +270,28 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await expect(primary).toHaveText('Next Question');
     await primary.click();
     const progress = page.getByRole('heading', { name: 'Question 2 of 3' });
+    await expect(progress).toBeFocused();
+    expect(await arrowCancelled(progress)).toBe(false);
+  });
+
+  // dispatchEvent clicks without moving focus, as Safari does.
+  test('arrow keys stay in the quiz once it refocuses the heading a page change focused', async ({
+    page,
+  }) => {
+    await page.addStyleTag({ content: '.tessera-page h1 { display: none }' });
+    await navigateToPage(page, 'Practice Quiz');
+    const progress = page.locator('.tessera-quiz-progress-text');
+    await expect(progress).toHaveAccessibleName('Question 1 of 2');
+    await expect(progress).toBeFocused();
+
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option input')
+      .nth(1)
+      .dispatchEvent('click');
+    await page
+      .locator('.tessera-quiz-nav .tessera-btn-primary')
+      .dispatchEvent('click');
+    await expect(progress).toHaveAccessibleName('Question 2 of 2');
     await expect(progress).toBeFocused();
     expect(await arrowCancelled(progress)).toBe(false);
   });

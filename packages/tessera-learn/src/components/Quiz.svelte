@@ -15,14 +15,17 @@
   const resultsId = $props.id();
 
   // The button the learner pressed is disabled or gone once the question or
-  // phase changes, so focus moves to what replaced it.
+  // phase changes, so focus moves to what replaced it. Arrow keys stay in the
+  // quiz from there, even on what a page change focused first.
   async function focusProgress() {
     await tick();
+    progressEl?.removeAttribute('data-tessera-page-focus');
     progressEl?.focus();
   }
 
   async function focusResults() {
     await tick();
+    resultsEl?.removeAttribute('data-tessera-page-focus');
     resultsEl?.focus();
   }
 

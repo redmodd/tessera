@@ -154,8 +154,7 @@
   // Focus goes to the new page's heading so a screen reader announces it,
   // unless focus moved during the load: into the page, or anywhere else. A
   // heading inside a focus target (a quiz's results) focuses the target, which
-  // reads more. The mark lets the default layout's arrow keys work from it
-  // until focus moves on.
+  // reads more. The mark lets the default layout's arrow keys work from it.
   function focusPageHeading(focusBefore) {
     const active = document.activeElement;
     if (!pageEl || (active !== focusBefore && active !== document.body)) return;
@@ -167,22 +166,15 @@
     const target = heading.closest('.tessera-page [tabindex="-1"]') ?? heading;
     if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
     target.setAttribute(PAGE_FOCUS, '');
-    const release = (e) => {
-      if (e.target === target) return;
-      target.removeAttribute(PAGE_FOCUS);
-      document.removeEventListener('focusin', release);
-    };
-    document.addEventListener('focusin', release);
     target.focus();
   }
 
-  // The first page keeps the browser's initial focus, and ErrorPage announces
+  // The first load keeps the browser's initial focus, and ErrorPage announces
   // itself as an alert.
-  function showPage(index, focusBefore) {
-    const firstPage = renderedPageIndex < 0;
+  function showPage(index, focusBefore, gen) {
     pageLoading = false;
     renderedPageIndex = index;
-    if (!firstPage && !pageError) {
+    if (gen > 1 && !pageError) {
       tick().then(() => focusPageHeading(focusBefore));
     }
   }
@@ -202,7 +194,7 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      showPage(index, focusBefore);
+      showPage(index, focusBefore, gen);
       return;
     }
 
@@ -217,7 +209,7 @@
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
-        showPage(index, focusBefore);
+        showPage(index, focusBefore, gen);
         progress.markVisited(index);
         tick().then(() => progress.pageMounted(index));
         if (
@@ -232,7 +224,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        showPage(index, focusBefore);
+        showPage(index, focusBefore, gen);
       });
   }
 
