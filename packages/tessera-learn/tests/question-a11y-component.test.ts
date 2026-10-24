@@ -175,20 +175,61 @@ describe('standalone feedback', () => {
     expect(focusedText()).toContain('The sky is blue.');
   });
 
-  it('states the MultipleChoice result and moves focus to it', async () => {
-    const { target } = mountWidget(MultipleChoice, {
+  it('selects a MultipleChoice option without submitting it', () => {
+    const { target, button } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+    });
+    const radios = target.querySelectorAll<HTMLInputElement>('input');
+    expect((button('Check') as HTMLButtonElement).disabled).toBe(true);
+    radios[0].click();
+    flushSync();
+
+    expect(radios[0].disabled).toBe(false);
+    expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('states the MultipleChoice result once and moves focus to it', async () => {
+    const { target, button, name, click } = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
       optionFeedback: ['Too low.', ''],
     });
-    const radios = target.querySelectorAll<HTMLInputElement>('input');
-    radios[0].click();
+    target.querySelector('input')!.click();
     flushSync();
+    click(button('Check'));
 
     await expect.poll(focusedText).toBe('Incorrect. Too low. Try again');
-    const labels = [...target.querySelectorAll('label')].map((l) =>
-      l.textContent?.replace(/\s+/g, ' ').trim(),
-    );
-    expect(labels).toEqual(['3 (incorrect) Too low.', '4 (correct)']);
+    const labels = [...target.querySelectorAll('label')].map(name);
+    expect(labels).toEqual(['3 (incorrect)', '4 (correct)']);
+  });
+
+  it('shows MultipleChoice correctFeedback once', () => {
+    const { target, button, click } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+      correctFeedback: 'Well done.',
+    });
+    target.querySelectorAll('input')[1].click();
+    flushSync();
+    click(button('Check'));
+
+    expect(target.textContent?.split('Well done.')).toHaveLength(2);
+  });
+
+  it('moves focus to the first control after Try again', async () => {
+    const { target, button, click } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+    });
+    const first = () => target.querySelector('input')!;
+    first().click();
+    flushSync();
+    click(button('Check'));
+    await expect.poll(focusedText).toContain('Try again');
+    click(button('Try again'));
+
+    await expect.poll(() => document.activeElement).toBe(first());
+    expect(first().checked).toBe(false);
   });
 });

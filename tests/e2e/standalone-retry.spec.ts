@@ -118,8 +118,10 @@ for (const mode of MODES) {
       return launch;
     }
 
-    const choose = (page: Page, option: string) =>
-      page.locator('.tessera-mc-option', { hasText: option }).click();
+    async function choose(page: Page, option: string) {
+      await page.locator('.tessera-mc-option', { hasText: option }).click();
+      await page.getByRole('button', { name: 'Check', exact: true }).click();
+    }
     const tryAgain = (page: Page) =>
       page.getByRole('button', { name: 'Try again' });
 
@@ -150,6 +152,7 @@ for (const mode of MODES) {
       await choose(page, 'Venus');
       await expect.poll(results).toEqual([false]);
       await tryAgain(page).click();
+      await expect(page.getByRole('radio').first()).toBeFocused();
 
       await choose(page, 'Mercury');
       await expect.poll(results).toEqual([false, true]);

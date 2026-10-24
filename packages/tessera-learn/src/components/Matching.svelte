@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick, untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
@@ -12,7 +12,7 @@
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import ResultIcon from './ResultIcon.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -43,7 +43,6 @@
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
-  let reviewEl = $state(null);
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -139,14 +138,7 @@
     selectedRight = null;
 
     q.setAnswer(new Map(matches));
-    if (!inQuiz && q.answerComplete && !q.submitted) submit();
-  }
-
-  async function submit() {
-    q.submit();
-    // Submit disables or removes the focused control; move focus to the result.
-    await tick();
-    reviewEl?.focus();
+    if (!inQuiz && q.answerComplete && !q.submitted) q.submit();
   }
 
   function removeMatch(leftIndex) {
@@ -253,43 +245,36 @@
     </div>
   </div>
 
-  <div role={inQuiz ? 'status' : undefined}>
-    {#if q.feedbackVisible}
-      {@const isCorrect = q.correct}
-      <div class="tessera-matching-review" tabindex="-1" bind:this={reviewEl}>
-        {#if isCorrect}
-          <div class="tessera-matching-result correct">
-            <ResultIcon kind="correct" />
-            All pairs matched correctly!
-          </div>
-          {#if correctFeedback}
-            <p class="tessera-matching-feedback correct">{correctFeedback}</p>
-          {/if}
-        {:else}
-          <div class="tessera-matching-result incorrect">
-            <ResultIcon kind="incorrect" />
-            Some pairs are incorrect
-          </div>
-          <div class="tessera-matching-correct-pairs">
-            <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
-            {#each pairs as pair, i (i)}
-              <p class="tessera-matching-correct-pair">
-                {pair.left} → {pair.right}
-              </p>
-            {/each}
-          </div>
-          {#if incorrectFeedback}
-            <p class="tessera-matching-feedback incorrect">
-              {incorrectFeedback}
-            </p>
-          {/if}
-        {/if}
-        {#if !inQuiz && q.canRetry}
-          <RetryButton onclick={q.retry} />
-        {/if}
+  <QuestionReview {q} class="tessera-matching-review">
+    {@const isCorrect = q.correct}
+    {#if isCorrect}
+      <div class="tessera-matching-result correct">
+        <ResultIcon kind="correct" />
+        All pairs matched correctly!
       </div>
+      {#if correctFeedback}
+        <p class="tessera-matching-feedback correct">{correctFeedback}</p>
+      {/if}
+    {:else}
+      <div class="tessera-matching-result incorrect">
+        <ResultIcon kind="incorrect" />
+        Some pairs are incorrect
+      </div>
+      <div class="tessera-matching-correct-pairs">
+        <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
+        {#each pairs as pair, i (i)}
+          <p class="tessera-matching-correct-pair">
+            {pair.left} → {pair.right}
+          </p>
+        {/each}
+      </div>
+      {#if incorrectFeedback}
+        <p class="tessera-matching-feedback incorrect">
+          {incorrectFeedback}
+        </p>
+      {/if}
     {/if}
-  </div>
+  </QuestionReview>
 </QuestionShell>
 
 <style>
@@ -409,7 +394,7 @@
     background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
   }
 
-  .tessera-matching-review {
+  :global(.tessera-matching-review) {
     margin-top: var(--tessera-spacing-lg);
   }
 

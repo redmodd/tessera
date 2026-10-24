@@ -1,5 +1,5 @@
 <script>
-  import { tick, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
@@ -8,7 +8,7 @@
     savedIndex,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -38,7 +38,6 @@
   } = $props();
 
   let selectedOption = $state(null);
-  let reviewEl = $state(null);
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -71,18 +70,7 @@
   function handleSelect(optIndex) {
     if (q.locked) return;
     selectedOption = optIndex;
-    if (inQuiz) {
-      q.setAnswer(optIndex);
-    } else {
-      submit();
-    }
-  }
-
-  async function submit() {
-    q.submit();
-    // Submit disables or removes the focused control; move focus to the result.
-    await tick();
-    reviewEl?.focus();
+    q.setAnswer(optIndex);
   }
 
   function isCorrectOption(optIndex) {
@@ -130,45 +118,44 @@
           <span class="tessera-sr-only">({stateClass})</span>
         {/if}
 
-        {#if q.feedbackVisible}
-          {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback correct"
-              >{optionFeedback[i] || correctFeedback}</span
-            >
-          {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback incorrect"
-              >{optionFeedback[i] || incorrectFeedback}</span
-            >
-          {:else if optionFeedback[i]}
-            <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
-          {/if}
+        {#if q.feedbackVisible && optionFeedback[i]}
+          <!-- The result below repeats the chosen option's feedback. -->
+          <span
+            class="tessera-mc-feedback {stateClass}"
+            aria-hidden={isSelected ? 'true' : undefined}
+            >{optionFeedback[i]}</span
+          >
         {/if}
       </label>
     {/each}
   </div>
 
-  <div role={inQuiz ? 'status' : undefined}>
-    {#if q.feedbackVisible}
-      <div class="tessera-mc-review" tabindex="-1" bind:this={reviewEl}>
-        <span class="tessera-sr-only"
-          >{q.correct ? 'Correct.' : 'Incorrect.'}
-          {optionFeedback[selectedOption] ?? ''}</span
-        >
-        {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
-          <div class="tessera-mc-overall-feedback correct">
-            {correctFeedback}
-          </div>
-        {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
-          <div class="tessera-mc-overall-feedback incorrect">
-            {incorrectFeedback}
-          </div>
-        {/if}
-        {#if !inQuiz && q.canRetry}
-          <RetryButton onclick={q.retry} />
-        {/if}
+  {#if !inQuiz && !q.submitted}
+    <button
+      class="tessera-btn-primary tessera-mc-check-btn"
+      disabled={!q.answerComplete}
+      onclick={q.submit}
+    >
+      Check
+    </button>
+  {/if}
+
+  <QuestionReview {q} class="tessera-mc-review">
+    {@const chosen = optionFeedback[selectedOption]}
+    {@const overall = q.correct ? correctFeedback : incorrectFeedback}
+    <span class="tessera-sr-only"
+      >{q.correct ? 'Correct.' : 'Incorrect.'} {chosen ?? ''}</span
+    >
+    {#if !chosen && overall}
+      <div
+        class="tessera-mc-overall-feedback"
+        class:correct={q.correct}
+        class:incorrect={!q.correct}
+      >
+        {overall}
       </div>
     {/if}
-  </div>
+  </QuestionReview>
 </QuestionShell>
 
 <style>
@@ -291,6 +278,13 @@
 
   .tessera-mc-feedback.incorrect {
     color: var(--tessera-error);
+  }
+
+  .tessera-mc-check-btn {
+    margin-top: var(--tessera-spacing-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
   .tessera-mc-overall-feedback {
