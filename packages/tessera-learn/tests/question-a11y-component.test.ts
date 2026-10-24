@@ -443,8 +443,10 @@ describe('standalone feedback', () => {
       },
     },
   ])(
-    'moves focus to the $name first control after Try again',
+    'moves focus to the $name first control after Try again, without a Svelte warning',
     async ({ widget, props, first, answerWrong }) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      onTestFinished(() => warn.mockRestore());
       const mounted = mountWidget(widget, props);
       answerWrong(mounted);
       await expect.poll(focusedText).toContain('Try again');
@@ -453,27 +455,7 @@ describe('standalone feedback', () => {
       await expect
         .poll(() => document.activeElement)
         .toBe(mounted.target.querySelector(first));
+      expect(warn).not.toHaveBeenCalled();
     },
   );
-});
-
-describe('focus bindings', () => {
-  it.each([
-    {
-      name: 'MultipleChoice',
-      widget: MultipleChoice,
-      props: { options: ['3', '4'], correct: 1 },
-    },
-    {
-      name: 'Matching',
-      widget: Matching,
-      props: { pairs: [{ left: 'A', right: 'Alpha' }] },
-    },
-  ])('mounts $name without a Svelte warning', ({ widget, props }) => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    onTestFinished(() => warn.mockRestore());
-    mountWidget(widget, props);
-    flushSync();
-    expect(warn).not.toHaveBeenCalled();
-  });
 });
