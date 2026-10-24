@@ -1,5 +1,5 @@
 <script>
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
@@ -45,6 +45,7 @@
   let dragOver = $state(null); // target index highlighted during drag
   let isDragging = $state(false);
   let cardSelected = $state(false); // current card selected via tap/click
+  let cardEl = $state(null);
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
@@ -125,11 +126,14 @@
     q.setAnswer(new Map(placements));
   }
 
-  function returnCard(itemIdx) {
+  async function returnCard(itemIdx) {
     if (q.locked) return;
     placements.delete(itemIdx);
     queue = [itemIdx, ...queue];
     q.setAnswer(new Map(placements));
+    // The clicked button unmounts; keep keyboard focus on the returned card.
+    await tick();
+    cardEl?.focus();
   }
 
   // --- Drag handlers ---
@@ -193,6 +197,7 @@
       {#if currentItemIdx !== null}
         <div class="tessera-sorting-deck-inner">
           <div
+            bind:this={cardEl}
             class="tessera-sorting-card"
             class:selected={cardSelected}
             class:dragging={isDragging}

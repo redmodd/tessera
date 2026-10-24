@@ -159,7 +159,7 @@ test.describe('Component — Sorting', () => {
     await fruit.getByRole('button', { name: /^Fruit/ }).click();
     await expect(counter).toHaveText('2 of 3 to sort');
 
-    // With no card selected, the target button no longer covers placed items.
+    // With no card selected, placed items sit above the target button.
     await fruit
       .locator('.tessera-sorting-item-text')
       .click({ trial: true, timeout: 2000 });
@@ -182,6 +182,7 @@ test.describe('Component — Sorting', () => {
       .click();
     await expect(counter).toHaveText('2 of 3 to sort');
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+    await expect(card).toBeFocused();
   });
 });
 

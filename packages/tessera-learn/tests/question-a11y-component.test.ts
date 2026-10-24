@@ -51,6 +51,22 @@ describe('Sorting accessible names', () => {
     expect(target.querySelector(`${control} ${control}`)).toBe(null);
   });
 
+  it('moves focus to the returned card', async () => {
+    const { target, button, click } = mountWidget(Sorting, {
+      items: ['Apple'],
+      targets: ['Fruit'],
+      correct: [0],
+    });
+    click(button('Apple'));
+    click(button('Fruit'));
+    button("Return 'Apple' to deck").focus();
+    click(button("Return 'Apple' to deck"));
+
+    const card = target.querySelector('.tessera-sorting-card');
+    expect(card?.textContent).toContain('Apple');
+    await expect.poll(() => document.activeElement).toBe(card);
+  });
+
   it('disables targets and states each placement result once locked', () => {
     const { target, button, name, click } = mountWidget(Sorting, {
       items: ['Apple', 'Carrot'],
