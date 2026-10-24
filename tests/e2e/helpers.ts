@@ -105,7 +105,8 @@ export async function answerMatching(
     if (!targetRight) continue;
     await leftItems.nth(i).click();
     await activeQ
-      .locator('.tessera-matching-item.right', { hasText: targetRight })
+      .locator('.tessera-matching-item.right:not(.matched)')
+      .filter({ has: page.getByText(targetRight, { exact: true }) })
       .first()
       .click();
     expected++;

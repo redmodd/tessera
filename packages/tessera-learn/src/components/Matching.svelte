@@ -156,21 +156,6 @@
     return MATCH_PAIR_COLORS[leftIndex % MATCH_PAIR_COLORS.length];
   }
 
-  function getRightMatchColor(rightOriginalIndex) {
-    const l = rightToLeft.get(rightOriginalIndex);
-    return l === undefined
-      ? null
-      : MATCH_PAIR_COLORS[l % MATCH_PAIR_COLORS.length];
-  }
-
-  function isRightMatched(rightOriginalIndex) {
-    return rightToLeft.has(rightOriginalIndex);
-  }
-
-  function getLeftForRight(rightOriginalIndex) {
-    return rightToLeft.get(rightOriginalIndex);
-  }
-
   function isMatchCorrect(leftIndex) {
     return matches.get(leftIndex) === leftIndex;
   }
@@ -190,6 +175,13 @@
         {@const correctMatch =
           q.feedbackVisible && matched && isMatchCorrect(i)}
         {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
+        {@const detail = !q.locked
+          ? ', activate to unmatch'
+          : correctMatch
+            ? ', correct'
+            : wrongMatch
+              ? ', incorrect'
+              : ''}
         <button
           class="tessera-matching-item left"
           class:selected={isSelected}
@@ -200,9 +192,7 @@
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
           disabled={q.locked}
-          aria-label="{pair.left}{matched
-            ? ' (matched, activate to unmatch)'
-            : ''}"
+          aria-pressed={matched ? undefined : isSelected}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -210,6 +200,9 @@
             </span>
           {/if}
           <span>{pair.left}</span>
+          {#if matched}
+            <span class="tessera-sr-only">(matched{detail})</span>
+          {/if}
           {#if matched && !q.locked}
             <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
           {/if}
@@ -221,9 +214,16 @@
     <div class="tessera-matching-column">
       <div class="tessera-matching-column-header">Match to</div>
       {#each shuffledRight as item (item.originalIndex)}
-        {@const color = getRightMatchColor(item.originalIndex)}
+        {@const leftIdx = rightToLeft.get(item.originalIndex)}
+        {@const matched = leftIdx !== undefined}
+        {@const color = getMatchColor(leftIdx)}
         {@const isSelected = selectedRight === item.originalIndex}
-        {@const matched = isRightMatched(item.originalIndex)}
+        {@const result =
+          matched && q.feedbackVisible
+            ? isMatchCorrect(leftIdx)
+              ? ', correct'
+              : ', incorrect'
+            : ''}
         <button
           class="tessera-matching-item right"
           class:selected={isSelected}
@@ -231,15 +231,17 @@
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() => handleRightClick(item.originalIndex)}
           disabled={q.locked}
-          aria-label="{item.text}{matched ? ' (matched)' : ''}"
+          aria-pressed={isSelected}
         >
           {#if matched}
-            {@const leftIdx = getLeftForRight(item.originalIndex)}
             <span class="tessera-matching-badge" style="background: {color}">
-              {leftIdx !== undefined ? leftIdx + 1 : ''}
+              {leftIdx + 1}
             </span>
           {/if}
           <span>{item.text}</span>
+          {#if matched}
+            <span class="tessera-sr-only">(matched{result})</span>
+          {/if}
         </button>
       {/each}
     </div>

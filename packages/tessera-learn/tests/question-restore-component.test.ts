@@ -5,25 +5,15 @@ import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import Sorting from '../src/components/Sorting.svelte';
-import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createManifest, createConfig } from './helpers.js';
-import { mountOnPage } from './helpers/mount.js';
+import { mountQuestion, type SavedAnswer } from './helpers/mount.js';
 
 // Mounts a widget on a page the learner already answered it on.
 function revisit(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved: { score: number; retries?: number; response?: unknown },
+  saved: SavedAnswer,
 ) {
-  const manifest = createManifest(1);
-  const config = createConfig();
-  const progress = new ProgressState(manifest, config);
-  progress.markStandaloneQuestion(0, 'q1', saved.score, false, 1, saved);
-  const { target } = mountOnPage(
-    widget,
-    { id: 'q1', question: 'Question', ...props },
-    { manifest, progress, config },
-  );
+  const { target } = mountQuestion(widget, props, saved);
   const all = <T extends Element>(selector: string) => [
     ...target.querySelectorAll<T>(selector),
   ];

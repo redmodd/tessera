@@ -1,16 +1,22 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
+async function openCourse(page: Page) {
+  await page.goto('/');
+  await waitForTesseraContent(page);
+}
+
+async function openFresh(page: Page, title: string, ready: string) {
+  await openCourse(page);
+  await navigateToPage(page, title);
+  await page.waitForSelector(ready);
+}
+
 test.describe('Component — Accordion', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Accordion & Carousel');
-    await page.waitForSelector('.tessera-accordion');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Accordion & Carousel', '.tessera-accordion'),
+  );
 
   test('accordion items toggle with click', async ({ page }) => {
     const firstTrigger = page.locator('.tessera-accordion-trigger').first();
@@ -53,14 +59,9 @@ test.describe('Component — Accordion', () => {
 });
 
 test.describe('Component — Carousel', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Accordion & Carousel');
-    await page.waitForSelector('.tessera-carousel');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Accordion & Carousel', '.tessera-carousel'),
+  );
 
   test('carousel shows first slide and navigation dots', async ({ page }) => {
     const dots = page.locator('.tessera-carousel-dot');
@@ -100,14 +101,9 @@ test.describe('Component — Carousel', () => {
 });
 
 test.describe('Component — RevealModal', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-    await navigateToPage(page, 'Modal, Video & Audio');
-    await page.waitForSelector('.tessera-reveal-trigger');
-  });
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Modal, Video & Audio', '.tessera-reveal-trigger'),
+  );
 
   test('clicking trigger opens modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
@@ -148,13 +144,70 @@ test.describe('Component — RevealModal', () => {
   });
 });
 
-test.describe('Component Accessibility', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
+test.describe('Component — Sorting', () => {
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Modal, Video & Audio', '.tessera-sorting-card'),
+  );
+
+  test('a click anywhere on a target places the card, and placed cards return to the deck', async ({
+    page,
+  }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const card = sorting.locator('.tessera-sorting-card');
+    const counter = sorting.locator('.tessera-sorting-counter');
+    const fruit = sorting.locator('.tessera-sorting-target').first();
+
+    await card.click();
+    await fruit.getByRole('button', { name: /^Fruit/ }).click();
+    await expect(counter).toHaveText('2 of 3 to sort');
+
+    // With no card selected, placed items sit above the target button.
+    await fruit
+      .locator('.tessera-sorting-item-text')
+      .click({ trial: true, timeout: 2000 });
+
+    // force skips Playwright's own hit check: the real pointer must land on
+    // the target button stretched over the placed item.
+    await card.click();
+    await fruit.locator('.tessera-sorting-placed-item').click({ force: true });
+    await expect(counter).toHaveText('1 of 3 to sort');
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(2);
+
+    expect(
+      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
+        .violations,
+    ).toEqual([]);
+
+    await fruit
+      .getByRole('button', { name: /^Return/ })
+      .first()
+      .click();
+    await expect(counter).toHaveText('2 of 3 to sort');
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+    await expect(card).toBeFocused();
   });
+
+  test('checked results pass axe audit', async ({ page }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const fruit = sorting.getByRole('button', { name: /^Fruit/ });
+
+    for (let i = 0; i < 3; i++) {
+      await sorting.locator('.tessera-sorting-card').click();
+      await fruit.click();
+    }
+    await sorting.getByRole('button', { name: 'Check Answer' }).click();
+    await expect(sorting.locator('.tessera-sorting-review')).toBeVisible();
+    await expect(sorting.getByText('(incorrect)')).toHaveCount(1);
+
+    expect(
+      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
+        .violations,
+    ).toEqual([]);
+  });
+});
+
+test.describe('Component Accessibility', () => {
+  test.beforeEach(({ page }) => openCourse(page));
 
   test('Callout & Image page passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Callouts & Images');
