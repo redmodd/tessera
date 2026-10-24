@@ -8,7 +8,7 @@
     savedIndex,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -38,6 +38,8 @@
   } = $props();
 
   let selectedOption = $state(null);
+  const chosenFeedback = $derived(optionFeedback[selectedOption]);
+  const radios = [];
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -70,11 +72,15 @@
   function handleSelect(optIndex) {
     if (q.locked) return;
     selectedOption = optIndex;
-    if (inQuiz) {
-      q.setAnswer(optIndex);
-    } else {
-      q.submit();
-    }
+    q.setAnswer(optIndex);
+  }
+
+  // Enter picks the focused option as Space does, matching screen reader
+  // browse modes that activate a radio on Enter.
+  function selectOnEnter(e, optIndex) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    handleSelect(optIndex);
   }
 
   function isCorrectOption(optIndex) {
@@ -89,15 +95,14 @@
   }
 </script>
 
-<QuestionShell
-  {q}
-  class="tessera-mc"
-  role="radiogroup"
-  aria-labelledby="{groupId}-label"
->
+<QuestionShell {q} class="tessera-mc">
   <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
-  <div class="tessera-mc-options">
+  <div
+    class="tessera-mc-options"
+    role="radiogroup"
+    aria-labelledby="{groupId}-label"
+  >
     {#each options as option, i (i)}
       {@const optionId = `${groupId}-opt-${i}`}
       {@const isSelected = selectedOption === i}
@@ -108,6 +113,7 @@
         for={optionId}
       >
         <input
+          bind:this={radios[i]}
           type="radio"
           id={optionId}
           name={groupId}
@@ -115,39 +121,48 @@
           checked={isSelected}
           disabled={q.locked}
           onchange={() => handleSelect(i)}
+          onkeydown={(e) => selectOnEnter(e, i)}
         />
         <span class="tessera-mc-radio-custom"></span>
         <span class="tessera-mc-option-text">{option}</span>
+        {#if stateClass}
+          <span class="tessera-sr-only">({stateClass})</span>
+        {/if}
 
-        {#if q.feedbackVisible}
-          {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback correct"
-              >{optionFeedback[i] || correctFeedback}</span
-            >
-          {:else if stateClass === 'incorrect' && (incorrectFeedback || optionFeedback[i])}
-            <span class="tessera-mc-feedback incorrect"
-              >{optionFeedback[i] || incorrectFeedback}</span
-            >
-          {:else if optionFeedback[i]}
-            <span class="tessera-mc-feedback">{optionFeedback[i]}</span>
-          {/if}
+        {#if q.feedbackVisible && optionFeedback[i]}
+          <!-- The result below repeats the chosen option's feedback. -->
+          <span
+            class="tessera-mc-feedback {stateClass}"
+            aria-hidden={isSelected ? 'true' : undefined}
+            >{optionFeedback[i]}</span
+          >
         {/if}
       </label>
     {/each}
   </div>
 
-  {#if q.feedbackVisible}
-    {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
-      <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-    {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
-      <div class="tessera-mc-overall-feedback incorrect">
-        {incorrectFeedback}
-      </div>
-    {/if}
-    {#if !inQuiz && q.canRetry}
-      <RetryButton onclick={q.retry} />
-    {/if}
+  {#if !inQuiz && !q.submitted}
+    <button
+      type="button"
+      class="tessera-btn-primary tessera-mc-check-btn"
+      disabled={!q.answerComplete}
+      onclick={q.submit}
+    >
+      Check
+    </button>
   {/if}
+
+  <QuestionReview
+    {q}
+    class="tessera-mc-review"
+    correctFeedback={chosenFeedback ? '' : correctFeedback}
+    incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
+    firstControl={() => radios[0]}
+  >
+    {#if chosenFeedback}
+      <span class="tessera-sr-only">{chosenFeedback}</span>
+    {/if}
+  </QuestionReview>
 </QuestionShell>
 
 <style>
@@ -272,25 +287,20 @@
     color: var(--tessera-error);
   }
 
-  .tessera-mc-overall-feedback {
+  .tessera-mc-check-btn {
     margin-top: var(--tessera-spacing-md);
-    padding: var(--tessera-spacing-md);
-    border-radius: 6px;
-    font-size: 0.9375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
-  .tessera-mc-overall-feedback.correct {
-    background: var(--tessera-success-bg);
-    color: var(--tessera-success);
+  :global(.tessera-mc-review) {
+    margin-top: var(--tessera-spacing-md);
   }
 
-  .tessera-mc-overall-feedback.incorrect {
-    background: var(--tessera-error-bg);
-    color: var(--tessera-error);
-  }
-
+  /* A dark ring, so focus can't be mistaken for the blue selected border. */
   .tessera-mc-option:has(input:focus-visible) {
-    outline: 2px solid var(--tessera-primary);
+    outline: 2px solid var(--tessera-text);
     outline-offset: 2px;
   }
 

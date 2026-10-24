@@ -26,6 +26,8 @@ function answer(graded: boolean | undefined) {
   radio.checked = true;
   radio.dispatchEvent(new Event('change', { bubbles: true }));
   flushSync();
+  target.querySelector<HTMLButtonElement>('.tessera-mc-check-btn')!.click();
+  flushSync();
   progress.markVisited(0);
   return { progress, manifest, config };
 }

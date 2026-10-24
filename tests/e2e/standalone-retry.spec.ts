@@ -118,8 +118,10 @@ for (const mode of MODES) {
       return launch;
     }
 
-    const choose = (page: Page, option: string) =>
-      page.locator('.tessera-mc-option', { hasText: option }).click();
+    async function choose(page: Page, option: string) {
+      await page.locator('.tessera-mc-option', { hasText: option }).click();
+      await page.getByRole('button', { name: 'Check', exact: true }).click();
+    }
     const tryAgain = (page: Page) =>
       page.getByRole('button', { name: 'Try again' });
 

@@ -3,8 +3,7 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { QUESTION_ID_PREFIX, fillInAnswers, questionId } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -36,6 +35,7 @@
 
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
+  let inputEl;
 
   const q = useQuestion({
     get id() {
@@ -71,9 +71,7 @@
 
   function handleKeydown(e) {
     if (inQuiz || q.submitted) return;
-    if (e.key === 'Enter' && q.answerComplete) {
-      q.submit();
-    }
+    if (e.key === 'Enter' && q.answerComplete) q.submit();
   }
 </script>
 
@@ -82,6 +80,7 @@
 
   <div class="tessera-fitb-input-wrapper">
     <input
+      bind:this={inputEl}
       type="text"
       id={inputId}
       class="tessera-fitb-input"
@@ -96,47 +95,31 @@
     />
     {#if !inQuiz && !q.submitted}
       <button
+        type="button"
         class="tessera-btn-primary tessera-fitb-check-btn"
         disabled={!q.answerComplete}
-        onclick={() => {
-          q.submit();
-        }}
+        onclick={q.submit}
       >
         Check
       </button>
     {/if}
   </div>
 
-  {#if q.feedbackVisible}
-    {@const isCorrect = q.correct}
-    <div class="tessera-fitb-review">
-      {#if isCorrect}
-        <div class="tessera-fitb-result correct">
-          <ResultIcon kind="correct" />
-          Correct
-        </div>
-        {#if correctFeedback}
-          <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
-        {/if}
-      {:else}
-        <div class="tessera-fitb-result incorrect">
-          <ResultIcon kind="incorrect" />
-          Incorrect
-        </div>
-        <p class="tessera-fitb-correct-answer">
-          Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(
-            ', ',
-          )}
-        </p>
-        {#if incorrectFeedback}
-          <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
-        {/if}
-      {/if}
-      {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={q.retry} />
-      {/if}
-    </div>
-  {/if}
+  <QuestionReview
+    {q}
+    class="tessera-fitb-review"
+    {correctFeedback}
+    {incorrectFeedback}
+    firstControl={() => inputEl}
+  >
+    {#if !q.correct}
+      <p class="tessera-fitb-correct-answer">
+        Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(
+          ', ',
+        )}
+      </p>
+    {/if}
+  </QuestionReview>
 </QuestionShell>
 
 <style>
@@ -184,47 +167,14 @@
     border-color: var(--tessera-error);
   }
 
-  .tessera-fitb-review {
+  :global(.tessera-fitb-review) {
     margin-top: var(--tessera-spacing-md);
-  }
-
-  .tessera-fitb-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-result.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-fitb-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-fitb-correct-answer {
     font-size: 0.875rem;
     color: var(--tessera-text-light);
     margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-  }
-
-  .tessera-fitb-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-fitb-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   .tessera-fitb-check-btn {

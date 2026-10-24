@@ -414,7 +414,7 @@ Per-page weighting, optional pages, pass/fail and manual completion are in [`nod
 
 Props listed before "Optional" are required. Every type also accepts `id`, `weight` (default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
-**MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`.
+**MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`, shown next to each option after checking; the chosen option's entry replaces `correctFeedback` / `incorrectFeedback`.
 
 **FillInTheBlank**: `question` `string`, `answers` `string | string[]` (distinct spellings only). Optional: `caseSensitive` `boolean` (default `false`, so don't list case variants).
 
@@ -443,7 +443,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice. `MultipleChoice` and `Matching` check the answer as soon as it is complete; `FillInTheBlank` and `Sorting` show a Check button. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice. `Matching` checks the answer as soon as the last pair is matched; `MultipleChoice`, `FillInTheBlank` and `Sorting` show a Check button. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />

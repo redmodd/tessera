@@ -11,8 +11,7 @@
     shuffle,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -43,6 +42,7 @@
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
+  const leftItems = [];
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -138,9 +138,7 @@
     selectedRight = null;
 
     q.setAnswer(new Map(matches));
-    if (!inQuiz && q.answerComplete && !q.submitted) {
-      q.submit();
-    }
+    if (!inQuiz && q.answerComplete && !q.submitted) q.submit();
   }
 
   function removeMatch(leftIndex) {
@@ -183,6 +181,8 @@
               ? ', incorrect'
               : ''}
         <button
+          bind:this={leftItems[i]}
+          type="button"
           class="tessera-matching-item left"
           class:selected={isSelected}
           class:matched
@@ -225,6 +225,7 @@
               : ', incorrect'
             : ''}
         <button
+          type="button"
           class="tessera-matching-item right"
           class:selected={isSelected}
           class:matched
@@ -247,39 +248,26 @@
     </div>
   </div>
 
-  {#if q.feedbackVisible}
-    {@const isCorrect = q.correct}
-    <div class="tessera-matching-review">
-      {#if isCorrect}
-        <div class="tessera-matching-result correct">
-          <ResultIcon kind="correct" />
-          All pairs matched correctly!
-        </div>
-        {#if correctFeedback}
-          <p class="tessera-matching-feedback correct">{correctFeedback}</p>
-        {/if}
-      {:else}
-        <div class="tessera-matching-result incorrect">
-          <ResultIcon kind="incorrect" />
-          Some pairs are incorrect
-        </div>
-        <div class="tessera-matching-correct-pairs">
-          <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
-          {#each pairs as pair, i (i)}
-            <p class="tessera-matching-correct-pair">
-              {pair.left} → {pair.right}
-            </p>
-          {/each}
-        </div>
-        {#if incorrectFeedback}
-          <p class="tessera-matching-feedback incorrect">{incorrectFeedback}</p>
-        {/if}
-      {/if}
-      {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={q.retry} />
-      {/if}
-    </div>
-  {/if}
+  <QuestionReview
+    {q}
+    class="tessera-matching-review"
+    correctLabel="All pairs matched correctly!"
+    incorrectLabel="Some pairs are incorrect"
+    {correctFeedback}
+    {incorrectFeedback}
+    firstControl={() => leftItems[0]}
+  >
+    {#if !q.correct}
+      <div class="tessera-matching-correct-pairs">
+        <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
+        {#each pairs as pair, i (i)}
+          <p class="tessera-matching-correct-pair">
+            {pair.left} → {pair.right}
+          </p>
+        {/each}
+      </div>
+    {/if}
+  </QuestionReview>
 </QuestionShell>
 
 <style>
@@ -399,25 +387,8 @@
     background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
   }
 
-  .tessera-matching-review {
+  :global(.tessera-matching-review) {
     margin-top: var(--tessera-spacing-lg);
-  }
-
-  .tessera-matching-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-matching-result.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-matching-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-matching-correct-pairs {
@@ -433,23 +404,6 @@
 
   .tessera-matching-correct-pair {
     margin: 2px 0;
-  }
-
-  .tessera-matching-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-    margin-top: var(--tessera-spacing-sm);
-  }
-
-  .tessera-matching-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-matching-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   @media (max-width: 640px) {
