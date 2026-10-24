@@ -28,6 +28,28 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-sidebar')).toHaveClass(/open/);
   });
 
+  test('Escape closes the sidebar from inside an arrow-key widget', async ({
+    page,
+  }) => {
+    await page.locator('.tessera-hamburger').click();
+    await expect(page.locator('.tessera-sidebar')).toHaveClass(/open/);
+
+    await page.evaluate(() => {
+      const toolbar = document.createElement('div');
+      toolbar.setAttribute('role', 'toolbar');
+      document.querySelector('.tessera-content')!.append(toolbar);
+      toolbar.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+  });
+
   test('selecting a page closes sidebar and loads content', async ({
     page,
   }) => {

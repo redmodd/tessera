@@ -168,6 +168,24 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     expect(cancelled).toEqual([false, false, false, false, true]);
   });
 
+  test('arrow keys on a native media player are left to it', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Modal, Video & Audio');
+    const cancelled = await page
+      .locator('.tessera-audio-player')
+      .evaluate((audio) => {
+        const e = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+        });
+        audio.dispatchEvent(e);
+        return e.defaultPrevented;
+      });
+    expect(cancelled).toBe(false);
+  });
+
   test('ArrowLeft does nothing on first page', async ({ page }) => {
     await page.keyboard.press('ArrowLeft');
     // Should still be on page 1

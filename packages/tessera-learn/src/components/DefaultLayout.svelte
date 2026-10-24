@@ -34,6 +34,8 @@
     'input',
     'textarea',
     'select',
+    'video',
+    'audio',
     'dialog',
     '[role="dialog"]',
     ...[
@@ -54,7 +56,17 @@
   ].join(', ');
 
   function handleKeyNav(e) {
-    if (e.defaultPrevented || e.target?.isContentEditable) return;
+    if (e.defaultPrevented) return;
+
+    if (e.key === 'Escape') {
+      if (sidebarOpen && !e.target?.closest?.('dialog, [role="dialog"]')) {
+        closeSidebar();
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.target?.isContentEditable) return;
     if (e.target?.closest?.(ARROW_KEY_OWNERS)) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
 
@@ -64,10 +76,6 @@
     }
     if (e.key === 'ArrowRight') {
       nav.next();
-      e.preventDefault();
-    }
-    if (e.key === 'Escape' && sidebarOpen) {
-      closeSidebar();
       e.preventDefault();
     }
   }
