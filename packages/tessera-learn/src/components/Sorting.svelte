@@ -46,6 +46,7 @@
   let isDragging = $state(false);
   let cardSelected = $state(false); // current card selected via tap/click
   let cardEl = $state(null);
+  let reviewEl = $state(null);
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
@@ -135,6 +136,13 @@
     // The clicked button unmounts; keep keyboard focus on the returned card.
     await tick();
     cardEl?.focus();
+  }
+
+  async function submit() {
+    q.submit();
+    // Submit disables or removes the focused control; move focus to the result.
+    await tick();
+    reviewEl?.focus();
   }
 
   // --- Drag handlers ---
@@ -290,46 +298,50 @@
   </div>
 
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
-  {#if q.feedbackVisible}
-    {@const isCorrect = q.correct}
-    <div class="tessera-sorting-review">
-      {#if isCorrect}
-        <div class="tessera-sorting-result correct">
-          <ResultIcon kind="correct" />
-          All items sorted correctly!
-        </div>
-        {#if correctFeedback}
-          <p class="tessera-sorting-feedback correct">{correctFeedback}</p>
-        {/if}
-      {:else}
-        <div class="tessera-sorting-result incorrect">
-          <ResultIcon kind="incorrect" />
-          Some items are in the wrong category.
-        </div>
-        <div class="tessera-sorting-correct-list">
-          <p class="tessera-sorting-correct-title">Correct arrangement:</p>
-          {#each items as item, i (i)}
-            <p class="tessera-sorting-correct-item">
-              {item} → {targets[correct[i]]}
+  <div role={inQuiz ? 'status' : undefined}>
+    {#if q.feedbackVisible}
+      {@const isCorrect = q.correct}
+      <div class="tessera-sorting-review" tabindex="-1" bind:this={reviewEl}>
+        {#if isCorrect}
+          <div class="tessera-sorting-result correct">
+            <ResultIcon kind="correct" />
+            All items sorted correctly!
+          </div>
+          {#if correctFeedback}
+            <p class="tessera-sorting-feedback correct">{correctFeedback}</p>
+          {/if}
+        {:else}
+          <div class="tessera-sorting-result incorrect">
+            <ResultIcon kind="incorrect" />
+            Some items are in the wrong category.
+          </div>
+          <div class="tessera-sorting-correct-list">
+            <p class="tessera-sorting-correct-title">Correct arrangement:</p>
+            {#each items as item, i (i)}
+              <p class="tessera-sorting-correct-item">
+                {item} → {targets[correct[i]]}
+              </p>
+            {/each}
+          </div>
+          {#if incorrectFeedback}
+            <p class="tessera-sorting-feedback incorrect">
+              {incorrectFeedback}
             </p>
-          {/each}
-        </div>
-        {#if incorrectFeedback}
-          <p class="tessera-sorting-feedback incorrect">{incorrectFeedback}</p>
+          {/if}
         {/if}
-      {/if}
-      {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={q.retry} />
-      {/if}
-    </div>
-  {/if}
+        {#if !inQuiz && q.canRetry}
+          <RetryButton onclick={q.retry} />
+        {/if}
+      </div>
+    {/if}
+  </div>
 
   <!-- Standalone Check button (shown once all cards are placed) -->
   {#if !inQuiz && !q.submitted && q.answerComplete}
     <div class="tessera-sorting-actions">
       <button
         class="tessera-btn-primary tessera-sorting-check"
-        onclick={q.submit}
+        onclick={submit}
       >
         Check Answer
       </button>

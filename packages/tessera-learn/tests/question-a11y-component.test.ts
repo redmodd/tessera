@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { flushSync, type Component } from 'svelte';
+import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
+import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import { mountQuestion } from './helpers/mount.js';
 
@@ -124,5 +126,69 @@ describe('Matching accessible names', () => {
     expect(name(button('1 A'))).toBe('1 A (matched, incorrect)');
     expect(name(button('2 B'))).toBe('2 B (matched, incorrect)');
     expect(name(button('1 Beta'))).toBe('1 Beta (matched, incorrect)');
+  });
+});
+
+describe('standalone feedback', () => {
+  const focusedText = () => {
+    const el = document.activeElement;
+    if (!el || el === document.body) return '';
+    return (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+  };
+
+  it('moves focus to the Sorting result after Check Answer', async () => {
+    const { target, button, click } = mountWidget(Sorting, {
+      items: ['Apple'],
+      targets: ['Fruit'],
+      correct: [0],
+    });
+    click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
+    click(button('Fruit'));
+    button('Check Answer').focus();
+    click(button('Check Answer'));
+
+    await expect.poll(focusedText).toContain('All items sorted correctly!');
+  });
+
+  it('moves focus to the Matching result after the last pair', async () => {
+    const { button, click } = mountWidget(Matching, {
+      pairs: [{ left: 'A', right: 'Alpha' }],
+    });
+    click(button('A'));
+    click(button('Alpha'));
+
+    await expect.poll(focusedText).toContain('All pairs matched correctly!');
+  });
+
+  it('moves focus to the FillInTheBlank result after Check', async () => {
+    const { target, button, click } = mountWidget(FillInTheBlank, {
+      answers: 'blue',
+      incorrectFeedback: 'The sky is blue.',
+    });
+    const input = target.querySelector('input')!;
+    input.value = 'red';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    click(button('Check'));
+
+    await expect.poll(focusedText).toContain('Incorrect');
+    expect(focusedText()).toContain('The sky is blue.');
+  });
+
+  it('states the MultipleChoice result and moves focus to it', async () => {
+    const { target } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+      optionFeedback: ['Too low.', ''],
+    });
+    const radios = target.querySelectorAll<HTMLInputElement>('input');
+    radios[0].click();
+    flushSync();
+
+    await expect.poll(focusedText).toBe('Incorrect. Too low. Try again');
+    const labels = [...target.querySelectorAll('label')].map((l) =>
+      l.textContent?.replace(/\s+/g, ' ').trim(),
+    );
+    expect(labels).toEqual(['3 (incorrect) Too low.', '4 (correct)']);
   });
 });

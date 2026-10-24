@@ -1,5 +1,5 @@
 <script>
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
@@ -38,6 +38,7 @@
   } = $props();
 
   let selectedOption = $state(null);
+  let reviewEl = $state(null);
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -73,8 +74,15 @@
     if (inQuiz) {
       q.setAnswer(optIndex);
     } else {
-      q.submit();
+      submit();
     }
+  }
+
+  async function submit() {
+    q.submit();
+    // Submit disables or removes the focused control; move focus to the result.
+    await tick();
+    reviewEl?.focus();
   }
 
   function isCorrectOption(optIndex) {
@@ -118,6 +126,9 @@
         />
         <span class="tessera-mc-radio-custom"></span>
         <span class="tessera-mc-option-text">{option}</span>
+        {#if stateClass}
+          <span class="tessera-sr-only">({stateClass})</span>
+        {/if}
 
         {#if q.feedbackVisible}
           {#if stateClass === 'correct' && (correctFeedback || optionFeedback[i])}
@@ -136,18 +147,28 @@
     {/each}
   </div>
 
-  {#if q.feedbackVisible}
-    {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
-      <div class="tessera-mc-overall-feedback correct">{correctFeedback}</div>
-    {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
-      <div class="tessera-mc-overall-feedback incorrect">
-        {incorrectFeedback}
+  <div role={inQuiz ? 'status' : undefined}>
+    {#if q.feedbackVisible}
+      <div class="tessera-mc-review" tabindex="-1" bind:this={reviewEl}>
+        <span class="tessera-sr-only"
+          >{q.correct ? 'Correct.' : 'Incorrect.'}
+          {optionFeedback[selectedOption] ?? ''}</span
+        >
+        {#if q.correct && correctFeedback && !optionFeedback[selectedOption]}
+          <div class="tessera-mc-overall-feedback correct">
+            {correctFeedback}
+          </div>
+        {:else if !q.correct && incorrectFeedback && !optionFeedback[selectedOption]}
+          <div class="tessera-mc-overall-feedback incorrect">
+            {incorrectFeedback}
+          </div>
+        {/if}
+        {#if !inQuiz && q.canRetry}
+          <RetryButton onclick={q.retry} />
+        {/if}
       </div>
     {/if}
-    {#if !inQuiz && q.canRetry}
-      <RetryButton onclick={q.retry} />
-    {/if}
-  {/if}
+  </div>
 </QuestionShell>
 
 <style>

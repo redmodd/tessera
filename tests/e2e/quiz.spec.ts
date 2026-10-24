@@ -418,6 +418,23 @@ test.describe('Quiz — Accessibility', () => {
     await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 
+  test('immediate feedback is announced through a status region', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    const btn = primaryBtn(page);
+    const status = page
+      .locator('.tessera-quiz-question-wrapper.active')
+      .getByRole('status');
+
+    await answerMultipleChoice(page, 0);
+    await expect(status).toBeEmpty();
+    await btn.click();
+    await expect(status).toContainText('Incorrect. 3 is too low.');
+    await expect(btn).toBeFocused();
+  });
+
   test('quiz results panel passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
