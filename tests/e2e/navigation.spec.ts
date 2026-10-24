@@ -1,6 +1,10 @@
 import { test, expect, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { navigateToPage, waitForTesseraContent } from './helpers.js';
+import {
+  answerGradedQuiz,
+  navigateToPage,
+  waitForTesseraContent,
+} from './helpers.js';
 
 /** Dispatches ArrowRight on the element and reports whether the layout cancelled it. */
 function arrowCancelled(target: Locator, init: KeyboardEventInit = {}) {
@@ -27,6 +31,8 @@ test.describe('Navigation — Free Mode', () => {
 
   test('loads first page on initial visit', async ({ page }) => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
+    await expect(page).toHaveTitle('Welcome – E2E Test Course');
+    await expect(page.locator('body')).toBeFocused();
   });
 
   test('sidebar shows all sections and pages', async ({ page }) => {
@@ -47,6 +53,48 @@ test.describe('Navigation — Free Mode', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
+  });
+
+  test('focus moved while a page loads stays where the learner put it', async ({
+    page,
+  }) => {
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/objectives\.svelte/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto('/');
+    await waitForTesseraContent(page);
+
+    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
+    const other = page.locator('.tessera-nav-page', { hasText: 'Welcome' });
+    await other.focus();
+    release();
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
+    await expect(other).toBeFocused();
+  });
+
+  test('a page chosen while the first page loads gets focus', async ({
+    page,
+  }) => {
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/welcome\.svelte/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto('/');
+
+    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
+    release();
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
   test('can click any page in free mode — no locking', async ({ page }) => {
@@ -71,6 +119,8 @@ test.describe('Navigation — Free Mode', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
+    await expect(page).toHaveTitle('Objectives – E2E Test Course');
   });
 
   test('prev/next navigate through all pages end-to-end', async ({ page }) => {
@@ -157,10 +207,12 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
 
-    // Go back
+    // Go back, from the focused heading
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
   test('arrow keys with a modifier are left to the browser', async ({
@@ -194,6 +246,68 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
       await control.focus();
       expect(await arrowCancelled(control)).toBe(false);
     }
+  });
+
+  test('arrow keys work from the focused heading of a quiz page', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('.tessera-content h1')).toContainText('Practice');
+  });
+
+  test('arrow keys stay in the quiz once its own heading has focus', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
+    await primary.click();
+    await expect(primary).toHaveText('Next Question');
+    await primary.click();
+    const progress = page.getByRole('heading', { name: 'Question 2 of 3' });
+    await expect(progress).toBeFocused();
+    expect(await arrowCancelled(progress)).toBe(false);
+  });
+
+  // dispatchEvent clicks without moving focus, as Safari does.
+  test('arrow keys stay in the quiz once it refocuses the heading a page change focused', async ({
+    page,
+  }) => {
+    await page.addStyleTag({ content: '.tessera-page h1 { display: none }' });
+    await navigateToPage(page, 'Practice Quiz');
+    const progress = page.locator('.tessera-quiz-progress-text');
+    await expect(progress).toHaveAccessibleName('Question 1 of 2');
+    await expect(progress).toBeFocused();
+
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option input')
+      .nth(1)
+      .dispatchEvent('click');
+    await page
+      .locator('.tessera-quiz-nav .tessera-btn-primary')
+      .dispatchEvent('click');
+    await expect(progress).toHaveAccessibleName('Question 2 of 2');
+    await expect(progress).toBeFocused();
+    expect(await arrowCancelled(progress)).toBe(false);
+  });
+
+  test('a finished quiz page focuses its results, and arrow keys still work', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await answerGradedQuiz(page);
+    await navigateToPage(page, 'Objectives');
+    await navigateToPage(page, 'Graded Assessment');
+    await expect(
+      page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
+    ).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('.tessera-content h1')).toContainText('Practice');
   });
 
   test('ArrowLeft does nothing on first page', async ({ page }) => {

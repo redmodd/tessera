@@ -31,6 +31,8 @@ Part of the Tessera authoring guide. [`AGENTS.md`](../AGENTS.md) holds the rules
 
 A custom layout gets no Exit button; add one with [`useCourse()`](hooks.md#usecourse).
 
+`page()` renders inside a `div.tessera-page` (`display: contents`), so select page content with `.tessera-page h1`, not `main > h1`. On every page change after the first, focus moves to the page's first visible heading (`h1` preferred), or to a `tabindex="-1"` element wrapping it, never to a heading the layout renders. Focus stays put if it moved while the page loaded, including when the page focuses its own content.
+
 To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` and compose around it. With no `layout.svelte`, `chrome: 'custom'` in `course.config.js` renders pages with no chrome at all.
 
 ## Recipe 1: Custom "draw a line" question

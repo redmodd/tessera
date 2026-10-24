@@ -133,6 +133,51 @@
 
   // ---- Page loading ----
   let loadGeneration = 0;
+  let pageEl;
+  const shownPage = $derived(manifest.pages[renderedPageIndex]);
+  const tabTitle = $derived(
+    shownPage ? `${shownPage.title} – ${config.title}` : config.title,
+  );
+
+  // Chrome before 121 and Firefox before 122 know only checkVisibilityCSS.
+  // Safari before 17.4 has no checkVisibility, so only display: none is caught.
+  const isAnnounced = (el) =>
+    (el.checkVisibility?.({
+      visibilityProperty: true,
+      checkVisibilityCSS: true,
+    }) ??
+      el.getClientRects().length > 0) &&
+    !el.closest('[aria-hidden="true"], [inert]');
+
+  const PAGE_FOCUS = 'data-tessera-page-focus';
+
+  // Focus goes to the new page's heading so a screen reader announces it,
+  // unless focus moved during the load: into the page, or anywhere else. A
+  // heading inside a focus target (a quiz's results) focuses the target, which
+  // reads more. The mark lets the default layout's arrow keys work from it.
+  function focusPageHeading(focusBefore) {
+    const active = document.activeElement;
+    if (!pageEl || (active !== focusBefore && active !== document.body)) return;
+    const headings = [
+      ...pageEl.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+    ].filter(isAnnounced);
+    const heading = headings.find((h) => h.localName === 'h1') ?? headings[0];
+    if (!heading) return;
+    const target = heading.closest('.tessera-page [tabindex="-1"]') ?? heading;
+    if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
+    target.setAttribute(PAGE_FOCUS, '');
+    target.focus();
+  }
+
+  // The first load keeps the browser's initial focus, and ErrorPage announces
+  // itself as an alert.
+  function showPage(index, focusBefore, gen) {
+    pageLoading = false;
+    renderedPageIndex = index;
+    if (gen > 1 && !pageError) {
+      tick().then(() => focusPageHeading(focusBefore));
+    }
+  }
 
   function loadPage(index) {
     const page = manifest.pages[index];
@@ -140,6 +185,7 @@
 
     const gen = ++loadGeneration;
     pageLoading = true;
+    const focusBefore = document.activeElement;
 
     const loader = pageModules[page.importPath];
     if (!loader) {
@@ -148,8 +194,7 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      pageLoading = false;
-      renderedPageIndex = index;
+      showPage(index, focusBefore, gen);
       return;
     }
 
@@ -164,8 +209,7 @@
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
-        pageLoading = false;
-        renderedPageIndex = index;
+        showPage(index, focusBefore, gen);
         progress.markVisited(index);
         tick().then(() => progress.pageMounted(index));
         if (
@@ -180,8 +224,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        pageLoading = false;
-        renderedPageIndex = index;
+        showPage(index, focusBefore, gen);
       });
   }
 
@@ -202,7 +245,6 @@
   // ---- Lifecycle ----
   onMount(async () => {
     applyBranding(document.documentElement, config.branding);
-    if (config.title) document.title = config.title;
 
     const initError = await session.start();
     if (initError) {
@@ -218,22 +260,28 @@
   });
 </script>
 
+<svelte:head>
+  <title>{tabTitle}</title>
+</svelte:head>
+
 {#snippet page()}
-  {#if pageError}
-    <ErrorPage error={pageError} onretry={retryPage} />
-  {:else if PageComponent}
-    <PageHost>
-      {#if pageContext.quiz}
-        {#key renderedPageIndex}
-          <Quiz>
-            <PageComponent />
-          </Quiz>
-        {/key}
-      {:else}
-        <PageComponent />
-      {/if}
-    </PageHost>
-  {/if}
+  <div class="tessera-page" bind:this={pageEl}>
+    {#if pageError}
+      <ErrorPage error={pageError} onretry={retryPage} />
+    {:else if PageComponent}
+      <PageHost>
+        {#if pageContext.quiz}
+          {#key renderedPageIndex}
+            <Quiz>
+              <PageComponent />
+            </Quiz>
+          {/key}
+        {:else}
+          <PageComponent />
+        {/if}
+      </PageHost>
+    {/if}
+  </div>
 {/snippet}
 
 <div
@@ -256,3 +304,9 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  .tessera-page {
+    display: contents;
+  }
+</style>
