@@ -134,11 +134,10 @@
   // ---- Page loading ----
   let loadGeneration = 0;
   let pageEl;
-
-  $effect(() => {
-    const shown = manifest.pages[renderedPageIndex];
-    document.title = shown ? `${shown.title} – ${config.title}` : config.title;
-  });
+  const shownPage = $derived(manifest.pages[renderedPageIndex]);
+  const tabTitle = $derived(
+    shownPage ? `${shownPage.title} – ${config.title}` : config.title,
+  );
 
   // Chrome before 121 and Firefox before 122 know only checkVisibilityCSS.
   // Safari before 17.4 has no checkVisibility, so only display: none is caught.
@@ -165,8 +164,7 @@
     ].filter(isAnnounced);
     const heading = headings.find((h) => h.localName === 'h1') ?? headings[0];
     if (!heading) return;
-    const wrapper = heading.closest('[tabindex="-1"]');
-    const target = wrapper && pageEl.contains(wrapper) ? wrapper : heading;
+    const target = heading.closest('.tessera-page [tabindex="-1"]') ?? heading;
     if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
     target.setAttribute(PAGE_FOCUS, '');
     const release = (e) => {
@@ -269,6 +267,10 @@
     session.dispose();
   });
 </script>
+
+<svelte:head>
+  <title>{tabTitle}</title>
+</svelte:head>
 
 {#snippet page()}
   <div class="tessera-page" bind:this={pageEl}>
