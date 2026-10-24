@@ -1,5 +1,23 @@
 # tessera-learn
 
+## 0.11.2
+
+### Patch Changes
+
+- 52706a8: - `@vitest/coverage-v8` 5.0.3 → 5.0.5
+  - `jsdom` 30.1.2 → 30.1.3
+  - `svelte-check` 4.7.6 → 4.7.7
+  - `tsdown` 0.23.0 → 0.23.1
+  - `vitest` 5.0.3 → 5.0.5
+- 45a5439: Matching and Sorting buttons take their accessible name from their visible text, so screen reader and voice control users hear and say what they see. Both announce the pending selection and, once feedback shows, whether each match or placement is correct. Locked Matching items no longer offer to unmatch, and locked Sorting targets leave the tab order. Sorting targets no longer nest the "return to deck" buttons inside another button, and returning a card to the deck clears the selection and moves keyboard focus to it.
+- a684bcb: A `performance` correct step answer written `min[:]max` grades any decimal step answer inside it as correct. Performance steps grade in order and by the text they record, so `3` matches a correct `'3'`. A `numeric` correct with only `min` or `max` records as an open range (`5[:]`), not an exact value. A correct range with its minimum above its maximum warns in dev and is left out of the SCORM record. A correct step answer holding `[:]` that is not a valid range warns in dev, as it grades as exact text. SCORM 1.2, which has no range syntax, leaves a correct answer holding a range out of the LMS record.
+- a84641d: SCORM 1.2 and 2004 commit progress saves (bookmark, visited pages, `usePersistence`) and the session time at most every ten seconds while the page is visible, and right away once it is hidden. On an LMS that keeps only committed values, a page killed without `pagehide` no longer resumes from the last status change.
+- 5d404f7: SCORM 1.2 and 2004 write the exit mode with every status commit, not only when the session ends. A page the browser kills without `pagehide` (iOS Safari in the background, a crash) now leaves the attempt suspended instead of exited normally.
+- c4904d3: Internal: SCORM 2004 checks each interaction value against one table of rules per type. Recorded values and warnings are unchanged.
+- 107525f: `--tessera-success` and `--tessera-error` default to darker shades (`#147638`, `#b91c1c`) so quiz feedback text meets WCAG AA contrast (4.5:1), including on its tinted backgrounds.
+  
+  Matching pair badges use darker colors so their numbers meet AA contrast, including after submit, and no pair color matches the error color.
+
 ## 0.11.1
 
 ### Patch Changes
