@@ -181,6 +181,7 @@
               ? ', incorrect'
               : ''}
         <button
+          type="button"
           class="tessera-matching-item left"
           class:selected={isSelected}
           class:matched
@@ -223,6 +224,7 @@
               : ', incorrect'
             : ''}
         <button
+          type="button"
           class="tessera-matching-item right"
           class:selected={isSelected}
           class:matched

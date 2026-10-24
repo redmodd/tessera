@@ -132,6 +132,7 @@
 
   {#if !inQuiz && !q.submitted}
     <button
+      type="button"
       class="tessera-btn-primary tessera-mc-check-btn"
       disabled={!q.answerComplete}
       onclick={q.submit}

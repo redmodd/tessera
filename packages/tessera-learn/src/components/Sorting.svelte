@@ -249,6 +249,7 @@
         ondrop={(e) => onDrop(e, targetIdx)}
       >
         <button
+          type="button"
           class="tessera-sorting-target-label"
           disabled={q.locked}
           aria-disabled={!cardSelected}
@@ -273,6 +274,7 @@
                 <span class="tessera-sorting-item-text">{items[itemIdx]}</span>
                 {#if !q.locked}
                   <button
+                    type="button"
                     class="tessera-sorting-remove"
                     aria-label="Return '{items[itemIdx]}' to deck"
                     onclick={() => returnCard(itemIdx)}>×</button
@@ -329,6 +331,7 @@
   {#if !inQuiz && !q.submitted && q.answerComplete}
     <div class="tessera-sorting-actions">
       <button
+        type="button"
         class="tessera-btn-primary tessera-sorting-check"
         onclick={q.submit}
       >

@@ -94,6 +94,7 @@
     />
     {#if !inQuiz && !q.submitted}
       <button
+        type="button"
         class="tessera-btn-primary tessera-fitb-check-btn"
         disabled={!q.answerComplete}
         onclick={q.submit}
