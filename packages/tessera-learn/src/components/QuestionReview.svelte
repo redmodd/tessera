@@ -6,9 +6,10 @@
   // submit (immediate mode) sits in a status region; review does not, since a
   // shell may keep every question mounted. Standalone, Check and Try again
   // disable or remove the focused control, so focus moves to the result, then
-  // back to the control `firstControl` returns. The result is a group named by
-  // its own text: VoiceOver in Safari reads an unnamed focused block as only its
-  // first line ("Incorrect and 2 more items").
+  // back to the control `firstControl` returns. There the result is a group
+  // named by its own text: VoiceOver in Safari reads an unnamed focused block as
+  // only its first line ("Incorrect and 2 more items"). In a quiz the name made
+  // VoiceOver in Chrome skip the status announcement, so it is left off.
   let { q, class: className = '', firstControl, children } = $props();
 
   const inQuiz = $derived(q.mode === 'quiz');
@@ -32,8 +33,8 @@
   {#if q.feedbackVisible}
     <div
       class={className}
-      role="group"
-      aria-labelledby={contentId}
+      role={inQuiz ? undefined : 'group'}
+      aria-labelledby={inQuiz ? undefined : contentId}
       tabindex="-1"
       {@attach focusOnCheck}
     >

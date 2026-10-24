@@ -433,6 +433,7 @@ test.describe('Quiz — Accessibility', () => {
     await expect(status).toBeEmpty();
     await btn.click();
     await expect(status).toContainText(/Incorrect\s*3 is too low\./);
+    await expect(status.getByRole('group')).toHaveCount(0);
     await expect(btn).toBeFocused();
   });
 
