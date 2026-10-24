@@ -44,7 +44,7 @@
   let selectedRight = $state(null);
   let leftFocus = $state(0);
   let rightFocus = $state(0);
-  const leftItems = [];
+  const leftItems = $state([]);
   const componentId = $props.id();
   const leftHeadingId = `matching-${componentId}-from`;
   const rightHeadingId = `matching-${componentId}-to`;

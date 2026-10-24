@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { flushSync, type Component } from 'svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
@@ -455,4 +455,25 @@ describe('standalone feedback', () => {
         .toBe(mounted.target.querySelector(first));
     },
   );
+});
+
+describe('focus bindings', () => {
+  it.each([
+    {
+      name: 'MultipleChoice',
+      widget: MultipleChoice,
+      props: { options: ['3', '4'], correct: 1 },
+    },
+    {
+      name: 'Matching',
+      widget: Matching,
+      props: { pairs: [{ left: 'A', right: 'Alpha' }] },
+    },
+  ])('mounts $name without a Svelte warning', ({ widget, props }) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
+    mountWidget(widget, props);
+    flushSync();
+    expect(warn).not.toHaveBeenCalled();
+  });
 });

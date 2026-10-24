@@ -39,7 +39,7 @@
 
   let selectedOption = $state(null);
   const chosenFeedback = $derived(optionFeedback[selectedOption]);
-  const radios = [];
+  const radios = $state([]);
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
