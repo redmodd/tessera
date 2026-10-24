@@ -136,15 +136,12 @@
   let pageEl;
 
   $effect(() => {
-    const title = [manifest.pages[renderedPageIndex]?.title, config.title]
-      .filter(Boolean)
-      .join(' – ');
-    if (title) document.title = title;
+    const shown = manifest.pages[renderedPageIndex];
+    document.title = shown ? `${shown.title} – ${config.title}` : config.title;
   });
 
   const isAnnounced = (el) =>
-    el.getClientRects().length > 0 &&
-    getComputedStyle(el).visibility === 'visible' &&
+    el.checkVisibility({ visibilityProperty: true }) &&
     !el.closest('[aria-hidden="true"], [inert]');
 
   // Focus goes to the new page's heading so a screen reader announces it,

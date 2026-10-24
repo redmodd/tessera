@@ -219,6 +219,8 @@ export async function mountApp({
     buildXAPIClient,
   });
   vi.stubGlobal('__tesseraNavCtx', undefined);
+  // jsdom has no layout and no checkVisibility, so nothing renders as visible.
+  Element.prototype.checkVisibility ??= () => false;
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   onTestFinished(() => {
