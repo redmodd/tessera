@@ -218,6 +218,12 @@
         {@const matched = leftIdx !== undefined}
         {@const color = getMatchColor(leftIdx)}
         {@const isSelected = selectedRight === item.originalIndex}
+        {@const result =
+          matched && q.feedbackVisible
+            ? isMatchCorrect(leftIdx)
+              ? ', correct'
+              : ', incorrect'
+            : ''}
         <button
           class="tessera-matching-item right"
           class:selected={isSelected}
@@ -234,7 +240,7 @@
           {/if}
           <span>{item.text}</span>
           {#if matched}
-            <span class="tessera-sr-only">(matched)</span>
+            <span class="tessera-sr-only">(matched{result})</span>
           {/if}
         </button>
       {/each}

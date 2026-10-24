@@ -123,6 +123,6 @@ describe('Matching accessible names', () => {
 
     expect(name(button('1 A'))).toBe('1 A (matched, incorrect)');
     expect(name(button('2 B'))).toBe('2 B (matched, incorrect)');
-    expect(name(button('1 Beta'))).toBe('1 Beta (matched)');
+    expect(name(button('1 Beta'))).toBe('1 Beta (matched, incorrect)');
   });
 });

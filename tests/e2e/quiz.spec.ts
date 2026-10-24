@@ -362,11 +362,9 @@ test.describe('Quiz — Accessibility', () => {
         name: '1 1 (matched, activate to unmatch)',
       }),
     ).toBeVisible();
-    const rightOne = matching.getByRole('button', {
-      name: '1 One (matched)',
-      exact: true,
-    });
-    await expect(rightOne).toBeVisible();
+    await expect(
+      matching.getByRole('button', { name: '1 One (matched)', exact: true }),
+    ).toBeVisible();
     expect((await audit()).violations).toEqual([]);
 
     await primaryBtn(page).click();
@@ -376,7 +374,12 @@ test.describe('Quiz — Accessibility', () => {
         exact: true,
       }),
     ).toBeDisabled();
-    await expect(rightOne).toBeDisabled();
+    await expect(
+      matching.getByRole('button', {
+        name: '1 One (matched, correct)',
+        exact: true,
+      }),
+    ).toBeDisabled();
     expect((await audit()).violations).toEqual([]);
   });
 
