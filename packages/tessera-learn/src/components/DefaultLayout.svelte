@@ -28,32 +28,16 @@
     sidebarOpen = false;
   }
 
-  // Arrow keys belong to these first: native controls, dialogs, the ARIA
-  // patterns that use arrows, and the quiz. Other widgets call preventDefault().
-  const ARROW_KEY_OWNERS = [
-    'input',
-    'textarea',
-    'select',
-    'video',
-    'audio',
-    'dialog',
-    '[role="dialog"]',
-    ...[
-      'radiogroup',
-      'listbox',
-      'combobox',
-      'menu',
-      'menubar',
-      'tablist',
-      'toolbar',
-      'tree',
-      'treegrid',
-      'grid',
-      'slider',
-      'spinbutton',
-    ].map((role) => `[role="${role}"]`),
-    '.tessera-quiz',
-  ].join(', ');
+  // Arrow keys change page only while no control has focus: the page itself,
+  // or a heading or result that focus was moved to. WebKit gives media
+  // players and editable text a tabIndex of -1, so they are named here.
+  function controlHasFocus(el) {
+    return (
+      el.tabIndex >= 0 ||
+      el.isContentEditable ||
+      !!el.closest('video, audio, dialog, [role="dialog"], .tessera-quiz')
+    );
+  }
 
   function handleKeyNav(e) {
     if (e.defaultPrevented) return;
@@ -66,8 +50,7 @@
       return;
     }
 
-    if (e.target?.isContentEditable) return;
-    if (e.target?.closest?.(ARROW_KEY_OWNERS)) return;
+    if (e.target instanceof Element && controlHasFocus(e.target)) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
 
     if (e.key === 'ArrowLeft') {

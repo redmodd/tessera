@@ -149,15 +149,8 @@
 
     {@render questionList(currentQuestionIndex)}
 
+    <!-- The forward button comes first in the Tab order; CSS keeps Back on the left. -->
     <div class="tessera-quiz-nav">
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={currentQuestionIndex === 0}
-        onclick={goPrevQuestion}
-      >
-        Back
-      </button>
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           type="button"
@@ -173,21 +166,34 @@
             Next
           {/if}
         </button>
-      {:else}
-        <!-- One button for reveal and submit, so focus survives the reveal. -->
-        {@const reveal = needsReveal(currentQuestion)}
+      {:else if needsReveal(currentQuestion)}
         <button
           type="button"
           class="tessera-quiz-btn tessera-btn-primary"
-          class:tessera-quiz-btn-submit={!reveal}
-          disabled={!reveal && !handle.canSubmit}
-          onclick={reveal ? revealCurrent : handleSubmit}
+          onclick={revealCurrent}
         >
-          {isImmediateMode && !reveal && isAnswered(currentQuestion)
+          Submit
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="tessera-quiz-btn tessera-btn-primary tessera-quiz-btn-submit"
+          disabled={!handle.canSubmit}
+          onclick={handleSubmit}
+        >
+          {isImmediateMode && isAnswered(currentQuestion)
             ? 'See Results'
             : 'Submit'}
         </button>
       {/if}
+      <button
+        type="button"
+        class="tessera-quiz-btn tessera-quiz-btn-secondary"
+        disabled={currentQuestionIndex === 0}
+        onclick={goPrevQuestion}
+      >
+        Back
+      </button>
     </div>
   {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
@@ -205,14 +211,6 @@
     {@render questionList(reviewIndex)}
 
     <div class="tessera-quiz-nav">
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={reviewIndex === 0}
-        onclick={goPrevReview}
-      >
-        Back
-      </button>
       {#if reviewIndex < totalQuestions - 1}
         <button
           type="button"
@@ -230,6 +228,14 @@
           Done
         </button>
       {/if}
+      <button
+        type="button"
+        class="tessera-quiz-btn tessera-quiz-btn-secondary"
+        disabled={reviewIndex === 0}
+        onclick={goPrevReview}
+      >
+        Back
+      </button>
     </div>
   {:else}
     <!-- Results phase -->
@@ -353,6 +359,7 @@
 
   .tessera-quiz-nav {
     display: flex;
+    flex-direction: row-reverse;
     justify-content: space-between;
     gap: var(--tessera-spacing-md);
     margin-top: var(--tessera-spacing-lg);

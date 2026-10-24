@@ -154,7 +154,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     ).toContainText('state: answering');
   });
 
-  test('review does not put every mounted question in a status region', async ({
+  test('review leaves focus alone with every question mounted', async ({
     page,
   }) => {
     await navigateToExam(page);
@@ -170,7 +170,10 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
 
     const list = page.locator('.custom-quiz-list');
     await expect(list.locator('.tessera-mc-result')).toContainText('Incorrect');
-    await expect(list.getByRole('status')).toHaveCount(0);
+    const focusInList = await page.evaluate(
+      () => !!document.activeElement?.closest('.custom-quiz-list'),
+    );
+    expect(focusInList).toBe(false);
   });
 });
 

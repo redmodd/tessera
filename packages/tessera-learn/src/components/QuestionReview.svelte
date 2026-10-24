@@ -2,14 +2,13 @@
   import { tick, untrack } from 'svelte';
   import RetryButton from './RetryButton.svelte';
 
-  // The result block for the question widgets. In a quiz, feedback shown before
-  // submit (immediate mode) sits in a status region; review does not, since a
-  // shell may keep every question mounted. Standalone, Check and Try again
-  // disable or remove the focused control, so focus moves to the result, then
-  // back to the control `firstControl` returns. There the result is a group
-  // named by its own text: VoiceOver in Safari reads an unnamed focused block as
-  // only its first line ("Incorrect and 2 more items"). In a quiz the name made
-  // VoiceOver in Chrome skip the status announcement, so it is left off.
+  // The result block for the question widgets. A fresh result takes focus,
+  // standalone after Check and in a quiz when immediate mode reveals it, so it
+  // is read out and the next Tab reaches the next control. Try again sends
+  // focus back to the control `firstControl` returns. Review after a quiz is
+  // submitted never takes focus: a shell may keep every question mounted.
+  // The result is a group named by its own text: VoiceOver in Safari reads an
+  // unnamed focused block as only its first line ("Incorrect and 2 more items").
   let { q, class: className = '', firstControl, children } = $props();
 
   const inQuiz = $derived(q.mode === 'quiz');
@@ -18,7 +17,8 @@
   let restored = untrack(() => q.feedbackVisible);
 
   function focusOnCheck(el) {
-    if (!restored && !inQuiz) el.focus();
+    const review = untrack(() => inQuiz && q.submitted);
+    if (!restored && !review) el.focus();
     restored = false;
   }
 
@@ -29,19 +29,17 @@
   }
 </script>
 
-<div role={inQuiz && !q.submitted ? 'status' : undefined}>
-  {#if q.feedbackVisible}
-    <div
-      class={className}
-      role={inQuiz ? undefined : 'group'}
-      aria-labelledby={inQuiz ? undefined : contentId}
-      tabindex="-1"
-      {@attach focusOnCheck}
-    >
-      <div id={contentId}>{@render children()}</div>
-      {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={retry} />
-      {/if}
-    </div>
-  {/if}
-</div>
+{#if q.feedbackVisible}
+  <div
+    class={className}
+    role="group"
+    aria-labelledby={contentId}
+    tabindex="-1"
+    {@attach focusOnCheck}
+  >
+    <div id={contentId}>{@render children()}</div>
+    {#if !inQuiz && q.canRetry}
+      <RetryButton onclick={retry} />
+    {/if}
+  </div>
+{/if}

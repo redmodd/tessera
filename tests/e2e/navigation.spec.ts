@@ -186,6 +186,27 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     expect(cancelled).toBe(false);
   });
 
+  test('arrow keys on a focused link or button are left alone', async ({
+    page,
+  }) => {
+    const cancelled = await page.evaluate(() =>
+      ['.tessera-nav-page', '.tessera-page-nav-btn:not([disabled])'].map(
+        (selector) => {
+          const control = document.querySelector<HTMLElement>(selector)!;
+          control.focus();
+          const e = new KeyboardEvent('keydown', {
+            key: 'ArrowRight',
+            bubbles: true,
+            cancelable: true,
+          });
+          control.dispatchEvent(e);
+          return e.defaultPrevented;
+        },
+      ),
+    );
+    expect(cancelled).toEqual([false, false]);
+  });
+
   test('ArrowLeft does nothing on first page', async ({ page }) => {
     await page.keyboard.press('ArrowLeft');
     // Should still be on page 1

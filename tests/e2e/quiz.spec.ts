@@ -13,25 +13,26 @@ import {
 } from './helpers.js';
 
 /**
- * Advance past one immediate-feedback question. The primary button cycles:
- *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
- *     relabels to "Next Question" → second click advances and focuses the
- *     next question's heading.
- *   - last question: "Submit" → click reveals feedback → the same button
- *     becomes "See Results" and keeps focus.
+ * Advance past one immediate-feedback question. "Submit" reveals the feedback,
+ * which takes focus, and the button becomes "Next Question" (or "See Results"
+ * on the last question). "Next Question" focuses the next question's heading.
  * We wait on the label text to change instead of sleeping.
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
   const btn = primaryBtn(page);
+  const feedback = page
+    .locator('.tessera-quiz-question-wrapper.active')
+    .getByRole('group');
   if (isLast) {
     await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
-    await expect(btn).toBeFocused();
+    await expect(feedback).toBeFocused();
   } else {
     await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(btn).toHaveText('Next Question');
+    await expect(feedback).toBeFocused();
     await btn.click();
     await expect(
       page.getByRole('heading', { name: /^Question \d+ of \d+$/ }),
@@ -426,21 +427,29 @@ test.describe('Quiz — Accessibility', () => {
     await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 
-  test('immediate feedback is announced through a status region', async ({
+  test('Tab reaches Submit, then the feedback leads to Next Question', async ({
     page,
   }) => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
     const btn = primaryBtn(page);
-    const status = page
-      .locator('.tessera-quiz-question-wrapper.active')
-      .getByRole('status');
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
 
     await answerMultipleChoice(page, 0);
-    await expect(status).toBeEmpty();
     await btn.click();
-    await expect(status).toContainText(/Incorrect\s*3 is too low\./);
-    await expect(status.getByRole('group')).toHaveCount(0);
+    await expect(
+      active.getByRole('group', { name: /Incorrect\s*3 is too low\./ }),
+    ).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(btn).toHaveText('Next Question');
+    await expect(btn).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await expect(active.locator('input')).toBeFocused();
+    await page.keyboard.type('blue');
+    await page.keyboard.press('Tab');
+    await expect(btn).toHaveText('Submit');
     await expect(btn).toBeFocused();
   });
 
