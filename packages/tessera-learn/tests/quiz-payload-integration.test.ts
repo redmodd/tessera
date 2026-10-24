@@ -241,9 +241,9 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
     const [, interaction, correct] = reports[0];
     expect(interaction.response).toBe('blue');
     expect(correct).toBe(true);
-    expect(target.querySelector('.tessera-fitb-result')?.className).toContain(
-      'correct',
-    );
+    expect(
+      target.querySelector('.tessera-question-result')?.className,
+    ).toContain('correct');
   });
 
   it('shows and reports a single answer string as one answer', async () => {

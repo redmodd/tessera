@@ -1,6 +1,20 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
+
+/** Dispatches ArrowRight on the element and reports whether the layout cancelled it. */
+function arrowCancelled(target: Locator, init: KeyboardEventInit = {}) {
+  return target.evaluate((el, init) => {
+    const e = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    el.dispatchEvent(e);
+    return e.defaultPrevented;
+  }, init);
+}
 
 test.describe('Navigation — Free Mode', () => {
   test.beforeEach(async ({ page }) => {
@@ -149,32 +163,58 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
+  test('arrow keys with a modifier are left to the browser', async ({
+    page,
+  }) => {
+    // The layout cancels a key it navigates on; the last press has no modifier.
+    const body = page.locator('body');
+    for (const mod of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      expect(await arrowCancelled(body, { [mod]: true })).toBe(false);
+    }
+    expect(await arrowCancelled(body)).toBe(true);
+  });
+
+  test('arrow keys on a native media player are left to it', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Modal, Video & Audio');
+    expect(await arrowCancelled(page.locator('.tessera-audio-player'))).toBe(
+      false,
+    );
+  });
+
+  test('arrow keys on a focused link or button are left alone', async ({
+    page,
+  }) => {
+    for (const selector of [
+      '.tessera-nav-page',
+      '.tessera-page-nav-btn:not([disabled])',
+    ]) {
+      const control = page.locator(selector).first();
+      await control.focus();
+      expect(await arrowCancelled(control)).toBe(false);
+    }
+  });
+
   test('ArrowLeft does nothing on first page', async ({ page }) => {
     await page.keyboard.press('ArrowLeft');
     // Should still be on page 1
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
-  test('arrow keys are ignored when focus is in an input', async ({ page }) => {
-    // Navigate to inline questions page which has inputs
-    await navigateToPage(page, 'Graded Assessment');
-
-    // The quiz page should be visible - find a text input if any
-    // Focus on an input element — FillInTheBlank has text input
-    // First navigate to the fill-in-the-blank question
-    const content = page.locator('.tessera-content');
-    await expect(content).toBeVisible();
-
-    // If there's a radio input, focus it and verify arrow keys don't navigate pages
-    const radioInput = page.locator('input[type="radio"]').first();
-    if (await radioInput.isVisible()) {
-      await radioInput.focus();
-      const h1Before = await page.locator('.tessera-content h1').textContent();
-      await page.keyboard.press('ArrowRight');
-      // Small wait to see if navigation happens
-      await page.waitForTimeout(300);
-      const h1After = await page.locator('.tessera-content h1').textContent();
-      expect(h1After).toBe(h1Before);
+  test('arrow keys in a form field are left to it, even with tabindex -1', async ({
+    page,
+  }) => {
+    const tags = ['input', 'textarea', 'select'];
+    await page.locator('.tessera-content').evaluate((el, tags) => {
+      for (const tag of tags) {
+        el.appendChild(document.createElement(tag)).tabIndex = -1;
+      }
+    }, tags);
+    for (const tag of tags) {
+      const field = page.locator(`.tessera-content > ${tag}`);
+      await field.focus();
+      expect(await arrowCancelled(field)).toBe(false);
     }
   });
 });

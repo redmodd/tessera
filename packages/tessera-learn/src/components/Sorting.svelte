@@ -10,8 +10,7 @@
     shuffle,
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
-  import ResultIcon from './ResultIcon.svelte';
-  import RetryButton from './RetryButton.svelte';
+  import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
@@ -46,6 +45,8 @@
   let isDragging = $state(false);
   let cardSelected = $state(false); // current card selected via tap/click
   let cardEl = $state(null);
+  const componentId = $props.id();
+  const hintId = `sorting-${componentId}-hint`;
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
@@ -202,14 +203,13 @@
             role="button"
             tabindex="0"
             aria-pressed={cardSelected}
+            aria-describedby={hintId}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
             onclick={onCardClick}
             onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
-            <span class="tessera-sr-only">(activate, then choose a target)</span
-            >
           </div>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
@@ -226,12 +226,20 @@
         </div>
       {/if}
     </div>
+    <!-- A description, not part of the name: a toggle keeps its name when
+         pressed. Hidden and outside the live deck so changes aren't announced. -->
+    <span id={hintId} hidden
+      >{cardSelected
+        ? 'Choose a target.'
+        : 'Activate, then choose a target.'}</span
+    >
   {/if}
 
   <!-- Drop targets -->
   <div
     class="tessera-sorting-targets"
     class:targets-active={cardSelected && !q.locked}
+    role="list"
   >
     {#each targets as targetLabel, targetIdx (targetIdx)}
       {@const targetItems = getItemsForTarget(targetIdx)}
@@ -239,12 +247,13 @@
         class="tessera-sorting-target"
         class:drag-over={dragOver === targetIdx}
         class:clickable={cardSelected && !q.locked}
-        role="group"
+        role="listitem"
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
       >
         <button
+          type="button"
           class="tessera-sorting-target-label"
           disabled={q.locked}
           aria-disabled={!cardSelected}
@@ -269,6 +278,7 @@
                 <span class="tessera-sorting-item-text">{items[itemIdx]}</span>
                 {#if !q.locked}
                   <button
+                    type="button"
                     class="tessera-sorting-remove"
                     aria-label="Return '{items[itemIdx]}' to deck"
                     onclick={() => returnCard(itemIdx)}>×</button
@@ -290,44 +300,32 @@
   </div>
 
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
-  {#if q.feedbackVisible}
-    {@const isCorrect = q.correct}
-    <div class="tessera-sorting-review">
-      {#if isCorrect}
-        <div class="tessera-sorting-result correct">
-          <ResultIcon kind="correct" />
-          All items sorted correctly!
-        </div>
-        {#if correctFeedback}
-          <p class="tessera-sorting-feedback correct">{correctFeedback}</p>
-        {/if}
-      {:else}
-        <div class="tessera-sorting-result incorrect">
-          <ResultIcon kind="incorrect" />
-          Some items are in the wrong category.
-        </div>
-        <div class="tessera-sorting-correct-list">
-          <p class="tessera-sorting-correct-title">Correct arrangement:</p>
-          {#each items as item, i (i)}
-            <p class="tessera-sorting-correct-item">
-              {item} → {targets[correct[i]]}
-            </p>
-          {/each}
-        </div>
-        {#if incorrectFeedback}
-          <p class="tessera-sorting-feedback incorrect">{incorrectFeedback}</p>
-        {/if}
-      {/if}
-      {#if !inQuiz && q.canRetry}
-        <RetryButton onclick={q.retry} />
-      {/if}
-    </div>
-  {/if}
+  <QuestionReview
+    {q}
+    class="tessera-sorting-review"
+    correctLabel="All items sorted correctly!"
+    incorrectLabel="Some items are in the wrong category."
+    {correctFeedback}
+    {incorrectFeedback}
+    firstControl={() => cardEl}
+  >
+    {#if !q.correct}
+      <div class="tessera-sorting-correct-list">
+        <p class="tessera-sorting-correct-title">Correct arrangement:</p>
+        {#each items as item, i (i)}
+          <p class="tessera-sorting-correct-item">
+            {item} → {targets[correct[i]]}
+          </p>
+        {/each}
+      </div>
+    {/if}
+  </QuestionReview>
 
   <!-- Standalone Check button (shown once all cards are placed) -->
   {#if !inQuiz && !q.submitted && q.answerComplete}
     <div class="tessera-sorting-actions">
       <button
+        type="button"
         class="tessera-btn-primary tessera-sorting-check"
         onclick={q.submit}
       >
@@ -577,24 +575,8 @@
 
   /* --- Feedback --- */
 
-  .tessera-sorting-review {
+  :global(.tessera-sorting-review) {
     margin-top: var(--tessera-spacing-lg);
-  }
-
-  .tessera-sorting-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-result.correct {
-    color: var(--tessera-success);
-  }
-  .tessera-sorting-result.incorrect {
-    color: var(--tessera-error);
   }
 
   .tessera-sorting-correct-list {
@@ -611,23 +593,6 @@
 
   .tessera-sorting-correct-item {
     margin: 2px 0;
-  }
-
-  .tessera-sorting-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-    margin-top: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-sorting-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   /* --- Standalone actions --- */

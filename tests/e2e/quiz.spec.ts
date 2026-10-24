@@ -13,24 +13,30 @@ import {
 } from './helpers.js';
 
 /**
- * Advance past one immediate-feedback question. The primary button cycles:
- *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
- *     relabels to "Next Question" → second click advances.
- *   - last question: "Submit" → click reveals feedback → primary button
- *     becomes the "See Results" button.
+ * Advance past one immediate-feedback question. "Submit" reveals the feedback,
+ * which takes focus, and the button becomes "Next Question" (or "See Results"
+ * on the last question). "Next Question" focuses the next question's heading.
  * We wait on the label text to change instead of sleeping.
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
   const btn = primaryBtn(page);
+  const feedback = page
+    .locator('.tessera-quiz-question-wrapper.active')
+    .getByRole('group');
   if (isLast) {
     await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
+    await expect(feedback).toBeFocused();
   } else {
     await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(btn).toHaveText('Next Question');
+    await expect(feedback).toBeFocused();
     await btn.click();
+    await expect(
+      page.getByRole('heading', { name: /^Question \d+ of \d+$/ }),
+    ).toBeFocused();
   }
 }
 
@@ -66,6 +72,9 @@ async function completeGradedQuiz(
   // Submit and wait for the results panel.
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+  await expect(
+    page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
+  ).toBeFocused();
 }
 
 test.describe('Quiz — Graded Assessment', () => {
@@ -406,7 +415,7 @@ test.describe('Quiz — Accessibility', () => {
     await btn.click();
     await expect(btn).toHaveText('Next Question');
     await expect(
-      activeQ.locator('.tessera-fitb-feedback.incorrect'),
+      activeQ.locator('.tessera-question-feedback.incorrect'),
     ).toBeVisible();
     expect(await audit()).toEqual([]);
     await btn.click();
@@ -416,6 +425,54 @@ test.describe('Quiz — Accessibility', () => {
     await expect(page.locator('.tessera-matching-review')).toBeVisible();
     expect(await audit('.tessera-matching-review')).toEqual([]);
     await expectAAText(activeQ.locator('.tessera-matching-badge'));
+  });
+
+  test('Tab reaches Submit, then the feedback leads to Next Question', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    const btn = primaryBtn(page);
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
+
+    await answerMultipleChoice(page, 0);
+    await btn.click();
+    await expect(
+      active.getByRole('group', { name: /Incorrect\s*3 is too low\./ }),
+    ).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(btn).toHaveText('Next Question');
+    await expect(btn).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await expect(active.locator('input')).toBeFocused();
+    await page.keyboard.type('blue');
+    await page.keyboard.press('Tab');
+    await expect(btn).toHaveText('Submit');
+    await expect(btn).toBeFocused();
+  });
+
+  test('review moves focus to each question, then back to the results', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await completeGradedQuiz(page);
+    const heading = (name: string) => page.getByRole('heading', { name });
+
+    await page.getByRole('button', { name: 'Review Answers' }).click();
+    await expect(heading('Review: Question 1 of 3')).toBeFocused();
+    await primaryBtn(page).click();
+    await expect(heading('Review: Question 2 of 3')).toBeFocused();
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(heading('Review: Question 1 of 3')).toBeFocused();
+    await primaryBtn(page).click();
+    await primaryBtn(page).click();
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(
+      page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
+    ).toBeFocused();
   });
 
   test('quiz results panel passes axe audit', async ({ page }) => {

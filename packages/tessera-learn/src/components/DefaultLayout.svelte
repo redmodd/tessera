@@ -28,15 +28,34 @@
     sidebarOpen = false;
   }
 
+  // Arrow keys change page only while no control has focus: the page itself,
+  // or a heading or result that focus was moved to. Form fields, media and
+  // editable text are named here because their tabIndex can be -1 (set by
+  // code, or by WebKit for media and editable text).
+  const DIALOG = 'dialog, [role="dialog"]';
+
+  function controlHasFocus(el) {
+    return (
+      el.tabIndex >= 0 ||
+      el.matches('input, textarea, select') ||
+      el.isContentEditable ||
+      !!el.closest(`video, audio, ${DIALOG}, .tessera-quiz`)
+    );
+  }
+
   function handleKeyNav(e) {
-    const tag = e.target?.tagName;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-    if (
-      e.target?.closest(
-        'dialog, [role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz',
-      )
-    )
+    if (e.defaultPrevented || !(e.target instanceof Element)) return;
+
+    if (e.key === 'Escape') {
+      if (sidebarOpen && !e.target.closest(DIALOG)) {
+        closeSidebar();
+        e.preventDefault();
+      }
       return;
+    }
+
+    if (controlHasFocus(e.target)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
 
     if (e.key === 'ArrowLeft') {
       nav.prev();
@@ -44,10 +63,6 @@
     }
     if (e.key === 'ArrowRight') {
       nav.next();
-      e.preventDefault();
-    }
-    if (e.key === 'Escape' && sidebarOpen) {
-      closeSidebar();
       e.preventDefault();
     }
   }

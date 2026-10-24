@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { useQuiz } from '../runtime/hooks.svelte.js';
 
   let { children } = $props();
@@ -9,6 +10,21 @@
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
+  let progressEl = $state();
+  let resultsEl = $state();
+  const resultsId = $props.id();
+
+  // The button the learner pressed is disabled or gone once the question or
+  // phase changes, so focus moves to what replaced it.
+  async function focusProgress() {
+    await tick();
+    progressEl?.focus();
+  }
+
+  async function focusResults() {
+    await tick();
+    resultsEl?.focus();
+  }
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
@@ -42,6 +58,7 @@
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
+      focusProgress();
     }
   }
 
@@ -51,33 +68,69 @@
   }
 
   function goPrevQuestion() {
-    if (currentQuestionIndex > 0) currentQuestionIndex--;
+    if (currentQuestionIndex === 0) return;
+    currentQuestionIndex--;
+    focusProgress();
   }
 
   function goNextReview() {
-    if (reviewIndex < totalQuestions - 1) reviewIndex++;
+    if (reviewIndex === totalQuestions - 1) return;
+    reviewIndex++;
+    focusProgress();
   }
 
   function goPrevReview() {
-    if (reviewIndex > 0) reviewIndex--;
+    if (reviewIndex === 0) return;
+    reviewIndex--;
+    focusProgress();
   }
 
   function handleSubmit() {
     if (!handle.canSubmit) return;
     handle.submit();
+    focusResults();
   }
 
   function handleStartReview() {
     reviewIndex = 0;
     handle.startReview();
+    focusProgress();
+  }
+
+  function handleExitReview() {
+    handle.exitReview();
+    focusResults();
   }
 
   function handleRetry() {
     handle.retry();
     currentQuestionIndex = 0;
     reviewIndex = 0;
+    focusProgress();
   }
 </script>
+
+{#snippet progressHeading(prefix, index)}
+  <h2 class="tessera-quiz-progress-text" tabindex="-1" bind:this={progressEl}>
+    <span class="tessera-quiz-progress-desktop"
+      >{prefix}Question {index + 1} of {totalQuestions}</span
+    >
+    <span class="tessera-quiz-progress-mobile" aria-hidden="true"
+      >{prefix}{index + 1}/{totalQuestions}</span
+    >
+  </h2>
+{/snippet}
+
+{#snippet backButton(disabled, onclick)}
+  <button
+    type="button"
+    class="tessera-quiz-btn tessera-quiz-btn-secondary"
+    {disabled}
+    {onclick}
+  >
+    Back
+  </button>
+{/snippet}
 
 {#snippet questionList(activeIndex)}
   <div class="tessera-quiz-questions">
@@ -102,15 +155,8 @@
 
   {#if handle.state === 'answering'}
     <!-- Question phase -->
-    <div class="tessera-quiz-progress" aria-live="polite">
-      <span class="tessera-quiz-progress-text">
-        <span class="tessera-quiz-progress-desktop"
-          >Question {currentQuestionIndex + 1} of {totalQuestions}</span
-        >
-        <span class="tessera-quiz-progress-mobile"
-          >{currentQuestionIndex + 1}/{totalQuestions}</span
-        >
-      </span>
+    <div class="tessera-quiz-progress">
+      {@render progressHeading('', currentQuestionIndex)}
       <div class="tessera-progress-track">
         <div
           class="tessera-progress-fill"
@@ -123,15 +169,8 @@
 
     {@render questionList(currentQuestionIndex)}
 
+    <!-- The forward button comes first in the Tab order; CSS keeps Back on the left. -->
     <div class="tessera-quiz-nav">
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={currentQuestionIndex === 0}
-        onclick={goPrevQuestion}
-      >
-        Back
-      </button>
       {#if currentQuestionIndex < totalQuestions - 1}
         <button
           type="button"
@@ -167,31 +206,17 @@
             : 'Submit'}
         </button>
       {/if}
+      {@render backButton(currentQuestionIndex === 0, goPrevQuestion)}
     </div>
   {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
-    <div class="tessera-quiz-progress" aria-live="polite">
-      <span class="tessera-quiz-progress-text">
-        <span class="tessera-quiz-progress-desktop"
-          >Review: Question {reviewIndex + 1} of {totalQuestions}</span
-        >
-        <span class="tessera-quiz-progress-mobile"
-          >Review: {reviewIndex + 1}/{totalQuestions}</span
-        >
-      </span>
+    <div class="tessera-quiz-progress">
+      {@render progressHeading('Review: ', reviewIndex)}
     </div>
 
     {@render questionList(reviewIndex)}
 
     <div class="tessera-quiz-nav">
-      <button
-        type="button"
-        class="tessera-quiz-btn tessera-quiz-btn-secondary"
-        disabled={reviewIndex === 0}
-        onclick={goPrevReview}
-      >
-        Back
-      </button>
       {#if reviewIndex < totalQuestions - 1}
         <button
           type="button"
@@ -204,58 +229,75 @@
         <button
           type="button"
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={() => handle.exitReview()}
+          onclick={handleExitReview}
         >
           Done
         </button>
       {/if}
+      {@render backButton(reviewIndex === 0, goPrevReview)}
     </div>
   {:else}
     <!-- Results phase -->
-    <div class="tessera-quiz-results" role="status" aria-live="polite">
-      <h2 class="tessera-quiz-results-title">Quiz Results</h2>
-      {#if bestBeaten}
-        <div class="tessera-quiz-score paired" data-testid="quiz-attempt-score">
-          <span class="tessera-quiz-score-caption">This attempt</span>
-          <span class="tessera-quiz-score-value">{handle.score}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed={attemptPassed}
-            class:failed={!attemptPassed}
-          >
-            {attemptPassed ? 'Passed' : 'Not Passed'}
-          </span>
+    <div class="tessera-quiz-results">
+      <!-- Named by its text so focus reads the score, not just the heading. -->
+      <div
+        role="group"
+        aria-labelledby={resultsId}
+        tabindex="-1"
+        bind:this={resultsEl}
+      >
+        <div id={resultsId}>
+          <h2 class="tessera-quiz-results-title">Quiz Results</h2>
+          {#if bestBeaten}
+            <div
+              class="tessera-quiz-score paired"
+              data-testid="quiz-attempt-score"
+            >
+              <span class="tessera-quiz-score-caption">This attempt</span>
+              <span class="tessera-quiz-score-value">{handle.score}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed={attemptPassed}
+                class:failed={!attemptPassed}
+              >
+                {attemptPassed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+            <div
+              class="tessera-quiz-score paired"
+              data-testid="quiz-best-score"
+            >
+              <span class="tessera-quiz-score-caption">On record</span>
+              <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed
+                class:failed={!passed}
+              >
+                {passed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+          {:else}
+            <div class="tessera-quiz-score">
+              <span class="tessera-quiz-score-value">{handle.score}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed
+                class:failed={!passed}
+              >
+                {passed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+          {/if}
+          {#if handle.restored}
+            <p class="tessera-quiz-results-detail">Your previous result.</p>
+          {:else}
+            <p class="tessera-quiz-results-detail">
+              You answered {correctCount} of {totalQuestions} questions correctly.
+            </p>
+          {/if}
         </div>
-        <div class="tessera-quiz-score paired" data-testid="quiz-best-score">
-          <span class="tessera-quiz-score-caption">On record</span>
-          <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed
-            class:failed={!passed}
-          >
-            {passed ? 'Passed' : 'Not Passed'}
-          </span>
-        </div>
-      {:else}
-        <div class="tessera-quiz-score">
-          <span class="tessera-quiz-score-value">{handle.score}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed
-            class:failed={!passed}
-          >
-            {passed ? 'Passed' : 'Not Passed'}
-          </span>
-        </div>
-      {/if}
-      {#if handle.restored}
-        <p class="tessera-quiz-results-detail">Your previous result.</p>
-      {:else}
-        <p class="tessera-quiz-results-detail">
-          You answered {correctCount} of {totalQuestions} questions correctly.
-        </p>
-      {/if}
+      </div>
       <div class="tessera-quiz-results-actions">
         {#if !feedbackDisabled && !handle.restored}
           <button
@@ -308,6 +350,9 @@
   }
 
   .tessera-quiz-progress-text {
+    margin: 0;
+    font: inherit;
+    color: inherit;
     white-space: nowrap;
   }
 
@@ -329,6 +374,7 @@
 
   .tessera-quiz-nav {
     display: flex;
+    flex-direction: row-reverse;
     justify-content: space-between;
     gap: var(--tessera-spacing-md);
     margin-top: var(--tessera-spacing-lg);
@@ -443,8 +489,13 @@
 
   /* Mobile */
   @media (max-width: 640px) {
+    /* Screen readers keep the full text; "2/3" can be read as a fraction. */
     .tessera-quiz-progress-desktop {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
     }
     .tessera-quiz-progress-mobile {
       display: inline;

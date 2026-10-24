@@ -153,6 +153,27 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
       page.locator('[data-testid="custom-quiz-status"]'),
     ).toContainText('state: answering');
   });
+
+  test('review leaves focus alone with every question mounted', async ({
+    page,
+  }) => {
+    await navigateToExam(page);
+    await page
+      .locator('[data-question-id="q-planet"] .tessera-mc-option')
+      .nth(0)
+      .click();
+    await page
+      .locator('[data-question-id="q-water"] input[type="text"]')
+      .fill('H2O');
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+    await page.locator('[data-testid="custom-quiz-review"]').click();
+
+    const list = page.locator('.custom-quiz-list');
+    await expect(
+      list.locator('.tessera-mc .tessera-question-result'),
+    ).toContainText('Incorrect');
+    await expect(page.locator('.custom-quiz-list:focus-within')).toHaveCount(0);
+  });
 });
 
 /**
