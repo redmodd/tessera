@@ -301,7 +301,6 @@
     {/each}
   </div>
 
-  <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
   <QuestionReview
     {q}
     correctLabel="All items sorted correctly!"
@@ -321,17 +320,6 @@
       </div>
     {/if}
   </QuestionReview>
-
-  {#if !inQuiz && !q.submitted}
-    <button
-      type="button"
-      class="tessera-btn-primary tessera-question-submit"
-      disabled={!q.answerComplete}
-      onclick={q.submit}
-    >
-      Submit
-    </button>
-  {/if}
 </QuestionShell>
 
 <style>

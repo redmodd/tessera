@@ -32,6 +32,17 @@
   }
 </script>
 
+{#if !inQuiz && !q.submitted}
+  <button
+    type="button"
+    class="tessera-btn-primary tessera-question-submit"
+    disabled={!q.answerComplete}
+    onclick={q.submit}
+  >
+    Submit
+  </button>
+{/if}
+
 {#if q.feedbackVisible}
   <!-- Named by its text: VoiceOver in Safari reads an unnamed focused block as
        only its first line ("Incorrect and 2 more items"). -->

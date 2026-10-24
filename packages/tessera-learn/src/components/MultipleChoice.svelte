@@ -66,9 +66,6 @@
     },
   });
 
-  // `q.mode` is fixed for the lifetime of the widget; capture once.
-  const inQuiz = q.mode === 'quiz';
-
   function handleSelect(optIndex) {
     if (q.locked) return;
     selectedOption = optIndex;
@@ -140,17 +137,6 @@
       </label>
     {/each}
   </div>
-
-  {#if !inQuiz && !q.submitted}
-    <button
-      type="button"
-      class="tessera-btn-primary tessera-question-submit"
-      disabled={!q.answerComplete}
-      onclick={q.submit}
-    >
-      Submit
-    </button>
-  {/if}
 
   <QuestionReview
     {q}

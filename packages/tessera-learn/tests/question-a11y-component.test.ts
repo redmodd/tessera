@@ -132,7 +132,9 @@ describe('Matching accessible names', () => {
     click(button('Beta'));
     click(button('B'));
     click(button('Alpha'));
+    expect(name(button('1 A'))).toBe('1 A (matched, activate to unmatch)');
 
+    click(button('Submit'));
     expect(name(button('1 A'))).toBe('1 A (matched, incorrect)');
     expect(name(button('2 B'))).toBe('2 B (matched, incorrect)');
     expect(name(button('1 Beta'))).toBe('1 Beta (matched, incorrect)');
@@ -181,12 +183,15 @@ describe('standalone feedback', () => {
     await expect.poll(focusedText).toContain('All items sorted correctly!');
   });
 
-  it('moves focus to the Matching result after the last pair', async () => {
-    const { button, click } = mountWidget(Matching, {
+  it('moves focus to the Matching result after Submit', async () => {
+    const { target, button, click } = mountWidget(Matching, {
       pairs: [{ left: 'A', right: 'Alpha' }],
     });
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(true);
     click(button('A'));
     click(button('Alpha'));
+    expect(target.querySelector('.tessera-question-result')).toBe(null);
+    click(button('Submit'));
 
     await expect.poll(focusedText).toContain('All pairs matched correctly!');
   });
@@ -341,6 +346,7 @@ describe('standalone feedback', () => {
         click(button('Beta'));
         click(button('B'));
         click(button('Alpha'));
+        click(button('Submit'));
       },
     },
     {

@@ -138,7 +138,6 @@
     selectedRight = null;
 
     q.setAnswer(new Map(matches));
-    if (!inQuiz && q.answerComplete && !q.submitted) q.submit();
   }
 
   function removeMatch(leftIndex) {

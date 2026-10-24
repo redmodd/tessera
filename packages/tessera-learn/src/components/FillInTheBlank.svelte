@@ -93,16 +93,6 @@
       placeholder="Type your answer..."
       autocomplete="off"
     />
-    {#if !inQuiz && !q.submitted}
-      <button
-        type="button"
-        class="tessera-btn-primary tessera-question-submit"
-        disabled={!q.answerComplete}
-        onclick={q.submit}
-      >
-        Submit
-      </button>
-    {/if}
   </div>
 
   <QuestionReview
