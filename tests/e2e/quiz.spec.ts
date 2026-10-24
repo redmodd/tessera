@@ -20,9 +20,9 @@ import {
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
   const btn = primaryBtn(page);
-  const feedback = page
-    .locator('.tessera-quiz-question-wrapper.active')
-    .getByRole('group');
+  const feedback = page.locator(
+    '.tessera-quiz-question-wrapper.active .tessera-question-review',
+  );
   if (isLast) {
     await expect(btn).toHaveText('Submit');
     await btn.click();
@@ -368,24 +368,27 @@ test.describe('Quiz — Accessibility', () => {
 
     await expect(
       matching.getByRole('button', {
-        name: '1 1 (matched, activate to unmatch)',
+        name: '1 1 (matched with One, activate to unmatch)',
       }),
     ).toBeVisible();
     await expect(
-      matching.getByRole('button', { name: '1 One (matched)', exact: true }),
+      matching.getByRole('button', {
+        name: '1 One (matched with 1)',
+        exact: true,
+      }),
     ).toBeVisible();
     expect((await audit()).violations).toEqual([]);
 
     await primaryBtn(page).click();
     await expect(
       matching.getByRole('button', {
-        name: '1 1 (matched, correct)',
+        name: '1 1 (matched with One, correct)',
         exact: true,
       }),
     ).toBeDisabled();
     await expect(
       matching.getByRole('button', {
-        name: '1 One (matched, correct)',
+        name: '1 One (matched with 1, correct)',
         exact: true,
       }),
     ).toBeDisabled();

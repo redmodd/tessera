@@ -42,7 +42,13 @@
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
+  let leftFocus = $state(0);
+  let rightFocus = $state(0);
   const leftItems = [];
+  const componentId = $props.id();
+  const leftHeadingId = `matching-${componentId}-from`;
+  const rightHeadingId = `matching-${componentId}-to`;
+  const hintId = `matching-${componentId}-hint`;
 
   function initShuffle() {
     shuffledRight = shuffle(
@@ -156,6 +162,31 @@
   function isMatchCorrect(leftIndex) {
     return matches.get(leftIndex) === leftIndex;
   }
+
+  function srDetail(parts) {
+    const text = parts.filter(Boolean).join(', ');
+    return text && `(${text})`;
+  }
+
+  function resultText(leftIndex) {
+    if (!q.feedbackVisible) return '';
+    return isMatchCorrect(leftIndex) ? 'correct' : 'incorrect';
+  }
+
+  // Roving tabindex: each column is one Tab stop, arrows move within it.
+  const NEXT = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+
+  function onItemKeydown(e) {
+    const items = [...e.currentTarget.parentElement.querySelectorAll('button')];
+    const i = items.indexOf(e.currentTarget);
+    let next;
+    if (e.key in NEXT) next = (i + NEXT[e.key] + items.length) % items.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = items.length - 1;
+    else return;
+    e.preventDefault();
+    items[next].focus();
+  }
 </script>
 
 <QuestionShell {q} class="tessera-matching" aria-label={question}>
@@ -163,8 +194,14 @@
 
   <div class="tessera-matching-grid">
     <!-- Left column -->
-    <div class="tessera-matching-column">
-      <div class="tessera-matching-column-header">Match from</div>
+    <div
+      class="tessera-matching-column"
+      role="group"
+      aria-labelledby={leftHeadingId}
+    >
+      <div id={leftHeadingId} class="tessera-matching-column-header">
+        Match from
+      </div>
       {#each pairs as pair, i (i)}
         {@const color = getMatchColor(i)}
         {@const isSelected = selectedLeft === i}
@@ -172,13 +209,14 @@
         {@const correctMatch =
           q.feedbackVisible && matched && isMatchCorrect(i)}
         {@const wrongMatch = q.feedbackVisible && matched && !isMatchCorrect(i)}
-        {@const detail = !q.locked
-          ? ', activate to unmatch'
-          : correctMatch
-            ? ', correct'
-            : wrongMatch
-              ? ', incorrect'
-              : ''}
+        {@const detail = matched
+          ? srDetail([
+              `matched with ${pairs[matches.get(i)].right}`,
+              q.locked ? resultText(i) : 'activate to unmatch',
+            ])
+          : selectedRight !== null && !q.locked
+            ? srDetail([`activate to match with ${pairs[selectedRight].right}`])
+            : ''}
         <button
           bind:this={leftItems[i]}
           type="button"
@@ -190,8 +228,12 @@
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
+          onfocus={() => (leftFocus = i)}
+          onkeydown={onItemKeydown}
+          tabindex={leftFocus === i ? 0 : -1}
           disabled={q.locked}
           aria-pressed={matched ? undefined : isSelected}
+          aria-describedby={isSelected ? hintId : undefined}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -199,8 +241,8 @@
             </span>
           {/if}
           <span>{pair.left}</span>
-          {#if matched}
-            <span class="tessera-sr-only">(matched{detail})</span>
+          {#if detail}
+            <span class="tessera-sr-only">{detail}</span>
           {/if}
           {#if matched && !q.locked}
             <span class="tessera-matching-unmatch" aria-hidden="true">×</span>
@@ -210,19 +252,26 @@
     </div>
 
     <!-- Right column -->
-    <div class="tessera-matching-column">
-      <div class="tessera-matching-column-header">Match to</div>
-      {#each shuffledRight as item (item.originalIndex)}
+    <div
+      class="tessera-matching-column"
+      role="group"
+      aria-labelledby={rightHeadingId}
+    >
+      <div id={rightHeadingId} class="tessera-matching-column-header">
+        Match to
+      </div>
+      {#each shuffledRight as item, pos (item.originalIndex)}
         {@const leftIdx = rightToLeft.get(item.originalIndex)}
         {@const matched = leftIdx !== undefined}
         {@const color = getMatchColor(leftIdx)}
         {@const isSelected = selectedRight === item.originalIndex}
-        {@const result =
-          matched && q.feedbackVisible
-            ? isMatchCorrect(leftIdx)
-              ? ', correct'
-              : ', incorrect'
-            : ''}
+        {@const detail = srDetail([
+          matched && `matched with ${pairs[leftIdx].left}`,
+          matched && q.locked && resultText(leftIdx),
+          selectedLeft !== null &&
+            !q.locked &&
+            `activate to match with ${pairs[selectedLeft].left}`,
+        ])}
         <button
           type="button"
           class="tessera-matching-item right"
@@ -230,8 +279,12 @@
           class:matched
           style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
           onclick={() => handleRightClick(item.originalIndex)}
+          onfocus={() => (rightFocus = pos)}
+          onkeydown={onItemKeydown}
+          tabindex={rightFocus === pos ? 0 : -1}
           disabled={q.locked}
           aria-pressed={isSelected}
+          aria-describedby={isSelected ? hintId : undefined}
         >
           {#if matched}
             <span class="tessera-matching-badge" style="background: {color}">
@@ -239,13 +292,24 @@
             </span>
           {/if}
           <span>{item.text}</span>
-          {#if matched}
-            <span class="tessera-sr-only">(matched{result})</span>
+          {#if detail}
+            <span class="tessera-sr-only">{detail}</span>
           {/if}
         </button>
       {/each}
     </div>
   </div>
+
+  <!-- A description, not part of the name: a toggle keeps its name when
+       pressed. -->
+  <span id={hintId} hidden>Choose a match.</span>
+  {#if !inQuiz}
+    <p class="tessera-sr-only" aria-live="polite">
+      {matches.size === pairs.length && !q.locked
+        ? 'All pairs matched. Submit your answer below.'
+        : ''}
+    </p>
+  {/if}
 
   <QuestionReview
     {q}

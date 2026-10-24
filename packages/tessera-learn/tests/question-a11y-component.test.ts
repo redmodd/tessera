@@ -118,26 +118,88 @@ describe('Sorting accessible names', () => {
 });
 
 describe('Matching accessible names', () => {
-  it('exposes the pending selection and each locked match result', () => {
-    const { button, name, click } = mountWidget(Matching, {
-      pairs: [
-        { left: 'A', right: 'Alpha' },
-        { left: 'B', right: 'Beta' },
-      ],
-    });
+  const pairs = [
+    { left: 'A', right: 'Alpha' },
+    { left: 'B', right: 'Beta' },
+  ];
+
+  it('hints the next step and names each partner', () => {
+    const { target, button, name, click } = mountWidget(Matching, { pairs });
     const a = button('A');
     click(a);
     expect(a.getAttribute('aria-pressed')).toBe('true');
+    const hint = target.querySelector(
+      `[id="${a.getAttribute('aria-describedby')}"]`,
+    );
+    expect(hint?.textContent).toBe('Choose a match.');
+    expect(name(a)).toBe('A');
+    expect(name(button('Beta'))).toBe('Beta (activate to match with A)');
 
     click(button('Beta'));
-    click(button('B'));
+    expect(name(button('B'))).toBe('B');
     click(button('Alpha'));
-    expect(name(button('1 A'))).toBe('1 A (matched, activate to unmatch)');
+    expect(name(button('B'))).toBe('B (activate to match with Alpha)');
+    click(button('B'));
+    expect(name(button('1 A'))).toBe(
+      '1 A (matched with Beta, activate to unmatch)',
+    );
+    expect(name(button('1 Beta'))).toBe('1 Beta (matched with A)');
 
     click(button('Submit'));
-    expect(name(button('1 A'))).toBe('1 A (matched, incorrect)');
-    expect(name(button('2 B'))).toBe('2 B (matched, incorrect)');
-    expect(name(button('1 Beta'))).toBe('1 Beta (matched, incorrect)');
+    expect(name(button('1 A'))).toBe('1 A (matched with Beta, incorrect)');
+    expect(name(button('2 B'))).toBe('2 B (matched with Alpha, incorrect)');
+    expect(name(button('1 Beta'))).toBe('1 Beta (matched with A, incorrect)');
+  });
+
+  it('makes each column one Tab stop named by its heading', () => {
+    const { target } = mountWidget(Matching, {
+      pairs: [...pairs, { left: 'C', right: 'Gamma' }],
+    });
+    const groups = [
+      ...target.querySelectorAll<HTMLElement>('[role="group"]'),
+    ].filter((g) => g.querySelector('.tessera-matching-item'));
+    const heading = (g: HTMLElement) =>
+      document
+        .getElementById(g.getAttribute('aria-labelledby')!)
+        ?.textContent?.trim();
+    expect(groups.map(heading)).toEqual(['Match from', 'Match to']);
+
+    const [left] = groups;
+    const items = [...left.querySelectorAll<HTMLElement>('button')];
+    const tabStops = () => items.filter((b) => b.tabIndex === 0);
+    expect(tabStops()).toEqual([items[0]]);
+
+    const press = (key: string) => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+      flushSync();
+    };
+    items[0].focus();
+    press('ArrowDown');
+    expect(document.activeElement).toBe(items[1]);
+    expect(tabStops()).toEqual([items[1]]);
+    press('End');
+    expect(document.activeElement).toBe(items[2]);
+    press('ArrowDown');
+    expect(document.activeElement).toBe(items[0]);
+    press('ArrowUp');
+    expect(document.activeElement).toBe(items[2]);
+    press('Home');
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it('announces when every pair is matched', () => {
+    const { target, button, click } = mountWidget(Matching, { pairs });
+    const live = target.querySelector('[aria-live="polite"]')!;
+    click(button('A'));
+    click(button('Alpha'));
+    expect(live.textContent?.trim()).toBe('');
+    click(button('B'));
+    click(button('Beta'));
+    expect(live.textContent?.trim()).toBe(
+      'All pairs matched. Submit your answer below.',
+    );
   });
 });
 
