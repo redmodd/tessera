@@ -221,6 +221,27 @@ describe('standalone feedback', () => {
     expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('selects the focused MultipleChoice option on Enter without submitting it', () => {
+    const { target, button } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+    });
+    const radios = target.querySelectorAll<HTMLInputElement>('input');
+    radios[0].focus();
+    const enter = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    radios[0].dispatchEvent(enter);
+    flushSync();
+
+    expect(enter.defaultPrevented).toBe(true);
+    expect(radios[0].checked).toBe(true);
+    expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
+    expect(target.querySelector('.tessera-mc-result')).toBe(null);
+  });
+
   it('states the MultipleChoice result once and moves focus to it', async () => {
     const { target, button, name, click } = mountWidget(MultipleChoice, {
       options: ['3', '4'],

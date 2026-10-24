@@ -75,6 +75,14 @@
     q.setAnswer(optIndex);
   }
 
+  // Enter picks the focused option as Space does, matching screen reader
+  // browse modes that activate a radio on Enter.
+  function selectOnEnter(e, optIndex) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    handleSelect(optIndex);
+  }
+
   function isCorrectOption(optIndex) {
     return optIndex === correct;
   }
@@ -113,6 +121,7 @@
           checked={isSelected}
           disabled={q.locked}
           onchange={() => handleSelect(i)}
+          onkeydown={(e) => selectOnEnter(e, i)}
         />
         <span class="tessera-mc-radio-custom"></span>
         <span class="tessera-mc-option-text">{option}</span>
@@ -334,8 +343,9 @@
     color: var(--tessera-error);
   }
 
+  /* A dark ring, so focus can't be mistaken for the blue selected border. */
   .tessera-mc-option:has(input:focus-visible) {
-    outline: 2px solid var(--tessera-primary);
+    outline: 2px solid var(--tessera-text);
     outline-offset: 2px;
   }
 
