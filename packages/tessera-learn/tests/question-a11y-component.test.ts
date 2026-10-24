@@ -139,6 +139,22 @@ describe('Matching accessible names', () => {
   });
 });
 
+type Widget = ReturnType<typeof mountWidget>;
+
+function checkFillIn({ target, button, click }: Widget, text: string) {
+  const input = target.querySelector('input')!;
+  input.value = text;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  flushSync();
+  click(button('Check'));
+}
+
+function checkOption({ target, button, click }: Widget, index: number) {
+  target.querySelectorAll('input')[index].click();
+  flushSync();
+  click(button('Check'));
+}
+
 describe('standalone feedback', () => {
   const focusedText = () => {
     const el = document.activeElement;
@@ -170,31 +186,12 @@ describe('standalone feedback', () => {
     await expect.poll(focusedText).toContain('All pairs matched correctly!');
   });
 
-  it('moves focus to the FillInTheBlank result after Check', async () => {
-    const { target, button, click } = mountWidget(FillInTheBlank, {
+  it('moves focus to the FillInTheBlank result, named by its text without Try again', async () => {
+    const widget = mountWidget(FillInTheBlank, {
       answers: 'blue',
       incorrectFeedback: 'The sky is blue.',
     });
-    const input = target.querySelector('input')!;
-    input.value = 'red';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    click(button('Check'));
-
-    await expect.poll(focusedText).toContain('Incorrect');
-    expect(focusedText()).toContain('The sky is blue.');
-  });
-
-  it('names the focused result by its text, without Try again', async () => {
-    const { target, button, click } = mountWidget(FillInTheBlank, {
-      answers: 'blue',
-      incorrectFeedback: 'The sky is blue.',
-    });
-    const input = target.querySelector('input')!;
-    input.value = 'red';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    click(button('Check'));
+    checkFillIn(widget, 'red');
 
     await expect.poll(focusedText).toContain('Try again');
     const result = document.activeElement!;
@@ -243,28 +240,27 @@ describe('standalone feedback', () => {
   });
 
   it('states the MultipleChoice result once and moves focus to it', async () => {
-    const { target, button, name, click } = mountWidget(MultipleChoice, {
+    const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
       optionFeedback: ['Too low.', ''],
+      incorrectFeedback: 'Not quite.',
     });
-    target.querySelector('input')!.click();
-    flushSync();
-    click(button('Check'));
+    checkOption(widget, 0);
 
     await expect.poll(focusedText).toBe('Incorrect Too low. Try again');
-    const labels = [...target.querySelectorAll('label')].map(name);
+    const labels = [...widget.target.querySelectorAll('label')].map(
+      widget.name,
+    );
     expect(labels).toEqual(['3 (incorrect)', '4 (correct)']);
   });
 
   it('focuses a visible MultipleChoice result when there is no feedback', async () => {
-    const { target, button, click } = mountWidget(MultipleChoice, {
+    const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
     });
-    target.querySelectorAll('input')[1].click();
-    flushSync();
-    click(button('Check'));
+    checkOption(widget, 1);
 
     await expect.poll(focusedText).toBe('Correct');
     expect(
@@ -273,15 +269,14 @@ describe('standalone feedback', () => {
   });
 
   it('keeps Check and the result outside the MultipleChoice radiogroup', () => {
-    const { target, button, click } = mountWidget(MultipleChoice, {
+    const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
     });
+    const { target, button } = widget;
     const group = target.querySelector('[role="radiogroup"]')!;
     expect(group.contains(button('Check'))).toBe(false);
-    target.querySelector('input')!.click();
-    flushSync();
-    click(button('Check'));
+    checkOption(widget, 0);
 
     expect(group.contains(button('Try again'))).toBe(false);
     expect(
@@ -290,57 +285,41 @@ describe('standalone feedback', () => {
   });
 
   it('shows MultipleChoice correctFeedback once', () => {
-    const { target, button, click } = mountWidget(MultipleChoice, {
+    const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
       correctFeedback: 'Well done.',
     });
-    target.querySelectorAll('input')[1].click();
-    flushSync();
-    click(button('Check'));
+    checkOption(widget, 1);
 
-    expect(target.textContent?.split('Well done.')).toHaveLength(2);
+    expect(widget.target.textContent?.split('Well done.')).toHaveLength(2);
   });
 
   it('clears the MultipleChoice selection after Try again', () => {
-    const { target, button, click } = mountWidget(MultipleChoice, {
+    const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
     });
-    const first = target.querySelector('input')!;
-    first.click();
-    flushSync();
-    click(button('Check'));
-    click(button('Try again'));
+    checkOption(widget, 0);
+    widget.click(widget.button('Try again'));
 
-    expect(first.checked).toBe(false);
+    expect(widget.target.querySelector('input')!.checked).toBe(false);
   });
 
-  type Widget = ReturnType<typeof mountWidget>;
   it.each([
     {
       name: 'MultipleChoice',
       widget: MultipleChoice,
       props: { options: ['3', '4'], correct: 1 },
       first: 'input',
-      answerWrong: ({ target, button, click }: Widget) => {
-        target.querySelector('input')!.click();
-        flushSync();
-        click(button('Check'));
-      },
+      answerWrong: (w: Widget) => checkOption(w, 0),
     },
     {
       name: 'FillInTheBlank',
       widget: FillInTheBlank,
       props: { answers: 'blue' },
       first: '.tessera-fitb-input',
-      answerWrong: ({ target, button, click }: Widget) => {
-        const input = target.querySelector('input')!;
-        input.value = 'red';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        flushSync();
-        click(button('Check'));
-      },
+      answerWrong: (w: Widget) => checkFillIn(w, 'red'),
     },
     {
       name: 'Matching',

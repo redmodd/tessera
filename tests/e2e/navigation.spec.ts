@@ -1,6 +1,20 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
+
+/** Dispatches ArrowRight on the element and reports whether the layout cancelled it. */
+function arrowCancelled(target: Locator, init: KeyboardEventInit = {}) {
+  return target.evaluate((el, init) => {
+    const e = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    el.dispatchEvent(e);
+    return e.defaultPrevented;
+  }, init);
+}
 
 test.describe('Navigation — Free Mode', () => {
   test.beforeEach(async ({ page }) => {
@@ -153,58 +167,33 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     page,
   }) => {
     // The layout cancels a key it navigates on; the last press has no modifier.
-    const cancelled = await page.evaluate(() =>
-      ['altKey', 'ctrlKey', 'metaKey', 'shiftKey', 'none'].map((mod) => {
-        const e = new KeyboardEvent('keydown', {
-          key: 'ArrowRight',
-          bubbles: true,
-          cancelable: true,
-          [mod]: true,
-        });
-        document.body.dispatchEvent(e);
-        return e.defaultPrevented;
-      }),
-    );
-    expect(cancelled).toEqual([false, false, false, false, true]);
+    const body = page.locator('body');
+    for (const mod of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      expect(await arrowCancelled(body, { [mod]: true })).toBe(false);
+    }
+    expect(await arrowCancelled(body)).toBe(true);
   });
 
   test('arrow keys on a native media player are left to it', async ({
     page,
   }) => {
     await navigateToPage(page, 'Modal, Video & Audio');
-    const cancelled = await page
-      .locator('.tessera-audio-player')
-      .evaluate((audio) => {
-        const e = new KeyboardEvent('keydown', {
-          key: 'ArrowRight',
-          bubbles: true,
-          cancelable: true,
-        });
-        audio.dispatchEvent(e);
-        return e.defaultPrevented;
-      });
-    expect(cancelled).toBe(false);
+    expect(await arrowCancelled(page.locator('.tessera-audio-player'))).toBe(
+      false,
+    );
   });
 
   test('arrow keys on a focused link or button are left alone', async ({
     page,
   }) => {
-    const cancelled = await page.evaluate(() =>
-      ['.tessera-nav-page', '.tessera-page-nav-btn:not([disabled])'].map(
-        (selector) => {
-          const control = document.querySelector<HTMLElement>(selector)!;
-          control.focus();
-          const e = new KeyboardEvent('keydown', {
-            key: 'ArrowRight',
-            bubbles: true,
-            cancelable: true,
-          });
-          control.dispatchEvent(e);
-          return e.defaultPrevented;
-        },
-      ),
-    );
-    expect(cancelled).toEqual([false, false]);
+    for (const selector of [
+      '.tessera-nav-page',
+      '.tessera-page-nav-btn:not([disabled])',
+    ]) {
+      const control = page.locator(selector).first();
+      await control.focus();
+      expect(await arrowCancelled(control)).toBe(false);
+    }
   });
 
   test('ArrowLeft does nothing on first page', async ({ page }) => {

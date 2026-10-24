@@ -172,10 +172,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await expect(
       list.locator('.tessera-mc .tessera-question-result'),
     ).toContainText('Incorrect');
-    const focusInList = await page.evaluate(
-      () => !!document.activeElement?.closest('.custom-quiz-list'),
-    );
-    expect(focusInList).toBe(false);
+    await expect(page.locator('.custom-quiz-list:focus-within')).toHaveCount(0);
   });
 });
 
