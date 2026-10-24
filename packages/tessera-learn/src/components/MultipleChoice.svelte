@@ -39,6 +39,7 @@
   } = $props();
 
   let selectedOption = $state(null);
+  const radios = $state([]);
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -104,6 +105,7 @@
         for={optionId}
       >
         <input
+          bind:this={radios[i]}
           type="radio"
           id={optionId}
           name={groupId}
@@ -141,7 +143,7 @@
     </button>
   {/if}
 
-  <QuestionReview {q} class="tessera-mc-review">
+  <QuestionReview {q} class="tessera-mc-review" firstControl={() => radios[0]}>
     {@const chosen = optionFeedback[selectedOption]}
     {@const overall = q.correct ? correctFeedback : incorrectFeedback}
     <div

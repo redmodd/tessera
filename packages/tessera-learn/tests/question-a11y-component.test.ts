@@ -259,19 +259,89 @@ describe('standalone feedback', () => {
     expect(target.textContent?.split('Well done.')).toHaveLength(2);
   });
 
-  it('moves focus to the first control after Try again', async () => {
+  it('clears the MultipleChoice selection after Try again', () => {
     const { target, button, click } = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
     });
-    const first = () => target.querySelector('input')!;
-    first().click();
+    const first = target.querySelector('input')!;
+    first.click();
     flushSync();
     click(button('Check'));
-    await expect.poll(focusedText).toContain('Try again');
     click(button('Try again'));
 
-    await expect.poll(() => document.activeElement).toBe(first());
-    expect(first().checked).toBe(false);
+    expect(first.checked).toBe(false);
   });
+
+  type Widget = ReturnType<typeof mountWidget>;
+  it.each([
+    {
+      name: 'MultipleChoice',
+      widget: MultipleChoice,
+      props: { options: ['3', '4'], correct: 1 },
+      first: 'input',
+      answerWrong: ({ target, button, click }: Widget) => {
+        target.querySelector('input')!.click();
+        flushSync();
+        click(button('Check'));
+      },
+    },
+    {
+      name: 'FillInTheBlank',
+      widget: FillInTheBlank,
+      props: { answers: 'blue' },
+      first: '.tessera-fitb-input',
+      answerWrong: ({ target, button, click }: Widget) => {
+        const input = target.querySelector('input')!;
+        input.value = 'red';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        flushSync();
+        click(button('Check'));
+      },
+    },
+    {
+      name: 'Matching',
+      widget: Matching,
+      props: {
+        pairs: [
+          { left: 'A', right: 'Alpha' },
+          { left: 'B', right: 'Beta' },
+        ],
+      },
+      first: '.tessera-matching-item.left',
+      answerWrong: ({ button, click }: Widget) => {
+        click(button('A'));
+        click(button('Beta'));
+        click(button('B'));
+        click(button('Alpha'));
+      },
+    },
+    {
+      name: 'Sorting',
+      widget: Sorting,
+      props: {
+        items: ['Apple'],
+        targets: ['Fruit', 'Vegetable'],
+        correct: [1],
+      },
+      first: '.tessera-sorting-card',
+      answerWrong: ({ target, button, click }: Widget) => {
+        click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
+        click(button('Fruit'));
+        click(button('Check Answer'));
+      },
+    },
+  ])(
+    'moves focus to the $name first control after Try again',
+    async ({ widget, props, first, answerWrong }) => {
+      const mounted = mountWidget(widget, props);
+      answerWrong(mounted);
+      await expect.poll(focusedText).toContain('Try again');
+      mounted.click(mounted.button('Try again'));
+
+      await expect
+        .poll(() => document.activeElement)
+        .toBe(mounted.target.querySelector(first));
+    },
+  );
 });

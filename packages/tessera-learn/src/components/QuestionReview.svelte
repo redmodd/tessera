@@ -6,11 +6,10 @@
   // submit (immediate mode) sits in a status region; review does not, since a
   // shell may keep every question mounted. Standalone, Check and Try again
   // disable or remove the focused control, so focus moves to the result, then
-  // back to the first control.
-  let { q, class: className = '', children } = $props();
+  // back to the control `firstControl` returns.
+  let { q, class: className = '', firstControl, children } = $props();
 
   const inQuiz = $derived(q.mode === 'quiz');
-  let shell = $state(null);
   // Feedback showing at mount is a restored answer, not a fresh check.
   let restored = untrack(() => q.feedbackVisible);
 
@@ -22,16 +21,11 @@
   async function retry() {
     q.retry();
     await tick();
-    shell
-      ?.closest('.tessera-question-shell')
-      ?.querySelector(
-        'input:not(:disabled), button:not(:disabled), [tabindex="0"]',
-      )
-      ?.focus();
+    firstControl()?.focus();
   }
 </script>
 
-<div role={inQuiz && !q.submitted ? 'status' : undefined} bind:this={shell}>
+<div role={inQuiz && !q.submitted ? 'status' : undefined}>
   {#if q.feedbackVisible}
     <div class={className} tabindex="-1" {@attach focusOnCheck}>
       {@render children()}

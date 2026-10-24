@@ -36,6 +36,7 @@
 
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
+  let inputEl = $state(null);
 
   const q = useQuestion({
     get id() {
@@ -80,6 +81,7 @@
 
   <div class="tessera-fitb-input-wrapper">
     <input
+      bind:this={inputEl}
       type="text"
       id={inputId}
       class="tessera-fitb-input"
@@ -104,7 +106,7 @@
     {/if}
   </div>
 
-  <QuestionReview {q} class="tessera-fitb-review">
+  <QuestionReview {q} class="tessera-fitb-review" firstControl={() => inputEl}>
     {@const isCorrect = q.correct}
     {#if isCorrect}
       <div class="tessera-fitb-result correct">

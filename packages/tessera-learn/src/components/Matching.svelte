@@ -42,6 +42,7 @@
   // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
   const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
+  const leftItems = $state([]);
   let selectedRight = $state(null);
 
   function initShuffle() {
@@ -181,6 +182,7 @@
               ? ', incorrect'
               : ''}
         <button
+          bind:this={leftItems[i]}
           type="button"
           class="tessera-matching-item left"
           class:selected={isSelected}
@@ -247,7 +249,11 @@
     </div>
   </div>
 
-  <QuestionReview {q} class="tessera-matching-review">
+  <QuestionReview
+    {q}
+    class="tessera-matching-review"
+    firstControl={() => leftItems[0]}
+  >
     {@const isCorrect = q.correct}
     {#if isCorrect}
       <div class="tessera-matching-result correct">

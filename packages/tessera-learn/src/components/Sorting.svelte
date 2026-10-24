@@ -301,7 +301,11 @@
   </div>
 
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
-  <QuestionReview {q} class="tessera-sorting-review">
+  <QuestionReview
+    {q}
+    class="tessera-sorting-review"
+    firstControl={() => cardEl}
+  >
     {@const isCorrect = q.correct}
     {#if isCorrect}
       <div class="tessera-sorting-result correct">
