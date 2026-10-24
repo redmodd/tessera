@@ -182,10 +182,6 @@
       onCardClick();
     }
   }
-
-  function onTargetClick(targetIdx) {
-    if (cardSelected) placeCard(targetIdx);
-  }
 </script>
 
 <QuestionShell {q} class="tessera-sorting" aria-label={question}>
@@ -218,7 +214,7 @@
             {queue.length} of {items.length} to sort
           </p>
           {#if cardSelected}
-            <p class="tessera-sorting-hint">
+            <p class="tessera-sorting-hint" aria-hidden="true">
               Click a target below to place this card
             </p>
           {/if}
@@ -252,7 +248,7 @@
           class="tessera-sorting-target-label"
           disabled={q.locked}
           aria-disabled={!cardSelected}
-          onclick={() => onTargetClick(targetIdx)}
+          onclick={() => cardSelected && placeCard(targetIdx)}
         >
           {targetLabel}
           {#if cardSelected && !q.locked}

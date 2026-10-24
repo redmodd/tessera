@@ -2,11 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
-async function openFresh(page: Page, title: string, ready: string) {
+async function openCourse(page: Page) {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.goto('/');
   await waitForTesseraContent(page);
+}
+
+async function openFresh(page: Page, title: string, ready: string) {
+  await openCourse(page);
   await navigateToPage(page, title);
   await page.waitForSelector(ready);
 }
@@ -187,12 +191,7 @@ test.describe('Component — Sorting', () => {
 });
 
 test.describe('Component Accessibility', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/');
-    await waitForTesseraContent(page);
-  });
+  test.beforeEach(({ page }) => openCourse(page));
 
   test('Callout & Image page passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Callouts & Images');

@@ -216,7 +216,7 @@
       {#each shuffledRight as item (item.originalIndex)}
         {@const leftIdx = rightToLeft.get(item.originalIndex)}
         {@const matched = leftIdx !== undefined}
-        {@const color = matched ? getMatchColor(leftIdx) : null}
+        {@const color = getMatchColor(leftIdx)}
         {@const isSelected = selectedRight === item.originalIndex}
         <button
           class="tessera-matching-item right"
