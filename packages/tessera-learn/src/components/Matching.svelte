@@ -138,7 +138,6 @@
     selectedRight = null;
 
     q.setAnswer(new Map(matches));
-    if (!inQuiz && q.answerComplete && !q.submitted) q.submit();
   }
 
   function removeMatch(leftIndex) {
@@ -250,7 +249,6 @@
 
   <QuestionReview
     {q}
-    class="tessera-matching-review"
     correctLabel="All pairs matched correctly!"
     incorrectLabel="Some pairs are incorrect"
     {correctFeedback}
@@ -385,10 +383,6 @@
   .tessera-matching-unmatch:hover {
     color: var(--tessera-error);
     background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
-  }
-
-  :global(.tessera-matching-review) {
-    margin-top: var(--tessera-spacing-lg);
   }
 
   .tessera-matching-correct-pairs {

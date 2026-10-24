@@ -26,7 +26,7 @@ function answer(graded: boolean | undefined) {
   radio.checked = true;
   radio.dispatchEvent(new Event('change', { bubbles: true }));
   flushSync();
-  target.querySelector<HTMLButtonElement>('.tessera-mc-check-btn')!.click();
+  target.querySelector<HTMLButtonElement>('.tessera-question-submit')!.click();
   flushSync();
   progress.markVisited(0);
   return { progress, manifest, config };

@@ -4,7 +4,6 @@
 
   let {
     q,
-    class: className = '',
     correctLabel = 'Correct',
     incorrectLabel = 'Incorrect',
     correctFeedback = '',
@@ -16,11 +15,11 @@
   const inQuiz = $derived(q.mode === 'quiz');
   const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
   const contentId = $props.id();
-  // Feedback showing at mount is a restored answer, not a fresh check.
+  // Feedback showing at mount is a restored answer, not a fresh submit.
   let restored = untrack(() => q.feedbackVisible);
 
   // Review never takes focus: a custom quiz shell may keep every question mounted.
-  function focusOnCheck(el) {
+  function focusOnSubmit(el) {
     const review = untrack(() => inQuiz && q.submitted);
     if (!restored && !review) el.focus();
     restored = false;
@@ -33,15 +32,26 @@
   }
 </script>
 
+{#if !inQuiz && !q.submitted}
+  <button
+    type="button"
+    class="tessera-btn-primary tessera-question-submit"
+    disabled={!q.answerComplete}
+    onclick={q.submit}
+  >
+    Submit
+  </button>
+{/if}
+
 {#if q.feedbackVisible}
   <!-- Named by its text: VoiceOver in Safari reads an unnamed focused block as
        only its first line ("Incorrect and 2 more items"). -->
   <div
-    class={className}
+    class="tessera-question-review"
     role="group"
     aria-labelledby={contentId}
     tabindex="-1"
-    {@attach focusOnCheck}
+    {@attach focusOnSubmit}
   >
     <div id={contentId}>
       <div

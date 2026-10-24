@@ -66,9 +66,6 @@
     },
   });
 
-  // `q.mode` is fixed for the lifetime of the widget; capture once.
-  const inQuiz = q.mode === 'quiz';
-
   function handleSelect(optIndex) {
     if (q.locked) return;
     selectedOption = optIndex;
@@ -141,20 +138,8 @@
     {/each}
   </div>
 
-  {#if !inQuiz && !q.submitted}
-    <button
-      type="button"
-      class="tessera-btn-primary tessera-mc-check-btn"
-      disabled={!q.answerComplete}
-      onclick={q.submit}
-    >
-      Check
-    </button>
-  {/if}
-
   <QuestionReview
     {q}
-    class="tessera-mc-review"
     correctFeedback={chosenFeedback ? '' : correctFeedback}
     incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
     firstControl={() => radios[0]}
@@ -285,17 +270,6 @@
 
   .tessera-mc-feedback.incorrect {
     color: var(--tessera-error);
-  }
-
-  .tessera-mc-check-btn {
-    margin-top: var(--tessera-spacing-md);
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  :global(.tessera-mc-review) {
-    margin-top: var(--tessera-spacing-md);
   }
 
   /* A dark ring, so focus can't be mistaken for the blue selected border. */

@@ -35,7 +35,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. Check stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. Submit stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -80,7 +80,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 
 <button
   onclick={q.submit}
-  disabled={q.submitted || pairs.length < CORRECT.length}>Check</button
+  disabled={q.submitted || pairs.length < CORRECT.length}>Submit</button
 >
 {#if q.correct === true}<p>Correct.</p>{/if}
 {#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
@@ -205,7 +205,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}
   {@render view()}
   {#if !q.submitted}
-    <button disabled={selected === null} onclick={q.submit}>Check</button>
+    <button disabled={selected === null} onclick={q.submit}>Submit</button>
   {:else if q.canRetry}
     <button onclick={q.retry}>Try again</button>
   {/if}

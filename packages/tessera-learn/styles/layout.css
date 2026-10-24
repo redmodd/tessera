@@ -396,6 +396,17 @@
   cursor: not-allowed;
 }
 
+.tessera-question-review {
+  margin-top: var(--tessera-spacing-md);
+}
+
+.tessera-question-submit {
+  margin-top: var(--tessera-spacing-md);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 /* ---- Error Page / Session Ended ---- */
 .tessera-error,
 .tessera-session-ended {

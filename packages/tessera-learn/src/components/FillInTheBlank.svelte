@@ -78,36 +78,23 @@
 <QuestionShell {q} class="tessera-fitb">
   <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
-  <div class="tessera-fitb-input-wrapper">
-    <input
-      bind:this={inputEl}
-      type="text"
-      id={inputId}
-      class="tessera-fitb-input"
-      class:correct={q.feedbackVisible && q.correct}
-      class:incorrect={q.feedbackVisible && !q.correct}
-      value={inputValue}
-      oninput={handleInput}
-      onkeydown={handleKeydown}
-      disabled={q.locked}
-      placeholder="Type your answer..."
-      autocomplete="off"
-    />
-    {#if !inQuiz && !q.submitted}
-      <button
-        type="button"
-        class="tessera-btn-primary tessera-fitb-check-btn"
-        disabled={!q.answerComplete}
-        onclick={q.submit}
-      >
-        Check
-      </button>
-    {/if}
-  </div>
+  <input
+    bind:this={inputEl}
+    type="text"
+    id={inputId}
+    class="tessera-fitb-input"
+    class:correct={q.feedbackVisible && q.correct}
+    class:incorrect={q.feedbackVisible && !q.correct}
+    value={inputValue}
+    oninput={handleInput}
+    onkeydown={handleKeydown}
+    disabled={q.locked}
+    placeholder="Type your answer..."
+    autocomplete="off"
+  />
 
   <QuestionReview
     {q}
-    class="tessera-fitb-review"
     {correctFeedback}
     {incorrectFeedback}
     firstControl={() => inputEl}
@@ -131,12 +118,10 @@
     color: var(--tessera-text);
   }
 
-  .tessera-fitb-input-wrapper {
-    max-width: 400px;
-  }
-
   .tessera-fitb-input {
+    display: block;
     width: 100%;
+    max-width: 400px;
     padding: 0.625rem 0.875rem;
     border: 2px solid var(--tessera-border);
     border-radius: 6px;
@@ -167,26 +152,9 @@
     border-color: var(--tessera-error);
   }
 
-  :global(.tessera-fitb-review) {
-    margin-top: var(--tessera-spacing-md);
-  }
-
   .tessera-fitb-correct-answer {
     font-size: 0.875rem;
     color: var(--tessera-text-light);
     margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-check-btn {
-    margin-top: var(--tessera-spacing-sm);
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  @media (max-width: 640px) {
-    .tessera-fitb-input-wrapper {
-      max-width: 100%;
-    }
   }
 </style>
