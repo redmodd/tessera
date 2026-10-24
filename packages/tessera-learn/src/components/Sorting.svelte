@@ -235,6 +235,7 @@
   <div
     class="tessera-sorting-targets"
     class:targets-active={cardSelected && !q.locked}
+    role="list"
   >
     {#each targets as targetLabel, targetIdx (targetIdx)}
       {@const targetItems = getItemsForTarget(targetIdx)}
@@ -242,7 +243,7 @@
         class="tessera-sorting-target"
         class:drag-over={dragOver === targetIdx}
         class:clickable={cardSelected && !q.locked}
-        role="group"
+        role="listitem"
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}

@@ -54,8 +54,10 @@ describe('Sorting accessible names', () => {
     expect(button("Return 'Apple' to deck")).toBeTruthy();
     const control = ':is(button, [role="button"])';
     expect(target.querySelector(`${control} ${control}`)).toBe(null);
-    // The target button already names the group; a group label is read twice.
-    expect(target.querySelector('[role="group"][aria-label]')).toBe(null);
+    // The target button already names the item; a label is read twice.
+    const items = target.querySelectorAll('[role="list"] > [role="listitem"]');
+    expect(items).toHaveLength(2);
+    expect(target.querySelector('[role="listitem"][aria-label]')).toBe(null);
   });
 
   it('moves focus to the returned card', async () => {
