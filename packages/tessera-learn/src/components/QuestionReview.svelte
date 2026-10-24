@@ -90,9 +90,9 @@
   }
 
   .tessera-question-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
+    font-size: 0.9375rem;
+    padding: var(--tessera-spacing-md);
+    border-radius: 6px;
     margin-top: var(--tessera-spacing-sm);
   }
 
