@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, onTestFinished, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { flushSync, type Component } from 'svelte';
 import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
@@ -446,7 +446,6 @@ describe('standalone feedback', () => {
     'moves focus to the $name first control after Try again, without a Svelte warning',
     async ({ widget, props, first, answerWrong }) => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      onTestFinished(() => warn.mockRestore());
       const mounted = mountWidget(widget, props);
       answerWrong(mounted);
       await expect.poll(focusedText).toContain('Try again');

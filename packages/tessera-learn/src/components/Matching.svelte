@@ -332,7 +332,7 @@
     incorrectLabel="Some pairs are incorrect"
     {correctFeedback}
     {incorrectFeedback}
-    firstControl={() => leftColumn.querySelector('button')}
+    firstControl={() => leftColumn?.querySelector('button')}
   >
     {#if !q.correct}
       <div class="tessera-matching-correct-pairs">

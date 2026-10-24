@@ -142,7 +142,7 @@
     {q}
     correctFeedback={chosenFeedback ? '' : correctFeedback}
     incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
-    firstControl={() => radioGroup.querySelector('input')}
+    firstControl={() => radioGroup?.querySelector('input')}
   >
     {#if chosenFeedback}
       <span class="tessera-sr-only">{chosenFeedback}</span>
