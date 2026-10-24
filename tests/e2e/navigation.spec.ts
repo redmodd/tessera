@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
@@ -240,5 +240,47 @@ test.describe('Navigation — Accessibility', () => {
       .exclude('iframe')
       .analyze();
     expect(results.violations).toEqual([]);
+  });
+});
+
+test.describe('Navigation — Focus and title', () => {
+  const heading = (page: Page) => page.locator('.tessera-content h1');
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/');
+    await expect(heading(page)).toContainText('Welcome');
+  });
+
+  test('first load leaves focus alone and titles the tab', async ({ page }) => {
+    await expect(page).toHaveTitle('Welcome – E2E Test Course');
+    await expect(page.locator('body')).toBeFocused();
+  });
+
+  test('Next moves focus to the new page heading', async ({ page }) => {
+    await page.locator('.tessera-page-nav-btn', { hasText: 'Next' }).click();
+    await expect(heading(page)).toContainText('Course Objectives');
+    await expect(heading(page)).toBeFocused();
+    await expect(page).toHaveTitle('Objectives – E2E Test Course');
+  });
+
+  test('a sidebar link moves focus to the new page heading', async ({
+    page,
+  }) => {
+    await page
+      .locator('.tessera-nav-page', { hasText: 'Objectives' })
+      .press('Enter');
+    await expect(heading(page)).toContainText('Course Objectives');
+    await expect(heading(page)).toBeFocused();
+  });
+
+  test('arrow keys move focus to the new page heading', async ({ page }) => {
+    await page.keyboard.press('ArrowRight');
+    await expect(heading(page)).toContainText('Course Objectives');
+    await expect(heading(page)).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(heading(page)).toContainText('Welcome');
+    await expect(heading(page)).toBeFocused();
   });
 });

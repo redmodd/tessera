@@ -133,6 +133,34 @@
 
   // ---- Page loading ----
   let loadGeneration = 0;
+  let pageEl;
+  let firstRender = true;
+
+  $effect(() => {
+    const title = [manifest.pages[renderedPageIndex]?.title, config.title];
+    document.title = title.filter(Boolean).join(' – ');
+  });
+
+  // Focus goes to the new page's heading so a screen reader announces it. The
+  // first page keeps the browser's initial focus.
+  function focusPageHeading() {
+    if (firstRender) {
+      firstRender = false;
+      return;
+    }
+    const heading =
+      pageEl?.querySelector('h1') ??
+      pageEl?.querySelector('h2, h3, h4, h5, h6');
+    if (!heading) return;
+    if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+    heading.focus();
+  }
+
+  function showPage(index) {
+    pageLoading = false;
+    renderedPageIndex = index;
+    tick().then(focusPageHeading);
+  }
 
   function loadPage(index) {
     const page = manifest.pages[index];
@@ -148,8 +176,7 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      pageLoading = false;
-      renderedPageIndex = index;
+      showPage(index);
       return;
     }
 
@@ -164,8 +191,7 @@
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
-        pageLoading = false;
-        renderedPageIndex = index;
+        showPage(index);
         progress.markVisited(index);
         tick().then(() => progress.pageMounted(index));
         if (
@@ -180,8 +206,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        pageLoading = false;
-        renderedPageIndex = index;
+        showPage(index);
       });
   }
 
@@ -202,7 +227,6 @@
   // ---- Lifecycle ----
   onMount(async () => {
     applyBranding(document.documentElement, config.branding);
-    if (config.title) document.title = config.title;
 
     const initError = await session.start();
     if (initError) {
@@ -219,21 +243,23 @@
 </script>
 
 {#snippet page()}
-  {#if pageError}
-    <ErrorPage error={pageError} onretry={retryPage} />
-  {:else if PageComponent}
-    <PageHost>
-      {#if pageContext.quiz}
-        {#key renderedPageIndex}
-          <Quiz>
-            <PageComponent />
-          </Quiz>
-        {/key}
-      {:else}
-        <PageComponent />
-      {/if}
-    </PageHost>
-  {/if}
+  <div class="tessera-page" bind:this={pageEl}>
+    {#if pageError}
+      <ErrorPage error={pageError} onretry={retryPage} />
+    {:else if PageComponent}
+      <PageHost>
+        {#if pageContext.quiz}
+          {#key renderedPageIndex}
+            <Quiz>
+              <PageComponent />
+            </Quiz>
+          {/key}
+        {:else}
+          <PageComponent />
+        {/if}
+      </PageHost>
+    {/if}
+  </div>
 {/snippet}
 
 <div
@@ -256,3 +282,9 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  .tessera-page {
+    display: contents;
+  }
+</style>

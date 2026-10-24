@@ -24,6 +24,11 @@ test.describe('Custom layout.svelte overrides default chrome', () => {
     await expect(page.getByTestId('page-overview')).toBeVisible();
   });
 
+  test('nav.next() moves focus to the new page heading', async ({ page }) => {
+    await page.getByTestId('custom-next').click();
+    await expect(page.getByTestId('page-overview')).toBeFocused();
+  });
+
   test('custom-prev is disabled on the first page', async ({ page }) => {
     await expect(page.getByTestId('custom-prev')).toBeDisabled();
   });
