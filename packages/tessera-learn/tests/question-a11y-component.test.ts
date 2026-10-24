@@ -43,8 +43,11 @@ describe('Sorting accessible names', () => {
     expect(card.getAttribute('aria-pressed')).toBe('false');
     expect(button('Fruit').getAttribute('aria-disabled')).toBe('true');
 
+    expect(name(card)).toBe('Apple (activate, then choose a target)');
+
     click(card);
     expect(card.getAttribute('aria-pressed')).toBe('true');
+    expect(name(card)).toBe('Apple (choose a target)');
     expect(name(button('Fruit'))).toBe('Fruit (activate to place Apple)');
 
     click(button('Fruit'));

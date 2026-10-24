@@ -208,7 +208,10 @@
             onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
-            <span class="tessera-sr-only">(activate, then choose a target)</span
+            <span class="tessera-sr-only"
+              >{cardSelected
+                ? '(choose a target)'
+                : '(activate, then choose a target)'}</span
             >
           </div>
           <p class="tessera-sorting-counter">
