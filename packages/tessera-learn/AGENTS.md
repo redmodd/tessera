@@ -414,7 +414,7 @@ Per-page weighting, optional pages, pass/fail and manual completion are in [`nod
 
 Props listed before "Optional" are required. Every type also accepts `id`, `weight` (default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
-**MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`, shown next to each option after checking; the chosen option's entry replaces `correctFeedback` / `incorrectFeedback`.
+**MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`, shown next to each option after submitting; the chosen option's entry replaces `correctFeedback` / `incorrectFeedback`.
 
 **FillInTheBlank**: `question` `string`, `answers` `string | string[]` (distinct spellings only). Optional: `caseSensitive` `boolean` (default `false`, so don't list case variants).
 

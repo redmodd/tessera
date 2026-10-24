@@ -78,22 +78,20 @@
 <QuestionShell {q} class="tessera-fitb">
   <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
-  <div class="tessera-fitb-input-wrapper">
-    <input
-      bind:this={inputEl}
-      type="text"
-      id={inputId}
-      class="tessera-fitb-input"
-      class:correct={q.feedbackVisible && q.correct}
-      class:incorrect={q.feedbackVisible && !q.correct}
-      value={inputValue}
-      oninput={handleInput}
-      onkeydown={handleKeydown}
-      disabled={q.locked}
-      placeholder="Type your answer..."
-      autocomplete="off"
-    />
-  </div>
+  <input
+    bind:this={inputEl}
+    type="text"
+    id={inputId}
+    class="tessera-fitb-input"
+    class:correct={q.feedbackVisible && q.correct}
+    class:incorrect={q.feedbackVisible && !q.correct}
+    value={inputValue}
+    oninput={handleInput}
+    onkeydown={handleKeydown}
+    disabled={q.locked}
+    placeholder="Type your answer..."
+    autocomplete="off"
+  />
 
   <QuestionReview
     {q}
@@ -120,12 +118,10 @@
     color: var(--tessera-text);
   }
 
-  .tessera-fitb-input-wrapper {
-    max-width: 400px;
-  }
-
   .tessera-fitb-input {
+    display: block;
     width: 100%;
+    max-width: 400px;
     padding: 0.625rem 0.875rem;
     border: 2px solid var(--tessera-border);
     border-radius: 6px;
@@ -160,11 +156,5 @@
     font-size: 0.875rem;
     color: var(--tessera-text-light);
     margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  @media (max-width: 640px) {
-    .tessera-fitb-input-wrapper {
-      max-width: 100%;
-    }
   }
 </style>
