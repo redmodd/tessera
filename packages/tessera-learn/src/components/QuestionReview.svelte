@@ -4,7 +4,6 @@
 
   let {
     q,
-    class: className = '',
     correctLabel = 'Correct',
     incorrectLabel = 'Incorrect',
     correctFeedback = '',
@@ -37,7 +36,7 @@
   <!-- Named by its text: VoiceOver in Safari reads an unnamed focused block as
        only its first line ("Incorrect and 2 more items"). -->
   <div
-    class="tessera-question-review {className}"
+    class="tessera-question-review"
     role="group"
     aria-labelledby={contentId}
     tabindex="-1"

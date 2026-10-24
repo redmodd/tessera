@@ -303,7 +303,6 @@
   <!-- Feedback (shown after standalone submit or quiz feedbackVisible) -->
   <QuestionReview
     {q}
-    class="tessera-sorting-review"
     correctLabel="All items sorted correctly!"
     incorrectLabel="Some items are in the wrong category."
     {correctFeedback}
@@ -322,10 +321,11 @@
     {/if}
   </QuestionReview>
 
-  {#if !inQuiz && !q.submitted && q.answerComplete}
+  {#if !inQuiz && !q.submitted}
     <button
       type="button"
       class="tessera-btn-primary tessera-question-submit"
+      disabled={!q.answerComplete}
       onclick={q.submit}
     >
       Submit

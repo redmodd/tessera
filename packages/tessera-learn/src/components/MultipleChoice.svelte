@@ -154,7 +154,6 @@
 
   <QuestionReview
     {q}
-    class="tessera-mc-review"
     correctFeedback={chosenFeedback ? '' : correctFeedback}
     incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
     firstControl={() => radios[0]}

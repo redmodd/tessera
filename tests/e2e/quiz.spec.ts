@@ -422,8 +422,8 @@ test.describe('Quiz — Accessibility', () => {
 
     await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await btn.click();
-    await expect(page.locator('.tessera-matching-review')).toBeVisible();
-    expect(await audit('.tessera-matching-review')).toEqual([]);
+    await expect(activeQ.locator('.tessera-question-review')).toBeVisible();
+    expect(await audit('.tessera-question-review')).toEqual([]);
     await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 

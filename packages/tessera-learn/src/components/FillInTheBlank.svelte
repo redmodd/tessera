@@ -107,7 +107,6 @@
 
   <QuestionReview
     {q}
-    class="tessera-fitb-review"
     {correctFeedback}
     {incorrectFeedback}
     firstControl={() => inputEl}

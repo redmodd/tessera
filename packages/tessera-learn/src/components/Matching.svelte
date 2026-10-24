@@ -250,7 +250,6 @@
 
   <QuestionReview
     {q}
-    class="tessera-matching-review"
     correctLabel="All pairs matched correctly!"
     incorrectLabel="Some pairs are incorrect"
     {correctFeedback}

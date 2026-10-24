@@ -141,7 +141,7 @@ describe('Matching accessible names', () => {
 
 type Widget = ReturnType<typeof mountWidget>;
 
-function checkFillIn({ target, button, click }: Widget, text: string) {
+function submitFillIn({ target, button, click }: Widget, text: string) {
   const input = target.querySelector('input')!;
   input.value = text;
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -149,7 +149,7 @@ function checkFillIn({ target, button, click }: Widget, text: string) {
   click(button('Submit'));
 }
 
-function checkOption({ target, button, click }: Widget, index: number) {
+function submitOption({ target, button, click }: Widget, index: number) {
   target.querySelectorAll('input')[index].click();
   flushSync();
   click(button('Submit'));
@@ -168,8 +168,10 @@ describe('standalone feedback', () => {
       targets: ['Fruit'],
       correct: [0],
     });
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(true);
     click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
     click(button('Fruit'));
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(false);
     button('Submit').focus();
     click(button('Submit'));
 
@@ -191,7 +193,7 @@ describe('standalone feedback', () => {
       answers: 'blue',
       incorrectFeedback: 'The sky is blue.',
     });
-    checkFillIn(widget, 'red');
+    submitFillIn(widget, 'red');
 
     await expect.poll(focusedText).toContain('Try again');
     const result = document.activeElement!;
@@ -246,7 +248,7 @@ describe('standalone feedback', () => {
       optionFeedback: ['Too low.', ''],
       incorrectFeedback: 'Not quite.',
     });
-    checkOption(widget, 0);
+    submitOption(widget, 0);
 
     await expect.poll(focusedText).toBe('Incorrect Too low. Try again');
     const labels = [...widget.target.querySelectorAll('label')].map(
@@ -260,7 +262,7 @@ describe('standalone feedback', () => {
       options: ['3', '4'],
       correct: 1,
     });
-    checkOption(widget, 1);
+    submitOption(widget, 1);
 
     await expect.poll(focusedText).toBe('Correct');
     expect(
@@ -276,7 +278,7 @@ describe('standalone feedback', () => {
     const { target, button } = widget;
     const group = target.querySelector('[role="radiogroup"]')!;
     expect(group.contains(button('Submit'))).toBe(false);
-    checkOption(widget, 0);
+    submitOption(widget, 0);
 
     expect(group.contains(button('Try again'))).toBe(false);
     expect(
@@ -290,7 +292,7 @@ describe('standalone feedback', () => {
       correct: 1,
       correctFeedback: 'Well done.',
     });
-    checkOption(widget, 1);
+    submitOption(widget, 1);
 
     expect(widget.target.textContent?.split('Well done.')).toHaveLength(2);
   });
@@ -300,7 +302,7 @@ describe('standalone feedback', () => {
       options: ['3', '4'],
       correct: 1,
     });
-    checkOption(widget, 0);
+    submitOption(widget, 0);
     widget.click(widget.button('Try again'));
 
     expect(widget.target.querySelector('input')!.checked).toBe(false);
@@ -312,14 +314,14 @@ describe('standalone feedback', () => {
       widget: MultipleChoice,
       props: { options: ['3', '4'], correct: 1 },
       first: 'input',
-      answerWrong: (w: Widget) => checkOption(w, 0),
+      answerWrong: (w: Widget) => submitOption(w, 0),
     },
     {
       name: 'FillInTheBlank',
       widget: FillInTheBlank,
       props: { answers: 'blue' },
       first: '.tessera-fitb-input',
-      answerWrong: (w: Widget) => checkFillIn(w, 'red'),
+      answerWrong: (w: Widget) => submitFillIn(w, 'red'),
     },
     {
       name: 'Matching',
