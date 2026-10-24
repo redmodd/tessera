@@ -372,6 +372,7 @@ test.describe('Quiz — Accessibility', () => {
     await expect(
       matching.getByRole('button', {
         name: '1 1 (matched with One, activate to unmatch)',
+        exact: true,
       }),
     ).toBeVisible();
     await expect(
