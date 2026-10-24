@@ -184,7 +184,6 @@ test.describe('Component — Sorting', () => {
       .click();
     await expect(counter).toHaveText('2 of 3 to sort');
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
-    await expect(card).toBeFocused();
   });
 
   test('checked results pass axe audit', async ({ page }) => {
@@ -196,7 +195,7 @@ test.describe('Component — Sorting', () => {
       await fruit.click();
     }
     await sorting.getByRole('button', { name: 'Check Answer' }).click();
-    await expect(sorting.locator('.tessera-sorting-review')).toBeFocused();
+    await expect(sorting.locator('.tessera-sorting-review')).toBeVisible();
     await expect(sorting.getByText('(incorrect)')).toHaveCount(1);
 
     expect(

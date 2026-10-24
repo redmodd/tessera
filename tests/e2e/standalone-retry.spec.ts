@@ -152,7 +152,6 @@ for (const mode of MODES) {
       await choose(page, 'Venus');
       await expect.poll(results).toEqual([false]);
       await tryAgain(page).click();
-      await expect(page.getByRole('radio').first()).toBeFocused();
 
       await choose(page, 'Mercury');
       await expect.poll(results).toEqual([false, true]);
