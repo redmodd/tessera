@@ -171,6 +171,9 @@ describe('standalone feedback', () => {
     expect((button('Submit') as HTMLButtonElement).disabled).toBe(true);
     click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
     click(button('Fruit'));
+    expect(
+      target.querySelector('.tessera-sorting-deck-empty')?.textContent,
+    ).toBe('All cards placed. Submit your answers below.');
     expect((button('Submit') as HTMLButtonElement).disabled).toBe(false);
     button('Submit').focus();
     click(button('Submit'));
