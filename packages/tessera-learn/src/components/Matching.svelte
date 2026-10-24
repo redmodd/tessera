@@ -253,14 +253,11 @@
     class="tessera-matching-review"
     correctLabel="All pairs matched correctly!"
     incorrectLabel="Some pairs are incorrect"
+    {correctFeedback}
+    {incorrectFeedback}
     firstControl={() => leftItems[0]}
   >
-    {@const isCorrect = q.correct}
-    {#if isCorrect}
-      {#if correctFeedback}
-        <p class="tessera-matching-feedback correct">{correctFeedback}</p>
-      {/if}
-    {:else}
+    {#if !q.correct}
       <div class="tessera-matching-correct-pairs">
         <p class="tessera-matching-correct-pairs-title">Correct pairs:</p>
         {#each pairs as pair, i (i)}
@@ -269,11 +266,6 @@
           </p>
         {/each}
       </div>
-      {#if incorrectFeedback}
-        <p class="tessera-matching-feedback incorrect">
-          {incorrectFeedback}
-        </p>
-      {/if}
     {/if}
   </QuestionReview>
 </QuestionShell>
@@ -412,23 +404,6 @@
 
   .tessera-matching-correct-pair {
     margin: 2px 0;
-  }
-
-  .tessera-matching-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-    margin-top: var(--tessera-spacing-sm);
-  }
-
-  .tessera-matching-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-matching-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   @media (max-width: 640px) {

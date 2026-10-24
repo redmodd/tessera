@@ -415,7 +415,7 @@ test.describe('Quiz — Accessibility', () => {
     await btn.click();
     await expect(btn).toHaveText('Next Question');
     await expect(
-      activeQ.locator('.tessera-fitb-feedback.incorrect'),
+      activeQ.locator('.tessera-question-feedback.incorrect'),
     ).toBeVisible();
     expect(await audit()).toEqual([]);
     await btn.click();

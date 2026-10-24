@@ -305,14 +305,11 @@
     class="tessera-sorting-review"
     correctLabel="All items sorted correctly!"
     incorrectLabel="Some items are in the wrong category."
+    {correctFeedback}
+    {incorrectFeedback}
     firstControl={() => cardEl}
   >
-    {@const isCorrect = q.correct}
-    {#if isCorrect}
-      {#if correctFeedback}
-        <p class="tessera-sorting-feedback correct">{correctFeedback}</p>
-      {/if}
-    {:else}
+    {#if !q.correct}
       <div class="tessera-sorting-correct-list">
         <p class="tessera-sorting-correct-title">Correct arrangement:</p>
         {#each items as item, i (i)}
@@ -321,11 +318,6 @@
           </p>
         {/each}
       </div>
-      {#if incorrectFeedback}
-        <p class="tessera-sorting-feedback incorrect">
-          {incorrectFeedback}
-        </p>
-      {/if}
     {/if}
   </QuestionReview>
 
@@ -601,23 +593,6 @@
 
   .tessera-sorting-correct-item {
     margin: 2px 0;
-  }
-
-  .tessera-sorting-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-    margin-top: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-sorting-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   /* --- Standalone actions --- */

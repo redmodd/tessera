@@ -35,7 +35,7 @@
 
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
-  let inputEl = $state(null);
+  let inputEl;
 
   const q = useQuestion({
     get id() {
@@ -105,21 +105,19 @@
     {/if}
   </div>
 
-  <QuestionReview {q} class="tessera-fitb-review" firstControl={() => inputEl}>
-    {@const isCorrect = q.correct}
-    {#if isCorrect}
-      {#if correctFeedback}
-        <p class="tessera-fitb-feedback correct">{correctFeedback}</p>
-      {/if}
-    {:else}
+  <QuestionReview
+    {q}
+    class="tessera-fitb-review"
+    {correctFeedback}
+    {incorrectFeedback}
+    firstControl={() => inputEl}
+  >
+    {#if !q.correct}
       <p class="tessera-fitb-correct-answer">
         Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(
           ', ',
         )}
       </p>
-      {#if incorrectFeedback}
-        <p class="tessera-fitb-feedback incorrect">{incorrectFeedback}</p>
-      {/if}
     {/if}
   </QuestionReview>
 </QuestionShell>
@@ -177,22 +175,6 @@
     font-size: 0.875rem;
     color: var(--tessera-text-light);
     margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-feedback {
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    border-radius: 4px;
-  }
-
-  .tessera-fitb-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-fitb-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
   }
 
   .tessera-fitb-check-btn {

@@ -38,6 +38,7 @@
   } = $props();
 
   let selectedOption = $state(null);
+  const chosenFeedback = $derived(optionFeedback[selectedOption]);
   const radios = [];
 
   const componentId = $props.id();
@@ -151,19 +152,15 @@
     </button>
   {/if}
 
-  <QuestionReview {q} class="tessera-mc-review" firstControl={() => radios[0]}>
-    {@const chosen = optionFeedback[selectedOption]}
-    {@const overall = q.correct ? correctFeedback : incorrectFeedback}
-    {#if chosen}
-      <span class="tessera-sr-only">{chosen}</span>
-    {:else if overall}
-      <div
-        class="tessera-mc-overall-feedback"
-        class:correct={q.correct}
-        class:incorrect={!q.correct}
-      >
-        {overall}
-      </div>
+  <QuestionReview
+    {q}
+    class="tessera-mc-review"
+    correctFeedback={chosenFeedback ? '' : correctFeedback}
+    incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
+    firstControl={() => radios[0]}
+  >
+    {#if chosenFeedback}
+      <span class="tessera-sr-only">{chosenFeedback}</span>
     {/if}
   </QuestionReview>
 </QuestionShell>
@@ -299,22 +296,6 @@
 
   :global(.tessera-mc-review) {
     margin-top: var(--tessera-spacing-md);
-  }
-
-  .tessera-mc-overall-feedback {
-    padding: var(--tessera-spacing-md);
-    border-radius: 6px;
-    font-size: 0.9375rem;
-  }
-
-  .tessera-mc-overall-feedback.correct {
-    background: var(--tessera-success-bg);
-    color: var(--tessera-success);
-  }
-
-  .tessera-mc-overall-feedback.incorrect {
-    background: var(--tessera-error-bg);
-    color: var(--tessera-error);
   }
 
   /* A dark ring, so focus can't be mistaken for the blue selected border. */
