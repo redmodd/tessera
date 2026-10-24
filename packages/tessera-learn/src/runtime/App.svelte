@@ -134,6 +134,7 @@
   // ---- Page loading ----
   let loadGeneration = 0;
   let pageEl;
+  let focusAtLoad;
 
   $effect(() => {
     const shown = manifest.pages[renderedPageIndex];
@@ -145,9 +146,10 @@
     !el.closest('[aria-hidden="true"], [inert]');
 
   // Focus goes to the new page's heading so a screen reader announces it,
-  // unless the page already moved focus into itself.
+  // unless focus moved during the load: into the page, or anywhere else.
   function focusPageHeading() {
-    if (!pageEl || pageEl.contains(document.activeElement)) return;
+    const active = document.activeElement;
+    if (!pageEl || (active !== focusAtLoad && active !== document.body)) return;
     const headings = [
       ...pageEl.querySelectorAll('h1, h2, h3, h4, h5, h6'),
     ].filter(isAnnounced);
@@ -172,6 +174,7 @@
 
     const gen = ++loadGeneration;
     pageLoading = true;
+    focusAtLoad = document.activeElement;
 
     const loader = pageModules[page.importPath];
     if (!loader) {

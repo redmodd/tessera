@@ -52,6 +52,28 @@ test.describe('Navigation — Free Mode', () => {
     await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
+  test('focus moved while a page loads stays where the learner put it', async ({
+    page,
+  }) => {
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/objectives\.svelte/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto('/');
+    await waitForTesseraContent(page);
+
+    await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
+    const other = page.locator('.tessera-nav-page', { hasText: 'Welcome' });
+    await other.focus();
+    release();
+    await expect(page.locator('.tessera-content h1')).toContainText(
+      'Course Objectives',
+    );
+    await expect(other).toBeFocused();
+  });
+
   test('can click any page in free mode — no locking', async ({ page }) => {
     // Should be able to jump directly to a later page
     await navigateToPage(page, 'Accordion & Carousel');
@@ -201,6 +223,15 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
       await control.focus();
       expect(await arrowCancelled(control)).toBe(false);
     }
+  });
+
+  test('arrow keys work from the focused heading of a quiz page', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('.tessera-content h1')).toContainText('Practice');
   });
 
   test('ArrowLeft does nothing on first page', async ({ page }) => {

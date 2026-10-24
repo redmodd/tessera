@@ -24,14 +24,7 @@ test.describe('Custom layout.svelte overrides default chrome', () => {
     await expect(page.getByTestId('page-overview')).toBeVisible();
   });
 
-  test('nav.next() focuses the first heading a screen reader can reach', async ({
-    page,
-  }) => {
-    await page.getByTestId('custom-next').click();
-    await expect(page.getByTestId('page-overview')).toBeFocused();
-  });
-
-  test('a page that focuses its own content keeps that focus', async ({
+  test('nav.next() focuses the first reachable heading, unless the page focuses its own content', async ({
     page,
   }) => {
     await page.getByTestId('custom-next').click();

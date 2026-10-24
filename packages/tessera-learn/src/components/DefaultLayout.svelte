@@ -31,7 +31,8 @@
   // Arrow keys change page only while no control has focus: the page itself,
   // or a heading or result that focus was moved to. Form fields, media and
   // editable text are named here because their tabIndex can be -1 (set by
-  // code, or by WebKit for media and editable text).
+  // code, or by WebKit for media and editable text). Inside a quiz, only a
+  // focused heading lets arrow keys change page.
   const DIALOG = 'dialog, [role="dialog"]';
 
   function controlHasFocus(el) {
@@ -39,7 +40,8 @@
       el.tabIndex >= 0 ||
       el.matches('input, textarea, select') ||
       el.isContentEditable ||
-      !!el.closest(`video, audio, ${DIALOG}, .tessera-quiz`)
+      !!el.closest(`video, audio, ${DIALOG}`) ||
+      (!!el.closest('.tessera-quiz') && !el.matches('h1, h2, h3, h4, h5, h6'))
     );
   }
 
