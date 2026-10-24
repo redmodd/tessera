@@ -49,6 +49,8 @@ describe('Sorting accessible names', () => {
     expect(button("Return 'Apple' to deck")).toBeTruthy();
     const control = ':is(button, [role="button"])';
     expect(target.querySelector(`${control} ${control}`)).toBe(null);
+    // The target button already names the group; a group label is read twice.
+    expect(target.querySelector('[role="group"][aria-label]')).toBe(null);
   });
 
   it('moves focus to the returned card', async () => {
@@ -65,6 +67,22 @@ describe('Sorting accessible names', () => {
     const card = target.querySelector('.tessera-sorting-card');
     expect(card?.textContent).toContain('Apple');
     await expect.poll(() => document.activeElement).toBe(card);
+  });
+
+  it('clears the selection when a placed card returns to the deck', () => {
+    const { target, button, name, click } = mountWidget(Sorting, {
+      items: ['Apple', 'Pear'],
+      targets: ['Fruit'],
+      correct: [0, 0],
+    });
+    const card = target.querySelector<HTMLElement>('.tessera-sorting-card')!;
+    click(card);
+    click(button('Fruit'));
+    click(card);
+    click(button('Return'));
+
+    expect(card.getAttribute('aria-pressed')).toBe('false');
+    expect(name(button('Fruit'))).toBe('Fruit');
   });
 
   it('disables targets and states each placement result once locked', () => {

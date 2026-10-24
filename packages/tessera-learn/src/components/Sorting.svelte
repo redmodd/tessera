@@ -130,6 +130,7 @@
     if (q.locked) return;
     placements.delete(itemIdx);
     queue = [itemIdx, ...queue];
+    cardSelected = false;
     q.setAnswer(new Map(placements));
     // The clicked button unmounts; keep keyboard focus on the returned card.
     await tick();
@@ -239,7 +240,6 @@
         class:drag-over={dragOver === targetIdx}
         class:clickable={cardSelected && !q.locked}
         role="group"
-        aria-label={targetLabel}
         ondragover={(e) => onDragOver(e, targetIdx)}
         ondragleave={onDragLeave}
         ondrop={(e) => onDrop(e, targetIdx)}
