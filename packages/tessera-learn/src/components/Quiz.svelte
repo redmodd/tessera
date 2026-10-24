@@ -147,22 +147,17 @@
             Next
           {/if}
         </button>
-      {:else if needsReveal(currentQuestion)}
+      {:else}
+        <!-- One button for reveal and submit, so focus survives the reveal. -->
+        {@const reveal = needsReveal(currentQuestion)}
         <button
           type="button"
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={revealCurrent}
+          class:tessera-quiz-btn-submit={!reveal}
+          disabled={!reveal && !handle.canSubmit}
+          onclick={reveal ? revealCurrent : handleSubmit}
         >
-          Submit
-        </button>
-      {:else}
-        <button
-          type="button"
-          class="tessera-quiz-btn tessera-btn-primary tessera-quiz-btn-submit"
-          disabled={!handle.canSubmit}
-          onclick={handleSubmit}
-        >
-          {isImmediateMode && isAnswered(currentQuestion)
+          {isImmediateMode && !reveal && isAnswered(currentQuestion)
             ? 'See Results'
             : 'Submit'}
         </button>

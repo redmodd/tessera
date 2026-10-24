@@ -16,8 +16,8 @@ import {
  * Advance past one immediate-feedback question. The primary button cycles:
  *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
  *     relabels to "Next Question" → second click advances.
- *   - last question: "Submit" → click reveals feedback → primary button
- *     becomes the "See Results" button.
+ *   - last question: "Submit" → click reveals feedback → the same button
+ *     becomes "See Results" and keeps focus.
  * We wait on the label text to change instead of sleeping.
  */
 async function checkThenContinue(page: Page, isLast: boolean) {
@@ -26,6 +26,7 @@ async function checkThenContinue(page: Page, isLast: boolean) {
     await expect(btn).toHaveText('Submit');
     await btn.click();
     await expect(page.locator('.tessera-quiz-btn-submit')).toBeVisible();
+    await expect(btn).toBeFocused();
   } else {
     await expect(btn).toHaveText('Submit');
     await btn.click();
