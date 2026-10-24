@@ -186,6 +186,24 @@ test.describe('Component — Sorting', () => {
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
     await expect(card).toBeFocused();
   });
+
+  test('checked results pass axe audit', async ({ page }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const fruit = sorting.getByRole('button', { name: /^Fruit/ });
+
+    for (let i = 0; i < 3; i++) {
+      await sorting.locator('.tessera-sorting-card').click();
+      await fruit.click();
+    }
+    await sorting.getByRole('button', { name: 'Check Answer' }).click();
+    await expect(sorting.locator('.tessera-sorting-review')).toBeVisible();
+    await expect(sorting.getByText('(incorrect)')).toHaveCount(1);
+
+    expect(
+      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
+        .violations,
+    ).toEqual([]);
+  });
 });
 
 test.describe('Component Accessibility', () => {
