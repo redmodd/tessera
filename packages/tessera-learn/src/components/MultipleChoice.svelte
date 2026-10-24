@@ -9,6 +9,7 @@
   } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
+  import ResultIcon from './ResultIcon.svelte';
 
   /**
    * @type {{
@@ -85,15 +86,14 @@
   }
 </script>
 
-<QuestionShell
-  {q}
-  class="tessera-mc"
-  role="radiogroup"
-  aria-labelledby="{groupId}-label"
->
+<QuestionShell {q} class="tessera-mc">
   <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
-  <div class="tessera-mc-options">
+  <div
+    class="tessera-mc-options"
+    role="radiogroup"
+    aria-labelledby="{groupId}-label"
+  >
     {#each options as option, i (i)}
       {@const optionId = `${groupId}-opt-${i}`}
       {@const isSelected = selectedOption === i}
@@ -143,10 +143,17 @@
   <QuestionReview {q} class="tessera-mc-review">
     {@const chosen = optionFeedback[selectedOption]}
     {@const overall = q.correct ? correctFeedback : incorrectFeedback}
-    <span class="tessera-sr-only"
-      >{q.correct ? 'Correct.' : 'Incorrect.'} {chosen ?? ''}</span
+    <div
+      class="tessera-mc-result"
+      class:correct={q.correct}
+      class:incorrect={!q.correct}
     >
-    {#if !chosen && overall}
+      <ResultIcon kind={q.correct ? 'correct' : 'incorrect'} />
+      {q.correct ? 'Correct' : 'Incorrect'}
+    </div>
+    {#if chosen}
+      <span class="tessera-sr-only">{chosen}</span>
+    {:else if overall}
       <div
         class="tessera-mc-overall-feedback"
         class:correct={q.correct}
@@ -287,8 +294,28 @@
     font-weight: 600;
   }
 
-  .tessera-mc-overall-feedback {
+  :global(.tessera-mc-review) {
     margin-top: var(--tessera-spacing-md);
+  }
+
+  .tessera-mc-result {
+    display: flex;
+    align-items: center;
+    gap: var(--tessera-spacing-sm);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    margin-bottom: var(--tessera-spacing-sm);
+  }
+
+  .tessera-mc-result.correct {
+    color: var(--tessera-success);
+  }
+
+  .tessera-mc-result.incorrect {
+    color: var(--tessera-error);
+  }
+
+  .tessera-mc-overall-feedback {
     padding: var(--tessera-spacing-md);
     border-radius: 6px;
     font-size: 0.9375rem;

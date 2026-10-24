@@ -431,7 +431,7 @@ test.describe('Quiz — Accessibility', () => {
     await answerMultipleChoice(page, 0);
     await expect(status).toBeEmpty();
     await btn.click();
-    await expect(status).toContainText('Incorrect. 3 is too low.');
+    await expect(status).toContainText(/Incorrect\s*3 is too low\./);
     await expect(btn).toBeFocused();
   });
 

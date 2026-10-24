@@ -153,6 +153,25 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
       page.locator('[data-testid="custom-quiz-status"]'),
     ).toContainText('state: answering');
   });
+
+  test('review does not put every mounted question in a status region', async ({
+    page,
+  }) => {
+    await navigateToExam(page);
+    await page
+      .locator('[data-question-id="q-planet"] .tessera-mc-option')
+      .nth(0)
+      .click();
+    await page
+      .locator('[data-question-id="q-water"] input[type="text"]')
+      .fill('H2O');
+    await page.locator('[data-testid="custom-quiz-submit"]').click();
+    await page.locator('[data-testid="custom-quiz-review"]').click();
+
+    const list = page.locator('.custom-quiz-list');
+    await expect(list.locator('.tessera-mc-result')).toContainText('Incorrect');
+    await expect(list.getByRole('status')).toHaveCount(0);
+  });
 });
 
 /**

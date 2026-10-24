@@ -199,9 +199,41 @@ describe('standalone feedback', () => {
     flushSync();
     click(button('Check'));
 
-    await expect.poll(focusedText).toBe('Incorrect. Too low. Try again');
+    await expect.poll(focusedText).toBe('Incorrect Too low. Try again');
     const labels = [...target.querySelectorAll('label')].map(name);
     expect(labels).toEqual(['3 (incorrect)', '4 (correct)']);
+  });
+
+  it('focuses a visible MultipleChoice result when there is no feedback', async () => {
+    const { target, button, click } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+    });
+    target.querySelectorAll('input')[1].click();
+    flushSync();
+    click(button('Check'));
+
+    await expect.poll(focusedText).toBe('Correct');
+    expect(
+      document.activeElement!.querySelector('.tessera-mc-result'),
+    ).not.toBe(null);
+  });
+
+  it('keeps Check and the result outside the MultipleChoice radiogroup', () => {
+    const { target, button, click } = mountWidget(MultipleChoice, {
+      options: ['3', '4'],
+      correct: 1,
+    });
+    const group = target.querySelector('[role="radiogroup"]')!;
+    expect(group.contains(button('Check'))).toBe(false);
+    target.querySelector('input')!.click();
+    flushSync();
+    click(button('Check'));
+
+    expect(group.contains(button('Try again'))).toBe(false);
+    expect(group.contains(target.querySelector('.tessera-mc-result'))).toBe(
+      false,
+    );
   });
 
   it('shows MultipleChoice correctFeedback once', () => {
