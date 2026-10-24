@@ -1,5 +1,13 @@
 # create-tessera
 
+## 0.11.2
+
+### Patch Changes
+
+- 52706a8: - `@vitest/coverage-v8` 5.0.3 → 5.0.5
+  - `tsdown` 0.23.0 → 0.23.1
+  - `vitest` 5.0.3 → 5.0.5
+
 ## 0.11.1
 
 No changes in this release.
