@@ -134,38 +134,59 @@
   // ---- Page loading ----
   let loadGeneration = 0;
   let pageEl;
-  let focusAtLoad;
 
   $effect(() => {
     const shown = manifest.pages[renderedPageIndex];
     document.title = shown ? `${shown.title} – ${config.title}` : config.title;
   });
 
+  // Chrome before 121 and Firefox before 122 know only checkVisibilityCSS.
+  // Safari before 17.4 has no checkVisibility, so only display: none is caught.
   const isAnnounced = (el) =>
-    el.checkVisibility({ visibilityProperty: true }) &&
+    (el.checkVisibility?.({
+      visibilityProperty: true,
+      checkVisibilityCSS: true,
+    }) ??
+      el.getClientRects().length > 0) &&
     !el.closest('[aria-hidden="true"], [inert]');
 
+  const PAGE_FOCUS = 'data-tessera-page-focus';
+
   // Focus goes to the new page's heading so a screen reader announces it,
-  // unless focus moved during the load: into the page, or anywhere else.
-  function focusPageHeading() {
+  // unless focus moved during the load: into the page, or anywhere else. A
+  // heading inside a focus target (a quiz's results) focuses the target, which
+  // reads more. The mark lets the default layout's arrow keys work from it
+  // until focus moves on.
+  function focusPageHeading(focusBefore) {
     const active = document.activeElement;
-    if (!pageEl || (active !== focusAtLoad && active !== document.body)) return;
+    if (!pageEl || (active !== focusBefore && active !== document.body)) return;
     const headings = [
       ...pageEl.querySelectorAll('h1, h2, h3, h4, h5, h6'),
     ].filter(isAnnounced);
     const heading = headings.find((h) => h.localName === 'h1') ?? headings[0];
     if (!heading) return;
-    if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
-    heading.focus();
+    const wrapper = heading.closest('[tabindex="-1"]');
+    const target = wrapper && pageEl.contains(wrapper) ? wrapper : heading;
+    if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
+    target.setAttribute(PAGE_FOCUS, '');
+    const release = (e) => {
+      if (e.target === target) return;
+      target.removeAttribute(PAGE_FOCUS);
+      document.removeEventListener('focusin', release);
+    };
+    document.addEventListener('focusin', release);
+    target.focus();
   }
 
   // The first page keeps the browser's initial focus, and ErrorPage announces
   // itself as an alert.
-  function showPage(index) {
+  function showPage(index, focusBefore) {
     const firstPage = renderedPageIndex < 0;
     pageLoading = false;
     renderedPageIndex = index;
-    if (!firstPage && !pageError) tick().then(focusPageHeading);
+    if (!firstPage && !pageError) {
+      tick().then(() => focusPageHeading(focusBefore));
+    }
   }
 
   function loadPage(index) {
@@ -174,7 +195,7 @@
 
     const gen = ++loadGeneration;
     pageLoading = true;
-    focusAtLoad = document.activeElement;
+    const focusBefore = document.activeElement;
 
     const loader = pageModules[page.importPath];
     if (!loader) {
@@ -183,7 +204,7 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      showPage(index);
+      showPage(index, focusBefore);
       return;
     }
 
@@ -198,7 +219,7 @@
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
-        showPage(index);
+        showPage(index, focusBefore);
         progress.markVisited(index);
         tick().then(() => progress.pageMounted(index));
         if (
@@ -213,7 +234,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        showPage(index);
+        showPage(index, focusBefore);
       });
   }
 

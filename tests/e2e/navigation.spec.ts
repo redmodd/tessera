@@ -1,6 +1,10 @@
 import { test, expect, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { navigateToPage, waitForTesseraContent } from './helpers.js';
+import {
+  answerGradedQuiz,
+  navigateToPage,
+  waitForTesseraContent,
+} from './helpers.js';
 
 /** Dispatches ArrowRight on the element and reports whether the layout cancelled it. */
 function arrowCancelled(target: Locator, init: KeyboardEventInit = {}) {
@@ -230,6 +234,37 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
   }) => {
     await navigateToPage(page, 'Graded Assessment');
     await expect(page.locator('.tessera-content h1')).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('.tessera-content h1')).toContainText('Practice');
+  });
+
+  test('arrow keys stay in the quiz once its own heading has focus', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+    await page
+      .locator('.tessera-quiz-question-wrapper.active .tessera-mc-option')
+      .nth(1)
+      .click();
+    await primary.click();
+    await expect(primary).toHaveText('Next Question');
+    await primary.click();
+    const progress = page.getByRole('heading', { name: 'Question 2 of 3' });
+    await expect(progress).toBeFocused();
+    expect(await arrowCancelled(progress)).toBe(false);
+  });
+
+  test('a finished quiz page focuses its results, and arrow keys still work', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await answerGradedQuiz(page);
+    await navigateToPage(page, 'Objectives');
+    await navigateToPage(page, 'Graded Assessment');
+    await expect(
+      page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
+    ).toBeFocused();
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator('.tessera-content h1')).toContainText('Practice');
   });
