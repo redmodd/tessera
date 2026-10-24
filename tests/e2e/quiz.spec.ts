@@ -15,7 +15,8 @@ import {
 /**
  * Advance past one immediate-feedback question. The primary button cycles:
  *   - mid-quiz: "Submit" (with answer) → first click reveals feedback and
- *     relabels to "Next Question" → second click advances.
+ *     relabels to "Next Question" → second click advances and focuses the
+ *     next question's heading.
  *   - last question: "Submit" → click reveals feedback → the same button
  *     becomes "See Results" and keeps focus.
  * We wait on the label text to change instead of sleeping.
@@ -32,6 +33,9 @@ async function checkThenContinue(page: Page, isLast: boolean) {
     await btn.click();
     await expect(btn).toHaveText('Next Question');
     await btn.click();
+    await expect(
+      page.getByRole('heading', { name: /^Question \d+ of \d+$/ }),
+    ).toBeFocused();
   }
 }
 
@@ -67,6 +71,9 @@ async function completeGradedQuiz(
   // Submit and wait for the results panel.
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Quiz Results' }),
+  ).toBeFocused();
 }
 
 test.describe('Quiz — Graded Assessment', () => {
@@ -435,6 +442,26 @@ test.describe('Quiz — Accessibility', () => {
     await expect(status).toContainText(/Incorrect\s*3 is too low\./);
     await expect(status.getByRole('group')).toHaveCount(0);
     await expect(btn).toBeFocused();
+  });
+
+  test('review moves focus to each question, then back to the results', async ({
+    page,
+  }) => {
+    await navigateToPage(page, 'Graded Assessment');
+    await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
+    await completeGradedQuiz(page);
+    const heading = (name: string) => page.getByRole('heading', { name });
+
+    await page.getByRole('button', { name: 'Review Answers' }).click();
+    await expect(heading('Review: Question 1 of 3')).toBeFocused();
+    await primaryBtn(page).click();
+    await expect(heading('Review: Question 2 of 3')).toBeFocused();
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(heading('Review: Question 1 of 3')).toBeFocused();
+    await primaryBtn(page).click();
+    await primaryBtn(page).click();
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(heading('Quiz Results')).toBeFocused();
   });
 
   test('quiz results panel passes axe audit', async ({ page }) => {

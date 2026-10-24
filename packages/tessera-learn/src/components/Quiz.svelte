@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { useQuiz } from '../runtime/hooks.svelte.js';
 
   let { children } = $props();
@@ -9,6 +10,16 @@
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
+  let quizEl = $state();
+
+  // The button the learner pressed is disabled or gone once the question or
+  // phase changes, so focus moves to what replaced it.
+  async function focusAfterUpdate(selector) {
+    await tick();
+    quizEl?.querySelector(selector)?.focus();
+  }
+  const focusProgress = () => focusAfterUpdate('.tessera-quiz-progress-text');
+  const focusResults = () => focusAfterUpdate('.tessera-quiz-results-title');
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
@@ -42,6 +53,7 @@
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
+      focusProgress();
     }
   }
 
@@ -51,31 +63,45 @@
   }
 
   function goPrevQuestion() {
-    if (currentQuestionIndex > 0) currentQuestionIndex--;
+    if (currentQuestionIndex === 0) return;
+    currentQuestionIndex--;
+    focusProgress();
   }
 
   function goNextReview() {
-    if (reviewIndex < totalQuestions - 1) reviewIndex++;
+    if (reviewIndex === totalQuestions - 1) return;
+    reviewIndex++;
+    focusProgress();
   }
 
   function goPrevReview() {
-    if (reviewIndex > 0) reviewIndex--;
+    if (reviewIndex === 0) return;
+    reviewIndex--;
+    focusProgress();
   }
 
   function handleSubmit() {
     if (!handle.canSubmit) return;
     handle.submit();
+    focusResults();
   }
 
   function handleStartReview() {
     reviewIndex = 0;
     handle.startReview();
+    focusProgress();
+  }
+
+  function handleExitReview() {
+    handle.exitReview();
+    focusResults();
   }
 
   function handleRetry() {
     handle.retry();
     currentQuestionIndex = 0;
     reviewIndex = 0;
+    focusProgress();
   }
 </script>
 
@@ -95,22 +121,22 @@
   </div>
 {/snippet}
 
-<div class="tessera-quiz" role="region" aria-label="Quiz">
+<div class="tessera-quiz" role="region" aria-label="Quiz" bind:this={quizEl}>
   <div class="tessera-quiz-intro" hidden={handle.state !== 'answering'}>
     {@render children?.()}
   </div>
 
   {#if handle.state === 'answering'}
     <!-- Question phase -->
-    <div class="tessera-quiz-progress" aria-live="polite">
-      <span class="tessera-quiz-progress-text">
+    <div class="tessera-quiz-progress">
+      <h2 class="tessera-quiz-progress-text" tabindex="-1">
         <span class="tessera-quiz-progress-desktop"
           >Question {currentQuestionIndex + 1} of {totalQuestions}</span
         >
-        <span class="tessera-quiz-progress-mobile"
+        <span class="tessera-quiz-progress-mobile" aria-hidden="true"
           >{currentQuestionIndex + 1}/{totalQuestions}</span
         >
-      </span>
+      </h2>
       <div class="tessera-progress-track">
         <div
           class="tessera-progress-fill"
@@ -165,15 +191,15 @@
     </div>
   {:else if handle.state === 'reviewing'}
     <!-- Review phase -->
-    <div class="tessera-quiz-progress" aria-live="polite">
-      <span class="tessera-quiz-progress-text">
+    <div class="tessera-quiz-progress">
+      <h2 class="tessera-quiz-progress-text" tabindex="-1">
         <span class="tessera-quiz-progress-desktop"
           >Review: Question {reviewIndex + 1} of {totalQuestions}</span
         >
-        <span class="tessera-quiz-progress-mobile"
+        <span class="tessera-quiz-progress-mobile" aria-hidden="true"
           >Review: {reviewIndex + 1}/{totalQuestions}</span
         >
-      </span>
+      </h2>
     </div>
 
     {@render questionList(reviewIndex)}
@@ -199,7 +225,7 @@
         <button
           type="button"
           class="tessera-quiz-btn tessera-btn-primary"
-          onclick={() => handle.exitReview()}
+          onclick={handleExitReview}
         >
           Done
         </button>
@@ -208,7 +234,7 @@
   {:else}
     <!-- Results phase -->
     <div class="tessera-quiz-results" role="status" aria-live="polite">
-      <h2 class="tessera-quiz-results-title">Quiz Results</h2>
+      <h2 class="tessera-quiz-results-title" tabindex="-1">Quiz Results</h2>
       {#if bestBeaten}
         <div class="tessera-quiz-score paired" data-testid="quiz-attempt-score">
           <span class="tessera-quiz-score-caption">This attempt</span>
@@ -303,6 +329,9 @@
   }
 
   .tessera-quiz-progress-text {
+    margin: 0;
+    font: inherit;
+    color: inherit;
     white-space: nowrap;
   }
 
@@ -438,8 +467,13 @@
 
   /* Mobile */
   @media (max-width: 640px) {
+    /* Screen readers keep the full text; "2/3" can be read as a fraction. */
     .tessera-quiz-progress-desktop {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
     }
     .tessera-quiz-progress-mobile {
       display: inline;
