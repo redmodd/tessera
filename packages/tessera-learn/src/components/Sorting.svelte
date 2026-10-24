@@ -46,6 +46,8 @@
   let isDragging = $state(false);
   let cardSelected = $state(false); // current card selected via tap/click
   let cardEl = $state(null);
+  const componentId = $props.id();
+  const hintId = `sorting-${componentId}-hint`;
 
   function initQueue() {
     queue = shuffle(items.map((_, i) => i).filter((i) => !placements.has(i)));
@@ -202,17 +204,13 @@
             role="button"
             tabindex="0"
             aria-pressed={cardSelected}
+            aria-describedby={hintId}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
             onclick={onCardClick}
             onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
-            <span class="tessera-sr-only"
-              >{cardSelected
-                ? '(choose a target)'
-                : '(activate, then choose a target)'}</span
-            >
           </div>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
@@ -229,6 +227,13 @@
         </div>
       {/if}
     </div>
+    <!-- A description, not part of the name: a toggle keeps its name when
+         pressed. Hidden and outside the live deck so changes aren't announced. -->
+    <span id={hintId} hidden
+      >{cardSelected
+        ? 'Choose a target.'
+        : 'Activate, then choose a target.'}</span
+    >
   {/if}
 
   <!-- Drop targets -->
