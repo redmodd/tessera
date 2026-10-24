@@ -202,26 +202,19 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
-  test('arrow keys are ignored when focus is in an input', async ({ page }) => {
-    // Navigate to inline questions page which has inputs
-    await navigateToPage(page, 'Graded Assessment');
-
-    // The quiz page should be visible - find a text input if any
-    // Focus on an input element — FillInTheBlank has text input
-    // First navigate to the fill-in-the-blank question
-    const content = page.locator('.tessera-content');
-    await expect(content).toBeVisible();
-
-    // If there's a radio input, focus it and verify arrow keys don't navigate pages
-    const radioInput = page.locator('input[type="radio"]').first();
-    if (await radioInput.isVisible()) {
-      await radioInput.focus();
-      const h1Before = await page.locator('.tessera-content h1').textContent();
-      await page.keyboard.press('ArrowRight');
-      // Small wait to see if navigation happens
-      await page.waitForTimeout(300);
-      const h1After = await page.locator('.tessera-content h1').textContent();
-      expect(h1After).toBe(h1Before);
+  test('arrow keys in a form field are left to it, even with tabindex -1', async ({
+    page,
+  }) => {
+    const tags = ['input', 'textarea', 'select'];
+    await page.locator('.tessera-content').evaluate((el, tags) => {
+      for (const tag of tags) {
+        el.appendChild(document.createElement(tag)).tabIndex = -1;
+      }
+    }, tags);
+    for (const tag of tags) {
+      const field = page.locator(`.tessera-content > ${tag}`);
+      await field.focus();
+      expect(await arrowCancelled(field)).toBe(false);
     }
   });
 });

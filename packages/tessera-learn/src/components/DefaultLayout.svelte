@@ -29,13 +29,15 @@
   }
 
   // Arrow keys change page only while no control has focus: the page itself,
-  // or a heading or result that focus was moved to. WebKit gives media
-  // players and editable text a tabIndex of -1, so they are named here.
+  // or a heading or result that focus was moved to. Form fields, media and
+  // editable text are named here because their tabIndex can be -1 (set by
+  // code, or by WebKit for media and editable text).
   const DIALOG = 'dialog, [role="dialog"]';
 
   function controlHasFocus(el) {
     return (
       el.tabIndex >= 0 ||
+      el.matches('input, textarea, select') ||
       el.isContentEditable ||
       !!el.closest(`video, audio, ${DIALOG}, .tessera-quiz`)
     );
