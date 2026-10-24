@@ -185,6 +185,28 @@ describe('standalone feedback', () => {
     expect(focusedText()).toContain('The sky is blue.');
   });
 
+  it('names the focused result by its text, without Try again', async () => {
+    const { target, button, click } = mountWidget(FillInTheBlank, {
+      answers: 'blue',
+      incorrectFeedback: 'The sky is blue.',
+    });
+    const input = target.querySelector('input')!;
+    input.value = 'red';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    click(button('Check'));
+
+    await expect.poll(focusedText).toContain('Try again');
+    const result = document.activeElement!;
+    expect(result.getAttribute('role')).toBe('group');
+    const label = document
+      .getElementById(result.getAttribute('aria-labelledby')!)!
+      .textContent!.replace(/\s+/g, ' ');
+    expect(label).toContain('Incorrect');
+    expect(label).toContain('The sky is blue.');
+    expect(label).not.toContain('Try again');
+  });
+
   it('selects a MultipleChoice option without submitting it', () => {
     const { target, button } = mountWidget(MultipleChoice, {
       options: ['3', '4'],
