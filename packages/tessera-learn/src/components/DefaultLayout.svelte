@@ -28,15 +28,35 @@
     sidebarOpen = false;
   }
 
+  // Arrow keys belong to these first: native controls, dialogs, the ARIA
+  // patterns that use arrows, and the quiz. Other widgets call preventDefault().
+  const ARROW_KEY_OWNERS = [
+    'input',
+    'textarea',
+    'select',
+    'dialog',
+    '[role="dialog"]',
+    ...[
+      'radiogroup',
+      'listbox',
+      'combobox',
+      'menu',
+      'menubar',
+      'tablist',
+      'toolbar',
+      'tree',
+      'treegrid',
+      'grid',
+      'slider',
+      'spinbutton',
+    ].map((role) => `[role="${role}"]`),
+    '.tessera-quiz',
+  ].join(', ');
+
   function handleKeyNav(e) {
-    const tag = e.target?.tagName;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-    if (
-      e.target?.closest(
-        'dialog, [role="radiogroup"], [role="dialog"], .tessera-accordion, .tessera-carousel, .tessera-quiz',
-      )
-    )
-      return;
+    if (e.defaultPrevented || e.target?.isContentEditable) return;
+    if (e.target?.closest?.(ARROW_KEY_OWNERS)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
 
     if (e.key === 'ArrowLeft') {
       nav.prev();

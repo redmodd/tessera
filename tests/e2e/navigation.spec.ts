@@ -149,6 +149,25 @@ test.describe('Navigation — Keyboard Shortcuts', () => {
     await expect(page.locator('.tessera-content h1')).toContainText('Welcome');
   });
 
+  test('arrow keys with a modifier are left to the browser', async ({
+    page,
+  }) => {
+    // The layout cancels a key it navigates on; the last press has no modifier.
+    const cancelled = await page.evaluate(() =>
+      ['altKey', 'ctrlKey', 'metaKey', 'shiftKey', 'none'].map((mod) => {
+        const e = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+          [mod]: true,
+        });
+        document.body.dispatchEvent(e);
+        return e.defaultPrevented;
+      }),
+    );
+    expect(cancelled).toEqual([false, false, false, false, true]);
+  });
+
   test('ArrowLeft does nothing on first page', async ({ page }) => {
     await page.keyboard.press('ArrowLeft');
     // Should still be on page 1
