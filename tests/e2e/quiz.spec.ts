@@ -73,7 +73,7 @@ async function completeGradedQuiz(
   await page.locator('.tessera-quiz-btn-submit').click();
   await expect(page.locator('.tessera-quiz-results')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Quiz Results' }),
+    page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
   ).toBeFocused();
 }
 
@@ -470,7 +470,9 @@ test.describe('Quiz — Accessibility', () => {
     await primaryBtn(page).click();
     await primaryBtn(page).click();
     await page.getByRole('button', { name: 'Done' }).click();
-    await expect(heading('Quiz Results')).toBeFocused();
+    await expect(
+      page.getByRole('group', { name: /^Quiz Results\s*[\d.]+%/ }),
+    ).toBeFocused();
   });
 
   test('quiz results panel passes axe audit', async ({ page }) => {

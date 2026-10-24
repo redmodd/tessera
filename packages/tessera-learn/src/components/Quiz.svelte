@@ -10,16 +10,21 @@
 
   let currentQuestionIndex = $state(0);
   let reviewIndex = $state(0);
-  let quizEl;
+  let progressEl = $state();
+  let resultsEl = $state();
+  const resultsId = $props.id();
 
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it.
-  async function focusAfterUpdate(selector) {
+  async function focusProgress() {
     await tick();
-    quizEl?.querySelector(selector)?.focus();
+    progressEl?.focus();
   }
-  const focusProgress = () => focusAfterUpdate('.tessera-quiz-progress-text');
-  const focusResults = () => focusAfterUpdate('.tessera-quiz-results-title');
+
+  async function focusResults() {
+    await tick();
+    resultsEl?.focus();
+  }
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
@@ -106,7 +111,7 @@
 </script>
 
 {#snippet progressHeading(prefix, index)}
-  <h2 class="tessera-quiz-progress-text" tabindex="-1">
+  <h2 class="tessera-quiz-progress-text" tabindex="-1" bind:this={progressEl}>
     <span class="tessera-quiz-progress-desktop"
       >{prefix}Question {index + 1} of {totalQuestions}</span
     >
@@ -143,7 +148,7 @@
   </div>
 {/snippet}
 
-<div class="tessera-quiz" role="region" aria-label="Quiz" bind:this={quizEl}>
+<div class="tessera-quiz" role="region" aria-label="Quiz">
   <div class="tessera-quiz-intro" hidden={handle.state !== 'answering'}>
     {@render children?.()}
   </div>
@@ -234,49 +239,65 @@
   {:else}
     <!-- Results phase -->
     <div class="tessera-quiz-results">
-      <h2 class="tessera-quiz-results-title" tabindex="-1">Quiz Results</h2>
-      {#if bestBeaten}
-        <div class="tessera-quiz-score paired" data-testid="quiz-attempt-score">
-          <span class="tessera-quiz-score-caption">This attempt</span>
-          <span class="tessera-quiz-score-value">{handle.score}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed={attemptPassed}
-            class:failed={!attemptPassed}
-          >
-            {attemptPassed ? 'Passed' : 'Not Passed'}
-          </span>
+      <!-- Named by its text so focus reads the score, not just the heading. -->
+      <div
+        role="group"
+        aria-labelledby={resultsId}
+        tabindex="-1"
+        bind:this={resultsEl}
+      >
+        <div id={resultsId}>
+          <h2 class="tessera-quiz-results-title">Quiz Results</h2>
+          {#if bestBeaten}
+            <div
+              class="tessera-quiz-score paired"
+              data-testid="quiz-attempt-score"
+            >
+              <span class="tessera-quiz-score-caption">This attempt</span>
+              <span class="tessera-quiz-score-value">{handle.score}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed={attemptPassed}
+                class:failed={!attemptPassed}
+              >
+                {attemptPassed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+            <div
+              class="tessera-quiz-score paired"
+              data-testid="quiz-best-score"
+            >
+              <span class="tessera-quiz-score-caption">On record</span>
+              <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed
+                class:failed={!passed}
+              >
+                {passed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+          {:else}
+            <div class="tessera-quiz-score">
+              <span class="tessera-quiz-score-value">{handle.score}%</span>
+              <span
+                class="tessera-quiz-score-label"
+                class:passed
+                class:failed={!passed}
+              >
+                {passed ? 'Passed' : 'Not Passed'}
+              </span>
+            </div>
+          {/if}
+          {#if handle.restored}
+            <p class="tessera-quiz-results-detail">Your previous result.</p>
+          {:else}
+            <p class="tessera-quiz-results-detail">
+              You answered {correctCount} of {totalQuestions} questions correctly.
+            </p>
+          {/if}
         </div>
-        <div class="tessera-quiz-score paired" data-testid="quiz-best-score">
-          <span class="tessera-quiz-score-caption">On record</span>
-          <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed
-            class:failed={!passed}
-          >
-            {passed ? 'Passed' : 'Not Passed'}
-          </span>
-        </div>
-      {:else}
-        <div class="tessera-quiz-score">
-          <span class="tessera-quiz-score-value">{handle.score}%</span>
-          <span
-            class="tessera-quiz-score-label"
-            class:passed
-            class:failed={!passed}
-          >
-            {passed ? 'Passed' : 'Not Passed'}
-          </span>
-        </div>
-      {/if}
-      {#if handle.restored}
-        <p class="tessera-quiz-results-detail">Your previous result.</p>
-      {:else}
-        <p class="tessera-quiz-results-detail">
-          You answered {correctCount} of {totalQuestions} questions correctly.
-        </p>
-      {/if}
+      </div>
       <div class="tessera-quiz-results-actions">
         {#if !feedbackDisabled && !handle.restored}
           <button
