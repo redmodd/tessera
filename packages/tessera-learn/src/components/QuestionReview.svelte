@@ -16,11 +16,11 @@
   const inQuiz = $derived(q.mode === 'quiz');
   const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
   const contentId = $props.id();
-  // Feedback showing at mount is a restored answer, not a fresh check.
+  // Feedback showing at mount is a restored answer, not a fresh submit.
   let restored = untrack(() => q.feedbackVisible);
 
   // Review never takes focus: a custom quiz shell may keep every question mounted.
-  function focusOnCheck(el) {
+  function focusOnSubmit(el) {
     const review = untrack(() => inQuiz && q.submitted);
     if (!restored && !review) el.focus();
     restored = false;
@@ -41,7 +41,7 @@
     role="group"
     aria-labelledby={contentId}
     tabindex="-1"
-    {@attach focusOnCheck}
+    {@attach focusOnSubmit}
   >
     <div id={contentId}>
       <div
@@ -72,10 +72,6 @@
 {/if}
 
 <style>
-  .tessera-question-review {
-    margin-top: var(--tessera-spacing-md);
-  }
-
   .tessera-question-result {
     display: flex;
     align-items: center;

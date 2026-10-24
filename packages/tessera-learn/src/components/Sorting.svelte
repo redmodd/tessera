@@ -222,7 +222,8 @@
         </div>
       {:else}
         <div class="tessera-sorting-deck-empty">
-          All cards placed. Submit your answers below.
+          All cards placed.{#if !inQuiz}
+            Submit your answers below.{/if}
         </div>
       {/if}
     </div>

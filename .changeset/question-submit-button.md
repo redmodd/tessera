@@ -2,4 +2,5 @@
 'tessera-learn': patch
 ---
 
-The standalone MultipleChoice, FillInTheBlank and Sorting button now reads "Submit" and shares one style (`.tessera-question-submit`). Question results use the same top spacing in every widget.
+Standalone FillInTheBlank and Sorting buttons read "Submit". The standalone MultipleChoice, FillInTheBlank and Sorting buttons share one style, `.tessera-question-submit`, which replaces `.tessera-fitb-check-btn` and `.tessera-sorting-check`.
+Question results use the same top spacing in every widget, set by `.tessera-question-review`.

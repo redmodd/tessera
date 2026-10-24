@@ -396,6 +396,10 @@
   cursor: not-allowed;
 }
 
+.tessera-question-review {
+  margin-top: var(--tessera-spacing-md);
+}
+
 .tessera-question-submit {
   margin-top: var(--tessera-spacing-md);
   padding: 0.5rem 1rem;
