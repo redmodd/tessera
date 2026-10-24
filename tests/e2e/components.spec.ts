@@ -194,7 +194,7 @@ test.describe('Component — Sorting', () => {
       await sorting.locator('.tessera-sorting-card').click();
       await fruit.click();
     }
-    await sorting.getByRole('button', { name: 'Check Answer' }).click();
+    await sorting.getByRole('button', { name: 'Submit' }).click();
     await expect(sorting.locator('.tessera-sorting-review')).toBeVisible();
     await expect(sorting.getByText('(incorrect)')).toHaveCount(1);
 

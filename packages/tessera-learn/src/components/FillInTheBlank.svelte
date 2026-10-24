@@ -96,11 +96,11 @@
     {#if !inQuiz && !q.submitted}
       <button
         type="button"
-        class="tessera-btn-primary tessera-fitb-check-btn"
+        class="tessera-btn-primary tessera-question-submit"
         disabled={!q.answerComplete}
         onclick={q.submit}
       >
-        Check
+        Submit
       </button>
     {/if}
   </div>
@@ -167,21 +167,10 @@
     border-color: var(--tessera-error);
   }
 
-  :global(.tessera-fitb-review) {
-    margin-top: var(--tessera-spacing-md);
-  }
-
   .tessera-fitb-correct-answer {
     font-size: 0.875rem;
     color: var(--tessera-text-light);
     margin-bottom: var(--tessera-spacing-sm);
-  }
-
-  .tessera-fitb-check-btn {
-    margin-top: var(--tessera-spacing-sm);
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
   }
 
   @media (max-width: 640px) {

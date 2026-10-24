@@ -144,11 +144,11 @@
   {#if !inQuiz && !q.submitted}
     <button
       type="button"
-      class="tessera-btn-primary tessera-mc-check-btn"
+      class="tessera-btn-primary tessera-question-submit"
       disabled={!q.answerComplete}
       onclick={q.submit}
     >
-      Check
+      Submit
     </button>
   {/if}
 
@@ -285,17 +285,6 @@
 
   .tessera-mc-feedback.incorrect {
     color: var(--tessera-error);
-  }
-
-  .tessera-mc-check-btn {
-    margin-top: var(--tessera-spacing-md);
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  :global(.tessera-mc-review) {
-    margin-top: var(--tessera-spacing-md);
   }
 
   /* A dark ring, so focus can't be mistaken for the blue selected border. */

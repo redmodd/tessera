@@ -101,7 +101,7 @@ describe('a built-in question the learner returns to', () => {
 
     expect(input.value).toBe('blue');
     expect(input.disabled).toBe(true);
-    expect(all('.tessera-fitb-check-btn')).toHaveLength(0);
+    expect(all('.tessera-question-submit')).toHaveLength(0);
     expect(target.textContent).toContain('Correct');
   });
 

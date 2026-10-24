@@ -222,7 +222,7 @@
         </div>
       {:else}
         <div class="tessera-sorting-deck-empty">
-          All cards placed — check your answers below.
+          All cards placed. Submit your answers below.
         </div>
       {/if}
     </div>
@@ -321,17 +321,14 @@
     {/if}
   </QuestionReview>
 
-  <!-- Standalone Check button (shown once all cards are placed) -->
   {#if !inQuiz && !q.submitted && q.answerComplete}
-    <div class="tessera-sorting-actions">
-      <button
-        type="button"
-        class="tessera-btn-primary tessera-sorting-check"
-        onclick={q.submit}
-      >
-        Check Answer
-      </button>
-    </div>
+    <button
+      type="button"
+      class="tessera-btn-primary tessera-question-submit"
+      onclick={q.submit}
+    >
+      Submit
+    </button>
   {/if}
 </QuestionShell>
 
@@ -575,10 +572,6 @@
 
   /* --- Feedback --- */
 
-  :global(.tessera-sorting-review) {
-    margin-top: var(--tessera-spacing-lg);
-  }
-
   .tessera-sorting-correct-list {
     margin: var(--tessera-spacing-sm) 0;
     font-size: 0.875rem;
@@ -593,18 +586,6 @@
 
   .tessera-sorting-correct-item {
     margin: 2px 0;
-  }
-
-  /* --- Standalone actions --- */
-
-  .tessera-sorting-actions {
-    margin-top: var(--tessera-spacing-lg);
-  }
-
-  .tessera-sorting-check {
-    padding: 0.625rem 1.5rem;
-    font-size: 0.9375rem;
-    font-weight: 500;
   }
 
   /* --- Mobile --- */

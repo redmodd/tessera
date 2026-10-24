@@ -107,7 +107,7 @@ describe('Sorting accessible names', () => {
       click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
       click(button('Fruit'));
     }
-    click(button('Check Answer'));
+    click(button('Submit'));
 
     expect((button('Fruit') as HTMLButtonElement).disabled).toBe(true);
     const placed = [
@@ -146,13 +146,13 @@ function checkFillIn({ target, button, click }: Widget, text: string) {
   input.value = text;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   flushSync();
-  click(button('Check'));
+  click(button('Submit'));
 }
 
 function checkOption({ target, button, click }: Widget, index: number) {
   target.querySelectorAll('input')[index].click();
   flushSync();
-  click(button('Check'));
+  click(button('Submit'));
 }
 
 describe('standalone feedback', () => {
@@ -162,7 +162,7 @@ describe('standalone feedback', () => {
     return (el.textContent ?? '').replace(/\s+/g, ' ').trim();
   };
 
-  it('moves focus to the Sorting result after Check Answer', async () => {
+  it('moves focus to the Sorting result after Submit', async () => {
     const { target, button, click } = mountWidget(Sorting, {
       items: ['Apple'],
       targets: ['Fruit'],
@@ -170,8 +170,8 @@ describe('standalone feedback', () => {
     });
     click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
     click(button('Fruit'));
-    button('Check Answer').focus();
-    click(button('Check Answer'));
+    button('Submit').focus();
+    click(button('Submit'));
 
     await expect.poll(focusedText).toContain('All items sorted correctly!');
   });
@@ -210,12 +210,12 @@ describe('standalone feedback', () => {
       correct: 1,
     });
     const radios = target.querySelectorAll<HTMLInputElement>('input');
-    expect((button('Check') as HTMLButtonElement).disabled).toBe(true);
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(true);
     radios[0].click();
     flushSync();
 
     expect(radios[0].disabled).toBe(false);
-    expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('selects the focused MultipleChoice option on Enter without submitting it', () => {
@@ -235,7 +235,7 @@ describe('standalone feedback', () => {
 
     expect(enter.defaultPrevented).toBe(true);
     expect(radios[0].checked).toBe(true);
-    expect((button('Check') as HTMLButtonElement).disabled).toBe(false);
+    expect((button('Submit') as HTMLButtonElement).disabled).toBe(false);
     expect(target.querySelector('.tessera-question-result')).toBe(null);
   });
 
@@ -268,14 +268,14 @@ describe('standalone feedback', () => {
     ).not.toBe(null);
   });
 
-  it('keeps Check and the result outside the MultipleChoice radiogroup', () => {
+  it('keeps Submit and the result outside the MultipleChoice radiogroup', () => {
     const widget = mountWidget(MultipleChoice, {
       options: ['3', '4'],
       correct: 1,
     });
     const { target, button } = widget;
     const group = target.querySelector('[role="radiogroup"]')!;
-    expect(group.contains(button('Check'))).toBe(false);
+    expect(group.contains(button('Submit'))).toBe(false);
     checkOption(widget, 0);
 
     expect(group.contains(button('Try again'))).toBe(false);
@@ -350,7 +350,7 @@ describe('standalone feedback', () => {
       answerWrong: ({ target, button, click }: Widget) => {
         click(target.querySelector<HTMLElement>('.tessera-sorting-card')!);
         click(button('Fruit'));
-        click(button('Check Answer'));
+        click(button('Submit'));
       },
     },
   ])(

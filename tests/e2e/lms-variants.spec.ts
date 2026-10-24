@@ -364,7 +364,7 @@ test.describe.serial('per-page weights in the course rollup', () => {
   async function answerRevealedExamQuestion(page: Page, optionIndex: number) {
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.locator('.tessera-mc-option').nth(optionIndex).click();
-    await page.getByRole('button', { name: 'Check', exact: true }).click();
+    await page.getByRole('button', { name: 'Submit', exact: true }).click();
   }
 
   async function answerExam(page: Page, correct: boolean) {

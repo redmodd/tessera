@@ -387,10 +387,6 @@
     background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
   }
 
-  :global(.tessera-matching-review) {
-    margin-top: var(--tessera-spacing-lg);
-  }
-
   .tessera-matching-correct-pairs {
     margin: var(--tessera-spacing-sm) 0;
     font-size: 0.875rem;

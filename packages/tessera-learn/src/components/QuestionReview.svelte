@@ -37,7 +37,7 @@
   <!-- Named by its text: VoiceOver in Safari reads an unnamed focused block as
        only its first line ("Incorrect and 2 more items"). -->
   <div
-    class={className}
+    class="tessera-question-review {className}"
     role="group"
     aria-labelledby={contentId}
     tabindex="-1"
@@ -72,6 +72,10 @@
 {/if}
 
 <style>
+  .tessera-question-review {
+    margin-top: var(--tessera-spacing-md);
+  }
+
   .tessera-question-result {
     display: flex;
     align-items: center;
