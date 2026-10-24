@@ -4,8 +4,6 @@ import { navigateToPage, waitForTesseraContent } from './helpers.js';
 
 async function openCourse(page: Page) {
   await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
-  await page.goto('/');
   await waitForTesseraContent(page);
 }
 
