@@ -1,5 +1,55 @@
 # tessera-learn
 
+## 0.12.0
+
+### Minor Changes
+
+- c83cf81: **Breaking:** the `.tessera-carousel-controls` wrapper is gone. Previous and Next sit either side of the slide, with the dots below. To upgrade, move custom CSS for the wrapper to `.tessera-carousel-arrow` and `.tessera-carousel-dots`.
+  
+  Carousel works with a keyboard and a screen reader. Hidden slides can't take focus, and the dots are one Tab stop with arrow keys moving between them. Previous, Next and swipe announce the new slide. Arrow keys change slides only from the dots.
+- 93fe03f: `QuestionReview` is exported, so a custom `useQuestion` widget gets the built-in Submit button, result, and Try again, with focus moving to the result and back to the first control. A standalone question with no correct answer shows a neutral Submitted result.
+- 7c74aa9: **Breaking:** `--tessera-focus-ring` is gone. To upgrade, wherever you set or read it, use `--tessera-focus-outline` as an `outline` (default `2px solid var(--tessera-text)`) and `--tessera-focus-halo` as a `box-shadow` (default `0 0 0 4px var(--tessera-bg)`).
+  
+  The focus ring meets 3:1 contrast on any background and shows in forced-colors mode, and it no longer takes `branding.primaryColor`. It is no longer clipped in the sidebar or the accordion, and headings focused only for screen readers (`tabindex="-1"`) show no ring. New `--tessera-shadow-sm` and `--tessera-shadow-lg` tokens set the shadows on the mobile menu button and Sorting cards, and on the exit dialog and RevealModal.
+- 1d7e19c: **Breaking:** element selectors and layered CSS in `styles/` now reach built-in components, so a reset such as Tailwind's preflight strips their styling. To upgrade, leave preflight out and scope element rules such as `button { … }` to your own classes.
+  
+  Framework CSS sits in the `tessera` cascade layer, so a plain rule in `styles/` overrides any built-in component style without matching its specificity.
+- 4f1d202: **Breaking:** page content renders inside a `div.tessera-page`, so layout CSS that reaches page elements with a child selector such as `main > h1` stops matching. To upgrade, write it as `.tessera-page > h1`.
+  
+  Changing page moves focus to the new page's heading (its `h1`, or else its first heading), so screen readers announce the page. The browser tab title becomes "Page title – Course title".
+- a684bcb: **Behavior change:** `performance` steps grade in order and compare as recorded text, so the right steps in a different order are now incorrect, and `3` matches a correct `'3'`. A custom widget should send steps in the order of its `correct` answer. A `numeric` correct with only `min` or `max` records as an open range (`5[:]`), not an exact value, and SCORM 1.2, which has no range syntax, leaves it out of the LMS record.
+  
+  A `performance` correct step answer can be a `min[:]max` range, and any decimal step answer inside it grades as correct. SCORM 1.2 leaves a correct answer holding a range out of the LMS record. In dev, a console warning flags a range with its minimum above its maximum (left out of the SCORM record) and a `[:]` answer that is not a valid range (graded as exact text).
+- 432c4bb: **Behavior change:** every standalone question shows a Submit button, disabled until the answer is complete. MultipleChoice no longer checks the answer when an option is picked, nor Matching when the last pair is matched, so learners press Submit. Sorting shows its button from the start, and the FillInTheBlank and Sorting buttons read "Submit". Question results use the same top spacing in every widget.
+  
+  **Breaking:** the question widgets share new class names, so custom CSS aimed at the old ones stops applying. To upgrade, rename them:
+  
+  - `.tessera-fitb-check-btn` and `.tessera-sorting-check` → `.tessera-question-submit`. The `.tessera-sorting-actions` wrapper is gone.
+  - `.tessera-fitb-review`, `.tessera-matching-review` and `.tessera-sorting-review` → `.tessera-question-review`.
+  - `.tessera-fitb-result`, `.tessera-matching-result` and `.tessera-sorting-result` → `.tessera-question-result`.
+  - `.tessera-fitb-feedback`, `.tessera-matching-feedback`, `.tessera-sorting-feedback` and `.tessera-mc-overall-feedback` → `.tessera-question-feedback`.
+  - The `.tessera-fitb-input-wrapper` div is gone.
+
+### Patch Changes
+
+- 390351c: Screen readers now announce question feedback: focus moves to the result after submitting an answer, and back to the question on Try again.
+- 4466114: Authoring guide and README corrections.
+- 52706a8: - `@vitest/coverage-v8` 5.0.3 → 5.0.5
+  - `jsdom` 30.1.2 → 30.1.3
+  - `svelte-check` 4.7.6 → 4.7.7
+  - `tsdown` 0.23.0 → 0.23.1
+  - `vitest` 5.0.3 → 5.0.5
+- 3e1c635: Matching is easier to use with a keyboard and a screen reader: each column is one Tab stop named by its heading, with arrow keys moving inside it. Items say what to choose next and which item they are matched with, and Matching announces when every pair is matched.
+- 45a5439: Matching and Sorting buttons take their accessible name from their visible text, so screen reader and voice control users hear and say what they see. Both announce the pending selection and, once feedback shows, whether each match or placement is correct. Locked Matching items no longer offer to unmatch, and locked Sorting targets leave the tab order. Screen readers can reach the "return to deck" buttons on Sorting targets, and returning a card to the deck clears the selection and moves keyboard focus to it.
+- a84641d: SCORM 1.2 and 2004 commit progress saves (bookmark, visited pages, `usePersistence`) and the session time at most every ten seconds while the page is visible, and right away once it is hidden. If the browser kills the page without `pagehide`, an LMS that keeps only committed values now resumes from the last progress save, not the last status change.
+- 5d404f7: SCORM 1.2 and 2004 write the exit mode with every status commit, not only when the session ends. A page the browser kills without `pagehide` (iOS Safari in the background, a crash) now leaves the attempt suspended instead of exited normally.
+- c4904d3: Internal: SCORM 2004 checks each interaction value against one table of rules per type. Recorded values and warnings are unchanged.
+- 9cffba7: The default layout adds a "Skip to content" link as the first Tab stop. On narrow screens the closed sidebar is out of the Tab order, opening it moves focus into it and takes the page behind it out of the Tab order, and closing it returns focus to the menu button. The menu button shows the focus ring.
+  Arrow keys change page only when no control has focus, and Escape closes the sidebar from anywhere outside a dialog.
+- 107525f: `--tessera-success` and `--tessera-error` default to darker shades (`#147638`, `#b91c1c`) so quiz feedback text meets WCAG AA contrast (4.5:1), including on its tinted backgrounds.
+  
+  Matching pair badges use darker colors so their numbers meet AA contrast, including after submit, and no pair color matches the error color.
+
 ## 0.11.1
 
 ### Patch Changes
