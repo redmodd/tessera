@@ -41,7 +41,7 @@ tone, brand). If Claude Code does not pick it up, add a `CLAUDE.md` containing
 ## Updating
 
 Ask your assistant to update the framework. The authoring guide has it check
-the changelog and warn you about anything that resets learners' saved progress
-before it edits a course. To update by hand, read the
+the changelog and warn you about anything that resets learners' saved progress,
+and ask whether to go on, before it edits a course. To update by hand, read the
 [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md)
 first, then run `pnpm add tessera-learn@latest` from the workspace root.

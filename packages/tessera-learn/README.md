@@ -18,7 +18,7 @@ That creates a [workspace](https://tesseralearn.dev/docs/workspace/) with Tesser
 
 ## Updating
 
-Ask your assistant to update the framework. It follows [`docs/updating.md`](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/docs/updating.md), which ships with this package: it checks the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) and warns you about anything that resets learners' saved progress before it edits a course. To update by hand, read the changelog first, then run `pnpm add tessera-learn@latest` from the workspace root.
+Ask your assistant to update the framework. It follows [`docs/updating.md`](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/docs/updating.md), which ships with this package: it checks the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) and warns you about anything that resets learners' saved progress, and asks whether to go on, before it edits a course. To update by hand, read the changelog first, then run `pnpm add tessera-learn@latest` from the workspace root.
 
 ## What's included
 

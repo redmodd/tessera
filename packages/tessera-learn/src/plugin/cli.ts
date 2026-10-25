@@ -153,7 +153,7 @@ function formatUsage(): string {
   return [
     'Usage: tessera <command> [course] [options]',
     `Commands:\n${commandLines.join('\n')}`,
-    'Name the course, or run `npx tessera <command>` from inside its folder.',
+    'For course commands, name the course, or run `npx tessera <command>` from inside its folder.',
     ...flagBlocks,
   ].join('\n\n');
 }

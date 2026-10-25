@@ -72,7 +72,7 @@ Tessera is a runtime built on Svelte and Vite, and pages are `.svelte` files, so
 
 ## Updating an existing workspace
 
-Ask your assistant to update the framework. The authoring guide has it check the [changelog](./packages/tessera-learn/CHANGELOG.md) and warn you about anything that resets learners' saved progress before it edits a course. Every course moves together. [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) covers updating by hand.
+Ask your assistant to update the framework. The authoring guide has it check the [changelog](./packages/tessera-learn/CHANGELOG.md) and warn you about anything that resets learners' saved progress, and ask whether to go on, before it edits a course. Every course moves together. [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) covers updating by hand.
 
 ## Documentation
 

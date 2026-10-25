@@ -39,7 +39,7 @@ Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md`, `.cla
 
 There is no `create-tessera upgrade` verb: you update by bumping the `tessera-learn` dependency, and every course moves together. Some updates change how courses are written, and some reset learners' saved progress.
 
-The simplest way is to ask your assistant to update the framework. The authoring guide's [update steps](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/docs/updating.md) have it read the changelog, warn you about anything that resets saved progress before it edits a course, then apply the changes and validate every course.
+The simplest way is to ask your assistant to update the framework. The authoring guide's [update steps](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/docs/updating.md) have it read the changelog, warn you about anything that resets saved progress and ask whether to go on before it edits a course, then apply the changes and validate every course.
 
 To update by hand, read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first, then, from the workspace root:
 

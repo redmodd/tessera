@@ -2,7 +2,7 @@
 
 Part of the Tessera authoring guide. [`AGENTS.md`](../AGENTS.md) holds the rules that apply to every task: read it first.
 
-Seven hooks plus two helpers. Each hook is synchronous and must be called during component setup inside a Tessera course. The built-in components track, score and save through these hooks and `QuestionReview`, so anything a built-in does, a custom component can do too. The eighth hook, `useXAPI()`, sends your own xAPI statements: see [Custom xAPI statements](xapi.md).
+Seven hooks plus two helpers. Each hook is synchronous and must be called during component setup inside a Tessera course. The built-in components track, score and save through these hooks and `QuestionReview`, so anything a built-in does, a custom component can do too. The eighth hook, `useXAPI()`, can be called anywhere and sends your own xAPI statements: see [Custom xAPI statements](xapi.md).
 
 ```js
 import {
