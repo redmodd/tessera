@@ -2,12 +2,12 @@
 'tessera-learn': minor
 ---
 
-Every standalone question shows a Submit button, disabled until the answer is complete. MultipleChoice no longer checks the answer when an option is picked, nor Matching when the last pair is matched. Sorting shows its button from the start, and the FillInTheBlank and Sorting buttons read "Submit". Question results use the same top spacing in every widget.
+**Behavior change:** every standalone question shows a Submit button, disabled until the answer is complete. MultipleChoice no longer checks the answer when an option is picked, nor Matching when the last pair is matched, so learners press Submit. Sorting shows its button from the start, and the FillInTheBlank and Sorting buttons read "Submit". Question results use the same top spacing in every widget.
 
-Custom CSS that targets question widgets needs updating. The widgets share these classes:
+**Breaking:** the question widgets share new class names, so custom CSS aimed at the old ones stops applying. To upgrade, rename them:
 
-- `.tessera-question-submit` replaces `.tessera-fitb-check-btn`, `.tessera-sorting-check` and the `.tessera-sorting-actions` wrapper.
-- `.tessera-question-review` replaces the `.tessera-fitb-`, `.tessera-matching-` and `.tessera-sorting-` `review` classes.
-- `.tessera-question-result` replaces the `.tessera-fitb-`, `.tessera-matching-` and `.tessera-sorting-` `result` classes.
-- `.tessera-question-feedback` replaces the `.tessera-fitb-`, `.tessera-matching-` and `.tessera-sorting-` `feedback` classes, and `.tessera-mc-overall-feedback`.
-- FillInTheBlank drops its `.tessera-fitb-input-wrapper` div.
+- `.tessera-fitb-check-btn` and `.tessera-sorting-check` → `.tessera-question-submit`. The `.tessera-sorting-actions` wrapper is gone.
+- `.tessera-fitb-review`, `.tessera-matching-review` and `.tessera-sorting-review` → `.tessera-question-review`.
+- `.tessera-fitb-result`, `.tessera-matching-result` and `.tessera-sorting-result` → `.tessera-question-result`.
+- `.tessera-fitb-feedback`, `.tessera-matching-feedback`, `.tessera-sorting-feedback` and `.tessera-mc-overall-feedback` → `.tessera-question-feedback`.
+- The `.tessera-fitb-input-wrapper` div is gone.
