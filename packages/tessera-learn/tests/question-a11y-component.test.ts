@@ -505,18 +505,34 @@ describe('standalone feedback', () => {
   });
 
   it.each([
-    { name: 'is the page', nested: false, problem: 'is the page' },
+    {
+      name: 'is the page',
+      nested: false,
+      arrange: (t: HTMLElement) => t.classList.add('tessera-page'),
+      problem: 'is the page',
+    },
     {
       name: 'has no control',
       nested: true,
+      arrange: () => {},
       problem: 'has no control that takes focus',
+    },
+    {
+      name: 'holds another question',
+      nested: false,
+      arrange: (t: HTMLElement) =>
+        t.insertAdjacentHTML(
+          'beforeend',
+          '<button class="tessera-question-submit">Submit</button>',
+        ),
+      problem: 'holds another question',
     },
   ])(
     'warns when the QuestionReview parent $name',
-    async ({ nested, problem }) => {
+    async ({ nested, arrange, problem }) => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const mounted = mountWidget(CustomChoiceUnwrapped, { nested });
-      mounted.target.classList.add('tessera-page');
+      arrange(mounted.target);
       mounted.click(mounted.target.querySelector('input')!);
       mounted.click(mounted.button('Submit'));
       mounted.click(mounted.button('Try again'));
