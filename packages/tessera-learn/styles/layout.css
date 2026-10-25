@@ -305,6 +305,10 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.tessera-hamburger:focus-visible {
+  box-shadow: var(--tessera-focus-ring);
+}
+
 .tessera-hamburger-line {
   display: block;
   width: 20px;
