@@ -35,26 +35,32 @@
 
   setCarouselContext(ctx);
 
+  // A focused dot already announces the selected slide, so only the
+  // arrows and swipe use the live region.
   function goTo(index) {
-    if (index < 0 || index >= totalSlides || index === currentSlide) return;
+    currentSlide = index;
+    status = '';
+  }
+
+  function step(delta) {
+    const index = currentSlide + delta;
+    if (index < 0 || index >= totalSlides) return;
     currentSlide = index;
     status = `Slide ${index + 1} of ${totalSlides}`;
   }
 
-  const prev = () => goTo(currentSlide - 1);
-  const next = () => goTo(currentSlide + 1);
+  const prev = () => step(-1);
+  const next = () => step(1);
 
   // Tabs pattern: the dots are one Tab stop, arrows move and select.
-  function onDotKeydown(e) {
+  const STEP = { ArrowRight: 1, ArrowLeft: -1 };
+
+  function onDotKeydown(e, dot) {
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const last = totalSlides - 1;
     let index;
-    if (e.key === 'ArrowRight')
-      index = currentSlide === last ? 0 : currentSlide + 1;
-    else if (e.key === 'ArrowLeft')
-      index = currentSlide === 0 ? last : currentSlide - 1;
+    if (e.key in STEP) index = (dot + STEP[e.key] + totalSlides) % totalSlides;
     else if (e.key === 'Home') index = 0;
-    else if (e.key === 'End') index = last;
+    else if (e.key === 'End') index = totalSlides - 1;
     else return;
     e.preventDefault();
     goTo(index);
@@ -100,7 +106,7 @@
     <button
       class="tessera-carousel-arrow tessera-carousel-prev"
       onclick={prev}
-      disabled={currentSlide === 0}
+      aria-disabled={currentSlide === 0}
       aria-label="Previous slide"
     >
       ‹
@@ -118,10 +124,10 @@
           role="tab"
           aria-selected={dot === currentSlide}
           aria-controls="{id}-slide-{dot}"
-          aria-label="Go to slide {dot + 1}"
+          aria-label="Slide {dot + 1}"
           tabindex={dot === currentSlide ? 0 : -1}
           onclick={() => goTo(dot)}
-          onkeydown={onDotKeydown}
+          onkeydown={(e) => onDotKeydown(e, dot)}
         ></button>
       {/each}
     </div>
@@ -129,7 +135,7 @@
     <button
       class="tessera-carousel-arrow tessera-carousel-next"
       onclick={next}
-      disabled={currentSlide >= totalSlides - 1}
+      aria-disabled={currentSlide >= totalSlides - 1}
       aria-label="Next slide"
     >
       ›
@@ -180,11 +186,11 @@
       color var(--tessera-transition-fast);
   }
 
-  .tessera-carousel-arrow:hover:not(:disabled) {
+  .tessera-carousel-arrow:hover:not([aria-disabled='true']) {
     background-color: var(--tessera-bg-secondary);
   }
 
-  .tessera-carousel-arrow:disabled {
+  .tessera-carousel-arrow[aria-disabled='true'] {
     opacity: 0.35;
     cursor: not-allowed;
   }

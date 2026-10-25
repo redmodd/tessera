@@ -76,11 +76,29 @@ test.describe('Component — Carousel', () => {
     page,
   }) => {
     const dots = page.locator('.tessera-carousel-dot');
-    await page.getByRole('button', { name: 'Next slide' }).click();
+    const status = page.locator('.tessera-carousel [aria-live="polite"]');
+    const nextArrow = page.getByRole('button', { name: 'Next slide' });
+    await nextArrow.click();
     await expect(dots.nth(1)).toHaveClass(/active/);
-    await expect(
-      page.locator('.tessera-carousel [aria-live="polite"]'),
-    ).toHaveText('Slide 2 of 3');
+    await expect(status).toHaveText('Slide 2 of 3');
+
+    await dots.nth(0).click();
+    await expect(status).toHaveText('');
+    await nextArrow.click();
+    await expect(status).toHaveText('Slide 2 of 3');
+  });
+
+  test('carousel arrow keeps focus at the last slide', async ({ page }) => {
+    const nextArrow = page.getByRole('button', { name: 'Next slide' });
+    await nextArrow.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await expect(nextArrow).toBeFocused();
+    await expect(nextArrow).toHaveAttribute('aria-disabled', 'true');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.tessera-carousel-dot').nth(2)).toHaveClass(
+      /active/,
+    );
   });
 
   test('carousel Tab stops: one dot, the arrows, and only the current slide', async ({
@@ -102,13 +120,17 @@ test.describe('Component — Carousel', () => {
       return stops;
     }
 
-    expect(await carouselTabStops()).toEqual(['Go to slide 1', 'Next slide']);
+    expect(await carouselTabStops()).toEqual([
+      'Previous slide',
+      'Slide 1',
+      'Next slide',
+    ]);
 
     await page.getByRole('button', { name: 'Next slide' }).click();
     expect(await carouselTabStops()).toEqual([
       'Slide 2 action',
       'Previous slide',
-      'Go to slide 2',
+      'Slide 2',
       'Next slide',
     ]);
   });
@@ -134,7 +156,7 @@ test.describe('Component — Carousel', () => {
     await expect(dots.nth(1)).toHaveAttribute('aria-selected', 'true');
     await expect(await slideFor(1)).not.toHaveAttribute('inert');
     await expect(await slideFor(0)).toHaveAttribute('inert');
-    await expect(status).toHaveText('Slide 2 of 3');
+    await expect(status).toHaveText('');
 
     await page.keyboard.press('End');
     await expect(dots.nth(2)).toBeFocused();
@@ -144,7 +166,22 @@ test.describe('Component — Carousel', () => {
     await expect(dots.nth(2)).toBeFocused();
     await page.keyboard.press('Home');
     await expect(dots.nth(0)).toBeFocused();
-    await expect(status).toHaveText('Slide 1 of 3');
+    await expect(status).toHaveText('');
+  });
+
+  test('carousel dot arrow keys start from the focused dot', async ({
+    page,
+  }) => {
+    const dots = page.locator('.tessera-carousel-dot');
+    await dots.nth(0).focus();
+    // Clicking without moving focus, as Safari does.
+    await page
+      .getByRole('button', { name: 'Next slide' })
+      .dispatchEvent('click');
+    await expect(dots.nth(0)).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(dots.nth(1)).toBeFocused();
+    await expect(dots.nth(1)).toHaveAttribute('aria-selected', 'true');
   });
 });
 
