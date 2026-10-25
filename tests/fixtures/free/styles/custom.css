@@ -3,3 +3,7 @@
 .tessera-accordion {
   border-radius: 12px;
 }
+
+.tessera-matching-item.correct {
+  border-color: rgb(21, 128, 61);
+}

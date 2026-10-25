@@ -213,6 +213,25 @@ test.describe('Quiz — Graded Assessment', () => {
     ).toBeVisible();
   });
 
+  test('a plain rule in styles/ overrides the correct matching item color', async ({
+    page,
+  }) => {
+    await answerMultipleChoice(page, 1);
+    await checkThenContinue(page, false);
+    await answerFillInTheBlank(page, 'blue');
+    await checkThenContinue(page, false);
+    await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
+    await checkThenContinue(page, true);
+
+    await expect(
+      page
+        .locator(
+          '.tessera-quiz-question-wrapper.active .tessera-matching-item.correct',
+        )
+        .first(),
+    ).toHaveCSS('border-color', 'rgb(21, 128, 61)');
+  });
+
   test('a submitted quiz comes back as results with its answers to review', async ({
     page,
   }) => {

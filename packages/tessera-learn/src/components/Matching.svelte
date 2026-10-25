@@ -233,7 +233,7 @@
           class:matched
           class:correct={result === 'correct'}
           class:incorrect={result === 'incorrect'}
-          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          style:--match-color={color}
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
           onfocus={() => (leftFocus = i)}
@@ -292,7 +292,7 @@
           class="tessera-matching-item right"
           class:selected={isSelected}
           class:matched
-          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          style:--match-color={color}
           onclick={() => handleRightClick(item.originalIndex)}
           onfocus={() => (rightFocus = pos)}
           onkeydown={onItemKeydown}
@@ -411,21 +411,23 @@
     }
 
     .tessera-matching-item.matched {
-      background: color-mix(
-        in srgb,
-        var(--match-color, var(--tessera-primary)) 8%,
-        transparent
-      );
+      background: color-mix(in srgb, var(--match-color) 8%, transparent);
+    }
+
+    /* The pair color stays on hover; only the hover background applies. */
+    .tessera-matching-item.matched,
+    .tessera-matching-item.matched:hover:not(:disabled) {
+      border-color: var(--match-color);
     }
 
     .tessera-matching-item.correct {
-      border-color: var(--tessera-success) !important;
-      background: var(--tessera-success-bg) !important;
+      border-color: var(--tessera-success);
+      background: var(--tessera-success-bg);
     }
 
     .tessera-matching-item.incorrect {
-      border-color: var(--tessera-error) !important;
-      background: var(--tessera-error-bg) !important;
+      border-color: var(--tessera-error);
+      background: var(--tessera-error-bg);
     }
 
     .tessera-matching-item:disabled {
