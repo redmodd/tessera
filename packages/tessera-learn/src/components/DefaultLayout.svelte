@@ -42,16 +42,16 @@
 
   // The menu button shows only while the stylesheet makes the sidebar an
   // overlay, so its size tracks that breakpoint wherever CSS puts it.
-  $effect(() => {
-    const observer = new ResizeObserver(() => {
-      if (!hamburger.offsetWidth) sidebarOpen = false;
+  function closeWhenMenuHides(button) {
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry.contentRect.width) sidebarOpen = false;
       else if (!sidebarOpen && sidebar.contains(document.activeElement)) {
-        hamburger.focus();
+        button.focus();
       }
     });
-    observer.observe(hamburger);
+    observer.observe(button);
     return () => observer.disconnect();
-  });
+  }
 
   // Following the link would add a #hash history entry. <main> is focusable
   // only while focused: otherwise every click on page text would focus it,
@@ -59,6 +59,9 @@
   function skipToContent(e) {
     e.preventDefault();
     main.tabIndex = -1;
+    main.addEventListener('blur', () => main.removeAttribute('tabindex'), {
+      once: true,
+    });
     main.focus();
   }
 
@@ -118,6 +121,7 @@
 
 <button
   bind:this={hamburger}
+  {@attach closeWhenMenuHides}
   class="tessera-hamburger"
   aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
   aria-expanded={sidebarOpen}
@@ -188,7 +192,6 @@
     id="tessera-main"
     class="tessera-main"
     inert={sidebarOpen}
-    onblur={() => main.removeAttribute('tabindex')}
   >
     <div class="tessera-content">
       {@render page()}
