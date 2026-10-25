@@ -1,6 +1,5 @@
 <script>
   import { tick } from 'svelte';
-  import { MediaQuery } from 'svelte/reactivity';
   import {
     useCourse,
     useNavigation,
@@ -13,12 +12,10 @@
   const progress = useProgress();
   const course = useCourse();
 
-  // The layout.css breakpoint where the sidebar becomes an overlay.
-  const overlaySidebar = new MediaQuery('max-width: 1024px');
   let sidebarOpen = $state(false);
-  let sidebarModal = $derived(overlaySidebar.current && sidebarOpen);
   let hamburger = $state();
   let sidebar = $state();
+  let main = $state();
   let exitDialog = $state();
 
   let progressPercent = $derived(
@@ -41,6 +38,28 @@
     if (!sidebarOpen) return;
     sidebarOpen = false;
     hamburger.focus();
+  }
+
+  // The menu button shows only while the stylesheet makes the sidebar an
+  // overlay, so its size tracks that breakpoint wherever CSS puts it.
+  $effect(() => {
+    const observer = new ResizeObserver(() => {
+      if (!hamburger.offsetWidth) sidebarOpen = false;
+      else if (!sidebarOpen && sidebar.contains(document.activeElement)) {
+        hamburger.focus();
+      }
+    });
+    observer.observe(hamburger);
+    return () => observer.disconnect();
+  });
+
+  // Following the link would add a #hash history entry. <main> is focusable
+  // only while focused: otherwise every click on page text would focus it,
+  // which keeps a new page's heading from taking focus.
+  function skipToContent(e) {
+    e.preventDefault();
+    main.tabIndex = -1;
+    main.focus();
   }
 
   // Arrow keys change page only while no control has focus: the page itself,
@@ -88,7 +107,12 @@
 
 <svelte:window onkeydown={handleKeyNav} />
 
-<a class="tessera-skip-link" href="#tessera-main" inert={sidebarModal}>
+<a
+  class="tessera-skip-link"
+  href="#tessera-main"
+  inert={sidebarOpen}
+  onclick={skipToContent}
+>
   Skip to content
 </a>
 
@@ -117,7 +141,6 @@
 <div class="tessera-app" data-chrome="default">
   <aside
     bind:this={sidebar}
-    inert={overlaySidebar.current && !sidebarOpen}
     class="tessera-sidebar"
     class:open={sidebarOpen}
     aria-label="Course sidebar"
@@ -161,10 +184,11 @@
   </aside>
 
   <main
+    bind:this={main}
     id="tessera-main"
     class="tessera-main"
-    tabindex="-1"
-    inert={sidebarModal}
+    inert={sidebarOpen}
+    onblur={() => main.removeAttribute('tabindex')}
   >
     <div class="tessera-content">
       {@render page()}
@@ -193,7 +217,7 @@
   <footer
     class="tessera-progress"
     aria-label="Course progress"
-    inert={sidebarModal}
+    inert={sidebarOpen}
   >
     <div
       class="tessera-progress-track"

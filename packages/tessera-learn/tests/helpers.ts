@@ -219,12 +219,14 @@ export async function mountApp({
     buildXAPIClient,
   });
   vi.stubGlobal('__tesseraNavCtx', undefined);
-  // jsdom has no matchMedia, which the default layout reads.
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
-    addEventListener() {},
-    removeEventListener() {},
-  }));
+  // jsdom has no ResizeObserver, which the default layout uses.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   const App = (await import('../src/runtime/App.svelte')).default;
   const component = mount(App, { target: document.body });
   onTestFinished(() => {

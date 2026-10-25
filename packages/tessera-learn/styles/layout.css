@@ -468,11 +468,16 @@
     width: var(--tessera-sidebar-width);
     z-index: 1000;
     transform: translateX(-100%);
-    transition: transform var(--tessera-transition-normal);
+    visibility: hidden;
+    transition:
+      transform var(--tessera-transition-normal),
+      visibility 0s var(--tessera-transition-normal);
   }
 
   .tessera-sidebar.open {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform var(--tessera-transition-normal);
   }
 
   .tessera-sidebar-overlay.visible {
@@ -481,6 +486,10 @@
 
   .tessera-hamburger {
     display: flex;
+  }
+
+  .tessera-skip-link {
+    left: calc(2 * var(--tessera-spacing-md) + 44px);
   }
 
   .tessera-content {

@@ -65,16 +65,21 @@ test.describe('Mobile Navigation', () => {
       page.locator('.tessera-nav-page[aria-current="page"]'),
     ).toBeFocused();
 
-    const stops = await page.locator('.tessera-sidebar button').count();
-    for (let i = 0; i < stops + 2; i++) {
-      await page.keyboard.press('Tab');
-      const escaped = await page.evaluate(
-        () =>
-          !!document.activeElement?.closest(
-            '.tessera-main, .tessera-progress, .tessera-skip-link',
-          ),
+    // Past either end, focus leaves the document (body here, browser chrome
+    // in a real browser), as from a native modal dialog.
+    const inSidebarOrOut = () => {
+      const el = document.activeElement!;
+      return (
+        el === document.body ||
+        !!el.closest('.tessera-sidebar, .tessera-hamburger')
       );
-      expect(escaped).toBe(false);
+    };
+    const stops = await page.locator('.tessera-sidebar button').count();
+    for (const key of ['Tab', 'Shift+Tab']) {
+      for (let i = 0; i < stops + 2; i++) {
+        await page.keyboard.press(key);
+        expect(await page.evaluate(inSidebarOrOut)).toBe(true);
+      }
     }
 
     await page.locator('.tessera-sidebar button').first().focus();
@@ -97,6 +102,26 @@ test.describe('Mobile Navigation', () => {
     await page.locator('.tessera-nav-page', { hasText: 'Welcome' }).click();
     await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
     await expect(hamburger).toBeFocused();
+  });
+
+  test('leaving the overlay width closes the sidebar', async ({ page }) => {
+    await page.locator('.tessera-hamburger').click();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(page.locator('.tessera-main')).not.toHaveAttribute('inert');
+
+    await page.locator('.tessera-nav-page').nth(1).focus();
+    await page.setViewportSize({ width: 375, height: 667 });
+    await expect(page.locator('.tessera-hamburger')).toBeFocused();
+  });
+
+  test('the skip link does not cover the menu button', async ({ page }) => {
+    await page.keyboard.press('Tab');
+    const skip = page.getByRole('link', { name: 'Skip to content' });
+    await expect(skip).toBeFocused();
+    const link = (await skip.boundingBox())!;
+    const menu = (await page.locator('.tessera-hamburger').boundingBox())!;
+    expect(link.x).toBeGreaterThanOrEqual(menu.x + menu.width);
   });
 
   test('selecting a page closes sidebar and loads content', async ({
