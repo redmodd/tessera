@@ -89,7 +89,7 @@ test.describe('Mobile Navigation', () => {
     await expect(hamburger).toHaveCSS('outline-style', 'solid');
     await expect(hamburger).toHaveCSS(
       'box-shadow',
-      'rgb(255, 255, 255) 0px 0px 0px 4px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px',
+      'rgb(255, 255, 255) 0px 0px 0px 4px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px',
     );
   });
 

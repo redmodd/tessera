@@ -357,7 +357,7 @@
     background: var(--tessera-bg);
     border: 2px solid var(--tessera-border);
     border-radius: 10px;
-    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --card-shadow: var(--tessera-shadow-sm);
     box-shadow: var(--card-shadow);
     font-size: 1rem;
     font-weight: 500;

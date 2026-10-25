@@ -306,13 +306,11 @@
   cursor: pointer;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--tessera-shadow-sm);
 }
 
 .tessera-hamburger:focus-visible {
-  box-shadow:
-    var(--tessera-focus-halo),
-    0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--tessera-focus-halo), var(--tessera-shadow-sm);
 }
 
 .tessera-hamburger-line {

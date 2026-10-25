@@ -47,6 +47,9 @@
   --tessera-focus-outline: 2px solid var(--tessera-text);
   --tessera-focus-halo: 0 0 0 4px var(--tessera-bg);
 
+  /* Shadows */
+  --tessera-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+
   /* Transitions */
   --tessera-transition-fast: 150ms ease;
   --tessera-transition-normal: 250ms ease;
