@@ -31,8 +31,18 @@
   const CONTROL = 'input, select, textarea, button, [tabindex="0"]';
 
   const inQuiz = $derived(q.mode === 'quiz');
+  const result = $derived(
+    q.correct === null ? 'submitted' : q.correct ? 'correct' : 'incorrect',
+  );
+  const label = $derived(
+    {
+      correct: correctLabel,
+      incorrect: incorrectLabel,
+      submitted: submittedLabel,
+    }[result],
+  );
   const feedback = $derived(
-    q.correct === null ? '' : q.correct ? correctFeedback : incorrectFeedback,
+    { correct: correctFeedback, incorrect: incorrectFeedback }[result] ?? '',
   );
   const contentId = $props.id();
   // Feedback showing at mount is a restored answer, not a fresh submit.
@@ -102,27 +112,13 @@
     {@attach focusOnSubmit}
   >
     <div id={contentId}>
-      <div
-        class="tessera-question-result"
-        class:correct={q.correct === true}
-        class:incorrect={q.correct === false}
-      >
-        {#if q.correct === null}
-          {submittedLabel}
-        {:else}
-          <ResultIcon kind={q.correct ? 'correct' : 'incorrect'} />
-          {q.correct ? correctLabel : incorrectLabel}
-        {/if}
+      <div class="tessera-question-result {result}">
+        {#if result !== 'submitted'}<ResultIcon kind={result} />{/if}
+        {label}
       </div>
       {@render children?.()}
       {#if feedback}
-        <p
-          class="tessera-question-feedback"
-          class:correct={q.correct}
-          class:incorrect={!q.correct}
-        >
-          {feedback}
-        </p>
+        <p class="tessera-question-feedback {result}">{feedback}</p>
       {/if}
     </div>
     {#if !inQuiz && q.canRetry}

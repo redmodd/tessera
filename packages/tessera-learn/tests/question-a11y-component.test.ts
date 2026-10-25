@@ -8,12 +8,15 @@ import Sorting from '../src/components/Sorting.svelte';
 import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
-import { ProgressState } from '../src/runtime/progress.svelte.js';
-import { createConfig, createManifest } from './helpers.js';
-import { mountOnPage, mountQuestion } from './helpers/mount.js';
+import type { QuizConfig } from '../src/runtime/types.js';
+import { mountQuestion } from './helpers/mount.js';
 
-function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
-  const { target } = mountQuestion(widget, props);
+function mountWidget(
+  widget: Component<any>,
+  props: Record<string, unknown>,
+  quiz?: QuizConfig,
+) {
+  const { target } = mountQuestion(widget, props, { quiz });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -527,25 +530,17 @@ describe('standalone feedback', () => {
 
 describe('custom widget in a quiz', () => {
   it('moves focus to the immediate-feedback result', async () => {
-    const manifest = createManifest(1);
-    const config = createConfig();
-    const progress = new ProgressState(manifest, config);
-    const { target } = mountOnPage(
+    const { target, button, click } = mountWidget(
       CustomChoiceQuiz,
       {},
-      { manifest, progress, config },
       { feedbackMode: 'immediate' },
     );
     flushSync();
     const active = target.querySelector(
       '.tessera-quiz-question-wrapper.active',
     )!;
-    active.querySelector('input')!.click();
-    flushSync();
-    [...target.querySelectorAll('button')]
-      .find((b) => b.textContent?.trim() === 'Submit')!
-      .click();
-    flushSync();
+    click(active.querySelector('input')!);
+    click(button('Submit'));
 
     await expect
       .poll(() => document.activeElement?.textContent ?? '')

@@ -48,9 +48,9 @@
       {/each}
     </fieldset>
     <QuestionReview {q}>
-      {#if q.correct === false}<p>
-          The right answer was {options[correct]}.
-        </p>{/if}
+      {#if q.correct === false}
+        <p>The right answer was {options[correct]}.</p>
+      {/if}
     </QuestionReview>
   </div>
 {/snippet}

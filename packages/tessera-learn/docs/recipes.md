@@ -37,7 +37,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn, and `QuestionReview` renders Submit, the result, and Try again ([Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers its props). To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn, and `QuestionReview` renders Submit, the result, and Try again. [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers its props and a widget that also works inside a quiz.
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -197,9 +197,9 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     </fieldset>
 
     <QuestionReview {q}>
-      {#if q.correct === false}<p>
-          The right answer was {options[correct]}.
-        </p>{/if}
+      {#if q.correct === false}
+        <p>The right answer was {options[correct]}.</p>
+      {/if}
     </QuestionReview>
   </div>
 {/snippet}
@@ -272,18 +272,17 @@ A standalone question (no `<Quiz>`) counts toward course success when built with
   <label for="why">Why does this matter to your team?</label>
   <textarea
     id="why"
-    bind:value={answer}
-    disabled={q.locked}
-    oninput={() => q.setAnswer(answer)}></textarea>
+    bind:value={() => answer, (v) => q.setAnswer((answer = v))}
+    disabled={q.locked}></textarea>
   <QuestionReview {q}>
-    {#if !q.isLockedCorrect}<p>
-        Write at least 50 characters for full marks.
-      </p>{/if}
+    {#if !q.isLockedCorrect}
+      <p>Write at least 50 characters for full marks.</p>
+    {/if}
   </QuestionReview>
 </div>
 ```
 
-With no `correct`, `QuestionReview` shows a neutral `Submitted` result in place of Correct / Incorrect; the children here say why an answer scored under 100. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
+The `QuestionReview` children say why an answer scored under 100. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

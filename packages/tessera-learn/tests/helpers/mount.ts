@@ -72,11 +72,14 @@ export function mountOnPage(
 
 export type SavedAnswer = StandaloneSubmit & { score: number };
 
-/** Mounts question `q1` on page 0, already answered when `saved` is given. */
+/**
+ * Mounts question `q1` on page 0, already answered when `saved` is given,
+ * on a quiz page when `quiz` is given.
+ */
 export function mountQuestion(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved?: SavedAnswer,
+  { saved, quiz }: { saved?: SavedAnswer; quiz?: QuizConfig } = {},
 ) {
   const manifest = createManifest(1);
   const config = createConfig();
@@ -88,6 +91,7 @@ export function mountQuestion(
     widget,
     { id: 'q1', question: 'Question', ...props },
     { manifest, progress, config },
+    quiz,
   );
 }
 
