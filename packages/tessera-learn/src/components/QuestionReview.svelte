@@ -24,8 +24,7 @@
   } = $props();
 
   const CONTROL =
-    'input:enabled, select:enabled, textarea:enabled, button:enabled, [tabindex="0"]';
-  let container;
+    'input:enabled:not([type="hidden"]), select:enabled, textarea:enabled, button:enabled, [tabindex="0"]';
 
   const inQuiz = $derived(q.mode === 'quiz');
   const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
@@ -35,16 +34,36 @@
 
   // Review never takes focus: a custom quiz shell may keep every question mounted.
   function focusOnSubmit(el) {
-    container = el.parentElement;
     const review = untrack(() => inQuiz && q.submitted);
     if (!restored && !review) el.focus();
     restored = false;
   }
 
-  async function retry() {
+  async function retry(e) {
+    const container = e.currentTarget.closest(
+      '.tessera-question-review',
+    ).parentElement;
     q.retry();
     await tick();
-    container?.querySelector(CONTROL)?.focus();
+    if (import.meta.env?.DEV) warnIfShared(container);
+    // A hidden or inert control ignores focus(); fall through to the next.
+    for (const el of container.querySelectorAll(CONTROL)) {
+      el.focus();
+      if (document.activeElement === el) break;
+    }
+  }
+
+  function warnIfShared(container) {
+    const reviews = container.querySelectorAll(
+      '.tessera-question-submit, .tessera-question-review',
+    );
+    if (container.matches('.tessera-page') || reviews.length > 1) {
+      console.warn(
+        '[tessera] QuestionReview: Try again focuses the first control in its ' +
+          'parent element, which holds more than this question. Wrap the ' +
+          "question's controls and QuestionReview in one element.",
+      );
+    }
   }
 </script>
 

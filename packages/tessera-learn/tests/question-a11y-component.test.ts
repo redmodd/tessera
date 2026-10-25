@@ -7,14 +7,10 @@ import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import Sorting from '../src/components/Sorting.svelte';
 import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
+import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createConfig, createManifest } from './helpers.js';
-import { mountInBody, mountQuestion } from './helpers/mount.js';
-import {
-  setInPage,
-  setNavContext,
-  setPageContext,
-} from '../src/runtime/contexts.js';
+import { mountOnPage, mountQuestion } from './helpers/mount.js';
 
 function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
   const { target } = mountQuestion(widget, props);
@@ -473,30 +469,49 @@ describe('standalone feedback', () => {
       expect(warn).not.toHaveBeenCalled();
     },
   );
+
+  it('skips a hidden input when focusing the first control after Try again', async () => {
+    const mounted = mountWidget(CustomChoice, {
+      prompt: '2 + 2?',
+      options: ['3', '4'],
+      correct: 1,
+    });
+    submitOption(mounted, 0);
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    mounted.target.querySelector('fieldset')!.before(hidden);
+    mounted.click(mounted.button('Try again'));
+
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(mounted.target.querySelector('fieldset input'));
+  });
+
+  it('warns when QuestionReview shares its parent with the page', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mounted = mountWidget(CustomChoiceUnwrapped, {});
+    mounted.target.classList.add('tessera-page');
+    mounted.click(mounted.target.querySelector('input')!);
+    mounted.click(mounted.button('Submit'));
+    mounted.click(mounted.button('Try again'));
+
+    await expect
+      .poll(() => warn.mock.calls.flat().join(' '))
+      .toContain('Wrap the question');
+  });
 });
 
 describe('custom widget in a quiz', () => {
   it('moves focus to the immediate-feedback result', async () => {
     const manifest = createManifest(1);
     const config = createConfig();
-    const { target } = mountInBody(CustomChoiceQuiz, {
-      props: {},
-      setup: () => {
-        setNavContext({
-          nav: { currentPageIndex: 0 },
-          manifest,
-          config,
-          progress: new ProgressState(manifest, config),
-        } as any);
-        setPageContext({
-          quiz: { feedbackMode: 'immediate' },
-          quizState: null,
-          passingScore: 70,
-          index: 0,
-        });
-        setInPage(true);
-      },
-    });
+    const progress = new ProgressState(manifest, config);
+    const { target } = mountOnPage(
+      CustomChoiceQuiz,
+      {},
+      { manifest, progress, config },
+      { feedbackMode: 'immediate' },
+    );
     flushSync();
     const active = target.querySelector(
       '.tessera-quiz-question-wrapper.active',

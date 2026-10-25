@@ -144,7 +144,7 @@ Inline layout needs custom widgets that render their own markup instead of calli
 
 ## Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Put it inside the element that wraps the question's controls.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Wrap the question's controls and `QuestionReview` in one element: Try again focuses the first control in it, and warns in dev when that element holds more than the question.
 
 ```svelte
 <!-- components/MyChoice.svelte -->

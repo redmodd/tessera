@@ -24,6 +24,7 @@
   onMount(() => q.setRender(view));
 
   function pick(i) {
+    if (q.locked) return;
     selected = i;
     q.setAnswer(i);
   }
@@ -34,11 +35,12 @@
     <fieldset disabled={q.locked}>
       <legend>{prompt}</legend>
       {#each options as opt, i (i)}
+        {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
         <label>
           <input
             type="radio"
             name={id}
-            checked={selected === i}
+            checked={chosen}
             onchange={() => pick(i)}
           />
           {opt}
