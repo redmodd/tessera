@@ -499,7 +499,7 @@ const url = signs[`/assets/signs/${filename}`]; // look up by full key
 
 ## Styling
 
-Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer, so any unlayered rule in `styles/` or a component `<style>` overrides it, whatever the specificity. That includes element selectors: `button { … }` or `p { … }` in `styles/` also restyles the buttons and paragraphs inside built-in components, so target your own classes. CSS in any author `@layer` outranks framework CSS too, so a library reset such as Tailwind's preflight strips framework heading, list and button styles. Theme globally by overriding these custom properties:
+Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer, so any unlayered rule in `styles/` or a component `<style>` overrides it, whatever the specificity. That includes element selectors: `button { … }` or `p { … }` in `styles/` also restyles the buttons and paragraphs inside built-in components, and a `display` or `position` rule can reveal their hidden or screen-reader-only text, so target your own classes. CSS in any author `@layer` outranks framework CSS too: Tailwind's preflight strips the margins, padding, borders and button backgrounds of every built-in component, so leave preflight out. Theme globally by overriding these custom properties:
 
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |

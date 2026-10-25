@@ -400,8 +400,11 @@
     }
 
     .tessera-matching-item:hover:not(:disabled) {
-      border-color: var(--tessera-primary);
       background: var(--tessera-bg-secondary);
+    }
+
+    .tessera-matching-item:hover:not(:disabled, .matched) {
+      border-color: var(--tessera-primary);
     }
 
     .tessera-matching-item.selected {
@@ -411,13 +414,8 @@
     }
 
     .tessera-matching-item.matched {
-      background: color-mix(in srgb, var(--match-color) 8%, transparent);
-    }
-
-    /* The pair color stays on hover; only the hover background applies. */
-    .tessera-matching-item.matched,
-    .tessera-matching-item.matched:hover:not(:disabled) {
       border-color: var(--match-color);
+      background: color-mix(in srgb, var(--match-color) 8%, transparent);
     }
 
     .tessera-matching-item.correct {
