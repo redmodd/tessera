@@ -178,11 +178,31 @@
   opacity: 0.6;
 }
 
+/* ---- Skip Link ---- */
+.tessera-skip-link {
+  position: fixed;
+  top: -100px;
+  left: var(--tessera-spacing-md);
+  z-index: 1002;
+  padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
+  background-color: var(--tessera-bg);
+  border: 1px solid var(--tessera-border);
+  border-radius: 8px;
+}
+
+.tessera-skip-link:focus {
+  top: var(--tessera-spacing-md);
+}
+
 /* ---- Content Area ---- */
 .tessera-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.tessera-main:focus-visible {
+  box-shadow: none;
 }
 
 .tessera-content {

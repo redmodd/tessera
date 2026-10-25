@@ -50,6 +50,55 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
   });
 
+  test('the closed sidebar is out of the Tab order', async ({ page }) => {
+    await page.locator('.tessera-hamburger').focus();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.tessera-main :focus')).toHaveCount(1);
+  });
+
+  test('the open sidebar holds focus and Escape returns it to the menu button', async ({
+    page,
+  }) => {
+    const hamburger = page.locator('.tessera-hamburger');
+    await hamburger.click();
+    await expect(
+      page.locator('.tessera-nav-page[aria-current="page"]'),
+    ).toBeFocused();
+
+    const stops = await page.locator('.tessera-sidebar button').count();
+    for (let i = 0; i < stops + 2; i++) {
+      await page.keyboard.press('Tab');
+      const escaped = await page.evaluate(
+        () =>
+          !!document.activeElement?.closest(
+            '.tessera-main, .tessera-progress, .tessera-skip-link',
+          ),
+      );
+      expect(escaped).toBe(false);
+    }
+
+    await page.locator('.tessera-sidebar button').first().focus();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(hamburger).toBeFocused();
+  });
+
+  test('closing the sidebar from the overlay or the current page returns focus to the menu button', async ({
+    page,
+  }) => {
+    const hamburger = page.locator('.tessera-hamburger');
+    await hamburger.click();
+    await page
+      .locator('.tessera-sidebar-overlay')
+      .click({ position: { x: 360, y: 300 } });
+    await expect(hamburger).toBeFocused();
+
+    await hamburger.click();
+    await page.locator('.tessera-nav-page', { hasText: 'Welcome' }).click();
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(hamburger).toBeFocused();
+  });
+
   test('selecting a page closes sidebar and loads content', async ({
     page,
   }) => {
@@ -69,6 +118,7 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
   test('prev/next buttons work on mobile', async ({ page }) => {

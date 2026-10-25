@@ -1,4 +1,6 @@
 <script>
+  import { tick } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import {
     useCourse,
     useNavigation,
@@ -11,7 +13,12 @@
   const progress = useProgress();
   const course = useCourse();
 
+  // The layout.css breakpoint where the sidebar becomes an overlay.
+  const overlaySidebar = new MediaQuery('max-width: 1024px');
   let sidebarOpen = $state(false);
+  let sidebarModal = $derived(overlaySidebar.current && sidebarOpen);
+  let hamburger = $state();
+  let sidebar = $state();
   let exitDialog = $state();
 
   let progressPercent = $derived(
@@ -20,12 +27,20 @@
       : 0,
   );
 
-  function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
+  async function toggleSidebar() {
+    if (sidebarOpen) return closeSidebar();
+    sidebarOpen = true;
+    await tick();
+    (
+      sidebar.querySelector('[aria-current="page"]') ??
+      sidebar.querySelector('button')
+    )?.focus();
   }
 
   function closeSidebar() {
+    if (!sidebarOpen) return;
     sidebarOpen = false;
+    hamburger.focus();
   }
 
   // Arrow keys change page only while no control has focus: the page itself,
@@ -73,7 +88,12 @@
 
 <svelte:window onkeydown={handleKeyNav} />
 
+<a class="tessera-skip-link" href="#tessera-main" inert={sidebarModal}>
+  Skip to content
+</a>
+
 <button
+  bind:this={hamburger}
   class="tessera-hamburger"
   aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
   aria-expanded={sidebarOpen}
@@ -96,6 +116,8 @@
 
 <div class="tessera-app" data-chrome="default">
   <aside
+    bind:this={sidebar}
+    inert={overlaySidebar.current && !sidebarOpen}
     class="tessera-sidebar"
     class:open={sidebarOpen}
     aria-label="Course sidebar"
@@ -138,7 +160,12 @@
     {/if}
   </aside>
 
-  <main class="tessera-main">
+  <main
+    id="tessera-main"
+    class="tessera-main"
+    tabindex="-1"
+    inert={sidebarModal}
+  >
     <div class="tessera-content">
       {@render page()}
     </div>
@@ -163,7 +190,11 @@
     </div>
   </main>
 
-  <footer class="tessera-progress" aria-label="Course progress">
+  <footer
+    class="tessera-progress"
+    aria-label="Course progress"
+    inert={sidebarModal}
+  >
     <div
       class="tessera-progress-track"
       role="progressbar"
