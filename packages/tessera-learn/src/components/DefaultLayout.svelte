@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import {
     useCourse,
     useNavigation,
@@ -12,6 +13,10 @@
   const course = useCourse();
 
   let sidebarOpen = $state(false);
+  let overlay = $state(false);
+  let hamburger = $state();
+  let sidebar = $state();
+  let main = $state();
   let exitDialog = $state();
 
   let progressPercent = $derived(
@@ -20,12 +25,46 @@
       : 0,
   );
 
-  function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
+  async function toggleSidebar() {
+    if (sidebarOpen) return closeSidebar();
+    sidebarOpen = true;
+    await tick();
+    (
+      sidebar.querySelector('[aria-current="page"]') ??
+      sidebar.querySelector('button')
+    )?.focus();
   }
 
   function closeSidebar() {
+    if (!sidebarOpen) return;
     sidebarOpen = false;
+    hamburger.focus();
+  }
+
+  // The menu button shows only while the stylesheet makes the sidebar an
+  // overlay, so its size tracks that breakpoint wherever CSS puts it.
+  function closeWhenMenuHides(button) {
+    const observer = new ResizeObserver(([entry]) => {
+      overlay = entry.contentRect.width > 0;
+      if (!overlay) sidebarOpen = false;
+      else if (!sidebarOpen && sidebar.contains(document.activeElement)) {
+        button.focus();
+      }
+    });
+    observer.observe(button);
+    return () => observer.disconnect();
+  }
+
+  // Following the link would add a #hash history entry. <main> is focusable
+  // only while focused: otherwise every click on page text would focus it,
+  // which keeps a new page's heading from taking focus.
+  function skipToContent(e) {
+    e.preventDefault();
+    main.tabIndex = -1;
+    main.addEventListener('blur', () => main.removeAttribute('tabindex'), {
+      once: true,
+    });
+    main.focus();
   }
 
   // Arrow keys change page only while no control has focus: the page itself,
@@ -73,7 +112,18 @@
 
 <svelte:window onkeydown={handleKeyNav} />
 
+<a
+  class="tessera-skip-link"
+  href="#tessera-main"
+  inert={sidebarOpen}
+  onclick={skipToContent}
+>
+  Skip to content
+</a>
+
 <button
+  bind:this={hamburger}
+  {@attach closeWhenMenuHides}
   class="tessera-hamburger"
   aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
   aria-expanded={sidebarOpen}
@@ -96,9 +146,11 @@
 
 <div class="tessera-app" data-chrome="default">
   <aside
+    bind:this={sidebar}
     class="tessera-sidebar"
     class:open={sidebarOpen}
     aria-label="Course sidebar"
+    inert={overlay && !sidebarOpen}
   >
     <Sidebar onclose={closeSidebar} />
     {#if course.canExit}
@@ -138,7 +190,12 @@
     {/if}
   </aside>
 
-  <main class="tessera-main">
+  <main
+    bind:this={main}
+    id="tessera-main"
+    class="tessera-main"
+    inert={sidebarOpen}
+  >
     <div class="tessera-content">
       {@render page()}
     </div>
@@ -163,7 +220,11 @@
     </div>
   </main>
 
-  <footer class="tessera-progress" aria-label="Course progress">
+  <footer
+    class="tessera-progress"
+    aria-label="Course progress"
+    inert={sidebarOpen}
+  >
     <div
       class="tessera-progress-track"
       role="progressbar"

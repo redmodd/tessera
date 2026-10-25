@@ -50,6 +50,96 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
   });
 
+  test('the closed sidebar is out of the Tab order', async ({ page }) => {
+    await page.locator('.tessera-hamburger').focus();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.tessera-main :focus')).toHaveCount(1);
+  });
+
+  test('the open sidebar holds focus and Escape returns it to the menu button', async ({
+    page,
+  }) => {
+    const hamburger = page.locator('.tessera-hamburger');
+    await hamburger.click();
+    await expect(
+      page.locator('.tessera-nav-page[aria-current="page"]'),
+    ).toBeFocused();
+
+    // Past either end, focus leaves the document (body here, browser chrome
+    // in a real browser), as from a native modal dialog.
+    const inSidebarOrOut = () => {
+      const el = document.activeElement!;
+      return (
+        el === document.body ||
+        !!el.closest('.tessera-sidebar, .tessera-hamburger')
+      );
+    };
+    const stops = await page.locator('.tessera-sidebar button').count();
+    for (const key of ['Tab', 'Shift+Tab']) {
+      for (let i = 0; i < stops + 2; i++) {
+        await page.keyboard.press(key);
+        expect(await page.evaluate(inSidebarOrOut)).toBe(true);
+      }
+    }
+
+    await page.locator('.tessera-sidebar button').first().focus();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(hamburger).toBeFocused();
+    await expect(hamburger).toHaveCSS(
+      'box-shadow',
+      'rgba(37, 99, 235, 0.4) 0px 0px 0px 3px',
+    );
+  });
+
+  test('Tab right after closing skips the sliding-out sidebar', async ({
+    page,
+  }) => {
+    await page.locator('.tessera-hamburger').click();
+    await expect(
+      page.locator('.tessera-nav-page[aria-current="page"]'),
+    ).toBeFocused();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.tessera-main :focus')).toHaveCount(1);
+  });
+
+  test('closing the sidebar from the overlay or the current page returns focus to the menu button', async ({
+    page,
+  }) => {
+    const hamburger = page.locator('.tessera-hamburger');
+    await hamburger.click();
+    await page
+      .locator('.tessera-sidebar-overlay')
+      .click({ position: { x: 360, y: 300 } });
+    await expect(hamburger).toBeFocused();
+
+    await hamburger.click();
+    await page.locator('.tessera-nav-page', { hasText: 'Welcome' }).click();
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(hamburger).toBeFocused();
+  });
+
+  test('leaving the overlay width closes the sidebar', async ({ page }) => {
+    await page.locator('.tessera-hamburger').click();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
+    await expect(page.locator('.tessera-main')).not.toHaveAttribute('inert');
+
+    await page.locator('.tessera-nav-page').nth(1).focus();
+    await page.setViewportSize({ width: 375, height: 667 });
+    await expect(page.locator('.tessera-hamburger')).toBeFocused();
+  });
+
+  test('the skip link does not cover the menu button', async ({ page }) => {
+    await page.keyboard.press('Tab');
+    const skip = page.getByRole('link', { name: 'Skip to content' });
+    await expect(skip).toBeFocused();
+    const link = (await skip.boundingBox())!;
+    const menu = (await page.locator('.tessera-hamburger').boundingBox())!;
+    expect(link.x).toBeGreaterThanOrEqual(menu.x + menu.width);
+  });
+
   test('selecting a page closes sidebar and loads content', async ({
     page,
   }) => {
@@ -69,6 +159,7 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Course Objectives',
     );
+    await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
   test('prev/next buttons work on mobile', async ({ page }) => {

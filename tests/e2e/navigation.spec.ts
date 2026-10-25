@@ -35,6 +35,26 @@ test.describe('Navigation — Free Mode', () => {
     await expect(page.locator('body')).toBeFocused();
   });
 
+  test('a skip link is the first Tab stop and moves focus to the content', async ({
+    page,
+  }) => {
+    await page.keyboard.press('Tab');
+    const skip = page.getByRole('link', { name: 'Skip to content' });
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeInViewport();
+
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.tessera-main')).toBeFocused();
+    expect(new URL(page.url()).hash).toBe('');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.tessera-main :focus')).toHaveCount(1);
+  });
+
+  test('clicking page text does not move focus', async ({ page }) => {
+    await page.locator('.tessera-content p').first().click();
+    await expect(page.locator('body')).toBeFocused();
+  });
+
   test('sidebar shows all sections and pages', async ({ page }) => {
     // Check sections exist
     await expect(
