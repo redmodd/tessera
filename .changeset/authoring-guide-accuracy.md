@@ -1,5 +1,6 @@
 ---
 'tessera-learn': patch
+'create-tessera': patch
 ---
 
-Authoring guide corrections.
+Authoring guide and README corrections.

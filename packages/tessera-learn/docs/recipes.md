@@ -243,7 +243,7 @@ Render `children` visibly, never call `q.render()`, and let widgets render their
 </fieldset>
 ```
 
-Built-in widgets render nothing in this layout (`QuestionShell` renders inline only when standalone). Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
+Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
 
 ## Recipe 3: Graded standalone question
 
@@ -299,7 +299,7 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
 
   const nav = useNavigation();
   const progress = useProgress();
-  const pageIndex = $derived(nav.currentPageIndex);
+  const pageIndex = nav.currentPageIndex;
 
   const TOTAL_CHUNKS = 4;
   let revealed = $state(progress.chunkProgress.get(pageIndex) ?? 0);

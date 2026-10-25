@@ -12,7 +12,7 @@ content. It routes specialised tasks to the reference files in
 
 **Open this workspace folder** (not an individual course) so this guide is in
 scope. Add a course with `pnpm tessera new <name>`; run a command against one with
-`pnpm tessera dev <name>` (or cd into its folder and run `pnpm exec tessera dev`). The framework guide always
+`pnpm dev <name>` (or cd into its folder and run `pnpm exec tessera dev`). The framework guide always
 matches your installed `tessera-learn` version, so there's nothing to keep in sync
 above this line.
 

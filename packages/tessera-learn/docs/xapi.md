@@ -2,7 +2,7 @@
 
 Part of the Tessera authoring guide. [`AGENTS.md`](../AGENTS.md) holds the rules that apply to every task: read it first.
 
-The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated; `cmi.*` writes under SCORM) is sent automatically. To emit your own verbs, use `useXAPI()`:
+Tessera sends its own statements automatically: Initialized, Answered (one per question), Scored (when the course score changes), Completed, Passed, Failed and Terminated. Under SCORM it writes `cmi.*` instead. To emit your own verbs, use `useXAPI()`:
 
 ```ts
 import { useXAPI } from 'tessera-learn';

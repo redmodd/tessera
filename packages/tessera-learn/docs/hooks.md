@@ -246,7 +246,7 @@ Each `ManifestPage` exposes `slug`, `title`, and `index`.
 ```ts
 function useProgress(): {
   readonly visitedPages: Set<number>;
-  readonly completedPages: number; // visited pages, minus graded pages still awaiting a score
+  readonly completedPages: number; // visited pages, minus unsubmitted quiz pages and graded pages still awaiting a score
   quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
   pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the page on screen
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; what successStatus is judged on

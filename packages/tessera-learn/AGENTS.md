@@ -133,7 +133,7 @@ my-course/
 
 ```
 my-course/
-├── layout.svelte              # Custom chrome (replaces default sidebar/topbar); scaffolded
+├── layout.svelte              # Custom chrome (replaces the default sidebar and page nav); scaffolded
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
 ├── course.runtime.js          # Runtime hooks: canAccess, xAPI auth/actor resolvers
 ├── components/                # Course-local components, imported by relative path
@@ -388,7 +388,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 - **Pass every required prop**, listed under [Question types](#question-types). A missing one is a build error.
 - **Question `id`s are unique within a page, and use only letters, digits and inner underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`) and the validator warns.
-- **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime the second registration is renamed (`q1-2`), which changes its `cmi.interactions` key.
+- **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime a quiz renames the second registration (`q1-2`), which changes its `cmi.interactions` key.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
 
@@ -511,6 +511,8 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-border`                             | `#e5e7eb`                             |
 | `--tessera-success`                            | `#147638`                             |
 | `--tessera-error`                              | `#b91c1c`                             |
+| `--tessera-success-bg` / `--tessera-error-bg`  | the color at 8% over transparent      |
+| `--tessera-success-border` / `-error-border`   | the color at 25% over transparent     |
 | `--tessera-warning`                            | `#d97706`                             |
 | `--tessera-font-family`                        | `'Inter', system-ui, sans-serif`      |
 | `--tessera-font-size-base`                     | `1rem`                                |
@@ -522,10 +524,11 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-focus-halo`                         | `0 0 0 4px var(--tessera-bg)`         |
 | `--tessera-shadow-sm`                          | `0 2px 8px rgba(0, 0, 0, 0.08)`       |
 | `--tessera-shadow-lg`                          | `0 20px 60px rgba(0, 0, 0, 0.2)`      |
+| `--tessera-transition-fast` / `-normal`        | `150ms ease` / `250ms ease`           |
 
 Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. A `tabindex="-1"` wrapper the page change focuses (see [Custom Layouts](docs/recipes.md#custom-layouts)) does show it. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
-Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
+Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {
@@ -608,7 +611,7 @@ export default {
 
 ### Minimum config
 
-Every field has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`. Keep the scaffolded `id` and `language`: the build warns without them.
+Every field has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`. Keep the scaffolded `id`, `language` and `passingScore`: the build warns without `id` or `language`, and without `passingScore` once a graded page decides pass/fail.
 
 ### Runtime hooks: `course.runtime.js`
 
@@ -651,7 +654,19 @@ The plugin validates on every dev start and build. Errors abort the build and pr
 
 Two passes plus components that are accessible by construction.
 
-**Static checks** run inside `validate` / `dev` / `export`, with no setup. They cover: `<Image>` alt-or-`decorative`; `<Video>`/`<Audio>` `title` + captions/transcript; empty question labels; skipped heading levels; `branding.primaryColor` contrast against white; well-formed `language`; and the Svelte compiler's `a11y_*` warnings. Each diagnostic carries a rule ID (`[tessera/image-alt]`, `[a11y_missing_attribute]`), which is what `a11y.ignore` and `a11y.level` match.
+**Static checks** run inside `validate` / `dev` / `export`, with no setup. Each diagnostic starts with its rule ID, which is what `a11y.ignore` and `a11y.level` match:
+
+| Rule ID                    | Checks                                                    |
+| -------------------------- | --------------------------------------------------------- |
+| `tessera/image-alt`        | `<Image>` has `alt` or `decorative`, not both             |
+| `tessera/media-title`      | `<Video>` / `<Audio>` has a `title`                       |
+| `tessera/media-captions`   | native `<Video>` has `tracks` or a `transcript`           |
+| `tessera/media-transcript` | `<Audio>` and embedded `<Video>` have a `transcript`      |
+| `tessera/question-label`   | question prompts are not empty                            |
+| `tessera/heading-order`    | page headings skip no level                               |
+| `tessera/primary-contrast` | `branding.primaryColor` has enough contrast against white |
+| `tessera/lang`             | `language` is set and is a well-formed BCP-47 tag         |
+| `a11y_*`                   | the Svelte compiler's accessibility warnings              |
 
 **Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 
