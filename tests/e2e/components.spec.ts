@@ -188,6 +188,9 @@ test.describe('Component — Carousel', () => {
     // Clicking without moving focus, as Safari does.
     await nextArrow.dispatchEvent('click');
     await expect(page.locator('.tessera-carousel-dot').nth(2)).toBeFocused();
+    await expect(
+      page.locator('.tessera-carousel [aria-live="polite"]'),
+    ).toHaveText('');
   });
 });
 

@@ -21,6 +21,7 @@
   let totalSlides = $state(0);
   let status = $state('');
   let touchStartX = 0;
+  let viewport;
 
   const ctx = {
     get currentSlide() {
@@ -39,21 +40,19 @@
 
   const focusDot = (index) => document.getElementById(ctx.tabId(index)).focus();
 
-  // A focused dot already announces the selected slide, so only the
-  // arrows and swipe use the live region.
-  function goTo(index) {
+  function goTo(index, announce = false) {
     // An inert slide drops focus to the page, where arrow keys change pages.
-    const slide = document.getElementById(ctx.slideId(currentSlide));
-    if (slide.contains(document.activeElement)) focusDot(index);
+    const moveFocus = viewport.contains(document.activeElement);
+    if (moveFocus) focusDot(index);
     currentSlide = index;
-    status = '';
+    // A focused dot already announces the selected slide.
+    status =
+      announce && !moveFocus ? `Slide ${index + 1} of ${totalSlides}` : '';
   }
 
   function step(delta) {
     const index = currentSlide + delta;
-    if (index < 0 || index >= totalSlides) return;
-    goTo(index);
-    status = `Slide ${index + 1} of ${totalSlides}`;
+    if (index >= 0 && index < totalSlides) goTo(index, true);
   }
 
   const prev = () => step(-1);
@@ -108,7 +107,7 @@
     ›
   </button>
 
-  <div class="tessera-carousel-viewport">
+  <div class="tessera-carousel-viewport" bind:this={viewport}>
     <div
       class="tessera-carousel-track"
       style="transform: translateX(-{currentSlide * 100}%)"
