@@ -88,7 +88,7 @@
     padding: var(--tessera-spacing-xl);
     max-height: 80vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--tessera-shadow-lg);
     animation: tessera-modal-slide-in 200ms ease;
   }
 
