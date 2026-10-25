@@ -385,10 +385,18 @@
     cursor: pointer;
   }
 
-  /* After the card's own shadows, which outrank the global halo. */
+  /* The card's shadows outrank the global halo, so stack the halo on them. */
   .tessera-sorting-card:focus-visible {
     border-color: var(--tessera-primary);
-    box-shadow: var(--tessera-focus-halo);
+    box-shadow:
+      var(--tessera-focus-halo),
+      0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .tessera-sorting-card.selected:focus-visible {
+    box-shadow:
+      var(--tessera-focus-halo),
+      0 4px 16px rgba(0, 0, 0, 0.15);
   }
 
   .tessera-sorting-card.dragging {

@@ -80,9 +80,15 @@ test.describe('Navigation — Free Mode', () => {
     page,
   }) => {
     const link = page.locator('.tessera-nav-page', { hasText: 'Objectives' });
+    // A key press first, so the scripted focus counts as keyboard focus.
+    await page.keyboard.press('Shift');
     await link.focus();
     await expect(link).toHaveCSS('outline-style', 'solid');
     await expect(link).toHaveCSS('outline-offset', '-2px');
+    await expect(link).toHaveCSS(
+      'box-shadow',
+      'rgb(255, 255, 255) 0px 0px 0px 4px inset',
+    );
 
     await page.keyboard.press('Enter');
     const heading = page.locator('.tessera-content h1');
