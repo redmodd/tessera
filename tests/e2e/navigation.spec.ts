@@ -89,6 +89,7 @@ test.describe('Navigation — Free Mode', () => {
       'box-shadow',
       'rgb(255, 255, 255) 0px 0px 0px 4px inset',
     );
+    await expect(link).toHaveCSS('border-left-width', '0px');
 
     await page.keyboard.press('Enter');
     const heading = page.locator('.tessera-content h1:focus-visible');

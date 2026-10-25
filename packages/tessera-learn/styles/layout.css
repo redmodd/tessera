@@ -111,7 +111,7 @@
 .tessera-nav-section-title:focus-visible,
 .tessera-nav-page:focus-visible {
   outline-offset: -2px;
-  box-shadow: inset 0 0 0 4px var(--tessera-bg);
+  box-shadow: inset var(--tessera-focus-halo);
 }
 
 .tessera-nav-section-title:hover {
@@ -166,6 +166,14 @@
   color: var(--tessera-primary-dark);
   font-weight: 600;
   border-left-color: var(--tessera-primary);
+}
+
+/* The inset halo starts inside the border, so the border gives way to padding. */
+.tessera-nav-page:focus-visible {
+  border-left-width: 0;
+  padding-left: calc(
+    var(--tessera-spacing-lg) + var(--tessera-spacing-xl) + 3px
+  );
 }
 
 .tessera-nav-page[aria-disabled='true'] {

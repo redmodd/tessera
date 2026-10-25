@@ -375,7 +375,6 @@
   .tessera-sorting-card:hover {
     border-color: var(--tessera-primary);
     --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    box-shadow: var(--card-shadow);
     transform: translateY(-1px);
   }
 
@@ -383,7 +382,6 @@
     border-color: var(--tessera-primary);
     background: var(--tessera-primary-light);
     --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    box-shadow: var(--card-shadow);
     transform: translateY(-2px) scale(1.02);
     cursor: pointer;
   }
