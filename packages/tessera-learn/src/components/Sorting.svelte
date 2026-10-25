@@ -378,8 +378,6 @@
   }
 
   .tessera-sorting-card:focus-visible {
-    outline: none;
-    box-shadow: var(--tessera-focus-ring);
     border-color: var(--tessera-primary);
   }
 
@@ -441,8 +439,11 @@
     position: relative;
   }
 
+  /* The target clips its label, so the target shows the label's focus. */
   .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible) {
-    box-shadow: var(--tessera-focus-ring);
+    outline: var(--tessera-focus-outline);
+    outline-offset: 2px;
+    box-shadow: var(--tessera-focus-halo);
   }
 
   .tessera-sorting-target.drag-over {
@@ -465,6 +466,7 @@
   .tessera-sorting-target-label {
     background: none;
     border: none;
+    outline: none;
     box-shadow: none;
     cursor: inherit;
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);

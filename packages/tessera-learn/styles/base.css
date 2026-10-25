@@ -102,8 +102,6 @@ a:hover {
 }
 
 a:focus-visible {
-  outline: none;
-  box-shadow: var(--tessera-focus-ring);
   border-radius: 2px;
 }
 
@@ -204,8 +202,15 @@ th {
 
 /* ---- Focus Visible ---- */
 :focus-visible {
+  outline: var(--tessera-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--tessera-focus-halo);
+}
+
+/* Headings take focus only so screen readers announce them; they aren't controls. */
+:is(h1, h2, h3, h4, h5, h6):focus-visible {
   outline: none;
-  box-shadow: var(--tessera-focus-ring);
+  box-shadow: none;
 }
 
 /* ---- Screen Reader Only ---- */

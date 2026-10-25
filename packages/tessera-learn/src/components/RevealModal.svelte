@@ -67,8 +67,6 @@
   }
 
   .tessera-reveal-trigger:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
     border-radius: 4px;
   }
 
@@ -134,11 +132,6 @@
   .tessera-modal-close:hover {
     background-color: var(--tessera-bg-secondary);
     color: var(--tessera-text);
-  }
-
-  .tessera-modal-close:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
   }
 
   @keyframes tessera-modal-fade-in {

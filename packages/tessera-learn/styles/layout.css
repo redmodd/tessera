@@ -107,6 +107,13 @@
   transition: color var(--tessera-transition-fast);
 }
 
+/* Full-width rows in a scrolling list clip an outside ring, so draw it inside. */
+.tessera-nav-section-title:focus-visible,
+.tessera-nav-page:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--tessera-bg);
+}
+
 .tessera-nav-section-title:hover {
   color: var(--tessera-text);
 }
@@ -202,6 +209,7 @@
 }
 
 .tessera-main:focus-visible {
+  outline: none;
   box-shadow: none;
 }
 
@@ -249,10 +257,6 @@
 .tessera-page-nav-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-}
-
-.tessera-page-nav-btn:focus-visible {
-  box-shadow: var(--tessera-focus-ring);
 }
 
 /* ---- Progress Bar ---- */
@@ -306,7 +310,7 @@
 }
 
 .tessera-hamburger:focus-visible {
-  box-shadow: var(--tessera-focus-ring);
+  box-shadow: var(--tessera-focus-halo);
 }
 
 .tessera-hamburger-line {

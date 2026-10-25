@@ -198,11 +198,6 @@
     cursor: not-allowed;
   }
 
-  .tessera-carousel-arrow:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
-  }
-
   .tessera-carousel-dots {
     grid-area: 2 / 2;
     justify-self: center;
@@ -224,10 +219,5 @@
   .tessera-carousel-dot.active {
     background-color: var(--tessera-primary);
     border-color: var(--tessera-primary);
-  }
-
-  .tessera-carousel-dot:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
   }
 </style>

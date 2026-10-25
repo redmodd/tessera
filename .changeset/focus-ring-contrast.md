@@ -1,0 +1,5 @@
+---
+'tessera-learn': patch
+---
+
+The focus ring is a 2px outline in `--tessera-text` with a `--tessera-bg` halo, so it meets 3:1 contrast on any background and shows in forced-colors mode. It is no longer clipped in the sidebar or the accordion, and headings that take focus show no ring. `--tessera-focus-ring` is replaced by `--tessera-focus-outline` and `--tessera-focus-halo`.

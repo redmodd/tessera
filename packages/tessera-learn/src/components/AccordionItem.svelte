@@ -94,9 +94,19 @@
     background-color: var(--tessera-bg-secondary);
   }
 
+  /* The accordion doesn't clip its corners, so the end headers round their own. */
+  .tessera-accordion-item:first-child .tessera-accordion-trigger {
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+  }
+
+  .tessera-accordion-item:last-child
+    .tessera-accordion-trigger[aria-expanded='false'] {
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+  }
+
   .tessera-accordion-trigger:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
     z-index: 1;
     position: relative;
   }
