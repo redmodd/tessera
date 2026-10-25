@@ -16,8 +16,9 @@
 
 <div
   class="tessera-carousel-slide"
+  id="{carousel.id}-slide-{index}"
   role="tabpanel"
-  aria-hidden={!isCurrent}
+  inert={!isCurrent}
   aria-label="Slide {index + 1}"
 >
   {@render children?.()}

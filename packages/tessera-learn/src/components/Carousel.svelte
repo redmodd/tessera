@@ -1,7 +1,7 @@
 <script module>
   import { createContext } from 'svelte';
 
-  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number }>>} */
+  /** @type {ReturnType<typeof createContext<{ readonly id: string; readonly currentSlide: number; register(): number }>>} */
   const [getCarouselContext, setCarouselContext] = createContext();
   export { getCarouselContext };
 </script>
@@ -14,12 +14,15 @@
    * @prop {import('svelte').Snippet} [children] - CarouselSlide children
    */
   let { children } = $props();
+  const id = $props.id();
   let currentSlide = $state(0);
   let totalSlides = $state(0);
+  let status = $state('');
   let touchStartX = 0;
   let touchEndX = 0;
 
   const ctx = {
+    id,
     get currentSlide() {
       return currentSlide;
     },
@@ -32,27 +35,30 @@
 
   setCarouselContext(ctx);
 
-  function prev() {
-    if (currentSlide > 0) currentSlide--;
-  }
-
-  function next() {
-    if (currentSlide < totalSlides - 1) currentSlide++;
-  }
-
   function goTo(index) {
+    if (index < 0 || index >= totalSlides || index === currentSlide) return;
     currentSlide = index;
+    status = `Slide ${index + 1} of ${totalSlides}`;
   }
 
-  function handleKeydown(e) {
-    if (e.key === 'ArrowLeft') {
-      prev();
-      e.preventDefault();
-    }
-    if (e.key === 'ArrowRight') {
-      next();
-      e.preventDefault();
-    }
+  const prev = () => goTo(currentSlide - 1);
+  const next = () => goTo(currentSlide + 1);
+
+  // Tabs pattern: the dots are one Tab stop, arrows move and select.
+  function onDotKeydown(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const last = totalSlides - 1;
+    let index;
+    if (e.key === 'ArrowRight')
+      index = currentSlide === last ? 0 : currentSlide + 1;
+    else if (e.key === 'ArrowLeft')
+      index = currentSlide === 0 ? last : currentSlide - 1;
+    else if (e.key === 'Home') index = 0;
+    else if (e.key === 'End') index = last;
+    else return;
+    e.preventDefault();
+    goTo(index);
+    e.currentTarget.parentElement.children[index].focus();
   }
 
   function handleTouchStart(e) {
@@ -72,17 +78,13 @@
   let dots = $derived(Array.from({ length: totalSlides }, (_, i) => i));
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="tessera-carousel"
   role="region"
   aria-roledescription="carousel"
   aria-label="Slide carousel"
-  onkeydown={handleKeydown}
   ontouchstart={handleTouchStart}
   ontouchend={handleTouchEnd}
-  tabindex="0"
 >
   <div class="tessera-carousel-viewport">
     <div
@@ -92,6 +94,7 @@
       {@render children?.()}
     </div>
   </div>
+  <p class="tessera-sr-only" aria-live="polite">{status}</p>
 
   <div class="tessera-carousel-controls">
     <button
@@ -114,8 +117,11 @@
           class:active={dot === currentSlide}
           role="tab"
           aria-selected={dot === currentSlide}
+          aria-controls="{id}-slide-{dot}"
           aria-label="Go to slide {dot + 1}"
+          tabindex={dot === currentSlide ? 0 : -1}
           onclick={() => goTo(dot)}
+          onkeydown={onDotKeydown}
         ></button>
       {/each}
     </div>
