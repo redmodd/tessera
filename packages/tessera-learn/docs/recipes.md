@@ -197,7 +197,9 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     </fieldset>
 
     <QuestionReview {q}>
-      {#if !q.correct}<p>The right answer was {options[correct]}.</p>{/if}
+      {#if q.correct === false}<p>
+          The right answer was {options[correct]}.
+        </p>{/if}
     </QuestionReview>
   </div>
 {/snippet}
@@ -205,7 +207,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}{@render view()}{/if}
 ```
 
-`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown when the question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 
@@ -247,20 +249,37 @@ Built-in widgets render nothing in this layout (`QuestionShell` renders inline o
 
 A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`; omit `correct` to accept any answer. Course success rolls up across every declared graded page, quiz and standalone pages alike.
 
-```js
-const q = useQuestion({
-  id: 'whyItMatters',
-  graded: true,
-  response: () => ({ type: 'long-fill-in', response: answer }),
-  score: () => (answer.trim().length >= 50 ? 100 : 0),
-  reset: () => {
-    answer = '';
-  },
-  restore: (saved) => (answer = saved), // shows the saved answer on a return visit
-});
+```svelte
+<script>
+  import { QuestionReview, useQuestion } from 'tessera-learn';
+
+  let answer = $state('');
+
+  const q = useQuestion({
+    id: 'whyItMatters',
+    graded: true,
+    response: () => ({ type: 'long-fill-in', response: answer }),
+    score: () => (answer.trim().length >= 50 ? 100 : 0),
+    complete: () => answer.trim() !== '',
+    reset: () => {
+      answer = '';
+    },
+    restore: (saved) => (answer = saved), // shows the saved answer on a return visit
+  });
+</script>
+
+<div>
+  <label for="why">Why does this matter to your team?</label>
+  <textarea
+    id="why"
+    bind:value={answer}
+    disabled={q.locked}
+    oninput={() => q.setAnswer(answer)}></textarea>
+  <QuestionReview {q} />
+</div>
 ```
 
-Render a Try again button while `q.canRetry`: a submitted answer stays submitted and locked when the learner returns to the page.
+With no `correct`, `QuestionReview` shows a neutral `Submitted` result in place of Correct / Incorrect. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

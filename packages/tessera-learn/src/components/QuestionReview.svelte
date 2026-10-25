@@ -10,6 +10,7 @@
    * @prop {import('../runtime/hooks.svelte.js').UseQuestionHandle} q - The `useQuestion()` handle
    * @prop {string} [correctLabel]
    * @prop {string} [incorrectLabel]
+   * @prop {string} [submittedLabel] - Shown when the question has no correct answer
    * @prop {string} [correctFeedback]
    * @prop {string} [incorrectFeedback]
    * @prop {import('svelte').Snippet} [children] - Shown under the result
@@ -18,6 +19,7 @@
     q,
     correctLabel = 'Correct',
     incorrectLabel = 'Incorrect',
+    submittedLabel = 'Submitted',
     correctFeedback = '',
     incorrectFeedback = '',
     children,
@@ -26,7 +28,9 @@
   const CONTROL = 'input, select, textarea, button, [tabindex="0"]';
 
   const inQuiz = $derived(q.mode === 'quiz');
-  const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
+  const feedback = $derived(
+    q.correct === null ? '' : q.correct ? correctFeedback : incorrectFeedback,
+  );
   const contentId = $props.id();
   // Feedback showing at mount is a restored answer, not a fresh submit.
   let restored = untrack(() => q.feedbackVisible);
@@ -97,11 +101,15 @@
     <div id={contentId}>
       <div
         class="tessera-question-result"
-        class:correct={q.correct}
-        class:incorrect={!q.correct}
+        class:correct={q.correct === true}
+        class:incorrect={q.correct === false}
       >
-        <ResultIcon kind={q.correct ? 'correct' : 'incorrect'} />
-        {q.correct ? correctLabel : incorrectLabel}
+        {#if q.correct === null}
+          {submittedLabel}
+        {:else}
+          <ResultIcon kind={q.correct ? 'correct' : 'incorrect'} />
+          {q.correct ? correctLabel : incorrectLabel}
+        {/if}
       </div>
       {@render children?.()}
       {#if feedback}

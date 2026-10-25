@@ -12,7 +12,7 @@
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
-      correct: [String(correct)],
+      correct: correct === undefined ? undefined : [String(correct)],
       options: options.map((_, i) => String(i)),
     }),
     reset: () => {
@@ -48,7 +48,9 @@
       {/each}
     </fieldset>
     <QuestionReview {q}>
-      {#if !q.correct}<p>The right answer was {options[correct]}.</p>{/if}
+      {#if q.correct === false}<p>
+          The right answer was {options[correct]}.
+        </p>{/if}
     </QuestionReview>
   </div>
 {/snippet}

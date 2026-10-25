@@ -470,6 +470,20 @@ describe('standalone feedback', () => {
     },
   );
 
+  it('shows a neutral result for a question with no correct answer', () => {
+    const mounted = mountWidget(CustomChoice, {
+      prompt: 'Favourite?',
+      options: ['Red', 'Blue'],
+    });
+    submitOption(mounted, 0);
+
+    const result = mounted.target.querySelector('.tessera-question-result')!;
+    expect(result.textContent?.trim()).toBe('Submitted');
+    expect(result.className).not.toMatch(/\b(correct|incorrect)\b/);
+    expect(result.querySelector('svg')).toBeNull();
+    expect(mounted.button('Try again')).toBeTruthy();
+  });
+
   it('skips a hidden input when focusing the first control after Try again', async () => {
     const mounted = mountWidget(CustomChoice, {
       prompt: '2 + 2?',
