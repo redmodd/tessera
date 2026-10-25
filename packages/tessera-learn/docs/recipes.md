@@ -81,7 +81,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 </script>
 
 <div>
-  <!-- line-drawing UI calls connect(l, r) on drop -->
+  <!-- line-drawing UI, keyboard-operable with buttons, calls connect(l, r) -->
   <QuestionReview {q} />
 </div>
 ```
@@ -207,7 +207,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}{@render view()}{/if}
 ```
 
-`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown when the question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when a standalone question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 
@@ -275,11 +275,15 @@ A standalone question (no `<Quiz>`) counts toward course success when built with
     bind:value={answer}
     disabled={q.locked}
     oninput={() => q.setAnswer(answer)}></textarea>
-  <QuestionReview {q} />
+  <QuestionReview {q}>
+    {#if !q.isLockedCorrect}<p>
+        Write at least 50 characters for full marks.
+      </p>{/if}
+  </QuestionReview>
 </div>
 ```
 
-With no `correct`, `QuestionReview` shows a neutral `Submitted` result in place of Correct / Incorrect. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
+With no `correct`, `QuestionReview` shows a neutral `Submitted` result in place of Correct / Incorrect; the children here say why an answer scored under 100. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

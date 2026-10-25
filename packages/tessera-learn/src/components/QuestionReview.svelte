@@ -6,14 +6,17 @@
    * @component QuestionReview
    * A question's Submit button, result, and Try again, with focus handling.
    * Place it inside the element that wraps the question's controls.
-   *
-   * @prop {import('../runtime/hooks.svelte.js').UseQuestionHandle} q - The `useQuestion()` handle
-   * @prop {string} [correctLabel]
-   * @prop {string} [incorrectLabel]
-   * @prop {string} [submittedLabel] - Shown when the question has no correct answer
-   * @prop {string} [correctFeedback]
-   * @prop {string} [incorrectFeedback]
-   * @prop {import('svelte').Snippet} [children] - Shown under the result
+   */
+  /**
+   * @type {{
+   *   q: import('../runtime/hooks.svelte.js').UseQuestionHandle;
+   *   correctLabel?: string;
+   *   incorrectLabel?: string;
+   *   submittedLabel?: string;
+   *   correctFeedback?: string;
+   *   incorrectFeedback?: string;
+   *   children?: import('svelte').Snippet;
+   * }}
    */
   let {
     q,
