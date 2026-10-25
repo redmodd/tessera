@@ -91,12 +91,9 @@ test.describe('Navigation — Free Mode', () => {
     );
 
     await page.keyboard.press('Enter');
-    const heading = page.locator('.tessera-content h1');
+    const heading = page.locator('.tessera-content h1:focus-visible');
     await expect(heading).toContainText('Course Objectives');
     await expect(heading).toBeFocused();
-    expect(await heading.evaluate((el) => el.matches(':focus-visible'))).toBe(
-      true,
-    );
     await expect(heading).toHaveCSS('outline-style', 'none');
   });
 

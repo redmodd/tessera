@@ -357,7 +357,8 @@
     background: var(--tessera-bg);
     border: 2px solid var(--tessera-border);
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--card-shadow);
     font-size: 1rem;
     font-weight: 500;
     font-family: var(--tessera-font-family);
@@ -373,14 +374,16 @@
 
   .tessera-sorting-card:hover {
     border-color: var(--tessera-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--card-shadow);
     transform: translateY(-1px);
   }
 
   .tessera-sorting-card.selected {
     border-color: var(--tessera-primary);
     background: var(--tessera-primary-light);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--card-shadow);
     transform: translateY(-2px) scale(1.02);
     cursor: pointer;
   }
@@ -388,15 +391,7 @@
   /* The card's shadows outrank the global halo, so stack the halo on them. */
   .tessera-sorting-card:focus-visible {
     border-color: var(--tessera-primary);
-    box-shadow:
-      var(--tessera-focus-halo),
-      0 2px 8px rgba(0, 0, 0, 0.08);
-  }
-
-  .tessera-sorting-card.selected:focus-visible {
-    box-shadow:
-      var(--tessera-focus-halo),
-      0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--tessera-focus-halo), var(--card-shadow);
   }
 
   .tessera-sorting-card.dragging {
