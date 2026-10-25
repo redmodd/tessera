@@ -126,7 +126,7 @@ response: () => ({
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
 - **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
-- **Standalone:** the widget owns Submit/Retry. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
+- **Standalone:** the widget owns Submit and Try again; [`QuestionReview`](recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) renders both. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
@@ -166,7 +166,7 @@ Pass `restore` to show the answer again. Rules:
 - It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
 - Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
 - A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
-- A standalone widget needs a retry control (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
+- A standalone widget needs a retry control: `QuestionReview` renders Try again, or write your own (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
 
 ```js
 let selected = $state(null);

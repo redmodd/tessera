@@ -443,7 +443,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Try again after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />
@@ -525,7 +525,7 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-shadow-sm`                          | `0 2px 8px rgba(0, 0, 0, 0.08)`       |
 | `--tessera-shadow-lg`                          | `0 20px 60px rgba(0, 0, 0, 0.2)`      |
 
-Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
+Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
 Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
