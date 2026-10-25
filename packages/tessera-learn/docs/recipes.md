@@ -37,7 +37,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. Submit stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn, and `QuestionReview` renders Submit, the result, and Try again ([Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers its props). To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -46,7 +46,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 </script>
 
 <script>
-  import { useQuestion } from 'tessera-learn';
+  import { QuestionReview, useQuestion } from 'tessera-learn';
 
   const CORRECT = [
     ['Hydrogen', 'H'],
@@ -67,6 +67,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
         right: CORRECT.map(([, r]) => r),
       },
     }),
+    complete: () => pairs.length === CORRECT.length,
     reset: () => {
       pairs = [];
     },
@@ -75,17 +76,14 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 
   function connect(l, r) {
     pairs = [...pairs.filter(([a]) => a !== l), [l, r]];
+    q.setAnswer(pairs);
   }
 </script>
 
-<!-- line-drawing UI calls connect(l, r) on drop -->
-
-<button
-  onclick={q.submit}
-  disabled={q.submitted || pairs.length < CORRECT.length}>Submit</button
->
-{#if q.correct === true}<p>Correct.</p>{/if}
-{#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
+<div>
+  <!-- line-drawing UI calls connect(l, r) on drop -->
+  <QuestionReview {q} />
+</div>
 ```
 
 ## Recipe 2: Custom quiz shell via `quiz.svelte`
@@ -144,7 +142,7 @@ Inline layout needs custom widgets that render their own markup instead of calli
 
 ## Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Wrap the question's controls and `QuestionReview` in one element: Try again focuses the first control in it, and warns in dev when that element holds more than the question.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Wrap the question's controls and `QuestionReview` in one element: Try again focuses the first control in it, and warns in dev when that element is the page, holds another question, or has no control that takes focus.
 
 ```svelte
 <!-- components/MyChoice.svelte -->

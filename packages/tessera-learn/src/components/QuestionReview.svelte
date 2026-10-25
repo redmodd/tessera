@@ -23,8 +23,7 @@
     children,
   } = $props();
 
-  const CONTROL =
-    'input:enabled:not([type="hidden"]), select:enabled, textarea:enabled, button:enabled, [tabindex="0"]';
+  const CONTROL = 'input, select, textarea, button, [tabindex="0"]';
 
   const inQuiz = $derived(q.mode === 'quiz');
   const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
@@ -45,23 +44,30 @@
     ).parentElement;
     q.retry();
     await tick();
-    if (import.meta.env?.DEV) warnIfShared(container);
-    // A hidden or inert control ignores focus(); fall through to the next.
-    for (const el of container.querySelectorAll(CONTROL)) {
+    // A hidden, disabled, or inert control ignores focus(); fall through to the next.
+    const focused = [...container.querySelectorAll(CONTROL)].some((el) => {
       el.focus();
-      if (document.activeElement === el) break;
-    }
+      return document.activeElement === el;
+    });
+    if (import.meta.env?.DEV) warnPlacement(container, focused);
   }
 
-  function warnIfShared(container) {
+  function warnPlacement(container, focused) {
     const reviews = container.querySelectorAll(
       '.tessera-question-submit, .tessera-question-review',
     );
-    if (container.matches('.tessera-page') || reviews.length > 1) {
+    const problem = !focused
+      ? 'has no control that takes focus'
+      : container.matches('.tessera-page')
+        ? 'is the page'
+        : reviews.length > 1
+          ? 'holds another question'
+          : null;
+    if (problem) {
       console.warn(
         '[tessera] QuestionReview: Try again focuses the first control in its ' +
-          'parent element, which holds more than this question. Wrap the ' +
-          "question's controls and QuestionReview in one element.",
+          `parent element, which ${problem}. Put the question's controls and ` +
+          'QuestionReview directly inside one element.',
       );
     }
   }

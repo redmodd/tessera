@@ -1,7 +1,7 @@
 <script>
   import { QuestionReview, useQuestion } from '../../src/index.js';
 
-  let { id } = $props();
+  let { id, nested = false } = $props();
   let selected = $state(null);
 
   const q = useQuestion({
@@ -29,4 +29,8 @@
     q.setAnswer(0);
   }}
 />
-<QuestionReview {q} />
+{#if nested}
+  <div><QuestionReview {q} /></div>
+{:else}
+  <QuestionReview {q} />
+{/if}

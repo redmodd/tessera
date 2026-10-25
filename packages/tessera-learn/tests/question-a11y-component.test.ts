@@ -487,18 +487,28 @@ describe('standalone feedback', () => {
       .toBe(mounted.target.querySelector('fieldset input'));
   });
 
-  it('warns when QuestionReview shares its parent with the page', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const mounted = mountWidget(CustomChoiceUnwrapped, {});
-    mounted.target.classList.add('tessera-page');
-    mounted.click(mounted.target.querySelector('input')!);
-    mounted.click(mounted.button('Submit'));
-    mounted.click(mounted.button('Try again'));
+  it.each([
+    { name: 'is the page', nested: false, problem: 'is the page' },
+    {
+      name: 'has no control',
+      nested: true,
+      problem: 'has no control that takes focus',
+    },
+  ])(
+    'warns when the QuestionReview parent $name',
+    async ({ nested, problem }) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const mounted = mountWidget(CustomChoiceUnwrapped, { nested });
+      mounted.target.classList.add('tessera-page');
+      mounted.click(mounted.target.querySelector('input')!);
+      mounted.click(mounted.button('Submit'));
+      mounted.click(mounted.button('Try again'));
 
-    await expect
-      .poll(() => warn.mock.calls.flat().join(' '))
-      .toContain('Wrap the question');
-  });
+      await expect
+        .poll(() => warn.mock.calls.flat().join(' '))
+        .toContain(`which ${problem}.`);
+    },
+  );
 });
 
 describe('custom widget in a quiz', () => {
