@@ -136,6 +136,10 @@ test.describe('Component — Carousel', () => {
 
     for (let i = 0; i < 3; i++) {
       await expect(await slideFor(i)).toHaveAttribute('role', 'tabpanel');
+      await expect(await slideFor(i)).toHaveAttribute(
+        'aria-labelledby',
+        (await dots.nth(i).getAttribute('id'))!,
+      );
     }
     await expect(await slideFor(0)).not.toHaveAttribute('inert');
     await expect(await slideFor(1)).toHaveAttribute('inert');
@@ -173,6 +177,17 @@ test.describe('Component — Carousel', () => {
     await page.keyboard.press('ArrowRight');
     await expect(dots.nth(1)).toBeFocused();
     await expect(dots.nth(1)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('carousel moves focus to the dot when the focused slide is hidden', async ({
+    page,
+  }) => {
+    const nextArrow = page.getByRole('button', { name: 'Next slide' });
+    await nextArrow.click();
+    await page.getByRole('button', { name: 'Slide 2 action' }).focus();
+    // Clicking without moving focus, as Safari does.
+    await nextArrow.dispatchEvent('click');
+    await expect(page.locator('.tessera-carousel-dot').nth(2)).toBeFocused();
   });
 });
 

@@ -17,7 +17,7 @@
   id={carousel.slideId(index)}
   role="tabpanel"
   inert={carousel.currentSlide !== index}
-  aria-label="Slide {index + 1}"
+  aria-labelledby={carousel.tabId(index)}
 >
   {@render children?.()}
 </div>

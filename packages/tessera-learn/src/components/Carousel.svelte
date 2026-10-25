@@ -1,7 +1,7 @@
 <script module>
   import { createContext } from 'svelte';
 
-  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number; slideId(index: number): string }>>} */
+  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number; slideId(index: number): string; tabId(index: number): string }>>} */
   const [getCarouselContext, setCarouselContext] = createContext();
   export { getCarouselContext };
 </script>
@@ -32,13 +32,19 @@
       return index;
     },
     slideId: (index) => `${id}-slide-${index}`,
+    tabId: (index) => `${id}-tab-${index}`,
   };
 
   setCarouselContext(ctx);
 
+  const focusDot = (index) => document.getElementById(ctx.tabId(index)).focus();
+
   // A focused dot already announces the selected slide, so only the
   // arrows and swipe use the live region.
   function goTo(index) {
+    // An inert slide drops focus to the page, where arrow keys change pages.
+    const slide = document.getElementById(ctx.slideId(currentSlide));
+    if (slide.contains(document.activeElement)) focusDot(index);
     currentSlide = index;
     status = '';
   }
@@ -61,7 +67,7 @@
     if (index === undefined) return;
     e.preventDefault();
     goTo(index);
-    e.currentTarget.parentElement.children[index].focus();
+    focusDot(index);
   }
 
   function handleTouchStart(e) {
@@ -114,6 +120,7 @@
         <button
           class="tessera-carousel-dot"
           class:active={dot === currentSlide}
+          id={ctx.tabId(dot)}
           role="tab"
           aria-selected={dot === currentSlide}
           aria-controls={ctx.slideId(dot)}
