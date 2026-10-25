@@ -87,7 +87,7 @@ Use `completion.mode: "manual"` when the author owns the completion moment (fina
 
 ### Success status
 
-By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion. It is an alias for `success: { from: "fixed", status }`; see [Success criterion](#success-criterion) to judge a quiz instead.
+By default `successStatus` stays `"unknown"`. Set `requireSuccessStatus: "passed"` (or `"failed"`) for an automatic pass alongside completion. It is an alias for `success: { from: "fixed", status }`, and a `success` block outranks it; see [Success criterion](#success-criterion) to judge a quiz instead.
 
 | Adapter        | `markComplete()`, default                                       | with `requireSuccessStatus: "passed"` |
 | -------------- | --------------------------------------------------------------- | ------------------------------------- |

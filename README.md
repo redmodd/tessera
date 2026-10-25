@@ -41,7 +41,7 @@ This scaffolds a [workspace](https://tesseralearn.dev/docs/workspace/) with one 
 
 ## Commands
 
-Every command works on one course. Name it, or `cd` into the course folder and leave the name off. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
+Every command works on one course, so name it. From inside a course folder, run `npx tessera <command>` with no name instead: `pnpm` scripts always run from the workspace root. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
 
 ```bash
 pnpm dev <course>       # live preview, hot-reloads as you edit
