@@ -307,7 +307,6 @@
     incorrectLabel="Some items are in the wrong category."
     {correctFeedback}
     {incorrectFeedback}
-    firstControl={() => cardEl}
   >
     {#if !q.correct}
       <div class="tessera-sorting-correct-list">

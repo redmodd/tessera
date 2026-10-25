@@ -43,7 +43,7 @@ Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to rende
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
-`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness; your widget renders its own UI).
+`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness). Standalone, `QuestionReview` shows a neutral `Submitted` result; inside a quiz the question still counts as wrong.
 
 ```ts
 type Interaction =

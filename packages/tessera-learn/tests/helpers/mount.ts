@@ -5,7 +5,7 @@ import {
   ProgressState,
   type StandaloneSubmit,
 } from '../../src/runtime/progress.svelte.js';
-import type { CourseConfig } from '../../src/runtime/types.js';
+import type { CourseConfig, QuizConfig } from '../../src/runtime/types.js';
 import type { Manifest } from '../../src/plugin/manifest.js';
 import {
   setInPage,
@@ -48,18 +48,19 @@ export function mountInBody<Props extends Record<string, any>>(
   return { target, unmount: destroy };
 }
 
-/** Mounts a component as the content of page 0, outside a quiz. */
+/** Mounts a component as the content of page 0, a quiz page when `quiz` is given. */
 export function mountOnPage(
   component: Component<any>,
   props: Record<string, unknown>,
   course: { manifest: Manifest; progress: ProgressState; config: CourseConfig },
+  quiz: QuizConfig | null = null,
 ) {
   return mountInBody(component, {
     props,
     setup: () => {
       setNavContext({ nav: { currentPageIndex: 0 }, ...course } as any);
       setPageContext({
-        quiz: null,
+        quiz,
         quizState: null,
         passingScore: 70,
         index: 0,
@@ -71,11 +72,14 @@ export function mountOnPage(
 
 export type SavedAnswer = StandaloneSubmit & { score: number };
 
-/** Mounts question `q1` on page 0, already answered when `saved` is given. */
+/**
+ * Mounts question `q1` on page 0, already answered when `saved` is given,
+ * on a quiz page when `quiz` is given.
+ */
 export function mountQuestion(
   widget: Component<any>,
   props: Record<string, unknown>,
-  saved?: SavedAnswer,
+  { saved, quiz }: { saved?: SavedAnswer; quiz?: QuizConfig } = {},
 ) {
   const manifest = createManifest(1);
   const config = createConfig();
@@ -87,6 +91,7 @@ export function mountQuestion(
     widget,
     { id: 'q1', question: 'Question', ...props },
     { manifest, progress, config },
+    quiz,
   );
 }
 

@@ -37,7 +37,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. Submit stays disabled until every pair is drawn. To make a widget that also works inside a quiz, see [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell).
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn, and `QuestionReview` renders Submit, the result, and Try again. [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers its props and a widget that also works inside a quiz.
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -46,7 +46,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 </script>
 
 <script>
-  import { useQuestion } from 'tessera-learn';
+  import { QuestionReview, useQuestion } from 'tessera-learn';
 
   const CORRECT = [
     ['Hydrogen', 'H'],
@@ -67,6 +67,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
         right: CORRECT.map(([, r]) => r),
       },
     }),
+    complete: () => pairs.length === CORRECT.length,
     reset: () => {
       pairs = [];
     },
@@ -75,17 +76,14 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 
   function connect(l, r) {
     pairs = [...pairs.filter(([a]) => a !== l), [l, r]];
+    q.setAnswer(pairs);
   }
 </script>
 
-<!-- line-drawing UI calls connect(l, r) on drop -->
-
-<button
-  onclick={q.submit}
-  disabled={q.submitted || pairs.length < CORRECT.length}>Submit</button
->
-{#if q.correct === true}<p>Correct.</p>{/if}
-{#if q.canRetry}<button onclick={q.retry}>Try again</button>{/if}
+<div>
+  <!-- line-drawing UI, keyboard-operable with buttons, calls connect(l, r) -->
+  <QuestionReview {q} />
+</div>
 ```
 
 ## Recipe 2: Custom quiz shell via `quiz.svelte`
@@ -144,19 +142,21 @@ Inline layout needs custom widgets that render their own markup instead of calli
 
 ## Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Wrap the question's controls and `QuestionReview` in one element: Try again focuses the first control in it, and warns in dev when that element is the page, holds another question, or has no control that takes focus.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
 <script>
   import { onMount } from 'svelte';
-  import { useQuestion } from 'tessera-learn';
+  import { QuestionReview, useQuestion } from 'tessera-learn';
 
   let { id, prompt, options, correct } = $props();
   let selected = $state(null);
 
   const q = useQuestion({
-    id,
+    get id() {
+      return id;
+    },
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
@@ -179,40 +179,35 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 </script>
 
 {#snippet view()}
-  <fieldset disabled={q.locked}>
-    <legend>{prompt}</legend>
-    {#each options as opt, i}
-      {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
-      <label>
-        <input
-          type="radio"
-          name={id}
-          checked={chosen}
-          onchange={() => pick(i)}
-        />
-        {opt}
-      </label>
-    {/each}
-  </fieldset>
+  <div>
+    <fieldset disabled={q.locked}>
+      <legend>{prompt}</legend>
+      {#each options as opt, i (i)}
+        {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
+        <label>
+          <input
+            type="radio"
+            name={id}
+            checked={chosen}
+            onchange={() => pick(i)}
+          />
+          {opt}
+        </label>
+      {/each}
+    </fieldset>
 
-  {#if q.feedbackVisible}
-    <p>
-      {q.answer === correct
-        ? 'Correct.'
-        : 'The right answer was ' + options[correct] + '.'}
-    </p>
-  {/if}
+    <QuestionReview {q}>
+      {#if q.correct === false}
+        <p>The right answer was {options[correct]}.</p>
+      {/if}
+    </QuestionReview>
+  </div>
 {/snippet}
 
-{#if q.mode === 'standalone'}
-  {@render view()}
-  {#if !q.submitted}
-    <button disabled={selected === null} onclick={q.submit}>Submit</button>
-  {:else if q.canRetry}
-    <button onclick={q.retry}>Try again</button>
-  {/if}
-{/if}
+{#if q.mode === 'standalone'}{@render view()}{/if}
 ```
+
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when a standalone question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 
@@ -254,20 +249,40 @@ Built-in widgets render nothing in this layout (`QuestionShell` renders inline o
 
 A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`; omit `correct` to accept any answer. Course success rolls up across every declared graded page, quiz and standalone pages alike.
 
-```js
-const q = useQuestion({
-  id: 'whyItMatters',
-  graded: true,
-  response: () => ({ type: 'long-fill-in', response: answer }),
-  score: () => (answer.trim().length >= 50 ? 100 : 0),
-  reset: () => {
-    answer = '';
-  },
-  restore: (saved) => (answer = saved), // shows the saved answer on a return visit
-});
+```svelte
+<script>
+  import { QuestionReview, useQuestion } from 'tessera-learn';
+
+  let answer = $state('');
+
+  const q = useQuestion({
+    id: 'whyItMatters',
+    graded: true,
+    response: () => ({ type: 'long-fill-in', response: answer }),
+    score: () => (answer.trim().length >= 50 ? 100 : 0),
+    complete: () => answer.trim() !== '',
+    reset: () => {
+      answer = '';
+    },
+    restore: (saved) => (answer = saved), // shows the saved answer on a return visit
+  });
+</script>
+
+<div>
+  <label for="why">Why does this matter to your team?</label>
+  <textarea
+    id="why"
+    bind:value={() => answer, (v) => q.setAnswer((answer = v))}
+    disabled={q.locked}></textarea>
+  <QuestionReview {q}>
+    {#if !q.isLockedCorrect}
+      <p>Write at least 50 characters for full marks.</p>
+    {/if}
+  </QuestionReview>
+</div>
 ```
 
-Render a Try again button while `q.canRetry`: a submitted answer stays submitted and locked when the learner returns to the page.
+The `QuestionReview` children say why an answer scored under 100. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 

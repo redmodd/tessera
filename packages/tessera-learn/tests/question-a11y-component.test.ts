@@ -5,10 +5,18 @@ import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import Sorting from '../src/components/Sorting.svelte';
+import CustomChoice from './fixtures/custom-choice.svelte';
+import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
+import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
+import type { QuizConfig } from '../src/runtime/types.js';
 import { mountQuestion } from './helpers/mount.js';
 
-function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
-  const { target } = mountQuestion(widget, props);
+function mountWidget(
+  widget: Component<any>,
+  props: Record<string, unknown>,
+  quiz?: QuizConfig,
+) {
+  const { target } = mountQuestion(widget, props, { quiz });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -442,6 +450,13 @@ describe('standalone feedback', () => {
         click(button('Submit'));
       },
     },
+    {
+      name: 'custom useQuestion',
+      widget: CustomChoice,
+      props: { prompt: '2 + 2?', options: ['3', '4'], correct: 1 },
+      first: 'input',
+      answerWrong: (w: Widget) => submitOption(w, 0),
+    },
   ])(
     'moves focus to the $name first control after Try again, without a Svelte warning',
     async ({ widget, props, first, answerWrong }) => {
@@ -457,4 +472,96 @@ describe('standalone feedback', () => {
       expect(warn).not.toHaveBeenCalled();
     },
   );
+
+  it('shows a neutral result for a question with no correct answer', () => {
+    const mounted = mountWidget(CustomChoice, {
+      prompt: 'Favourite?',
+      options: ['Red', 'Blue'],
+    });
+    submitOption(mounted, 0);
+
+    const result = mounted.target.querySelector('.tessera-question-result')!;
+    expect(result.textContent?.trim()).toBe('Submitted');
+    expect(result.className).not.toMatch(/\b(correct|incorrect)\b/);
+    expect(result.querySelector('svg')).toBeNull();
+    expect(mounted.button('Try again')).toBeTruthy();
+  });
+
+  it('skips a hidden input when focusing the first control after Try again', async () => {
+    const mounted = mountWidget(CustomChoice, {
+      prompt: '2 + 2?',
+      options: ['3', '4'],
+      correct: 1,
+    });
+    submitOption(mounted, 0);
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    mounted.target.querySelector('fieldset')!.before(hidden);
+    mounted.click(mounted.button('Try again'));
+
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(mounted.target.querySelector('fieldset input'));
+  });
+
+  it.each([
+    {
+      name: 'is the page',
+      nested: false,
+      arrange: (t: HTMLElement) => t.classList.add('tessera-page'),
+      problem: 'is the page',
+    },
+    {
+      name: 'has no control',
+      nested: true,
+      arrange: () => {},
+      problem: 'has no control that takes focus',
+    },
+    {
+      name: 'holds another question',
+      nested: false,
+      arrange: (t: HTMLElement) =>
+        t.insertAdjacentHTML(
+          'beforeend',
+          '<button class="tessera-question-submit">Submit</button>',
+        ),
+      problem: 'holds another question',
+    },
+  ])(
+    'warns when the QuestionReview parent $name',
+    async ({ nested, arrange, problem }) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const mounted = mountWidget(CustomChoiceUnwrapped, { nested });
+      arrange(mounted.target);
+      mounted.click(mounted.target.querySelector('input')!);
+      mounted.click(mounted.button('Submit'));
+      mounted.click(mounted.button('Try again'));
+
+      await expect
+        .poll(() => warn.mock.calls.flat().join(' '))
+        .toContain(`which ${problem}.`);
+    },
+  );
+});
+
+describe('custom widget in a quiz', () => {
+  it('moves focus to the immediate-feedback result', async () => {
+    const { target, button, click } = mountWidget(
+      CustomChoiceQuiz,
+      {},
+      { feedbackMode: 'immediate' },
+    );
+    flushSync();
+    const active = target.querySelector(
+      '.tessera-quiz-question-wrapper.active',
+    )!;
+    click(active.querySelector('input')!);
+    click(button('Submit'));
+
+    await expect
+      .poll(() => document.activeElement?.textContent ?? '')
+      .toContain('The right answer was 4.');
+    expect(active.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement!.getAttribute('role')).toBe('group');
+  });
 });

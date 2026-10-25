@@ -24,7 +24,7 @@ Some releases change how courses are written, and some reset learners' saved pro
 
 - **Hooks** (`tessera-learn`): `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`, `useXAPI`.
 - **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` wires page/layout discovery, the LMS adapter, the `$shared` alias, and the export pipeline. The `tessera` CLI (`new`/`duplicate`/`dev`/`export`/`validate`/`a11y`/`check`) runs Vite with this plugin for you, so scaffolded workspaces need no `vite.config.js`.
-- **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `DefaultLayout`.
+- **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `QuestionReview`, `DefaultLayout`.
 - **LMS adapters**: SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3 ("Tin Can"), static web. Selected via `course.config.js` `export.standard`, or overridden per build with `tessera export --standard <value>`.
 - **Accessibility checks**: static rules (alt text, media titles/captions, heading order, contrast, `<html lang>`) run inside validation and the build with zero extra dependencies. An opt-in runtime audit (`tessera a11y`, with `playwright` + `@axe-core/playwright` as optional peers) renders every page and gates on axe-core violations; its first run installs the Chromium browser if it's missing.
 

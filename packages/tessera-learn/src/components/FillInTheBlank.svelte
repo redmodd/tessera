@@ -35,7 +35,6 @@
 
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
-  let inputEl;
 
   const q = useQuestion({
     get id() {
@@ -79,7 +78,6 @@
   <label class="tessera-fitb-question" for={inputId}>{question}</label>
 
   <input
-    bind:this={inputEl}
     type="text"
     id={inputId}
     class="tessera-fitb-input"
@@ -93,12 +91,7 @@
     autocomplete="off"
   />
 
-  <QuestionReview
-    {q}
-    {correctFeedback}
-    {incorrectFeedback}
-    firstControl={() => inputEl}
-  >
+  <QuestionReview {q} {correctFeedback} {incorrectFeedback}>
     {#if !q.correct}
       <p class="tessera-fitb-correct-answer">
         Correct answer{answerList.length > 1 ? 's' : ''}: {answerList.join(

@@ -13,7 +13,7 @@ function revisit(
   props: Record<string, unknown>,
   saved: SavedAnswer,
 ) {
-  const { target } = mountQuestion(widget, props, saved);
+  const { target } = mountQuestion(widget, props, { saved });
   const all = <T extends Element>(selector: string) => [
     ...target.querySelectorAll<T>(selector),
   ];
