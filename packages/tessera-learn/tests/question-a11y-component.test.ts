@@ -5,7 +5,16 @@ import FillInTheBlank from '../src/components/FillInTheBlank.svelte';
 import Matching from '../src/components/Matching.svelte';
 import MultipleChoice from '../src/components/MultipleChoice.svelte';
 import Sorting from '../src/components/Sorting.svelte';
-import { mountQuestion } from './helpers/mount.js';
+import CustomChoice from './fixtures/custom-choice.svelte';
+import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
+import { ProgressState } from '../src/runtime/progress.svelte.js';
+import { createConfig, createManifest } from './helpers.js';
+import { mountInBody, mountQuestion } from './helpers/mount.js';
+import {
+  setInPage,
+  setNavContext,
+  setPageContext,
+} from '../src/runtime/contexts.js';
 
 function mountWidget(widget: Component<any>, props: Record<string, unknown>) {
   const { target } = mountQuestion(widget, props);
@@ -442,6 +451,13 @@ describe('standalone feedback', () => {
         click(button('Submit'));
       },
     },
+    {
+      name: 'custom useQuestion',
+      widget: CustomChoice,
+      props: { prompt: '2 + 2?', options: ['3', '4'], correct: 1 },
+      first: 'input',
+      answerWrong: (w: Widget) => submitOption(w, 0),
+    },
   ])(
     'moves focus to the $name first control after Try again, without a Svelte warning',
     async ({ widget, props, first, answerWrong }) => {
@@ -457,4 +473,45 @@ describe('standalone feedback', () => {
       expect(warn).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('custom widget in a quiz', () => {
+  it('moves focus to the immediate-feedback result', async () => {
+    const manifest = createManifest(1);
+    const config = createConfig();
+    const { target } = mountInBody(CustomChoiceQuiz, {
+      props: {},
+      setup: () => {
+        setNavContext({
+          nav: { currentPageIndex: 0 },
+          manifest,
+          config,
+          progress: new ProgressState(manifest, config),
+        } as any);
+        setPageContext({
+          quiz: { feedbackMode: 'immediate' },
+          quizState: null,
+          passingScore: 70,
+          index: 0,
+        });
+        setInPage(true);
+      },
+    });
+    flushSync();
+    const active = target.querySelector(
+      '.tessera-quiz-question-wrapper.active',
+    )!;
+    active.querySelector('input')!.click();
+    flushSync();
+    [...target.querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Submit')!
+      .click();
+    flushSync();
+
+    await expect
+      .poll(() => document.activeElement?.textContent ?? '')
+      .toContain('The right answer was 4.');
+    expect(active.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement!.getAttribute('role')).toBe('group');
+  });
 });

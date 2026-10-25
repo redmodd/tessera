@@ -13,3 +13,4 @@ export { default as FillInTheBlank } from './FillInTheBlank.svelte';
 export { default as Matching } from './Matching.svelte';
 export { default as Sorting } from './Sorting.svelte';
 export { default as DefaultLayout } from './DefaultLayout.svelte';
+export { default as QuestionReview } from './QuestionReview.svelte';

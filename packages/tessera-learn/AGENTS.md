@@ -189,7 +189,7 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 
 ## Authoring Surfaces
 
-1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use.
+1. **Built-in components**: `Callout`, `Image`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, etc. from `tessera-learn`. Import only what you use. `QuestionReview` gives a custom `useQuestion` widget the built-in Submit, result, and Try again with their focus handling (see [Recipe 2b](docs/recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-shell)).
 2. **Hooks**: `useQuestion`, `useQuiz`, `useNavigation`, `useProgress`, `useCompletion`, `usePersistence`, `useCourse`. The stable contract between custom widgets and the runtime. See [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md).
 3. **Custom layout**: `layout.svelte` at the course root replaces the default chrome. See [Custom Layouts](docs/recipes.md#custom-layouts).
 4. **Custom quiz shell**: `quiz.svelte` at the course root replaces the quiz UI for every page with `pageConfig.quiz`. See [`useQuiz`](docs/hooks.md#usequiz) and [Recipe 2](docs/recipes.md#recipe-2-custom-quiz-shell-via-quizsvelte).

@@ -45,7 +45,6 @@
   let selectedRight = $state(null);
   let leftFocus = $state(0);
   let rightFocus = $state(0);
-  let leftColumn;
   const componentId = $props.id();
   const leftHeadingId = `matching-${componentId}-from`;
   const rightHeadingId = `matching-${componentId}-to`;
@@ -198,7 +197,6 @@
   <div class="tessera-matching-grid">
     <!-- Left column -->
     <div
-      bind:this={leftColumn}
       class="tessera-matching-column"
       role="group"
       aria-labelledby={leftHeadingId}
@@ -333,7 +331,6 @@
     incorrectLabel="Some pairs are incorrect"
     {correctFeedback}
     {incorrectFeedback}
-    firstControl={() => leftColumn?.querySelector('button')}
   >
     {#if !q.correct}
       <div class="tessera-matching-correct-pairs">

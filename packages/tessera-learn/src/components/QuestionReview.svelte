@@ -2,15 +2,30 @@
   import { tick, untrack } from 'svelte';
   import ResultIcon from './ResultIcon.svelte';
 
+  /**
+   * @component QuestionReview
+   * A question's Submit button, result, and Try again, with focus handling.
+   * Place it inside the element that wraps the question's controls.
+   *
+   * @prop {import('../runtime/hooks.svelte.js').UseQuestionHandle} q - The `useQuestion()` handle
+   * @prop {string} [correctLabel]
+   * @prop {string} [incorrectLabel]
+   * @prop {string} [correctFeedback]
+   * @prop {string} [incorrectFeedback]
+   * @prop {import('svelte').Snippet} [children] - Shown under the result
+   */
   let {
     q,
     correctLabel = 'Correct',
     incorrectLabel = 'Incorrect',
     correctFeedback = '',
     incorrectFeedback = '',
-    firstControl,
     children,
   } = $props();
+
+  const CONTROL =
+    'input:enabled, select:enabled, textarea:enabled, button:enabled, [tabindex="0"]';
+  let container;
 
   const inQuiz = $derived(q.mode === 'quiz');
   const feedback = $derived(q.correct ? correctFeedback : incorrectFeedback);
@@ -20,6 +35,7 @@
 
   // Review never takes focus: a custom quiz shell may keep every question mounted.
   function focusOnSubmit(el) {
+    container = el.parentElement;
     const review = untrack(() => inQuiz && q.submitted);
     if (!restored && !review) el.focus();
     restored = false;
@@ -28,7 +44,7 @@
   async function retry() {
     q.retry();
     await tick();
-    firstControl()?.focus();
+    container?.querySelector(CONTROL)?.focus();
   }
 </script>
 

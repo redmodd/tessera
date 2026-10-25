@@ -144,19 +144,21 @@ Inline layout needs custom widgets that render their own markup instead of calli
 
 ## Recipe 2b: Custom question widget for a custom quiz shell
 
-The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does.
+The widget calls `useQuestion()`, registers a render snippet with `setRender`, pushes answers up with `setAnswer`, and reads `locked`/`feedbackVisible`/`answer`. It never reports: the shell does. `QuestionReview` renders the standalone Submit button, the result, and Try again, and moves focus to the result and back to the first control. Put it inside the element that wraps the question's controls.
 
 ```svelte
 <!-- components/MyChoice.svelte -->
 <script>
   import { onMount } from 'svelte';
-  import { useQuestion } from 'tessera-learn';
+  import { QuestionReview, useQuestion } from 'tessera-learn';
 
   let { id, prompt, options, correct } = $props();
   let selected = $state(null);
 
   const q = useQuestion({
-    id,
+    get id() {
+      return id;
+    },
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
@@ -179,40 +181,33 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 </script>
 
 {#snippet view()}
-  <fieldset disabled={q.locked}>
-    <legend>{prompt}</legend>
-    {#each options as opt, i}
-      {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
-      <label>
-        <input
-          type="radio"
-          name={id}
-          checked={chosen}
-          onchange={() => pick(i)}
-        />
-        {opt}
-      </label>
-    {/each}
-  </fieldset>
+  <div>
+    <fieldset disabled={q.locked}>
+      <legend>{prompt}</legend>
+      {#each options as opt, i (i)}
+        {@const chosen = (q.feedbackVisible ? q.answer : selected) === i}
+        <label>
+          <input
+            type="radio"
+            name={id}
+            checked={chosen}
+            onchange={() => pick(i)}
+          />
+          {opt}
+        </label>
+      {/each}
+    </fieldset>
 
-  {#if q.feedbackVisible}
-    <p>
-      {q.answer === correct
-        ? 'Correct.'
-        : 'The right answer was ' + options[correct] + '.'}
-    </p>
-  {/if}
+    <QuestionReview {q}>
+      {#if !q.correct}<p>The right answer was {options[correct]}.</p>{/if}
+    </QuestionReview>
+  </div>
 {/snippet}
 
-{#if q.mode === 'standalone'}
-  {@render view()}
-  {#if !q.submitted}
-    <button disabled={selected === null} onclick={q.submit}>Submit</button>
-  {:else if q.canRetry}
-    <button onclick={q.retry}>Try again</button>
-  {/if}
-{/if}
+{#if q.mode === 'standalone'}{@render view()}{/if}
 ```
+
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 

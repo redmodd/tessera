@@ -39,7 +39,6 @@
 
   let selectedOption = $state(null);
   const chosenFeedback = $derived(optionFeedback[selectedOption]);
-  let radioGroup;
 
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
@@ -96,7 +95,6 @@
   <p class="tessera-mc-question" id="{groupId}-label">{question}</p>
 
   <div
-    bind:this={radioGroup}
     class="tessera-mc-options"
     role="radiogroup"
     aria-labelledby="{groupId}-label"
@@ -142,7 +140,6 @@
     {q}
     correctFeedback={chosenFeedback ? '' : correctFeedback}
     incorrectFeedback={chosenFeedback ? '' : incorrectFeedback}
-    firstControl={() => radioGroup?.querySelector('input')}
   >
     {#if chosenFeedback}
       <span class="tessera-sr-only">{chosenFeedback}</span>
