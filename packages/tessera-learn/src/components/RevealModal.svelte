@@ -66,10 +66,6 @@
     cursor: pointer;
   }
 
-  .tessera-reveal-trigger:focus-visible {
-    border-radius: 4px;
-  }
-
   .tessera-modal {
     border: none;
     padding: 0;

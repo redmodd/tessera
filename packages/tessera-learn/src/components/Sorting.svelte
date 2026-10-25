@@ -377,16 +377,18 @@
     transform: translateY(-1px);
   }
 
-  .tessera-sorting-card:focus-visible {
-    border-color: var(--tessera-primary);
-  }
-
   .tessera-sorting-card.selected {
     border-color: var(--tessera-primary);
     background: var(--tessera-primary-light);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px) scale(1.02);
     cursor: pointer;
+  }
+
+  /* After the card's own shadows, which outrank the global halo. */
+  .tessera-sorting-card:focus-visible {
+    border-color: var(--tessera-primary);
+    box-shadow: var(--tessera-focus-halo);
   }
 
   .tessera-sorting-card.dragging {

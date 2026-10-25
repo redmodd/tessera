@@ -243,6 +243,20 @@ test.describe('Component — Sorting', () => {
     openFresh(page, 'Modal, Video & Audio', '.tessera-sorting-card'),
   );
 
+  test('a focused card shows the focus halo, selected or not', async ({
+    page,
+  }) => {
+    const card = page.locator('.tessera-sorting-card');
+    const halo = 'rgb(255, 255, 255) 0px 0px 0px 4px';
+    // A key press first, so the scripted focus counts as keyboard focus.
+    await page.keyboard.press('Shift');
+    await card.focus();
+    await expect(card).toHaveCSS('box-shadow', halo);
+    await page.keyboard.press('Enter');
+    await expect(card).toHaveClass(/selected/);
+    await expect(card).toHaveCSS('box-shadow', halo);
+  });
+
   test('a click anywhere on a target places the card, and placed cards return to the deck', async ({
     page,
   }) => {

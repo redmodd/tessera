@@ -76,6 +76,24 @@ test.describe('Navigation — Free Mode', () => {
     await expect(page.locator('.tessera-content h1')).toBeFocused();
   });
 
+  test('sidebar links draw the focus ring inside; the focused heading shows none', async ({
+    page,
+  }) => {
+    const link = page.locator('.tessera-nav-page', { hasText: 'Objectives' });
+    await link.focus();
+    await expect(link).toHaveCSS('outline-style', 'solid');
+    await expect(link).toHaveCSS('outline-offset', '-2px');
+
+    await page.keyboard.press('Enter');
+    const heading = page.locator('.tessera-content h1');
+    await expect(heading).toContainText('Course Objectives');
+    await expect(heading).toBeFocused();
+    expect(await heading.evaluate((el) => el.matches(':focus-visible'))).toBe(
+      true,
+    );
+    await expect(heading).toHaveCSS('outline-style', 'none');
+  });
+
   test('focus moved while a page loads stays where the learner put it', async ({
     page,
   }) => {

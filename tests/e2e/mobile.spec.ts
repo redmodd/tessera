@@ -87,6 +87,10 @@ test.describe('Mobile Navigation', () => {
     await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
     await expect(hamburger).toBeFocused();
     await expect(hamburger).toHaveCSS('outline-style', 'solid');
+    await expect(hamburger).toHaveCSS(
+      'box-shadow',
+      'rgb(255, 255, 255) 0px 0px 0px 4px',
+    );
   });
 
   test('Tab right after closing skips the sliding-out sidebar', async ({

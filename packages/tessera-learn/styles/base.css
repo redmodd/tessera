@@ -207,8 +207,8 @@ th {
   box-shadow: var(--tessera-focus-halo);
 }
 
-/* Headings take focus only so screen readers announce them; they aren't controls. */
-:is(h1, h2, h3, h4, h5, h6):focus-visible {
+/* A heading focused only so screen readers announce it isn't a control. */
+:is(h1, h2, h3, h4, h5, h6)[tabindex='-1']:focus-visible {
   outline: none;
   box-shadow: none;
 }
