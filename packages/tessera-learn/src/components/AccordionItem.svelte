@@ -66,85 +66,87 @@
 </div>
 
 <style>
-  .tessera-accordion-item {
-    border-bottom: 1px solid var(--tessera-border);
-  }
+  @layer tessera {
+    .tessera-accordion-item {
+      border-bottom: 1px solid var(--tessera-border);
+    }
 
-  .tessera-accordion-item:last-child {
-    border-bottom: none;
-  }
+    .tessera-accordion-item:last-child {
+      border-bottom: none;
+    }
 
-  .tessera-accordion-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--tessera-text);
-    background: var(--tessera-bg);
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    transition: background-color var(--tessera-transition-fast);
-  }
+    .tessera-accordion-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--tessera-text);
+      background: var(--tessera-bg);
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      transition: background-color var(--tessera-transition-fast);
+    }
 
-  .tessera-accordion-trigger:hover {
-    background-color: var(--tessera-bg-secondary);
-  }
+    .tessera-accordion-trigger:hover {
+      background-color: var(--tessera-bg-secondary);
+    }
 
-  /* The accordion doesn't clip its corners, so the end headers round their own. */
-  .tessera-accordion-item:first-child .tessera-accordion-trigger {
-    border-top-left-radius: 7px;
-    border-top-right-radius: 7px;
-  }
+    /* The accordion doesn't clip its corners, so the end headers round their own. */
+    .tessera-accordion-item:first-child .tessera-accordion-trigger {
+      border-top-left-radius: 7px;
+      border-top-right-radius: 7px;
+    }
 
-  .tessera-accordion-item:last-child
-    .tessera-accordion-trigger[aria-expanded='false'] {
-    border-bottom-left-radius: 7px;
-    border-bottom-right-radius: 7px;
-  }
+    .tessera-accordion-item:last-child
+      .tessera-accordion-trigger[aria-expanded='false'] {
+      border-bottom-left-radius: 7px;
+      border-bottom-right-radius: 7px;
+    }
 
-  .tessera-accordion-trigger:focus-visible {
-    z-index: 1;
-    position: relative;
-  }
+    .tessera-accordion-trigger:focus-visible {
+      z-index: 1;
+      position: relative;
+    }
 
-  .tessera-accordion-trigger-text {
-    flex: 1;
-    min-width: 0;
-  }
+    .tessera-accordion-trigger-text {
+      flex: 1;
+      min-width: 0;
+    }
 
-  .tessera-accordion-chevron {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    transition: transform var(--tessera-transition-fast);
-  }
+    .tessera-accordion-chevron {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      transition: transform var(--tessera-transition-fast);
+    }
 
-  .tessera-accordion-chevron.open {
-    transform: rotate(180deg);
-  }
+    .tessera-accordion-chevron.open {
+      transform: rotate(180deg);
+    }
 
-  .tessera-accordion-panel {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows var(--tessera-transition-normal);
-    visibility: hidden;
-  }
+    .tessera-accordion-panel {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--tessera-transition-normal);
+      visibility: hidden;
+    }
 
-  .tessera-accordion-panel.open {
-    grid-template-rows: 1fr;
-    visibility: visible;
-  }
+    .tessera-accordion-panel.open {
+      grid-template-rows: 1fr;
+      visibility: visible;
+    }
 
-  .tessera-accordion-panel-content {
-    overflow: hidden;
-    padding: 0 var(--tessera-spacing-lg);
-  }
+    .tessera-accordion-panel-content {
+      overflow: hidden;
+      padding: 0 var(--tessera-spacing-lg);
+    }
 
-  .tessera-accordion-panel.open .tessera-accordion-panel-content {
-    padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+    .tessera-accordion-panel.open .tessera-accordion-panel-content {
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+    }
   }
 </style>

@@ -35,51 +35,53 @@
 </div>
 
 <style>
-  .tessera-callout {
-    display: flex;
-    gap: var(--tessera-spacing-md);
-    padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
-    border-radius: 8px;
-    border-left: 4px solid;
-    margin-bottom: var(--tessera-spacing-lg);
-  }
+  @layer tessera {
+    .tessera-callout {
+      display: flex;
+      gap: var(--tessera-spacing-md);
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
+      border-radius: 8px;
+      border-left: 4px solid;
+      margin-bottom: var(--tessera-spacing-lg);
+    }
 
-  .tessera-callout-icon {
-    flex-shrink: 0;
-    font-size: 1.25rem;
-    line-height: 1.6;
-  }
+    .tessera-callout-icon {
+      flex-shrink: 0;
+      font-size: 1.25rem;
+      line-height: 1.6;
+    }
 
-  .tessera-callout-content {
-    flex: 1;
-    min-width: 0;
-  }
+    .tessera-callout-content {
+      flex: 1;
+      min-width: 0;
+    }
 
-  .tessera-callout-content :global(p:last-child) {
-    margin-bottom: 0;
-  }
+    .tessera-callout-content :global(p:last-child) {
+      margin-bottom: 0;
+    }
 
-  .tessera-callout-info {
-    background-color: #eff6ff;
-    border-left-color: var(--tessera-primary);
-    color: var(--tessera-text);
-  }
+    .tessera-callout-info {
+      background-color: #eff6ff;
+      border-left-color: var(--tessera-primary);
+      color: var(--tessera-text);
+    }
 
-  .tessera-callout-warning {
-    background-color: #fffbeb;
-    border-left-color: var(--tessera-warning);
-    color: var(--tessera-text);
-  }
+    .tessera-callout-warning {
+      background-color: #fffbeb;
+      border-left-color: var(--tessera-warning);
+      color: var(--tessera-text);
+    }
 
-  .tessera-callout-tip {
-    background-color: #f0fdf4;
-    border-left-color: var(--tessera-success);
-    color: var(--tessera-text);
-  }
+    .tessera-callout-tip {
+      background-color: #f0fdf4;
+      border-left-color: var(--tessera-success);
+      color: var(--tessera-text);
+    }
 
-  .tessera-callout-important {
-    background-color: #fef2f2;
-    border-left-color: var(--tessera-error);
-    color: var(--tessera-text);
+    .tessera-callout-important {
+      background-color: #fef2f2;
+      border-left-color: var(--tessera-error);
+      color: var(--tessera-text);
+    }
   }
 </style>

@@ -151,136 +151,138 @@
 </QuestionShell>
 
 <style>
-  .tessera-mc-question {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: var(--tessera-spacing-lg);
-    color: var(--tessera-text);
-  }
+  @layer tessera {
+    .tessera-mc-question {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
+    }
 
-  .tessera-mc-options {
-    display: flex;
-    flex-direction: column;
-    gap: var(--tessera-spacing-sm);
-  }
+    .tessera-mc-options {
+      display: flex;
+      flex-direction: column;
+      gap: var(--tessera-spacing-sm);
+    }
 
-  .tessera-mc-option {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--tessera-spacing-md);
-    padding: var(--tessera-spacing-md);
-    border: 2px solid var(--tessera-border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition:
-      border-color 0.2s,
-      background 0.2s;
-    flex-wrap: wrap;
-    min-height: 44px;
-  }
-
-  .tessera-mc-option:hover:not(:has(input:disabled)) {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-bg-secondary);
-  }
-
-  .tessera-mc-option.selected {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-primary-light);
-  }
-
-  .tessera-mc-option.correct {
-    border-color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-mc-option.incorrect {
-    border-color: var(--tessera-error);
-    background: var(--tessera-error-bg);
-  }
-
-  .tessera-mc-option input[type='radio'] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  .tessera-mc-radio-custom {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--tessera-border);
-    border-radius: 50%;
-    margin-top: 2px;
-    transition:
-      border-color 0.2s,
-      background 0.2s;
-    position: relative;
-  }
-
-  .tessera-mc-option.selected .tessera-mc-radio-custom {
-    border-color: var(--tessera-primary);
-  }
-
-  .tessera-mc-option.selected .tessera-mc-radio-custom::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--tessera-primary);
-  }
-
-  .tessera-mc-option.correct .tessera-mc-radio-custom {
-    border-color: var(--tessera-success);
-  }
-
-  .tessera-mc-option.correct .tessera-mc-radio-custom::after {
-    background: var(--tessera-success);
-  }
-
-  .tessera-mc-option.incorrect .tessera-mc-radio-custom {
-    border-color: var(--tessera-error);
-  }
-
-  .tessera-mc-option.incorrect .tessera-mc-radio-custom::after {
-    background: var(--tessera-error);
-  }
-
-  .tessera-mc-option-text {
-    flex: 1;
-    line-height: 1.5;
-    color: var(--tessera-text);
-  }
-
-  .tessera-mc-feedback {
-    width: 100%;
-    font-size: 0.875rem;
-    padding: var(--tessera-spacing-sm) 0 0
-      calc(20px + var(--tessera-spacing-md));
-    line-height: 1.4;
-  }
-
-  .tessera-mc-feedback.correct {
-    color: var(--tessera-success);
-  }
-
-  .tessera-mc-feedback.incorrect {
-    color: var(--tessera-error);
-  }
-
-  .tessera-mc-option:has(input:focus-visible) {
-    outline: var(--tessera-focus-outline);
-    outline-offset: 2px;
-    box-shadow: var(--tessera-focus-halo);
-  }
-
-  @media (max-width: 640px) {
     .tessera-mc-option {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--tessera-spacing-md);
       padding: var(--tessera-spacing-md);
+      border: 2px solid var(--tessera-border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition:
+        border-color 0.2s,
+        background 0.2s;
+      flex-wrap: wrap;
+      min-height: 44px;
+    }
+
+    .tessera-mc-option:hover:not(:has(input:disabled)) {
+      border-color: var(--tessera-primary);
+      background: var(--tessera-bg-secondary);
+    }
+
+    .tessera-mc-option.selected {
+      border-color: var(--tessera-primary);
+      background: var(--tessera-primary-light);
+    }
+
+    .tessera-mc-option.correct {
+      border-color: var(--tessera-success);
+      background: var(--tessera-success-bg);
+    }
+
+    .tessera-mc-option.incorrect {
+      border-color: var(--tessera-error);
+      background: var(--tessera-error-bg);
+    }
+
+    .tessera-mc-option input[type='radio'] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .tessera-mc-radio-custom {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--tessera-border);
+      border-radius: 50%;
+      margin-top: 2px;
+      transition:
+        border-color 0.2s,
+        background 0.2s;
+      position: relative;
+    }
+
+    .tessera-mc-option.selected .tessera-mc-radio-custom {
+      border-color: var(--tessera-primary);
+    }
+
+    .tessera-mc-option.selected .tessera-mc-radio-custom::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--tessera-primary);
+    }
+
+    .tessera-mc-option.correct .tessera-mc-radio-custom {
+      border-color: var(--tessera-success);
+    }
+
+    .tessera-mc-option.correct .tessera-mc-radio-custom::after {
+      background: var(--tessera-success);
+    }
+
+    .tessera-mc-option.incorrect .tessera-mc-radio-custom {
+      border-color: var(--tessera-error);
+    }
+
+    .tessera-mc-option.incorrect .tessera-mc-radio-custom::after {
+      background: var(--tessera-error);
+    }
+
+    .tessera-mc-option-text {
+      flex: 1;
+      line-height: 1.5;
+      color: var(--tessera-text);
+    }
+
+    .tessera-mc-feedback {
+      width: 100%;
+      font-size: 0.875rem;
+      padding: var(--tessera-spacing-sm) 0 0
+        calc(20px + var(--tessera-spacing-md));
+      line-height: 1.4;
+    }
+
+    .tessera-mc-feedback.correct {
+      color: var(--tessera-success);
+    }
+
+    .tessera-mc-feedback.incorrect {
+      color: var(--tessera-error);
+    }
+
+    .tessera-mc-option:has(input:focus-visible) {
+      outline: var(--tessera-focus-outline);
+      outline-offset: 2px;
+      box-shadow: var(--tessera-focus-halo);
+    }
+
+    @media (max-width: 640px) {
+      .tessera-mc-option {
+        padding: var(--tessera-spacing-md);
+      }
     }
   }
 </style>

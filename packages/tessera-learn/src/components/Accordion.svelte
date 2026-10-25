@@ -31,9 +31,11 @@
 </div>
 
 <style>
-  .tessera-accordion {
-    border: 1px solid var(--tessera-border);
-    border-radius: 8px;
-    margin-bottom: var(--tessera-spacing-lg);
+  @layer tessera {
+    .tessera-accordion {
+      border: 1px solid var(--tessera-border);
+      border-radius: 8px;
+      margin-bottom: var(--tessera-spacing-lg);
+    }
   }
 </style>

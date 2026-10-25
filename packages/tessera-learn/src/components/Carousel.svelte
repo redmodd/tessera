@@ -140,84 +140,86 @@
 </div>
 
 <style>
-  /* Previous and Next come first in the markup, so a screen reader reads on
+  @layer tessera {
+    /* Previous and Next come first in the markup, so a screen reader reads on
      into the new slide; the grid shows them either side of it. */
-  .tessera-carousel {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--tessera-spacing-md) var(--tessera-spacing-sm);
-    margin-bottom: var(--tessera-spacing-lg);
-    position: relative;
-  }
+    .tessera-carousel {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--tessera-spacing-md) var(--tessera-spacing-sm);
+      margin-bottom: var(--tessera-spacing-lg);
+      position: relative;
+    }
 
-  .tessera-carousel-prev {
-    grid-area: 1 / 1;
-  }
+    .tessera-carousel-prev {
+      grid-area: 1 / 1;
+    }
 
-  .tessera-carousel-next {
-    grid-area: 1 / 3;
-  }
+    .tessera-carousel-next {
+      grid-area: 1 / 3;
+    }
 
-  .tessera-carousel-viewport {
-    grid-area: 1 / 2;
-    overflow: hidden;
-    border-radius: 8px;
-    border: 1px solid var(--tessera-border);
-  }
+    .tessera-carousel-viewport {
+      grid-area: 1 / 2;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid var(--tessera-border);
+    }
 
-  .tessera-carousel-track {
-    display: flex;
-    transition: transform var(--tessera-transition-normal);
-  }
+    .tessera-carousel-track {
+      display: flex;
+      transition: transform var(--tessera-transition-normal);
+    }
 
-  .tessera-carousel-arrow {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    font-size: 1.5rem;
-    line-height: 1;
-    color: var(--tessera-text);
-    background: var(--tessera-bg);
-    border: 1px solid var(--tessera-border);
-    border-radius: 50%;
-    cursor: pointer;
-    transition:
-      background-color var(--tessera-transition-fast),
-      color var(--tessera-transition-fast);
-  }
+    .tessera-carousel-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      font-size: 1.5rem;
+      line-height: 1;
+      color: var(--tessera-text);
+      background: var(--tessera-bg);
+      border: 1px solid var(--tessera-border);
+      border-radius: 50%;
+      cursor: pointer;
+      transition:
+        background-color var(--tessera-transition-fast),
+        color var(--tessera-transition-fast);
+    }
 
-  .tessera-carousel-arrow:hover:not([aria-disabled='true']) {
-    background-color: var(--tessera-bg-secondary);
-  }
+    .tessera-carousel-arrow:hover:not([aria-disabled='true']) {
+      background-color: var(--tessera-bg-secondary);
+    }
 
-  .tessera-carousel-arrow[aria-disabled='true'] {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
+    .tessera-carousel-arrow[aria-disabled='true'] {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
 
-  .tessera-carousel-dots {
-    grid-area: 2 / 2;
-    justify-self: center;
-    display: flex;
-    gap: 8px;
-  }
+    .tessera-carousel-dots {
+      grid-area: 2 / 2;
+      justify-self: center;
+      display: flex;
+      gap: 8px;
+    }
 
-  .tessera-carousel-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 1px solid var(--tessera-border);
-    background: var(--tessera-bg);
-    cursor: pointer;
-    padding: 0;
-    transition: background-color var(--tessera-transition-fast);
-  }
+    .tessera-carousel-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid var(--tessera-border);
+      background: var(--tessera-bg);
+      cursor: pointer;
+      padding: 0;
+      transition: background-color var(--tessera-transition-fast);
+    }
 
-  .tessera-carousel-dot.active {
-    background-color: var(--tessera-primary);
-    border-color: var(--tessera-primary);
+    .tessera-carousel-dot.active {
+      background-color: var(--tessera-primary);
+      border-color: var(--tessera-primary);
+    }
   }
 </style>

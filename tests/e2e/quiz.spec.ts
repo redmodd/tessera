@@ -213,6 +213,30 @@ test.describe('Quiz — Graded Assessment', () => {
     ).toBeVisible();
   });
 
+  test('a plain author rule overrides Matching result and badge colors', async ({
+    page,
+  }) => {
+    await completeGradedQuiz(page);
+    await page.getByRole('button', { name: 'Review Answers' }).click();
+    await primaryBtn(page).click();
+    await primaryBtn(page).click();
+
+    const item = page
+      .locator(
+        '.tessera-quiz-question-wrapper.active .tessera-matching-item.correct',
+      )
+      .first();
+    await expect(item).toHaveCSS('border-color', 'rgb(21, 128, 61)');
+
+    await page.addStyleTag({
+      content: '.tessera-matching-badge { background: rgb(88, 28, 135); }',
+    });
+    await expect(item.locator('.tessera-matching-badge')).toHaveCSS(
+      'background-color',
+      'rgb(88, 28, 135)',
+    );
+  });
+
   test('a submitted quiz comes back as results with its answers to review', async ({
     page,
   }) => {

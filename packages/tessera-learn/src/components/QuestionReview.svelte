@@ -82,55 +82,57 @@
 {/if}
 
 <style>
-  .tessera-question-result {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    margin-bottom: var(--tessera-spacing-sm);
-  }
+  @layer tessera {
+    .tessera-question-result {
+      display: flex;
+      align-items: center;
+      gap: var(--tessera-spacing-sm);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      margin-bottom: var(--tessera-spacing-sm);
+    }
 
-  .tessera-question-result.correct {
-    color: var(--tessera-success);
-  }
+    .tessera-question-result.correct {
+      color: var(--tessera-success);
+    }
 
-  .tessera-question-result.incorrect {
-    color: var(--tessera-error);
-  }
+    .tessera-question-result.incorrect {
+      color: var(--tessera-error);
+    }
 
-  .tessera-question-feedback {
-    font-size: 0.9375rem;
-    padding: var(--tessera-spacing-md);
-    border-radius: 6px;
-    margin-top: var(--tessera-spacing-sm);
-  }
+    .tessera-question-feedback {
+      font-size: 0.9375rem;
+      padding: var(--tessera-spacing-md);
+      border-radius: 6px;
+      margin-top: var(--tessera-spacing-sm);
+    }
 
-  .tessera-question-feedback.correct {
-    color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
+    .tessera-question-feedback.correct {
+      color: var(--tessera-success);
+      background: var(--tessera-success-bg);
+    }
 
-  .tessera-question-feedback.incorrect {
-    color: var(--tessera-error);
-    background: var(--tessera-error-bg);
-  }
+    .tessera-question-feedback.incorrect {
+      color: var(--tessera-error);
+      background: var(--tessera-error-bg);
+    }
 
-  .tessera-standalone-retry {
-    display: inline-block;
-    margin-top: var(--tessera-spacing-md);
-    padding: 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--tessera-primary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
+    .tessera-standalone-retry {
+      display: inline-block;
+      margin-top: var(--tessera-spacing-md);
+      padding: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--tessera-primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
 
-  .tessera-standalone-retry:hover {
-    color: var(--tessera-primary-dark);
+    .tessera-standalone-retry:hover {
+      color: var(--tessera-primary-dark);
+    }
   }
 </style>

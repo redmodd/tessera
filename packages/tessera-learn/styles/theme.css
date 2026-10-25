@@ -1,57 +1,63 @@
-:root {
-  /* Colors */
-  --tessera-primary: #2563eb;
-  --tessera-primary-light: #dbeafe;
-  --tessera-primary-dark: #1e40af;
-  --tessera-text: #1f2937;
-  --tessera-text-light: #6b7280;
-  --tessera-bg: #ffffff;
-  --tessera-bg-secondary: #f9fafb;
-  --tessera-border: #e5e7eb;
-  --tessera-success: #147638;
-  --tessera-success-bg: color-mix(
-    in srgb,
-    var(--tessera-success) 8%,
-    transparent
-  );
-  --tessera-success-border: color-mix(
-    in srgb,
-    var(--tessera-success) 25%,
-    transparent
-  );
-  --tessera-error: #b91c1c;
-  --tessera-error-bg: color-mix(in srgb, var(--tessera-error) 8%, transparent);
-  --tessera-error-border: color-mix(
-    in srgb,
-    var(--tessera-error) 25%,
-    transparent
-  );
-  --tessera-warning: #d97706;
+@layer tessera {
+  :root {
+    /* Colors */
+    --tessera-primary: #2563eb;
+    --tessera-primary-light: #dbeafe;
+    --tessera-primary-dark: #1e40af;
+    --tessera-text: #1f2937;
+    --tessera-text-light: #6b7280;
+    --tessera-bg: #ffffff;
+    --tessera-bg-secondary: #f9fafb;
+    --tessera-border: #e5e7eb;
+    --tessera-success: #147638;
+    --tessera-success-bg: color-mix(
+      in srgb,
+      var(--tessera-success) 8%,
+      transparent
+    );
+    --tessera-success-border: color-mix(
+      in srgb,
+      var(--tessera-success) 25%,
+      transparent
+    );
+    --tessera-error: #b91c1c;
+    --tessera-error-bg: color-mix(
+      in srgb,
+      var(--tessera-error) 8%,
+      transparent
+    );
+    --tessera-error-border: color-mix(
+      in srgb,
+      var(--tessera-error) 25%,
+      transparent
+    );
+    --tessera-warning: #d97706;
 
-  /* Typography */
-  --tessera-font-family: 'Inter', system-ui, sans-serif;
-  --tessera-font-size-base: 1rem;
-  --tessera-line-height: 1.6;
+    /* Typography */
+    --tessera-font-family: 'Inter', system-ui, sans-serif;
+    --tessera-font-size-base: 1rem;
+    --tessera-line-height: 1.6;
 
-  /* Spacing */
-  --tessera-spacing-sm: 0.5rem;
-  --tessera-spacing-md: 1rem;
-  --tessera-spacing-lg: 1.5rem;
-  --tessera-spacing-xl: 2rem;
+    /* Spacing */
+    --tessera-spacing-sm: 0.5rem;
+    --tessera-spacing-md: 1rem;
+    --tessera-spacing-lg: 1.5rem;
+    --tessera-spacing-xl: 2rem;
 
-  /* Layout */
-  --tessera-sidebar-width: 280px;
-  --tessera-content-max-width: 800px;
+    /* Layout */
+    --tessera-sidebar-width: 280px;
+    --tessera-content-max-width: 800px;
 
-  /* Focus: a text-colored ring with a background-colored halo shows on any background */
-  --tessera-focus-outline: 2px solid var(--tessera-text);
-  --tessera-focus-halo: 0 0 0 4px var(--tessera-bg);
+    /* Focus: a text-colored ring with a background-colored halo shows on any background */
+    --tessera-focus-outline: 2px solid var(--tessera-text);
+    --tessera-focus-halo: 0 0 0 4px var(--tessera-bg);
 
-  /* Shadows */
-  --tessera-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --tessera-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.2);
+    /* Shadows */
+    --tessera-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --tessera-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.2);
 
-  /* Transitions */
-  --tessera-transition-fast: 150ms ease;
-  --tessera-transition-normal: 250ms ease;
+    /* Transitions */
+    --tessera-transition-fast: 150ms ease;
+    --tessera-transition-normal: 250ms ease;
+  }
 }

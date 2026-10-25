@@ -331,190 +331,192 @@
 </div>
 
 <style>
-  .tessera-quiz {
-    margin: var(--tessera-spacing-xl) 0;
-  }
-
-  .tessera-quiz-intro:not(:empty) {
-    margin-bottom: var(--tessera-spacing-lg);
-  }
-
-  .tessera-quiz-intro[hidden] {
-    display: none;
-  }
-
-  .tessera-quiz-progress {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-md);
-    margin-bottom: var(--tessera-spacing-lg);
-    font-size: 0.875rem;
-    color: var(--tessera-text-light);
-  }
-
-  .tessera-quiz-progress-text {
-    margin: 0;
-    font: inherit;
-    color: inherit;
-    white-space: nowrap;
-  }
-
-  .tessera-quiz-progress-mobile {
-    display: none;
-  }
-
-  .tessera-quiz-progress :global(.tessera-progress-track) {
-    flex: 1;
-  }
-
-  .tessera-quiz-question-wrapper {
-    display: none;
-  }
-
-  .tessera-quiz-question-wrapper.active {
-    display: block;
-  }
-
-  .tessera-quiz-nav {
-    display: flex;
-    flex-direction: row-reverse;
-    justify-content: space-between;
-    gap: var(--tessera-spacing-md);
-    margin-top: var(--tessera-spacing-lg);
-    padding-top: var(--tessera-spacing-lg);
-    border-top: 1px solid var(--tessera-border);
-  }
-
-  .tessera-quiz-btn {
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9375rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition:
-      background 0.2s,
-      opacity 0.2s;
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  .tessera-quiz-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .tessera-quiz-btn-secondary {
-    background: var(--tessera-bg-secondary);
-    color: var(--tessera-text);
-    border: 1px solid var(--tessera-border);
-  }
-
-  .tessera-quiz-btn-secondary:hover:not(:disabled) {
-    background: var(--tessera-border);
-  }
-
-  .tessera-quiz-results {
-    text-align: center;
-    padding: var(--tessera-spacing-xl);
-  }
-
-  .tessera-quiz-results-title {
-    font-size: 1.5rem;
-    margin-bottom: var(--tessera-spacing-lg);
-  }
-
-  .tessera-quiz-score {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    margin-bottom: var(--tessera-spacing-lg);
-  }
-
-  .tessera-quiz-score.paired {
-    gap: 0.25rem;
-    margin-bottom: var(--tessera-spacing-md);
-  }
-
-  .tessera-quiz-score.paired .tessera-quiz-score-value {
-    font-size: 2rem;
-  }
-
-  .tessera-quiz-score-caption {
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--tessera-text-light);
-  }
-
-  .tessera-quiz-score-value {
-    font-size: 3rem;
-    font-weight: 700;
-    color: var(--tessera-text);
-  }
-
-  .tessera-quiz-score-label {
-    font-size: 1.125rem;
-    font-weight: 600;
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
-  }
-
-  .tessera-quiz-score-label.passed {
-    color: color-mix(in srgb, var(--tessera-success) 55%, black);
-    background: color-mix(in srgb, var(--tessera-success) 12%, white);
-  }
-
-  .tessera-quiz-score-label.failed {
-    color: color-mix(in srgb, var(--tessera-error) 55%, black);
-    background: color-mix(in srgb, var(--tessera-error) 12%, white);
-  }
-
-  .tessera-quiz-results-detail {
-    color: var(--tessera-text-light);
-    margin-bottom: var(--tessera-spacing-lg);
-  }
-
-  .tessera-quiz-results-actions {
-    display: flex;
-    gap: var(--tessera-spacing-md);
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .tessera-quiz-attempts-exhausted {
-    color: var(--tessera-text-light);
-    font-size: 0.875rem;
-    font-style: italic;
-  }
-
-  /* Mobile */
-  @media (max-width: 640px) {
-    /* Screen readers keep the full text; "2/3" can be read as a fraction. */
-    .tessera-quiz-progress-desktop {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
+  @layer tessera {
+    .tessera-quiz {
+      margin: var(--tessera-spacing-xl) 0;
     }
+
+    .tessera-quiz-intro:not(:empty) {
+      margin-bottom: var(--tessera-spacing-lg);
+    }
+
+    .tessera-quiz-intro[hidden] {
+      display: none;
+    }
+
+    .tessera-quiz-progress {
+      display: flex;
+      align-items: center;
+      gap: var(--tessera-spacing-md);
+      margin-bottom: var(--tessera-spacing-lg);
+      font-size: 0.875rem;
+      color: var(--tessera-text-light);
+    }
+
+    .tessera-quiz-progress-text {
+      margin: 0;
+      font: inherit;
+      color: inherit;
+      white-space: nowrap;
+    }
+
     .tessera-quiz-progress-mobile {
-      display: inline;
+      display: none;
+    }
+
+    .tessera-quiz-progress :global(.tessera-progress-track) {
+      flex: 1;
+    }
+
+    .tessera-quiz-question-wrapper {
+      display: none;
+    }
+
+    .tessera-quiz-question-wrapper.active {
+      display: block;
     }
 
     .tessera-quiz-nav {
-      position: sticky;
-      bottom: 0;
-      background: var(--tessera-bg);
-      padding: var(--tessera-spacing-md);
-      margin: 0 calc(-1 * var(--tessera-spacing-md));
+      display: flex;
+      flex-direction: row-reverse;
+      justify-content: space-between;
+      gap: var(--tessera-spacing-md);
+      margin-top: var(--tessera-spacing-lg);
+      padding-top: var(--tessera-spacing-lg);
       border-top: 1px solid var(--tessera-border);
     }
 
     .tessera-quiz-btn {
-      flex: 1;
+      padding: 0.625rem 1.25rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition:
+        background 0.2s,
+        opacity 0.2s;
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .tessera-quiz-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .tessera-quiz-btn-secondary {
+      background: var(--tessera-bg-secondary);
+      color: var(--tessera-text);
+      border: 1px solid var(--tessera-border);
+    }
+
+    .tessera-quiz-btn-secondary:hover:not(:disabled) {
+      background: var(--tessera-border);
+    }
+
+    .tessera-quiz-results {
+      text-align: center;
+      padding: var(--tessera-spacing-xl);
+    }
+
+    .tessera-quiz-results-title {
+      font-size: 1.5rem;
+      margin-bottom: var(--tessera-spacing-lg);
+    }
+
+    .tessera-quiz-score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--tessera-spacing-sm);
+      margin-bottom: var(--tessera-spacing-lg);
+    }
+
+    .tessera-quiz-score.paired {
+      gap: 0.25rem;
+      margin-bottom: var(--tessera-spacing-md);
+    }
+
+    .tessera-quiz-score.paired .tessera-quiz-score-value {
+      font-size: 2rem;
+    }
+
+    .tessera-quiz-score-caption {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tessera-text-light);
+    }
+
+    .tessera-quiz-score-value {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--tessera-text);
+    }
+
+    .tessera-quiz-score-label {
+      font-size: 1.125rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+    }
+
+    .tessera-quiz-score-label.passed {
+      color: color-mix(in srgb, var(--tessera-success) 55%, black);
+      background: color-mix(in srgb, var(--tessera-success) 12%, white);
+    }
+
+    .tessera-quiz-score-label.failed {
+      color: color-mix(in srgb, var(--tessera-error) 55%, black);
+      background: color-mix(in srgb, var(--tessera-error) 12%, white);
+    }
+
+    .tessera-quiz-results-detail {
+      color: var(--tessera-text-light);
+      margin-bottom: var(--tessera-spacing-lg);
+    }
+
+    .tessera-quiz-results-actions {
+      display: flex;
+      gap: var(--tessera-spacing-md);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .tessera-quiz-attempts-exhausted {
+      color: var(--tessera-text-light);
+      font-size: 0.875rem;
+      font-style: italic;
+    }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      /* Screen readers keep the full text; "2/3" can be read as a fraction. */
+      .tessera-quiz-progress-desktop {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+      }
+      .tessera-quiz-progress-mobile {
+        display: inline;
+      }
+
+      .tessera-quiz-nav {
+        position: sticky;
+        bottom: 0;
+        background: var(--tessera-bg);
+        padding: var(--tessera-spacing-md);
+        margin: 0 calc(-1 * var(--tessera-spacing-md));
+        border-top: 1px solid var(--tessera-border);
+      }
+
+      .tessera-quiz-btn {
+        flex: 1;
+      }
     }
   }
 </style>

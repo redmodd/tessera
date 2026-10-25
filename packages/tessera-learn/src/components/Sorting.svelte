@@ -323,281 +323,283 @@
 </QuestionShell>
 
 <style>
-  .tessera-sorting-question {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: var(--tessera-spacing-lg);
-    color: var(--tessera-text);
-  }
-
-  /* --- Deck --- */
-
-  .tessera-sorting-deck {
-    margin-bottom: var(--tessera-spacing-lg);
-    min-height: 110px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .tessera-sorting-deck-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-card {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
-    min-width: 140px;
-    min-height: 64px;
-    background: var(--tessera-bg);
-    border: 2px solid var(--tessera-border);
-    border-radius: 10px;
-    --card-shadow: var(--tessera-shadow-sm);
-    box-shadow: var(--card-shadow);
-    font-size: 1rem;
-    font-weight: 500;
-    font-family: var(--tessera-font-family);
-    color: var(--tessera-text);
-    cursor: grab;
-    transition:
-      border-color 0.15s,
-      transform 0.15s,
-      box-shadow 0.15s;
-    text-align: center;
-    user-select: none;
-  }
-
-  .tessera-sorting-card:hover {
-    border-color: var(--tessera-primary);
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    transform: translateY(-1px);
-  }
-
-  .tessera-sorting-card.selected {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-primary-light);
-    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px) scale(1.02);
-    cursor: pointer;
-  }
-
-  /* The card's shadows outrank the global halo, so stack the halo on them. */
-  .tessera-sorting-card:focus-visible {
-    border-color: var(--tessera-primary);
-    box-shadow: var(--tessera-focus-halo), var(--card-shadow);
-  }
-
-  .tessera-sorting-card.dragging {
-    opacity: 0.5;
-    cursor: grabbing;
-  }
-
-  .tessera-sorting-counter {
-    font-size: 0.8125rem;
-    color: var(--tessera-text-light);
-    margin: 0;
-  }
-
-  .tessera-sorting-hint {
-    font-size: 0.8125rem;
-    color: var(--tessera-primary);
-    font-weight: 500;
-    margin: 0;
-  }
-
-  .tessera-sorting-deck-empty {
-    font-size: 0.9375rem;
-    color: var(--tessera-text-light);
-    font-style: italic;
-  }
-
-  /* --- Targets --- */
-
-  .tessera-sorting-targets {
-    display: flex;
-    gap: var(--tessera-spacing-md);
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
-  .tessera-sorting-target {
-    flex: 1;
-    min-width: 140px;
-    min-height: 120px;
-    border: 2px dashed var(--tessera-border);
-    border-radius: 10px;
-    background: var(--tessera-bg-secondary);
-    transition:
-      border-color 0.15s,
-      background 0.15s;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: relative;
-  }
-
-  /* The target clips its label, so the target shows the label's focus. */
-  .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible) {
-    outline: var(--tessera-focus-outline);
-    outline-offset: 2px;
-    box-shadow: var(--tessera-focus-halo);
-  }
-
-  .tessera-sorting-target.drag-over {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-primary-light);
-    border-style: solid;
-  }
-
-  .tessera-sorting-target.clickable {
-    cursor: pointer;
-    border-color: var(--tessera-primary);
-    border-style: dashed;
-  }
-
-  .tessera-sorting-target.clickable:hover {
-    background: var(--tessera-primary-light);
-    border-style: solid;
-  }
-
-  .tessera-sorting-target-label {
-    background: none;
-    border: none;
-    outline: none;
-    box-shadow: none;
-    cursor: inherit;
-    padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
-    font-size: 0.8125rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--tessera-text-light);
-    text-align: center;
-  }
-
-  /* Stretch the button over the whole target so a click anywhere places the card. */
-  .tessera-sorting-target.clickable .tessera-sorting-target-label::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-
-  .tessera-sorting-target-items {
-    display: flex;
-    flex-direction: column;
-    gap: var(--tessera-spacing-xs, 4px);
-    padding: var(--tessera-spacing-sm);
-  }
-
-  .tessera-sorting-placed-item {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-xs, 4px);
-    padding: 6px var(--tessera-spacing-sm);
-    background: var(--tessera-bg);
-    border: 1px solid var(--tessera-border);
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-family: var(--tessera-font-family);
-    color: var(--tessera-text);
-    transition:
-      border-color 0.15s,
-      background 0.15s;
-  }
-
-  .tessera-sorting-placed-item.correct {
-    border-color: var(--tessera-success);
-    background: var(--tessera-success-bg);
-  }
-
-  .tessera-sorting-placed-item.incorrect {
-    border-color: var(--tessera-error);
-    background: var(--tessera-error-bg);
-  }
-
-  .tessera-sorting-item-text {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: break-word;
-  }
-
-  .tessera-sorting-item-icon {
-    flex-shrink: 0;
-    font-size: 0.875rem;
-  }
-
-  .tessera-sorting-placed-item.correct .tessera-sorting-item-icon {
-    color: var(--tessera-success);
-  }
-
-  .tessera-sorting-placed-item.incorrect .tessera-sorting-item-icon {
-    color: var(--tessera-error);
-  }
-
-  .tessera-sorting-remove {
-    flex-shrink: 0;
-    margin-left: auto;
-    background: none;
-    border: none;
-    font-size: 1.1rem;
-    line-height: 1;
-    color: var(--tessera-text-light);
-    cursor: pointer;
-    padding: 0 2px;
-    min-width: 20px;
-    min-height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-    /* Lifts the button above the target's stretched click area. */
-    position: relative;
-  }
-
-  .tessera-sorting-remove:hover {
-    color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
-  }
-
-  /* --- Feedback --- */
-
-  .tessera-sorting-correct-list {
-    margin: var(--tessera-spacing-sm) 0;
-    font-size: 0.875rem;
-    color: var(--tessera-text-light);
-  }
-
-  .tessera-sorting-correct-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-    color: var(--tessera-text);
-  }
-
-  .tessera-sorting-correct-item {
-    margin: 2px 0;
-  }
-
-  /* --- Mobile --- */
-
-  @media (max-width: 640px) {
-    .tessera-sorting-targets {
-      flex-direction: column;
+  @layer tessera {
+    .tessera-sorting-question {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
     }
 
-    .tessera-sorting-target {
-      min-width: unset;
-      width: 100%;
+    /* --- Deck --- */
+
+    .tessera-sorting-deck {
+      margin-bottom: var(--tessera-spacing-lg);
+      min-height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tessera-sorting-deck-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--tessera-spacing-sm);
     }
 
     .tessera-sorting-card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
       min-width: 140px;
+      min-height: 64px;
+      background: var(--tessera-bg);
+      border: 2px solid var(--tessera-border);
+      border-radius: 10px;
+      --card-shadow: var(--tessera-shadow-sm);
+      box-shadow: var(--card-shadow);
+      font-size: 1rem;
+      font-weight: 500;
+      font-family: var(--tessera-font-family);
+      color: var(--tessera-text);
+      cursor: grab;
+      transition:
+        border-color 0.15s,
+        transform 0.15s,
+        box-shadow 0.15s;
+      text-align: center;
+      user-select: none;
+    }
+
+    .tessera-sorting-card:hover {
+      border-color: var(--tessera-primary);
+      --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .tessera-sorting-card.selected {
+      border-color: var(--tessera-primary);
+      background: var(--tessera-primary-light);
+      --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px) scale(1.02);
+      cursor: pointer;
+    }
+
+    /* The card's shadows outrank the global halo, so stack the halo on them. */
+    .tessera-sorting-card:focus-visible {
+      border-color: var(--tessera-primary);
+      box-shadow: var(--tessera-focus-halo), var(--card-shadow);
+    }
+
+    .tessera-sorting-card.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    .tessera-sorting-counter {
+      font-size: 0.8125rem;
+      color: var(--tessera-text-light);
+      margin: 0;
+    }
+
+    .tessera-sorting-hint {
+      font-size: 0.8125rem;
+      color: var(--tessera-primary);
+      font-weight: 500;
+      margin: 0;
+    }
+
+    .tessera-sorting-deck-empty {
       font-size: 0.9375rem;
+      color: var(--tessera-text-light);
+      font-style: italic;
+    }
+
+    /* --- Targets --- */
+
+    .tessera-sorting-targets {
+      display: flex;
+      gap: var(--tessera-spacing-md);
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .tessera-sorting-target {
+      flex: 1;
+      min-width: 140px;
+      min-height: 120px;
+      border: 2px dashed var(--tessera-border);
+      border-radius: 10px;
+      background: var(--tessera-bg-secondary);
+      transition:
+        border-color 0.15s,
+        background 0.15s;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* The target clips its label, so the target shows the label's focus. */
+    .tessera-sorting-target:has(.tessera-sorting-target-label:focus-visible) {
+      outline: var(--tessera-focus-outline);
+      outline-offset: 2px;
+      box-shadow: var(--tessera-focus-halo);
+    }
+
+    .tessera-sorting-target.drag-over {
+      border-color: var(--tessera-primary);
+      background: var(--tessera-primary-light);
+      border-style: solid;
+    }
+
+    .tessera-sorting-target.clickable {
+      cursor: pointer;
+      border-color: var(--tessera-primary);
+      border-style: dashed;
+    }
+
+    .tessera-sorting-target.clickable:hover {
+      background: var(--tessera-primary-light);
+      border-style: solid;
+    }
+
+    .tessera-sorting-target-label {
+      background: none;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      cursor: inherit;
+      padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tessera-text-light);
+      text-align: center;
+    }
+
+    /* Stretch the button over the whole target so a click anywhere places the card. */
+    .tessera-sorting-target.clickable .tessera-sorting-target-label::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+    }
+
+    .tessera-sorting-target-items {
+      display: flex;
+      flex-direction: column;
+      gap: var(--tessera-spacing-xs, 4px);
+      padding: var(--tessera-spacing-sm);
+    }
+
+    .tessera-sorting-placed-item {
+      display: flex;
+      align-items: center;
+      gap: var(--tessera-spacing-xs, 4px);
+      padding: 6px var(--tessera-spacing-sm);
+      background: var(--tessera-bg);
+      border: 1px solid var(--tessera-border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-family: var(--tessera-font-family);
+      color: var(--tessera-text);
+      transition:
+        border-color 0.15s,
+        background 0.15s;
+    }
+
+    .tessera-sorting-placed-item.correct {
+      border-color: var(--tessera-success);
+      background: var(--tessera-success-bg);
+    }
+
+    .tessera-sorting-placed-item.incorrect {
+      border-color: var(--tessera-error);
+      background: var(--tessera-error-bg);
+    }
+
+    .tessera-sorting-item-text {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: break-word;
+    }
+
+    .tessera-sorting-item-icon {
+      flex-shrink: 0;
+      font-size: 0.875rem;
+    }
+
+    .tessera-sorting-placed-item.correct .tessera-sorting-item-icon {
+      color: var(--tessera-success);
+    }
+
+    .tessera-sorting-placed-item.incorrect .tessera-sorting-item-icon {
+      color: var(--tessera-error);
+    }
+
+    .tessera-sorting-remove {
+      flex-shrink: 0;
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      color: var(--tessera-text-light);
+      cursor: pointer;
+      padding: 0 2px;
+      min-width: 20px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      /* Lifts the button above the target's stretched click area. */
+      position: relative;
+    }
+
+    .tessera-sorting-remove:hover {
+      color: var(--tessera-error);
+      background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
+    }
+
+    /* --- Feedback --- */
+
+    .tessera-sorting-correct-list {
+      margin: var(--tessera-spacing-sm) 0;
+      font-size: 0.875rem;
+      color: var(--tessera-text-light);
+    }
+
+    .tessera-sorting-correct-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--tessera-text);
+    }
+
+    .tessera-sorting-correct-item {
+      margin: 2px 0;
+    }
+
+    /* --- Mobile --- */
+
+    @media (max-width: 640px) {
+      .tessera-sorting-targets {
+        flex-direction: column;
+      }
+
+      .tessera-sorting-target {
+        min-width: unset;
+        width: 100%;
+      }
+
+      .tessera-sorting-card {
+        min-width: 140px;
+        font-size: 0.9375rem;
+      }
     }
   }
 </style>

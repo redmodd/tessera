@@ -233,7 +233,7 @@
           class:matched
           class:correct={result === 'correct'}
           class:incorrect={result === 'incorrect'}
-          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          style:--match-color={color}
           onclick={() =>
             matched && !q.locked ? removeMatch(i) : handleLeftClick(i)}
           onfocus={() => (leftFocus = i)}
@@ -244,7 +244,7 @@
           aria-describedby={hint}
         >
           {#if matched}
-            <span class="tessera-matching-badge" style="background: {color}">
+            <span class="tessera-matching-badge">
               {i + 1}
             </span>
           {/if}
@@ -292,7 +292,7 @@
           class="tessera-matching-item right"
           class:selected={isSelected}
           class:matched
-          style={color ? `border-color: ${color}; --match-color: ${color}` : ''}
+          style:--match-color={color}
           onclick={() => handleRightClick(item.originalIndex)}
           onfocus={() => (rightFocus = pos)}
           onkeydown={onItemKeydown}
@@ -302,7 +302,7 @@
           aria-describedby={hint}
         >
           {#if matched}
-            <span class="tessera-matching-badge" style="background: {color}">
+            <span class="tessera-matching-badge">
               {leftIdx + 1}
             </span>
           {/if}
@@ -349,145 +349,148 @@
 </QuestionShell>
 
 <style>
-  .tessera-matching-question {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: var(--tessera-spacing-lg);
-    color: var(--tessera-text);
-  }
+  @layer tessera {
+    .tessera-matching-question {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
+    }
 
-  .tessera-matching-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--tessera-spacing-lg);
-  }
-
-  .tessera-matching-column {
-    display: flex;
-    flex-direction: column;
-    gap: var(--tessera-spacing-sm);
-  }
-
-  .tessera-matching-column-header {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--tessera-text-light);
-    padding-bottom: var(--tessera-spacing-sm);
-    border-bottom: 1px solid var(--tessera-border);
-  }
-
-  .tessera-matching-item {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    padding: var(--tessera-spacing-md);
-    border: 2px solid var(--tessera-border);
-    border-radius: 8px;
-    background: var(--tessera-bg);
-    cursor: pointer;
-    transition:
-      border-color 0.2s,
-      background 0.2s,
-      transform 0.1s;
-    font-size: 0.9375rem;
-    font-family: var(--tessera-font-family);
-    color: var(--tessera-text);
-    text-align: left;
-    min-height: 44px;
-  }
-
-  .tessera-matching-item:hover:not(:disabled) {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-bg-secondary);
-  }
-
-  .tessera-matching-item.selected {
-    border-color: var(--tessera-primary);
-    background: var(--tessera-primary-light);
-    transform: scale(1.02);
-  }
-
-  .tessera-matching-item.matched {
-    background: color-mix(
-      in srgb,
-      var(--match-color, var(--tessera-primary)) 8%,
-      transparent
-    );
-  }
-
-  .tessera-matching-item.correct {
-    border-color: var(--tessera-success) !important;
-    background: var(--tessera-success-bg) !important;
-  }
-
-  .tessera-matching-item.incorrect {
-    border-color: var(--tessera-error) !important;
-    background: var(--tessera-error-bg) !important;
-  }
-
-  .tessera-matching-item:disabled {
-    cursor: default;
-  }
-
-  .tessera-matching-badge {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .tessera-matching-unmatch {
-    margin-left: auto;
-    background: none;
-    border: none;
-    font-size: 1.25rem;
-    color: var(--tessera-text-light);
-    cursor: pointer;
-    padding: 0 4px;
-    min-width: 24px;
-    min-height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-  }
-
-  .tessera-matching-unmatch:hover {
-    color: var(--tessera-error);
-    background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
-  }
-
-  .tessera-matching-correct-pairs {
-    margin: var(--tessera-spacing-sm) 0;
-    font-size: 0.875rem;
-    color: var(--tessera-text-light);
-  }
-
-  .tessera-matching-correct-pairs-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .tessera-matching-correct-pair {
-    margin: 2px 0;
-  }
-
-  @media (max-width: 640px) {
     .tessera-matching-grid {
-      grid-template-columns: 1fr;
-      gap: var(--tessera-spacing-xl);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--tessera-spacing-lg);
+    }
+
+    .tessera-matching-column {
+      display: flex;
+      flex-direction: column;
+      gap: var(--tessera-spacing-sm);
+    }
+
+    .tessera-matching-column-header {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tessera-text-light);
+      padding-bottom: var(--tessera-spacing-sm);
+      border-bottom: 1px solid var(--tessera-border);
     }
 
     .tessera-matching-item {
+      display: flex;
+      align-items: center;
+      gap: var(--tessera-spacing-sm);
       padding: var(--tessera-spacing-md);
+      border: 2px solid var(--tessera-border);
+      border-radius: 8px;
+      background: var(--tessera-bg);
+      cursor: pointer;
+      transition:
+        border-color 0.2s,
+        background 0.2s,
+        transform 0.1s;
+      font-size: 0.9375rem;
+      font-family: var(--tessera-font-family);
+      color: var(--tessera-text);
+      text-align: left;
+      min-height: 44px;
+    }
+
+    .tessera-matching-item:hover:not(:disabled) {
+      background: var(--tessera-bg-secondary);
+    }
+
+    .tessera-matching-item:hover:not(:disabled, .matched) {
+      border-color: var(--tessera-primary);
+    }
+
+    .tessera-matching-item.selected {
+      border-color: var(--tessera-primary);
+      background: var(--tessera-primary-light);
+      transform: scale(1.02);
+    }
+
+    .tessera-matching-item.matched {
+      border-color: var(--match-color);
+      background: color-mix(in srgb, var(--match-color) 8%, transparent);
+    }
+
+    .tessera-matching-item.correct {
+      border-color: var(--tessera-success);
+      background: var(--tessera-success-bg);
+    }
+
+    .tessera-matching-item.incorrect {
+      border-color: var(--tessera-error);
+      background: var(--tessera-error-bg);
+    }
+
+    .tessera-matching-item:disabled {
+      cursor: default;
+    }
+
+    .tessera-matching-badge {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--match-color);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tessera-matching-unmatch {
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 1.25rem;
+      color: var(--tessera-text-light);
+      cursor: pointer;
+      padding: 0 4px;
+      min-width: 24px;
+      min-height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .tessera-matching-unmatch:hover {
+      color: var(--tessera-error);
+      background: color-mix(in srgb, var(--tessera-error) 10%, transparent);
+    }
+
+    .tessera-matching-correct-pairs {
+      margin: var(--tessera-spacing-sm) 0;
+      font-size: 0.875rem;
+      color: var(--tessera-text-light);
+    }
+
+    .tessera-matching-correct-pairs-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .tessera-matching-correct-pair {
+      margin: 2px 0;
+    }
+
+    @media (max-width: 640px) {
+      .tessera-matching-grid {
+        grid-template-columns: 1fr;
+        gap: var(--tessera-spacing-xl);
+      }
+
+      .tessera-matching-item {
+        padding: var(--tessera-spacing-md);
+      }
     }
   }
 </style>

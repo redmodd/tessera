@@ -31,22 +31,24 @@
 </figure>
 
 <style>
-  .tessera-image {
-    margin: var(--tessera-spacing-lg) 0;
-  }
+  @layer tessera {
+    .tessera-image {
+      margin: var(--tessera-spacing-lg) 0;
+    }
 
-  .tessera-image-img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    display: block;
-  }
+    .tessera-image-img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+    }
 
-  .tessera-image-caption {
-    margin-top: var(--tessera-spacing-sm);
-    font-size: 0.875rem;
-    color: var(--tessera-text-light);
-    text-align: center;
-    font-style: italic;
+    .tessera-image-caption {
+      margin-top: var(--tessera-spacing-sm);
+      font-size: 0.875rem;
+      color: var(--tessera-text-light);
+      text-align: center;
+      font-style: italic;
+    }
   }
 </style>

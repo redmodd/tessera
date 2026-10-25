@@ -23,9 +23,11 @@
 </div>
 
 <style>
-  .tessera-carousel-slide {
-    flex: 0 0 100%;
-    min-width: 0;
-    padding: var(--tessera-spacing-lg);
+  @layer tessera {
+    .tessera-carousel-slide {
+      flex: 0 0 100%;
+      min-width: 0;
+      padding: var(--tessera-spacing-lg);
+    }
   }
 </style>
