@@ -80,6 +80,24 @@ export function indexIds(list: readonly unknown[]): string[] {
   return list.map((_, i) => String(i));
 }
 
+/**
+ * Roving-focus target for item `i` of `length`: `step` maps arrow keys to a
+ * wrapping offset, plus Home and End. Undefined for other keys or modifiers.
+ */
+export function rovingIndex(
+  e: KeyboardEvent,
+  i: number,
+  length: number,
+  step: Partial<Record<string, number>>,
+): number | undefined {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return undefined;
+  const offset = step[e.key];
+  if (offset !== undefined) return (i + offset + length) % length;
+  if (e.key === 'Home') return 0;
+  if (e.key === 'End') return length - 1;
+  return undefined;
+}
+
 /** Fisher-Yates shuffle returning a fresh array. */
 export function shuffle<T>(arr: readonly T[]): T[] {
   const result = arr.slice();

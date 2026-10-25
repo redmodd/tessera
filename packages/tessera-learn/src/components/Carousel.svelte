@@ -1,7 +1,7 @@
 <script module>
   import { createContext } from 'svelte';
 
-  /** @type {ReturnType<typeof createContext<{ readonly id: string; readonly currentSlide: number; register(): number }>>} */
+  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number; slideId(index: number): string }>>} */
   const [getCarouselContext, setCarouselContext] = createContext();
   export { getCarouselContext };
 </script>
@@ -13,16 +13,16 @@
    *
    * @prop {import('svelte').Snippet} [children] - CarouselSlide children
    */
+  import { rovingIndex } from './util.js';
+
   let { children } = $props();
   const id = $props.id();
   let currentSlide = $state(0);
   let totalSlides = $state(0);
   let status = $state('');
   let touchStartX = 0;
-  let touchEndX = 0;
 
   const ctx = {
-    id,
     get currentSlide() {
       return currentSlide;
     },
@@ -31,6 +31,7 @@
       totalSlides++;
       return index;
     },
+    slideId: (index) => `${id}-slide-${index}`,
   };
 
   setCarouselContext(ctx);
@@ -45,7 +46,7 @@
   function step(delta) {
     const index = currentSlide + delta;
     if (index < 0 || index >= totalSlides) return;
-    currentSlide = index;
+    goTo(index);
     status = `Slide ${index + 1} of ${totalSlides}`;
   }
 
@@ -56,12 +57,8 @@
   const STEP = { ArrowRight: 1, ArrowLeft: -1 };
 
   function onDotKeydown(e, dot) {
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    let index;
-    if (e.key in STEP) index = (dot + STEP[e.key] + totalSlides) % totalSlides;
-    else if (e.key === 'Home') index = 0;
-    else if (e.key === 'End') index = totalSlides - 1;
-    else return;
+    const index = rovingIndex(e, dot, totalSlides, STEP);
+    if (index === undefined) return;
     e.preventDefault();
     goTo(index);
     e.currentTarget.parentElement.children[index].focus();
@@ -72,16 +69,12 @@
   }
 
   function handleTouchEnd(e) {
-    touchEndX = e.changedTouches[0].screenX;
-    const diff = touchStartX - touchEndX;
+    const diff = touchStartX - e.changedTouches[0].screenX;
     if (Math.abs(diff) > 50) {
       if (diff > 0) next();
       else prev();
     }
   }
-
-  // Build dots array reactively
-  let dots = $derived(Array.from({ length: totalSlides }, (_, i) => i));
 </script>
 
 <div
@@ -117,13 +110,13 @@
       role="tablist"
       aria-label="Slide indicators"
     >
-      {#each dots as dot (dot)}
+      {#each { length: totalSlides }, dot}
         <button
           class="tessera-carousel-dot"
           class:active={dot === currentSlide}
           role="tab"
           aria-selected={dot === currentSlide}
-          aria-controls="{id}-slide-{dot}"
+          aria-controls={ctx.slideId(dot)}
           aria-label="Slide {dot + 1}"
           tabindex={dot === currentSlide ? 0 : -1}
           onclick={() => goTo(dot)}

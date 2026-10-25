@@ -104,30 +104,21 @@ test.describe('Component — Carousel', () => {
   test('carousel Tab stops: one dot, the arrows, and only the current slide', async ({
     page,
   }) => {
-    async function carouselTabStops() {
+    const focused = page.locator('.tessera-carousel :focus');
+    async function expectTabStops(names: string[]) {
       await page.locator('.tessera-accordion-trigger').last().focus();
-      const stops: string[] = [];
-      for (let i = 0; i < 10; i++) {
+      for (const name of names) {
         await page.keyboard.press('Tab');
-        const stop = await page.evaluate(() => {
-          const el = document.activeElement as HTMLElement;
-          if (!el.closest('.tessera-carousel')) return null;
-          return el.getAttribute('aria-label') ?? el.textContent!.trim();
-        });
-        if (stop === null && stops.length) break;
-        if (stop !== null) stops.push(stop);
+        await expect(focused).toHaveAccessibleName(name);
       }
-      return stops;
+      await page.keyboard.press('Tab');
+      await expect(focused).toHaveCount(0);
     }
 
-    expect(await carouselTabStops()).toEqual([
-      'Previous slide',
-      'Slide 1',
-      'Next slide',
-    ]);
+    await expectTabStops(['Previous slide', 'Slide 1', 'Next slide']);
 
     await page.getByRole('button', { name: 'Next slide' }).click();
-    expect(await carouselTabStops()).toEqual([
+    await expectTabStops([
       'Slide 2 action',
       'Previous slide',
       'Slide 2',
