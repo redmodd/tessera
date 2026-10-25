@@ -10,15 +10,14 @@
   let { children } = $props();
   const carousel = getCarouselContext();
   const index = carousel.register();
-
-  let isCurrent = $derived(carousel.currentSlide === index);
 </script>
 
 <div
   class="tessera-carousel-slide"
+  id={carousel.slideId(index)}
   role="tabpanel"
-  aria-hidden={!isCurrent}
-  aria-label="Slide {index + 1}"
+  inert={carousel.currentSlide !== index}
+  aria-labelledby={carousel.tabId(index)}
 >
   {@render children?.()}
 </div>

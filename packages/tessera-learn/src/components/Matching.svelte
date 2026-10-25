@@ -7,6 +7,7 @@
     QUESTION_ID_PREFIX,
     indexIds,
     questionId,
+    rovingIndex,
     savedIndex,
     shuffle,
   } from './util.js';
@@ -178,14 +179,14 @@
   const NEXT = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
 
   function onItemKeydown(e) {
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     const items = [...e.currentTarget.parentElement.querySelectorAll('button')];
-    const i = items.indexOf(e.currentTarget);
-    let next;
-    if (e.key in NEXT) next = (i + NEXT[e.key] + items.length) % items.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = items.length - 1;
-    else return;
+    const next = rovingIndex(
+      e,
+      items.indexOf(e.currentTarget),
+      items.length,
+      NEXT,
+    );
+    if (next === undefined) return;
     e.preventDefault();
     items[next].focus();
   }

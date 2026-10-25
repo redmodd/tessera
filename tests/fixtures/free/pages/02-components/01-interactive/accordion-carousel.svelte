@@ -37,6 +37,7 @@
   <CarouselSlide>
     <h3>Slide 2</h3>
     <p>Second slide content.</p>
+    <button type="button">Slide 2 action</button>
   </CarouselSlide>
   <CarouselSlide>
     <h3>Slide 3</h3>

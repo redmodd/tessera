@@ -1,7 +1,7 @@
 <script module>
   import { createContext } from 'svelte';
 
-  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number }>>} */
+  /** @type {ReturnType<typeof createContext<{ readonly currentSlide: number; register(): number; slideId(index: number): string; tabId(index: number): string }>>} */
   const [getCarouselContext, setCarouselContext] = createContext();
   export { getCarouselContext };
 </script>
@@ -13,11 +13,15 @@
    *
    * @prop {import('svelte').Snippet} [children] - CarouselSlide children
    */
+  import { rovingIndex } from './util.js';
+
   let { children } = $props();
+  const id = $props.id();
   let currentSlide = $state(0);
   let totalSlides = $state(0);
+  let status = $state('');
   let touchStartX = 0;
-  let touchEndX = 0;
+  let viewport;
 
   const ctx = {
     get currentSlide() {
@@ -28,31 +32,41 @@
       totalSlides++;
       return index;
     },
+    slideId: (index) => `${id}-slide-${index}`,
+    tabId: (index) => `${id}-tab-${index}`,
   };
 
   setCarouselContext(ctx);
 
-  function prev() {
-    if (currentSlide > 0) currentSlide--;
-  }
+  const focusDot = (index) => document.getElementById(ctx.tabId(index)).focus();
 
-  function next() {
-    if (currentSlide < totalSlides - 1) currentSlide++;
-  }
-
-  function goTo(index) {
+  function goTo(index, announce = false) {
+    // An inert slide drops focus to the page, where arrow keys change pages.
+    const moveFocus = viewport.contains(document.activeElement);
+    if (moveFocus) focusDot(index);
     currentSlide = index;
+    // A focused dot already announces the selected slide.
+    status =
+      announce && !moveFocus ? `Slide ${index + 1} of ${totalSlides}` : '';
   }
 
-  function handleKeydown(e) {
-    if (e.key === 'ArrowLeft') {
-      prev();
-      e.preventDefault();
-    }
-    if (e.key === 'ArrowRight') {
-      next();
-      e.preventDefault();
-    }
+  function step(delta) {
+    const index = currentSlide + delta;
+    if (index >= 0 && index < totalSlides) goTo(index, true);
+  }
+
+  const prev = () => step(-1);
+  const next = () => step(1);
+
+  // Tabs pattern: the dots are one Tab stop, arrows move and select.
+  const STEP = { ArrowRight: 1, ArrowLeft: -1 };
+
+  function onDotKeydown(e, dot) {
+    const index = rovingIndex(e, dot, totalSlides, STEP);
+    if (index === undefined) return;
+    e.preventDefault();
+    goTo(index);
+    focusDot(index);
   }
 
   function handleTouchStart(e) {
@@ -60,31 +74,40 @@
   }
 
   function handleTouchEnd(e) {
-    touchEndX = e.changedTouches[0].screenX;
-    const diff = touchStartX - touchEndX;
+    const diff = touchStartX - e.changedTouches[0].screenX;
     if (Math.abs(diff) > 50) {
       if (diff > 0) next();
       else prev();
     }
   }
-
-  // Build dots array reactively
-  let dots = $derived(Array.from({ length: totalSlides }, (_, i) => i));
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="tessera-carousel"
   role="region"
   aria-roledescription="carousel"
   aria-label="Slide carousel"
-  onkeydown={handleKeydown}
   ontouchstart={handleTouchStart}
   ontouchend={handleTouchEnd}
-  tabindex="0"
 >
-  <div class="tessera-carousel-viewport">
+  <button
+    class="tessera-carousel-arrow tessera-carousel-prev"
+    onclick={prev}
+    aria-disabled={currentSlide === 0}
+    aria-label="Previous slide"
+  >
+    ‹
+  </button>
+  <button
+    class="tessera-carousel-arrow tessera-carousel-next"
+    onclick={next}
+    aria-disabled={currentSlide >= totalSlides - 1}
+    aria-label="Next slide"
+  >
+    ›
+  </button>
+
+  <div class="tessera-carousel-viewport" bind:this={viewport}>
     <div
       class="tessera-carousel-track"
       style="transform: translateX(-{currentSlide * 100}%)"
@@ -92,52 +115,52 @@
       {@render children?.()}
     </div>
   </div>
+  <p class="tessera-sr-only" aria-live="polite">{status}</p>
 
-  <div class="tessera-carousel-controls">
-    <button
-      class="tessera-carousel-arrow tessera-carousel-prev"
-      onclick={prev}
-      disabled={currentSlide === 0}
-      aria-label="Previous slide"
-    >
-      ‹
-    </button>
-
-    <div
-      class="tessera-carousel-dots"
-      role="tablist"
-      aria-label="Slide indicators"
-    >
-      {#each dots as dot (dot)}
-        <button
-          class="tessera-carousel-dot"
-          class:active={dot === currentSlide}
-          role="tab"
-          aria-selected={dot === currentSlide}
-          aria-label="Go to slide {dot + 1}"
-          onclick={() => goTo(dot)}
-        ></button>
-      {/each}
-    </div>
-
-    <button
-      class="tessera-carousel-arrow tessera-carousel-next"
-      onclick={next}
-      disabled={currentSlide >= totalSlides - 1}
-      aria-label="Next slide"
-    >
-      ›
-    </button>
+  <div
+    class="tessera-carousel-dots"
+    role="tablist"
+    aria-label="Slide indicators"
+  >
+    {#each { length: totalSlides }, dot}
+      <button
+        class="tessera-carousel-dot"
+        class:active={dot === currentSlide}
+        id={ctx.tabId(dot)}
+        role="tab"
+        aria-selected={dot === currentSlide}
+        aria-controls={ctx.slideId(dot)}
+        aria-label="Slide {dot + 1}"
+        tabindex={dot === currentSlide ? 0 : -1}
+        onclick={() => goTo(dot)}
+        onkeydown={(e) => onDotKeydown(e, dot)}
+      ></button>
+    {/each}
   </div>
 </div>
 
 <style>
+  /* Previous and Next come first in the markup, so a screen reader reads on
+     into the new slide; the grid shows them either side of it. */
   .tessera-carousel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--tessera-spacing-md) var(--tessera-spacing-sm);
     margin-bottom: var(--tessera-spacing-lg);
     position: relative;
   }
 
+  .tessera-carousel-prev {
+    grid-area: 1 / 1;
+  }
+
+  .tessera-carousel-next {
+    grid-area: 1 / 3;
+  }
+
   .tessera-carousel-viewport {
+    grid-area: 1 / 2;
     overflow: hidden;
     border-radius: 8px;
     border: 1px solid var(--tessera-border);
@@ -146,14 +169,6 @@
   .tessera-carousel-track {
     display: flex;
     transition: transform var(--tessera-transition-normal);
-  }
-
-  .tessera-carousel-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--tessera-spacing-md);
-    margin-top: var(--tessera-spacing-md);
   }
 
   .tessera-carousel-arrow {
@@ -174,11 +189,11 @@
       color var(--tessera-transition-fast);
   }
 
-  .tessera-carousel-arrow:hover:not(:disabled) {
+  .tessera-carousel-arrow:hover:not([aria-disabled='true']) {
     background-color: var(--tessera-bg-secondary);
   }
 
-  .tessera-carousel-arrow:disabled {
+  .tessera-carousel-arrow[aria-disabled='true'] {
     opacity: 0.35;
     cursor: not-allowed;
   }
@@ -189,6 +204,8 @@
   }
 
   .tessera-carousel-dots {
+    grid-area: 2 / 2;
+    justify-self: center;
     display: flex;
     gap: 8px;
   }
