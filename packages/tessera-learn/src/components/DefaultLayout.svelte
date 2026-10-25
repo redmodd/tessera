@@ -13,6 +13,7 @@
   const course = useCourse();
 
   let sidebarOpen = $state(false);
+  let overlay = $state(false);
   let hamburger = $state();
   let sidebar = $state();
   let main = $state();
@@ -44,7 +45,8 @@
   // overlay, so its size tracks that breakpoint wherever CSS puts it.
   function closeWhenMenuHides(button) {
     const observer = new ResizeObserver(([entry]) => {
-      if (!entry.contentRect.width) sidebarOpen = false;
+      overlay = entry.contentRect.width > 0;
+      if (!overlay) sidebarOpen = false;
       else if (!sidebarOpen && sidebar.contains(document.activeElement)) {
         button.focus();
       }
@@ -148,6 +150,7 @@
     class="tessera-sidebar"
     class:open={sidebarOpen}
     aria-label="Course sidebar"
+    inert={overlay && !sidebarOpen}
   >
     <Sidebar onclose={closeSidebar} />
     {#if course.canExit}

@@ -92,6 +92,18 @@ test.describe('Mobile Navigation', () => {
     );
   });
 
+  test('Tab right after closing skips the sliding-out sidebar', async ({
+    page,
+  }) => {
+    await page.locator('.tessera-hamburger').click();
+    await expect(
+      page.locator('.tessera-nav-page[aria-current="page"]'),
+    ).toBeFocused();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.tessera-main :focus')).toHaveCount(1);
+  });
+
   test('closing the sidebar from the overlay or the current page returns focus to the menu button', async ({
     page,
   }) => {
