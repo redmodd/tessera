@@ -101,7 +101,7 @@ test.describe('Component — Carousel', () => {
     );
   });
 
-  test('carousel Tab stops: one dot, the arrows, and only the current slide', async ({
+  test('carousel Tab stops: the arrows, then the current slide, then one dot', async ({
     page,
   }) => {
     const focused = page.locator('.tessera-carousel :focus');
@@ -115,14 +115,14 @@ test.describe('Component — Carousel', () => {
       await expect(focused).toHaveCount(0);
     }
 
-    await expectTabStops(['Previous slide', 'Slide 1', 'Next slide']);
+    await expectTabStops(['Previous slide', 'Next slide', 'Slide 1']);
 
     await page.getByRole('button', { name: 'Next slide' }).click();
     await expectTabStops([
-      'Slide 2 action',
       'Previous slide',
-      'Slide 2',
       'Next slide',
+      'Slide 2 action',
+      'Slide 2',
     ]);
   });
 

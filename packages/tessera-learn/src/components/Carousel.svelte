@@ -91,6 +91,23 @@
   ontouchstart={handleTouchStart}
   ontouchend={handleTouchEnd}
 >
+  <button
+    class="tessera-carousel-arrow tessera-carousel-prev"
+    onclick={prev}
+    aria-disabled={currentSlide === 0}
+    aria-label="Previous slide"
+  >
+    ‹
+  </button>
+  <button
+    class="tessera-carousel-arrow tessera-carousel-next"
+    onclick={next}
+    aria-disabled={currentSlide >= totalSlides - 1}
+    aria-label="Next slide"
+  >
+    ›
+  </button>
+
   <div class="tessera-carousel-viewport">
     <div
       class="tessera-carousel-track"
@@ -101,55 +118,50 @@
   </div>
   <p class="tessera-sr-only" aria-live="polite">{status}</p>
 
-  <div class="tessera-carousel-controls">
-    <button
-      class="tessera-carousel-arrow tessera-carousel-prev"
-      onclick={prev}
-      aria-disabled={currentSlide === 0}
-      aria-label="Previous slide"
-    >
-      ‹
-    </button>
-
-    <div
-      class="tessera-carousel-dots"
-      role="tablist"
-      aria-label="Slide indicators"
-    >
-      {#each { length: totalSlides }, dot}
-        <button
-          class="tessera-carousel-dot"
-          class:active={dot === currentSlide}
-          id={ctx.tabId(dot)}
-          role="tab"
-          aria-selected={dot === currentSlide}
-          aria-controls={ctx.slideId(dot)}
-          aria-label="Slide {dot + 1}"
-          tabindex={dot === currentSlide ? 0 : -1}
-          onclick={() => goTo(dot)}
-          onkeydown={(e) => onDotKeydown(e, dot)}
-        ></button>
-      {/each}
-    </div>
-
-    <button
-      class="tessera-carousel-arrow tessera-carousel-next"
-      onclick={next}
-      aria-disabled={currentSlide >= totalSlides - 1}
-      aria-label="Next slide"
-    >
-      ›
-    </button>
+  <div
+    class="tessera-carousel-dots"
+    role="tablist"
+    aria-label="Slide indicators"
+  >
+    {#each { length: totalSlides }, dot}
+      <button
+        class="tessera-carousel-dot"
+        class:active={dot === currentSlide}
+        id={ctx.tabId(dot)}
+        role="tab"
+        aria-selected={dot === currentSlide}
+        aria-controls={ctx.slideId(dot)}
+        aria-label="Slide {dot + 1}"
+        tabindex={dot === currentSlide ? 0 : -1}
+        onclick={() => goTo(dot)}
+        onkeydown={(e) => onDotKeydown(e, dot)}
+      ></button>
+    {/each}
   </div>
 </div>
 
 <style>
+  /* Previous and Next come first in the markup, so a screen reader reads on
+     into the new slide; the grid shows them either side of it. */
   .tessera-carousel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--tessera-spacing-md) var(--tessera-spacing-sm);
     margin-bottom: var(--tessera-spacing-lg);
     position: relative;
   }
 
+  .tessera-carousel-prev {
+    grid-area: 1 / 1;
+  }
+
+  .tessera-carousel-next {
+    grid-area: 1 / 3;
+  }
+
   .tessera-carousel-viewport {
+    grid-area: 1 / 2;
     overflow: hidden;
     border-radius: 8px;
     border: 1px solid var(--tessera-border);
@@ -158,14 +170,6 @@
   .tessera-carousel-track {
     display: flex;
     transition: transform var(--tessera-transition-normal);
-  }
-
-  .tessera-carousel-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--tessera-spacing-md);
-    margin-top: var(--tessera-spacing-md);
   }
 
   .tessera-carousel-arrow {
@@ -201,6 +205,8 @@
   }
 
   .tessera-carousel-dots {
+    grid-area: 2 / 2;
+    justify-self: center;
     display: flex;
     gap: 8px;
   }
