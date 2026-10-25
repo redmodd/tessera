@@ -2,7 +2,7 @@
 
 Part of the Tessera authoring guide. [`AGENTS.md`](../AGENTS.md) holds the rules that apply to every task: read it first.
 
-The lifecycle stream (Initialized / Completed / Passed / Failed / Terminated; `cmi.*` writes under SCORM) is sent automatically. To emit your own verbs, use `useXAPI()`:
+Tessera sends its own statements automatically: Initialized, Answered (one per question), Scored (when the course score changes), Completed, Passed, Failed and Terminated. Under SCORM it writes `cmi.*` instead. To emit your own verbs, use `useXAPI()`:
 
 ```ts
 import { useXAPI } from 'tessera-learn';
@@ -14,7 +14,7 @@ xapi?.sendStatement({
 });
 ```
 
-`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured, before adapter init resolves, or once the session has ended (Exit or page close): **null-check and degrade gracefully**. The client exposes `sendStatement(statement, options?)`, `getActivityId()`, `getActor()` and `getSessionId()`; the getters read the first destination. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, and (cmi5) `context.registration` + `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
+`useXAPI()` is callable anywhere (setup, handlers, async, `.ts` modules). It returns `null` when no LRS is configured, before adapter init resolves, or once the session has ended (Exit or page close): **null-check and degrade gracefully**. The client exposes `sendStatement(statement, options?)`, `getActivityId()`, `getActor()` and `getSessionId()`; the getters read the first destination. The publisher fills in `actor`, `timestamp`, `id`, `context.contextActivities.grouping`, `context.registration` (the cmi5 launch's, or an explicit destination's optional `registration` UUID v4) and (cmi5) `sessionid`; you supply `verb`, optionally `object` (defaults to the activity), `result`, `context`, `attachments`.
 
 ## Configure the destination
 

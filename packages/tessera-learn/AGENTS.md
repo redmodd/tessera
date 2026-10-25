@@ -13,7 +13,7 @@ This is the canonical reference for authoring a Tessera course. Read it before g
 - **`pageConfig` and `course.config.js` are static object literals.** Trailing commas, unquoted keys and single quotes are fine (JSON5); variables, shorthand properties, function calls, template literals and computed values are not.
 - **No runtime data fetching in pages.** No `fetch()` or dynamic loaders in page components.
 - **Third-party libraries** go in the workspace `package.json`.
-- **Never edit `node_modules/`.** Use an [extension point](#editing-rules).
+- **Never edit `node_modules/`.** The next install wipes it. Use an [extension point](#editing-rules).
 
 ## Workflow
 
@@ -79,23 +79,22 @@ pnpm a11y <course>                      # runtime a11y audit on its own
 pnpm check <course>                     # validate, then the a11y audit
 pnpm export <course>                    # build + package for export.standard
 pnpm export <course> --standard <web|scorm12|scorm2004|cmi5|xapi>   # override it for one build (validate takes it too)
-cd courses/<name> && pnpm exec tessera dev   # or cd in and omit the name
+cd courses/<name> && npx tessera dev    # inside a course: npx, not pnpm, and omit the name
 ```
 
 - Course names: lowercase letters, digits, `-`, `_` and `.`, starting with a letter or digit.
 - `new` / `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them. `duplicate` has no script: run it as `pnpm tessera duplicate`.
 - `dev` hot-reloads pages, layouts, components and `course.config.js`. It stores progress in `localStorage` whatever `export.standard` is, so clear site data to restart as a new learner.
-- `validate` runs the same static checks as `dev`/`export` and exits non-zero on an error.
 - After `duplicate`, update the copy's `title` in `course.config.js` (and the heading in its `layout.svelte`, if it kept the scaffolded one).
 
 ### What `new` scaffolds
 
-| File                         | Contents                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `course.config.js`           | `title`, a generated `id`, `branding.primaryColor`, free navigation, web export |
-| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button             |
-| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                |
-| `styles/custom.css`          | Empty stylesheet for overrides                                                  |
+| File                         | Contents                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `course.config.js`           | `title`, a generated `id`, `language`, `branding.primaryColor`, free navigation, percentage completion at 100, `passingScore: 70`, web export |
+| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button                                                                           |
+| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                                                                              |
+| `styles/custom.css`          | Empty stylesheet for overrides                                                                                                                |
 
 Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button under an LMS). See [Custom Layouts](docs/recipes.md#custom-layouts).
 
@@ -134,7 +133,7 @@ my-course/
 
 ```
 my-course/
-├── layout.svelte              # Custom chrome (replaces default sidebar/topbar); scaffolded
+├── layout.svelte              # Custom chrome (replaces the default sidebar and page nav); scaffolded
 ├── quiz.svelte                # Custom quiz shell (replaces built-in <Quiz>)
 ├── course.runtime.js          # Runtime hooks: canAccess, xAPI auth/actor resolvers
 ├── components/                # Course-local components, imported by relative path
@@ -153,7 +152,6 @@ my-course/
 
 - **Edit freely:** `pages/`, `course.config.js`, `course.runtime.js`, `layout.svelte`, `quiz.svelte`, `components/`, `assets/`, `styles/`.
 - **Components:** course-local ones go in `components/` and are imported by relative path (`import MyChoice from '../../components/MyChoice.svelte'`). Ones shared across courses go in the workspace `shared/` (`$shared/…`).
-- **Never edit `node_modules/`.** Edits there are wiped on the next install. There is no `vite.config.js` to edit.
 - To change framework behaviour, use an extension point:
 
 | Need                                           | Use                                          |
@@ -356,7 +354,7 @@ Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`, an embed 
 
 A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in the resolved quiz shell (built-in `<Quiz>`, or a project `quiz.svelte` if present). Drop question components at the page root, with no `<Quiz>` wrapper.
 
-The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then a results screen with Retry and Review.
+The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then a results screen with **Retry Quiz** (while attempts remain) and **Review Answers** (hidden under `feedbackMode: "never"` and on a result restored without its answers).
 
 ### Setup
 
@@ -390,7 +388,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 - **Pass every required prop**, listed under [Question types](#question-types). A missing one is a build error.
 - **Question `id`s are unique within a page, and use only letters, digits and inner underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`) and the validator warns.
-- **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime the second registration is renamed (`q1-2`), which changes its `cmi.interactions` key.
+- **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime a quiz renames the second registration (`q1-2`), which changes its `cmi.interactions` key.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
 
@@ -401,7 +399,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 | `graded`        | `boolean`                            | `false`    | Whether the score counts toward course success                                                                                                                                                                           |
 | `gatesProgress` | `boolean`                            | `false`    | Passing required to access the next page (works in `free` and `sequential`)                                                                                                                                              |
 | `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions until the LMS attempt ends ([export](docs/export.md#lms-behaviour)); the recorded score is the best attempt   |
-| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: the button reads "Submit" and each answer is locked and reported as the learner submits it. `review`: post-submit only. `never`: off                                                                        |
+| `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: each question's Submit locks, reports and shows feedback for that answer, then the button reads "Next Question" ("See Results" on the last). `review`: post-submit only. `never`: off                       |
 | `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` keeps already-correct questions locked. On a return visit, a question whose answer did not come back (see [`restored`](docs/hooks.md#usequiz)) is reset either way |
 
 ### Per-question weighting
@@ -443,7 +441,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Retry after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Try again after an answer that scores under 100, until `maxRetries` is spent. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />
@@ -459,7 +457,7 @@ Drop files into `assets/`. Reference with `$assets/` in built-in component props
 
 ### `$assets/` in custom components
 
-`$assets/` is **only** rewritten in two places: ES `import` statements (Vite alias) and the `src` prop of built-in `Image`/`Audio`/`Video`. **Raw HTML attributes are NOT rewritten**: `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and JS-built CSS `url()` strings all 404 silently. Pick by use case:
+`$assets/` is **only** rewritten in ES `import` statements (Vite alias), the `src` and `tracks[].src` props of built-in `Image`/`Audio`/`Video`, and `branding.logo`. **Raw HTML attributes are NOT rewritten**: `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and JS-built CSS `url()` strings all 404 silently. Pick by use case:
 
 **One-off: ES import (preferred).** Build-time bundling, hashing, fails the build if missing:
 
@@ -513,6 +511,8 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-border`                             | `#e5e7eb`                             |
 | `--tessera-success`                            | `#147638`                             |
 | `--tessera-error`                              | `#b91c1c`                             |
+| `--tessera-success-bg` / `--tessera-error-bg`  | the color at 8% over transparent      |
+| `--tessera-success-border` / `-error-border`   | the color at 25% over transparent     |
 | `--tessera-warning`                            | `#d97706`                             |
 | `--tessera-font-family`                        | `'Inter', system-ui, sans-serif`      |
 | `--tessera-font-size-base`                     | `1rem`                                |
@@ -524,10 +524,11 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-focus-halo`                         | `0 0 0 4px var(--tessera-bg)`         |
 | `--tessera-shadow-sm`                          | `0 2px 8px rgba(0, 0, 0, 0.08)`       |
 | `--tessera-shadow-lg`                          | `0 20px 60px rgba(0, 0, 0, 0.2)`      |
+| `--tessera-transition-fast` / `-normal`        | `150ms ease` / `250ms ease`           |
 
-Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
+Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. A `tabindex="-1"` wrapper the page change focuses (see [Custom Layouts](docs/recipes.md#custom-layouts)) does show it. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
-Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
+Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {
@@ -594,23 +595,23 @@ export default {
 
 ### Field behaviour
 
-| Field                           | Behaviour                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                            | Unique course identity; seeds the web localStorage key and the cmi5/xAPI activity id. Scaffolders mint a `urn:uuid:…`. Missing → falls back to a fixed value (collides across courses) and the build warns. `tessera duplicate` regenerates it.                                                                                                                        |
-| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                                                                                                                                                                                                              |
-| `resume`                        | `"auto"` (default) restores saved progress, but **discards it when pages were added, removed, reordered or renamed** since the save, or when a `tessera-learn` update changed the save format. `"never"` always starts fresh. Discarded scores and progress are not remapped, so upload a restructured course to the LMS as a _new version_, not an overwrite in place |
-| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                                                                                                                                                                                                            |
-| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes: a plain page on view, a quiz page on submit, a `graded: true` page once every graded question on it is answered                                                                                                                                                                                                          |
-| `completion.mode: "percentage"` | Completes when `completedPages / totalPages * 100 >= percentageThreshold`. A quiz page counts only once its quiz has been submitted (pass or fail), and a `graded: true` page only once every graded question on it is answered.                                                                                                                                       |
-| `completion.mode: "quiz"`       | Completes when the graded average >= `scoring.passingScore`. Needs a required graded page                                                                                                                                                                                                                                                                              |
-| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](docs/scoring.md#manual-completion)                                                                                                                                                                                                                                                                     |
-| `success.from`                  | What judges pass/fail, independent of completion. See [Success criterion](docs/scoring.md#success-criterion)                                                                                                                                                                                                                                                           |
-| `a11y.level: "error"`           | Promotes captions/transcript, empty question labels, heading order, contrast, language and Svelte a11y warnings to errors. Missing `alt` and missing media `title` are errors at either level                                                                                                                                                                          |
-| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs). Suppresses a matching diagnostic at any severity, the missing `alt` / `title` errors included                                                                                                                                                     |
+| Field                           | Behaviour                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                            | Unique course identity; seeds the web localStorage key and the cmi5/xAPI activity id. Scaffolders mint a `urn:uuid:…`. Missing → falls back to a fixed value (collides across courses), and the build warns under web, cmi5 and xAPI. `tessera duplicate` regenerates it.                                                                                                             |
+| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                                                                                                                                                                                                                             |
+| `resume`                        | `"auto"` (default) restores saved progress, but **discards it when pages were added, removed, reordered or had their file renamed** since the save, or when a `tessera-learn` update changed the save format. `"never"` always starts fresh. Discarded scores and progress are not remapped, so upload a restructured course to the LMS as a _new version_, not an overwrite in place |
+| `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                                                                                                                                                                                                                           |
+| `navigation.mode: "sequential"` | Pages unlock one at a time as each completes: a plain page on view, a quiz page on submit, a `graded: true` page once every graded question on it is answered                                                                                                                                                                                                                         |
+| `completion.mode: "percentage"` | Completes when `completedPages / totalPages * 100 >= percentageThreshold`. A quiz page counts only once its quiz has been submitted (pass or fail), and a `graded: true` page only once every graded question on it is answered.                                                                                                                                                      |
+| `completion.mode: "quiz"`       | Completes when the graded average >= `scoring.passingScore`. Needs a required graded page                                                                                                                                                                                                                                                                                             |
+| `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](docs/scoring.md#manual-completion)                                                                                                                                                                                                                                                                                    |
+| `success.from`                  | What judges pass/fail, independent of completion. See [Success criterion](docs/scoring.md#success-criterion)                                                                                                                                                                                                                                                                          |
+| `a11y.level: "error"`           | Promotes captions/transcript, empty question labels, heading order, contrast, language and, at build time, Svelte a11y warnings to errors. Missing `alt` and missing media `title` are errors at either level                                                                                                                                                                         |
+| `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs). Suppresses a matching diagnostic at any severity, the missing `alt` / `title` errors included                                                                                                                                                                    |
 
 ### Minimum config
 
-Every field has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`. Keep the scaffolded `id` and `language`: the build warns without them.
+Every field has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`. Keep the scaffolded `id`, `language` and `passingScore`: the build warns without `language`, without `id` under web, cmi5 or xAPI, and without `passingScore` once a graded page decides pass/fail.
 
 ### Runtime hooks: `course.runtime.js`
 
@@ -645,7 +646,7 @@ Build output, the web export CSP and per-LMS behaviour are in [`node_modules/tes
 
 ### Validation
 
-The plugin validates on every dev start and build. Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates on save; those errors print and the server keeps running. Run `pnpm validate <course>` to check without building.
+The plugin validates on every dev start and build. Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates on save; those errors print and the server keeps running. `pnpm validate <course>` runs the same checks without building and exits non-zero on an error.
 
 ---
 
@@ -653,7 +654,19 @@ The plugin validates on every dev start and build. Errors abort the build and pr
 
 Two passes plus components that are accessible by construction.
 
-**Static checks** run inside `validate` / `dev` / `export`, with no setup. They cover: `<Image>` alt-or-`decorative`; `<Video>`/`<Audio>` `title` + captions/transcript; empty question labels; skipped heading levels; `branding.primaryColor` contrast against white; well-formed `language`; and the Svelte compiler's `a11y_*` warnings. Each diagnostic carries a rule ID (`[tessera/image-alt]`, `[a11y_missing_attribute]`), which is what `a11y.ignore` and `a11y.level` match.
+**Static checks** run inside `validate` / `dev` / `export`, with no setup. `a11y_*` comes from the Svelte compiler, so `validate`, which compiles nothing, never reports it: `dev` prints it as pages compile, and `export`, `a11y` and `check` gate it. Each diagnostic starts with its rule ID, which is what `a11y.ignore` and `a11y.level` match:
+
+| Rule ID                    | Checks                                                    |
+| -------------------------- | --------------------------------------------------------- |
+| `tessera/image-alt`        | `<Image>` has `alt` or `decorative`, not both             |
+| `tessera/media-title`      | `<Video>` / `<Audio>` has a `title`                       |
+| `tessera/media-captions`   | native `<Video>` has `tracks` or a `transcript`           |
+| `tessera/media-transcript` | `<Audio>` and embedded `<Video>` have a `transcript`      |
+| `tessera/question-label`   | question prompts are not empty                            |
+| `tessera/heading-order`    | page headings skip no level                               |
+| `tessera/primary-contrast` | `branding.primaryColor` has enough contrast against white |
+| `tessera/lang`             | `language` is set and is a well-formed BCP-47 tag         |
+| `a11y_*`                   | the Svelte compiler's accessibility warnings              |
 
 **Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 

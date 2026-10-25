@@ -2,18 +2,15 @@
 
 This guide covers how Tessera's test suite is organised and how to run it locally. For general contributor setup, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Prerequisites
+## Setup
 
-- Node.js >= 24 (CI tests Node 24 and 26)
-- pnpm (the repo is a pnpm workspace; `package.json` pins the version in `packageManager`)
-
-A first-time setup script is available:
+With the [prerequisites](./CONTRIBUTING.md#prerequisites) installed, run the first-time setup script:
 
 ```bash
 ./scripts/setup-e2e.sh
 ```
 
-It runs `pnpm install`, builds the workspace, and installs the Playwright Chromium build with system deps. Idempotent — safe to re-run.
+It runs `pnpm install`, builds the workspace, and installs the Playwright Chromium build with system deps. It is safe to re-run.
 
 ## Layout
 
@@ -53,7 +50,7 @@ pnpm exec vitest tests/scorm12.test.ts
 ### End-to-end tests (Playwright)
 
 ```bash
-pnpm build           # tessera-learn must be built first — fixtures import its plugin
+pnpm build           # tessera-learn must be built first: fixtures import its plugin
 pnpm test:e2e        # runs all Playwright projects
 ```
 
@@ -141,8 +138,7 @@ If you change a fixture's content, treat it like any other source change: commit
 
 ## Writing tests
 
-- New features ship with tests. Bug fixes ship with a regression test that fails before the fix and passes after.
-- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS. Run the full e2e suite (`pnpm test:e2e`) and note in the PR description which modes you tested and how.
+- For runtime/adapter changes (SCORM 1.2 / SCORM 2004 / cmi5 / xAPI 1.0.3 / web), prefer adding both a unit test in `packages/tessera-learn/tests/` and an e2e roundtrip if behavior is observable to the LMS. Run the full e2e suite (`pnpm test:e2e`) before opening the PR.
 - Keep e2e specs project-scoped: a spec should only depend on the fixture its project targets. `playwright.config.ts` enforces this with `testMatch` / `testIgnore`.
 - E2E tests get isolated browser contexts automatically, so localStorage and per-test state don't leak across tests. Don't add manual `beforeEach` resets for that.
 

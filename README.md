@@ -41,11 +41,11 @@ This scaffolds a [workspace](https://tesseralearn.dev/docs/workspace/) with one 
 
 ## Commands
 
-Every command works on one course. Name it, or `cd` into the course folder and leave the name off. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
+Every command works on one course, so name it. From inside a course folder, run `npx tessera <command>` with no name instead: `pnpm` scripts always run from the workspace root. A bare `pnpm dev` from the workspace root lists the available courses rather than guessing.
 
 ```bash
 pnpm dev <course>       # live preview, hot-reloads as you edit
-pnpm validate <course>  # structural errors only, no server, no build
+pnpm validate <course>  # static checks only, no server, no build
 pnpm a11y <course>      # accessibility audit on its own (axe-core, headless browser)
 pnpm check <course>     # validate, then the accessibility audit; run before export
 pnpm export <course>    # build + package for the course's configured standard
@@ -72,7 +72,7 @@ Tessera is a runtime built on Svelte and Vite, and pages are `.svelte` files, so
 
 ## Updating an existing workspace
 
-Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](./packages/tessera-learn/CHANGELOG.md) before you update. Then, from the workspace root, run `pnpm add tessera-learn@latest`. Every course moves together. Or ask your assistant to do the update, and tell it to read the changelog and apply what changed. See [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) for details.
+Ask your assistant to update the framework. The authoring guide has it check the [changelog](./packages/tessera-learn/CHANGELOG.md) and warn you about anything that resets learners' saved progress, and ask whether to go on, before it edits a course. Every course moves together. [`packages/create-tessera/README.md`](./packages/create-tessera/README.md#updating-an-existing-workspace) covers updating by hand.
 
 ## Documentation
 

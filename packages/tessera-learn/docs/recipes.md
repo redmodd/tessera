@@ -37,7 +37,7 @@ To keep most of the default chrome, import `DefaultLayout` from `tessera-learn` 
 
 ## Recipe 1: Custom "draw a line" question
 
-A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn, and `QuestionReview` renders Submit, the result, and Try again. [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers its props and a widget that also works inside a quiz.
+A standalone practice widget written straight into a page. Emits a `matching` interaction (scored like `<Matching>`); `restore` shows the submitted pairs on a return visit. `complete` keeps Submit disabled until every pair is drawn. [Recipe 2b](#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) covers `QuestionReview` and a widget that also works inside a quiz.
 
 ```svelte
 <!-- pages/05-pairs/01-pairs/draw-pairs.svelte -->
@@ -243,7 +243,7 @@ Render `children` visibly, never call `q.render()`, and let widgets render their
 </fieldset>
 ```
 
-Built-in widgets render nothing in this layout (`QuestionShell` renders inline only when standalone). Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
+Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
 
 ## Recipe 3: Graded standalone question
 
@@ -282,7 +282,7 @@ A standalone question (no `<Quiz>`) counts toward course success when built with
 </div>
 ```
 
-The `QuestionReview` children say why an answer scored under 100. Try again shows while `q.canRetry`; a submitted answer stays submitted and locked when the learner returns to the page.
+The `QuestionReview` children say why an answer scored under 100.
 
 ## Recipe 4: Chunked-reveal page with `markChunk`
 
@@ -299,7 +299,7 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
 
   const nav = useNavigation();
   const progress = useProgress();
-  const pageIndex = $derived(nav.currentPageIndex);
+  const pageIndex = nav.currentPageIndex;
 
   const TOTAL_CHUNKS = 4;
   let revealed = $state(progress.chunkProgress.get(pageIndex) ?? 0);

@@ -31,5 +31,5 @@ In scope:
 
 Out of scope:
 
-- Vulnerabilities in third-party LMSes or LRSes — please report those to the upstream vendor
+- Vulnerabilities in third-party LMSes or LRSes: please report those to the upstream vendor
 - Issues that require an attacker to already have write access to the course author's filesystem or LMS admin account

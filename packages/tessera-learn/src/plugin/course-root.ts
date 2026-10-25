@@ -81,7 +81,7 @@ function listHint(workspaceRoot: string): string {
   }
   return (
     `\nAvailable courses:\n${courses.map((c) => `  ${c}`).join('\n')}` +
-    '\nName one (`tessera <command> <course>`) or cd into its folder.' +
+    '\nName one (`tessera <command> <course>`), or run `npx tessera <command>` from inside its folder.' +
     malformedHint(malformed)
   );
 }

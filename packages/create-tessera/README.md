@@ -37,15 +37,17 @@ Claude Code reads `AGENTS.md` from v2.1.277, and only when no `CLAUDE.md`, `.cla
 
 ## Updating an existing workspace
 
-There is no `create-tessera upgrade` verb: you update by bumping the `tessera-learn` dependency. Some updates change how courses are written, and some reset learners' saved progress, so read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first. Then, from the workspace root:
+There is no `create-tessera upgrade` verb: you update by bumping the `tessera-learn` dependency, and every course moves together. Some updates change how courses are written, and some reset learners' saved progress.
+
+The simplest way is to ask your assistant to update the framework. The authoring guide's [update steps](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/docs/updating.md) have it read the changelog, warn you about anything that resets saved progress and ask whether to go on before it edits a course, then apply the changes and validate every course.
+
+To update by hand, read the [changelog](https://github.com/redmodd/tessera/blob/main/packages/tessera-learn/CHANGELOG.md) first, then, from the workspace root:
 
 ```bash
 pnpm add tessera-learn@latest
 ```
 
-Or ask your assistant to do the update, and tell it to read the changelog and apply what changed. After the update, the changelog is also at `node_modules/tessera-learn/CHANGELOG.md`.
-
-Every course moves together, and the authoring guide updates with the dependency. To pin a specific release instead of the newest, name the version: `pnpm add tessera-learn@<version>`.
+To pin a specific release instead of the newest, name the version: `pnpm add tessera-learn@<version>`. The authoring guide updates with the dependency, and the changelog is also at `node_modules/tessera-learn/CHANGELOG.md`.
 
 An older workspace has a `CLAUDE.md` that duplicates `AGENTS.md`. Project notes live in `AGENTS.md` only: move any notes from `CLAUDE.md` into `AGENTS.md`, then delete `CLAUDE.md`, or replace its contents with `@AGENTS.md` if one of the Claude Code cases above applies.
 
