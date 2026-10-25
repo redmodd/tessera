@@ -13,7 +13,7 @@ This is the canonical reference for authoring a Tessera course. Read it before g
 - **`pageConfig` and `course.config.js` are static object literals.** Trailing commas, unquoted keys and single quotes are fine (JSON5); variables, shorthand properties, function calls, template literals and computed values are not.
 - **No runtime data fetching in pages.** No `fetch()` or dynamic loaders in page components.
 - **Third-party libraries** go in the workspace `package.json`.
-- **Never edit `node_modules/`.** Use an [extension point](#editing-rules).
+- **Never edit `node_modules/`.** The next install wipes it. Use an [extension point](#editing-rules).
 
 ## Workflow
 
@@ -85,17 +85,16 @@ cd courses/<name> && pnpm exec tessera dev   # or cd in and omit the name
 - Course names: lowercase letters, digits, `-`, `_` and `.`, starting with a letter or digit.
 - `new` / `dev` / `export` / `validate` / `a11y` / `check` are **reserved script names** aliasing the `tessera` subcommands. Don't repurpose them. `duplicate` has no script: run it as `pnpm tessera duplicate`.
 - `dev` hot-reloads pages, layouts, components and `course.config.js`. It stores progress in `localStorage` whatever `export.standard` is, so clear site data to restart as a new learner.
-- `validate` runs the same static checks as `dev`/`export` and exits non-zero on an error.
 - After `duplicate`, update the copy's `title` in `course.config.js` (and the heading in its `layout.svelte`, if it kept the scaffolded one).
 
 ### What `new` scaffolds
 
-| File                         | Contents                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `course.config.js`           | `title`, a generated `id`, `branding.primaryColor`, free navigation, web export |
-| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button             |
-| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                |
-| `styles/custom.css`          | Empty stylesheet for overrides                                                  |
+| File                         | Contents                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `course.config.js`           | `title`, a generated `id`, `language`, `branding.primaryColor`, free navigation, percentage completion at 100, `passingScore: 70`, web export |
+| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button                                                                           |
+| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                                                                              |
+| `styles/custom.css`          | Empty stylesheet for overrides                                                                                                                |
 
 Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button under an LMS). See [Custom Layouts](docs/recipes.md#custom-layouts).
 
@@ -153,7 +152,6 @@ my-course/
 
 - **Edit freely:** `pages/`, `course.config.js`, `course.runtime.js`, `layout.svelte`, `quiz.svelte`, `components/`, `assets/`, `styles/`.
 - **Components:** course-local ones go in `components/` and are imported by relative path (`import MyChoice from '../../components/MyChoice.svelte'`). Ones shared across courses go in the workspace `shared/` (`$shared/…`).
-- **Never edit `node_modules/`.** Edits there are wiped on the next install. There is no `vite.config.js` to edit.
 - To change framework behaviour, use an extension point:
 
 | Need                                           | Use                                          |
@@ -356,7 +354,7 @@ Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`, an embed 
 
 A quiz page is a normal page with `pageConfig.quiz` set. The runtime wraps it in the resolved quiz shell (built-in `<Quiz>`, or a project `quiz.svelte` if present). Drop question components at the page root, with no `<Quiz>` wrapper.
 
-The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then a results screen with Retry and Review.
+The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then a results screen with **Retry Quiz** (while attempts remain) and **Review Answers** (hidden under `feedbackMode: "never"` and on a result restored without its answers).
 
 ### Setup
 
@@ -443,7 +441,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ### Standalone questions
 
-All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Try again after a wrong answer. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
+All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Try again after an answer that scores under 100, until `maxRetries` is spent. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
 <MultipleChoice graded question="..." options={[...]} correct={0} />
@@ -459,7 +457,7 @@ Drop files into `assets/`. Reference with `$assets/` in built-in component props
 
 ### `$assets/` in custom components
 
-`$assets/` is **only** rewritten in two places: ES `import` statements (Vite alias) and the `src` prop of built-in `Image`/`Audio`/`Video`. **Raw HTML attributes are NOT rewritten**: `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and JS-built CSS `url()` strings all 404 silently. Pick by use case:
+`$assets/` is **only** rewritten in ES `import` statements (Vite alias), the `src` and `tracks[].src` props of built-in `Image`/`Audio`/`Video`, and `branding.logo`. **Raw HTML attributes are NOT rewritten**: `<img src="$assets/foo.svg">`, `new Audio('$assets/...')`, and JS-built CSS `url()` strings all 404 silently. Pick by use case:
 
 **One-off: ES import (preferred).** Build-time bundling, hashing, fails the build if missing:
 
@@ -525,7 +523,7 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-shadow-sm`                          | `0 2px 8px rgba(0, 0, 0, 0.08)`       |
 | `--tessera-shadow-lg`                          | `0 20px 60px rgba(0, 0, 0, 0.2)`      |
 
-Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
+Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. A `tabindex="-1"` wrapper the page change focuses (see [Custom Layouts](docs/recipes.md#custom-layouts)) does show it. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
 Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
@@ -645,7 +643,7 @@ Build output, the web export CSP and per-LMS behaviour are in [`node_modules/tes
 
 ### Validation
 
-The plugin validates on every dev start and build. Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates on save; those errors print and the server keeps running. Run `pnpm validate <course>` to check without building.
+The plugin validates on every dev start and build. Errors abort the build and print `[tessera error] ...`; warnings print `[tessera warning] ...` and don't block. `tessera dev` re-validates on save; those errors print and the server keeps running. `pnpm validate <course>` runs the same checks without building and exits non-zero on an error.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Part of the Tessera authoring guide. [`AGENTS.md`](../AGENTS.md) holds the rules that apply to every task: read it first.
 
-Seven hooks plus two helpers. Each hook is synchronous and must be called during component setup inside a Tessera course. The built-in components use only these exports, so anything a built-in does, a custom component can do too.
+Seven hooks plus two helpers. Each hook is synchronous and must be called during component setup inside a Tessera course. The built-in components track, score and save through these hooks and `QuestionReview`, so anything a built-in does, a custom component can do too. The eighth hook, `useXAPI()`, sends your own xAPI statements: see [Custom xAPI statements](xapi.md).
 
 ```js
 import {
@@ -43,7 +43,7 @@ Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to rende
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
-`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness). Standalone, `QuestionReview` shows a neutral `Submitted` result; inside a quiz the question still counts as wrong.
+`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness). Standalone, `QuestionReview` shows a neutral `Submitted` result; inside a quiz the question still counts as wrong. A standalone question with no `correct` scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down: pass `score: () => 100` to accept any answer.
 
 ```ts
 type Interaction =
@@ -126,7 +126,7 @@ response: () => ({
 Register a question widget so the runtime can submit, score, persist, and report it. Returns a `Question` plus standalone-only methods.
 
 - **Inside a quiz:** the shell drives submission. The widget calls `setAnswer()` on input, `setRender(snippet)` once at mount, and reads `locked`/`feedbackVisible`/`answer`. The widget never reports; `useQuiz().submit()` reports every question. `submit()`/`retry()` are no-ops here.
-- **Standalone:** the widget owns Submit and Try again; [`QuestionReview`](recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) renders both. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
+- **Standalone:** the widget owns Submit and Try again. [`QuestionReview`](recipes.md#recipe-2b-custom-question-widget-for-a-custom-quiz-shell) renders both: put it and the question's controls inside one wrapper element, because Try again focuses the first control in it. Or write your own: a button calling `q.submit()`, and one calling `q.retry()` under `{#if q.canRetry}`. Set `graded: true` to count toward the page score; the page also needs `pageConfig.graded: true` to count toward course success.
 
 ```ts
 function useQuestion(opts: {
@@ -166,7 +166,7 @@ Pass `restore` to show the answer again. Rules:
 - It is called once, inside `useQuestion()`, with the `response` value your `response()` returned at submit. Declare the state it writes **above** the `useQuestion()` call.
 - Return what the widget passes to `setAnswer()`; it becomes `q.answer`. With no return value, `q.answer` is the response.
 - A retry the learner clicked but did not resubmit is not saved: the question comes back showing the last submitted answer.
-- A standalone widget needs a retry control: `QuestionReview` renders Try again, or write your own (`{#if q.canRetry}` calling `q.retry()`). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
+- A standalone widget needs a Try again control (see [`useQuestion`](#usequestion)). A wrong answer stays submitted and locked across visits, so without one the learner cannot answer again.
 
 ```js
 let selected = $state(null);
@@ -183,7 +183,7 @@ const q = useQuestion({
 });
 ```
 
-An answer does not come back when the widget has no `restore`, which also keeps it out of the save and raises a console warning in dev, or when the save had no room for it (see [the suspend data limits](export.md)). The score, `correct`, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
+An answer does not come back when the widget has no `restore`, which also keeps it out of the save and raises a console warning in dev, or when the save had no room for it (see [the suspend data limits](export.md#lms-behaviour)). The score, `correct`, retries and lock still do: a standalone question mounts submitted with no answer shown, and a quiz reports `restored`.
 
 ## `useQuiz`
 

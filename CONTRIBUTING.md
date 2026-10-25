@@ -60,7 +60,7 @@ Tessera supports five delivery modes: SCORM 1.2, SCORM 2004 4th Edition, cmi5, x
 
 ## Releases
 
-Releases are managed by [changesets](https://github.com/changesets/changesets). CI gates every PR on `pnpm changeset status --since=origin/main`, so any PR that changes a file under a published package — `packages/tessera-learn/` or `packages/create-tessera/`, including tests and in-package docs — needs a changeset:
+Releases are managed by [changesets](https://github.com/changesets/changesets). CI gates every PR on `pnpm changeset status --since=origin/main`, so any PR that changes a file under a published package (`packages/tessera-learn/` or `packages/create-tessera/`, including tests and in-package docs) needs a changeset:
 
 ```bash
 pnpm changeset
