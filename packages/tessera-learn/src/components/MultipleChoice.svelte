@@ -272,10 +272,10 @@
     color: var(--tessera-error);
   }
 
-  /* A dark ring, so focus can't be mistaken for the blue selected border. */
   .tessera-mc-option:has(input:focus-visible) {
-    outline: 2px solid var(--tessera-text);
+    outline: var(--tessera-focus-outline);
     outline-offset: 2px;
+    box-shadow: var(--tessera-focus-halo);
   }
 
   @media (max-width: 640px) {

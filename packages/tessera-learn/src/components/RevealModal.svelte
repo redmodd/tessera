@@ -66,12 +66,6 @@
     cursor: pointer;
   }
 
-  .tessera-reveal-trigger:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
-    border-radius: 4px;
-  }
-
   .tessera-modal {
     border: none;
     padding: 0;
@@ -94,7 +88,7 @@
     padding: var(--tessera-spacing-xl);
     max-height: 80vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--tessera-shadow-lg);
     animation: tessera-modal-slide-in 200ms ease;
   }
 
@@ -134,11 +128,6 @@
   .tessera-modal-close:hover {
     background-color: var(--tessera-bg-secondary);
     color: var(--tessera-text);
-  }
-
-  .tessera-modal-close:focus-visible {
-    box-shadow: var(--tessera-focus-ring);
-    outline: none;
   }
 
   @keyframes tessera-modal-fade-in {

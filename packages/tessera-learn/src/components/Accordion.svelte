@@ -34,7 +34,6 @@
   .tessera-accordion {
     border: 1px solid var(--tessera-border);
     border-radius: 8px;
-    overflow: hidden;
     margin-bottom: var(--tessera-spacing-lg);
   }
 </style>

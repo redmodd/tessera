@@ -43,8 +43,13 @@
   --tessera-sidebar-width: 280px;
   --tessera-content-max-width: 800px;
 
-  /* Focus */
-  --tessera-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.4);
+  /* Focus: a text-colored ring with a background-colored halo shows on any background */
+  --tessera-focus-outline: 2px solid var(--tessera-text);
+  --tessera-focus-halo: 0 0 0 4px var(--tessera-bg);
+
+  /* Shadows */
+  --tessera-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --tessera-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.2);
 
   /* Transitions */
   --tessera-transition-fast: 150ms ease;

@@ -86,9 +86,10 @@ test.describe('Mobile Navigation', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.tessera-sidebar')).not.toHaveClass(/open/);
     await expect(hamburger).toBeFocused();
+    await expect(hamburger).toHaveCSS('outline-style', 'solid');
     await expect(hamburger).toHaveCSS(
       'box-shadow',
-      'rgba(37, 99, 235, 0.4) 0px 0px 0px 3px',
+      'rgb(255, 255, 255) 0px 0px 0px 4px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px',
     );
   });
 

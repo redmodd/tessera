@@ -78,10 +78,6 @@ export function applyBranding(
         '--tessera-primary-dark',
         `hsl(${hsl.h}, ${Math.min(hsl.s + 10, 100)}%, ${Math.max(hsl.l - 15, 10)}%)`,
       );
-      el.style.setProperty(
-        '--tessera-focus-ring',
-        `0 0 0 3px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
-      );
     }
   }
   if (branding?.fontFamily) {

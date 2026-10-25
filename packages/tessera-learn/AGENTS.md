@@ -520,6 +520,12 @@ Add `.css` files to `styles/`; they load after framework styles and override the
 | `--tessera-spacing-sm` / `-md` / `-lg` / `-xl` | `0.5rem` / `1rem` / `1.5rem` / `2rem` |
 | `--tessera-sidebar-width`                      | `280px`                               |
 | `--tessera-content-max-width`                  | `800px`                               |
+| `--tessera-focus-outline`                      | `2px solid var(--tessera-text)`       |
+| `--tessera-focus-halo`                         | `0 0 0 4px var(--tessera-bg)`         |
+| `--tessera-shadow-sm`                          | `0 2px 8px rgba(0, 0, 0, 0.08)`       |
+| `--tessera-shadow-lg`                          | `0 20px 60px rgba(0, 0, 0, 0.2)`      |
+
+Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`. A custom widget restates these in its own `:focus-visible` rule when it sets `outline` or `box-shadow` on the focusable element (its scoped rule wins), and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
 Feedback text renders in `--tessera-success` / `--tessera-error` on an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
