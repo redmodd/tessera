@@ -61,105 +61,107 @@
 </dialog>
 
 <style>
-  .tessera-reveal-trigger {
-    display: inline-block;
-    cursor: pointer;
-  }
-
-  .tessera-modal {
-    border: none;
-    padding: 0;
-    background: transparent;
-    max-width: 600px;
-    width: 100%;
-    max-height: 80vh;
-    margin: auto;
-  }
-
-  .tessera-modal::backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    animation: tessera-modal-fade-in 200ms ease;
-  }
-
-  .tessera-modal-content {
-    position: relative;
-    background: var(--tessera-bg);
-    border-radius: 12px;
-    padding: var(--tessera-spacing-xl);
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: var(--tessera-shadow-lg);
-    animation: tessera-modal-slide-in 200ms ease;
-  }
-
-  .tessera-modal-title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--tessera-text);
-    margin-bottom: var(--tessera-spacing-md);
-    margin-top: 0;
-    padding-right: var(--tessera-spacing-xl);
-  }
-
-  .tessera-modal-body :global(p:last-child) {
-    margin-bottom: 0;
-  }
-
-  .tessera-modal-close {
-    position: absolute;
-    top: var(--tessera-spacing-md);
-    right: var(--tessera-spacing-md);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    font-size: 1.125rem;
-    color: var(--tessera-text-light);
-    cursor: pointer;
-    border-radius: 6px;
-    transition:
-      background-color var(--tessera-transition-fast),
-      color var(--tessera-transition-fast);
-  }
-
-  .tessera-modal-close:hover {
-    background-color: var(--tessera-bg-secondary);
-    color: var(--tessera-text);
-  }
-
-  @keyframes tessera-modal-fade-in {
-    from {
-      opacity: 0;
+  @layer tessera {
+    .tessera-reveal-trigger {
+      display: inline-block;
+      cursor: pointer;
     }
-    to {
-      opacity: 1;
-    }
-  }
 
-  @keyframes tessera-modal-slide-in {
-    from {
-      transform: translateY(10px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  @media (max-width: 640px) {
     .tessera-modal {
-      max-height: 90vh;
-      margin-top: auto;
-      margin-bottom: 0;
+      border: none;
+      padding: 0;
+      background: transparent;
+      max-width: 600px;
+      width: 100%;
+      max-height: 80vh;
+      margin: auto;
+    }
+
+    .tessera-modal::backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+      animation: tessera-modal-fade-in 200ms ease;
     }
 
     .tessera-modal-content {
-      max-height: 90vh;
-      border-radius: 12px 12px 0 0;
+      position: relative;
+      background: var(--tessera-bg);
+      border-radius: 12px;
+      padding: var(--tessera-spacing-xl);
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: var(--tessera-shadow-lg);
+      animation: tessera-modal-slide-in 200ms ease;
+    }
+
+    .tessera-modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--tessera-text);
+      margin-bottom: var(--tessera-spacing-md);
+      margin-top: 0;
+      padding-right: var(--tessera-spacing-xl);
+    }
+
+    .tessera-modal-body :global(p:last-child) {
+      margin-bottom: 0;
+    }
+
+    .tessera-modal-close {
+      position: absolute;
+      top: var(--tessera-spacing-md);
+      right: var(--tessera-spacing-md);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      font-size: 1.125rem;
+      color: var(--tessera-text-light);
+      cursor: pointer;
+      border-radius: 6px;
+      transition:
+        background-color var(--tessera-transition-fast),
+        color var(--tessera-transition-fast);
+    }
+
+    .tessera-modal-close:hover {
+      background-color: var(--tessera-bg-secondary);
+      color: var(--tessera-text);
+    }
+
+    @keyframes tessera-modal-fade-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes tessera-modal-slide-in {
+      from {
+        transform: translateY(10px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .tessera-modal {
+        max-height: 90vh;
+        margin-top: auto;
+        margin-bottom: 0;
+      }
+
+      .tessera-modal-content {
+        max-height: 90vh;
+        border-radius: 12px 12px 0 0;
+      }
     }
   }
 </style>

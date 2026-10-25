@@ -18,6 +18,15 @@ test.describe('Component — Accordion', () => {
     openFresh(page, 'Accordion & Carousel', '.tessera-accordion'),
   );
 
+  test('a plain class in styles/ overrides the scoped component rule', async ({
+    page,
+  }) => {
+    await expect(page.locator('.tessera-accordion')).toHaveCSS(
+      'border-radius',
+      '12px',
+    );
+  });
+
   test('accordion items toggle with click', async ({ page }) => {
     const firstTrigger = page.locator('.tessera-accordion-trigger').first();
 

@@ -306,7 +306,9 @@
 </div>
 
 <style>
-  .tessera-page {
-    display: contents;
+  @layer tessera {
+    .tessera-page {
+      display: contents;
+    }
   }
 </style>

@@ -17,21 +17,23 @@
 {/if}
 
 <style>
-  .tessera-transcript {
-    margin-top: var(--tessera-spacing-sm);
-    margin-bottom: var(--tessera-spacing-lg);
-    font-size: 0.875rem;
-  }
+  @layer tessera {
+    .tessera-transcript {
+      margin-top: var(--tessera-spacing-sm);
+      margin-bottom: var(--tessera-spacing-lg);
+      font-size: 0.875rem;
+    }
 
-  .tessera-transcript summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--tessera-text);
-  }
+    .tessera-transcript summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--tessera-text);
+    }
 
-  .tessera-transcript-body {
-    margin-top: var(--tessera-spacing-sm);
-    color: var(--tessera-text-light);
-    white-space: pre-line;
+    .tessera-transcript-body {
+      margin-top: var(--tessera-spacing-sm);
+      color: var(--tessera-text-light);
+      white-space: pre-line;
+    }
   }
 </style>

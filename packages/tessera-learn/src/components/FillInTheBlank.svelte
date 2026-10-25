@@ -110,49 +110,51 @@
 </QuestionShell>
 
 <style>
-  .tessera-fitb-question {
-    display: block;
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: var(--tessera-spacing-lg);
-    color: var(--tessera-text);
-  }
+  @layer tessera {
+    .tessera-fitb-question {
+      display: block;
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
+    }
 
-  .tessera-fitb-input {
-    display: block;
-    width: 100%;
-    max-width: 400px;
-    padding: 0.625rem 0.875rem;
-    border: 2px solid var(--tessera-border);
-    border-radius: 6px;
-    font-size: 1rem;
-    font-family: var(--tessera-font-family);
-    color: var(--tessera-text);
-    background: var(--tessera-bg);
-    transition: border-color 0.2s;
-    min-height: 44px;
-  }
+    .tessera-fitb-input {
+      display: block;
+      width: 100%;
+      max-width: 400px;
+      padding: 0.625rem 0.875rem;
+      border: 2px solid var(--tessera-border);
+      border-radius: 6px;
+      font-size: 1rem;
+      font-family: var(--tessera-font-family);
+      color: var(--tessera-text);
+      background: var(--tessera-bg);
+      transition: border-color 0.2s;
+      min-height: 44px;
+    }
 
-  .tessera-fitb-input:focus {
-    border-color: var(--tessera-primary);
-  }
+    .tessera-fitb-input:focus {
+      border-color: var(--tessera-primary);
+    }
 
-  .tessera-fitb-input:disabled {
-    background: var(--tessera-bg-secondary);
-    cursor: not-allowed;
-  }
+    .tessera-fitb-input:disabled {
+      background: var(--tessera-bg-secondary);
+      cursor: not-allowed;
+    }
 
-  .tessera-fitb-input.correct {
-    border-color: var(--tessera-success);
-  }
+    .tessera-fitb-input.correct {
+      border-color: var(--tessera-success);
+    }
 
-  .tessera-fitb-input.incorrect {
-    border-color: var(--tessera-error);
-  }
+    .tessera-fitb-input.incorrect {
+      border-color: var(--tessera-error);
+    }
 
-  .tessera-fitb-correct-answer {
-    font-size: 0.875rem;
-    color: var(--tessera-text-light);
-    margin-bottom: var(--tessera-spacing-sm);
+    .tessera-fitb-correct-answer {
+      font-size: 0.875rem;
+      color: var(--tessera-text-light);
+      margin-bottom: var(--tessera-spacing-sm);
+    }
   }
 </style>

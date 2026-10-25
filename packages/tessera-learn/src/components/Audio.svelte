@@ -37,19 +37,21 @@
 </div>
 
 <style>
-  .tessera-audio {
-    margin-bottom: var(--tessera-spacing-lg);
-  }
+  @layer tessera {
+    .tessera-audio {
+      margin-bottom: var(--tessera-spacing-lg);
+    }
 
-  .tessera-audio-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--tessera-text);
-    margin-bottom: var(--tessera-spacing-sm);
-  }
+    .tessera-audio-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--tessera-text);
+      margin-bottom: var(--tessera-spacing-sm);
+    }
 
-  .tessera-audio-player {
-    width: 100%;
-    display: block;
+    .tessera-audio-player {
+      width: 100%;
+      display: block;
+    }
   }
 </style>

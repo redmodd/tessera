@@ -10,21 +10,23 @@
 </div>
 
 <style>
-  .tessera-quiz-locked-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--tessera-spacing-sm);
-    padding: var(--tessera-spacing-md);
-    margin-bottom: var(--tessera-spacing-md);
-    background: var(--tessera-success-bg);
-    border: 1px solid var(--tessera-success-border);
-    border-radius: 6px;
-    color: var(--tessera-success);
-    font-size: 0.9375rem;
-    font-weight: 500;
-  }
+  @layer tessera {
+    .tessera-quiz-locked-banner {
+      display: flex;
+      align-items: center;
+      gap: var(--tessera-spacing-sm);
+      padding: var(--tessera-spacing-md);
+      margin-bottom: var(--tessera-spacing-md);
+      background: var(--tessera-success-bg);
+      border: 1px solid var(--tessera-success-border);
+      border-radius: 6px;
+      color: var(--tessera-success);
+      font-size: 0.9375rem;
+      font-weight: 500;
+    }
 
-  .tessera-quiz-locked-banner :global(svg) {
-    flex-shrink: 0;
+    .tessera-quiz-locked-banner :global(svg) {
+      flex-shrink: 0;
+    }
   }
 </style>

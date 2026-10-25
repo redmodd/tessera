@@ -29,7 +29,9 @@
 {/snippet}
 
 <style>
-  .tessera-question-shell {
-    padding: var(--tessera-spacing-md) 0;
+  @layer tessera {
+    .tessera-question-shell {
+      padding: var(--tessera-spacing-md) 0;
+    }
   }
 </style>

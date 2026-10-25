@@ -499,7 +499,7 @@ const url = signs[`/assets/signs/${filename}`]; // look up by full key
 
 ## Styling
 
-Add `.css` files to `styles/`; they load after framework styles and override them. Theme globally by overriding these custom properties:
+Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer, so any unlayered rule in `styles/` or a component `<style>` overrides it, whatever the specificity. Theme globally by overriding these custom properties:
 
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
