@@ -1,39 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parse } from 'svelte/compiler';
+import { parse, parseCss } from 'svelte/compiler';
 
 const PKG_ROOT = resolve(import.meta.dirname, '..');
 
-const stylesheets = [
-  ...readdirSync(resolve(PKG_ROOT, 'styles')).map((file) => `styles/${file}`),
-  ...readdirSync(resolve(PKG_ROOT, 'src'), {
-    recursive: true,
-    encoding: 'utf-8',
-  })
-    .filter((file) => file.endsWith('.svelte'))
-    .map((file) => `src/${file}`),
-];
+const stylesheets = globSync(['styles/*.css', 'src/**/*.svelte'], {
+  cwd: PKG_ROOT,
+});
 
-function topLevelRules(file: string) {
-  const source = readFileSync(resolve(PKG_ROOT, file), 'utf-8');
-  const css = parse(
-    file.endsWith('.css') ? `<style>${source}</style>` : source,
-    { modern: true },
-  ).css;
-  return css?.children ?? [];
+function topLevelRules(file: string, source: string) {
+  return file.endsWith('.css')
+    ? parseCss(source).children
+    : (parse(source, { modern: true }).css?.children ?? []);
 }
 
 // Unlayered author CSS beats every layered rule, so each framework rule must
-// sit in the layer for `styles/` to override it.
+// sit in the layer for `styles/` to override it. Inside a layer `!important`
+// inverts: it beats every author rule, even an author's `!important`.
 describe('framework CSS sits in the tessera cascade layer', () => {
   it.each(stylesheets)('%s', (file) => {
-    for (const rule of topLevelRules(file)) {
+    const source = readFileSync(resolve(PKG_ROOT, file), 'utf-8');
+    for (const rule of topLevelRules(file, source)) {
       expect(rule).toMatchObject({
         type: 'Atrule',
         name: 'layer',
         prelude: 'tessera',
       });
     }
+    expect(source).not.toContain('!important');
   });
 });

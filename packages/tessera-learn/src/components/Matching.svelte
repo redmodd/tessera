@@ -244,7 +244,7 @@
           aria-describedby={hint}
         >
           {#if matched}
-            <span class="tessera-matching-badge" style="background: {color}">
+            <span class="tessera-matching-badge">
               {i + 1}
             </span>
           {/if}
@@ -302,7 +302,7 @@
           aria-describedby={hint}
         >
           {#if matched}
-            <span class="tessera-matching-badge" style="background: {color}">
+            <span class="tessera-matching-badge">
               {leftIdx + 1}
             </span>
           {/if}
@@ -439,6 +439,7 @@
       width: 22px;
       height: 22px;
       border-radius: 50%;
+      background: var(--match-color);
       color: #fff;
       font-size: 0.75rem;
       font-weight: 700;
