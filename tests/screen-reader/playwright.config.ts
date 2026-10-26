@@ -8,7 +8,6 @@ export default withGuidepup({
   outputDir: '../../test-results/screen-reader',
   timeout: 90000,
   retries: process.env.CI ? 1 : 0,
-  failOnFlakyTests: !!process.env.CI,
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
   projects: [

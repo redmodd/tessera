@@ -7,7 +7,15 @@ async function hears(
   action: () => Promise<unknown>,
   ...phrases: string[]
 ): Promise<string> {
-  const { spokenPhrase } = await nvda.capture(action, { capture: true });
+  // Capture ends after 1s without speech, and a loaded runner can take longer
+  // to speak a focus move, so keep listening a second past the action.
+  const { spokenPhrase } = await nvda.capture(
+    async () => {
+      await action();
+      await new Promise((r) => setTimeout(r, 1000));
+    },
+    { capture: true },
+  );
   // Chromium exposes CSS text-transform, so NVDA reads uppercase labels in caps.
   const spoken = spokenPhrase.toLowerCase();
   for (const phrase of phrases) expect(spoken).toContain(phrase.toLowerCase());
