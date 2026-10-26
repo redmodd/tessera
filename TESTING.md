@@ -98,6 +98,17 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Ni
 | `lms-variants`    | n/a  | pre-built variants              | `lms-variants.spec.ts`, `standalone-retry.spec.ts`           |
 | `a11y-audit`      | n/a  | pre-built variants              | `a11y-audit.spec.ts`                                         |
 
+### Firefox and WebKit
+
+Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). CI's `cross-browser` job runs both. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
+
+```bash
+pnpm exec playwright install webkit
+E2E_BROWSER=webkit pnpm test:e2e
+```
+
+On macOS, WebKit's Tab skips links and buttons, as Safari does by default, so Tab-order tests fail there but pass in CI on Linux.
+
 ### The variant pre-build
 
 The `export`, `lms`, `lms-variants` and `a11y-audit` projects don't use the dev servers, though Playwright starts all four for any project. They read pre-built `dist/` output for each export standard (`web`, `scorm12`, `scorm2004`, `cmi5`, `xapi`).
@@ -148,6 +159,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
+- `playwright-test-results-<browser>`: the same, from each `cross-browser` job (`firefox`, `webkit`)
 
 Download from the failed run's Actions page. For Playwright traces:
 
