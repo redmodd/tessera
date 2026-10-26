@@ -77,8 +77,8 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 
 - **static**: install → `pnpm check`.
 - **test** (Node 24 and 26): install → build → `test:coverage`.
-- **e2e**: install → Playwright install → build → `test:e2e`.
+- **e2e** (Chromium, Firefox and WebKit): install → Playwright install → build → `test:e2e`. Each entry sets `E2E_BROWSER`; Firefox and WebKit run only the navigation, components and quiz specs, plus mobile under WebKit. Only Chromium is a required check.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 
-`dependabot-changeset.yml` commits a `patch` changeset listing the version bumps to each Dependabot npm PR that bumps a dependency of a published package. `release.yml` runs changesets on `main`. CI uploads `coverage-<node>` on every run and `playwright-test-results` when e2e fails; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).
+`dependabot-changeset.yml` commits a `patch` changeset listing the version bumps to each Dependabot npm PR that bumps a dependency of a published package. `release.yml` runs changesets on `main`. CI uploads `coverage-<node>` on every run and `playwright-test-results-<browser>` when e2e fails; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).

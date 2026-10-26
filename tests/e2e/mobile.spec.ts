@@ -198,46 +198,15 @@ test.describe('Mobile Navigation', () => {
     const dots = page.locator('.tessera-carousel-dot');
     await expect(dots.nth(0)).toHaveClass(/active/);
 
-    // Simulate swipe left via JavaScript touch events on the carousel element
-    await page.evaluate(() => {
-      const el = document.querySelector('.tessera-carousel')!;
-      const startX = 300;
-      const endX = 50; // swipe left by 250px (> 50px threshold)
-
-      const touchStart = new Touch({
-        identifier: 1,
-        target: el,
-        screenX: startX,
-        screenY: 200,
-        clientX: startX,
-        clientY: 200,
+    // WebKit has no Touch constructor; Playwright's dispatchEvent builds touches
+    // in every engine.
+    const carousel = page.locator('.tessera-carousel').first();
+    const swipe = (type: string, screenX: number) =>
+      carousel.dispatchEvent(type, {
+        changedTouches: [{ identifier: 1, screenX }],
       });
-      const touchEnd = new Touch({
-        identifier: 1,
-        target: el,
-        screenX: endX,
-        screenY: 200,
-        clientX: endX,
-        clientY: 200,
-      });
-
-      el.dispatchEvent(
-        new TouchEvent('touchstart', {
-          bubbles: true,
-          cancelable: true,
-          changedTouches: [touchStart],
-          touches: [touchStart],
-        }),
-      );
-      el.dispatchEvent(
-        new TouchEvent('touchend', {
-          bubbles: true,
-          cancelable: true,
-          changedTouches: [touchEnd],
-          touches: [],
-        }),
-      );
-    });
+    await swipe('touchstart', 300);
+    await swipe('touchend', 50);
 
     // Should advance to slide 2 — `expect` polls automatically.
     await expect(dots.nth(1)).toHaveClass(/active/);

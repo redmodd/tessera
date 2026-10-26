@@ -257,9 +257,10 @@ test.describe('Component — Sorting', () => {
   }) => {
     const card = page.locator('.tessera-sorting-card');
     const halo = 'rgb(255, 255, 255) 0px 0px 0px 4px';
-    // A key press first, so the scripted focus counts as keyboard focus.
-    await page.keyboard.press('Shift');
+    // Tab away and back so the focus counts as keyboard focus in every browser.
     await card.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
     await expect(card).toHaveCSS(
       'box-shadow',
       `${halo}, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px`,

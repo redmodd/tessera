@@ -84,7 +84,7 @@ pnpm exec playwright show-report
 
 ## How the e2e suite is wired
 
-Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Nine projects each target a different fixture / mode:
+Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). By default, nine Chromium projects each target a different fixture / mode:
 
 | Project           | Port | Fixture                         | Specs                                                        |
 | ----------------- | ---- | ------------------------------- | ------------------------------------------------------------ |
@@ -97,6 +97,17 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Ni
 | `lms`             | n/a  | pre-built variants              | `lms-roundtrip.spec.ts`, `custom-quiz-lms-roundtrip.spec.ts` |
 | `lms-variants`    | n/a  | pre-built variants              | `lms-variants.spec.ts`, `standalone-retry.spec.ts`           |
 | `a11y-audit`      | n/a  | pre-built variants              | `a11y-audit.spec.ts`                                         |
+
+### Firefox and WebKit
+
+Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). These runs skip the variant pre-build and start only the free dev server. CI's `e2e` job runs both next to Chromium. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
+
+```bash
+pnpm exec playwright install webkit
+E2E_BROWSER=webkit pnpm test:e2e
+```
+
+On macOS, WebKit's Tab skips links and buttons, as Safari does by default, so Tab-order tests fail there but pass in CI on Linux.
 
 ### The variant pre-build
 
@@ -147,7 +158,7 @@ If you change a fixture's content, treat it like any other source change: commit
 CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
-- `playwright-test-results`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
+- `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
 
 Download from the failed run's Actions page. For Playwright traces:
 
