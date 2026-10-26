@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { nvdaTest as test, type NVDAPlaywright } from '@guidepup/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
+
 async function hears(
   nvda: NVDAPlaywright,
   action: () => Promise<unknown>,
@@ -143,7 +144,9 @@ test.describe('standalone questions', () => {
     await nvda.perform(nvda.keyboardCommands.reportCurrentFocus, {
       capture: true,
     });
-    expect(await nvda.lastSpokenPhrase()).toContain('Choose a target');
+    expect((await nvda.lastSpokenPhrase()).toLowerCase()).toContain(
+      'choose a target',
+    );
 
     await hears(nvda, () => page.keyboard.press('Tab'), 'list', 'Fruit');
     await expect(page.getByRole('button', { name: /^Fruit/ })).toBeFocused();

@@ -1,4 +1,3 @@
-import { devices } from '@playwright/test';
 import { withGuidepup } from '@guidepup/playwright';
 
 const port = 5190;
@@ -7,12 +6,11 @@ const port = 5190;
 export default withGuidepup({
   testDir: '.',
   outputDir: '../../test-results/screen-reader',
-  timeout: 90 * 1000,
+  timeout: 90000,
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
-  projects: [{ name: 'nvda', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `pnpm build && pnpm exec vite preview --port ${port} --strictPort`,
     cwd: '../fixtures/screen-reader',

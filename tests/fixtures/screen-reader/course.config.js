@@ -6,7 +6,6 @@ export default {
   version: '1.0.0',
   language: 'en',
   navigation: { mode: 'free' },
-  completion: { mode: 'percentage', percentageThreshold: 100 },
+  completion: { mode: 'percentage' },
   scoring: { passingScore: 70 },
-  export: { standard: 'web' },
 };
