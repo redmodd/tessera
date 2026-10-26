@@ -172,7 +172,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
-- `nvda-phrases-<browser>`: the NVDA check's `test-results/screen-reader/` (`chromium`, `firefox`), on every run
+- `nvda-phrases-<browser>`: the NVDA check's `test-results/screen-reader/` (`chromium`, `firefox`), on every screen reader run
 
 Download from the failed run's Actions page. For Playwright traces:
 

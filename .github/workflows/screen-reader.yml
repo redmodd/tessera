@@ -10,11 +10,18 @@ on:
       - tests/screen-reader/**
       - tests/fixtures/screen-reader/**
       - packages/tessera-learn/src/**
+      - packages/tessera-learn/styles/**
+      - packages/tessera-learn/package.json
+      - packages/tessera-learn/tsdown.config.ts
       - package.json
       - pnpm-lock.yaml
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   nvda:
@@ -37,7 +44,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Screen readers need a headed browser, so skip the headless shell.
+      # Screen readers need a headed browser, so skip Chromium's headless shell.
       - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
 
       # Downloads the NVDA build that the installed @guidepup/guidepup expects.
