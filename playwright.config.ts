@@ -14,16 +14,18 @@ const mobileUse = {
   hasTouch: true,
 };
 
-const CROSS_BROWSERS = ['firefox', 'webkit'] as const;
-type CrossBrowser = (typeof CROSS_BROWSERS)[number];
+const BROWSERS = ['chromium', 'firefox', 'webkit'] as const;
+type CrossBrowser = Exclude<(typeof BROWSERS)[number], 'chromium'>;
 
-// CI sets E2E_BROWSER to run only the specs where browsers differ.
-const crossBrowser = process.env.E2E_BROWSER as CrossBrowser | undefined;
-if (crossBrowser && !CROSS_BROWSERS.includes(crossBrowser)) {
+// Firefox and WebKit run only the specs where browsers differ.
+const browser = process.env.E2E_BROWSER || 'chromium';
+if (!(BROWSERS as readonly string[]).includes(browser)) {
   throw new Error(
-    `E2E_BROWSER must be ${CROSS_BROWSERS.join(' or ')}, got "${crossBrowser}"`,
+    `E2E_BROWSER must be ${BROWSERS.join(', ')}, got "${browser}"`,
   );
 }
+const crossBrowser =
+  browser === 'chromium' ? undefined : (browser as CrossBrowser);
 
 const crossBrowserProjects = (browserName: CrossBrowser): Project[] => [
   {

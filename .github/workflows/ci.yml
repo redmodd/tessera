@@ -69,7 +69,7 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
     env:
-      E2E_BROWSER: ${{ matrix.browser != 'chromium' && matrix.browser || '' }}
+      E2E_BROWSER: ${{ matrix.browser }}
     steps:
       - uses: actions/checkout@v7
 
