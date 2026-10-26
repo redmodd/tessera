@@ -129,7 +129,7 @@ test.describe('Navigation — Free Mode', () => {
       await held;
       await route.continue();
     });
-    // WebKit holds the load event until the held page module arrives.
+    // Firefox and WebKit hold the load event until the held page module arrives.
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     await page.locator('.tessera-nav-page', { hasText: 'Objectives' }).click();
