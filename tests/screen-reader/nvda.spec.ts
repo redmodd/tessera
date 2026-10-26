@@ -9,7 +9,9 @@ async function hears(
   ...phrases: string[]
 ): Promise<void> {
   const { spokenPhrase } = await nvda.capture(action, { capture: true });
-  for (const phrase of phrases) expect(spokenPhrase).toContain(phrase);
+  // Chromium exposes CSS text-transform, so NVDA reads uppercase labels in caps.
+  for (const phrase of phrases)
+    expect(spokenPhrase.toLowerCase()).toContain(phrase.toLowerCase());
 }
 
 // navigateToWebContent clicks the middle of <body>, so it runs on the intro
