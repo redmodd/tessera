@@ -60,8 +60,7 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    # Chromium keeps the bare name: it is the required check.
-    name: Playwright e2e${{ matrix.browser != 'chromium' && format(' ({0})', matrix.browser) || '' }}
+    name: Playwright e2e (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
