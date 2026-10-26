@@ -85,6 +85,8 @@ beforeEach(() => {
 
 describe('exiting a course', () => {
   it('ends the session from the Exit button and shows the ended screen', async () => {
+    // A slow mount would otherwise report a one-second duration.
+    useFakeTimers({ toFake: ['Date'] });
     const { adapter, calls } = recordingAdapter();
     await mount(adapter);
     const launched = calls.length;

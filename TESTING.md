@@ -20,6 +20,7 @@ packages/
   create-tessera/tests/  # unit tests for the CLI scaffolder (Vitest)
 tests/
   e2e/                   # Playwright specs across all export modes
+  screen-reader/         # NVDA check (Windows only; own Playwright config)
   fixtures/              # course projects used by the e2e suite (committed)
   .e2e-variants/         # generated per run by globalSetup; gitignored
 ```
@@ -141,6 +142,19 @@ A fixture entry can also carry `overrides` for a variant that differs by a cours
 
 Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. Every e2e run rebuilds the variants before any spec executes, so expect a pause at startup.
 
+### NVDA screen reader check
+
+`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets, in Chromium and Firefox. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, with one `windows-latest` job per browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases-<browser>` artifact.
+
+On Windows:
+
+```bash
+pnpm exec playwright install --no-shell chromium firefox
+pnpm exec guidepup install nvda   # rerun after a @guidepup/guidepup bump
+pnpm --filter tessera-learn build
+pnpm exec playwright test -c tests/screen-reader/playwright.config.ts   # --project chromium|firefox for one
+```
+
 ### Fixtures are committed
 
 Unlike many monorepos, the fixture projects under `tests/fixtures/` are tracked in git. Only `tests/.e2e-variants/` (the per-run build output) is gitignored. Don't try to scaffold them with `npm create tessera`: the fixtures contain hand-tailored content (custom quiz components, sequential nav config, etc.) that the scaffolder doesn't produce.
@@ -159,6 +173,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
+- `nvda-phrases-<browser>`: the NVDA check's `test-results/screen-reader/` (`chromium`, `firefox`), on every screen reader run
 
 Download from the failed run's Actions page. For Playwright traces:
 
