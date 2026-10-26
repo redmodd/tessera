@@ -144,14 +144,14 @@ Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touc
 
 ### NVDA screen reader check
 
-`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, on `windows-latest`. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases` artifact.
+`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets, in Chromium and Firefox. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, with one `windows-latest` job per browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases-<browser>` artifact.
 
 On Windows:
 
 ```bash
 pnpm dlx @guidepup/setup@0.29.3 install nvda   # rerun after a @guidepup/guidepup bump
 pnpm --filter tessera-learn build
-pnpm exec playwright test -c tests/screen-reader/playwright.config.ts
+pnpm exec playwright test -c tests/screen-reader/playwright.config.ts   # --project chromium|firefox for one
 ```
 
 ### Fixtures are committed
@@ -172,7 +172,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
-- `nvda-phrases`: the NVDA check's `test-results/screen-reader/`, on every run
+- `nvda-phrases-<browser>`: the NVDA check's `test-results/screen-reader/` (`chromium`, `firefox`), on every run
 
 Download from the failed run's Actions page. For Playwright traces:
 

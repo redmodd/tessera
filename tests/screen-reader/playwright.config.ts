@@ -11,6 +11,10 @@ export default withGuidepup({
   failOnFlakyTests: !!process.env.CI,
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
+  ],
   webServer: {
     command: `pnpm build && pnpm exec vite preview --port ${port} --strictPort`,
     cwd: '../fixtures/screen-reader',

@@ -18,9 +18,13 @@ permissions:
 
 jobs:
   nvda:
-    name: NVDA (Chromium, Windows)
+    name: NVDA (${{ matrix.browser }}, Windows)
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
     steps:
       - uses: actions/checkout@v7
 
@@ -34,19 +38,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Screen readers need a headed browser, so skip the headless shell.
-      - run: pnpm exec playwright install --no-shell chromium
+      - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
 
       # Downloads the NVDA build that the installed @guidepup/guidepup expects.
       - run: pnpm dlx @guidepup/setup@0.29.3 install nvda
 
       - run: pnpm --filter tessera-learn build
 
-      - run: pnpm exec playwright test -c tests/screen-reader/playwright.config.ts
+      - run: pnpm exec playwright test -c tests/screen-reader/playwright.config.ts --project ${{ matrix.browser }}
 
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: nvda-phrases
+          name: nvda-phrases-${{ matrix.browser }}
           path: test-results/screen-reader/
           retention-days: 7
           if-no-files-found: ignore
