@@ -9,6 +9,7 @@ export default withGuidepup({
   outputDir: '../../test-results/screen-reader',
   timeout: 5 * 60 * 1000,
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
   projects: [{ name: 'nvda', use: { ...devices['Desktop Chrome'] } }],
@@ -16,8 +17,6 @@ export default withGuidepup({
     command: `pnpm build && pnpm exec vite preview --port ${port} --strictPort`,
     cwd: '../fixtures/screen-reader',
     port,
-    env: { TESSERA_STANDARD: '' },
-    reuseExistingServer: !process.env.CI,
     timeout: 60000,
   },
 });

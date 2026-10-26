@@ -1,8 +1,8 @@
 name: Screen reader
 
 # Not a required check: NVDA on hosted runners can be flaky. It also runs on
-# PRs that change the check itself, since workflow_dispatch only works once the
-# workflow is on main.
+# PRs that change the check, the widgets it reads, or dependencies,
+# since workflow_dispatch only works once the workflow is on main.
 on:
   workflow_dispatch:
   pull_request:
@@ -10,7 +10,11 @@ on:
     paths:
       - .github/workflows/screen-reader.yml
       - tests/screen-reader/**
+      - tests/e2e/helpers.ts
       - tests/fixtures/screen-reader/**
+      - packages/tessera-learn/src/components/**
+      - package.json
+      - pnpm-lock.yaml
 
 permissions:
   contents: read
@@ -34,7 +38,8 @@ jobs:
 
       - run: pnpm exec playwright install chromium
 
-      - uses: guidepup/setup-action@0.21.0
+      # Downloads the NVDA build that the installed @guidepup/guidepup expects.
+      - run: pnpm dlx @guidepup/setup@0.29.3 install nvda
 
       - run: pnpm --filter tessera-learn build
 

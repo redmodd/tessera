@@ -144,11 +144,12 @@ Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touc
 
 ### NVDA screen reader check
 
-`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, on `windows-latest`. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that change the check. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases` artifact.
+`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, on `windows-latest`. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that change the check, the question widgets or dependencies. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases` artifact.
 
-On a Windows machine with NVDA set up (`npx @guidepup/setup`):
+On Windows:
 
 ```bash
+pnpm dlx @guidepup/setup install nvda   # rerun after a @guidepup/guidepup bump
 pnpm --filter tessera-learn build
 pnpm exec playwright test -c tests/screen-reader/playwright.config.ts
 ```

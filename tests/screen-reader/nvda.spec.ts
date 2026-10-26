@@ -1,8 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import { nvdaTest as test, type NVDAPlaywright } from '@guidepup/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
+import { navigateToPage, primaryBtn } from '../e2e/helpers.js';
 
-/** Run a Playwright action and expect NVDA to speak every phrase while it settles. */
 async function hears(
   nvda: NVDAPlaywright,
   action: () => Promise<unknown>,
@@ -12,11 +12,13 @@ async function hears(
   for (const phrase of phrases) expect(spokenPhrase).toContain(phrase);
 }
 
+// navigateToWebContent clicks the middle of <body>, so it runs on the intro
+// page, where that click can't answer a question.
 async function open(page: Page, nvda: NVDAPlaywright, title: string) {
   await page.goto('/');
-  await page.locator('.tessera-nav-page', { hasText: title }).click();
-  await expect(page.locator('.tessera-content h1')).toHaveText(title);
+  await expect(page.locator('.tessera-content h1')).toHaveText('Start');
   await nvda.navigateToWebContent();
+  await navigateToPage(page, title);
 }
 
 test.afterEach(async ({ nvda }, testInfo) => {
@@ -149,7 +151,7 @@ test.describe('standalone questions', () => {
 test('an immediate-mode quiz announces each result', async ({ page, nvda }) => {
   await open(page, nvda, 'Immediate Quiz');
   const active = page.locator('.tessera-quiz-question-wrapper.active');
-  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+  const primary = primaryBtn(page);
 
   await active.getByText('3', { exact: true }).click();
   await hears(nvda, () => primary.click(), 'Incorrect');
