@@ -60,57 +60,16 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    name: Playwright e2e
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - id: playwright-version
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - id: playwright-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - run: pnpm build
-
-      - run: pnpm test:e2e
-
-      - if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-test-results
-          path: test-results/
-          retention-days: 7
-
-  cross-browser:
-    name: Playwright e2e (${{ matrix.browser }})
+    # Chromium keeps the bare name: it is the required check.
+    name: Playwright e2e${{ matrix.browser != 'chromium' && format(' ({0})', matrix.browser) || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        browser: [firefox, webkit]
+        browser: [chromium, firefox, webkit]
     env:
-      E2E_BROWSER: ${{ matrix.browser }}
+      E2E_BROWSER: ${{ matrix.browser != 'chromium' && matrix.browser || '' }}
     steps:
       - uses: actions/checkout@v7
 

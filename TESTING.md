@@ -100,7 +100,7 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). By
 
 ### Firefox and WebKit
 
-Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). These runs skip the variant pre-build and start only the free dev server. CI's `cross-browser` job runs both. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
+Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). These runs skip the variant pre-build and start only the free dev server. CI's `e2e` job runs both next to Chromium. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
 
 ```bash
 pnpm exec playwright install webkit
@@ -158,8 +158,7 @@ If you change a fixture's content, treat it like any other source change: commit
 CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
-- `playwright-test-results`: `test-results/` from the e2e job when it fails, with a trace for every failed attempt
-- `playwright-test-results-<browser>`: the same, from each `cross-browser` job (`firefox`, `webkit`)
+- `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
 
 Download from the failed run's Actions page. For Playwright traces:
 

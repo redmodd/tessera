@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, type Project } from '@playwright/test';
 
 const PORTS = {
   free: 5180,
@@ -7,11 +7,17 @@ const PORTS = {
   'custom-quiz': 5183,
 } as const;
 
+const freeURL = `http://localhost:${PORTS.free}`;
+const mobileUse = {
+  baseURL: freeURL,
+  viewport: { width: 375, height: 667 },
+  hasTouch: true,
+};
+
 const CROSS_BROWSERS = ['firefox', 'webkit'] as const;
 type CrossBrowser = (typeof CROSS_BROWSERS)[number];
 
-// CI's cross-browser job sets E2E_BROWSER to run only the specs where browsers
-// differ. Opt-in because Playwright's Firefox does not start on macOS 27.
+// CI sets E2E_BROWSER to run only the specs where browsers differ.
 const crossBrowser = process.env.E2E_BROWSER as CrossBrowser | undefined;
 if (crossBrowser && !CROSS_BROWSERS.includes(crossBrowser)) {
   throw new Error(
@@ -19,10 +25,10 @@ if (crossBrowser && !CROSS_BROWSERS.includes(crossBrowser)) {
   );
 }
 
-const crossBrowserProjects = (browserName: CrossBrowser) => [
+const crossBrowserProjects = (browserName: CrossBrowser): Project[] => [
   {
     name: browserName,
-    use: { browserName, baseURL: `http://localhost:${PORTS.free}` },
+    use: { browserName, baseURL: freeURL },
     testMatch: /\/(navigation|components|quiz)\.spec\.ts$/,
   },
   // WebKit is the closest engine to iOS Safari.
@@ -30,16 +36,81 @@ const crossBrowserProjects = (browserName: CrossBrowser) => [
     ? [
         {
           name: 'mobile-webkit',
-          use: {
-            browserName,
-            baseURL: `http://localhost:${PORTS.free}`,
-            viewport: { width: 375, height: 667 },
-            hasTouch: true,
-          },
+          use: { ...mobileUse, browserName },
           testMatch: /mobile\.spec\.ts$/,
         },
       ]
     : []),
+];
+
+const chromiumProjects: Project[] = [
+  {
+    name: 'free-mode',
+    use: {
+      browserName: 'chromium',
+      baseURL: freeURL,
+    },
+    testIgnore: [
+      /sequential\.spec\.ts$/,
+      /mobile\.spec\.ts$/,
+      /lms-roundtrip\.spec\.ts$/,
+      /export\.spec\.ts$/,
+      /layout-override\.spec\.ts$/,
+      /custom-quiz\.spec\.ts$/,
+      /a11y-audit\.spec\.ts$/,
+      /lms-variants\.spec\.ts$/,
+      /standalone-retry\.spec\.ts$/,
+    ],
+  },
+  {
+    name: 'custom-layout',
+    use: {
+      browserName: 'chromium',
+      baseURL: `http://localhost:${PORTS['custom-layout']}`,
+    },
+    testMatch: /layout-override\.spec\.ts$/,
+  },
+  {
+    name: 'custom-quiz',
+    use: {
+      browserName: 'chromium',
+      baseURL: `http://localhost:${PORTS['custom-quiz']}`,
+    },
+    testMatch: /custom-quiz\.spec\.ts$/,
+  },
+  {
+    name: 'sequential-mode',
+    use: {
+      browserName: 'chromium',
+      baseURL: `http://localhost:${PORTS.sequential}`,
+    },
+    testMatch: /sequential\.spec\.ts$/,
+  },
+  {
+    name: 'mobile',
+    use: { ...mobileUse, browserName: 'chromium' },
+    testMatch: /mobile\.spec\.ts$/,
+  },
+  {
+    name: 'export',
+    use: { browserName: 'chromium' },
+    testMatch: /export\.spec\.ts$/,
+  },
+  {
+    name: 'lms',
+    use: { browserName: 'chromium' },
+    testMatch: /lms-roundtrip\.spec\.ts$/,
+  },
+  {
+    name: 'lms-variants',
+    use: { browserName: 'chromium' },
+    testMatch: /(lms-variants|standalone-retry)\.spec\.ts$/,
+  },
+  {
+    name: 'a11y-audit',
+    use: { browserName: 'chromium' },
+    testMatch: /a11y-audit\.spec\.ts$/,
+  },
 ];
 
 export default defineConfig({
@@ -63,80 +134,7 @@ export default defineConfig({
   workers: process.env.CI ? 4 : undefined,
   projects: crossBrowser
     ? crossBrowserProjects(crossBrowser)
-    : [
-        {
-          name: 'free-mode',
-          use: {
-            browserName: 'chromium',
-            baseURL: `http://localhost:${PORTS.free}`,
-          },
-          testIgnore: [
-            /sequential\.spec\.ts$/,
-            /mobile\.spec\.ts$/,
-            /lms-roundtrip\.spec\.ts$/,
-            /export\.spec\.ts$/,
-            /layout-override\.spec\.ts$/,
-            /custom-quiz\.spec\.ts$/,
-            /a11y-audit\.spec\.ts$/,
-            /lms-variants\.spec\.ts$/,
-            /standalone-retry\.spec\.ts$/,
-          ],
-        },
-        {
-          name: 'custom-layout',
-          use: {
-            browserName: 'chromium',
-            baseURL: `http://localhost:${PORTS['custom-layout']}`,
-          },
-          testMatch: /layout-override\.spec\.ts$/,
-        },
-        {
-          name: 'custom-quiz',
-          use: {
-            browserName: 'chromium',
-            baseURL: `http://localhost:${PORTS['custom-quiz']}`,
-          },
-          testMatch: /custom-quiz\.spec\.ts$/,
-        },
-        {
-          name: 'sequential-mode',
-          use: {
-            browserName: 'chromium',
-            baseURL: `http://localhost:${PORTS.sequential}`,
-          },
-          testMatch: /sequential\.spec\.ts$/,
-        },
-        {
-          name: 'mobile',
-          use: {
-            browserName: 'chromium',
-            baseURL: `http://localhost:${PORTS.free}`,
-            viewport: { width: 375, height: 667 },
-            hasTouch: true,
-          },
-          testMatch: /mobile\.spec\.ts$/,
-        },
-        {
-          name: 'export',
-          use: { browserName: 'chromium' },
-          testMatch: /export\.spec\.ts$/,
-        },
-        {
-          name: 'lms',
-          use: { browserName: 'chromium' },
-          testMatch: /lms-roundtrip\.spec\.ts$/,
-        },
-        {
-          name: 'lms-variants',
-          use: { browserName: 'chromium' },
-          testMatch: /(lms-variants|standalone-retry)\.spec\.ts$/,
-        },
-        {
-          name: 'a11y-audit',
-          use: { browserName: 'chromium' },
-          testMatch: /a11y-audit\.spec\.ts$/,
-        },
-      ],
+    : chromiumProjects,
   // The fixtures read TESSERA_STANDARD for the variant pre-build; the servers
   // Playwright starts blank it so an exported value in a developer's shell can't
   // turn a dev server into an LMS build. A server reused via reuseExistingServer
