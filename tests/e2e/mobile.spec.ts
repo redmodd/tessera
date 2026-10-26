@@ -198,18 +198,22 @@ test.describe('Mobile Navigation', () => {
     const dots = page.locator('.tessera-carousel-dot');
     await expect(dots.nth(0)).toHaveClass(/active/);
 
-    // WebKit has no Touch constructor, so fake the one field the carousel reads.
-    await page.evaluate(() => {
-      const el = document.querySelector('.tessera-carousel')!;
-      const touch = (type: string, screenX: number) => {
-        const event = new Event(type, { bubbles: true, cancelable: true });
-        Object.defineProperty(event, 'changedTouches', {
-          value: [{ screenX }],
-        });
-        el.dispatchEvent(event);
-      };
-      touch('touchstart', 300);
-      touch('touchend', 50);
+    // Playwright builds the Touch objects, falling back to createTouch on WebKit.
+    const carousel = page.locator('.tessera-carousel').first();
+    const touch = (x: number) => ({
+      identifier: 1,
+      clientX: x,
+      clientY: 200,
+      screenX: x,
+      screenY: 200,
+    });
+    await carousel.dispatchEvent('touchstart', {
+      touches: [touch(300)],
+      changedTouches: [touch(300)],
+    });
+    await carousel.dispatchEvent('touchend', {
+      touches: [],
+      changedTouches: [touch(50)],
     });
 
     // Should advance to slide 2 — `expect` polls automatically.

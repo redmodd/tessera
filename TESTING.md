@@ -84,7 +84,7 @@ pnpm exec playwright show-report
 
 ## How the e2e suite is wired
 
-Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Nine projects each target a different fixture / mode:
+Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). By default, nine Chromium projects each target a different fixture / mode:
 
 | Project           | Port | Fixture                         | Specs                                                        |
 | ----------------- | ---- | ------------------------------- | ------------------------------------------------------------ |
@@ -100,7 +100,7 @@ Playwright is configured in [`playwright.config.ts`](./playwright.config.ts). Ni
 
 ### Firefox and WebKit
 
-Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). CI's `cross-browser` job runs both. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
+Setting `E2E_BROWSER` to `firefox` or `webkit` swaps those projects for the specs where browsers differ: `navigation`, `components` and `quiz` on port 5180, plus `mobile` under WebKit (`mobile-webkit`). These runs skip the variant pre-build and start only the free dev server. CI's `cross-browser` job runs both. Playwright's Firefox does not start on macOS 27, so run WebKit locally:
 
 ```bash
 pnpm exec playwright install webkit

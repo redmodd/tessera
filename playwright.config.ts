@@ -7,11 +7,17 @@ const PORTS = {
   'custom-quiz': 5183,
 } as const;
 
-type CrossBrowser = 'firefox' | 'webkit';
+const CROSS_BROWSERS = ['firefox', 'webkit'] as const;
+type CrossBrowser = (typeof CROSS_BROWSERS)[number];
 
 // CI's cross-browser job sets E2E_BROWSER to run only the specs where browsers
 // differ. Opt-in because Playwright's Firefox does not start on macOS 27.
 const crossBrowser = process.env.E2E_BROWSER as CrossBrowser | undefined;
+if (crossBrowser && !CROSS_BROWSERS.includes(crossBrowser)) {
+  throw new Error(
+    `E2E_BROWSER must be ${CROSS_BROWSERS.join(' or ')}, got "${crossBrowser}"`,
+  );
+}
 
 const crossBrowserProjects = (browserName: CrossBrowser) => [
   {
@@ -45,7 +51,8 @@ export default defineConfig({
   // Pre-builds every fixture variant in global-setup.ts's FIXTURES map into
   // tests/.e2e-variants/{fixture}/{standard} so specs read pre-built dist/
   // output instead of mutating the source fixtures and rebuilding mid-suite.
-  globalSetup: './tests/e2e/global-setup.ts',
+  // The cross-browser projects use only the free dev server.
+  globalSetup: crossBrowser ? undefined : './tests/e2e/global-setup.ts',
   use: {
     trace: 'retain-on-failure',
   },
@@ -134,11 +141,13 @@ export default defineConfig({
   // Playwright starts blank it so an exported value in a developer's shell can't
   // turn a dev server into an LMS build. A server reused via reuseExistingServer
   // keeps whatever environment it was started with.
-  webServer: Object.entries(PORTS).map(([fixture, port]) => ({
-    command: `cd tests/fixtures/${fixture} && pnpm dev --port ${port}`,
-    port,
-    env: { TESSERA_STANDARD: '' },
-    reuseExistingServer: !process.env.CI,
-    timeout: 20000,
-  })),
+  webServer: Object.entries(crossBrowser ? { free: PORTS.free } : PORTS).map(
+    ([fixture, port]) => ({
+      command: `cd tests/fixtures/${fixture} && pnpm dev --port ${port}`,
+      port,
+      env: { TESSERA_STANDARD: '' },
+      reuseExistingServer: !process.env.CI,
+      timeout: 20000,
+    }),
+  ),
 });

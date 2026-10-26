@@ -78,7 +78,7 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 - **static**: install → `pnpm check`.
 - **test** (Node 24 and 26): install → build → `test:coverage`.
 - **e2e**: install → Playwright install → build → `test:e2e`.
-- **cross-browser** (Firefox and WebKit): the same with `E2E_BROWSER` set, running only the navigation, components, quiz and mobile specs.
+- **cross-browser** (Firefox and WebKit): the same with `E2E_BROWSER` set, running only the navigation, components and quiz specs, plus mobile under WebKit.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 
