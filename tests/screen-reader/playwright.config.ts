@@ -7,7 +7,7 @@ const port = 5190;
 export default withGuidepup({
   testDir: '.',
   outputDir: '../../test-results/screen-reader',
-  timeout: 5 * 60 * 1000,
+  timeout: 90 * 1000,
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   reporter: 'list',

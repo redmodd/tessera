@@ -1,7 +1,7 @@
 name: Screen reader
 
 # Not a required check: NVDA on hosted runners can be flaky. It also runs on
-# PRs that change the check, the widgets it reads, or dependencies,
+# PRs that change the check, tessera-learn's source, or dependencies,
 # since workflow_dispatch only works once the workflow is on main.
 on:
   workflow_dispatch:
@@ -10,9 +10,8 @@ on:
     paths:
       - .github/workflows/screen-reader.yml
       - tests/screen-reader/**
-      - tests/e2e/helpers.ts
       - tests/fixtures/screen-reader/**
-      - packages/tessera-learn/src/components/**
+      - packages/tessera-learn/src/**
       - package.json
       - pnpm-lock.yaml
 

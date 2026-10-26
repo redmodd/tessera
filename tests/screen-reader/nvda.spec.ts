@@ -1,17 +1,16 @@
 import { writeFile } from 'node:fs/promises';
 import { nvdaTest as test, type NVDAPlaywright } from '@guidepup/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { navigateToPage, primaryBtn } from '../e2e/helpers.js';
-
 async function hears(
   nvda: NVDAPlaywright,
   action: () => Promise<unknown>,
   ...phrases: string[]
-): Promise<void> {
+): Promise<string> {
   const { spokenPhrase } = await nvda.capture(action, { capture: true });
   // Chromium exposes CSS text-transform, so NVDA reads uppercase labels in caps.
-  for (const phrase of phrases)
-    expect(spokenPhrase.toLowerCase()).toContain(phrase.toLowerCase());
+  const spoken = spokenPhrase.toLowerCase();
+  for (const phrase of phrases) expect(spoken).toContain(phrase.toLowerCase());
+  return spoken;
 }
 
 // navigateToWebContent clicks the middle of <body>, so it runs on the intro
@@ -20,7 +19,8 @@ async function open(page: Page, nvda: NVDAPlaywright, title: string) {
   await page.goto('/');
   await expect(page.locator('.tessera-content h1')).toHaveText('Start');
   await nvda.navigateToWebContent();
-  await navigateToPage(page, title);
+  await page.locator('.tessera-nav-page', { hasText: title }).click();
+  await expect(page.locator('.tessera-content h1')).toHaveText(title);
 }
 
 test.afterEach(async ({ nvda }, testInfo) => {
@@ -153,12 +153,13 @@ test.describe('standalone questions', () => {
 test('an immediate-mode quiz announces each result', async ({ page, nvda }) => {
   await open(page, nvda, 'Immediate Quiz');
   const active = page.locator('.tessera-quiz-question-wrapper.active');
-  const primary = primaryBtn(page);
+  const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await active.getByText('3', { exact: true }).click();
   await hears(nvda, () => primary.click(), 'Incorrect');
 
   await hears(nvda, () => primary.click(), 'Question 2 of 2');
   await active.getByRole('textbox').fill('blue');
-  await hears(nvda, () => primary.click(), 'Correct');
+  const spoken = await hears(nvda, () => primary.click(), 'Correct');
+  expect(spoken).not.toContain('incorrect');
 });
