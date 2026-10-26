@@ -149,6 +149,7 @@ Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touc
 On Windows:
 
 ```bash
+pnpm exec playwright install --no-shell chromium firefox
 pnpm exec guidepup install nvda   # rerun after a @guidepup/guidepup bump
 pnpm --filter tessera-learn build
 pnpm exec playwright test -c tests/screen-reader/playwright.config.ts   # --project chromium|firefox for one
