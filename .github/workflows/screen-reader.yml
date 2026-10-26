@@ -48,7 +48,7 @@ jobs:
       - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
 
       # Downloads the NVDA build that the installed @guidepup/guidepup expects.
-      - run: pnpm dlx @guidepup/setup@0.29.3 install nvda
+      - run: pnpm exec guidepup install nvda
 
       - run: pnpm --filter tessera-learn build
 

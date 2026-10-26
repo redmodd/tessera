@@ -5,3 +5,6 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - '@types/node@26.0.0'
+# Only @guidepup/setup's macOS screen recording uses it, and it pulls in ffmpeg-static.
+ignoredOptionalDependencies:
+  - '@guidepup/record'
