@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
+import { resolveTesseraConfig } from '../src/plugin/inline-config.js';
 import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir, writeLessonPage } from './helpers.js';
@@ -610,6 +611,67 @@ describe('dev terminal clearing', () => {
 
   it('leaves clearing on for a config that asks for it', async () => {
     expect(await resolvedClearScreen(true)).toBe(true);
+  });
+});
+
+describe('build browser target', () => {
+  async function resolvedTarget(tesseraConfig?: string) {
+    if (tesseraConfig) {
+      writeFileSync(resolve(projectRoot, 'tessera.config.js'), tesseraConfig);
+    }
+    const env = { command: 'build', mode: 'production' } as const;
+    const config = await resolveConfig(
+      await resolveTesseraConfig(projectRoot, projectRoot, env),
+      'build',
+    );
+    const { target, cssTarget } = config.environments.client.build;
+    return [target, cssTarget];
+  }
+
+  function documentedTarget() {
+    const ids: Record<string, string[]> = {
+      'Chrome / Edge': ['chrome', 'edge'],
+      Firefox: ['firefox'],
+      'Safari / iOS Safari': ['safari', 'ios'],
+    };
+    const doc = readFileSync(
+      new URL('../docs/export.md', import.meta.url),
+      'utf-8',
+    );
+    const section = doc.split('## Supported browsers')[1].split('\n## ')[0];
+    const rows = [...section.matchAll(/^\| ([^|]+?)\s*\| ([\d.]+)\s*\|\r?$/gm)];
+    expect(rows.map(([, name]) => name)).toEqual(Object.keys(ids));
+    return rows.flatMap(([, name, version]) =>
+      ids[name].map((id) => id + version),
+    );
+  }
+
+  it('pins JS and CSS to the browsers in docs/export.md', async () => {
+    const documented = documentedTarget();
+    expect(await resolvedTarget()).toEqual([documented, documented]);
+  });
+
+  it.each([
+    ['build.target', `export default { build: { target: 'es2020' } };`],
+    [
+      'environments.client.build.target',
+      `export default { environments: { client: { build: { target: 'es2020' } } } };`,
+    ],
+    [
+      'a plugin that mutates config, like @vitejs/plugin-legacy',
+      `export default { plugins: [{ name: 'p', config(c) {
+        if (c.build?.target !== undefined) throw new Error('target already set');
+        c.build = { ...c.build, target: 'es2020' };
+      } }] };`,
+    ],
+    [
+      'a post-ordered plugin config hook',
+      `export default { plugins: [{ name: 'p', config: {
+        order: 'post', handler: () => ({ build: { target: 'es2020' } }),
+      } }] };`,
+    ],
+  ])('keeps a target set by %s in tessera.config.js', async (_, source) => {
+    expect(await resolvedTarget(source)).toEqual(['es2020', 'es2020']);
   });
 });
 

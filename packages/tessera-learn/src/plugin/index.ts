@@ -271,6 +271,17 @@ function completionDefaults(
   };
 }
 
+// Pinned so a Vite update can't change the supported browsers. Vite only
+// rewrites syntax: Firefox 133 is for fetch keepalive (xAPI on close). Raise
+// with the tsconfig target.
+const BROWSER_TARGET = [
+  'chrome111',
+  'edge111',
+  'firefox133',
+  'safari16.4',
+  'ios16.4',
+];
+
 function tesseraConfigDefaultsPlugin(): Plugin {
   return {
     name: 'tessera:config-defaults',
@@ -286,6 +297,17 @@ function tesseraConfigDefaultsPlugin(): Plugin {
         // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.
         optimizeDeps: { exclude: ['tessera-learn'] },
       };
+    },
+    // Runs after every config hook, so a target from tessera.config.js or a
+    // plugin is visible. Vite concatenates arrays when merging, so only fill an
+    // unset target.
+    configEnvironment: {
+      order: 'post',
+      handler(name, config) {
+        if (name === 'client' && config.build?.target === undefined) {
+          return { build: { target: BROWSER_TARGET } };
+        }
+      },
     },
   };
 }
