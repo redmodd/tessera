@@ -287,8 +287,8 @@ function isFailing(v: AxeViolation, thresholdRank: number): boolean {
   return !v.impact || IMPACT_LEVELS.indexOf(v.impact) >= thresholdRank;
 }
 
-// Optional deps loaded by variable specifier so tsc doesn't require them to be
-// installed — Tier 2 is opt-in and the absence is handled with a clear message.
+// Peers loaded by variable specifier so a package manager that skips peers
+// (Yarn) gets a clear message instead of a crash.
 async function tryImport(specifier: string): Promise<unknown> {
   return import(specifier);
 }
