@@ -82,13 +82,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - id: playwright-version
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
 
       - id: playwright-cache
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright-version.outputs.version }}-${{ matrix.browser }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.image }}-${{ steps.playwright-version.outputs.version }}-${{ matrix.browser }}
 
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
