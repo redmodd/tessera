@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { normalizePath, resolveConfig, type Plugin } from 'vite';
 import { tesseraPlugin } from '../src/plugin/index.js';
+import { resolveTesseraConfig } from '../src/plugin/inline-config.js';
 import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
 import { tempDir, writeLessonPage } from './helpers.js';
@@ -614,17 +615,17 @@ describe('dev terminal clearing', () => {
 });
 
 describe('build browser target', () => {
-  async function resolvedTarget(target?: string, plugins: Plugin[] = []) {
+  async function resolvedTarget(tesseraConfig?: string) {
+    if (tesseraConfig) {
+      writeFileSync(resolve(projectRoot, 'tessera.config.js'), tesseraConfig);
+    }
+    const env = { command: 'build', mode: 'production' } as const;
     const config = await resolveConfig(
-      {
-        root: projectRoot,
-        configFile: false,
-        build: { target },
-        plugins: [tesseraPlugin(), ...plugins],
-      },
+      await resolveTesseraConfig(projectRoot, projectRoot, env),
       'build',
     );
-    return [config.build.target, config.build.cssTarget];
+    const { target, cssTarget } = config.environments.client.build;
+    return [target, cssTarget];
   }
 
   function documentedTarget() {
@@ -638,7 +639,7 @@ describe('build browser target', () => {
       'utf-8',
     );
     const section = doc.split('## Supported browsers')[1].split('\n## ')[0];
-    const rows = [...section.matchAll(/^\| ([^|]+?)\s*\| ([\d.]+)\s*\|$/gm)];
+    const rows = [...section.matchAll(/^\| ([^|]+?)\s*\| ([\d.]+)\s*\|\r?$/gm)];
     expect(rows.map(([, name]) => name)).toEqual(Object.keys(ids));
     return rows.flatMap(([, name, version]) =>
       ids[name].map((id) => id + version),
@@ -650,24 +651,27 @@ describe('build browser target', () => {
     expect(await resolvedTarget()).toEqual([documented, documented]);
   });
 
-  it('keeps a target set in tessera.config.js', async () => {
-    expect(await resolvedTarget('es2022')).toEqual(['es2022', 'es2022']);
-  });
-
-  it('keeps a target another plugin sets', async () => {
-    let seen: unknown;
-    const legacyLike: Plugin = {
-      name: 'sets-target',
-      config(config) {
-        seen = config.build?.target;
-        config.build = { ...config.build, target: 'es2020' };
-      },
-    };
-    expect(await resolvedTarget(undefined, [legacyLike])).toEqual([
-      'es2020',
-      'es2020',
-    ]);
-    expect(seen).toBeUndefined();
+  it.each([
+    ['build.target', `export default { build: { target: 'es2020' } };`],
+    [
+      'environments.client.build.target',
+      `export default { environments: { client: { build: { target: 'es2020' } } } };`,
+    ],
+    [
+      'a plugin that mutates config, like @vitejs/plugin-legacy',
+      `export default { plugins: [{ name: 'p', config(c) {
+        if (c.build?.target !== undefined) throw new Error('target already set');
+        c.build = { ...c.build, target: 'es2020' };
+      } }] };`,
+    ],
+    [
+      'a post-ordered plugin config hook',
+      `export default { plugins: [{ name: 'p', config: {
+        order: 'post', handler: () => ({ build: { target: 'es2020' } }),
+      } }] };`,
+    ],
+  ])('keeps a target set by %s in tessera.config.js', async (_, source) => {
+    expect(await resolvedTarget(source)).toEqual(['es2020', 'es2020']);
   });
 });
 

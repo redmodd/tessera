@@ -273,29 +273,30 @@ function completionDefaults(
 }
 
 // Pinned so a Vite update can't change the supported browsers. Keep in step
-// with docs/export.md. Vite only rewrites syntax, and nothing checks runtime
-// APIs or CSS features against this list (the components' :has() needs
-// Firefox 121). The tsconfig target (ES2022) caps JS built-ins; raise both
-// together.
+// with docs/export.md. Vite only rewrites syntax: nothing checks DOM APIs or
+// CSS features against this list (fetch keepalive, which delivers xAPI on
+// close, needs Firefox 133; the components' :has() needs 121). The runtime's
+// ES2022 tsconfig lib keeps newer JS built-ins out; raise both together.
 const BROWSER_TARGET = [
   'chrome111',
   'edge111',
-  'firefox121',
+  'firefox133',
   'safari16.4',
   'ios16.4',
 ];
 
-// Post-ordered so a target from tessera.config.js or another plugin (such as
-// @vitejs/plugin-legacy) is already set. Vite concatenates arrays when merging
-// hook results, so only fill an unset target.
+// configEnvironment runs after every config hook, on the client config already
+// merged with the top-level one, so any target from tessera.config.js or another
+// plugin (such as @vitejs/plugin-legacy) is visible here. Vite concatenates
+// arrays when merging, so only fill an unset target.
 function tesseraBuildTargetPlugin(): Plugin {
   return {
     name: 'tessera:build-target',
-    config: {
+    configEnvironment: {
       order: 'post',
-      handler(config) {
-        if (config.build?.target === undefined) {
-          return { build: { target: BROWSER_TARGET } };
+      handler(name, config) {
+        if (name === 'client' && config.build?.target === undefined) {
+          return { build: { target: [...BROWSER_TARGET] } };
         }
       },
     },

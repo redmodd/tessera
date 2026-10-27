@@ -27,7 +27,7 @@ Exported courses run in:
 | Browser             | Minimum version |
 | ------------------- | --------------- |
 | Chrome / Edge       | 111             |
-| Firefox             | 121             |
+| Firefox             | 133             |
 | Safari / iOS Safari | 16.4            |
 
 - The build rewrites newer JS and CSS syntax for these browsers but adds no polyfills: in course code, use only browser APIs and CSS features these versions support (check MDN's compatibility table). CSS is rewritten only while it's minified, so leave `build.minify` and `build.cssMinify` on.
