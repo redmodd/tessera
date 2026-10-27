@@ -271,6 +271,17 @@ function completionDefaults(
   };
 }
 
+// Pinned so a Vite update can't change the supported browsers. Keep in step
+// with docs/export.md. Vite doesn't polyfill, so the runtime's tsconfig lib
+// (ES2022) must stay within these browsers; raise both together.
+const BROWSER_TARGET = [
+  'chrome111',
+  'edge111',
+  'firefox114',
+  'safari16.4',
+  'ios16.4',
+];
+
 function tesseraConfigDefaultsPlugin(): Plugin {
   return {
     name: 'tessera:config-defaults',
@@ -280,7 +291,12 @@ function tesseraConfigDefaultsPlugin(): Plugin {
       return {
         base: './',
         clearScreen: config.clearScreen ?? false,
-        build: { assetsDir: 'tessera' },
+        // Vite concatenates arrays when merging hook results, so only fill
+        // the target when tessera.config.js hasn't set one.
+        build: {
+          assetsDir: 'tessera',
+          ...(config.build?.target === undefined && { target: BROWSER_TARGET }),
+        },
         resolve: { alias: { $assets: resolve(root, 'assets') } },
         // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer
         // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.

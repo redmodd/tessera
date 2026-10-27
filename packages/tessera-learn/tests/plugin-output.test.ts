@@ -613,6 +613,36 @@ describe('dev terminal clearing', () => {
   });
 });
 
+describe('build browser target', () => {
+  async function resolvedTarget(target?: string) {
+    const config = await resolveConfig(
+      {
+        root: projectRoot,
+        configFile: false,
+        build: { target },
+        plugins: [tesseraPlugin()],
+      },
+      'build',
+    );
+    return [config.build.target, config.build.cssTarget];
+  }
+
+  it('pins JS and CSS to the documented browsers', async () => {
+    const documented = [
+      'chrome111',
+      'edge111',
+      'firefox114',
+      'safari16.4',
+      'ios16.4',
+    ];
+    expect(await resolvedTarget()).toEqual([documented, documented]);
+  });
+
+  it('keeps a target set in tessera.config.js', async () => {
+    expect(await resolvedTarget('es2022')).toEqual(['es2022', 'es2022']);
+  });
+});
+
 describe('dev revalidation', () => {
   beforeEach(() => {
     vi.useFakeTimers();

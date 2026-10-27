@@ -20,6 +20,19 @@ Upload the zip via your LMS's import flow; drop `dist/` (web) on any static host
 
 To package one course for several LMSs, export once per `--standard` and move each zip out of the course folder before the next export. An unknown `--standard` value fails before the build runs.
 
+## Supported browsers
+
+Exported courses run in:
+
+| Browser             | Minimum version |
+| ------------------- | --------------- |
+| Chrome / Edge       | 111             |
+| Firefox             | 114             |
+| Safari / iOS Safari | 16.4            |
+
+- The build rewrites newer JS and CSS syntax for these browsers but adds no polyfills: in course code, use only browser APIs these versions support (check MDN's compatibility table).
+- To change the target for one course, set `build.target` in its `tessera.config.js` (see [Customising the build](../AGENTS.md#customising-the-build-optional)). CSS follows it.
+
 ## Web export Content-Security-Policy
 
 Web builds emit a baseline CSP `<meta>` (LMS packages and the dev server don't). It allows any `https:` for images/media/frames/network, but **not** for scripts, styles, or fonts, so a CDN script/stylesheet/font is blocked until you allow its origin. Extend per-directive via `export.csp` (sources are **appended** to the baseline, never replaced):

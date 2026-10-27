@@ -27,13 +27,13 @@ This is the canonical reference for authoring a Tessera course. Read it before g
 
 This file holds what every task needs. The topics below live in `docs/` beside it. **Read the matching file before starting such a task.** Link paths in this guide are relative to this file: open `docs/scoring.md` as `node_modules/tessera-learn/docs/scoring.md`.
 
-| Task                                                                               | Read                                                                                                                                                  |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Graded pages, course score weighting, optional pages, pass/fail, manual completion | [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md)                                                                                       |
-| Custom question widget, quiz shell, layout, navigation or progress UI              | [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md), then [`node_modules/tessera-learn/docs/recipes.md`](docs/recipes.md) for worked examples |
-| Custom xAPI statements, a second LRS                                               | [`node_modules/tessera-learn/docs/xapi.md`](docs/xapi.md)                                                                                             |
-| Export packages, the web CSP, per-LMS behaviour, testing in an LMS                 | [`node_modules/tessera-learn/docs/export.md`](docs/export.md)                                                                                         |
-| Updating `tessera-learn` to a newer version                                        | [`node_modules/tessera-learn/docs/updating.md`](docs/updating.md)                                                                                     |
+| Task                                                                                   | Read                                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Graded pages, course score weighting, optional pages, pass/fail, manual completion     | [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md)                                                                                       |
+| Custom question widget, quiz shell, layout, navigation or progress UI                  | [`node_modules/tessera-learn/docs/hooks.md`](docs/hooks.md), then [`node_modules/tessera-learn/docs/recipes.md`](docs/recipes.md) for worked examples |
+| Custom xAPI statements, a second LRS                                                   | [`node_modules/tessera-learn/docs/xapi.md`](docs/xapi.md)                                                                                             |
+| Export packages, supported browsers, the web CSP, per-LMS behaviour, testing in an LMS | [`node_modules/tessera-learn/docs/export.md`](docs/export.md)                                                                                         |
+| Updating `tessera-learn` to a newer version                                            | [`node_modules/tessera-learn/docs/updating.md`](docs/updating.md)                                                                                     |
 
 ---
 
@@ -642,7 +642,7 @@ export function canAccess(ctx) {
 
 `AccessContext` (`ctx`) exposes `pageIndex`, `page`, `manifest`, `progress`, `config`. `canAccess` replaces the preset, so compose with it: `resolveAccess(config)` returns the preset for `navigation.mode`, and `freeAccess` / `sequentialAccess` are re-exported.
 
-Build output, the web export CSP and per-LMS behaviour are in [`node_modules/tessera-learn/docs/export.md`](docs/export.md).
+Build output, supported browsers, the web export CSP and per-LMS behaviour are in [`node_modules/tessera-learn/docs/export.md`](docs/export.md).
 
 ### Validation
 
