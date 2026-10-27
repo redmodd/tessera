@@ -7,7 +7,10 @@ import {
 } from './helpers.js';
 
 /** Dispatches ArrowRight on the element and reports whether the layout cancelled it. */
-function arrowCancelled(target: Locator, init: KeyboardEventInit = {}) {
+function arrowCancelled(
+  target: Locator,
+  init: Omit<KeyboardEventInit, 'view'> = {},
+) {
   return target.evaluate((el, init) => {
     const e = new KeyboardEvent('keydown', {
       key: 'ArrowRight',
