@@ -72,7 +72,7 @@ jobs:
 
       - id: lockfile
         run: |
-          v=$(sed -n "s/^  playwright-core@\(.*\):$/\1/p" pnpm-lock.yaml | sort -u)
+          v=$(sed -n "s/^  playwright-core@\(.*\):$/\1/p" pnpm-lock.yaml)
           [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::expected one playwright-core version in pnpm-lock.yaml, got: $v"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
 

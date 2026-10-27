@@ -95,6 +95,14 @@
     "playwright": "^1.40.0",
     "svelte": "^5.57.0"
   },
+  "peerDependenciesMeta": {
+    "@axe-core/playwright": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@types/node": "^26.6.5",

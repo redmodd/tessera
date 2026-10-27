@@ -26,7 +26,7 @@ Ask your assistant to update the framework. It follows [`docs/updating.md`](http
 - **Vite plugin** (`tessera-learn/plugin`): `tesseraPlugin()` wires page/layout discovery, the LMS adapter, and the export pipeline. The `tessera` CLI (`new`/`duplicate`/`dev`/`export`/`validate`/`a11y`/`check`) runs Vite with this plugin and the `$shared` alias for you, so scaffolded workspaces need no `vite.config.js`.
 - **Built-in components** (`tessera-learn`): `Callout`, `Image`, `Audio`, `Video`, `Accordion` / `AccordionItem`, `Carousel` / `CarouselSlide`, `RevealModal`, `Quiz`, `MultipleChoice`, `FillInTheBlank`, `Matching`, `Sorting`, `QuestionReview`, `DefaultLayout`.
 - **LMS adapters**: SCORM 1.2, SCORM 2004 4th Edition, cmi5, xAPI 1.0.3 ("Tin Can"), static web. Selected via `course.config.js` `export.standard`, or overridden per build with `tessera export --standard <value>`.
-- **Accessibility checks**: static rules (alt text, media titles/captions, heading order, contrast, `<html lang>`) run inside validation and the build with zero extra dependencies. A runtime audit (`tessera a11y`, with `playwright` + `@axe-core/playwright` as peers) renders every page and gates on axe-core violations; its first run installs the Chromium browser if it's missing.
+- **Accessibility checks**: static rules (alt text, media titles/captions, heading order, contrast, `<html lang>`) run inside validation and the build with zero extra dependencies. An opt-in runtime audit (`tessera a11y`, with `playwright` + `@axe-core/playwright` as optional peers) renders every page and gates on axe-core violations; its first run installs the Chromium browser if it's missing.
 
 ## Documentation
 
