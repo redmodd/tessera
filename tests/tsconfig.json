@@ -1,0 +1,4 @@
+{
+  "extends": ["../tsconfig.json", "../tsconfig.test.json"],
+  "include": ["e2e", "screen-reader", "../playwright.config.ts"]
+}

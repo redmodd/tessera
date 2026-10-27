@@ -25,6 +25,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # tsc -p tests type-checks e2e specs that import tessera-learn's dist/.
+      - run: pnpm build
+
       - run: pnpm check
 
   test:

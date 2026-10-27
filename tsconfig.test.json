@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  }
+}
