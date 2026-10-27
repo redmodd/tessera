@@ -74,11 +74,11 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 
 ## CI
 
-`.github/workflows/ci.yml` runs five jobs:
+`.github/workflows/ci.yml` runs these jobs:
 
 - **static**: install → `pnpm check`.
 - **test** (Node 24 and 26): install → build → `test:coverage`.
-- **e2e** (Chromium, Firefox and WebKit): install → Playwright install → build → `test:e2e`. Each entry sets `E2E_BROWSER`; Firefox and WebKit run only the navigation, components and quiz specs, plus mobile under WebKit. Only Chromium is a required check.
+- **e2e** (Chromium, Firefox and WebKit): runs in the `mcr.microsoft.com/playwright` image, which ships the browsers. A `playwright-version` job reads the image tag from `@playwright/test` in `pnpm-lock.yaml`, so Dependabot bumps need no workflow edit. install → build → `test:e2e`. Each entry sets `E2E_BROWSER`; Firefox and WebKit run only the navigation, components and quiz specs, plus mobile under WebKit. Only Chromium is a required check.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 
