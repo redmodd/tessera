@@ -62,9 +62,32 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  playwright-version:
+    name: Playwright version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.lockfile.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: pnpm-lock.yaml
+          sparse-checkout-cone-mode: false
+
+      - id: lockfile
+        run: |
+          v=$(sed -n "s/^  playwright-core@\(.*\):$/\1/p" pnpm-lock.yaml)
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::expected one playwright-core version in pnpm-lock.yaml, got: $v"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
   e2e:
     name: Playwright e2e (${{ matrix.browser }})
+    needs: playwright-version
     runs-on: ubuntu-latest
+    # The image ships the browsers and their system packages; installing them
+    # on the runner stalls for minutes when the Ubuntu apt mirror is slow.
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-noble
+      options: --user 1001 --ipc=host
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -83,23 +106,6 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      - id: playwright-version
-        run: |
-          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-          echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
-
-      - id: playwright-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.image }}-${{ steps.playwright-version.outputs.version }}-${{ matrix.browser }}
-
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps ${{ matrix.browser }}
 
       - run: pnpm build
 
