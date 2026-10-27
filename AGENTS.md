@@ -42,7 +42,7 @@ pnpm build            # build both packages (tsdown); required before e2e
 pnpm test             # unit tests (Vitest) in both packages
 pnpm test:coverage    # + v8 coverage under packages/*/coverage/
 pnpm test:e2e         # Playwright suite (build first)
-pnpm check            # verify: prettier --check + eslint + svelte-check + tsc
+pnpm check            # verify: prettier --check + eslint + svelte-check + tsc (build first)
 pnpm fix              # autofix: prettier --write + eslint --fix
 pnpm changeset        # record a release note for a user-facing change
 ```
@@ -54,7 +54,7 @@ Per-package or single-file runs and the e2e variant pre-build are documented in 
 ## Conventions that bite
 
 - **Comments are sparse and earn their place.** Code should read on its own: don't add comments that restate what the code does. Comment only the non-obvious _why_ (a workaround, an LMS quirk, a deliberate deviation), and match the comment density of the file you're editing. Prefer a clearer name or smaller function over a comment.
-- **Build before e2e.** The fixtures import `tessera-learn`'s Vite plugin from its built `dist/`, so `pnpm build` must run first.
+- **Build before e2e and `pnpm check`.** The fixtures import `tessera-learn`'s Vite plugin from its built `dist/`, and `pnpm check` type-checks the e2e specs that import it, so `pnpm build` must run first.
 - **Fixtures are committed and hand-tailored.** `tests/fixtures/*` are tracked source, not scaffolder output. Edit them like any other code; don't regenerate them with `npm create tessera`. Only `tests/.e2e-variants/` (per-run build output) is gitignored.
 - **Five delivery modes, always.** Any change to the runtime API surface or an adapter must hold across SCORM 1.2 / SCORM 2004 4e / cmi5 / xAPI 1.0.3 / web. Prefer a unit test in `packages/tessera-learn/tests/` plus an e2e roundtrip, and note in the PR which modes you tested.
 - **Edit the authoring guide in place, in `packages/tessera-learn/`.** Its `AGENTS.md` loads into every authoring session, so it holds only what every task needs and routes the rest to `docs/`. Update it when a change alters what it documents.
@@ -76,7 +76,7 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 
 `.github/workflows/ci.yml` runs five jobs:
 
-- **static**: install → `pnpm check`.
+- **static**: install → build → `pnpm check`.
 - **test** (Node 24 and 26): install → build → `test:coverage`.
 - **e2e** (Chromium, Firefox and WebKit): install → Playwright install → build → `test:e2e`. Each entry sets `E2E_BROWSER`; Firefox and WebKit run only the navigation, components and quiz specs, plus mobile under WebKit. Only Chromium is a required check.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
