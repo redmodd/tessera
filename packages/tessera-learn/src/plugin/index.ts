@@ -116,7 +116,6 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraEntryPlugin(ctx),
     tesseraIndexHtmlPlugin(ctx),
     tesseraConfigDefaultsPlugin(),
-    tesseraBuildTargetPlugin(),
     tesseraConfigPlugin(ctx),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(ctx),
@@ -272,11 +271,9 @@ function completionDefaults(
   };
 }
 
-// Pinned so a Vite update can't change the supported browsers. Keep in step
-// with docs/export.md. Vite only rewrites syntax: nothing checks DOM APIs or
-// CSS features against this list (fetch keepalive, which delivers xAPI on
-// close, needs Firefox 133; the components' :has() needs 121). The runtime's
-// ES2022 tsconfig lib keeps newer JS built-ins out; raise both together.
+// Pinned so a Vite update can't change the supported browsers. Vite only
+// rewrites syntax: Firefox 133 is for fetch keepalive (xAPI on close). Raise
+// with the tsconfig target.
 const BROWSER_TARGET = [
   'chrome111',
   'edge111',
@@ -284,24 +281,6 @@ const BROWSER_TARGET = [
   'safari16.4',
   'ios16.4',
 ];
-
-// configEnvironment runs after every config hook, on the client config already
-// merged with the top-level one, so any target from tessera.config.js or another
-// plugin (such as @vitejs/plugin-legacy) is visible here. Vite concatenates
-// arrays when merging, so only fill an unset target.
-function tesseraBuildTargetPlugin(): Plugin {
-  return {
-    name: 'tessera:build-target',
-    configEnvironment: {
-      order: 'post',
-      handler(name, config) {
-        if (name === 'client' && config.build?.target === undefined) {
-          return { build: { target: [...BROWSER_TARGET] } };
-        }
-      },
-    },
-  };
-}
 
 function tesseraConfigDefaultsPlugin(): Plugin {
   return {
@@ -318,6 +297,17 @@ function tesseraConfigDefaultsPlugin(): Plugin {
         // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.
         optimizeDeps: { exclude: ['tessera-learn'] },
       };
+    },
+    // Runs after every config hook, so a target from tessera.config.js or a
+    // plugin is visible. Vite concatenates arrays when merging, so only fill an
+    // unset target.
+    configEnvironment: {
+      order: 'post',
+      handler(name, config) {
+        if (name === 'client' && config.build?.target === undefined) {
+          return { build: { target: BROWSER_TARGET } };
+        }
+      },
     },
   };
 }
