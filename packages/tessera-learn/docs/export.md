@@ -27,10 +27,10 @@ Exported courses run in:
 | Browser             | Minimum version |
 | ------------------- | --------------- |
 | Chrome / Edge       | 111             |
-| Firefox             | 114             |
+| Firefox             | 121             |
 | Safari / iOS Safari | 16.4            |
 
-- The build rewrites newer JS and CSS syntax for these browsers but adds no polyfills: in course code, use only browser APIs these versions support (check MDN's compatibility table).
+- The build rewrites newer JS and CSS syntax for these browsers but adds no polyfills: in course code, use only browser APIs and CSS features these versions support (check MDN's compatibility table). CSS is rewritten only while it's minified, so leave `build.minify` and `build.cssMinify` on.
 - To change the target for one course, set `build.target` in its `tessera.config.js` (see [Customising the build](../AGENTS.md#customising-the-build-optional)). CSS follows it.
 
 ## Web export Content-Security-Policy

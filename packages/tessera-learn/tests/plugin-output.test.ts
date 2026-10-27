@@ -614,32 +614,60 @@ describe('dev terminal clearing', () => {
 });
 
 describe('build browser target', () => {
-  async function resolvedTarget(target?: string) {
+  async function resolvedTarget(target?: string, plugins: Plugin[] = []) {
     const config = await resolveConfig(
       {
         root: projectRoot,
         configFile: false,
         build: { target },
-        plugins: [tesseraPlugin()],
+        plugins: [tesseraPlugin(), ...plugins],
       },
       'build',
     );
     return [config.build.target, config.build.cssTarget];
   }
 
-  it('pins JS and CSS to the documented browsers', async () => {
-    const documented = [
-      'chrome111',
-      'edge111',
-      'firefox114',
-      'safari16.4',
-      'ios16.4',
-    ];
+  function documentedTarget() {
+    const ids: Record<string, string[]> = {
+      'Chrome / Edge': ['chrome', 'edge'],
+      Firefox: ['firefox'],
+      'Safari / iOS Safari': ['safari', 'ios'],
+    };
+    const doc = readFileSync(
+      new URL('../docs/export.md', import.meta.url),
+      'utf-8',
+    );
+    const section = doc.split('## Supported browsers')[1].split('\n## ')[0];
+    const rows = [...section.matchAll(/^\| ([^|]+?)\s*\| ([\d.]+)\s*\|$/gm)];
+    expect(rows.map(([, name]) => name)).toEqual(Object.keys(ids));
+    return rows.flatMap(([, name, version]) =>
+      ids[name].map((id) => id + version),
+    );
+  }
+
+  it('pins JS and CSS to the browsers in docs/export.md', async () => {
+    const documented = documentedTarget();
     expect(await resolvedTarget()).toEqual([documented, documented]);
   });
 
   it('keeps a target set in tessera.config.js', async () => {
     expect(await resolvedTarget('es2022')).toEqual(['es2022', 'es2022']);
+  });
+
+  it('keeps a target another plugin sets', async () => {
+    let seen: unknown;
+    const legacyLike: Plugin = {
+      name: 'sets-target',
+      config(config) {
+        seen = config.build?.target;
+        config.build = { ...config.build, target: 'es2020' };
+      },
+    };
+    expect(await resolvedTarget(undefined, [legacyLike])).toEqual([
+      'es2020',
+      'es2020',
+    ]);
+    expect(seen).toBeUndefined();
   });
 });
 

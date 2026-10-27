@@ -116,6 +116,7 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraEntryPlugin(ctx),
     tesseraIndexHtmlPlugin(ctx),
     tesseraConfigDefaultsPlugin(),
+    tesseraBuildTargetPlugin(),
     tesseraConfigPlugin(ctx),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(ctx),
@@ -272,15 +273,34 @@ function completionDefaults(
 }
 
 // Pinned so a Vite update can't change the supported browsers. Keep in step
-// with docs/export.md. Vite doesn't polyfill, so the runtime's tsconfig lib
-// (ES2022) must stay within these browsers; raise both together.
+// with docs/export.md. Vite only rewrites syntax, and nothing checks runtime
+// APIs or CSS features against this list (the components' :has() needs
+// Firefox 121). The tsconfig target (ES2022) caps JS built-ins; raise both
+// together.
 const BROWSER_TARGET = [
   'chrome111',
   'edge111',
-  'firefox114',
+  'firefox121',
   'safari16.4',
   'ios16.4',
 ];
+
+// Post-ordered so a target from tessera.config.js or another plugin (such as
+// @vitejs/plugin-legacy) is already set. Vite concatenates arrays when merging
+// hook results, so only fill an unset target.
+function tesseraBuildTargetPlugin(): Plugin {
+  return {
+    name: 'tessera:build-target',
+    config: {
+      order: 'post',
+      handler(config) {
+        if (config.build?.target === undefined) {
+          return { build: { target: BROWSER_TARGET } };
+        }
+      },
+    },
+  };
+}
 
 function tesseraConfigDefaultsPlugin(): Plugin {
   return {
@@ -291,12 +311,7 @@ function tesseraConfigDefaultsPlugin(): Plugin {
       return {
         base: './',
         clearScreen: config.clearScreen ?? false,
-        // Vite concatenates arrays when merging hook results, so only fill
-        // the target when tessera.config.js hasn't set one.
-        build: {
-          assetsDir: 'tessera',
-          ...(config.build?.target === undefined && { target: BROWSER_TARGET }),
-        },
+        build: { assetsDir: 'tessera' },
         resolve: { alias: { $assets: resolve(root, 'assets') } },
         // tessera-learn ships .ts/.svelte.ts source; Vite's dep optimizer
         // doesn't run vite-plugin-svelte's preprocessor, so skip pre-bundling.
