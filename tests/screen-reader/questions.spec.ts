@@ -1,5 +1,9 @@
 import { writeFile } from 'node:fs/promises';
-import { nvda, voiceOver } from '@guidepup/guidepup';
+import {
+  NVDAKeyCodeCommands,
+  voiceOver,
+  voiceOverKeyCodeCommands,
+} from '@guidepup/guidepup';
 import {
   screenReaderTest as test,
   type ScreenReaderPlaywright,
@@ -11,11 +15,11 @@ import { expect, type Locator, type Page } from '@playwright/test';
 const reader = voiceOver.default()
   ? {
       textbox: 'edit text',
-      reportFocus: voiceOver.keyboardCommands.describeItemWithKeyboardFocus,
+      reportFocus: voiceOverKeyCodeCommands.describeItemWithKeyboardFocus,
     }
   : {
       textbox: 'edit',
-      reportFocus: nvda.keyboardCommands.reportCurrentFocus,
+      reportFocus: NVDAKeyCodeCommands.reportCurrentFocus,
     };
 
 async function hears(
