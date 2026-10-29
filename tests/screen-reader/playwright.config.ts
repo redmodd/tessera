@@ -2,7 +2,7 @@ import { withGuidepup } from '@guidepup/playwright';
 
 const port = 5190;
 
-// NVDA runs only on Windows: see .github/workflows/screen-reader.yml.
+// Runs NVDA on Windows and VoiceOver on macOS: see .github/workflows/screen-reader.yml.
 export default withGuidepup({
   testDir: '.',
   outputDir: '../../test-results/screen-reader',
@@ -13,6 +13,7 @@ export default withGuidepup({
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
     { name: 'firefox', use: { browserName: 'firefox' } },
+    { name: 'webkit', use: { browserName: 'webkit' } },
   ],
   webServer: {
     command: `pnpm build && pnpm exec vite preview --port ${port} --strictPort`,

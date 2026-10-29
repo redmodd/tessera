@@ -27,7 +27,7 @@ packages/
   create-tessera/    # scaffolder CLI; scaffolds an AGENTS.md pointer to the guide
 tests/
   e2e/               # Playwright specs across all export modes
-  screen-reader/     # NVDA check via Guidepup (Windows only; own Playwright config)
+  screen-reader/     # NVDA (Windows) + VoiceOver (macOS) check via Guidepup; own Playwright config
   fixtures/          # course projects the e2e suite drives (committed)
 AGENTS.md            # this file: monorepo dev guide
 CONTRIBUTING.md      # setup, conventions, releases
@@ -82,4 +82,4 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 - **templates-e2e**: `pnpm --filter create-tessera test:templates` scaffolds a workspace and builds it under every export standard.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 
-`dependabot-changeset.yml` commits a `patch` changeset listing the version bumps to each Dependabot npm PR that bumps a dependency of a published package. `release.yml` runs changesets on `main`. `screen-reader.yml` runs the NVDA check in Chromium and Firefox on `windows-latest`, by hand or on PRs that touch its `paths`; it is not a required check. CI uploads `coverage-<node>` on every run, `playwright-test-results-<browser>` when e2e fails and `nvda-phrases-<browser>` on every screen reader run; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).
+`dependabot-changeset.yml` commits a `patch` changeset listing the version bumps to each Dependabot npm PR that bumps a dependency of a published package. `release.yml` runs changesets on `main`. `screen-reader.yml` runs the screen reader check with NVDA in Chromium and Firefox on `windows-latest` and with VoiceOver in WebKit and Chromium on `macos-15`, by hand or on PRs that touch its `paths`; it is not a required check. CI uploads `coverage-<node>` on every run, `playwright-test-results-<browser>` when e2e fails and `nvda-phrases-<browser>` / `voiceover-phrases-<browser>` on every screen reader run; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).

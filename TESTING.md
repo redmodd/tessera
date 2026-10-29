@@ -20,7 +20,7 @@ packages/
   create-tessera/tests/  # unit tests for the CLI scaffolder (Vitest)
 tests/
   e2e/                   # Playwright specs across all export modes
-  screen-reader/         # NVDA check (Windows only; own Playwright config)
+  screen-reader/         # NVDA (Windows) + VoiceOver (macOS) check; own Playwright config
   fixtures/              # course projects used by the e2e suite (committed)
   .e2e-variants/         # generated per run by globalSetup; gitignored
 ```
@@ -142,9 +142,11 @@ A fixture entry can also carry `overrides` for a variant that differs by a cours
 
 Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touching the source fixtures. Every e2e run rebuilds the variants before any spec executes, so expect a pause at startup.
 
-### NVDA screen reader check
+### Screen reader check
 
-`tests/screen-reader/` drives NVDA through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what NVDA speaks for the question widgets, in Chromium and Firefox. NVDA runs only on Windows, so it has its own Playwright config and its own workflow, `screen-reader.yml`, with one `windows-latest` job per browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `nvda-phrases.txt`, uploaded as the `nvda-phrases-<browser>` artifact.
+`tests/screen-reader/` drives a screen reader through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what it speaks for the question widgets. It runs the OS's screen reader: NVDA on Windows (Chromium, Firefox) and VoiceOver on macOS (WebKit, Chromium). Phrases that differ between the two go in the `reader` table at the top of the spec. The check has its own Playwright config and its own workflow, `screen-reader.yml`, with one `windows-latest` NVDA job and one `macos-15` VoiceOver job per browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `spoken-phrases.txt`, uploaded as the `nvda-phrases-<browser>` or `voiceover-phrases-<browser>` artifact.
+
+VoiceOver results are noisier than NVDA's: a cold VoiceOver start can drop live-region announcements, and phrase capture can miss speech in WebKit, so a missing phrase isn't proof VoiceOver stayed silent. Playwright's WebKit is the closest automatable engine to Safari, not Safari itself.
 
 On Windows:
 
@@ -153,6 +155,15 @@ pnpm exec playwright install --no-shell chromium firefox
 pnpm exec guidepup install nvda   # rerun after a @guidepup/guidepup bump
 pnpm --filter tessera-learn build
 pnpm exec playwright test -c tests/screen-reader/playwright.config.ts   # --project chromium|firefox for one
+```
+
+On macOS, after `pnpm exec guidepup setup` (once per machine, see the [manual VoiceOver setup](https://www.guidepup.dev/docs/guides/manual-voiceover-setup)):
+
+```bash
+pnpm exec playwright install --no-shell webkit chromium
+pnpm exec guidepup install voiceover
+pnpm --filter tessera-learn build
+pnpm exec playwright test -c tests/screen-reader/playwright.config.ts --project webkit   # or chromium
 ```
 
 ### Fixtures are committed
@@ -173,7 +184,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
-- `nvda-phrases-<browser>`: the NVDA check's `test-results/screen-reader/` (`chromium`, `firefox`), on every screen reader run
+- `nvda-phrases-<browser>` / `voiceover-phrases-<browser>`: the screen reader check's `test-results/screen-reader/` (NVDA: `chromium`, `firefox`; VoiceOver: `webkit`, `chromium`), on every screen reader run
 
 Download from the failed run's Actions page. For Playwright traces:
 

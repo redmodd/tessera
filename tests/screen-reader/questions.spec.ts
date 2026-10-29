@@ -1,59 +1,81 @@
 import { writeFile } from 'node:fs/promises';
-import { nvdaTest as test, type NVDAPlaywright } from '@guidepup/playwright';
+import { nvda, voiceOver } from '@guidepup/guidepup';
+import {
+  screenReaderTest as test,
+  type ScreenReaderPlaywright,
+} from '@guidepup/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
 
+// screenReaderTest starts the OS's screen reader: VoiceOver on macOS, NVDA on
+// Windows. Phrases that differ between the two live here.
+const reader = voiceOver.default()
+  ? {
+      textbox: 'edit text',
+      reportFocus: voiceOver.keyboardCommands.describeItemWithKeyboardFocus,
+    }
+  : {
+      textbox: 'edit',
+      reportFocus: nvda.keyboardCommands.reportCurrentFocus,
+    };
+
 async function hears(
-  nvda: NVDAPlaywright,
+  screenReader: ScreenReaderPlaywright,
   action: () => Promise<unknown>,
   ...phrases: string[]
 ): Promise<string> {
   // Capture ends after 1s without speech, and a loaded runner can take longer
   // to speak a focus move, so keep listening a second past the action.
-  const { spokenPhrase } = await nvda.capture(
+  const { spokenPhrase } = await screenReader.capture(
     async () => {
       await action();
       await new Promise((r) => setTimeout(r, 1000));
     },
     { capture: true },
   );
-  // Chromium exposes CSS text-transform, so NVDA reads uppercase labels in caps.
+  // Chromium exposes CSS text-transform, so labels styled uppercase read in caps.
   const spoken = spokenPhrase.toLowerCase();
   for (const phrase of phrases) expect(spoken).toContain(phrase.toLowerCase());
   return spoken;
 }
 
-// navigateToWebContent clicks the middle of <body>, so it runs on the intro
-// page, where that click can't answer a question.
-async function open(page: Page, nvda: NVDAPlaywright, title: string) {
+// NVDA's navigateToWebContent clicks the middle of <body>, so it runs on the
+// intro page, where that click can't answer a question.
+async function open(
+  page: Page,
+  screenReader: ScreenReaderPlaywright,
+  title: string,
+) {
   await page.goto('/');
   await expect(page.locator('.tessera-content h1')).toHaveText('Start');
-  await nvda.navigateToWebContent();
+  await screenReader.navigateToWebContent();
   await page.locator('.tessera-nav-page', { hasText: title }).click();
   await expect(page.locator('.tessera-content h1')).toHaveText(title);
 }
 
-test.afterEach(async ({ nvda }, testInfo) => {
-  const log = await nvda.spokenPhraseLog();
-  await writeFile(testInfo.outputPath('nvda-phrases.txt'), log.join('\n'));
+test.afterEach(async ({ screenReader }, testInfo) => {
+  const log = await screenReader.spokenPhraseLog();
+  await writeFile(testInfo.outputPath('spoken-phrases.txt'), log.join('\n'));
 });
 
 test.describe('standalone questions', () => {
-  test.beforeEach(({ page, nvda }) => open(page, nvda, 'Standalone Questions'));
+  test.beforeEach(({ page, screenReader }) =>
+    open(page, screenReader, 'Standalone Questions'),
+  );
 
   async function submitAndRetry(
-    nvda: NVDAPlaywright,
+    screenReader: ScreenReaderPlaywright,
     question: Locator,
     result: string,
     firstControl: Locator,
     ...focusPhrases: string[]
   ) {
     await hears(
-      nvda,
+      screenReader,
       () => question.getByRole('button', { name: 'Submit' }).click(),
       result,
     );
     await hears(
-      nvda,
+      screenReader,
       () => question.getByRole('button', { name: 'Try again' }).click(),
       ...focusPhrases,
     );
@@ -62,12 +84,12 @@ test.describe('standalone questions', () => {
 
   test('MultipleChoice reads its result, and Try again returns focus', async ({
     page,
-    nvda,
+    screenReader,
   }) => {
     const mc = page.locator('.tessera-mc');
     await mc.getByText('Venus').click();
     await submitAndRetry(
-      nvda,
+      screenReader,
       mc,
       'Incorrect',
       mc.getByRole('radio', { name: 'Venus' }),
@@ -78,23 +100,23 @@ test.describe('standalone questions', () => {
 
   test('FillInTheBlank reads its result, and Try again returns focus', async ({
     page,
-    nvda,
+    screenReader,
   }) => {
     const fitb = page.locator('.tessera-fitb');
     await fitb.getByRole('textbox').fill('water');
     await submitAndRetry(
-      nvda,
+      screenReader,
       fitb,
       'Incorrect',
       fitb.getByRole('textbox'),
       'What is the chemical symbol for water?',
-      'edit',
+      reader.textbox,
     );
   });
 
   test('Matching reads its result, and Try again returns focus', async ({
     page,
-    nvda,
+    screenReader,
   }) => {
     const matching = page.locator('.tessera-matching');
     const left = (text: string) =>
@@ -106,7 +128,7 @@ test.describe('standalone questions', () => {
     await left('2').click();
     await right('One').click();
     await submitAndRetry(
-      nvda,
+      screenReader,
       matching,
       'Some pairs are incorrect',
       left('1'),
@@ -116,7 +138,7 @@ test.describe('standalone questions', () => {
 
   test('Sorting reads its result, and Try again returns focus', async ({
     page,
-    nvda,
+    screenReader,
   }) => {
     const sorting = page.locator('.tessera-sorting');
     const card = sorting.locator('.tessera-sorting-card');
@@ -132,7 +154,7 @@ test.describe('standalone questions', () => {
         .click();
     }
     await submitAndRetry(
-      nvda,
+      screenReader,
       sorting,
       'Some items are in the wrong category',
       card,
@@ -142,35 +164,45 @@ test.describe('standalone questions', () => {
 
   test('a selected Sorting card says to choose a target, and the targets are a list', async ({
     page,
-    nvda,
+    screenReader,
   }) => {
     const card = page.locator('.tessera-sorting-card');
-    await hears(nvda, () => card.focus(), (await card.textContent())!.trim());
+    await hears(
+      screenReader,
+      () => card.focus(),
+      (await card.textContent())!.trim(),
+    );
     await card.press('Enter');
     await expect(card).toHaveAttribute('aria-pressed', 'true');
 
-    await nvda.perform(nvda.keyboardCommands.reportCurrentFocus, {
-      capture: true,
-    });
-    expect((await nvda.lastSpokenPhrase()).toLowerCase()).toContain(
+    await screenReader.perform(reader.reportFocus, { capture: true });
+    expect((await screenReader.lastSpokenPhrase()).toLowerCase()).toContain(
       'choose a target',
     );
 
-    await hears(nvda, () => page.keyboard.press('Tab'), 'list', 'Fruit');
+    await hears(
+      screenReader,
+      () => page.keyboard.press('Tab'),
+      'list',
+      'Fruit',
+    );
     await expect(page.getByRole('button', { name: /^Fruit/ })).toBeFocused();
   });
 });
 
-test('an immediate-mode quiz announces each result', async ({ page, nvda }) => {
-  await open(page, nvda, 'Immediate Quiz');
+test('an immediate-mode quiz announces each result', async ({
+  page,
+  screenReader,
+}) => {
+  await open(page, screenReader, 'Immediate Quiz');
   const active = page.locator('.tessera-quiz-question-wrapper.active');
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await active.getByText('3', { exact: true }).click();
-  await hears(nvda, () => primary.click(), 'Incorrect');
+  await hears(screenReader, () => primary.click(), 'Incorrect');
 
-  await hears(nvda, () => primary.click(), 'Question 2 of 2');
+  await hears(screenReader, () => primary.click(), 'Question 2 of 2');
   await active.getByRole('textbox').fill('blue');
-  const spoken = await hears(nvda, () => primary.click(), 'Correct');
+  const spoken = await hears(screenReader, () => primary.click(), 'Correct');
   expect(spoken).not.toContain('incorrect');
 });

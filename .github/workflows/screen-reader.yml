@@ -1,6 +1,6 @@
 name: Screen reader
 
-# Not a required check: NVDA on hosted runners can be flaky.
+# Not a required check: screen readers on hosted runners can be flaky.
 on:
   workflow_dispatch:
   pull_request:
@@ -59,6 +59,46 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nvda-phrases-${{ matrix.browser }}
+          path: test-results/screen-reader/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  voiceover:
+    name: VoiceOver (${{ matrix.browser }}, macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Playwright's Firefox doesn't start on current macOS.
+        browser: [webkit, chromium]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
+
+      # Grants the automation permissions VoiceOver needs, then installs the
+      # assets the installed @guidepup/guidepup expects.
+      - run: pnpm exec guidepup setup --ci
+      - run: pnpm exec guidepup install voiceover
+
+      - run: pnpm --filter tessera-learn build
+
+      - run: pnpm exec playwright test -c tests/screen-reader/playwright.config.ts --project ${{ matrix.browser }}
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: voiceover-phrases-${{ matrix.browser }}
           path: test-results/screen-reader/
           retention-days: 7
           if-no-files-found: ignore
