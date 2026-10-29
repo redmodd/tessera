@@ -4,4 +4,4 @@
 
 <h1>Start</h1>
 
-<p>Question widgets for the NVDA check.</p>
+<p>Question widgets for the screen reader check.</p>

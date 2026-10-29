@@ -1,16 +1,9 @@
 import { writeFile } from 'node:fs/promises';
-import { voiceOver } from '@guidepup/guidepup';
 import {
   screenReaderTest as test,
   type ScreenReaderPlaywright,
 } from '@guidepup/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
-
-// screenReaderTest starts the OS's screen reader: VoiceOver on macOS, NVDA on
-// Windows. Phrases that differ between the two live here.
-const reader = voiceOver.default()
-  ? { textbox: 'edit text' }
-  : { textbox: 'edit' };
 
 // Checked by hand in Safari: VoiceOver reads the result and the field's label,
 // but WebKit capture drops speech around a text field.
@@ -111,7 +104,8 @@ test.describe('standalone questions', () => {
       'Incorrect',
       fitb.getByRole('textbox'),
       'What is the chemical symbol for water?',
-      reader.textbox,
+      // NVDA says "edit", VoiceOver "edit text".
+      'edit',
     );
   });
 
@@ -173,12 +167,19 @@ test.describe('standalone questions', () => {
       () => card.focus(),
       (await card.textContent())!.trim(),
     );
-    await card.press('Enter');
-    await expect(card).toHaveAttribute('aria-pressed', 'true');
-
     // Leave and return, so the reader announces the selected card afresh.
-    await page.keyboard.press('Shift+Tab');
-    await hears(screenReader, () => card.focus(), 'choose a target');
+    // Captured, so VoiceOver's delayed hint can't land in the next check.
+    await hears(screenReader, async () => {
+      await card.press('Enter');
+      await page.keyboard.press('Shift+Tab');
+    });
+    await expect(card).toHaveAttribute('aria-pressed', 'true');
+    const spoken = await hears(
+      screenReader,
+      () => card.focus(),
+      'choose a target',
+    );
+    expect(spoken).not.toContain('activate');
 
     await hears(
       screenReader,
@@ -195,7 +196,6 @@ test('an immediate-mode quiz announces each result', async ({
   screenReader,
   browserName,
 }) => {
-  test.fixme(browserName === 'webkit', webkitTextFieldCapture);
   await open(page, screenReader, 'Immediate Quiz');
   const active = page.locator('.tessera-quiz-question-wrapper.active');
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
@@ -204,7 +204,10 @@ test('an immediate-mode quiz announces each result', async ({
   await hears(screenReader, () => primary.click(), 'Incorrect');
 
   await hears(screenReader, () => primary.click(), 'Question 2 of 2');
-  await active.getByRole('textbox').fill('blue');
-  const spoken = await hears(screenReader, () => primary.click(), 'Correct');
-  expect(spoken).not.toContain('incorrect');
+  await test.step('the text field result', async (step) => {
+    step.skip(browserName === 'webkit', webkitTextFieldCapture);
+    await active.getByRole('textbox').fill('blue');
+    const spoken = await hears(screenReader, () => primary.click(), 'Correct');
+    expect(spoken).not.toContain('incorrect');
+  });
 });
