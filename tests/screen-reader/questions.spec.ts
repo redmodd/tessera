@@ -1,9 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import {
-  NVDAKeyCodeCommands,
-  voiceOver,
-  voiceOverKeyCodeCommands,
-} from '@guidepup/guidepup';
+import { voiceOver } from '@guidepup/guidepup';
 import {
   screenReaderTest as test,
   type ScreenReaderPlaywright,
@@ -13,14 +9,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 // screenReaderTest starts the OS's screen reader: VoiceOver on macOS, NVDA on
 // Windows. Phrases that differ between the two live here.
 const reader = voiceOver.default()
-  ? {
-      textbox: 'edit text',
-      reportFocus: voiceOverKeyCodeCommands.describeItemWithKeyboardFocus,
-    }
-  : {
-      textbox: 'edit',
-      reportFocus: NVDAKeyCodeCommands.reportCurrentFocus,
-    };
+  ? { textbox: 'edit text' }
+  : { textbox: 'edit' };
 
 async function hears(
   screenReader: ScreenReaderPlaywright,
@@ -179,12 +169,9 @@ test.describe('standalone questions', () => {
     await card.press('Enter');
     await expect(card).toHaveAttribute('aria-pressed', 'true');
 
-    await screenReader.perform(reader.reportFocus, { capture: true });
-    expect((await screenReader.lastSpokenPhrase()).toLowerCase()).toContain(
-      'choose a target',
-    );
-    // VoiceOver speaks its usage hint a beat later, over the Tab announcement.
-    await hears(screenReader, async () => {});
+    // Leave and return, so the reader announces the selected card afresh.
+    await page.keyboard.press('Shift+Tab');
+    await hears(screenReader, () => card.focus(), 'choose a target');
 
     await hears(
       screenReader,
