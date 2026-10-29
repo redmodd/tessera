@@ -31,12 +31,9 @@
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
-  let correctCount = $derived(
-    handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
-  );
-  let scoredCount = $derived(
-    handle.questions.filter((q) => q.correct !== null).length,
-  );
+  let results = $derived(handle.questions.map((q) => q.correct));
+  let correctCount = $derived(results.filter((c) => c).length);
+  let scoredCount = $derived(results.filter((c) => c !== null).length);
   let attemptPassed = $derived(handle.score >= handle.passingScore);
   let passed = $derived(handle.bestScore >= handle.passingScore);
   let bestBeaten = $derived(handle.bestScore > handle.score);

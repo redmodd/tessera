@@ -856,25 +856,34 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(100);
   });
 
-  it('incorrect-only retry resets a question with no correct answer', () => {
+  it('incorrect-only retry keeps a no-correct answer unlocked and resets a wrong one', () => {
     const { engine } = makeEngine({
       graded: true,
       retryMode: 'incorrect-only',
     });
-    const reset = vi.fn();
-    engine.registerQuestion({
+    const keptReset = vi.fn();
+    const wrongReset = vi.fn();
+    const kept = engine.registerQuestion({
       id: 'a',
       checkAnswer: () => null,
-      reset,
+      reset: keptReset,
       interaction: () => ({ type: 'long-fill-in', response: 'x' }),
     });
+    engine.registerQuestion({
+      ...tfQuestion('b', false, true),
+      reset: wrongReset,
+    });
     engine.setAnswer(0, 'x');
+    engine.setAnswer(1, false);
     engine.submit();
 
     engine.retry();
-    expect(engine.isLockedCorrect(0)).toBe(false);
-    expect(engine.getAnswer(0)).toBeUndefined();
-    expect(reset).toHaveBeenCalledTimes(1);
+    expect(engine.getAnswer(0)).toBe('x');
+    expect(kept.locked).toBe(false);
+    expect(kept.isLockedCorrect).toBe(false);
+    expect(keptReset).not.toHaveBeenCalled();
+    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(wrongReset).toHaveBeenCalledTimes(1);
   });
 
   it('weight=1 (default) scores the unweighted mean to 2 decimal places', () => {

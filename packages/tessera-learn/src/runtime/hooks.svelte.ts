@@ -407,7 +407,7 @@ export function useCourse(): {
  */
 export interface UseQuizQuestionApi {
   id: string;
-  /** Optional weight for the score rollup. Default 1 — `Σ(w·correct)/Σ(w)·100`. */
+  /** Optional weight for the score rollup, default 1: `Σ(w·correct)/Σ(w)·100` over the questions with a `correct`. */
   weight?: number;
   /** `null` when the question has no `correct`: it is left out of the score. */
   checkAnswer: () => boolean | null;
