@@ -25,14 +25,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  nvda:
-    name: NVDA (${{ matrix.browser }}, Windows)
-    runs-on: windows-latest
+  screen-reader:
+    name: ${{ matrix.label }} (${{ matrix.browser }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
+        reader: [nvda, voiceover]
+        browser: [chromium, firefox, webkit]
+        exclude:
+          # WebKit stands in for Safari, which is macOS-only.
+          - { reader: nvda, browser: webkit }
+        include:
+          - { reader: nvda, label: NVDA, os: windows-latest }
+          - { reader: voiceover, label: VoiceOver, os: macos-15 }
     steps:
       - uses: actions/checkout@v7
 
@@ -48,8 +55,12 @@ jobs:
       # Screen readers need a headed browser, so skip Chromium's headless shell.
       - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
 
-      # Downloads the NVDA build that the installed @guidepup/guidepup expects.
-      - run: pnpm exec guidepup install nvda
+      # Grants the automation permissions VoiceOver needs.
+      - if: runner.os == 'macOS'
+        run: pnpm exec guidepup setup --ci
+
+      # Downloads the screen reader build that the installed @guidepup/guidepup expects.
+      - run: pnpm exec guidepup install ${{ matrix.reader }}
 
       - run: pnpm --filter tessera-learn build
 
@@ -58,47 +69,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: nvda-phrases-${{ matrix.browser }}
-          path: test-results/screen-reader/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  voiceover:
-    name: VoiceOver (${{ matrix.browser }}, macOS)
-    runs-on: macos-15
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # Playwright's Firefox doesn't start on current macOS.
-        browser: [webkit, chromium]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
-
-      # Grants the automation permissions VoiceOver needs, then installs the
-      # assets the installed @guidepup/guidepup expects.
-      - run: pnpm exec guidepup setup --ci
-      - run: pnpm exec guidepup install voiceover
-
-      - run: pnpm --filter tessera-learn build
-
-      - run: pnpm exec playwright test -c tests/screen-reader/playwright.config.ts --project ${{ matrix.browser }}
-
-      - if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: voiceover-phrases-${{ matrix.browser }}
+          name: ${{ matrix.reader }}-phrases-${{ matrix.browser }}
           path: test-results/screen-reader/
           retention-days: 7
           if-no-files-found: ignore

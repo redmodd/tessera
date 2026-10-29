@@ -2,10 +2,10 @@ import { withGuidepup } from '@guidepup/playwright';
 
 const port = 5190;
 
-// Playwright's Firefox doesn't start on current macOS.
+// WebKit stands in for Safari, which is macOS-only.
 const browsers =
   process.platform === 'darwin'
-    ? (['webkit', 'chromium'] as const)
+    ? (['chromium', 'firefox', 'webkit'] as const)
     : (['chromium', 'firefox'] as const);
 
 // Runs NVDA on Windows and VoiceOver on macOS: see .github/workflows/screen-reader.yml.
