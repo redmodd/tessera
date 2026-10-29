@@ -1,6 +1,6 @@
 name: Screen reader
 
-# Not a required check: NVDA on hosted runners can be flaky.
+# Not a required check: screen readers on hosted runners can be flaky.
 on:
   workflow_dispatch:
   pull_request:
@@ -25,14 +25,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  nvda:
-    name: NVDA (${{ matrix.browser }}, Windows)
-    runs-on: windows-latest
+  screen-reader:
+    name: ${{ matrix.label }} (${{ matrix.browser }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
+        reader: [nvda, voiceover]
+        browser: [chromium, firefox, webkit]
+        exclude:
+          # WebKit stands in for Safari, which is macOS-only.
+          - { reader: nvda, browser: webkit }
+          # VoiceOver in Firefox misreads text fields and sometimes ignores
+          # clicks; NVDA covers Firefox.
+          - { reader: voiceover, browser: firefox }
+        include:
+          - { reader: nvda, label: NVDA, os: windows-latest }
+          - { reader: voiceover, label: VoiceOver, os: macos-15 }
     steps:
       - uses: actions/checkout@v7
 
@@ -48,8 +58,12 @@ jobs:
       # Screen readers need a headed browser, so skip Chromium's headless shell.
       - run: pnpm exec playwright install --no-shell ${{ matrix.browser }}
 
-      # Downloads the NVDA build that the installed @guidepup/guidepup expects.
-      - run: pnpm exec guidepup install nvda
+      # Grants the automation permissions VoiceOver needs.
+      - if: runner.os == 'macOS'
+        run: pnpm exec guidepup setup --ci
+
+      # Downloads the screen reader build that the installed @guidepup/guidepup expects.
+      - run: pnpm exec guidepup install ${{ matrix.reader }}
 
       - run: pnpm --filter tessera-learn build
 
@@ -58,7 +72,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: nvda-phrases-${{ matrix.browser }}
+          name: ${{ matrix.reader }}-phrases-${{ matrix.browser }}
           path: test-results/screen-reader/
           retention-days: 7
           if-no-files-found: ignore
