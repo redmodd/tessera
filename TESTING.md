@@ -146,7 +146,7 @@ Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touc
 
 `tests/screen-reader/` drives a screen reader through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what it speaks for the question widgets. It runs the OS's screen reader: NVDA on Windows (Chromium, Firefox) and VoiceOver on macOS (WebKit, Chromium). Phrases that differ between the two go in the `reader` table at the top of the spec. The check has its own Playwright config and its own workflow, `screen-reader.yml`, with one `windows-latest` NVDA job and one `macos-15` VoiceOver job per browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `spoken-phrases.txt`, uploaded as the `nvda-phrases-<browser>` or `voiceover-phrases-<browser>` artifact.
 
-VoiceOver results are noisier than NVDA's: a cold VoiceOver start can drop live-region announcements, and phrase capture can miss speech in WebKit, so a missing phrase isn't proof VoiceOver stayed silent. Playwright's WebKit is the closest automatable engine to Safari, not Safari itself.
+VoiceOver results are noisier than NVDA's: a cold VoiceOver start can drop live-region announcements, and phrase capture can miss speech in WebKit, so a missing phrase isn't proof VoiceOver stayed silent. Check a WebKit miss by hand in Safari before treating it as a bug; the text-field checks are `test.fixme` under WebKit for this reason. Playwright's WebKit is the closest automatable engine to Safari, not Safari itself.
 
 On Windows:
 
