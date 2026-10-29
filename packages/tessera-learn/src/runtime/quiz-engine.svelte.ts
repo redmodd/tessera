@@ -45,7 +45,7 @@ export interface QuizEngineDeps {
 interface InternalQuestion {
   id: string;
   weight: number;
-  checkAnswer: () => boolean;
+  checkAnswer: () => boolean | null;
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
@@ -355,12 +355,14 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   #computeScore(): number {
-    return weightedScore(
-      this.#internalQuestions.map((q) => ({
-        score: q.checkAnswer() ? 100 : 0,
-        weight: q.weight,
-      })),
-    );
+    const scored = this.#internalQuestions.flatMap((q) => {
+      const correct = q.checkAnswer();
+      return correct === null
+        ? []
+        : [{ score: correct ? 100 : 0, weight: q.weight }];
+    });
+    // A quiz of only survey or reflection questions has nothing to fail.
+    return scored.length ? weightedScore(scored) : 100;
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

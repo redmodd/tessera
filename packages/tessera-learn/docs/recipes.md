@@ -207,7 +207,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}{@render view()}{/if}
 ```
 
-`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when a standalone question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when the question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 

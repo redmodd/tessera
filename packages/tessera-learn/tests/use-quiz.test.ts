@@ -822,6 +822,61 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(75);
   });
 
+  it('leaves a question with no correct answer out of the score and the result', () => {
+    const { engine, events, reports } = makeEngine();
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const b = engine.registerQuestion({
+      id: 'b',
+      weight: 3,
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'anything' }),
+    });
+    engine.setAnswer(0, true);
+    engine.setAnswer(1, 'anything');
+    engine.submit();
+
+    expect(completeScore(events)).toBe(100);
+    expect(reports.map((r) => [r.id, r.correct])).toEqual([
+      ['a', true],
+      ['b', null],
+    ]);
+    expect(a.correct).toBe(true);
+    expect(b.correct).toBeNull();
+  });
+
+  it('scores 100 when no question has a correct answer', () => {
+    const { engine, events } = makeEngine();
+    engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(completeScore(events)).toBe(100);
+  });
+
+  it('incorrect-only retry resets a question with no correct answer', () => {
+    const { engine } = makeEngine({
+      graded: true,
+      retryMode: 'incorrect-only',
+    });
+    const reset = vi.fn();
+    engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      reset,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+
+    engine.retry();
+    expect(engine.isLockedCorrect(0)).toBe(false);
+    expect(engine.getAnswer(0)).toBeUndefined();
+    expect(reset).toHaveBeenCalledTimes(1);
+  });
+
   it('weight=1 (default) scores the unweighted mean to 2 decimal places', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct

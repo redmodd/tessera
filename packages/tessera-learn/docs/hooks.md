@@ -27,7 +27,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null on a quiz restored without its answers (see `useQuiz().restored`)
+  readonly correct: boolean | null; // null while answering, for a question with no `correct`, and on a quiz restored without its answers (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -43,7 +43,7 @@ Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to rende
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
-`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness). Standalone, `QuestionReview` shows a neutral `Submitted` result; inside a quiz the question still counts as wrong. A standalone question with no `correct` scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down: pass `score: () => 100` to accept any answer.
+`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result. Inside a quiz the question is left out of the score, and of the built-in `<Quiz>`'s correct count; a quiz with no `correct` on any question scores 100. An `incorrect-only` retry resets it. A standalone question with no `correct` scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down: pass `score: () => 100` to accept any answer.
 
 ```ts
 type Interaction =

@@ -34,6 +34,9 @@
   let correctCount = $derived(
     handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
   );
+  let scoredCount = $derived(
+    handle.questions.filter((q) => q.correct !== null).length,
+  );
   let attemptPassed = $derived(handle.score >= handle.passingScore);
   let passed = $derived(handle.bestScore >= handle.passingScore);
   let bestBeaten = $derived(handle.bestScore > handle.score);
@@ -294,9 +297,9 @@
           {/if}
           {#if handle.restored}
             <p class="tessera-quiz-results-detail">Your previous result.</p>
-          {:else}
+          {:else if scoredCount > 0}
             <p class="tessera-quiz-results-detail">
-              You answered {correctCount} of {totalQuestions} questions correctly.
+              You answered {correctCount} of {scoredCount} questions correctly.
             </p>
           {/if}
         </div>
