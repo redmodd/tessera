@@ -144,9 +144,9 @@ Tests then read `tests/.e2e-variants/{fixture}/{standard}/dist/` instead of touc
 
 ### Screen reader check
 
-`tests/screen-reader/` drives a screen reader through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what it speaks for the question widgets. It runs the OS's screen reader: NVDA on Windows (Chromium, Firefox) and VoiceOver on macOS (Chromium, WebKit); the config picks the browsers from the OS. The check has its own Playwright config and its own workflow, `screen-reader.yml`, with one job per reader and browser, on `windows-latest` for NVDA and `macos-15` for VoiceOver. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the paths listed in the workflow. Each test writes its spoken phrases to `spoken-phrases.txt`, uploaded as the `nvda-phrases-<browser>` or `voiceover-phrases-<browser>` artifact.
+`tests/screen-reader/` drives the OS's screen reader through [Guidepup](https://github.com/guidepup/guidepup-playwright) against the `tests/fixtures/screen-reader` course and asserts what it speaks for the question widgets: NVDA on Windows (Chromium, Firefox), VoiceOver on macOS (Chromium, WebKit). It has its own Playwright config and workflow, `screen-reader.yml`, with one job per reader and browser. It is not a required check. Run it from the Actions tab (`workflow_dispatch`); it also runs on PRs that touch the workflow's `paths`. Each test writes its spoken phrases to `spoken-phrases.txt`.
 
-VoiceOver results are noisier than NVDA's: a cold VoiceOver start can drop live-region announcements, and phrase capture can miss speech in WebKit, so a missing phrase isn't proof VoiceOver stayed silent. Check a WebKit miss by hand in Safari before treating it as a bug; the text-field checks are `fixme` or skipped under WebKit for this reason.
+VoiceOver capture misses speech more often than NVDA's, especially in WebKit, so check a WebKit miss by hand in Safari before calling it a bug. The text-field checks are `fixme` or skipped under WebKit for this reason.
 
 On Windows:
 
@@ -184,7 +184,7 @@ CI uploads these artifacts:
 
 - `coverage-<node>`: `packages/*/coverage/` from each unit-test job, on every run
 - `playwright-test-results-<browser>`: `test-results/` from each e2e job (`chromium`, `firefox`, `webkit`) when it fails, with a trace for every failed attempt
-- `nvda-phrases-<browser>` / `voiceover-phrases-<browser>`: the screen reader check's `test-results/screen-reader/` (NVDA: `chromium`, `firefox`; VoiceOver: `webkit`, `chromium`), on every screen reader run
+- `<reader>-phrases-<browser>`: the screen reader check's `test-results/screen-reader/`, on every screen reader run
 
 Download from the failed run's Actions page. For Playwright traces:
 
