@@ -66,9 +66,6 @@ test.describe('standalone questions', () => {
     open(page, screenReader, 'Standalone Questions'),
   );
 
-  // WebKit doesn't focus a clicked button, so focus would stay on the answer
-  // and VoiceOver re-reads it over the result. Press the buttons from the
-  // keyboard, as a screen reader user does.
   async function submitAndRetry(
     screenReader: ScreenReaderPlaywright,
     question: Locator,
@@ -78,12 +75,12 @@ test.describe('standalone questions', () => {
   ) {
     await hears(
       screenReader,
-      () => question.getByRole('button', { name: 'Submit' }).press('Enter'),
+      () => question.getByRole('button', { name: 'Submit' }).click(),
       result,
     );
     await hears(
       screenReader,
-      () => question.getByRole('button', { name: 'Try again' }).press('Enter'),
+      () => question.getByRole('button', { name: 'Try again' }).click(),
       ...focusPhrases,
     );
     await expect(firstControl).toBeFocused();
@@ -182,12 +179,12 @@ test.describe('standalone questions', () => {
     await card.press('Enter');
     await expect(card).toHaveAttribute('aria-pressed', 'true');
 
-    // Inside hears, so VoiceOver's delayed hint lands here, not in the Tab capture.
-    await hears(
-      screenReader,
-      () => screenReader.perform(reader.reportFocus, { capture: false }),
+    await screenReader.perform(reader.reportFocus, { capture: true });
+    expect((await screenReader.lastSpokenPhrase()).toLowerCase()).toContain(
       'choose a target',
     );
+    // VoiceOver speaks its usage hint a beat later, over the Tab announcement.
+    await hears(screenReader, async () => {});
 
     await hears(
       screenReader,
@@ -208,14 +205,10 @@ test('an immediate-mode quiz announces each result', async ({
   const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
 
   await active.getByText('3', { exact: true }).click();
-  await hears(screenReader, () => primary.press('Enter'), 'Incorrect');
+  await hears(screenReader, () => primary.click(), 'Incorrect');
 
-  await hears(screenReader, () => primary.press('Enter'), 'Question 2 of 2');
+  await hears(screenReader, () => primary.click(), 'Question 2 of 2');
   await active.getByRole('textbox').fill('blue');
-  const spoken = await hears(
-    screenReader,
-    () => primary.press('Enter'),
-    'Correct',
-  );
+  const spoken = await hears(screenReader, () => primary.click(), 'Correct');
   expect(spoken).not.toContain('incorrect');
 });
