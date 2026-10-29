@@ -37,6 +37,9 @@ jobs:
         exclude:
           # WebKit stands in for Safari, which is macOS-only.
           - { reader: nvda, browser: webkit }
+          # VoiceOver in Firefox misreads text fields and sometimes ignores
+          # clicks; NVDA covers Firefox.
+          - { reader: voiceover, browser: firefox }
         include:
           - { reader: nvda, label: NVDA, os: windows-latest }
           - { reader: voiceover, label: VoiceOver, os: macos-15 }

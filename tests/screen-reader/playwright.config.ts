@@ -2,10 +2,11 @@ import { withGuidepup } from '@guidepup/playwright';
 
 const port = 5190;
 
-// WebKit stands in for Safari, which is macOS-only.
+// WebKit stands in for Safari, which is macOS-only. VoiceOver in Firefox
+// misreads text fields and sometimes ignores clicks; NVDA covers Firefox.
 const browsers =
   process.platform === 'darwin'
-    ? (['chromium', 'firefox', 'webkit'] as const)
+    ? (['chromium', 'webkit'] as const)
     : (['chromium', 'firefox'] as const);
 
 // Runs NVDA on Windows and VoiceOver on macOS: see .github/workflows/screen-reader.yml.
