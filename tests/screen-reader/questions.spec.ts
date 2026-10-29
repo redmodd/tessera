@@ -17,12 +17,14 @@ async function hears(
 ): Promise<string> {
   // Capture ends after 1s without speech, and a loaded runner can take longer
   // to speak a focus move, so keep listening a second past the action.
-  const { spokenPhrase } = await screenReader.capture(
-    async () => {
-      await action();
-      await new Promise((r) => setTimeout(r, 1000));
-    },
-    { capture: true },
+  const { spokenPhrase } = await test.step(`hears ${phrases.join(' | ')}`, () =>
+    screenReader.capture(
+      async () => {
+        await action();
+        await new Promise((r) => setTimeout(r, 1000));
+      },
+      { capture: true },
+    ),
   );
   // Chromium exposes CSS text-transform, so labels styled uppercase read in caps.
   const spoken = spokenPhrase.toLowerCase();
@@ -39,7 +41,7 @@ async function open(
 ) {
   await page.goto('/');
   await expect(page.locator('.tessera-content h1')).toHaveText('Start');
-  await screenReader.navigateToWebContent();
+  await test.step('navigateToWebContent', () => screenReader.navigateToWebContent());
   await page.locator('.tessera-nav-page', { hasText: title }).click();
   await expect(page.locator('.tessera-content h1')).toHaveText(title);
 }

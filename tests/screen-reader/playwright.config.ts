@@ -15,7 +15,7 @@ export default withGuidepup({
   outputDir: '../../test-results/screen-reader',
   timeout: 90000,
   retries: process.env.CI ? 1 : 0,
-  reporter: 'list',
+  reporter: [['list'], ['json', { outputFile: '../../test-results/screen-reader/report.json' }]],
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
   projects: browsers.map((browserName) => ({
     name: browserName,
