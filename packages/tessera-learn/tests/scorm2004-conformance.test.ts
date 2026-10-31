@@ -160,15 +160,14 @@ describe('SCORM2004Adapter against scorm-again', () => {
         await start();
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const long = 'a'.repeat(max + 1);
-        const fits = 'b'.repeat(max - '{case_matters=true}'.length);
         const interaction: Interaction =
           type === 'other'
             ? { type, response: long, correct: long }
             : {
                 type,
                 response: long,
-                correct: [long, fits + 'b', fits],
-                caseMatters: type === 'fill-in',
+                correct: [long, 'b'.repeat(max)],
+                caseMatters: true,
               };
         adapter.reportInteraction('q1', interaction, true);
         await flush();
@@ -375,7 +374,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'starting or ending in whitespace',
       ],
       [
-        'a case-sensitive answer with a space after the prefix',
+        'a case-sensitive answer starting with a space',
         {
           type: 'fill-in',
           response: 'Paris',
@@ -383,8 +382,8 @@ describe('SCORM2004Adapter against scorm-again', () => {
           caseMatters: true,
         },
         'Paris',
-        '{case_matters=true} Paris',
-        undefined,
+        '',
+        'starting or ending in whitespace',
       ],
       [
         'a repeated sequence item',
