@@ -16,7 +16,7 @@ function mountWidget(
   props: Record<string, unknown>,
   quiz?: QuizConfig,
 ) {
-  const { target } = mountQuestion(widget, props, { quiz });
+  const { target, unmount } = mountQuestion(widget, props, { quiz });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -37,7 +37,7 @@ function mountWidget(
     el.click();
     flushSync();
   };
-  return { target, button, name, click };
+  return { target, button, name, click, unmount };
 }
 
 describe('Sorting accessible names', () => {
@@ -502,6 +502,23 @@ describe('standalone feedback', () => {
     await expect
       .poll(() => document.activeElement)
       .toBe(mounted.target.querySelector('fieldset input'));
+  });
+
+  it('does not warn when the question unmounts before Try again moves focus', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mounted = mountWidget(CustomChoice, {
+      prompt: '2 + 2?',
+      options: ['3', '4'],
+      correct: 1,
+    });
+    submitOption(mounted, 0);
+    mounted.click(mounted.button('Try again'));
+    mounted.unmount();
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+    );
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it.each([

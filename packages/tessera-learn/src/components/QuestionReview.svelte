@@ -49,7 +49,7 @@
   let restored = untrack(() => q.feedbackVisible);
 
   // NVDA in Firefox misreads or drops a focus move made in the same frame as
-  // the page change, so wait for Firefox's accessibility tree to catch up.
+  // the DOM change, so wait for Firefox's accessibility tree to catch up.
   const afterNextFrame = () =>
     new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
 
