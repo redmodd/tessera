@@ -16,7 +16,7 @@ function mountWidget(
   props: Record<string, unknown>,
   quiz?: QuizConfig,
 ) {
-  const { target } = mountQuestion(widget, props, { quiz });
+  const { target, unmount } = mountQuestion(widget, props, { quiz });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -37,7 +37,7 @@ function mountWidget(
     el.click();
     flushSync();
   };
-  return { target, button, name, click };
+  return { target, button, name, click, unmount };
 }
 
 describe('Sorting accessible names', () => {
@@ -504,6 +504,48 @@ describe('standalone feedback', () => {
       .toBe(mounted.target.querySelector('fieldset input'));
   });
 
+  it.each(['Submit', 'Try again'])(
+    'keeps focus the learner moves before %s focuses',
+    async (pressed) => {
+      const mounted = mountWidget(CustomChoice, {
+        prompt: '2 + 2?',
+        options: ['3', '4'],
+        correct: 1,
+      });
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      submitOption(mounted, 0);
+      if (pressed === 'Try again') {
+        await expect.poll(focusedText).toContain('Try again');
+        mounted.click(mounted.button('Try again'));
+      }
+      elsewhere.focus();
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+      );
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    },
+  );
+
+  it('does not warn when the question unmounts before Try again moves focus', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mounted = mountWidget(CustomChoice, {
+      prompt: '2 + 2?',
+      options: ['3', '4'],
+      correct: 1,
+    });
+    submitOption(mounted, 0);
+    mounted.click(mounted.button('Try again'));
+    mounted.unmount();
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: 'is the page',
@@ -558,10 +600,10 @@ describe('custom widget in a quiz', () => {
     click(active.querySelector('input')!);
     click(button('Submit'));
 
-    await expect
-      .poll(() => document.activeElement?.textContent ?? '')
-      .toContain('The right answer was 4.');
-    expect(active.contains(document.activeElement)).toBe(true);
+    await expect.poll(() => active.contains(document.activeElement)).toBe(true);
     expect(document.activeElement!.getAttribute('role')).toBe('group');
+    expect(document.activeElement!.textContent).toContain(
+      'The right answer was 4.',
+    );
   });
 });
