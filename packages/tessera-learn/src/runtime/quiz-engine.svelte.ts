@@ -363,8 +363,16 @@ export class QuizEngine implements UseQuizHandle {
         ? []
         : [{ score: correct ? 100 : 0, weight: q.weight }];
     });
+    if (scored.length) return weightedScore(scored);
+    if (import.meta.env?.DEV && this.#deps.quizConfig.graded) {
+      console.warn(
+        '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
+          'so every learner scores 100 toward the course score. ' +
+          'Leave `graded` off for a survey or reflection quiz.',
+      );
+    }
     // A quiz of only survey or reflection questions has nothing to fail.
-    return scored.length ? weightedScore(scored) : 100;
+    return 100;
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

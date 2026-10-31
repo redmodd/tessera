@@ -844,8 +844,9 @@ describe('QuizEngine', () => {
     expect(b.correct).toBeNull();
   });
 
-  it('scores 100 when no question has a correct answer', () => {
-    const { engine, events } = makeEngine();
+  it('scores 100 when no question has a correct answer, warning when graded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine, events } = makeEngine({ graded: true });
     engine.registerQuestion({
       id: 'a',
       checkAnswer: () => null,
@@ -854,6 +855,22 @@ describe('QuizEngine', () => {
     engine.setAnswer(0, 'x');
     engine.submit();
     expect(completeScore(events)).toBe(100);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/graded, but no question has a `correct`/),
+    );
+  });
+
+  it('does not warn about an ungraded quiz with no correct answer', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: false });
+    engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('incorrect-only retry keeps a no-correct answer unlocked and resets a wrong one', () => {

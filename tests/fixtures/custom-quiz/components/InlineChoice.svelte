@@ -15,6 +15,7 @@
     reset: () => {
       selected = null;
     },
+    restore: ([choice]) => (selected = Number(choice)),
   });
 
   function pick(i) {

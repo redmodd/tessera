@@ -13,6 +13,7 @@ import {
   findStatement,
   findStatements,
   interactionField,
+  interactionWrites,
   scormData,
   scormLog,
   startPreview,
@@ -33,6 +34,16 @@ import {
 
 async function waitForCustomQuiz(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 15000 });
+}
+
+/** cmi.interactions.<n>.result values keyed by <n>: the survey has none. */
+async function interactionResults(page: Page): Promise<Record<string, string>> {
+  const writes = await interactionWrites(page);
+  return Object.fromEntries(
+    writes
+      .filter(([, key]) => key.endsWith('.result'))
+      .map(([, key, value]) => [key.split('.')[2], value]),
+  );
 }
 
 /**
@@ -121,10 +132,10 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
       'q_water',
       'q_survey',
     ]);
-    expect(await interactionField(page, 'result')).toEqual([
-      'correct',
-      'correct',
-    ]);
+    expect(await interactionResults(page)).toEqual({
+      '0': 'correct',
+      '1': 'correct',
+    });
   });
 
   test('a failing score holds lesson_status at incomplete until the course completes, then reports failed once per launch', async ({
@@ -230,10 +241,10 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
       'q-water',
       'q-survey',
     ]);
-    expect(await interactionField(page, 'result')).toEqual([
-      'correct',
-      'correct',
-    ]);
+    expect(await interactionResults(page)).toEqual({
+      '0': 'correct',
+      '1': 'correct',
+    });
   });
 });
 
