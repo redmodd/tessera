@@ -525,8 +525,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
-    // scorm-again 3.4.6 rejects it, though SCORM 2004 reads it as no choice correct.
-    it.skip('records an empty choice pattern', async () => {
+    it('records an empty choice pattern', async () => {
       await start();
       adapter.reportInteraction(
         'q1',
