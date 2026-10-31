@@ -16,8 +16,9 @@ export interface InteractionFormat {
    */
   supportsRange: boolean;
   /**
-   * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
-   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
+   * SCORM 2004 4E RTE §4.2.7 fill-in patterns take `{case_matters=}`,
+   * `{order_matters=}` and `{lang=}` delimiters, so a correct answer starting
+   * with one is left out; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
   encodesOptionIndex: boolean;
@@ -62,6 +63,11 @@ interface ItemRule {
    * `[,]`, `[.]` or `[:]` unless `range` lets it be a `min[:]max` range.
    */
   steps?: 'text' | 'range';
+  /**
+   * No item can start with `{lang=`: the LMS reads a valid tag as the item's
+   * language and rejects any other.
+   */
+  untagged?: boolean;
 }
 
 /**
@@ -94,10 +100,10 @@ const SCORM2004_RULES: ValueRules = {
     correct: { ...STEPS, steps: 'range', trimmed: true, unique: true },
   },
   'fill-in': {
-    response: { maxParts: 10 },
+    response: { maxParts: 10, untagged: true },
     correct: { maxParts: 10, trimmed: true, unique: true },
   },
-  'long-fill-in': { correct: { trimmed: true } },
+  'long-fill-in': { response: { untagged: true }, correct: { trimmed: true } },
   other: { correct: { trimmed: true } },
 };
 
@@ -356,26 +362,12 @@ export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
 }
 
 /**
- * Returns null when no correct pattern was provided. Throws when the format
- * cannot encode a value.
- */
-export function formatCorrectPattern(
-  i: Interaction,
-  fmt: InteractionFormat,
-): string[] | null {
-  const answers = correctItems(i, fmt);
-  if (!answers) return null;
-  const kept = answers.filter((items) => !readsAsDelimiter(i, items, fmt));
-  if (answers.length && !kept.length) return null;
-  const prefix = casePrefix(i, fmt);
-  return kept.map((items) => prefix + items.join(fmt.itemDelim));
-}
-
-/**
  * The LMS strips these from the start of each fill-in part, or rejects the
- * pattern when one can't go there. No escape keeps one as answer text.
+ * pattern when one can't go there. No escape keeps one as answer text. An
+ * unclosed `{case_matters=` or `{order_matters=` is plain text; an unclosed
+ * `{lang=` still counts, since a long-fill-in pattern rejects it.
  */
-const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=/;
+const DELIMITER_START = /^\{(?:lang=|(?:case_matters|order_matters)=[^}]*\})/;
 
 function readsAsDelimiter(
   i: Interaction,
@@ -443,6 +435,11 @@ function checkValue(
   if (items.length > maxItems) {
     throw new UnrecordableError(
       `it has ${items.length} items, more than the ${maxItems} this export standard records`,
+    );
+  }
+  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
+    throw new UnrecordableError(
+      `it starts with {lang=${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a language tag`,
     );
   }
   if (rule.trimmed && items.some((item) => item.trim() !== item)) {

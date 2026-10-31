@@ -98,10 +98,10 @@ Ids inside a response (list items, matching ids, `performance` step ids, the `li
 - Sent as written and graded by that text, so `3` and `'3'` match.
 - A correct step value written `min[:]max` (either end optional, as in `1[:]5` or `[:]10`) matches any decimal step value inside the range, ends included.
 - Write each range end as digits with an optional `-` and fraction (`0.5[:]1`, not `.5[:]1` or `1 [:] 5`). Any other text holding `[:]` matches only that exact text: Tessera warns in dev.
-- Put the smaller end first, here and in a `numeric` `correct`. A range with its minimum above its maximum matches no answer: Tessera warns in dev and leaves it out of the SCORM record.
+- Put the smaller end first, here and in a `numeric` `correct`. A range with its minimum above its maximum matches no answer: Tessera warns in dev and leaves it out of the LMS record.
 - SCORM 1.2 has no range syntax, so it leaves a correct answer holding a range out of the LMS record. The result is still recorded.
 
-SCORM 2004 records at most 36 list items (250 `performance` steps) and rejects a correct answer that repeats an item or starts or ends in whitespace. Tessera leaves any value SCORM 2004 rejects out of the LMS record, with a console warning naming the cause. SCORM 2004, cmi5 and xAPI read a `fill-in` or `long-fill-in` answer starting with `{lang=`, `{case_matters=` or `{order_matters=` as a delimiter, so Tessera leaves that answer out too. The result is still recorded.
+SCORM 2004 records at most 36 list items (250 `performance` steps) and rejects a correct answer that repeats an item or starts or ends in whitespace. Tessera leaves any value SCORM 2004 rejects out of the LMS record, with a console warning naming the cause. SCORM 2004, cmi5 and xAPI read a `fill-in` or `long-fill-in` answer starting with `{lang=`, `{case_matters=…}` or `{order_matters=…}` as a delimiter, so Tessera leaves that answer out too, with a console warning. SCORM 2004 also reads a response starting with `{lang=` as a language tag, so Tessera leaves that response out. The result is still recorded.
 
 ```ts
 response: () => ({
