@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import {
   formatResponse,
-  formatCorrectPattern,
   fitPatterns,
   buildScormInteractionFields,
   type InteractionFormat,
@@ -34,9 +33,7 @@ function recordedResponse(i: Interaction, format: InteractionFormat) {
 describe('encodesOptionIndex', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
     expect(formatResponse(choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
-    expect(formatCorrectPattern(choice, SCORM12_INTERACTION_FORMAT)).toEqual([
-      '1',
-    ]);
+    expect(fitPatterns(choice, SCORM12_INTERACTION_FORMAT).kept).toEqual(['1']);
   });
 
   it('keeps encoding indexes on a copy of the SCORM 1.2 format', () => {
@@ -62,9 +59,9 @@ describe('performance steps', () => {
     expect(formatResponse(performance, SCORM12_INTERACTION_FORMAT)).toBe(
       'Step_1.turn left,angle.-3.5',
     );
-    expect(
-      formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
-    ).toEqual(['Step_1.done!']);
+    expect(fitPatterns(performance, SCORM12_INTERACTION_FORMAT).kept).toEqual([
+      'Step_1.done!',
+    ]);
   });
 
   it('percent-encodes performance step names but keeps answers as written on SCORM 2004', () => {
@@ -108,15 +105,15 @@ describe('performance steps', () => {
         ['t', 'x'],
       ],
     };
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
-    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual([]);
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual([
       's[.]1[:]5[,]t[.]x',
     ]);
     expect(
-      formatCorrectPattern(
+      fitPatterns(
         { ...i, correct: [['s', 'a[:]b']] },
         SCORM12_INTERACTION_FORMAT,
-      ),
+      ).kept,
     ).toEqual(['s.a[:]b']);
   });
 
@@ -135,19 +132,17 @@ describe('performance steps', () => {
 });
 
 describe('numeric ranges', () => {
-  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
-    [{ min: 5 }, ['5[:]'], null],
-    [{ max: 5 }, ['[:]5'], null],
-    [{ min: 1, max: 5 }, ['1[:]5'], null],
+  it.each<[{ min?: number; max?: number }, string[], string[]]>([
+    [{ min: 5 }, ['5[:]'], []],
+    [{ max: 5 }, ['[:]5'], []],
+    [{ min: 1, max: 5 }, ['1[:]5'], []],
     [{ min: 5, max: 5 }, ['5'], ['5']],
   ])('records the correct range %j', (correct, scorm2004, scorm12) => {
     const i: Interaction = { type: 'numeric', response: 7, correct };
-    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT).kept).toEqual(
       scorm2004,
     );
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
-      scorm12,
-    );
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual(scorm12);
   });
 });
 
@@ -331,6 +326,75 @@ describe('fitPatterns', () => {
       expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
     },
   );
+
+  it.each([
+    ['{lang=en}Paris'],
+    ['{case_matters=true}Paris'],
+    ['{order_matters=false}a[,]b'],
+    ['a[,]{lang=en}b'],
+  ])('drops an answer %j the LMS reads as a delimiter', (answer) => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: [answer, 'Oslo'],
+    };
+    const warning = expect.stringContaining(
+      '1 correct answer(s) starting with {lang=}, {case_matters=} or {order_matters=}',
+    );
+    for (const fmt of [SCORM2004_INTERACTION_FORMAT, XAPI_INTERACTION_FORMAT]) {
+      expect(fitPatterns(i, fmt)).toEqual({
+        kept: ['Oslo'],
+        warnings: [warning],
+      });
+    }
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual([
+      answer,
+      'Oslo',
+    ]);
+  });
+
+  it.each([
+    ['fill-in', '{case_matters=true Paris', true],
+    ['fill-in', '{order_matters=true Paris', true],
+    ['fill-in', '{lang=en Paris', false],
+    ['long-fill-in', '{case_matters=true Paris', true],
+    ['long-fill-in', '{lang=en Paris', false],
+  ] as const)(
+    'keeps a %s answer %j only when it is plain text',
+    (type, answer, kept) => {
+      const i: Interaction = { type, response: '', correct: [answer] };
+      for (const fmt of [
+        SCORM2004_INTERACTION_FORMAT,
+        XAPI_INTERACTION_FORMAT,
+      ]) {
+        expect(fitPatterns(i, fmt).kept).toEqual(kept ? [answer] : []);
+      }
+    },
+  );
+
+  it.each<[Interaction]>([
+    [{ type: 'fill-in', response: '{lang=en}Paris' }],
+    [{ type: 'fill-in', response: 'a[,]{lang=}x' }],
+    [{ type: 'long-fill-in', response: '{lang=en Paris' }],
+  ])('leaves out a SCORM 2004 response read as a language tag: %j', (i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('reads as a language tag'),
+    );
+    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe(i.response);
+    warn.mockRestore();
+  });
+
+  it('keeps a SCORM 2004 response starting with {case_matters=}', () => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '{case_matters=true}Paris',
+    };
+    expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      '{case_matters=true}Paris',
+    );
+  });
 
   it.each<[Interaction]>([
     [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],

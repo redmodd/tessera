@@ -1047,6 +1047,51 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
+    it('drops a fill-in answer read as a delimiter, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: 'Oslo',
+          correct: ['{lang=en}Paris', 'Oslo'],
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual(['Oslo']);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'which this export standard reads as a delimiter',
+        ),
+      );
+      warn.mockRestore();
+    });
+
+    it('omits correctResponsesPattern when every answer reads as a delimiter', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'long-fill-in', response: 'a', correct: ['{lang=en}Paris'] },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toBeUndefined();
+      warn.mockRestore();
+    });
+
+    it('omits a reversed correct range, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('minimum above its maximum'),
+      );
+      warn.mockRestore();
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',

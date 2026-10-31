@@ -2219,6 +2219,37 @@ let a = {}; let b = {};</script>
     ).toEqual([]);
   });
 
+  it.each([
+    ['web', false],
+    ['scorm12', false],
+    ['scorm2004', true],
+    ['xapi', true],
+    ['cmi5', true],
+  ])(
+    'warns about a fill-in answer starting with a delimiter under %s',
+    (standard, warns) => {
+      createValidProject(testRoot);
+      writeStandardConfig(standard);
+      writePage(
+        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank id="q1" question="Q" answers={["{case_matters=true}Paris", "Rome"]} />`,
+      );
+      expect(
+        validateProject(testRoot).warnings.filter((w) =>
+          w.includes('<FillInTheBlank> "q1" has'),
+        ),
+      ).toEqual(
+        warns
+          ? [
+              expect.stringMatching(
+                /"q1" has 1 correct answer\(s\) starting with \{lang=\}.* reads as a delimiter; they are graded but left out/,
+              ),
+            ]
+          : [],
+      );
+    },
+  );
+
   it('does not count the case-sensitive prefix toward the fill-in cap', () => {
     createValidProject(testRoot);
     writeStandardConfig('scorm2004');
