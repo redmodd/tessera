@@ -504,6 +504,31 @@ describe('standalone feedback', () => {
       .toBe(mounted.target.querySelector('fieldset input'));
   });
 
+  it.each(['Submit', 'Try again'])(
+    'keeps focus the learner moves before %s focuses',
+    async (pressed) => {
+      const mounted = mountWidget(CustomChoice, {
+        prompt: '2 + 2?',
+        options: ['3', '4'],
+        correct: 1,
+      });
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      submitOption(mounted, 0);
+      if (pressed === 'Try again') {
+        await expect.poll(focusedText).toContain('Try again');
+        mounted.click(mounted.button('Try again'));
+      }
+      elsewhere.focus();
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+      );
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    },
+  );
+
   it('does not warn when the question unmounts before Try again moves focus', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const mounted = mountWidget(CustomChoice, {
