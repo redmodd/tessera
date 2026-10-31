@@ -11,6 +11,7 @@
 
 <script>
   import { MultipleChoice, FillInTheBlank } from 'tessera-learn';
+  import InlineChoice from '../../../components/InlineChoice.svelte';
 </script>
 
 <MultipleChoice
@@ -24,4 +25,11 @@
   id="q-water"
   question="What is the chemical symbol for water?"
   answers={['H2O', 'h2o']}
+/>
+
+<!-- No `correct`: left out of the score and reported with no result. -->
+<InlineChoice
+  id="q-survey"
+  prompt="How confident do you feel about the solar system?"
+  options={['Not yet', 'Somewhat', 'Very']}
 />

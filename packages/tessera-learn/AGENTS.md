@@ -404,7 +404,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 ### Per-question weighting
 
-Pass `weight` (default 1; non-positive or non-finite counts as 1) to change how much a question pulls on the page score, inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places. In a quiz each `score` is 0 or 100, and a question with no `correct` is left out (a quiz of only those scores 100: set `quiz: { graded: false }` to keep it out of the course score); standalone it is what `score()` returns, clamped to 0–100. Weights change the page score only: each question is still reported to the LMS as one interaction, pass/fail or, with no `correct`, no result.
+Pass `weight` (default 1; non-positive or non-finite counts as 1) to change how much a question pulls on the page score, inside `<Quiz>` and standalone alike. Page score = `Σ(weight × score) / Σ(weight)`, rounded to 2 decimal places. In a quiz each `score` is 0 or 100, and a question with no `correct` is left out (a quiz of only those scores 100, so leave its `graded` off); standalone it is what `score()` returns, clamped to 0–100. Weights change the page score only: each question is still reported to the LMS as one interaction, pass/fail or, with no `correct`, no result.
 
 Per-page weighting, optional pages, pass/fail and manual completion are in [`node_modules/tessera-learn/docs/scoring.md`](docs/scoring.md).
 

@@ -318,21 +318,19 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    const newLocked = new Set<number>();
     const kept = new Set<number>();
+    this.#lockedCorrect.clear();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
       this.#internalQuestions.forEach((q, i) => {
         // A question restored without its answer can read as correct, and
         // locked it could never be answered.
         if (!this.#answers.has(i)) return;
         const correct = q.checkAnswer();
-        if (correct) newLocked.add(i);
+        if (correct) this.#lockedCorrect.add(i);
         // An answer with no `correct` can't be wrong: it stays, still editable.
         if (correct !== false) kept.add(i);
       });
     }
-    this.#lockedCorrect.clear();
-    for (const i of newLocked) this.#lockedCorrect.add(i);
     for (const i of [...this.#answers.keys()]) {
       if (!kept.has(i)) this.#answers.delete(i);
     }

@@ -17,6 +17,10 @@ async function navigateToExam(page: Page) {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 10000 });
 }
 
+async function answerSurvey(page: Page) {
+  await page.locator('[data-question-id="q-survey"] input').nth(1).check();
+}
+
 async function navigateToInlineExam(page: Page) {
   await page.locator('.tessera-nav-page', { hasText: 'Inline Exam' }).click();
   await page.waitForSelector('[data-testid="inline-heading"]', {
@@ -46,7 +50,8 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
   }) => {
     await navigateToExam(page);
     // The custom shell stacks every registered question — count the rendered
-    // list items to prove both built-in widgets registered.
+    // list items to prove both built-in widgets registered. The survey
+    // question renders inline, outside the list.
     await expect(
       page.locator('[data-testid="custom-quiz"] .custom-quiz-item'),
     ).toHaveCount(2);
@@ -70,6 +75,10 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page
       .locator('[data-question-id="q-water"] input[type="text"]')
       .fill('H2O');
+    await expect(submit).toBeDisabled();
+
+    // Answer Q3 (survey, no correct answer)
+    await answerSurvey(page);
     await expect(submit).toBeEnabled();
   });
 
@@ -94,6 +103,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page
       .locator('[data-question-id="q-water"] input[type="text"]')
       .fill('H2O');
+    await answerSurvey(page);
     await page.locator('[data-testid="custom-quiz-submit"]').click();
 
     await expect(
@@ -119,6 +129,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page
       .locator('[data-question-id="q-water"] input[type="text"]')
       .fill('H2O');
+    await answerSurvey(page);
     await page.locator('[data-testid="custom-quiz-submit"]').click();
     await expect(
       page.locator('[data-testid="custom-quiz-status"]'),
@@ -143,6 +154,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page
       .locator('[data-question-id="q-water"] input[type="text"]')
       .fill('H2O');
+    await answerSurvey(page);
     await page.locator('[data-testid="custom-quiz-submit"]').click();
     await expect(
       page.locator('[data-testid="custom-quiz-status"]'),
@@ -165,6 +177,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
     await page
       .locator('[data-question-id="q-water"] input[type="text"]')
       .fill('H2O');
+    await answerSurvey(page);
     await page.locator('[data-testid="custom-quiz-submit"]').click();
     await page.locator('[data-testid="custom-quiz-review"]').click();
 
