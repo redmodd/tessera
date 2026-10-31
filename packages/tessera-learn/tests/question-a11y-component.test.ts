@@ -558,10 +558,10 @@ describe('custom widget in a quiz', () => {
     click(active.querySelector('input')!);
     click(button('Submit'));
 
-    await expect
-      .poll(() => document.activeElement?.textContent ?? '')
-      .toContain('The right answer was 4.');
-    expect(active.contains(document.activeElement)).toBe(true);
+    await expect.poll(() => active.contains(document.activeElement)).toBe(true);
     expect(document.activeElement!.getAttribute('role')).toBe('group');
+    expect(document.activeElement!.textContent).toContain(
+      'The right answer was 4.',
+    );
   });
 });

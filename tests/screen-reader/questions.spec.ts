@@ -10,6 +10,17 @@ import { expect, type Locator, type Page } from '@playwright/test';
 const webkitTextFieldCapture =
   'WebKit capture drops VoiceOver speech around a text field';
 
+// VoiceOver speaks a hint well after a focus move, and capture only sees its
+// latest phrase, so a late hint can replace what the next check listens for.
+if (process.platform === 'darwin') {
+  test.use({
+    screenReaderStartOptions: {
+      capture: 'initial',
+      settings: { SCRShouldOutputVOInstructions: false },
+    },
+  });
+}
+
 async function hears(
   screenReader: ScreenReaderPlaywright,
   action: () => Promise<unknown>,

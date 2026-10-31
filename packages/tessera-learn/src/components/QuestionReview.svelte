@@ -1,5 +1,5 @@
 <script>
-  import { tick, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import ResultIcon from './ResultIcon.svelte';
 
   /**
@@ -48,10 +48,15 @@
   // Feedback showing at mount is a restored answer, not a fresh submit.
   let restored = untrack(() => q.feedbackVisible);
 
+  // NVDA in Firefox misreads or drops a focus move made in the same frame as
+  // the page change, so wait for Firefox's accessibility tree to catch up.
+  const afterNextFrame = () =>
+    new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
+
   // Review never takes focus: a custom quiz shell may keep every question mounted.
   function focusOnSubmit(el) {
     const review = untrack(() => inQuiz && q.submitted);
-    if (!restored && !review) el.focus();
+    if (!restored && !review) afterNextFrame().then(() => el.focus());
     restored = false;
   }
 
@@ -60,7 +65,8 @@
       '.tessera-question-review',
     ).parentElement;
     q.retry();
-    await tick();
+    await afterNextFrame();
+    if (!container.isConnected) return;
     // A hidden, disabled, or inert control ignores focus(); fall through to the next.
     const focused = [...container.querySelectorAll(CONTROL)].some((el) => {
       el.focus();
