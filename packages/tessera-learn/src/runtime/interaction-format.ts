@@ -547,19 +547,16 @@ export function fitPatterns(
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  // Counts a `{case_matters=true}` prefix too, as scorm-again does.
-  const fit = patterns.filter((p) => p.length <= max);
+  const prefix =
+    fmt.supportsCasePrefix &&
+    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
+    i.caseMatters
+      ? CASE_PREFIX.length
+      : 0;
+  const fit = patterns.filter((p) => p.length - prefix <= max);
   if (fit.length < patterns.length) {
-    const prefix = patterns.some(
-      (p) =>
-        p.length > max &&
-        p.startsWith(CASE_PREFIX) &&
-        p.length - CASE_PREFIX.length <= max,
-    )
-      ? `, counting the ${CASE_PREFIX} prefix of a case-sensitive answer`
-      : '';
     warnings.push(
-      `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records${prefix}; they are ${lost}`,
+      `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records; they are ${lost}`,
     );
   }
   if (fit.length > limit) {

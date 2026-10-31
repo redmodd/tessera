@@ -136,7 +136,6 @@ const QUESTION_COMPONENTS: Record<
           type: 'fill-in',
           response: '',
           correct: fillInAnswers(answers),
-          caseMatters: propMayBeTruthy(match, 'caseSensitive'),
         },
         standard.interactionFormat,
         standard.name,

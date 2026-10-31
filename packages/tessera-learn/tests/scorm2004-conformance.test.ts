@@ -160,15 +160,14 @@ describe('SCORM2004Adapter against scorm-again', () => {
         await start();
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const long = 'a'.repeat(max + 1);
-        const fits = 'b'.repeat(max - '{case_matters=true}'.length);
         const interaction: Interaction =
           type === 'other'
             ? { type, response: long, correct: long }
             : {
                 type,
                 response: long,
-                correct: [long, fits + 'b', fits],
-                caseMatters: type === 'fill-in',
+                correct: [long, 'b'.repeat(max)],
+                caseMatters: true,
               };
         adapter.reportInteraction('q1', interaction, true);
         await flush();

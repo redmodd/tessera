@@ -264,20 +264,22 @@ describe('SCORM 2004 ids inside a response', () => {
 
 describe('fitPatterns', () => {
   it.each([
-    [232, true],
-    [251, false],
-  ])(
-    'credits the case prefix only when it pushes a %i-character answer over the cap',
-    (length, credited) => {
-      const i: Interaction = {
-        type: 'fill-in',
-        response: '',
-        correct: ['x'.repeat(length)],
-        caseMatters: true,
-      };
-      const { warnings } = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0].includes('counting the')).toBe(credited);
+    ['fill-in', 250],
+    ['long-fill-in', 4000],
+  ] as const)(
+    'keeps a case-sensitive %s answer of %i characters, not counting the prefix',
+    (type, length) => {
+      const { kept, warnings } = fitPatterns(
+        {
+          type,
+          response: '',
+          correct: ['x'.repeat(length)],
+          caseMatters: true,
+        },
+        SCORM2004_INTERACTION_FORMAT,
+      );
+      expect(kept).toEqual(['{case_matters=true}' + 'x'.repeat(length)]);
+      expect(warnings).toEqual([]);
     },
   );
 
