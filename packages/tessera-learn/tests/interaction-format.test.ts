@@ -332,6 +332,42 @@ describe('fitPatterns', () => {
     },
   );
 
+  it.each([
+    ['{lang=en}Paris'],
+    ['{case_matters=true}Paris'],
+    ['{order_matters=false}a[,]b'],
+    ['a[,]{lang=en}b'],
+  ])('drops an answer %j the LMS reads as a delimiter', (answer) => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: [answer, 'Oslo'],
+    };
+    const warning = expect.stringContaining(
+      '1 correct answer(s) starting with {lang=}, {case_matters=} or {order_matters=}',
+    );
+    for (const fmt of [SCORM2004_INTERACTION_FORMAT, XAPI_INTERACTION_FORMAT]) {
+      expect(fitPatterns(i, fmt)).toEqual({
+        kept: ['Oslo'],
+        warnings: [warning],
+      });
+      expect(formatCorrectPattern(i, fmt)).toEqual(['Oslo']);
+    }
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual([
+      answer,
+      'Oslo',
+    ]);
+  });
+
+  it('leaves out the xAPI pattern when every answer reads as a delimiter', () => {
+    const i: Interaction = {
+      type: 'long-fill-in',
+      response: '',
+      correct: ['{lang=en}Paris'],
+    };
+    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toBeNull();
+  });
+
   it.each<[Interaction]>([
     [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],
     [{ type: 'performance', response: [], correct: [['s', '5[:]1']] }],

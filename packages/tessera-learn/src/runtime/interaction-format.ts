@@ -363,10 +363,29 @@ export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat,
 ): string[] | null {
+  const answers = correctItems(i, fmt);
+  if (!answers) return null;
+  const kept = answers.filter((items) => !readsAsDelimiter(i, items, fmt));
+  if (answers.length && !kept.length) return null;
   const prefix = casePrefix(i, fmt);
+  return kept.map((items) => prefix + items.join(fmt.itemDelim));
+}
+
+/**
+ * The LMS strips these from the start of each fill-in part, or rejects the
+ * pattern when one can't go there. No escape keeps one as answer text.
+ */
+const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=/;
+
+function readsAsDelimiter(
+  i: Interaction,
+  items: string[],
+  fmt: InteractionFormat,
+): boolean {
   return (
-    correctItems(i, fmt)?.map((items) => prefix + items.join(fmt.itemDelim)) ??
-    null
+    fmt.supportsCasePrefix &&
+    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
+    items.some((item) => DELIMITER_START.test(item))
   );
 }
 
@@ -392,7 +411,7 @@ function checkSteps(
   }
 }
 
-const DROPS = ['trimmed', 'unique', 'maxParts'] as const;
+const DROPS = ['delimiter', 'trimmed', 'unique', 'maxParts'] as const;
 type DroppedBy = (typeof DROPS)[number];
 
 /**
@@ -407,6 +426,9 @@ function checkValue(
   items: string[],
   fmt: InteractionFormat,
 ): DroppedBy | undefined {
+  if (field === 'correct' && readsAsDelimiter(i, items, fmt)) {
+    return 'delimiter';
+  }
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
   if (rule.steps && i.type === 'performance') {
@@ -533,6 +555,8 @@ export function fitPatterns(
   const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
+      case 'delimiter':
+        return `starting with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or with one after [,]' : ''}`;
       case 'trimmed':
         return isList(i)
           ? 'with an item starting or ending in whitespace'
@@ -550,7 +574,7 @@ export function fitPatterns(
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} rejects; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'delimiter' ? 'reads as a delimiter' : 'rejects'}; they are ${lost}`,
       );
     }
   }

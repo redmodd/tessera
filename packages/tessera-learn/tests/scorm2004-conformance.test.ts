@@ -421,6 +421,47 @@ describe('SCORM2004Adapter against scorm-again', () => {
         'repeating a [,]-separated part',
       ],
       [
+        'a fill-in answer starting with {case_matters=}',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['{case_matters=true}Paris'],
+        },
+        'Paris',
+        '',
+        'which this export standard reads as a delimiter',
+      ],
+      [
+        'a case-sensitive fill-in answer starting with {case_matters=}',
+        {
+          type: 'fill-in',
+          response: 'Paris',
+          correct: ['{case_matters=true}Paris'],
+          caseMatters: true,
+        },
+        'Paris',
+        '',
+        'which this export standard reads as a delimiter',
+      ],
+      [
+        'a fill-in answer with a part starting with {lang=}',
+        { type: 'fill-in', response: 'a', correct: ['a[,]{lang=en}b'] },
+        'a',
+        '',
+        'which this export standard reads as a delimiter',
+      ],
+      [
+        'a long-fill-in answer starting with {lang=}',
+        {
+          type: 'long-fill-in',
+          response: 'a',
+          correct: ['{lang=en}' + 'x'.repeat(250)],
+        },
+        'a',
+        '',
+        'which this export standard reads as a delimiter',
+      ],
+      [
         'a step with neither name nor answer',
         { type: 'performance', response: [['', '']], correct: [['', '']] },
         '',
