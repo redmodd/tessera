@@ -1,5 +1,11 @@
 # tessera-learn
 
+## 0.12.2
+
+### Patch Changes
+
+- 982d4f0: NVDA in Firefox reliably reads a question's result after Submit, and the first control after Try again: focus now moves once the browser has updated what it tells the screen reader.
+
 ## 0.12.1
 
 ### Patch Changes
