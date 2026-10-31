@@ -320,8 +320,7 @@ function correctItems(
       return [[fmt.formatBoolean(i.correct as boolean)]];
     case 'fill-in':
     case 'long-fill-in': {
-      const prefix = fmt.supportsCasePrefix && i.caseMatters ? CASE_PREFIX : '';
-      const answers = (i.correct as string[]).map((a) => prefix + a);
+      const answers = i.correct as string[];
       return i.type === 'fill-in'
         ? answers.map((a) => a.split(fmt.itemDelim))
         : answers.map((a) => [a]);
@@ -339,6 +338,18 @@ function correctItems(
   }
 }
 
+/**
+ * A delimiter, not part of the answer: the format's rules and length cap
+ * apply to the answer alone.
+ */
+function casePrefix(i: Interaction, fmt: InteractionFormat): string {
+  return fmt.supportsCasePrefix &&
+    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
+    i.caseMatters
+    ? CASE_PREFIX
+    : '';
+}
+
 /** Throws when the format cannot encode a value. */
 export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
   return responseItems(i, fmt).join(fmt.itemDelim);
@@ -352,8 +363,10 @@ export function formatCorrectPattern(
   i: Interaction,
   fmt: InteractionFormat,
 ): string[] | null {
+  const prefix = casePrefix(i, fmt);
   return (
-    correctItems(i, fmt)?.map((items) => items.join(fmt.itemDelim)) ?? null
+    correctItems(i, fmt)?.map((items) => prefix + items.join(fmt.itemDelim)) ??
+    null
   );
 }
 
@@ -547,13 +560,7 @@ export function fitPatterns(
   const max = fmt.maxValueLength(i.type);
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  const prefix =
-    fmt.supportsCasePrefix &&
-    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
-    i.caseMatters
-      ? CASE_PREFIX.length
-      : 0;
-  const fit = patterns.filter((p) => p.length - prefix <= max);
+  const fit = patterns.filter((p) => p.length <= max);
   if (fit.length < patterns.length) {
     warnings.push(
       `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records; they are ${lost}`,
@@ -566,7 +573,8 @@ export function fitPatterns(
       `has ${fit.length} correct answers${counted} but ${recorder} records at most ${limit}; the rest are ${lost}`,
     );
   }
-  return { kept: fit.slice(0, limit), warnings };
+  const prefix = casePrefix(i, fmt);
+  return { kept: fit.slice(0, limit).map((p) => prefix + p), warnings };
 }
 
 function hasLongStep(

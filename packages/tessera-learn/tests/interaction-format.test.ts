@@ -283,6 +283,21 @@ describe('fitPatterns', () => {
     },
   );
 
+  it.each([
+    [' Paris', 'starting or ending in whitespace'],
+    ['a[,]a', 'repeating a [,]-separated part'],
+  ])(
+    'checks a case-sensitive answer %j without its prefix',
+    (answer, reason) => {
+      const { kept, warnings } = fitPatterns(
+        { type: 'fill-in', response: '', correct: [answer], caseMatters: true },
+        SCORM2004_INTERACTION_FORMAT,
+      );
+      expect(kept).toEqual([]);
+      expect(warnings).toEqual([expect.stringContaining(reason)]);
+    },
+  );
+
   it.each<[string, Interaction, string[], string]>([
     [
       'fill-in',
