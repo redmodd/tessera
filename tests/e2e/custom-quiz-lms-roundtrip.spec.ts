@@ -13,6 +13,7 @@ import {
   findStatement,
   findStatements,
   interactionField,
+  interactionWrites,
   scormData,
   scormLog,
   startPreview,
@@ -35,10 +36,21 @@ async function waitForCustomQuiz(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="custom-quiz"]', { timeout: 15000 });
 }
 
+/** cmi.interactions.<n>.result values keyed by <n>: the survey has none. */
+async function interactionResults(page: Page): Promise<Record<string, string>> {
+  const writes = await interactionWrites(page);
+  return Object.fromEntries(
+    writes
+      .filter(([, key]) => key.endsWith('.result'))
+      .map(([, key, value]) => [key.split('.')[2], value]),
+  );
+}
+
 /**
  * The custom-quiz fixture stacks every question on a single page with one
  * Submit button — no per-question Next/Continue cycling like the built-in.
- * Answer both, click Submit, wait for the bridge to fire.
+ * Answer all three, click Submit, wait for the bridge to fire. The survey
+ * question has no `correct`: it stays out of the score and reports no result.
  */
 async function answerCustomQuiz(
   page: Page,
@@ -53,6 +65,7 @@ async function answerCustomQuiz(
   await page
     .locator('[data-question-id="q-water"] input[type="text"]')
     .fill('H2O');
+  await page.locator('[data-question-id="q-survey"] input').nth(1).check();
   await page.locator('[data-testid="custom-quiz-submit"]').click();
   await expect(
     page.locator('[data-testid="custom-quiz-status"]'),
@@ -109,8 +122,20 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 1.2', () => {
         'cmi.core.lesson_status': 'incomplete',
       });
 
-    expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
-    expect(await interactionField(page, 'id')).toEqual(['q_planet', 'q_water']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'choice',
+    ]);
+    expect(await interactionField(page, 'id')).toEqual([
+      'q_planet',
+      'q_water',
+      'q_survey',
+    ]);
+    expect(await interactionResults(page)).toEqual({
+      '0': 'correct',
+      '1': 'correct',
+    });
   });
 
   test('a failing score holds lesson_status at incomplete until the course completes, then reports failed once per launch', async ({
@@ -206,8 +231,20 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
         'cmi.success_status': 'unknown',
       });
 
-    expect(await interactionField(page, 'type')).toEqual(['choice', 'fill-in']);
-    expect(await interactionField(page, 'id')).toEqual(['q-planet', 'q-water']);
+    expect(await interactionField(page, 'type')).toEqual([
+      'choice',
+      'fill-in',
+      'choice',
+    ]);
+    expect(await interactionField(page, 'id')).toEqual([
+      'q-planet',
+      'q-water',
+      'q-survey',
+    ]);
+    expect(await interactionResults(page)).toEqual({
+      '0': 'correct',
+      '1': 'correct',
+    });
   });
 });
 
@@ -251,10 +288,16 @@ test.describe.serial('Custom-quiz LMS roundtrip — CMI5', () => {
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = findStatements(statements, 'answered');
-    expect(answered).toHaveLength(2);
+    expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
       'fill-in',
+      'choice',
+    ]);
+    expect(answered.map((s) => s.result?.success)).toEqual([
+      true,
+      true,
+      undefined,
     ]);
   });
 });
@@ -321,10 +364,16 @@ test.describe.serial('Custom-quiz LMS roundtrip — xAPI', () => {
     expect(findStatement(statements, 'passed')).toBeUndefined();
 
     const answered = findStatements(statements, 'answered');
-    expect(answered).toHaveLength(2);
+    expect(answered).toHaveLength(3);
     expect(answered.map((s) => s.object?.definition?.interactionType)).toEqual([
       'choice',
       'fill-in',
+      'choice',
+    ]);
+    expect(answered.map((s) => s.result?.success)).toEqual([
+      true,
+      true,
+      undefined,
     ]);
   });
 });

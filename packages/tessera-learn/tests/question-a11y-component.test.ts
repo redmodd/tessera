@@ -564,4 +564,44 @@ describe('custom widget in a quiz', () => {
     expect(active.contains(document.activeElement)).toBe(true);
     expect(document.activeElement!.getAttribute('role')).toBe('group');
   });
+
+  function submitBoth(correct: (number | undefined)[]) {
+    const { target, button, click } = mountWidget(
+      CustomChoiceQuiz,
+      { correct },
+      {},
+    );
+    flushSync();
+    const pickFirst = () =>
+      click(
+        target.querySelector(
+          '.tessera-quiz-question-wrapper.active input',
+        ) as HTMLElement,
+      );
+    pickFirst();
+    click(button('Next'));
+    pickFirst();
+    click(button('Submit'));
+    const text = (selector: string) =>
+      [...target.querySelectorAll(selector)].map((el) =>
+        (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+    return { text };
+  }
+
+  it('counts only questions with a correct answer in the results', () => {
+    const { text } = submitBoth([1, undefined]);
+    expect(text('.tessera-quiz-score-value')).toEqual(['0%']);
+    expect(text('.tessera-quiz-results-detail')).toEqual([
+      'You answered 0 of 1 questions correctly.',
+    ]);
+  });
+
+  it('shows no score when no question has a correct answer', () => {
+    const { text } = submitBoth([undefined, undefined]);
+    expect(text('.tessera-quiz-score')).toEqual([]);
+    expect(text('.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+    ]);
+  });
 });

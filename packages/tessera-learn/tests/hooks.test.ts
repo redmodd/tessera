@@ -486,7 +486,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     });
   });
 
-  it('checkAnswer() returns the boolean from isCorrect(response())', () => {
+  it('checkAnswer() returns isCorrect(response()), false while unanswered', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
 
@@ -501,6 +501,8 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(arg.checkAnswer()).toBe(true);
     current = { type: 'true-false', response: false, correct: true };
     expect(arg.checkAnswer()).toBe(false);
+    current = { type: 'true-false', response: true };
+    expect(arg.checkAnswer()).toBeNull();
     current = undefined;
     expect(arg.checkAnswer()).toBe(false);
   });

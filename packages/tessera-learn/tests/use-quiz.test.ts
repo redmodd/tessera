@@ -822,6 +822,87 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(75);
   });
 
+  it('leaves a question with no correct answer out of the score and the result', () => {
+    const { engine, events, reports } = makeEngine();
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const b = engine.registerQuestion({
+      id: 'b',
+      weight: 3,
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'anything' }),
+    });
+    engine.setAnswer(0, true);
+    engine.setAnswer(1, 'anything');
+    engine.submit();
+
+    expect(completeScore(events)).toBe(100);
+    expect(reports.map((r) => [r.id, r.correct])).toEqual([
+      ['a', true],
+      ['b', null],
+    ]);
+    expect(a.correct).toBe(true);
+    expect(b.correct).toBeNull();
+  });
+
+  it('scores 100 when no question has a correct answer, warning when graded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine, events } = makeEngine({ graded: true });
+    engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(completeScore(events)).toBe(100);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/graded, but no question has a `correct`/),
+    );
+  });
+
+  it('does not warn about an ungraded quiz with no correct answer', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: false });
+    engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('incorrect-only retry keeps a no-correct answer unlocked and resets a wrong one', () => {
+    const { engine } = makeEngine({
+      graded: true,
+      retryMode: 'incorrect-only',
+    });
+    const keptReset = vi.fn();
+    const wrongReset = vi.fn();
+    const kept = engine.registerQuestion({
+      id: 'a',
+      checkAnswer: () => null,
+      reset: keptReset,
+      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
+    });
+    engine.registerQuestion({
+      ...tfQuestion('b', false, true),
+      reset: wrongReset,
+    });
+    engine.setAnswer(0, 'x');
+    engine.setAnswer(1, false);
+    engine.submit();
+
+    engine.retry();
+    expect(engine.getAnswer(0)).toBe('x');
+    expect(kept.locked).toBe(false);
+    expect(kept.isLockedCorrect).toBe(false);
+    expect(keptReset).not.toHaveBeenCalled();
+    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(wrongReset).toHaveBeenCalledTimes(1);
+  });
+
   it('weight=1 (default) scores the unweighted mean to 2 decimal places', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct

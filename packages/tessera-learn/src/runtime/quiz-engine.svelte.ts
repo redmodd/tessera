@@ -45,7 +45,7 @@ export interface QuizEngineDeps {
 interface InternalQuestion {
   id: string;
   weight: number;
-  checkAnswer: () => boolean;
+  checkAnswer: () => boolean | null;
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
@@ -318,23 +318,25 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    const newLocked = new Set<number>();
+    const kept = new Set<number>();
+    this.#lockedCorrect.clear();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
       this.#internalQuestions.forEach((q, i) => {
         // A question restored without its answer can read as correct, and
         // locked it could never be answered.
-        if (this.#answers.has(i) && q.checkAnswer()) newLocked.add(i);
+        if (!this.#answers.has(i)) return;
+        const correct = q.checkAnswer();
+        if (correct) this.#lockedCorrect.add(i);
+        // An answer with no `correct` can't be wrong: it stays, still editable.
+        if (correct !== false) kept.add(i);
       });
     }
-    this.#lockedCorrect.clear();
-    for (const i of newLocked) this.#lockedCorrect.add(i);
     for (const i of [...this.#answers.keys()]) {
-      if (!newLocked.has(i)) this.#answers.delete(i);
+      if (!kept.has(i)) this.#answers.delete(i);
     }
     this.#reportedAnswers.clear();
     for (let i = 0; i < this.#internalQuestions.length; i++) {
-      if (!newLocked.has(i) && this.#internalQuestions[i].reset)
-        this.#internalQuestions[i].reset!();
+      if (!kept.has(i)) this.#internalQuestions[i].reset?.();
     }
     this.#feedbackShown.clear();
     this.#submitted = false;
@@ -355,12 +357,22 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   #computeScore(): number {
-    return weightedScore(
-      this.#internalQuestions.map((q) => ({
-        score: q.checkAnswer() ? 100 : 0,
-        weight: q.weight,
-      })),
-    );
+    const scored = this.#internalQuestions.flatMap((q) => {
+      const correct = q.checkAnswer();
+      return correct === null
+        ? []
+        : [{ score: correct ? 100 : 0, weight: q.weight }];
+    });
+    if (scored.length) return weightedScore(scored);
+    if (import.meta.env?.DEV && this.#deps.quizConfig.graded) {
+      console.warn(
+        '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
+          'so every learner scores 100 toward the course score. ' +
+          'Leave `graded` off for a survey or reflection quiz.',
+      );
+    }
+    // A quiz of only survey or reflection questions has nothing to fail.
+    return 100;
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {
